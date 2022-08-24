@@ -86,9 +86,6 @@ set -xeuo pipefail
 # about the Packet provisioner, remove the file if it's present.
 test -f /usr/config && rm -f /usr/config || true
 
-# TODO: remove this once rocky is marked as supported in dev-scripts
-sed -i -e 's/rocky/centos/g; s/Rocky/CentOS/g' /etc/os-release
-
 yum install -y git sysstat sos make
 systemctl start sysstat
 
