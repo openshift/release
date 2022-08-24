@@ -34,6 +34,7 @@ else
     curl https://github.com/coreos/etcd/releases/download/${latest}/etcd-${latest}-linux-amd64.tar.gz -L | gsutil cp - gs://crio-ci/etcd-${latest}.tar.gz
 fi 
 
+
 #####################################
 #####################################
 
@@ -58,6 +59,6 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     tar -xzvf cri-o.tar.gz -C "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
-    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow" -e '{ runc_enable: False, crun_enable: True }' --connection=local -vvv --tags setup,e2e
+    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv --tags setup,e2e
 EOF
 
