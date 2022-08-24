@@ -36,7 +36,7 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/sd-cicd-aws-prod
     name: sd-cicd-aws-prod
-- as: osde2e-aro-e2e-latest-y
+- as: aro-e2e-default
   cron: 0 0 3 * *
   steps:
     post:
@@ -104,75 +104,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: osde2e-aro-e2e-latest-z
-  cron: 0 0 6 * *
-  steps:
-    post:
-    - as: cluster-destroy
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/destroy-aro-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    pre:
-    - as: cluster-create
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/create-aro-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    test:
-    - as: conformance-tests-pre-upgrade
-      commands: |
-        source ./ci/aro-e2e-tests.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: upgrade-latest-z
-      commands: |
-        ./ci/upgrade-aro-cluster.sh z
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: conformance-tests-post-upgrade
-      commands: |
-        source ./ci/aro-e2e-tests.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: osde2e-aro-e2e-ovn-latest-y
+- as: aro-e2e-ovn-default
   cron: 0 0 9 * *
   steps:
     post:
@@ -240,75 +172,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: osde2e-aro-e2e-ovn-latest-z
-  cron: 0 0 12 * *
-  steps:
-    post:
-    - as: cluster-destroy
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/destroy-aro-cluster.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    pre:
-    - as: cluster-create
-      commands: |
-        cd /tmp/
-        git clone https://github.com/openshift/osde2e.git
-        cd
-        source /tmp/osde2e/ci/create-aro-cluster-ovn.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: azure
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    test:
-    - as: conformance-tests-pre-upgrade
-      commands: |
-        source ./ci/aro-e2e-tests.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: upgrade-latest-z
-      commands: |
-        ./ci/upgrade-aro-cluster.sh z
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: conformance-tests-post-upgrade
-      commands: |
-        source ./ci/aro-e2e-tests.sh
-      credentials:
-      - mount_path: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: osde2e-aro-nightly-cleanup
+- as: aro-nightly-cleanup
   cron: '@midnight'
   steps:
     test:
@@ -327,7 +191,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: osde2e-aws-stage-e2e-upgrade-to-latest
+- as: aws-stage-e2e-upgrade-to-latest
   commands: |
     export CONFIGS="aws,stage,e2e-suite,upgrade-to-latest"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
@@ -342,7 +206,7 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: osde2e-rosa-stage-e2e-default
+- as: rosa-stage-e2e-default
   commands: |
     export CONFIGS="rosa,e2e-suite"
     export ROSA_ENV="stage"
@@ -360,7 +224,7 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-rosa-stage
     name: osde2e-rosa-stage
-- as: osde2e-rosa-sts-stage-e2e-default
+- as: rosa-sts-stage-e2e-default
   commands: |
     export CONFIGS="rosa,e2e-suite"
     export ROSA_ENV="stage"
@@ -379,7 +243,7 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-rosa-stage
     name: osde2e-rosa-stage
-- as: osde2e-aws-stage-e2e-default
+- as: aws-stage-e2e-default
   commands: |
     export CONFIGS="aws,stage,e2e-suite"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
@@ -394,7 +258,7 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: osde2e-gcp-stage-e2e-default
+- as: gcp-stage-e2e-default
   commands: |
     export CONFIGS="gcp,stage,e2e-suite"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
@@ -409,7 +273,7 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: osde2e-aws-prod-e2e-default
+- as: aws-prod-e2e-default
   commands: |
     export CONFIGS="aws,prod,e2e-suite"
     export ENABLE_ALERTS="true"
@@ -425,7 +289,7 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: osde2e-aws-prod-informing-default
+- as: aws-prod-informing-default
   commands: |
     export CONFIGS="aws,prod,informing-suite"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
@@ -440,7 +304,7 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: osde2e-prod-cleanup
+- as: aws-prod-cleanup
   commands: |
     export CONFIGS="prod"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
@@ -455,7 +319,7 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: osde2e-gcp-prod-e2e-default
+- as: gcp-prod-e2e-default
   commands: |
     export CONFIGS="gcp,prod,e2e-suite"
     export ENABLE_ALERTS="true"
@@ -471,7 +335,7 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: osde2e-rosa-prod-e2e-default
+- as: rosa-prod-e2e-default
   commands: |
     export CONFIGS="rosa,e2e-suite"
     export ROSA_ENV="prod"
@@ -489,7 +353,7 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-rosa-prod
     name: osde2e-rosa-prod
-- as: osde2e-rosa-sts-prod-e2e-default
+- as: rosa-sts-prod-e2e-default
   commands: |
     export CONFIGS="rosa,e2e-suite"
     export ROSA_ENV="prod"
