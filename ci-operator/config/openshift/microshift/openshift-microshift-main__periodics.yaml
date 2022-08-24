@@ -29,44 +29,44 @@ build_root:
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
-  - dockerfile_literal: |
-      FROM src as builder
-      RUN dnf update -y && \
-          dnf install --setopt=tsflags=nodocs -y \
-          rpm-build glibc-static gcc selinux-policy-devel util-linux && \
-          dnf clean all && \
-          rm -rf /var/cache/dnf/*
-      WORKDIR /go/src/github.com/openshift/microshift
-      RUN make rpm
-      FROM libvirt-installer
-      WORKDIR /opt/microshift-rpms
-      USER root
-      RUN mkdir bin selinux
-      COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/microshift-* bin/
-      COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* selinux/
-      COPY microshift.conf /tmp/microshift.conf
-      COPY openshift-tests /usr/bin/openshift-tests
-      COPY oc /usr/bin/oc
-    from: libvirt-installer
-    inputs:
-      cli:
-        paths:
-          - destination_dir: .
-            source_path: /usr/bin/oc
-      libvirt-installer:
-        as:
-          - libvirt-installer
-      src:
-        as:
-          - src
-        paths:
-          - destination_dir: .
-            source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
-      openshift-tests-cli-4-12:
-        paths:
-          - destination_dir: .
-            source_path: /usr/bin/openshift-tests
-    to: microshift-conformance-4-12
+- dockerfile_literal: |
+    FROM src as builder
+    RUN dnf update -y && \
+        dnf install --setopt=tsflags=nodocs -y \
+        rpm-build glibc-static gcc selinux-policy-devel util-linux && \
+        dnf clean all && \
+        rm -rf /var/cache/dnf/*
+    WORKDIR /go/src/github.com/openshift/microshift
+    RUN make rpm
+    FROM libvirt-installer
+    WORKDIR /opt/microshift-rpms
+    USER root
+    RUN mkdir bin selinux
+    COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/microshift-* bin/
+    COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* selinux/
+    COPY microshift.conf /tmp/microshift.conf
+    COPY openshift-tests /usr/bin/openshift-tests
+    COPY oc /usr/bin/oc
+  from: libvirt-installer
+  inputs:
+    cli:
+      paths:
+        - destination_dir: .
+          source_path: /usr/bin/oc
+    libvirt-installer:
+      as:
+        - libvirt-installer
+    src:
+      as:
+        - src
+      paths:
+        - destination_dir: .
+          source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
+    openshift-tests-cli-4-12:
+      paths:
+        - destination_dir: .
+          source_path: /usr/bin/openshift-tests
+  to: microshift-conformance-4-12
 - dockerfile_literal: |
     # build
     FROM ubi-minimal
