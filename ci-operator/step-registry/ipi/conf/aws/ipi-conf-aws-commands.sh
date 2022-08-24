@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -67,7 +64,7 @@ MAX_ZONES_COUNT="${#ZONES[@]}"
 # Save max zones count information to ${SHARED_DIR} for use in other scenarios
 echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 
-existing_zones_setting=$(/tmp/yq r "${CONFIG}" 'controlPlane.platform.aws.zones')
+existing_zones_setting=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
 if [[ ${existing_zones_setting} == "" ]]; then
   ZONES_COUNT=${ZONES_COUNT:-2}
@@ -85,7 +82,7 @@ compute:
     aws:
       zones: ${ZONES_STR}
 EOF
-  /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
 else
   echo "zones already set in install-config.yaml, skipped"
 fi
@@ -113,7 +110,7 @@ compute:
       type: ${COMPUTE_NODE_TYPE}
 EOF
 
-/tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+yq-go m -x -i "${CONFIG}" "${PATCH}"
 
 # custom rhcos ami for non-public regions
 RHCOS_AMI=
@@ -135,7 +132,7 @@ platform:
   aws:
     amiID: ${RHCOS_AMI}
 EOF
-  /tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"
+  yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"
   cp "${SHARED_DIR}/install-config-ami.yaml.patch" "${ARTIFACT_DIR}/"
 fi
 
@@ -157,6 +154,6 @@ compute:
         authentication: ${AWS_METADATA_SERVICE_AUTH}
 EOF
 
-  /tmp/yq m -x -i "${CONFIG}" "${METADATA_AUTH_PATCH}"
+  yq-go m -x -i "${CONFIG}" "${METADATA_AUTH_PATCH}"
   cp "${METADATA_AUTH_PATCH}" "${ARTIFACT_DIR}/"
 fi

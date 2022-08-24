@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
@@ -27,8 +24,8 @@ export SSH_PUB_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-publickey
 infra_id=$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)
 
 VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"
-NETWORK=$(/tmp/yq r "${VPC_CONFIG}" 'platform.gcp.network')
-COMPUTE_SUBNET=$(/tmp/yq r "${VPC_CONFIG}" 'platform.gcp.computeSubnet')
+NETWORK=$(yq-go r "${VPC_CONFIG}" 'platform.gcp.network')
+COMPUTE_SUBNET=$(yq-go r "${VPC_CONFIG}" 'platform.gcp.computeSubnet')
 if [[ -z "${NETWORK}" || -z "${COMPUTE_SUBNET}" ]]; then
   echo "Could not find VPC network or compute subnet." && exit 1
 fi

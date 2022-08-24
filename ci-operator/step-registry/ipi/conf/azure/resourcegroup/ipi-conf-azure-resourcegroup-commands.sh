@@ -4,14 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="/tmp/install-config-existingresourcegroup.yaml.patch"
 
-azure_region=$(/tmp/yq r "${CONFIG}" 'platform.azure.region')
-cluster_name=$(/tmp/yq r "${CONFIG}" 'metadata.name')
+azure_region=$(yq-go r "${CONFIG}" 'platform.azure.region')
+cluster_name=$(yq-go r "${CONFIG}" 'metadata.name')
 existing_rg=${cluster_name}-exrg
 
 # az should already be there
@@ -37,4 +34,4 @@ platform:
 EOF
 
 # apply patch to install-config
-/tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+yq-go m -x -i "${CONFIG}" "${PATCH}"
