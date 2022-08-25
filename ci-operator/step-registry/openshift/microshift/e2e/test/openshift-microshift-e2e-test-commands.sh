@@ -33,6 +33,7 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
+sleep 360000
 
 "${HOME}"/openshift-tests run --provider=none "${TEST_SUITE}" > "${HOME}"/suite.txt
 chmod +r "${HOME}"/suite.txt
