@@ -38,6 +38,11 @@ EOF
 
 trap 'exit_with_failure' ERR
 
+if [[ ! "$JOB_NAME_SAFE" =~ "ipi" ]] ; then
+    echo Exiting
+    exit 1
+fi
+
 cd
 cat > packet-config.yaml <<-EOF
 - name: Create Config for host
@@ -163,30 +168,17 @@ EOF
 #   manages HW in equinix, at the moment this is for virt hosts
 # If neither can give us a host to use then we fall back to on demaned
 
-CIRTYPE=cihost
-# If baremetal on check the lab ofcir and exit,
-# as equinix doesn't serve baremetal clusters
-if [[ "$CLUSTERTYPE" == "baremetal" ]] ; then
-    CIRTYPE=cicluster
-    if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
-        getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)"
-        exit_with_success
-    fi
-    exit_with_failure
-fi
 
-if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
-    getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)" && exit_with_success
-fi
-if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
-    getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)" && exit_with_success
-fi
+
+
 
 # Avoid requesting a bunch of servers at the same time so they
 # don't race each other for available resources in a facility
 SLEEPTIME=$(( RANDOM % 120 ))
 echo "Sleeping for $SLEEPTIME seconds"
 sleep $SLEEPTIME
+
+export PACKET_PLAN=c3.medium.x86
 
 # Run Ansible playbook
 cat > packet-setup.yaml <<-EOF
