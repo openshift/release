@@ -13,20 +13,15 @@ images:
   dockerfile_path: Dockerfile
   from: os
   to: odh-manifests-tests
-promotion:
-  additional_images:
-    latest: odh-manifests-tests
-  name: odh-manifests-tests
-  namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.9"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.9"
       namespace: ocp
 resources:
   '*':
@@ -34,7 +29,8 @@ resources:
       cpu: 1000m
       memory: 1Gi
 tests:
-- as: odh-manifests-e2e
+- as: odh-manifests-e2e-nightly-49
+  cron: 46 13 */13 * *
   steps:
     cluster_profile: gcp
     env:
@@ -45,25 +41,11 @@ tests:
       from: odh-manifests-tests
       resources:
         requests:
-          cpu: 2000m
-          memory: 3Gi
-    workflow: ipi-gcp
-- as: odh-manifests-e2e-nightly
-  cron: 20 23 */14 * *
-  steps:
-    cluster_profile: gcp
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-    test:
-    - as: e2e
-      commands: $HOME/peak/installandtest.sh
-      from: odh-manifests-tests
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 3Gi
+          cpu: 1000m
+          memory: 2Gi
     workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: opendatahub-io
   repo: odh-manifests
+  variant: "49"
