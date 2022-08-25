@@ -1416,7 +1416,7 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/ods-plot-nb-ux-on-ocp-ocp
+    context: ci/prow/ods-plot-nb-ux-on-ocp
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1425,8 +1425,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-ods-plot-nb-ux-on-ocp-ocp
-    rerun_command: /test ods-plot-nb-ux-on-ocp-ocp
+    name: pull-ci-openshift-psap-ci-artifacts-master-ods-plot-nb-ux-on-ocp
+    rerun_command: /test ods-plot-nb-ux-on-ocp
     spec:
       containers:
       - args:
@@ -1434,7 +1434,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=plot-nb-ux-on-ocp-ocp
+        - --target=plot-nb-ux-on-ocp
         - --variant=ods
         command:
         - ci-operator
@@ -1468,14 +1468,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ods-plot-nb-ux-on-ocp-ocp,?($|\s.*)
+    trigger: (?m)^/test( | .* )ods-plot-nb-ux-on-ocp,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/ods-plot-nb-ux-on-ocp-osd
+    context: ci/prow/ods-plot-nb-ux-on-osd
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -1484,8 +1484,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-psap-ci-artifacts-master-ods-plot-nb-ux-on-ocp-osd
-    rerun_command: /test ods-plot-nb-ux-on-ocp-osd
+    name: pull-ci-openshift-psap-ci-artifacts-master-ods-plot-nb-ux-on-osd
+    rerun_command: /test ods-plot-nb-ux-on-osd
     spec:
       containers:
       - args:
@@ -1493,7 +1493,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=plot-nb-ux-on-ocp-osd
+        - --target=plot-nb-ux-on-osd
         - --variant=ods
         command:
         - ci-operator
@@ -1527,7 +1527,66 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ods-plot-nb-ux-on-ocp-osd,?($|\s.*)
+    trigger: (?m)^/test( | .* )ods-plot-nb-ux-on-osd,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/ods-plot-nb-ux-on-single
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ods
+      ci.openshift.io/generator: prowgen
+      job-release: "4.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-psap-ci-artifacts-master-ods-plot-nb-ux-on-single
+    rerun_command: /test ods-plot-nb-ux-on-single
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=plot-nb-ux-on-single
+        - --variant=ods
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ods-plot-nb-ux-on-single,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
