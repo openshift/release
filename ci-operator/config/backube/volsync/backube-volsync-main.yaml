@@ -169,21 +169,15 @@ tests:
         export MINIO_USE_TLS=1
         ./hack/run-minio.sh
 
-        # Run tests
-        make cli
-        cp "${KUBECONFIG}" /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
-        make test-e2e
-
-        # Run ansible-based tests
         # Add .local/bin to path so we can execute Python packages we install below
         export PATH="${PATH}:/alabama/.local/bin"
         # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
         export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
-        cd test-e2e
-        python -m pip install pipenv
-        pipenv install --deploy --no-site-packages -v
-        pipenv run ansible-galaxy install -r requirements.yml
-        ./run_tests_in_parallel.sh
+        make test-e2e-install
+
+        # Run tests
+        make cli
+        make test-e2e
       from: src-oc
       resources:
         requests:
