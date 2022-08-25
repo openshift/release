@@ -157,6 +157,9 @@ periodics:
       - --config-path=/etc/config/config.yaml
       - --github-mapping-config-path=/etc/github-mapping/mapping.yaml
       - --slack-token-path=/etc/slack/oauth_token
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-token-path=/etc/oauth/oauth
       command:
       - /usr/bin/pr-reminder
       image: registry.ci.openshift.org/ci/pr-reminder:latest
@@ -175,6 +178,8 @@ periodics:
       - mountPath: /etc/github-mapping
         name: github-mapping
         readOnly: true
+      - mountPath: /etc/oauth
+        name: github-token
     volumes:
     - name: slack
       secret:
@@ -185,6 +190,9 @@ periodics:
     - configMap:
         name: sync-rover-groups
       name: github-mapping
+    - name: github-token
+      secret:
+        secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
   cron: '@yearly'
