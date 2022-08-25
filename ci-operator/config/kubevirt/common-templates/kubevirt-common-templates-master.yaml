@@ -267,6 +267,29 @@ tests:
           cpu: 200m
           memory: 400Mi
     workflow: ipi-azure
+- as: e2e-azure-common-templates-windows2022
+  steps:
+    cluster_profile: azure4
+    env:
+      COMPUTE_NODE_TYPE: Standard_D8s_v3
+    test:
+    - as: e2e-tests-windows2022
+      commands: |
+        set -o pipefail
+        #kubeconfig is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L $KUBECONFIG /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+        echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >> /etc/passwd
+        export TARGET=windows2022 && make e2e-tests
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+          memory: 400Mi
+    workflow: ipi-azure
 - as: e2e-azure-common-templates-fedora
   steps:
     cluster_profile: azure4
