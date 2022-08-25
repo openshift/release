@@ -58,6 +58,8 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     tar -xzvf cri-o.tar.gz -C "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
+    sed -i 's/build_runc: True/build_runc: False/g' vars.yml
+    sed -i 's/build_crun: False/build_crun: True/g' vars.yml 
     ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv 
 EOF
 
