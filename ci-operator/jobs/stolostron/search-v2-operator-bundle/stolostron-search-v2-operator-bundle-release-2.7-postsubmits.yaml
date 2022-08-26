@@ -1,25 +1,25 @@
-presubmits:
-  stolostron/search-v2-operator:
+postsubmits:
+  stolostron/search-v2-operator-bundle:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.6$
-    - ^release-2\.6-
-    cluster: build03
-    context: ci/prow/images
+    - ^release-2\.7$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-search-v2-operator-release-2.6-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-stolostron-search-v2-operator-bundle-release-2.7-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -37,6 +37,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -45,32 +48,31 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.6$
-    - ^release-2\.6-
-    cluster: build03
-    context: ci/prow/pr-image-mirror
+    - ^release-2\.7$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-search-v2-operator-release-2.6-pr-image-mirror
-    rerun_command: /test pr-image-mirror
+    max_concurrency: 1
+    name: branch-ci-stolostron-search-v2-operator-bundle-release-2.7-latest-bundle-mirror
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=pr-image-mirror
+        - --target=latest-bundle-mirror
         command:
         - ci-operator
         image: ci-operator:latest
@@ -97,29 +99,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.6$
-    - ^release-2\.6-
-    cluster: build03
-    context: ci/prow/unit-test
+    - ^release-2\.7$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-search-v2-operator-release-2.6-unit-test
-    rerun_command: /test unit-test
+    max_concurrency: 1
+    name: branch-ci-stolostron-search-v2-operator-bundle-release-2.7-publish-search-operator-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-test
+        - --target=publish-search-operator-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -146,4 +144,55 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2\.7$
+    cluster: build01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stolostron-search-v2-operator-bundle-release-2.7-sonar-post-submit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonar-post-submit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
