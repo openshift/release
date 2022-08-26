@@ -55,70 +55,9 @@ resources:
 test_binary_build_commands: make build e2e
 tests:
 - as: e2e-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: hypershift
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.9"
   cron: 0 */6 * * *
   steps:
-    test:
-    - as: setup-monitoring
-      commands: |-
-        bin/test-setup monitoring \
-          --remote-write-url=$(cat /etc/grafana-prom-push/url) \
-          --remote-write-username-file=/etc/grafana-prom-push/username \
-          --remote-write-password-file=/etc/grafana-prom-push/password
-      credentials:
-      - mount_path: /etc/grafana-prom-push
-        name: hypershift-sjenning-homelab-push
-        namespace: test-credentials
-      from: test-bin
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 2m0s
-    - as: install-hypershift
-      cli: latest
-      commands: make ci-install-hypershift
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
-      from: bin
-      grace_period: 1m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 5m0s
-    - as: test-e2e
-      cli: latest
-      commands: make ci-test-e2e
-      credentials:
-      - mount_path: /etc/hypershift-pool-aws-credentials
-        name: hypershift-pool-aws-credentials
-        namespace: test-credentials
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: OCP_IMAGE_LATEST
-        name: release:hosted-ocp-latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      from: test-bin
-      grace_period: 15m0s
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 1h0m0s
-    workflow: generic-claim
+    workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-periodic-conformance-serial
   cron: 0 */6 * * *
   steps:
