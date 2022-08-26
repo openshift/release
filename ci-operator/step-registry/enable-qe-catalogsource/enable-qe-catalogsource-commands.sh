@@ -55,6 +55,7 @@ function update_global_auth () {
   else
       echo "!!! fail to add QE optional registry auth, retry and enable log..."
       sleep 1
+      ret=0
       run_command "oc --loglevel=10 set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
       if [[ $ret -eq 0 ]]; then
         echo "update the cluster global auth successfully after retry."
