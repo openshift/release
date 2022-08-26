@@ -146,6 +146,51 @@ tests:
     dependencies:
       OO_INDEX: ci-index-volsync-bundle
     env:
+      FIPS_ENABLED: "false"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: volsync
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: |
+        set -x -e -o pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+        # Configure default StorageClass to be CSI-based
+        oc annotate sc/gp2 storageclass.kubernetes.io/is-default-class-
+        oc annotate sc/gp2-csi storageclass.kubernetes.io/is-default-class="true"
+
+        # Install MinIO for rclone & restic
+        ./hack/run-minio.sh
+
+        # Install MinIO again w/ TLS
+        export MINIO_NAMESPACE=minio-tls
+        export MINIO_USE_TLS=1
+        ./hack/run-minio.sh
+
+        # Add .local/bin to path so we can execute Python packages we install below
+        export PATH="${PATH}:/alabama/.local/bin"
+        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+        make test-e2e-install
+
+        # Run tests
+        make cli
+        make test-e2e
+      from: src-oc
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: e2e-openshift-fips
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-volsync-bundle
+    env:
       FIPS_ENABLED: "true"
       OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-operators
