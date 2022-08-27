@@ -13,9 +13,35 @@ expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
 REGION="${LEASED_RESOURCE}"
+
+# m6a (AMD) are more cost effective than other x86 instance types
+# for general purpose work. Use by default, when supported in the
+# region.
+IS_M6A_REGION="no"
+if aws ec2 describe-instance-type-offerings --region "${REGION}" | grep m6a ; then
+  IS_M6A_REGION="yes"
+fi
+
+# Do not change auto-types unless it is coordinated with the cloud
+# financial operations team. Savings plans may be in place to
+# decrease the cost of certain instance families.
+if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+  if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+    COMPUTE_NODE_TYPE="m6a.xlarge"
+  else
+    COMPUTE_NODE_TYPE="m6i.xlarge"
+  fi
+fi
+
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
 architecture=${OCP_ARCH:-"amd64"}
-arch_instance_type=m6i
+
+if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+  arch_instance_type=m6a
+else
+  arch_instance_type=m6i
+fi
+
 if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
   architecture="arm64"
 fi
@@ -29,7 +55,8 @@ workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
 fi
-master_type=null
+
+master_type=${arch_instance_type}.xlarge
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   master_type=${arch_instance_type}.8xlarge
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
