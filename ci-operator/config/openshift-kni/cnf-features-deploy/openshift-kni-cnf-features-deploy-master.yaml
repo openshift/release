@@ -74,6 +74,83 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-gcp-ovn
+- as: e2e-gcp-ovn-in-container
+  skip_if_only_changed: ^ztp
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: create-podman-container
+      cli: latest
+      commands: |
+        oc -n openshift-config  get secret/pull-secret -o yaml | sed 's/openshift-config/default/' | sed 's/\.dockerconfigjson/auth.json/' | grep -v type: | oc apply -f -
+        oc label ns default --overwrite pod-security.kubernetes.io/enforce=privileged
+        downloads_route=$(oc get route -n openshift-console downloads | grep downloads-openshift-console | awk '{print $2}')
+        oc -n default apply -f - <<EOF
+        apiVersion: v1
+        kind: Pod
+        metadata:
+          name: podman
+        spec:
+          containers:
+          - name: podman
+            image: registry.redhat.io/rhel8/podman:latest
+            command:
+            - /bin/bash
+            - -c
+            - |
+              set -xe
+              yum install -y make wget jq
+              wget https://${downloads_route}/amd64/linux/oc.tar --no-check-certificate
+              tar -xf oc.tar 
+              mv oc /bin/
+              chmod +x ./bin/oc
+              sleep INF
+            securityContext:
+              privileged: true
+            volumeMounts:
+            - name: pull-secret
+              mountPath: "/run/user/0/containers/"
+              readOnly: true
+          volumes:
+          - name: pull-secret
+            secret:
+              secretName: pull-secret
+        EOF
+        oc -n default wait pod/podman --for=condition=Ready --timeout=90s
+        oc -n default describe pod/podman
+        oc label ns default --overwrite pod-security.kubernetes.io/enforce=baseline
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: copy-cnf-features-deploy-to-podman-container
+      cli: latest
+      commands: |
+        oc cp ./ default/podman:/
+        oc cp "${KUBECONFIG}" default/podman:/kubeconfig
+        cat "${KUBECONFIG}"
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    - as: run-cnf-tests-in-container
+      commands: |
+        oc -n default exec pod/podman -- bash -c "ls"
+        LOCAL_IMAGE_REG=$(echo "${OPENSHIFT_INSTALL_RELEASE_IMAGE}" | sed -e 's/release/stable/g' | sed -e 's/@.*$//g')
+        oc -n default exec pod/podman -- bash -c "KUBECONFIG=/kubeconfig IPERF3_BITRATE_OVERRIDE="300000000" TESTS_IN_CONTAINER="true" TEST_POD_IMAGES_REGISTRY="${LOCAL_IMAGE_REG}" TEST_POD_CNF_TEST_IMAGE=":cnf-tests" TEST_POD_DPDK_TEST_IMAGE=":dpdk" make functests-on-ci"
+      dependencies:
+      - env: OPENSHIFT_INSTALL_RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-ovn
 - as: e2e-gcp-ran-profile
   optional: true
   steps:
