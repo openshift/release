@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -33,7 +33,7 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-openshift-tests run --provider=none "${TEST_SUITE}" > "${HOME}"/suite.txt
+openshift-tests run --dry-run --provider=none "${TEST_SUITE}" > "${HOME}"/suite.txt
 chmod +r "${HOME}"/suite.txt
 
 # scp and install microshift.service
@@ -42,4 +42,3 @@ chmod +r "${HOME}"/suite.txt
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/suite.txt rhel8user@"${INSTANCE_PREFIX}":~/suite.txt
-
