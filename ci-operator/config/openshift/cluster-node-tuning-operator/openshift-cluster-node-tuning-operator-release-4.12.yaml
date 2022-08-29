@@ -89,6 +89,25 @@ tests:
   commands: make test-e2e-local
   container:
     from: src
+- as: e2e-aws-operator-hypershift
+  steps:
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - chain: hypershift-aws-destroy-nested-management-cluster
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-aws-setup-nested-management-cluster
+    - chain: hypershift-install
+    - chain: hypershift-aws-create
+    test:
+    - as: wait
+      commands: sleep 7200 & wait
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
