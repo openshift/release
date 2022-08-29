@@ -30,7 +30,6 @@ cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.p
 #####################################
 
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
-USE_CONMONRS=${USE_CONMONRS:-false}
 
 tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > \${HOME}/cri-o.tar.gz"
 timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
@@ -51,7 +50,7 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     tar -xzf cri-o.tar.gz -C "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
-    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow USE_CONMONRS=$USE_CONMONRS" --connection=local -vvv --tags setup,e2e
+    ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv
     sudo chown -R deadbeef /tmp/artifacts/*
     sudo chmod -R 777 /tmp/artifacts/*
 EOF
