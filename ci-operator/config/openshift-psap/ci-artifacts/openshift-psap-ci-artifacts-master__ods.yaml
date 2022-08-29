@@ -12,12 +12,6 @@ images:
 - dockerfile_path: build/Dockerfile
   from: os
   to: ci-artifacts
-releases:
-  latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.11"
 resources:
   '*':
     limits:
@@ -27,8 +21,14 @@ resources:
       memory: 2Gi
 tests:
 - as: nb-ux-on-private
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.11"
   steps:
-    cluster_profile: aws
     test:
     - as: test
       commands: |
@@ -43,7 +43,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: nb-ux-on-customer
   steps:
     post:
