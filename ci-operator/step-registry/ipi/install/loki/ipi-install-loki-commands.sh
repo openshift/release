@@ -41,7 +41,9 @@ subjects:
   name: loki-promtail
   namespace: loki
 EOF
-cat >> "${SHARED_DIR}/manifest_loki-psp.yml" << EOF
+ocp_minor_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f2)
+if [ "$ocp_minor_version" -le "11" ]; then
+  cat >> "${SHARED_DIR}/manifest_loki-psp.yml" << EOF
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -75,6 +77,7 @@ spec:
   - persistentVolumeClaim
   - secret
 EOF
+fi
 cat >> "${SHARED_DIR}/manifest_loki-role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -671,7 +674,8 @@ spec:
   updateStrategy:
     type: RollingUpdate
 EOF
-cat >> "${SHARED_DIR}/manifest_promtail-psp.yml" << EOF
+if [ "$ocp_minor_version" -le "11" ]; then
+  cat >> "${SHARED_DIR}/manifest_promtail-psp.yml" << EOF
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -698,6 +702,7 @@ spec:
   - configMap
   - hostPath
 EOF
+fi
 cat >> "${SHARED_DIR}/manifest_promtail-role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
