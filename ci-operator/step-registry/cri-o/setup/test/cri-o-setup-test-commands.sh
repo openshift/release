@@ -10,6 +10,10 @@ source "${SHARED_DIR}/env"
 ###############Log In################
 #####################################
 
+python3 --version 
+
+export CLOUDSDK_PYTHON=python3 
+
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
@@ -50,6 +54,10 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     tar -xzf cri-o.tar.gz -C "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
-    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv --tags setup,e2e --extra-vars "build_runc=False build_crun=True cgroupv2=True"
+    ansible-playbook setup-main.yml --connection=local -vvv
 EOF
+
+currentDate=$(date +'%s')
+gcloud compute instances stop ${instance_name} --zone=${ZONE} 
+gcloud compute images create crio-setup-${currentDate} --source-disk-zone=${ZONE} --source-disk="${instance_name//[$'\t\r\n']}" --family="crio-setup"
 

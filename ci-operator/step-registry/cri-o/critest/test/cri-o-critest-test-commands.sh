@@ -26,14 +26,6 @@ cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
 cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
 
-latest="v3.5.5"
-if gcloud alpha storage ls gs://crio-ci | grep -q ${latest} ; then 
-    echo "etcd is up to date"
-else 
-    echo "caching etcd" 
-    curl https://github.com/coreos/etcd/releases/download/${latest}/etcd-${latest}-linux-amd64.tar.gz -L | gsutil cp - gs://crio-ci/etcd-${latest}.tar.gz
-fi 
-
 #####################################
 #####################################
 
@@ -55,7 +47,7 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     REPO_DIR="/home/deadbeef/cri-o"
     mkdir -p "\${REPO_DIR}"
     # copy the agent sources on the remote machine
-    tar -xzvf cri-o.tar.gz -C "\${REPO_DIR}"
+    tar -xzf cri-o.tar.gz -C "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
     ansible-playbook critest-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv
