@@ -15,6 +15,7 @@ cat > gather_logs.yaml <<-EOF
   vars:
     LOGS_DIR: /tmp/artifacts
     GATHER_CAPI_LOGS: "{{ lookup('env', 'GATHER_CAPI_LOGS') }}"
+    CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE') }}"
     CLUSTER_GATHER:
       - "{{ (lookup('env', 'SOSREPORT') == 'true') | ternary('--sosreport','', '') }}"
       - "{{ (lookup('env', 'MUST_GATHER') == 'true') | ternary('--must-gather','', '') }}"
@@ -42,6 +43,22 @@ cat > gather_logs.yaml <<-EOF
       - name: List swtpm-localca files to a file
         ansible.builtin.shell: |
           ls -ltr /var/lib/swtpm-localca/ >> {{ LOGS_DIR }}/libvirt-qemu/ls-swtpm-localca.txt
+      - name: Equinix specific tasks
+        block:
+        - name: Fetch equinix metadata
+          ansible.builtin.uri:
+            url: "https://metadata.platformequinix.com/metadata"
+            return_content: yes
+          register: equinix_metadata
+          until: equinix_metadata.status == 200
+          retries: 5
+          delay: 5
+          no_log: true
+        - name: Filter and dump equinix metadata
+          ansible.builtin.copy:
+            content: "{% set removed = equinix_metadata.json.pop('ssh_keys') %}{{ equinix_metadata.json | to_nice_json }}"
+            dest: "{{ LOGS_DIR }}/equinix-metadata.json"
+        when: "'packet' in CLUSTER_TYPE"
       - name: Check minikube kubeconfig file existence
         stat:
           path: /root/.kube/config
@@ -52,6 +69,7 @@ cat > gather_logs.yaml <<-EOF
           target: download_service_logs
         environment:
           KUBECONFIG: "/root/.kube/config"
+          LOGS_DEST: "{{ LOGS_DIR }}"
         when: kubeconfig.stat.exists
       - name: Extract capi logs
         make:
@@ -59,6 +77,7 @@ cat > gather_logs.yaml <<-EOF
           target: download_capi_logs
         environment:
           KUBECONFIG: "/root/.kube/config"
+          LOGS_DEST: "{{ LOGS_DIR }}"
         when: kubeconfig.stat.exists and GATHER_CAPI_LOGS == "true"
       - debug:
           msg: "CLUSTER_GATHER = {{ CLUSTER_GATHER }}"
@@ -67,8 +86,9 @@ cat > gather_logs.yaml <<-EOF
           source /root/config.sh
           make download_cluster_logs
         environment:
-          KUBECONFIG: "/root/.kube/config"
           ADDITIONAL_PARAMS: "{{ CLUSTER_GATHER | join(' ') }}"
+          KUBECONFIG: "/root/.kube/config"
+          LOGS_DEST: "{{ LOGS_DIR }}"
         args:
           chdir: /home/assisted
       - name: Find kubeconfig files
@@ -117,19 +137,11 @@ cat > gather_logs.yaml <<-EOF
         loop: "{{ log_files.files }}"
         loop_control:
           label: "{{ item.path }}"
-      - name: Find all files under LOGS_DIR
-        find:
-          paths: "{{ LOGS_DIR }}"
-          recurse: true
-        register: files_to_download
       - name: Download log files
-        ansible.builtin.fetch:
-          src: "{{ item.path }}"
-          dest: "{{ lookup('env', 'ARTIFACT_DIR') }}/"
-          flat: yes
-        loop: "{{ files_to_download.files }}"
-        loop_control:
-          label: "{{ item.path }}"
+        synchronize:
+          src: "{{ LOGS_DIR }}/"
+          dest: "{{ lookup('env', 'ARTIFACT_DIR') }}"
+          mode: pull
 EOF
 
 ansible-playbook gather_logs.yaml -i ${SHARED_DIR}/inventory -vv
