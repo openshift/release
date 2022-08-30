@@ -41,7 +41,9 @@ subjects:
   name: loki-promtail
   namespace: loki
 EOF
-cat >> "${SHARED_DIR}/manifest_loki-psp.yml" << EOF
+ocp_minor_version=$(oc version -oyaml | grep "openshiftVersion" | cut -d '.' -f2)
+if [ "$ocp_minor_version" -le "11" ]; then
+  cat >> "${SHARED_DIR}/manifest_loki-psp.yml" << EOF
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -75,7 +77,7 @@ spec:
   - persistentVolumeClaim
   - secret
 EOF
-cat >> "${SHARED_DIR}/manifest_loki-role.yml" << EOF
+  cat >> "${SHARED_DIR}/manifest_loki-role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -91,7 +93,7 @@ rules:
   verbs:
   - use
 EOF
-cat >> "${SHARED_DIR}/manifest_loki-rolebinding.yml" << EOF
+  cat >> "${SHARED_DIR}/manifest_loki-rolebinding.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -105,6 +107,7 @@ subjects:
 - kind: ServiceAccount
   name: loki
 EOF
+fi
 cat >> "${SHARED_DIR}/manifest_loki-secret.yml" << EOF
 apiVersion: v1
 kind: Secret
@@ -671,7 +674,8 @@ spec:
   updateStrategy:
     type: RollingUpdate
 EOF
-cat >> "${SHARED_DIR}/manifest_promtail-psp.yml" << EOF
+if [ "$ocp_minor_version" -le "11" ]; then
+  cat >> "${SHARED_DIR}/manifest_promtail-psp.yml" << EOF
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
@@ -698,7 +702,7 @@ spec:
   - configMap
   - hostPath
 EOF
-cat >> "${SHARED_DIR}/manifest_promtail-role.yml" << EOF
+  cat >> "${SHARED_DIR}/manifest_promtail-role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -714,7 +718,7 @@ rules:
   verbs:
   - use
 EOF
-cat >> "${SHARED_DIR}/manifest_promtail-rolebinding.yml" << EOF
+  cat >> "${SHARED_DIR}/manifest_promtail-rolebinding.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -728,6 +732,7 @@ subjects:
 - kind: ServiceAccount
   name: loki-promtail
 EOF
+fi
 cat >> "${SHARED_DIR}/manifest_promtail-sa.yml" << EOF
 apiVersion: v1
 kind: ServiceAccount
