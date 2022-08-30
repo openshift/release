@@ -11,6 +11,8 @@ echo "${SSHOPTS[@]}"
 
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/cri-o.tar.gz"
 timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF 
+    useradd deadbeef 
+    su deadbeef
     export HOME=/home/deadbeef
     mkdir /tmp/artifacts 
     mkdir /logs
