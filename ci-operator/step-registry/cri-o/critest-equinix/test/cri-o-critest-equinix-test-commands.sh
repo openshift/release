@@ -11,8 +11,6 @@ echo "${SSHOPTS[@]}"
 
 tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/cri-o.tar.gz"
 timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF 
-    useradd deadbeef 
-    su deadbeef
     export HOME=/home/deadbeef
     mkdir /tmp/artifacts 
     mkdir /logs
@@ -42,5 +40,9 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
+    
+    useradd deadbeef 
+    su deadbeef
+
     ansible-playbook critest-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv
 EOF
