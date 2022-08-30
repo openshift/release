@@ -37,7 +37,6 @@ timeout --kill-after 10m 400m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     fi
     # copy the agent sources on the remote machine
     tar -xzvf cri-o.tar.gz -C "\${REPO_DIR}"
-    chown -R root:root "\${REPO_DIR}"
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
 
