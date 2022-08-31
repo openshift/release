@@ -1,0 +1,68 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
+binary_build_commands: make build
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+- dockerfile_path: build/Dockerfile.ci
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+  to: windows-machine-config-operator-test
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: origin
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 400Mi
+  src:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+  windows-machine-config-operator-test:
+    limits:
+      memory: 10Gi
+    requests:
+      cpu: 100m
+      memory: 10Gi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: build
+  commands: make build
+  container:
+    from: src
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: aws-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    env:
+      COMMUNITY: "true"
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-aws-ovn-hybrid
+zz_generated_metadata:
+  branch: community-4.11
+  org: openshift
+  repo: windows-machine-config-operator
+  variant: okd
