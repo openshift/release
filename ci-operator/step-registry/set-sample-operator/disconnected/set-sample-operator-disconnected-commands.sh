@@ -68,7 +68,7 @@ function set_CA_for_nodes () {
     fi
 
     # get the QE additional CA
-    QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/additional_ca"
+    QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/client_ca.crt"
     REGISTRY_HOST=`echo ${MIRROR_PROXY_REGISTRY} | cut -d \: -f 1`
     # Configuring additional trust stores for image registry access, details: https://docs.openshift.com/container-platform/4.11/registry/configuring-registry-operator.html#images-configuration-cas_configuring-registry-operator
     run_command "oc create configmap registry-config --from-file=\"${REGISTRY_HOST}..5000\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6001\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6002\"=${QE_ADDITIONAL_CA_FILE}  -n openshift-config"; ret=$?
@@ -113,6 +113,22 @@ registry.redhat.io/rhel8/httpd-24:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/httpd
 
 }
 
+function check_mirror_registry () {
+    run_command "oc adm new-project sample-test"
+    ret=0
+    run_command "oc import-image mytestimage --from=quay.io/openshifttest/busybox@sha256:c5439d7db88ab5423999530349d327b04279ad3161d7596d2126dfb5b02bfd1f --confirm -n sample-test" || ret=$?
+    if [[ $ret -eq 0 ]]; then
+      echo "mirror registry works well."
+      run_command "oc delete ns sample-test"
+    else
+      echo "mirror registry doesn't work, checking the image.config"
+      run_command "oc get image.config cluster -o yaml"
+      run_command "oc get configmap registry-config -n openshift-config -o yaml"
+      run_command "oc delete ns sample-test"
+      return 1
+    fi
+}
+
 set_proxy
 run_command "oc get config.samples.operator.openshift.io cluster"; ret=$?
 if [[ $ret -eq 0 ]]; then
@@ -132,3 +148,4 @@ unset https_proxy
 mirror_tag_images
 set_proxy
 config_samples_operator
+check_mirror_registry
