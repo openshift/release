@@ -1,0 +1,28 @@
+ref:
+  as: openshift-e2e-test-raise-conformance-skips
+  from: tests
+  grace_period: 10m
+  commands: openshift-e2e-test-raise-conformance-skips-commands.sh
+  env:
+  - name: TEST_SKIPS
+    default: ""
+    documentation: |
+      Regular expression (POSIX basic regular expression) of tests to skip.
+      It is suggested to test the regex to make sure that it matches with the available tests.
+      Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
+      that are printed in Prow won't exactly match the list returned by openshift-tests.
+  - name: TEST_SUITE
+    default: openshift/conformance/parallel
+    documentation: The test suite to run.  Use 'openshift-test run --help' to list available suites.
+  - name: TEST_CSI_DRIVER_MANIFEST
+    default: ""
+    documentation: |-
+      Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
+      program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
+      details. The file must be present in ${SHARED_DIR}.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  documentation: |-
+    Fails if TEST_SKIPS matches a Kubernetes conformance test.
