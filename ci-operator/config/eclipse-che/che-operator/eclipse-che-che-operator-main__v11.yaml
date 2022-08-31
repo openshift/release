@@ -30,10 +30,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: next
-      OO_INSTALL_NAMESPACE: eclipse-che
-      OO_PACKAGE: eclipse-che-preview-openshift
-      OO_TARGET_NAMESPACES: '!all'
+      TEST_SKIPS: ""
     test:
     - as: operator-test
       cli: latest
@@ -42,16 +39,13 @@ tests:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image
       env:
-      - name: OO_CHANNEL
-      - name: OO_INSTALL_NAMESPACE
-      - name: OO_PACKAGE
-      - name: OO_TARGET_NAMESPACES
+      - name: TEST_SKIPS
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: openshift-e2e-aws
 - as: upgrade-stable-to-next
   steps:
     cluster_profile: aws
@@ -112,7 +106,7 @@ tests:
     test:
     - as: che-behind-proxy
       cli: latest
-      commands: /bin/bash build/scripts/oc-tests/oc-test-operator-proxy.sh
+      commands: /bin/bash build/scripts/oc-tests/oc-test-operator.sh
       dependencies:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image
