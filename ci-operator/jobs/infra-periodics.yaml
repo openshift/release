@@ -308,46 +308,6 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
-  decorate: true
-  interval: 12m
-  labels:
-    ci.openshift.io/role: infra
-  name: periodic-retester
-  spec:
-    containers:
-    - args:
-      - --query=is:pr state:open label:lgtm label:approved status:failure comments:<2500
-        NOT "consistent with ART" -label:do-not-merge -label:do-not-merge/work-in-progress
-        -label:do-not-merge/hold -label:needs-rebase -label:needs-ok-to-test org:openshift-priv
-        repo:operator-framework/operator-marketplace repo:operator-framework/operator-registry
-        repo:cri-o/cri-o repo:kubevirt-ui/kubevirt-plugin
-      - --token=/etc/oauth/oauth
-      - --updated=0
-      - |-
-        --comment=/retest-required
-
-        Please review the [full test history](https://prow.ci.openshift.org/pr-history/?org={{.Org}}&repo={{.Repo}}&pr={{.Number}}) for this PR and help us cut down flakes.
-      - --template
-      - --ceiling=5
-      - --confirm
-      - --random
-      command:
-      - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20220830-c2bffe0c7a
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 500m
-      volumeMounts:
-      - mountPath: /etc/oauth
-        name: token
-    volumes:
-    - name: token
-      secret:
-        secretName: github-credentials-openshift-bot
-- agent: kubernetes
-  cluster: app.ci
   cron: 0 0,8 * * *
   decorate: true
   labels:
