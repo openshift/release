@@ -167,8 +167,8 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
     run_command "${cmd}" &&
     echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip} || :" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
     
-    wait_public_dns "${mirror_registry_dns}" || exit 2
-
+#    wait_public_dns "${mirror_registry_dns}" || exit 2
+    echo "Waiting for ${mirror_registry_dns} to be ready..." && sleep 120s
     # save mirror registry dns info
     echo "${mirror_registry_dns}:5000" > "${SHARED_DIR}/mirror_registry_url"
 fi
