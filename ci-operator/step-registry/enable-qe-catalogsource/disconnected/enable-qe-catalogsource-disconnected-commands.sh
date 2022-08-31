@@ -118,7 +118,7 @@ function set_CA_for_nodes () {
     fi
 
     # get the QE additional CA
-    QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/additional_ca"
+    QE_ADDITIONAL_CA_FILE="/var/run/vault/mirror-registry/client_ca.crt"
     REGISTRY_HOST=`echo ${MIRROR_PROXY_REGISTRY} | cut -d \: -f 1`
     # Configuring additional trust stores for image registry access, details: https://docs.openshift.com/container-platform/4.11/registry/configuring-registry-operator.html#images-configuration-cas_configuring-registry-operator
     run_command "oc create configmap registry-config --from-file=\"${REGISTRY_HOST}..5000\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6001\"=${QE_ADDITIONAL_CA_FILE} --from-file=\"${REGISTRY_HOST}..6002\"=${QE_ADDITIONAL_CA_FILE}  -n openshift-config"; ret=$?
