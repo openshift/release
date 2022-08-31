@@ -345,3 +345,7 @@ $(crds):
 
 update_dp_crd: download_dp_crd $(crds)
 update_crt_crd: download_crt_crd $(crds)
+
+check-repo:
+	./hack/check-repo.sh "$(REPO)"
+.PHONY: check-repo
