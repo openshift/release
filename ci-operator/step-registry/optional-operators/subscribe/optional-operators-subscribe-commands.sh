@@ -60,6 +60,12 @@ EOF
     )
 fi
 
+echo "Setting label security.openshift.io/scc.podSecurityLabelSync value to true on the namespace \"$OO_INSTALL_NAMESPACE\""
+
+if [[ "${OO_INSTALL_NAMESPACE}" =~ ^openshift- ]]; then
+    oc label --overwrite ns "${OO_INSTALL_NAMESPACE}" security.openshift.io/scc.podSecurityLabelSync=true
+fi
+
 echo "Installing \"$OO_PACKAGE\" in namespace \"$OO_INSTALL_NAMESPACE\""
 
 if [[ "$OO_TARGET_NAMESPACES" == "!install" ]]; then
