@@ -138,7 +138,7 @@ if [ -e /root/bm.json ] ; then
     nmcli con reload
     sleep 10
 
-    echo 'export KUBECONFIG=/root/dev-scripts/ocp/\$CLUSTER_NAME/auth/kubeconfig' >> /root/.bashrc
+    echo "export KUBECONFIG=/root/dev-scripts/ocp/\${CLUSTER_NAME}/auth/kubeconfig" >> /root/.bashrc
 else
     echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
 fi

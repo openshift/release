@@ -1,0 +1,39 @@
+chain:
+  as: cucushift-installer-rehearse-vsphere-upi-disconnected-sdn-workers-rhcos-rhel8-provision
+  steps:
+  - chain: cucushift-installer-rehearse-vsphere-upi-disconnected-sdn-provision
+  - ref: ipi-conf-vsphere-bastionhost
+  - ref: workers-rhel-vsphere-provision
+  - ref: workers-rhel-vsphere-provision-dns
+  - ref: workers-rhel-pre-hook-haproxy
+  - ref: workers-rhel-pre-hook-sshtunnel
+  - chain: workers-rhel
+  env:
+  - name: RHEL_WORKER_COUNT
+    default: 2
+    documentation: The number of rhel worker to be provisioned.
+  - name: RHEL_IMAGE
+    default: "qe-rhel-86-release"
+    documentation: |-
+      The name of rhel vm/template existing under folder /<Datacenter>/vm/Templates on vSphere, used to clone RHEL instances
+  - name: RHEL_VM_CPUS_NUM
+    default: "4"
+    documentation: |-
+      The number of cpu setting to rhel instance
+  - name: RHEL_VM_MEMORY_SIZE
+    default: "16384"
+    documentation: |-
+      The size in MB of memory setting to rhel instance
+  - name: PLATFORM_VERSION
+    default: 8.6
+    documentation: the version of rhel, valid value is 7.x and 8.x.
+  - name: SSH_USER
+    default: "test"
+    documentation: |-
+      The user to login the system of RHEL instance
+  - name: REMOVE_RHCOS_WORKER
+    default: "no"
+    documentation: |-
+      Keep or remove rhcos worker after scaling up rhel worker.
+  documentation: |-
+    Create an UPI cluster on vSphere with SDN and scaleup rhel workers for QE e2e tests.
