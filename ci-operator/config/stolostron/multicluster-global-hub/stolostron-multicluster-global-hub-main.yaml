@@ -105,8 +105,12 @@ tests:
     workflow: ocm-e2e-kind
 - as: sonarcloud
   commands: |
-    export SELF="make"
-    make sonar/go/prow
+    export TMP_BIN="/tmp/bin"
+    export HOME="/tmp"
+    make setup_envtest
+    export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
   secrets:
@@ -114,8 +118,12 @@ tests:
     name: acm-sonarcloud-token
 - as: sonarcloud-post-submit
   commands: |
-    export SELF="make"
-    make sonar/go/prow
+    export TMP_BIN="/tmp/bin"
+    export HOME="/tmp"
+    make setup_envtest
+    export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
   postsubmit: true
