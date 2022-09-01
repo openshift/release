@@ -129,7 +129,7 @@ function deploy_and_test {
     done
 }
 
-export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn vrf}" # next: ovs_qos metallb
+export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn}" # next: ovs_qos metallb
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
