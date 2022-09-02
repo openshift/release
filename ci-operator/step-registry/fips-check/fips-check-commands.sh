@@ -8,6 +8,13 @@ set -o pipefail
 get_nodes=$(oc --request-timeout=60s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{","}{end}')
 
 IFS="," read -r -a nodes <<< "$get_nodes"
+TEST_NS="openshift-e2e-fips-check"
+
+oc create ns "$TEST_NS"
+oc label namespace "$TEST_NS" --overwrite \
+  pod-security.kubernetes.io/enforce=privileged \
+  pod-security.kubernetes.io/audit=privileged
+
 
 # bash doesn't handle '.' in array elements easily
 num_nodes="${#nodes[@]}"
@@ -16,7 +23,7 @@ num_nodes="${#nodes[@]}"
 for (( i=0; i<$num_nodes; i++ )); do
   attempt=0
   while true; do
-      out=$(oc --request-timeout=60s -n default debug node/"${nodes[i]}" -- cat /proc/sys/crypto/fips_enabled || true)
+      out=$(oc --request-timeout=60s -n "$TEST_NS" debug node/"${nodes[i]}" -- cat /proc/sys/crypto/fips_enabled || true)
       if [[ ! -z "${out}" ]]; then
           break
       fi
@@ -44,3 +51,5 @@ for (( i=0; i<$num_nodes; i++ )); do
     fi
   fi
 done
+
+oc delete ns "$TEST_NS"
