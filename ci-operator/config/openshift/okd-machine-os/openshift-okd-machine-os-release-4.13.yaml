@@ -1,26 +1,43 @@
+base_images:
+  artifacts:
+    name: "4.12"
+    namespace: origin
+    tag: artifacts
+  mco:
+    name: "4.12"
+    namespace: origin
+    tag: machine-config-operator
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.18
 images:
 - dockerfile_path: Dockerfile.ci
-  to: cosa-build
+  to: layering-build
+- dockerfile_path: Dockerfile.rpms
+  inputs:
+    artifacts:
+      as:
+      - registry.ci.openshift.org/origin/4.12:artifacts
+    mco:
+      as:
+      - registry.ci.openshift.org/origin/4.12:machine-config-operator
+  to: okd-rpms
 - inputs:
-    cosa-build:
+    layering-build:
       paths:
       - destination_dir: .
         source_path: /tmp/Dockerfile
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
+    okd-rpms:
+      as:
+      - registry.ci.openshift.org/origin/4.12:okd-rpms
+  to: fedora-coreos
+- from: fedora-coreos
   to: machine-os-content
 promotion:
   excluded_images:
-  - cosa-build
+  - layering-build
   name: "4.13"
   namespace: origin
 releases:
