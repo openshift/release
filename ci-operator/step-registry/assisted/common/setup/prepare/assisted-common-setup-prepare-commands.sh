@@ -255,9 +255,10 @@ cat > run_test_playbook.yaml <<-"EOF"
         when: "equinix_metadata.json.plan == 'm3.large.x86'"
       - name: Setup working directory and swap for machine type c3.medium.x86
         ansible.builtin.shell: |
-          # c3.medium.x86 has 64GB of RAM which is not enough for most of assisted jobs
-          # we need to mount extra swap space in order over commit memory with libvirt/KVM
-          # the machine has 2x240G disks (one is used for the system) and 2x480GB disks
+          # c3.medium.x86 has 64GB of RAM which is not enough for most of assisted jobs.
+          # We need to mount extra swap space in order allow memory overcommit with libvirt/KVM.
+          # The machine is supposed to have 2x240G disks (one is used for the system) and
+          # 2x480GB disks (sometimes missing).
 
           # Get disk where / is mounted
           ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
@@ -266,11 +267,6 @@ cat > run_test_playbook.yaml <<-"EOF"
           SWAP_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | head -n1)
           mkswap "${SWAP_DISK}"
           swapon "${SWAP_DISK}"
-
-          # Setup the largest disk available (480GB) for assisted tests
-          REPO_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | tail -n1)
-          mkfs.xfs -f "${REPO_DISK}"
-          mount "${REPO_DISK}" "{{ REPO_DIR }}"
         when: "equinix_metadata.json.plan == 'c3.medium.x86'"
       when: '"packet" in CLUSTER_TYPE'
     - name: Create {{ MINIKUBE_HOME }} directory if it does not exist
