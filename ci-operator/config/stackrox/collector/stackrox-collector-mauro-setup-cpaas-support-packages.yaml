@@ -7,6 +7,10 @@ base_images:
     name: centos
     namespace: origin
     tag: stream8
+  cpaas-drivers-base:
+    name: stackrox-drivers
+    namespace: stackrox
+    tag: 0.1.0
   fc36:
     name: fedora
     namespace: coreos
@@ -250,6 +254,14 @@ images:
       as:
       - replaced-by-osci:scripts
   to: drivers
+- context_dir: .
+  dockerfile_path: .openshift-ci/drivers/cpaas.Dockerfile
+  from: fc36-base
+  inputs:
+    cpaas-drivers-base:
+      as:
+      - replaced-by-osci:cpaas-drivers-base
+  to: cpaas-drivers
 promotion:
   excluded_images:
   - collector-builder
@@ -849,7 +861,7 @@ tests:
     test:
     - as: push-drivers
       commands: |
-        /scripts/push-drivers.sh
+        /scripts/push-drivers.sh gs://collector-modules-osci
       credentials:
       - mount_path: /tmp/secret/stackrox-collector-driver-push
         name: stackrox-collector-driver-push
@@ -865,7 +877,7 @@ tests:
     test:
     - as: push-drivers
       commands: |
-        /scripts/push-drivers.sh
+        /scripts/push-drivers.sh gs://collector-modules-osci
       credentials:
       - mount_path: /tmp/secret/stackrox-collector-driver-push
         name: stackrox-collector-driver-push
@@ -875,7 +887,51 @@ tests:
         requests:
           cpu: 100m
           memory: 2000Mi
+- as: cpaas-drivers-tests-post
+  cron: 0 0 * * *
+  steps:
+    test:
+    - as: drivers-build-failures
+      commands: |
+        FAILURES_DIR=/FAILURES/ /scripts/drivers-build-failures.sh
+      from: cpaas-drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
+- as: cpaas-push-drivers-post
+  cron: 0 0 * * *
+  steps:
+    test:
+    - as: push-drivers
+      commands: |
+        /scripts/push-drivers.sh gs://collector-modules-osci/cpaas/
+      credentials:
+      - mount_path: /tmp/secrets
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: cpaas-drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
+- as: cpaas-create-support-package-post
+  cron: 0 0 * * *
+  steps:
+    test:
+    - as: support-package
+      commands: |
+        /scripts/cpaas-support-package.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: cpaas-drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
 zz_generated_metadata:
-  branch: master
+  branch: mauro-setup-cpaas-support-packages
   org: stackrox
   repo: collector
