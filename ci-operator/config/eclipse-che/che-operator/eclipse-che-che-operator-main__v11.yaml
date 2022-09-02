@@ -50,10 +50,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: next
-      OO_INSTALL_NAMESPACE: eclipse-che
-      OO_PACKAGE: eclipse-che-preview-openshift
-      OO_TARGET_NAMESPACES: '!all'
+      TEST_SKIPS: ""
     test:
     - as: upgrade-stable-to-next
       cli: latest
@@ -62,42 +59,35 @@ tests:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image
       env:
-      - name: OO_CHANNEL
-      - name: OO_INSTALL_NAMESPACE
-      - name: OO_PACKAGE
-      - name: OO_TARGET_NAMESPACES
+      - name: TEST_SKIPS
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: openshift-e2e-aws
 - as: devworkspace-happy-path
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: next
-      OO_INSTALL_NAMESPACE: eclipse-che
-      OO_PACKAGE: eclipse-che-preview-openshift
-      OO_TARGET_NAMESPACES: '!all'
+      TEST_SKIPS: ""
     test:
     - as: devworkspace-happy-path
       cli: latest
-      commands: /bin/bash build/scripts/oc-tests/oc-test-devworkspace-happy-path.sh
+      commands: |
+        /bin/bash build/scripts/olm/testCatalogFromSources -o ${CI_CHE_OPERATOR_IMAGE} --verbose
+        /bin/bash build/scripts/oc-tests/oc-test-happy-path.sh
       dependencies:
       - env: CI_CHE_OPERATOR_IMAGE
         name: che-operator-image
       env:
-      - name: OO_CHANNEL
-      - name: OO_INSTALL_NAMESPACE
-      - name: OO_PACKAGE
-      - name: OO_TARGET_NAMESPACES
+      - name: TEST_SKIPS
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: openshift-e2e-aws
 - as: che-behind-proxy
   steps:
     cluster_profile: aws
