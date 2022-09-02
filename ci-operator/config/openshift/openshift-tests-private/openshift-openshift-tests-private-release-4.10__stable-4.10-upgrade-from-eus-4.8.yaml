@@ -1,0 +1,68 @@
+base_images:
+  ansible:
+    name: "4.8"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.8"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: openstack-installer
+  tools:
+    name: "4.8"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  intermediate:
+    release:
+      channel: stable
+      version: "4.9"
+  latest:
+    release:
+      channel: stable
+      version: "4.8"
+  target:
+    release:
+      channel: stable
+      version: "4.10"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: aws-ipi-ovn-p1
+  cron: 0 0 */14 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_INTERMEDIATE_TAGS: '@4.9 and @aws-ipi and @upgrade-sanity'
+      E2E_RUN_LATEST_TAGS: '@4.10 and @aws-ipi and @upgrade-sanity'
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.8 and @aws-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.8 and @aws-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-paused-to-latest
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+zz_generated_metadata:
+  branch: release-4.10
+  org: openshift
+  repo: openshift-tests-private
+  variant: stable-4.10-upgrade-from-eus-4.8
