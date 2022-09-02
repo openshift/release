@@ -47,6 +47,20 @@ spec:
       labels:
         app: search
     spec:
+      affinity:
+        # Encourage replicas to be scheduled on separate nodes if more
+        # than one is available.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - search
+              topologyKey: kubernetes.io/hostname
+            weight: 100
       # Force the thing onto its own snowflake node so it only harms itself and not others.
       tolerations:
       - key: ci.openshift.io/ci-search
