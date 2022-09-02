@@ -15,6 +15,8 @@ else
   source "${SHARED_DIR}/ci-machine-config.sh"
 fi
 
+ansible-galaxy collection install ansible.posix
+
 mkdir -p build/ansible
 cd build/ansible
 
@@ -42,6 +44,12 @@ cat > packing-test-infra.yaml <<-EOF
         content: |
           [all]
           {{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+    - name: Create ansible configuration
+      ansible.builtin.copy:
+        dest: "{{ SHARED_DIR }}/ansible.cfg"
+        content: |
+          [defaults]
+          callback_whitelist = ansible.posix.profile_tasks
     - name: Create ssh config file
       ansible.builtin.copy:
         dest: "{{ SHARED_DIR }}/ssh_config"
@@ -60,6 +68,7 @@ ansible-playbook packing-test-infra.yaml
 
 # shellcheck disable=SC2034
 export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
+export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
 
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh

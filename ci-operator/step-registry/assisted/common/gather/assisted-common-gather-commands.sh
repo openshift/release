@@ -144,4 +144,6 @@ cat > gather_logs.yaml <<-EOF
           mode: pull
 EOF
 
-ansible-playbook gather_logs.yaml -i ${SHARED_DIR}/inventory -vv
+ansible-galaxy collection install ansible.posix
+export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
+ansible-playbook gather_logs.yaml -i "${SHARED_DIR}/inventory" -vv
