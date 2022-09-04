@@ -3,6 +3,10 @@ base_images:
     name: coreos-assembler
     namespace: coreos
     tag: latest
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: fcos-buildroot
@@ -34,6 +38,17 @@ images:
       as:
       - registry.ci.openshift.org/coreos/coreos-assembler:latest
   to: build-image
+- dockerfile_literal: |
+    # just the source code
+    FROM registry.access.redhat.com/ubi9/ubi-minimal
+    WORKDIR /src
+    # Copy the source code
+    COPY . .
+  inputs:
+    ubi_minimal:
+      as:
+      - registry.access.redhat.com/ubi9/ubi-minimal
+  to: openshift-os-src
 promotion:
   disabled: true
   excluded_images:
