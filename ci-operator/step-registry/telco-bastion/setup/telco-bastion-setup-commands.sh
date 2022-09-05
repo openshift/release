@@ -8,6 +8,8 @@ echo "************ telco cluster setup command ************"
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
 
+env
+
 # Workaround 777 perms on secret ssh password file
 KNI_SSH_PASS=$(cat /var/run/kni-pass/knipass)
 HYPERV_IP=10.19.16.50
