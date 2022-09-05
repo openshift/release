@@ -102,28 +102,16 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make test
 tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
 - as: verify
   commands: make verify
   container:
     from: src
 - as: operator-e2e
   optional: true
-  steps:
-    cluster_profile: gcp
-    dependencies:
-      OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
-    env:
-      CLUSTERCSIDRIVER: filestore.csi.storage.gke.io
-      OO_CHANNEL: preview
-      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
-      OO_PACKAGE: gcp-filestore-csi-driver-operator
-      OO_TARGET_NAMESPACES: '!all'
-      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-filestore.yaml
-      TEST_SUITE: openshift/csi
-      TRUECONDITIONS: GCPFilestoreDriverControllerServiceControllerAvailable GCPFilestoreDriverNodeServiceControllerAvailable
-    workflow: openshift-e2e-gcp-csi-filestore
-- as: nightly-operator-e2e
-  cron: 0 */12 * * *
   steps:
     cluster_profile: gcp
     dependencies:
