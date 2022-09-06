@@ -32384,7 +32384,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
+      - --target=release-payload-install-analysis-4.11
       command:
       - ci-operator
       env:
@@ -32392,6 +32392,25 @@ periodics:
         value: /var/run/secrets/google-serviceaccount-credentials.json
       - name: JOB_START_TIME
       - name: PAYLOAD_TAG
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: release-payload-install-analysis-4.11
+            steps:
+              env:
+                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
+                JOB_START_TIME: "$(JOB_START_TIME)"
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
+              test:
+              - ref: openshift-release-analysis-test-case-analysis
       image: ci-operator:latest
       imagePullPolicy: Always
       name: aggregator-check-install
@@ -37819,10 +37838,6 @@ periodics:
   decorate: true
   decoration_config:
     timeout: 6h0m0s
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
   name: periodic-ci-openshift-release-master-nightly-4.12-install-analysis-all
   spec:
     containers:
@@ -37835,7 +37850,7 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/usr/local/pull-secret
-      - --target=release-payload-install-analysis
+      - --target=release-payload-install-analysis-4.12
       command:
       - ci-operator
       env:
@@ -37843,6 +37858,25 @@ periodics:
         value: /var/run/secrets/google-serviceaccount-credentials.json
       - name: JOB_START_TIME
       - name: PAYLOAD_TAG
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: release-payload-install-analysis-4.12
+            steps:
+              env:
+                GOOGLE_SA_CREDENTIAL_FILE: "$(GOOGLE_SA_CREDENTIAL_FILE)"
+                JOB_START_TIME: "$(JOB_START_TIME)"
+                PAYLOAD_TAG: "$(PAYLOAD_TAG)"
+                WORKING_DIR: "$(ARTIFACT_DIR)/release-analysis-install-analysis"
+              test:
+              - ref: openshift-release-analysis-test-case-analysis
       image: ci-operator:latest
       imagePullPolicy: Always
       name: aggregator-check-install
@@ -37958,64 +37992,6 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-aws-2
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: '@yearly'
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  labels:
-    ci-operator.openshift.io/variant: nightly-4.12
-    ci.openshift.io/generator: prowgen
-    ci.openshift.io/no-builds: "true"
-    job-release: "4.12"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.12-release-payload-install-analysis
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=release-payload-install-analysis
-      - --variant=nightly-4.12
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
