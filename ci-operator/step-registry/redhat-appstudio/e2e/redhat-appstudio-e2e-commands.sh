@@ -7,7 +7,7 @@ set -o pipefail
 export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
-export GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN
+export GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_BUILD QUAY_OAUTH_TOKEN_RELEASE_RELEASE
 
 GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
 GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
