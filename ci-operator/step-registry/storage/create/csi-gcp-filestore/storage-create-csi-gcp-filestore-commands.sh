@@ -50,8 +50,8 @@ SnapshotClass:
 DriverInfo:
   Name: filestore.csi.storage.gke.io
   SupportedSizeRange:
-    Min: 1Gi
-    Max: 64Ti
+    Min: 1Ti
+    Max: 63.9Ti
   Capabilities:
     persistence: true
     exec: true
