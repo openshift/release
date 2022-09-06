@@ -51,7 +51,7 @@ if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
 fi
 
 # Delete XPN service account key
-if [[ -v IS_XPN ]] && [[ -f "${SHARED_DIR}/xpn_sa_key_id)" ]]; then
+if [[ -v IS_XPN ]] && [[ -f "${SHARED_DIR}/xpn_sa_key_id" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Deleting the XPN service account key..."
   gcloud iam service-accounts keys delete -q "$(< ${SHARED_DIR}/xpn_sa_key_id)" --iam-account="${HOST_PROJECT_CONTROL_SERVICE_ACCOUNT}"
   gcloud iam service-accounts keys list --iam-account="${HOST_PROJECT_CONTROL_SERVICE_ACCOUNT}"
