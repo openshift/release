@@ -17,7 +17,6 @@ QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-toke
 QUAY_OAUTH_TOKEN_RELEASE_BUILD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-build)
 QUAY_OAUTH_TOKEN_RELEASE_RELEASE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-release)
 
-
 git config --global user.name "redhat-appstudio-qe-bot"
 git config --global user.email redhat-appstudio-qe-bot@redhat.com
 
