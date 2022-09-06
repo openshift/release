@@ -27,7 +27,7 @@ Create a pull request with the changes above.
 ## Set up applyConfig against the cluster
 
 It is required that the API server uses a CA trusted certificate.
-See [OpenShift doc for the steps](https://docs.openshift.com/container-platform/4.11/security/certificates/api-server.html) of achieving it.
+See [OpenShift documentation](https://docs.openshift.com/container-platform/4.11/security/certificates/api-server.html) for the necessary steps.
 
 Create the namespaces:
 
