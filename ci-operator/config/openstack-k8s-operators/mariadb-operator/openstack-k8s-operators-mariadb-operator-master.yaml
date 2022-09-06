@@ -3,12 +3,22 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
+  cli:
+    name: "4.5"
+    namespace: "ocp"
+    tag: "cli"
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.18
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.10"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -42,6 +52,33 @@ tests:
   commands: make gofmt || true
   container:
     from: src
+- as: e2e-openstack-noop
+  cluster_claim:
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    version: "4.10"
+    product: ""
+    timeout: 1h0m0s
+  steps:
+    test:
+    - as: claim
+      commands: |
+        cd $HOME
+        rm -rf install_yamls
+        git clone https://github.com/openstack-k8s-operators/install_yamls.git
+        cd $HOME/install_yamls
+        make crc_storage
+        sleep 20
+        make mariadb
+        sleep 90
+        make mariadb_deploy
+        sleep 90
+      from: cli
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 200Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
