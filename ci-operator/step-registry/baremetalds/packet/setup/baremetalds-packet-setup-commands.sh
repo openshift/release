@@ -199,12 +199,17 @@ cat > packet-setup.yaml <<-EOF
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
     - packet_project_id: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-project-id') }}"
     - packet_auth_token: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-auth-token') }}"
-
+    - user_data_filename: "{{ lookup('env', 'USER_DATA_FILENAME') }}"
   tasks:
   - name: check cluster type
     fail:
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
     when: "cluster_type is not regex('^packet.*$|^equinix.*$')"
+
+  - name: load user-data file content
+    set_fact:
+      user_data: "{{ lookup('file', lookup('env', 'SHARED_DIR') + '/' + user_data_filename) }}"
+    when: user_data_filename != ""
 
   - name: create Packet host with error handling
     block:
@@ -217,6 +222,7 @@ cat > packet-setup.yaml <<-EOF
         plan: ${PACKET_PLAN}
         facility: any
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
+        user_data: "{{ user_data | default(omit) }}"
       register: hosts
       no_log: true
     - name: write device info to file
