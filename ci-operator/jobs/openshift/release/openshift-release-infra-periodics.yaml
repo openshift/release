@@ -2455,7 +2455,7 @@ periodics:
               candidate:
                 product: ocp
                 stream: ci
-                version: "4.8"
+                version: "4.12"
           resources:
             '*':
               requests:
@@ -2464,17 +2464,12 @@ periodics:
           tests:
           - as: launch
             steps:
-              cluster_profile: hypershift
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
-              - as: publish-console-url-hack
-                commands: echo "https://cluster.example.com" > "${SHARED_DIR}/console.url"
-                from: cli
-                resources: { requests: { cpu: 100m, memory: 100Mi } }
-              - as: wait
-                commands: sleep $(CLUSTER_DURATION) & wait
-                from: cli
-                resources: { requests: { cpu: 100m, memory: 100Mi } }
-              workflow: hypershift-launch-aws
+              - ref: clusterbot-wait
+              cluster_profile: hypershift
+              workflow: hypershift-aws-cluster
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
