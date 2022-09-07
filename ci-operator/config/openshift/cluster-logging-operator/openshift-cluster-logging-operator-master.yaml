@@ -55,6 +55,10 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: oauth-proxy
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.11
 build_root:
   image_stream_tag:
     name: release
@@ -72,6 +76,7 @@ images:
 operator:
   bundles:
   - as: cluster-logging-operator-bundle
+    base_index: operator-index
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/openshift-logging/cluster-logging-operator:latest
@@ -111,6 +116,13 @@ tests:
 - as: e2e-target
   steps:
     cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index-cluster-logging-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators-redhat
+      OO_PACKAGE: loki-operator
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: test
       cli: latest
@@ -150,7 +162,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: openshift-e2e-gcp
+    workflow: optional-operators-ci-generic-claim
   timeout: 5h0m0s
 - as: e2e-ocp-target-minus-one
   cluster_claim:
