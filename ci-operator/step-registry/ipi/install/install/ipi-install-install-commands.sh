@@ -301,14 +301,17 @@ EOF
   done
 }
 
+function get_yq() {
+  if [ ! -f /tmp/yq ]; then
+    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+  fi
+}
+
 # inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
 function inject_spot_instance_config() {
   local dir=${1}
 
-  if [ ! -f /tmp/yq ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-  fi
-
+  get_yq
   PATCH="${SHARED_DIR}/machinesets-spot-instances.yaml.patch"
   cat > "${PATCH}" << EOF
 spec:
@@ -325,6 +328,22 @@ EOF
   done
 
   echo "Enabled AWS Spot instances for worker nodes"
+}
+
+# Enable public IP addresses for worker nodes. This can significantly reduce transfer costs for
+# ephemeral test clusters.
+function inject_gcp_public_ip_config() {
+  local dir=${1}
+  get_yq
+
+  for MACHINESET in $dir/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
+    if [[ $(/tmp/yq r "${MACHINESET}" "spec.template.spec.providerSpec.value.kind") == "GCPMachineProviderSpec" ]]; then
+      /tmp/yq w -i "${MACHINESET}" "spec.template.spec.providerSpec.value.networkInterfaces[0].publicIP" "true"
+      echo "Patched publicIP into ${MACHINESET}"
+    fi
+  done
+
+  echo "Enabled public IP for GCP workers"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -422,6 +441,35 @@ aws|aws-arm64|aws-usgov)
     fi
     ;;
 esac
+
+if [[ "${GCP_PUBLIC_IPS:-}"  == 'auto' ]]; then
+  TARGET_VERSION="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -ojsonpath='{.metadata.version}')"
+  MAJOR_VERSION="$(echo ${TARGET_VERSION} | cut -d . -f 1)"
+  MINOR_VERSION="$(echo ${TARGET_VERSION} | cut -d . -f 2)"
+  if [[ "${MAJOR_VERSION}" -gt "4" || "${MINOR_VERSION}" -ge "14" ]]; then
+    # 4.14+ required because k8s tests did not support nodes have a public
+    # IP address that was not available outside of the cluster.
+    # https://github.com/openshift/kubernetes/pull/1560 removed this limitation.
+    # Our public IPs are used for ingress only and should not be accessible
+    # from outside of the cluster.
+    if [[ "${JOB_TYPE}" == "presubmit" ]]; then
+      # At present, only utilize NAT bypass for presubmits. We do not want to run this
+      # way for release controller jobs. In the future, we should analyze the prowjob
+      # manager or other aspects to include more non-RC jobs. For PoC, we can
+      # assess impact with presubmit only.
+
+      if [[ "${JOB_NAME}" != *"serial"* ]]; then
+        # The serial job presently fails because of egress failures.
+        # e.g. [sig-network][Feature:EgressIP][apigroup:operator.openshift.io] [external-targets][apigroup:user.openshift.io][apigroup:security.openshift.io] pods should have the assigned EgressIPs and EgressIPs can be updated [Skipped:Network/OpenShiftSDN] [Serial] [Suite:openshift/conformance/serial]
+        export GCP_PUBLIC_IPS="true"
+      fi
+    fi
+  fi
+fi
+
+if [[ "${GCP_PUBLIC_IPS:-}"  == 'true' ]]; then
+  inject_gcp_public_ip_config ${dir}
+fi
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
