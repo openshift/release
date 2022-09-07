@@ -177,9 +177,15 @@ tests:
           cpu: 2000m
           memory: 4000Mi
 - as: style-checks
-  steps:
-    test:
-    - ref: stackrox-initial
+  commands: |
+    HOME=$( mktemp -d )
+    .openshift-ci/dispatch.sh style-checks
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
 - as: policy-checks
   steps:
     test:
@@ -225,17 +231,35 @@ tests:
           cpu: 2000m
           memory: 4000Mi
 - as: go-unit-tests
-  steps:
-    test:
-    - ref: stackrox-initial
+  commands: |
+    HOME=$( mktemp -d )
+    .openshift-ci/dispatch.sh go-unit-tests
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
 - as: go-unit-tests-release
-  steps:
-    test:
-    - ref: stackrox-initial
+  commands: |
+    HOME=$( mktemp -d )
+    .openshift-ci/dispatch.sh go-unit-tests-release
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
 - as: go-postgres-tests
-  steps:
-    test:
-    - ref: stackrox-initial
+  commands: |
+    HOME=$( mktemp -d )
+    .openshift-ci/dispatch.sh go-postgres-tests
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
 - as: integration-unit-tests
   steps:
     test:
