@@ -216,14 +216,17 @@ EOF
   done
 }
 
+function get_yq() {
+  if [ ! -f /tmp/yq ]; then
+    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+  fi
+}
+
 # inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
 function inject_spot_instance_config() {
   local dir=${1}
 
-  if [ ! -f /tmp/yq ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-  fi
-
+  get_yq
   PATCH="${SHARED_DIR}/machinesets-spot-instances.yaml.patch"
   cat > "${PATCH}" << EOF
 spec:
@@ -240,6 +243,22 @@ EOF
   done
 
   echo "Enabled AWS Spot instances for worker nodes"
+}
+
+# Enable public IP addresses for worker nodes. This can significantly reduce transfer costs for
+# ephemeral test clusters.
+function inject_public_ip_config() {
+  local dir=${1}
+  get_yq
+
+  for MACHINESET in $dir/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
+    if [[ $(/tmp/yq r "${MACHINESET}" "spec.template.spec.providerSpec.value.kind") == "GCPMachineProviderSpec" ]]; then
+      /tmp/yq w -i "${MACHINESET}" "spec.template.spec.providerSpec.value.networkInterfaces[0].publicIP" "true"
+      echo "Patched publicIP into ${MACHINESET}"
+    fi
+  done
+
+  echo "Enabled public IP for workers"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -309,6 +328,10 @@ aws|aws-arm64|aws-usgov)
     fi
     ;;
 esac
+
+if [[ "${PUBLIC_WORKER_IPS:-}"  == 'true' ]]; then
+  inject_public_ip_config ${dir}
+fi
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
