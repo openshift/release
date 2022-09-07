@@ -155,8 +155,17 @@ fips: true
 EOF
 fi
 
-# Lets check the syntax of yaml file by reading it and print a redacted version
-# for debugging.
+# Regenerate install-config.yaml to fill in unset values with default values.
+# Note that this triggers some validation against the OpenStack infrastructure.
+(
+	declare dir=''
+	dir="$(mktemp -d)"
+	cp "${CONFIG}" "${dir}/install-config.yaml"
+	openshift-install --dir "$dir" create install-config
+	cp "${dir}/install-config.yaml" "${CONFIG}"
+)
+
+# Make a redacted version available for debugging in the artifacts dir.
 python -c 'import yaml;
 import sys
 data = yaml.safe_load(open(sys.argv[1]))
