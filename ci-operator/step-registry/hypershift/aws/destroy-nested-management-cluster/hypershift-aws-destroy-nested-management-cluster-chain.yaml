@@ -3,14 +3,10 @@ chain:
   steps:
   - as: dump-management-cluster
     cli: latest
-    env:
-    - name: NAMESPACE
-      default: "clusters"
-      documentation: "The Namespace where to create the HostedCluster and NodePools"
     commands: |-
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
-      bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir=$ARTIFACT_DIR --name="${CLUSTER_NAME}" --namespace="${NAMESPACE}"
+      bin/hypershift dump cluster --dump-guest-cluster=true --artifact-dir=$ARTIFACT_DIR --name="${CLUSTER_NAME}"
     credentials:
     - mount_path: /etc/hypershift-kubeconfig
       name: hypershift-ci-1
@@ -25,17 +21,12 @@ chain:
         cpu: 100m
   - as: destroy-management-cluster
     cli: latest
-    env:
-      - name: NAMESPACE
-        default: "clusters"
-        documentation: "The Namespace where to create the HostedCluster and NodePools"
     commands: |-
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       bin/hypershift destroy cluster aws \
       --aws-creds=/etc/hypershift-ci-jobs-awscreds/credentials  \
       --name="${CLUSTER_NAME}" \
-      --namespace="${NAMESPACE}" \
       --infra-id=${CLUSTER_NAME} \
       --base-domain=ci.hypershift.devcluster.openshift.com
     credentials:
