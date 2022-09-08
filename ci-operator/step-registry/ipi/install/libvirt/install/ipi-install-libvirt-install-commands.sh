@@ -111,6 +111,13 @@ function collect_bootstrap() {
 	set -e
 }
 
+# yq is needed
+if [ ! -f /tmp/yq ]; then
+  curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq
+  chmod +x /tmp/yq
+  PATH=${PATH}:/tmp
+fi
+
 trap 'prepare_next_steps' EXIT TERM
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 

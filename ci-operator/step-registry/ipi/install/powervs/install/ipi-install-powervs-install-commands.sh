@@ -233,6 +233,13 @@ function init_ibmcloud() {
     PATH=${PATH}:/tmp/Bluemix_CLI/bin
   fi
 
+  # yq is needed
+  if [ ! -f /tmp/yq ]; then
+    curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq
+    chmod +x /tmp/yq
+    PATH=${PATH}:/tmp
+  fi
+
   if [ ! -f /tmp/jq ]; then
 
     for I in $(seq 1 5)

@@ -6,6 +6,13 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+# yq is needed
+if [ ! -f /tmp/yq ]; then
+  curl -L https://github.com/mikefarah/yq/releases/download/v4.13.5/yq_linux_amd64 -o /tmp/yq
+  chmod +x /tmp/yq
+  PATH=${PATH}:/tmp
+fi
+
 REMOTE_LIBVIRT_URI=$(yq r "${SHARED_DIR}/cluster-config.yaml" 'REMOTE_LIBVIRT_URI')
 # Test the possibly flakey bastion connection before tearing down
 mock-nss.sh virsh -c ${REMOTE_LIBVIRT_URI} list --all || return
