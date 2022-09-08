@@ -253,21 +253,24 @@ cat > run_test_playbook.yaml <<-"EOF"
           mkfs.xfs -f /dev/nvme0n1
           mount /dev/nvme0n1 {{ REPO_DIR }}
         when: "equinix_metadata.json.plan == 'm3.large.x86'"
-      - name: Setup working directory and swap for machine type c3.medium.x86
+      - name: Setup extra swap for machine type {{ equinix_metadata.json.plan }}
         ansible.builtin.shell: |
-          # c3.medium.x86 has 64GB of RAM which is not enough for most of assisted jobs.
+          # c3.medium.x86 and m3.small.x86 have 64GB of RAM which is not enough for most of assisted jobs.
           # We need to mount extra swap space in order allow memory overcommit with libvirt/KVM.
-          # The machine is supposed to have 2x240G disks (one is used for the system) and
+          #
+          # c3.medium.x86 is supposed to have 2x240G disks (one is used for the system) and
           # 2x480GB disks (sometimes missing).
+          #
+          # m3.small.x86 has 2 x 480GB disks (one is used for the system)
 
           # Get disk where / is mounted
           ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
 
-          # Setup the smallest disk available (240GB) as swap
+          # Setup the smallest disk available as swap
           SWAP_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | head -n1)
           mkswap "${SWAP_DISK}"
           swapon "${SWAP_DISK}"
-        when: "equinix_metadata.json.plan == 'c3.medium.x86'"
+        when: "equinix_metadata.json.plan == 'c3.medium.x86' or equinix_metadata.json.plan == 'm3.small.x86'"
       when: '"packet" in CLUSTER_TYPE'
     - name: Create {{ MINIKUBE_HOME }} directory if it does not exist
       ansible.builtin.file:
