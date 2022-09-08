@@ -3,13 +3,24 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
+images:
+- context_dir: tests/
+  dockerfile_path: Dockerfile
+  to: ml-pipelines-tests
+promotion:
+  namespace: opendatahub-io
+  tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.10"
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: 200m
+      memory: 400Mi
 tests:
 - as: unit
   commands: |
@@ -19,6 +30,20 @@ tests:
     rm -rf vendor
   container:
     from: src
+- as: ml-pipelines-e2e
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      commands: $HOME/peak/installandtest.sh
+      from: ml-pipelines-tests
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: opendatahub-io
