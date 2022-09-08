@@ -21,10 +21,7 @@ tests:
 - as: verify
   commands: |
     set -o pipefail
-
-    export HOME=$(mktemp -d)
-
-    export REPORT_DIR=/tmp/artifacts
+    export REPORT_DIR="$ARTIFACT_DIR"
 
     ci/prow_pr_check.sh
   container:
@@ -74,6 +71,7 @@ tests:
     test:
     - as: conformance-tests-pre-upgrade
       commands: |
+        export REPORT_DIR="$ARTIFACT_DIR"
         source ./ci/aro-e2e-tests.sh
       credentials:
       - mount_path: /usr/local/osde2e-credentials
@@ -110,6 +108,7 @@ tests:
     test:
     - as: aro-cleanup
       commands: |
+        export REPORT_DIR="$ARTIFACT_DIR"
         cd /tmp/
         git clone https://github.com/openshift/osde2e.git
         cd osde2e
@@ -141,6 +140,7 @@ tests:
     name: osde2e-credentials
 - as: rosa-stage-e2e-default
   commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="rosa,e2e-suite"
     export ROSA_ENV="stage"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
@@ -159,6 +159,7 @@ tests:
     name: osde2e-rosa-stage
 - as: aws-stage-e2e-default
   commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="aws,stage,e2e-suite"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
@@ -174,6 +175,7 @@ tests:
     name: osde2e-credentials
 - as: gcp-stage-e2e-default
   commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="gcp,stage,e2e-suite"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
@@ -206,6 +208,7 @@ tests:
     name: osde2e-credentials
 - as: aws-prod-informing-default
   commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="aws,prod,informing-suite"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
@@ -221,6 +224,7 @@ tests:
     name: osde2e-credentials
 - as: aws-prod-cleanup
   commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="prod"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
@@ -236,6 +240,7 @@ tests:
     name: osde2e-credentials
 - as: gcp-prod-e2e-default
   commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="gcp,prod,e2e-suite"
     export ENABLE_ALERTS="true"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
@@ -252,6 +257,7 @@ tests:
     name: osde2e-credentials
 - as: rosa-prod-e2e-default
   commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="rosa,e2e-suite"
     export ROSA_ENV="prod"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-prod"
