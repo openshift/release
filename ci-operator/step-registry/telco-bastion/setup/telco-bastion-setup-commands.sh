@@ -8,6 +8,8 @@ echo "************ telco cluster setup command ************"
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
 
+env
+
 # Workaround 777 perms on secret ssh password file
 KNI_SSH_PASS=$(cat /var/run/kni-pass/knipass)
 HYPERV_IP=10.19.16.50
@@ -22,8 +24,13 @@ set -x
 
 KCLI_PARAM=""
 if [ ! -z $OO_CHANNEL ] ; then
+    # Historical reasons
     KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:$OO_CHANNEL"
+elif [[ "$PROW_JOB_ID" =~ "nightly" ]]; then
+    # In case of running on nightly releases we need to figure out what release exactly to use
+    KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:${PROW_JOB_ID/-telco5g/}"
 elif [ ! -z $JOB_NAME ]; then
+    # In case of regular periodic job
     tmpvar="${JOB_NAME/*nightly-/}"
     ocp_ver="${tmpvar/-e2e-telco5g/}"
     KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:$ocp_ver"

@@ -1117,8 +1117,10 @@ periodics:
         set -o errexit
         failures=0
         for mapping in /etc/imagemirror/mapping_coreos_assembler*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+          # Remove --keep-manifest-list option for now until the internal
+          # registry supports it. https://issues.redhat.com/browse/IR-192
+          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+          if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
             failures=$((failures+1))
           fi
@@ -1213,8 +1215,8 @@ periodics:
         set -o errexit
         failures=0
         for mapping in /etc/imagemirror/mapping_stackrox_collector*; do
-          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+          if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
             failures=$((failures+1))
           fi
@@ -1233,15 +1235,15 @@ periodics:
           cpu: 500m
       volumeMounts:
       - mountPath: /home/mirror/.docker/config.json
-        name: pull
+        name: push
         readOnly: true
-        subPath: config.json
+        subPath: .dockerconfigjson
       - mountPath: /etc/imagemirror
         name: config
     volumes:
-    - name: pull
+    - name: push
       secret:
-        secretName: mirror-brew-registry-redhat-io-to-central-stackrox-collector
+        secretName: mirror-brew-redhat-io-to-ci-central-registry-credentials
     - configMap:
         name: image-mirror-mappings
       name: config

@@ -394,7 +394,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -1019,6 +1019,15 @@ periodics:
               env:
                 TEST_SUITE: "all"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-virtualization-support
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                COMPUTE_NODE_TYPE: n2-standard-4
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLUSTER_TYPE)
       - name: JOB_NAME_SAFE
         value: launch
       - name: TEST_COMMAND
@@ -2446,7 +2455,7 @@ periodics:
               candidate:
                 product: ocp
                 stream: ci
-                version: "4.8"
+                version: "4.12"
           resources:
             '*':
               requests:
@@ -2455,17 +2464,12 @@ periodics:
           tests:
           - as: launch
             steps:
-              cluster_profile: hypershift
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
               test:
-              - as: publish-console-url-hack
-                commands: echo "https://cluster.example.com" > "${SHARED_DIR}/console.url"
-                from: cli
-                resources: { requests: { cpu: 100m, memory: 100Mi } }
-              - as: wait
-                commands: sleep $(CLUSTER_DURATION) & wait
-                from: cli
-                resources: { requests: { cpu: 100m, memory: 100Mi } }
-              workflow: hypershift-launch-aws
+              - ref: clusterbot-wait
+              cluster_profile: hypershift
+              workflow: hypershift-aws-cluster
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
