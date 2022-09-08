@@ -1,0 +1,29 @@
+chain:
+  as: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace-provision
+  steps:
+    - ref: ipi-conf
+    - ref: aws-provision-vpc-shared
+    - chain: aws-provision-bastionhost
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-marketplace
+    - ref: ipi-install-monitoringpvc
+    - ref: proxy-config-generate
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-install
+    - ref: ipi-install-times-collection
+    - ref: enable-qe-catalogsource
+  env:
+  - name: USE_MARKETPLACE_CONTRACT_NODE_TYPE_ONLY
+    default: "yes"
+    documentation: |-
+      Use instance types which present in the contract only.
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy."
+  documentation: |-
+    Create an IPI private cluster on AWS GovCloud for QE e2e tests.
+    The worker node is configured by using AWS Marketplace images
+    
+
