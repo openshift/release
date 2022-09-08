@@ -5,19 +5,19 @@ presubmits:
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build04
-    context: ci/prow/e2e
+    cluster: build01
+    context: ci/prow/e2e-techpreview
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-platform-operators-release-4.12-e2e
+    name: pull-ci-openshift-platform-operators-release-4.12-e2e-techpreview
     optional: true
-    rerun_command: /test e2e
+    rerun_command: /test e2e-techpreview
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -27,8 +27,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-cluster-profile
-        - --target=e2e
+        - --secret-dir=/usr/local/e2e-techpreview-cluster-profile
+        - --target=e2e-techpreview
         command:
         - ci-operator
         image: ci-operator:latest
@@ -44,7 +44,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-cluster-profile
+        - mountPath: /usr/local/e2e-techpreview-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -67,19 +67,15 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-techpreview,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
