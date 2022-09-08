@@ -35,13 +35,21 @@ releases:
 resources:
   '*':
     limits:
-      memory: 4Gi
+      memory: 6Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
 - as: fmt
   commands: make gofmt
+  container:
+    from: src
+- as: lint
+  commands: GOLANGCI_LINT_CACHE=/tmp/.cache GOFLAGS="-mod=readonly" make golint
+  container:
+    from: src
+- as: unit
+  commands: make unit-test
   container:
     from: src
 - as: e2e-alibabacloud

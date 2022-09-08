@@ -26,6 +26,9 @@ Create a pull request with the changes above.
 
 ## Set up applyConfig against the cluster
 
+It is required that the API server uses a CA trusted certificate.
+See [OpenShift documentation](https://docs.openshift.com/container-platform/4.11/security/certificates/api-server.html) for the necessary steps.
+
 Create the namespaces:
 
 > oc apply -f clusters/build-clusters/common/00_namespaces.yaml
@@ -36,15 +39,9 @@ Create the SA for the `appyconfig` job:
 
 Note that this will promote `system:serviceaccount:ci:config-updater` to `cluster-admin`.
 
-Create kubeconfig for `system:serviceaccount:ci:config-updater`:
-
-```
-context=vsphere
-sa=config-updater
-config="sa.${sa}.${context}.config"
-oc sa create-kubeconfig -n ci "${sa}" > "${config}"
-sed -i "s/${sa}/${context}/g" "${config}"
-```
+Create kubeconfig for `system:serviceaccount:ci:config-updater`: 
+- It has only one context named as the claimed folder name, e.g., `vsphere`.
+- (optional but nice to have) The namespace of the context is `ci`.
 
 Contact a member of DPTP to send the `kubeconfig` file with encryption. Then DPTP will set up the `applyconfig` (presubmit for dry-run and postsubmit) jobs for the cluster. Note that the `yaml` files in the claimed folder will be applied automatically to the cluster: The presubmit is with the `dry-run` mode while the postsubmit is not, e.g, [pull-ci-openshift-release-master-vsphere-dry](https://github.com/openshift/release/blob/d3e0f9b333f74537376a8978d958b33b8b081733/ci-operator/jobs/openshift/release/openshift-release-master-presubmits.yaml#L778) and [branch-ci-openshift-release-master-vsphere-apply](https://github.com/openshift/release/blob/d3e0f9b333f74537376a8978d958b33b8b081733/ci-operator/jobs/openshift/release/openshift-release-master-postsubmits.yaml#L170).
 

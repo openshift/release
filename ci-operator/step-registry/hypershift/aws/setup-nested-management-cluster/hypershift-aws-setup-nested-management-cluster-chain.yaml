@@ -3,9 +3,14 @@ chain:
   steps:
   - as: create-management-cluster
     cli: latest
+    env:
+    - name: HYPERSHIFT_NODE_COUNT
+      default: "3"
+      documentation: "The number nodes for the cluster. This number will get mulitplied by three, as there are three AZs"
     commands: |-
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
+      echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
       bin/hypershift create cluster aws \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --aws-creds=/etc/hypershift-ci-jobs-awscreds/credentials \
@@ -17,7 +22,7 @@ chain:
         --instance-type=m5.xlarge \
         --zones=us-east-1a,us-east-1b,us-east-1c \
         --service-cidr=172.29.0.0/16 \
-        --node-pool-replicas=3
+        --node-pool-replicas=${HYPERSHIFT_NODE_COUNT}
       echo "Waiting for cluster to become available"
       oc wait --timeout=10m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
@@ -32,6 +37,8 @@ chain:
           echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
           sleep 1s
       done
+      # Data for cluster bot.
+      echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
