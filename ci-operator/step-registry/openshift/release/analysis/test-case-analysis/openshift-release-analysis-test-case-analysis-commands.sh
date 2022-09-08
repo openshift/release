@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+MINIMUM_SUCCESSFUL_COUNT=2
+TEST_GROUP=install
+
 echo
 echo "********** Starting testcase analysis for:  aws-ovn-ipi "
 echo
