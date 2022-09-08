@@ -44,6 +44,36 @@ tests:
       IMAGE_TAG: "2.7"
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: deploy-and-run-e2e
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: search-operator-bundle
+    env:
+      CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES: "15"
+      CLUSTERPOOL_GROUP_NAME: Search
+      CLUSTERPOOL_HOST_NAMESPACE: acm-observability-usa
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-obs-usa-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      CLUSTERPOOL_MANAGED_COUNT: "1"
+      DEPLOY_TIMEOUT: "2700"
+      PIPELINE_STAGE: integration
+    test:
+    - as: e2e-test
+      commands: |
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow e2e
+      credentials:
+      - mount_path: /etc/secret
+        name: ocm-obs-usa-acmcreds
+        namespace: test-credentials
+      from: search-operator-bundle
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
 - as: publish
   postsubmit: true
   steps:
