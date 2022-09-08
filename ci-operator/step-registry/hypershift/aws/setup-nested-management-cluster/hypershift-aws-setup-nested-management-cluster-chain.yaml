@@ -7,12 +7,6 @@ chain:
     - name: HYPERSHIFT_NODE_COUNT
       default: "3"
       documentation: "The number nodes for the cluster. This number will get mulitplied by three, as there are three AZs"
-    - name: NAMESPACE
-      default: "clusters"
-      documentation: "The Namespace where to create the HostedCluster and NodePools"
-    - name: ZONES
-      default: "us-east-1a,us-east-1b,us-east-1c"
-      documentation: "The zones where to create NodePools"
     commands: |-
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
@@ -26,15 +20,14 @@ chain:
         --infra-id=${CLUSTER_NAME} \
         --base-domain=ci.hypershift.devcluster.openshift.com \
         --instance-type=m5.xlarge \
-        --zones=${ZONES} \
+        --zones=us-east-1a,us-east-1b,us-east-1c \
         --service-cidr=172.29.0.0/16 \
-        --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
-        --namespace=${NAMESPACE}
+        --node-pool-replicas=${HYPERSHIFT_NODE_COUNT}
       echo "Waiting for cluster to become available"
-      oc wait --timeout=10m --for=condition=Available --namespace=${NAMESPACE} hostedcluster/${CLUSTER_NAME}
+      oc wait --timeout=10m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
-      bin/hypershift create kubeconfig --namespace=${NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/management_cluster_kubeconfig
-      bin/hypershift create kubeconfig --namespace=${NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/kubeconfig
+      bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/management_cluster_kubeconfig
+      bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/kubeconfig
       echo "Waiting for clusteroperators to be ready"
       export KUBECONFIG=${SHARED_DIR}/management_cluster_kubeconfig
       until \
