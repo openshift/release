@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.17-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.17-linux
   stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
@@ -48,7 +44,6 @@ tests:
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export SELF="make"
         export OSCI_COMPONENT_NAME="search-operator-bundle"
         export OSCI_COMPONENT_VERSION="2.6"
@@ -80,6 +75,11 @@ tests:
       IMAGE_REPO: search-operator-bundle
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
 - as: unit-test
   commands: |
     export SELF="make -f Makefile.prow"
@@ -97,7 +97,6 @@ tests:
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_COMPONENT_VERSION="2.6"
         export OSCI_COMPONENT_NAME="search-v2-operator"
         export SELF="make -f Makefile.prow"

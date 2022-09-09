@@ -1,3 +1,12 @@
+base_images:
+  checkov-image:
+    name: checkov
+    namespace: ci
+    tag: "2"
+  hadolint-image:
+    name: hadolint
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -51,14 +60,12 @@ tests:
       cli: latest
       commands: |
         HOME_DIR="$(pwd)"
-
         echo "Start building kcp plugin ..."
         kcp_version="$(yq '.images[] | select(.name == "kcp") | .newTag' "ckcp/openshift/overlays/dev/kustomization.yaml")"
         echo "kcp version:" $kcp_version
         git clone https://github.com/kcp-dev/kcp.git -b $kcp_version
         cd $HOME_DIR/kcp && go mod vendor && make install
         kubectl-kcp --version
-
         echo "\n\nStart ckcp setup ..."
         cd $HOME_DIR/ckcp && ./openshift_dev_setup.sh -d
       from: plnsvc-test-image
@@ -88,6 +95,18 @@ tests:
       resources:
         requests:
           cpu: 100m
+- as: plnsvc-hadolint
+  commands: |
+    find . -name Dockerfile -exec hadolint -c test/config/hadolint.yaml {} +
+  container:
+    clone: true
+    from: hadolint-image
+- as: plnsvc-checkov
+  commands: |
+    checkov --directory . --config-file test/config/checkov.yaml
+  container:
+    clone: true
+    from: checkov-image
 zz_generated_metadata:
   branch: main
   org: openshift-pipelines

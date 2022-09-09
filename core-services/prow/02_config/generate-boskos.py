@@ -195,7 +195,7 @@ for i in range(10, 24):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(79,106):
+for i in range(83,106):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):
@@ -209,7 +209,7 @@ for i in range(50,54):
 
 for i in range(55,56):
     CONFIG['vsphere-connected-quota-slice']['ci-segment-{}'.format(i)] = 1
-    
+
 for i in range(151,155):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 

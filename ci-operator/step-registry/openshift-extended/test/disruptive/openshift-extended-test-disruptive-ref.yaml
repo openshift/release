@@ -1,0 +1,47 @@
+ref:
+  as: openshift-extended-test-disruptive
+  from: tests-private
+  grace_period: 10m
+  commands: openshift-extended-test-disruptive-commands.sh
+  cli: latest
+  timeout: 16h0m0s
+  env:
+  - name: TEST_SCENRAIOS
+    default: |
+        MCO|ETCD|PSAP|SDN|STORAGE|API_Server|Authentication|Cluster_Operator
+        Cluster_Infrastructure|OLM|Network_Edge|Operator_SDK
+        Workloads|Image_Registry|Container_Engine_Tools
+        NODE|OTA|PerfScale|Cluster_Observability|Security_and_Compliance|LOGGING
+    documentation: |-
+      Select the test case. It's a RE pattern and is passed to the 'grep -E'
+  - name: TEST_ADDITIONAL
+    default: ""
+    documentation: |
+      It is additional scenario to combine the TEST_SCENRAIOS to make final scenarios.
+  - name: TEST_FILTERS
+    default: "~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~DisconnectedOnly&"
+    documentation: |
+      It is filters to select case based on some case attribution which is in case title.
+  - name: TEST_IMPORTANCE
+    default: ""
+    documentation: it means case IMPORTANCE.
+  - name: TEST_TIMEOUT
+    default: "15"
+    documentation: it means the duration of one case execution.
+  - name: TEST_PARALLEL
+    default: "6"
+    documentation: it means the number of case execution in parallel.
+  - name: FORCE_SUCCESS_EXIT
+    default: "yes"
+    documentation: |-
+      if there is step after openshift-extended-test step in test,
+      you could set it as yes to ensure the subsequence step is executed. Or else, once openshift-extended-test step fails,
+      the subsequence step is not executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
+  resources:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+    limits:
+      memory: 6Gi
+  documentation: |-
+    The openshift-tests-private extended step executes the common extended test.

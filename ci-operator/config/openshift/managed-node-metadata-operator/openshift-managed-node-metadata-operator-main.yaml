@@ -3,12 +3,6 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile
   to: unused
-releases:
-  latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.7"
 resources:
   '*':
     limits:
@@ -17,12 +11,35 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: generate
-  commands: make generate --always-make && git diff --exit-code
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: managed-node-metadata-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: managed-node-metadata-operator-codecov-token
+- as: lint
+  commands: make lint
   container:
     from: src
 - as: test
   commands: make test
+  container:
+    from: src
+- as: validate
+  commands: make validate
   container:
     from: src
 zz_generated_metadata:

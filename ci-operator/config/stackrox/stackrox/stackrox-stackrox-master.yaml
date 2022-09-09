@@ -1,16 +1,24 @@
 base_images:
+  aro:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aro-0.3.8
   eks:
     name: automation-flavors
     namespace: stackrox
     tag: eks-0.3.1
-  golang-1.17.2:
+  golang-1.17.12:
     name: golang
     namespace: stackrox
-    tag: 1.17.2
+    tag: 1.17.12
   osd:
     name: automation-flavors
     namespace: stackrox
     tag: osd-0.3.6
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.3.8
   ubi:
     name: ubi
     namespace: ocp
@@ -20,8 +28,10 @@ base_images:
     namespace: ocp
     tag: "8"
 build_root:
-  project_image:
-    dockerfile_path: .openshift-ci/Dockerfile.build_root
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.46
 images:
 - build_args:
   - name: ROX_PRODUCT_BRANDING
@@ -77,14 +87,11 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/docs/.
   to: docs
-- build_args:
-  - name: ROX_IMAGE_FLAVOR
-    value: development_build
-  dockerfile_path: operator/Dockerfile
+- dockerfile_path: operator/build/Dockerfile.gen
   inputs:
-    golang-1.17.2:
+    golang-1.17.12:
       as:
-      - golang:1.17.2
+      - golang:1.17.12
     operator-artifacts:
       paths:
       - destination_dir: .
@@ -247,6 +254,32 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
+- as: openshift-oldest-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.6"
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: openshift-penultimate-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.10"
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: openshift-newest-qa-e2e-tests
   cluster_claim:
     architecture: amd64
@@ -254,7 +287,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 5h0m0s
-    version: "4.8"
+    version: "4.11"
   optional: true
   steps:
     test:
@@ -272,6 +305,12 @@ tests:
     test:
     - ref: stackrox-e2e
 - as: gke-kernel-qa-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: gke-version-compatibility-tests
   optional: true
   steps:
     test:
@@ -357,6 +396,16 @@ tests:
   optional: true
   steps:
     workflow: stackrox-automation-flavors-osd-gcp-e2e
+  timeout: 5h0m0s
+- as: aro-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-aro-e2e
+  timeout: 5h0m0s
+- as: rosa-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-rosa-e2e
   timeout: 5h0m0s
 - as: merge-push-and-release
   postsubmit: true
@@ -491,14 +540,14 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: merge-openshift-newest-qa-e2e-tests
+- as: merge-openshift-penultimate-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 5h0m0s
-    version: "4.8"
+    version: "4.10"
   postsubmit: true
   steps:
     env:

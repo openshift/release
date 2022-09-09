@@ -1,0 +1,23 @@
+workflow:
+  as: operator-pipelines-preflight-prod-aws
+  steps:
+    env:
+      TEST_ASSET: quay.io/opdev/simple-demo-operator-bundle:latest
+      ASSET_TYPE: operator
+      PFLT_INDEXIMAGE: quay.io/opdev/simple-demo-operator-catalog:latest
+      PFLT_ARTIFACTS: "./artifacts"
+      PFLT_DOCKERCONFIG: ""
+    pre:
+    - chain: ipi-aws-pre
+    test:
+    - ref: operator-pipelines-preflight-prod-decrypt
+    - ref: operator-pipelines-preflight-prod-check
+    - ref: operator-pipelines-preflight-prod-encrypt
+    post:
+    - chain: ipi-aws-post
+  documentation: |-
+    This workflows installs a cluster with a default configuration on AWS and
+    executes the Preflight tool against the provisioned cluster.
+    Important: Parameter values in `env` are supposed to be used only in rehearsals
+    and serve as "testing defaults". Production jobs should always override them
+    via `preflight-trigger`.

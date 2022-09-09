@@ -47,6 +47,10 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: gcp-pd-csi-driver-operator-test
+  ibm-vpc-block-csi-driver-operator-test:
+    name: "4.11"
+    namespace: ocp
+    tag: ibm-vpc-block-csi-driver-operator-test
   libvirt-installer:
     name: "4.11"
     namespace: ocp
@@ -136,11 +140,6 @@ tests:
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ipv4
-- as: e2e-metal-ipi
-  cron: 14 19 */1 * 1-5
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-ovn-dualstack-local-gateway
   interval: 48h
   steps:
@@ -216,11 +215,6 @@ tests:
         IP_STACK=v6
         NUM_WORKERS=0
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-virtualmedia
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-virtualmedia
 - as: e2e-aws-proxy
   cron: 0 0 */2 * *
   steps:
@@ -392,7 +386,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-gcp
 - as: console-aws
-  interval: 48h
+  interval: 12h
   steps:
     cluster_profile: aws-2
     env:
@@ -610,7 +604,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-telco5g
   cluster: build05
-  cron: 21 1 */1 * 1-5
+  cron: 21 22 */1 * 1-5
   steps:
     workflow: telco5g
 - as: e2e-alibaba
@@ -652,6 +646,11 @@ tests:
   steps:
     cluster_profile: azurestack
     workflow: openshift-e2e-azurestack-upi
+- as: e2e-ibmcloud-csi
+  interval: 48h
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-csi
 zz_generated_metadata:
   branch: master
   org: openshift

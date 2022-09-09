@@ -55,51 +55,98 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
+    always_run: true
     branches:
     - ^release-2\.4$
     cluster: build03
     decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
     name: branch-ci-stolostron-kube-state-metrics-release-2.4-publish
-    reporter_config:
-      slack:
-        channel: '#forum-acm-observability-ci'
-        job_states_to_report:
-        - success
-        - failure
-        - error
-        report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job
-          *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs>
-          :white_check_mark: {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-          <{{.Status.URL}}|View logs> :warning: {{end}}'
     spec:
       containers:
       - args:
-        - -f
-        - /opt/build-harness/Makefile.build-harness-openshift-ci
-        - osci/publish
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=publish
         command:
-        - make
-        env:
-        - name: OSCI_COMPONENT_NAME
-          value: kube-state-metrics
-        - name: OSCI_COMPONENT_VERSION
-          value: "2.4"
-        - name: OSCI_IMAGE_REMOTE_REPO_SRC
-          value: registry.ci.openshift.org/stolostron
-        - name: SELF
-          value: make -f /opt/build-harness/Makefile.build-harness-openshift-ci
-        image: registry.ci.openshift.org/stolostron/builder:go1.17-linux
+        - ci-operator
+        image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/github
-          name: acm-cicd-github
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: acm-cicd-github
+      - name: pull-secret
         secret:
-          secretName: acm-cicd-github
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-2\.4$
+    cluster: build03
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stolostron-kube-state-metrics-release-2.4-sonar-post-submit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/acm-sonarcloud-token
+        - --target=sonar-post-submit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/acm-sonarcloud-token
+          name: acm-sonarcloud-token
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: acm-sonarcloud-token
+        secret:
+          secretName: acm-sonarcloud-token
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator

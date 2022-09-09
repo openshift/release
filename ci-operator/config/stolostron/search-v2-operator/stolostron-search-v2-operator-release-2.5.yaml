@@ -47,7 +47,6 @@ tests:
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export SELF="make"
         export OSCI_COMPONENT_NAME="search-operator-bundle"
         export OSCI_COMPONENT_VERSION="2.5"
@@ -79,6 +78,11 @@ tests:
       IMAGE_REPO: search-operator-bundle
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
 - as: unit-test
   commands: |
     export SELF="make -f Makefile.prow"
@@ -97,7 +101,6 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME="search-v2-operator"
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_COMPONENT_VERSION="2.5"
         export SELF="make -f Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
