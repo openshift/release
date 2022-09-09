@@ -144,8 +144,15 @@ networking:
   - cidr: "${machine_cidr}"
 EOF
 
-curl -o ${SHARED_DIR}/manifest_externalFeatureGate.yaml https://raw.githubusercontent.com/openshift/cluster-cloud-controller-manager-operator/master/hack/externalFeatureGate.yaml
 
+cat >> ${SHARED_DIR}/manifest_externalFeatureGate.yaml << EOF
+apiVersion: config.openshift.io/v1
+kind: FeatureGate
+metadata:
+  name: cluster
+spec:
+  featureSet: TechPreviewNoUpgrade
+EOF
 
 # TODO: Add this back in once we have an vsphere
 # environment that will support topology storage
