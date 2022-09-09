@@ -105,6 +105,9 @@ then
   mount "${NVME_DEVICE}" /opt/dev-scripts
 fi
 
+# Needed if setting "EXTRA_NETWORK_NAMES" to avoid
+sysctl -w net.ipv6.conf.\$(ip -o route get 1.1.1.1 | cut -f 5 -d ' ').accept_ra=2
+
 cd dev-scripts
 
 cp /root/pull-secret /root/dev-scripts/pull_secret.json
