@@ -28,9 +28,6 @@ workdir=`mktemp -d`
 ###############Log In################
 #####################################
 
-workdir=`mktemp -d`
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
 sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
@@ -45,8 +42,8 @@ echo "Using region: ${REGION}"
 
 VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
-  NETWORK=$(/tmp/yq r "${VPC_CONFIG}" 'platform.gcp.network')
-  CONTROL_PLANE_SUBNET=$(/tmp/yq r "${VPC_CONFIG}" 'platform.gcp.controlPlaneSubnet')
+  NETWORK=$(yq-go r "${VPC_CONFIG}" 'platform.gcp.network')
+  CONTROL_PLANE_SUBNET=$(yq-go r "${VPC_CONFIG}" 'platform.gcp.controlPlaneSubnet')
 fi
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
   echo "Could not find VPC network and control-plane subnet" && exit 1
