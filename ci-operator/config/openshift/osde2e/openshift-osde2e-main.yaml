@@ -35,6 +35,74 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/sd-cicd-aws-prod
     name: sd-cicd-aws-prod
+- as: aro-ovn-e2e-default
+  cron: 0 0 9 * * *
+  steps:
+    post:
+    - as: cluster-destroy
+      commands: |
+        cd /tmp/
+        git clone https://github.com/openshift/osde2e.git
+        cd
+        source /tmp/osde2e/ci/destroy-aro-cluster.sh
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      from: azure
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    pre:
+    - as: cluster-create
+      commands: |
+        cd /tmp/
+        git clone https://github.com/openshift/osde2e.git
+        cd
+        source /tmp/osde2e/ci/create-aro-cluster-ovn.sh
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      from: azure
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: conformance-tests-pre-upgrade
+      commands: |
+        source ./ci/aro-e2e-tests.sh
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: upgrade-latest-y
+      commands: |
+        ./ci/upgrade-aro-cluster.sh y
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: conformance-tests-post-upgrade
+      commands: |
+        source ./ci/aro-e2e-tests.sh
+      credentials:
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: aro-e2e-default
   cron: 0 0 3 * *
   steps:
@@ -124,6 +192,51 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: rosa-stage-e2e-byo-vpc-proxy-install
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CLUSTER_EXPIRY_IN_MINUTES="480"
+    export HIBERNATE_AFTER_USE="false"
+    export ROSA_ENV="stage"
+    export USE_EXISTING_CLUSTER="false"
+    export USE_PROXY_FOR_INSTALL="true"
+    export CONFIGS="rosa,e2e-suite"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-rosa-staging"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 19 * * 0,2,4
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-rosa-staging
+    name: osde2e-rosa-staging
+  - mount_path: /usr/local/osde2e-static-byo-vpc
+    name: osde2e-static-byo-vpc
+- as: rosa-stage-e2e-byo-vpc-proxy-postinstall
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CLUSTER_EXPIRY_IN_MINUTES="480"
+    export HIBERNATE_AFTER_USE="false"
+    export ROSA_ENV="stage"
+    export USE_EXISTING_CLUSTER="false"
+    export CONFIGS="rosa,proxy-suite"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-rosa-staging"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 5 * * 1
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-rosa-staging
+    name: osde2e-rosa-staging
+  - mount_path: /usr/local/osde2e-static-byo-vpc
+    name: osde2e-static-byo-vpc
 - as: aws-stage-e2e-upgrade-to-latest
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
