@@ -1,25 +1,25 @@
-postsubmits:
-  stackrox/stackrox:
+presubmits:
+  opendatahub-io/notebooks:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^ci-perf-hacks$
+    - ^main$
+    - ^main-
     cluster: build01
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-stackrox-ci-perf-hacks-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-notebooks-main-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -37,9 +37,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -48,9 +45,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
