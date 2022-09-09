@@ -46,24 +46,22 @@ images:
         source_path: /usr/bin/openshift-tests
   to: microshift-test-binaries
 - dockerfile_literal: |
-    FROM src as builder
-    RUN dnf update -y && \
-        dnf install --setopt=tsflags=nodocs -y \
+    FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.10 as builder
+    RUN dnf install --setopt=tsflags=nodocs -y \
         rpm-build glibc-static gcc selinux-policy-devel util-linux && \
         dnf clean all && \
         rm -rf /var/cache/dnf/*
-    WORKDIR /go/src/github.com/openshift/microshift
+    RUN ls -lA
     RUN make rpm
     FROM libvirt-installer
-    WORKDIR /opt/microshift-rpms
     USER root
-    RUN mkdir bin selinux
-    COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/x86_64/microshift-* bin/
-    COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/noarch/microshift-selinux-* selinux/
-    COPY microshift.conf /tmp/microshift.conf
-    COPY openshift-tests /usr/bin/openshift-tests
-    COPY oc /usr/bin/oc
-  from: libvirt-installer
+    ENV HOME=/tmp/secret
+    ENV PAYLOAD_PATH=$HOME/payload
+    WORKDIR $PAYLOAD_PATH
+    COPY oc openshift-tests usr/bin/
+    RUN chmod 755 usr/bin/oc && ln -rs usr/bin/oc usr/bin/kubectl
+    COPY --from=builder /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS/*/*.rpm packages/
+    RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
   inputs:
     cli:
       paths:
@@ -74,15 +72,12 @@ images:
       - libvirt-installer
     src:
       as:
-      - src
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.10
     test-bin:
       paths:
       - destination_dir: .
         source_path: /usr/bin/openshift-tests
-  to: microshift-test-rpm
+  to: dependency-payload
 resources:
   '*':
     limits:
