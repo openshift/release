@@ -158,11 +158,22 @@ EOF
 
 # We have 2 ofcir servers,
 # the 1st (contents of ${CLUSTER_PROFILE_DIR}/ofcir_laburl)
-#   manages HW in the lab, this has hosts of type cihost (for virtualized jobs)
-#   and cicluster (for baremetal jobs)
+#   manages HW in the lab, this has hosts of type cihost (for virtualized jobs),
+#   cihost-small (for general purpose) and cicluster (for baremetal jobs)
 # the 2nd (contents of ${CLUSTER_PROFILE_DIR}/ofcir)
 #   manages HW in equinix, this is for virt hosts only
 # If neither can give us a host to use then we fall back to on demaned from equinix
+case $CLUSTERTYPE in
+    virt-small)
+        CIRTYPE=cihost-small
+        ;;
+    baremetal)
+        CIRTYPE=cicluster
+        ;;
+    *)
+        CIRTYPE=cihost
+        ;;
+esac
 
 CIRTYPE=cihost
 [[ "$CLUSTERTYPE" == "baremetal" ]] && CIRTYPE=cicluster
@@ -171,8 +182,8 @@ if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
     getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)" && exit_with_success
 fi
 
-# No point in continuing, only ofcir_laburl has cir's of type "cicluster"
-[[ "$CLUSTERTYPE" == "baremetal" ]] && exit_with_failure
+# No point in continuing, only ofcir_laburl has cir's of type "cicluster" and "cihost-small"
+[[ "$CLUSTERTYPE" =~ baremetal|cihost-small ]] && exit_with_failure
 
 if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
     getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)" && exit_with_success
