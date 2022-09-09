@@ -213,6 +213,45 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: e2e-network-mtu-migration-ovn-ipv4
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      MTU_DECREASE: "400"
+      MTU_INCREASE: "200"
+    test:
+    - chain: network-mtu-migration-decrease
+    - chain: network-mtu-migration-increase
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-gcp-ovn
+  timeout: 5h0m0s
+- as: e2e-network-mtu-migration-ovn-ipv6
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      MTU_DECREASE: "100"
+      MTU_INCREASE: "50"
+    test:
+    - chain: network-mtu-migration-decrease
+    - chain: network-mtu-migration-increase
+    - chain: baremetalds-ipi-test
+    workflow: baremetalds-e2e-ovn-ipv6
+  timeout: 5h0m0s
+- as: e2e-network-mtu-migration-sdn-ipv4
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      MTU_DECREASE: "400"
+      MTU_INCREASE: "200"
+    test:
+    - chain: network-mtu-migration-decrease
+    - chain: network-mtu-migration-increase
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-gcp-sdn
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.13
   org: openshift-priv
