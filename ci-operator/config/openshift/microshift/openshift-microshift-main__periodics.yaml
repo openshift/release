@@ -30,6 +30,51 @@ build_root:
     tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
 - dockerfile_literal: |
+    FROM src
+    RUN dnf install --setopt=tsflags=nodocs -y \
+          selinux-policy-devel util-linux && \
+          dnf clean all && \
+          rm -rf /var/cache/dnf/*
+    RUN make rpm
+  inputs:
+    src:
+      as:
+      - src
+  to: rpm
+- dockerfile_literal: |
+    FROM libvirt-installer
+    WORKDIR /opt/microshift-rpms
+    USER root
+    ENV HOME=/tmp/secret
+    ENV PAYLOAD_PATH=$HOME/payload
+    WORKDIR $PAYLOAD_PATH
+    COPY oc openshift-tests usr/bin/
+    RUN chmod 755 usr/bin/oc && ln -rs usr/bin/oc usr/bin/kubectl
+    COPY RPMS/*/*.rpm packages/
+    COPY validate-microshift opt/validate-microshift/
+    RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    libvirt-installer:
+      as:
+      - libvirt-installer
+    rpm:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/packaging/rpm/_rpmbuild/RPMS
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/validate-microshift
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/openshift-tests
+  to: dependency-payload
+- dockerfile_literal: |
     FROM src as builder
     RUN dnf update -y && \
         dnf install --setopt=tsflags=nodocs -y \
