@@ -231,6 +231,13 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --parameters baseName="$INFRA_ID" \
   --parameters diagnosticsStorageAccountName="${ACCOUNT_NAME}"
 
+BOOTSTRAP_PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-bootstrap-ssh-pip'] | [0].ipAddress" -o tsv)
+MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig --query "privateIpAddress" -o tsv)
+MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig --query "privateIpAddress" -o tsv)
+MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-2-nic --name pipConfig --query "privateIpAddress" -o tsv)
+
+GATHER_BOOTSTRAP_ARGS=('--bootstrap' "${BOOTSTRAP_PUBLIC_IP}" '--master' "${MASTER0_IP}" '--master' "${MASTER1_IP}" '--master' "${MASTER2_IP}")
+
 echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
 openshift-install wait-for bootstrap-complete &
 
