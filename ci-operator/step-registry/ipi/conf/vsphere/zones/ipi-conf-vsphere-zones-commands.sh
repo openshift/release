@@ -93,6 +93,7 @@ platform:
         datastore: workload_share_vcsmdcncworkload3_joYiR
 
 networking:
+  networkType: OpenShiftSDN
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
