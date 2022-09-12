@@ -40,7 +40,8 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  optional: true
+  run_if_changed: ^(tmp/build)
   steps:
     test:
     - as: jvm-build-service-e2e
@@ -137,9 +138,9 @@ tests:
         echo ${JVM_BUILD_SERVICE_JDK11_BUILDER_IMAGE}
         echo "jvm build service JDK17 builder image:"
         echo ${JVM_BUILD_SERVICE_JDK17_BUILDER_IMAGE}
-        # we turn off tr pruning for in repo e2e (vs. full appstudio e2e) to facilitate debug.
-        export JVM_DELETE_TASKRUN_PODS="0"
-        /bin/bash .ci/common-ci-settings-and-functions.sh
+        /bin/bash deploy/openshift-ci.sh
+        # we turn on pr pruning of successful pipelineruns to cover this path
+        export JVM_DELETE_TASKRUN_PODS="1"
         make appstudio-installed-on-openshift-e2e
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
@@ -203,9 +204,9 @@ tests:
         echo ${JVM_BUILD_SERVICE_JDK11_BUILDER_IMAGE}
         echo "jvm build service JDK17 builder image:"
         echo ${JVM_BUILD_SERVICE_JDK17_BUILDER_IMAGE}
-        # we turn off tr pruning for in repo e2e (vs. full appstudio e2e) to facilitate debug.
+        # we turn off pr pruning to facilitate debug of service registry, and to cover path vs. regular in-repo e2e
         export JVM_DELETE_TASKRUN_PODS="0"
-        /bin/bash .ci/common-ci-settings-and-functions.sh
+        /bin/bash deploy/openshift-ci.sh
         make appstudio-installed-on-openshift-periodic
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
@@ -233,105 +234,6 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-aws
-- as: jvm-build-service-in-repo-with-pruning-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    test:
-    - as: jvm-build-service-in-repo-with-pruning-e2e
-      cli: latest
-      commands: |
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
-        git config --global user.name "redhat-appstudio-qe-bot"
-        git config --global user.email redhat-appstudio-qe-bot@redhat.com
-        mkdir -p ${HOME}/creds
-        GIT_CREDS_PATH="${HOME}/creds/file"
-        git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
-        echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
-        echo "jvm build service golang operator image:"
-        echo ${JVM_BUILD_SERVICE_IMAGE}
-        echo "jvm build service jvm cache image:"
-        echo ${JVM_BUILD_SERVICE_CACHE_IMAGE}
-        echo "jvm build service jvm sidecar image:"
-        echo ${JVM_BUILD_SERVICE_SIDECAR_IMAGE}
-        echo "jvm build service jvm analyzer image:"
-        echo ${JVM_BUILD_SERVICE_ANALYZER_IMAGE}
-        echo "jvm build service jvm reqprocessor image:"
-        echo ${JVM_BUILD_SERVICE_REQPROCESSOR_IMAGE}
-        echo "jvm build service JDK8 builder image:"
-        echo ${JVM_BUILD_SERVICE_JDK8_BUILDER_IMAGE}
-        echo "jvm build service JDK11 builder image:"
-        echo ${JVM_BUILD_SERVICE_JDK11_BUILDER_IMAGE}
-        echo "jvm build service JDK17 builder image:"
-        echo ${JVM_BUILD_SERVICE_JDK17_BUILDER_IMAGE}
-        # we leave pruning on in this run to compare with the other in repo e2e
-        /bin/bash .ci/common-ci-settings-and-functions.sh
-        make appstudio-installed-on-openshift-e2e
-      credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
-        namespace: test-credentials
-      dependencies:
-      - env: JVM_BUILD_SERVICE_IMAGE
-        name: redhat-appstudio-jvm-build-service-image
-      - env: JVM_BUILD_SERVICE_CACHE_IMAGE
-        name: redhat-appstudio-jvm-build-service-cache-image
-      - env: JVM_BUILD_SERVICE_SIDECAR_IMAGE
-        name: redhat-appstudio-jvm-build-service-sidecar-image
-      - env: JVM_BUILD_SERVICE_ANALYZER_IMAGE
-        name: redhat-appstudio-jvm-build-service-analyzer-image
-      - env: JVM_BUILD_SERVICE_REQPROCESSOR_IMAGE
-        name: redhat-appstudio-jvm-build-service-reqprocessor-image
-      - env: JVM_BUILD_SERVICE_JDK8_BUILDER_IMAGE
-        name: redhat-appstudio-jvm-build-service-jdk8-builder-image
-      - env: JVM_BUILD_SERVICE_JDK11_BUILDER_IMAGE
-        name: redhat-appstudio-jvm-build-service-jdk11-builder-image
-      - env: JVM_BUILD_SERVICE_JDK17_BUILDER_IMAGE
-        name: redhat-appstudio-jvm-build-service-jdk17-builder-image
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
-- as: jvm-build-service-periodic
-  cron: 17 22  * * 6
-  steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m6i.4xlarge
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
-        git config --global user.name "redhat-appstudio-qe-bot"
-        git config --global user.email redhat-appstudio-qe-bot@redhat.com
-        mkdir -p ${HOME}/creds
-        GIT_CREDS_PATH="${HOME}/creds/file"
-        git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
-        echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
-        export JVM_DELETE_TASKRUN_PODS="0"
-        /bin/bash .ci/common-ci-settings-and-functions.sh
-        make appstudio-installed-on-openshift-periodic
-      credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 100m
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
