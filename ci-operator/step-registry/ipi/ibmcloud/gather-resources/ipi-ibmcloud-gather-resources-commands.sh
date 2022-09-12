@@ -24,12 +24,14 @@ RETRY_SLEEP=10
 
 # Retry commands to prevent intermittent flakes from causing failure
 function command_retry {
-    local cmd command_successful temp_results errexit temp_status
+    local cmd base_command command_successful temp_results errexit temp_status
     cmd=$1
     shift
 
     command_successful=false
-    temp_results=$(mktemp "/tmp/${cmd}_retry_results-XXXXXX")
+    # Remove any filepaths from the command to be called for temporary results filename
+    base_command=$(basename "${cmd}")
+    temp_results=$(mktemp "/tmp/${base_command}_retry_results-XXXXXX")
     temp_status=$(mktemp /tmp/errexit_status-XXXXXX)
 
     # stash the current errexit setting to restore after we disable for command retry loop
@@ -115,7 +117,7 @@ function gather_vpc_routing_tables {
 function gather_cos {
     {
         echo -e "# ibmcloud resource service-instances --service-name cloud-object-storage\n"
-        "${IBMCLOUD_CLI}" resource service-instances --service-name cloud-object-storage | grep "${CLUSTER_FILTER}"
+        "${IBMCLOUD_CLI}" resource service-instances --service-name cloud-object-storage | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter'
         echo -e "\n\n\n# ibmcloud resource service-instance <cos>"
         "${IBMCLOUD_CLI}" resource service-instances --service-name cloud-object-storage | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} resource service-instance %"
     } > "${RESOURCE_DUMP_DIR}/cos.txt"
@@ -128,11 +130,12 @@ function gather_cis {
     DOMAIN_ID=$(command_retry "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk '/ci-ibmcloud.devcluster.openshift.com/{print $1}')
     {
         echo -e "# ibmcloud cis domains\n"
-        command_retry "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk -v filter="${DOMAIN_ID}" '$0 ~ filter {print $1}'
+        command_retry "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk -v filter="${DOMAIN_ID}" '$0 ~ filter'
 	echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
-	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | grep "${CLUSTER_FILTER}"
+	# DNS Record Names do not contain the $JOB_NAME_HASH, so we filter on the $NAMESPACE only
+	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter'
 	echo -e "## ibmcloud cis dns-record ${DOMAIN_ID} <dns-record>\n"
-	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} %"
+	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} %"
     } > "${RESOURCE_DUMP_DIR}/cis.txt"
 }
 
@@ -141,7 +144,7 @@ function gather_resources {
     for resource in "${MAIN_RESOURCES[@]}"; do
         {
             echo -e "# ibmcloud is ${resource}s\n"
-            "${IBMCLOUD_CLI}" is "${resource}s" -q | grep "${CLUSTER_FILTER}"
+            "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter'
             echo -e "\n\n\n# ibmcloud is ${resource} <item>\n"
             "${IBMCLOUD_CLI}" is "${resource}s" -q | awk -v filter="${CLUSTER_FILTER}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} is ${resource} %"
         } > "${RESOURCE_DUMP_DIR}/${resource}s.txt"
