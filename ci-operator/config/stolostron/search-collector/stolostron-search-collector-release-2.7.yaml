@@ -100,6 +100,16 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    export DEPLOYED_IN_HUB=true
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"
