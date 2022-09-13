@@ -13,11 +13,11 @@ PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
 # extract gcp credentials requests from the release image
 oc registry login
-oc adm release extract --credentials-requests --cloud=gcp --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
+oc adm release extract --credentials-requests --cloud=gcp --to="${SHARED_DIR}/credrequests" "$RELEASE_IMAGE_LATEST"
 
 # create required credentials infrastructure and installer manifests for workload identity
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
-ccoctl gcp create-all --name="${infra_name}" --project="${PROJECT}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
+ccoctl gcp create-all --name="${infra_name}" --project="${PROJECT}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${SHARED_DIR}/credrequests" --output-dir="/tmp"
 
 # copy generated service account signing from ccoctl target directory into shared directory
 cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"

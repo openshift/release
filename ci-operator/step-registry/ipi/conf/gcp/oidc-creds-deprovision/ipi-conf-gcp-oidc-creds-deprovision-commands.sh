@@ -11,4 +11,4 @@ PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
 # delete credentials infrastructure created by oidc-creds-provision-provision configure step
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
-ccoctl gcp delete --name="${infra_name}" --project="${PROJECT}"
+ccoctl gcp delete --name="${infra_name}" --project="${PROJECT}" --credentials-requests-dir="${SHARED_DIR}/credrequests"
