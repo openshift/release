@@ -348,8 +348,33 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
-  # Save console URL in `console.url` file so that ci-chat-bot could report success
-  echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+
+  CONSOLE_ENABLED=false
+  CLUSTER_VERSION="$(oc --kubeconfig "${dir}/auth/kubeconfig" get -o json clusterversion version)"
+  if [ -z "${CLUSTER_VERSION}" ]; then
+    echo "Unabled to retrieve ClusterVersion to check enabledCapabilities"
+  else
+    KNOWN_CAPABILITIES="$(printf '%s' "${CLUSTER_VERSION}" | jq '.status.capabilities.knownCapabilities')"
+    ENABLED_CAPABILITIES="$(printf '%s' "${CLUSTER_VERSION}" | jq '.status.capabilities.enabledCapabilities')"
+    if [ -z "${KNOWN_CAPABILITIES}" ]; then
+      echo "ClusterVersion does not declare knownCapabilities; assuming Console is enabled"
+      CONSOLE_ENABLED=true
+    else
+      CONSOLE_KNOWN="$(printf '%s' "${KNOWN_CAPABILITIES}" | jq '([.[] | . == "Console"]) | any')"
+      if [ true != "${CONSOLE_KNOWN}" ]; then
+        echo "ClusterVersion does not declare Console in knownCapabilities ({$KNOWN_CAPABILITIES}); assuming Console is enabled"
+        CONSOLE_ENABLED=true
+      elif [ null = "${ENABLED_CAPABILITIES}" ]; then
+        echo "ClusterVersion does not have any enabledCapabilities; Console is disabled"
+      else
+        CONSOLE_ENABLED="$(printf '%s' "${ENABLED_CAPABILITIES}" | jq '([.[] | . == "Console"]) | any')"
+      fi
+    fi
+  fi
+  if [ true = "${CONSOLE_ENABLED}" ]; then
+    # Save console URL in `console.url` file so that ci-chat-bot could report success
+    echo "https://$(oc --kubeconfig "${dir}/auth/kubeconfig" -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+  fi
 fi
 
 echo "install-config.yaml"
