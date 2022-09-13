@@ -136,6 +136,7 @@ vsphere)
     # The test suite requires a vSphere config file with explicit user and password fields.
     sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
     sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    sed -i '/\[Labels/I,/^$/d' "$VSPHERE_CONF_FILE"
     export TEST_PROVIDER=vsphere;;
 alibabacloud)
     mkdir -p ~/.ssh
