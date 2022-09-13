@@ -1003,6 +1003,59 @@ periodics:
         secretName: github-credentials-openshift-bot
 - agent: kubernetes
   cluster: app.ci
+  cron: 30 7 * * 1
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-auto-prow-job-dispatcher
+  spec:
+    containers:
+    - args:
+      - --github-token-path=/etc/github/oauth
+      - --github-endpoint=http://ghproxy
+      - --github-endpoint=https://api.github.com
+      - --github-graphql-endpoint=http://ghproxy/graphql
+      - --github-login=openshift-bot
+      - --git-name=openshift-bot
+      - --git-email=openshift-bot@redhat.com
+      - --target-dir=.
+      - --config-path=./core-services/sanitize-prow-jobs/_config.yaml
+      - --prow-jobs-dir=./ci-operator/jobs
+      - --self-approve=true
+      - --prometheus-username=ci
+      - --prometheus-password-path=/etc/prometheus/password
+      - --create-pr=true
+      command:
+      - /usr/bin/prow-job-dispatcher
+      image: registry.ci.openshift.org/ci/prow-job-dispatcher:latest
+      imagePullPolicy: Always
+      name: auto-config-brancher
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/prometheus
+        name: prometheus
+        readOnly: true
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+    volumes:
+    - name: prometheus
+      secret:
+        items:
+        - key: password
+          path: password
+        secretName: prometheus-auth-credentials
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
   cron: 30 7 * * *
   decorate: true
   extra_refs:
