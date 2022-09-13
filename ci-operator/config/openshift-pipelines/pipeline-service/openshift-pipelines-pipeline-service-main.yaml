@@ -12,6 +12,17 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
+images:
+- dockerfile_literal: |-
+    FROM src
+    RUN pip3 install --upgrade setuptools pip && pip3 install yamllint && yamllint --version && \
+        SHELLCHECK_VERSION=0.7.1 && \
+        curl --fail -sSL  https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.x86_64.tar.xz | tar -xJvf - shellcheck-v$SHELLCHECK_VERSION/shellcheck && \
+        mv shellcheck-v$SHELLCHECK_VERSION/shellcheck /usr/local/bin/shellcheck && \
+        chmod 755 /usr/local/bin/shellcheck && \
+        shellcheck -V
+  from: src
+  to: yamllint-shellcheck-image
 releases:
   latest:
     release:
@@ -40,7 +51,7 @@ tests:
       cli: latest
       commands: |
         oc -n openshift-config  get secret/pull-secret -o yaml | sed 's/openshift-config/default/' | sed 's/\.dockerconfigjson/auth.json/' | grep -v type: | oc apply -f -
-        oc create -f - <<EOF
+        oc -n default apply -f - <<EOF
         apiVersion: v1
         kind: Pod
         metadata:
@@ -62,6 +73,8 @@ tests:
             secret:
               secretName: pull-secret
         EOF
+        oc -n default wait pod/podman --for=condition=Ready --timeout=90s
+        oc -n default describe pod/podman
       from: src
       resources:
         requests:
@@ -70,27 +83,70 @@ tests:
     - as: install-softwares-to-podman-container
       cli: latest
       commands: |
-        oc -n default exec pod/podman -- dnf install python3-pip
-        oc -n default exec pod/podman -- pip3 install yamllint && yamllint --version
-        oc -n default exec pod/podman -- curl --location -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/v2.4.7/argocd-linux-amd64 && chmod +x /usr/local/bin/argocd && argocd version --client
-        oc -n default exec pod/podman -- SHELLCHECK_VERSION=0.7.1 && curl --fail -sSL  https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.x86_64.tar.xz | tar -xJvf - shellcheck-v$SHELLCHECK_VERSION/shellcheck && mv shellcheck-v$SHELLCHECK_VERSION/shellcheck /usr/local/bin/shellcheck && chmod 755 /usr/local/bin/shellcheck && shellcheck -V
-        oc -n default exec pod/podman -- KUBECTL_VERSION=1.24.3 && curl -LO https://storage.googleapis.com/kubernetes-release/release/v$KUBECTL_VERSION/bin/linux/amd64/kubectl && chmod +x ./kubectl && mv ./kubectl /usr/local/bin && kubectl version --client=true
-        oc -n default exec pod/podman -- wget https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_linux_amd64 -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq && yq --version
+        oc -n default exec pod/podman -- sh -c "yum install -y python3-pip xz wget git make jq gcc && yum clean all"
+        oc -n default exec pod/podman -- sh -c "wget -c https://go.dev/dl/go1.19.1.linux-amd64.tar.gz && tar -C /usr/local -xzf go1.19.1.linux-amd64.tar.gz"
+        oc -n default exec pod/podman -- sh -c "curl --location -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/v2.4.7/argocd-linux-amd64 && chmod +x /usr/local/bin/argocd && argocd version --client"
+        oc -n default exec pod/podman -- sh -c "KUBECTL_VERSION=1.24.3 && curl -LO https://storage.googleapis.com/kubernetes-release/release/v\$KUBECTL_VERSION/bin/linux/amd64/kubectl && chmod +x ./kubectl && mv ./kubectl /usr/local/bin && kubectl version --client=true"
+        oc -n default exec pod/podman -- sh -c "wget https://github.com/mikefarah/yq/releases/download/v4.25.1/yq_linux_amd64 -O /usr/local/bin/yq && chmod +x /usr/local/bin/yq && yq --version"
       from: src
       resources:
         requests:
           cpu: 300m
           memory: 500Mi
+    - as: ckcp-setup
+      cli: latest
+      commands: |
+        cat <<'EOF' > ckcp_setup.sh
+        #!/usr/bin/env bash
+        set -o errexit
+        set -o pipefail
+
+        export PATH=/usr/local/go/bin:$PATH
+        export PATH=$(go env GOPATH)/bin:$PATH
+        HOME_DIR="$(pwd)"
+        echo "Start building kcp plugin ..."
+        KCP_TAG="$(yq '.images[] | select(.name == "kcp") | .newTag' "ckcp/openshift/overlays/dev/kustomization.yaml")"
+        echo "kcp tag:" $KCP_TAG
+        git clone https://github.com/kcp-dev/kcp.git
+        cd $HOME_DIR/kcp
+        git checkout tags/"${KCP_TAG}" -b "${KCP_TAG}"
+        make install
+        kubectl-kcp --version
+        echo "\n\nStart ckcp setup ..."
+        cd $HOME_DIR/ckcp && ./openshift_dev_setup.sh -d
+        EOF
+
+        chmod +x ckcp_setup.sh
+        echo "Copy all files, including pipeline-service abd ckcp_setup.sh, to podman container"
+        oc cp ./ default/podman:/
+        echo "Copy kubeconfig file to podman container"
+        oc cp "${KUBECONFIG}" default/podman:/kubeconfig
+        echo "Start to set up ckcp"
+        oc -n default exec pod/podman -- sh -c "export KUBECONFIG=/kubeconfig && /ckcp_setup.sh"
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 800Mi
     workflow: generic-claim
+- as: plnsvc-shellcheck
+  steps:
+    test:
+    - as: run-shellcheck
+      cli: latest
+      commands: |
+        find . -name "*.sh" -exec shellcheck {} +
+      from: yamllint-shellcheck-image
+      resources:
+        requests:
+          cpu: 100m
 - as: plnsvc-yaml-lint
   steps:
     test:
     - as: run-yamllint
-      cli: latest
       commands: |
-        podman --version
         yamllint -c test/config/yamllint.yaml .
-      from: plnsvc-test-image
+      from: yamllint-shellcheck-image
       resources:
         requests:
           cpu: 100m
