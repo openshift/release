@@ -544,6 +544,21 @@ tests:
         AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
         AGENT_DEPLOY_MCE=true
     workflow: agent-e2e-generic
+- as: e2e-aws-ovn-public-subnets
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    env:
+      OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    post:
+    - ref: ipi-deprovision-aws-publicsubnets
+    pre:
+    - chain: ipi-aws-pre-publicsubnets
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
