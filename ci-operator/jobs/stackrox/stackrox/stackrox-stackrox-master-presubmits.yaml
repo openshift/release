@@ -680,6 +680,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
         - --target=go-postgres-tests
         command:
         - ci-operator
@@ -699,6 +700,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -707,6 +711,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
     trigger: (?m)^/test( | .* )go-postgres-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -729,6 +736,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
         - --target=go-unit-tests
         command:
         - ci-operator
@@ -748,6 +756,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -756,6 +767,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
     trigger: (?m)^/test( | .* )go-unit-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -778,6 +792,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
         - --target=go-unit-tests-release
         command:
         - ci-operator
@@ -797,6 +812,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -805,6 +823,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
     trigger: (?m)^/test( | .* )go-unit-tests-release,?($|\s.*)
   - agent: kubernetes
     always_run: true
@@ -1119,7 +1140,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openshift-newest-operator-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -1249,6 +1270,136 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openshift-oldest-operator-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/openshift-oldest-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-openshift-oldest-qa-e2e-tests
+    optional: true
+    rerun_command: /test openshift-oldest-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=openshift-oldest-qa-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )openshift-oldest-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/openshift-penultimate-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-openshift-penultimate-qa-e2e-tests
+    optional: true
+    rerun_command: /test openshift-penultimate-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=openshift-penultimate-qa-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )openshift-penultimate-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1672,6 +1823,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
         - --target=style-checks
         command:
         - ci-operator
@@ -1691,6 +1843,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -1699,6 +1854,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
     trigger: (?m)^/test( | .* )style-checks,?($|\s.*)
   - agent: kubernetes
     always_run: true

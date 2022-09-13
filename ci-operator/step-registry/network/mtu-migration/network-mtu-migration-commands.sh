@@ -5,6 +5,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+DEBUG_NS="openshift-e2e-network-mtu-migration"
+
 log() {
   echo "[$(date -Is)] $1"
 }
@@ -238,7 +240,7 @@ run_debug() {
   shift
   # shellcheck disable=SC2034
   for i in {1..3}; do
-    oc --request-timeout=60s -n default debug -q ${OC_DEBUG_ARGS:+"${OC_DEBUG_ARGS[@]}"} ${what:+"${what}"} -- bash -c "$@" && s=0 && break || s=$?
+    oc --request-timeout=60s -n ${DEBUG_NS} debug -q ${OC_DEBUG_ARGS:+"${OC_DEBUG_ARGS[@]}"} ${what:+"${what}"} -- bash -c "$@" && s=0 && break || s=$?
     sleep 5
   done
   return $s
@@ -380,11 +382,18 @@ FOOTER
 print_debug_on_error() {
   e=$?
   [ $e -ne 0 ] && print_debug
+  oc delete ns "${DEBUG_NS}"
   exit $e
 }
 trap "print_debug_on_error" EXIT
 
 log "Applying MTU offset ${MTU_OFFSET} to the cluster"
+
+# create a namespace with pod-security allowing node debugging
+oc create ns "${DEBUG_NS}"
+oc label namespace "${DEBUG_NS}" --overwrite \
+  pod-security.kubernetes.io/enforce=privileged \
+  pod-security.kubernetes.io/audit=privileged
 
 time setup_packet_cluster
 

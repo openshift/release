@@ -10,25 +10,31 @@ HOST_PREFIX="$(         yq -r '.networking.clusterNetwork[0].hostPrefix' "${SHAR
 OS_NETWORKING_TYPE="$(  yq -r '.networking.networkType'                  "${SHARED_DIR}/install-config.yaml")"
 OS_EXTERNAL_DNS="$(     yq -c '.platform.openstack.externalDNS'          "${SHARED_DIR}/install-config.yaml")"
 
+declare errexit=0
 
 if [[ "$OS_SUBNET_RANGE" == 'null' ]]; then
-	OS_SUBNET_RANGE="172.16.0.0/24"
+	echo 'ERROR: Required install-config.yaml field empty: .networking.machineNetwork[0].cidr'
+	errexit=1
 fi
 
 if [[ "$SVC_SUBNET_RANGE" == 'null' ]]; then
-	SVC_SUBNET_RANGE="172.30.0.0/16"
+	echo 'ERROR: Required install-config.yaml field empty: .networking.serviceNetwork[0]'
+	errexit=1
 fi
 
 if [[ "$CLUSTER_NETWORK_CIDR" == 'null' ]]; then
-	CLUSTER_NETWORK_CIDR="10.128.0.0/14"
+	echo 'ERROR: Required install-config.yaml field empty: .networking.clusterNetwork[0].cidr'
+	errexit=1
 fi
 
 if [[ "$HOST_PREFIX" == 'null' ]]; then
-	HOST_PREFIX="23"
+	echo 'ERROR: Required install-config.yaml field empty: .networking.clusterNetwork[0].hostPrefix'
+	errexit=1
 fi
 
 if [[ "$OS_NETWORKING_TYPE" == 'null' ]]; then
-	OS_NETWORKING_TYPE="OpenshiftSDN"
+	echo 'ERROR: Required install-config.yaml field empty: .networking.networkType'
+	errexit=1
 fi
 
 yq --yaml-output "$(cat <<-EOF
@@ -50,3 +56,5 @@ yq --yaml-output "$(cat <<-EOF
 	)" '/var/lib/openshift-install/upi/inventory.yaml' > "${SHARED_DIR}/inventory.yaml"
 
 cp "${SHARED_DIR}/inventory.yaml" "${ARTIFACT_DIR}/"
+
+exit $errexit

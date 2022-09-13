@@ -1,8 +1,4 @@
 base_images:
-  assisted-image-service:
-    name: ocm-2.7
-    namespace: edge-infrastructure
-    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.7
     namespace: edge-infrastructure
@@ -69,12 +65,16 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.11"
+      version: "4.12"
   latest:
     integration:
       include_built_images: true
       name: "4.13"
       namespace: ocp
+  previous:
+    release:
+      channel: stable
+      version: "4.11"
 resources:
   '*':
     limits:
@@ -128,6 +128,8 @@ tests:
   optional: true
   steps:
     cluster_profile: azure4
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:previous
     test:
     - as: deploy-cnv
       cli: latest
@@ -143,7 +145,7 @@ tests:
         # install hypershift
         bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
 
-        # complie the e2e tests
+        # compile the e2e tests
         make e2e
 
         # run the test
@@ -178,6 +180,10 @@ tests:
   skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: gcp
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:previous
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
     test:
     - as: deploy-cnv
       cli: latest
@@ -193,7 +199,7 @@ tests:
         # install hypershift
         bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
 
-        # complie the e2e tests
+        # compile the e2e tests
         make e2e
 
         # run the test

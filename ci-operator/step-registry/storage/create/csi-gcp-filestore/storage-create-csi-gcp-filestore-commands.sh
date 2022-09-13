@@ -3,7 +3,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-NETWORK_NAME="$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)-network"
+CLUSTER_NAME="$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)"
+NETWORK_NAME="$CLUSTER_NAME-network"
+export CLUSTER_NAME
 export NETWORK_NAME
 export STORAGECLASS_LOCATION=${SHARED_DIR}/filestore-sc.yaml
 export MANIFEST_LOCATION=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
@@ -20,6 +22,7 @@ volumeBindingMode: WaitForFirstConsumer
 allowVolumeExpansion: true
 parameters:
   network: $NETWORK_NAME
+  labels: kubernetes-io-cluster-$CLUSTER_NAME=owned
 EOF
 
 echo "Using StorageClass file ${STORAGECLASS_LOCATION}"
@@ -50,8 +53,8 @@ SnapshotClass:
 DriverInfo:
   Name: filestore.csi.storage.gke.io
   SupportedSizeRange:
-    Min: 1Gi
-    Max: 64Ti
+    Min: 1Ti
+    Max: 63.9Ti
   Capabilities:
     persistence: true
     exec: true
