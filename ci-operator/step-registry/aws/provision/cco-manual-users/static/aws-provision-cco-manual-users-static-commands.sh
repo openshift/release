@@ -104,7 +104,7 @@ oc version --client
 cmd="oc adm release extract ${RELEASE_IMAGE_LATEST} --credentials-requests --cloud=aws --to '$cr_yaml_d'"
 run_command "${cmd}" || exit 1
 
-annotation="release.openshift.io/feature-gate: TechPreviewNoUpgrade"
+annotation="TechPreviewNoUpgrade"
 remove_tech_preview_feature_from_manifests "${cr_yaml_d}" "${annotation}" || exit 1
 
 ls "${cr_yaml_d}" > "${credentials_requests_files}"
