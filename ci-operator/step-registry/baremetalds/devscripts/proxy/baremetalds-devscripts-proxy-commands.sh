@@ -35,12 +35,13 @@ if [[ "$CLUSTERTYPE" == "baremetal" ]] ; then
 fi
 
 sudo setenforce 0
+
 sudo podman run -d --rm \
      --net host \
      --volume \$HOME/squid.conf:/etc/squid/squid.conf \$EXTRAVOLUMES \
      --name external-squid \
      --dns 127.0.0.1 \
-     quay.io/sameersbn/squid:latest
+     quay.io/openshifttest/squid-proxy:multiarch
 EOF
 
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"

@@ -15,7 +15,6 @@ cat > gather_logs.yaml <<-EOF
   vars:
     LOGS_DIR: /tmp/artifacts
     GATHER_CAPI_LOGS: "{{ lookup('env', 'GATHER_CAPI_LOGS') }}"
-    CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE') }}"
     CLUSTER_GATHER:
       - "{{ (lookup('env', 'SOSREPORT') == 'true') | ternary('--sosreport','', '') }}"
       - "{{ (lookup('env', 'MUST_GATHER') == 'true') | ternary('--must-gather','', '') }}"
@@ -43,22 +42,6 @@ cat > gather_logs.yaml <<-EOF
       - name: List swtpm-localca files to a file
         ansible.builtin.shell: |
           ls -ltr /var/lib/swtpm-localca/ >> {{ LOGS_DIR }}/libvirt-qemu/ls-swtpm-localca.txt
-      - name: Equinix specific tasks
-        block:
-        - name: Fetch equinix metadata
-          ansible.builtin.uri:
-            url: "https://metadata.platformequinix.com/metadata"
-            return_content: yes
-          register: equinix_metadata
-          until: equinix_metadata.status == 200
-          retries: 5
-          delay: 5
-          no_log: true
-        - name: Filter and dump equinix metadata
-          ansible.builtin.copy:
-            content: "{% set removed = equinix_metadata.json.pop('ssh_keys') %}{{ equinix_metadata.json | to_nice_json }}"
-            dest: "{{ LOGS_DIR }}/equinix-metadata.json"
-        when: "'packet' in CLUSTER_TYPE"
       - name: Check minikube kubeconfig file existence
         stat:
           path: /root/.kube/config
