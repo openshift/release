@@ -262,7 +262,16 @@ function upgrade_paused() {
 
 # Preserve the && chaining in this function, because it is called from and AND-OR list so it doesn't get errexit.
 function suite() {
-    if [[ -n "${TEST_SKIPS}" ]]; then
+    if [[ -n "${TESTS:-}" ]]; then
+        readarray -t config <<< "${TESTS}"
+        for var in "${config[@]}"; do
+            if [[ ! -z "${var}" ]]; then
+                echo "Adding test: ${var}"
+                echo "${var}" >>/tmp/tests
+            fi
+        done
+        TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+    elif [[ -n "${TEST_SKIPS}" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
         echo "Skipping tests:" &&
