@@ -95,6 +95,10 @@ EOF
 ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
 function getCIR(){
+    if [ "${ARCHITECTURE}" == "arm64" ]; then
+      return 1
+    fi
+
     OFCIRURL=$1
     echo $OFCIRURL > $SHARED_DIR/ofcir
     echo "Attempting to acquire a Host from OFCIR"
@@ -216,7 +220,7 @@ cat > packet-setup.yaml <<-EOF
         hostnames: "{{ packet_hostname }}"
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
-        facility: any
+        facility: ${PACKET_FACILITY}
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
         user_data: "{{ user_data | default(omit) }}"
       register: hosts
