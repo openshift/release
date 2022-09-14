@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.17-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.17-linux
   stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
@@ -110,6 +106,7 @@ tests:
     make setup_envtest
     export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./operator/... ./agent/... ./manager/..."
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -123,6 +120,7 @@ tests:
     make setup_envtest
     export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
     export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./operator/... ./agent/... ./manager/..."
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src

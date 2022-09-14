@@ -1,7 +1,7 @@
 presubmits:
   openshift-priv/cluster-etcd-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -21,6 +21,7 @@ presubmits:
     name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-configmap-scale
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test configmap-scale
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -83,12 +84,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )configmap-scale,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build05
-    context: ci/prow/e2e-agnostic
+    context: ci/prow/e2e-agnostic-ovn
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -100,9 +101,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-agnostic
+    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-agnostic-ovn
     path_alias: github.com/openshift/cluster-etcd-operator
-    rerun_command: /test e2e-agnostic
+    rerun_command: /test e2e-agnostic-ovn
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -112,8 +114,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agnostic-cluster-profile
-        - --target=e2e-agnostic
+        - --secret-dir=/usr/local/e2e-agnostic-ovn-cluster-profile
+        - --target=e2e-agnostic-ovn
         command:
         - ci-operator
         image: ci-operator:latest
@@ -129,7 +131,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agnostic-cluster-profile
+        - mountPath: /usr/local/e2e-agnostic-ovn-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -163,14 +165,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agnostic,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agnostic-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build04
-    context: ci/prow/e2e-agnostic-upgrade
+    context: ci/prow/e2e-agnostic-ovn-upgrade
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -182,9 +184,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-agnostic-upgrade
+    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-agnostic-ovn-upgrade
     path_alias: github.com/openshift/cluster-etcd-operator
-    rerun_command: /test e2e-agnostic-upgrade
+    rerun_command: /test e2e-agnostic-ovn-upgrade
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -194,8 +197,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agnostic-upgrade-cluster-profile
-        - --target=e2e-agnostic-upgrade
+        - --secret-dir=/usr/local/e2e-agnostic-ovn-upgrade-cluster-profile
+        - --target=e2e-agnostic-ovn-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -211,7 +214,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agnostic-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-agnostic-ovn-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -249,9 +252,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agnostic-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agnostic-ovn-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -272,6 +275,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-aws
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -334,7 +338,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -355,6 +359,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-aws-disruptive
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -417,7 +422,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-disruptive,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -438,6 +443,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-aws-disruptive-ovn
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -505,7 +511,7 @@ presubmits:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build05
-    context: ci/prow/e2e-aws-serial
+    context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -517,9 +523,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-aws-serial
+    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-aws-ovn-serial
     path_alias: github.com/openshift/cluster-etcd-operator
-    rerun_command: /test e2e-aws-serial
+    rerun_command: /test e2e-aws-ovn-serial
     spec:
       containers:
       - args:
@@ -529,8 +535,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-serial-cluster-profile
-        - --target=e2e-aws-serial
+        - --secret-dir=/usr/local/e2e-aws-ovn-serial-cluster-profile
+        - --target=e2e-aws-ovn-serial
         command:
         - ci-operator
         image: ci-operator:latest
@@ -546,7 +552,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-serial-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ovn-serial-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -580,14 +586,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-serial,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-serial,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build05
-    context: ci/prow/e2e-aws-single-node
+    context: ci/prow/e2e-aws-ovn-single-node
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -599,9 +605,10 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-aws-single-node
+    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-aws-ovn-single-node
     path_alias: github.com/openshift/cluster-etcd-operator
-    rerun_command: /test e2e-aws-single-node
+    rerun_command: /test e2e-aws-ovn-single-node
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -611,8 +618,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-single-node-cluster-profile
-        - --target=e2e-aws-single-node
+        - --secret-dir=/usr/local/e2e-aws-ovn-single-node-cluster-profile
+        - --target=e2e-aws-ovn-single-node
         command:
         - ci-operator
         image: ci-operator:latest
@@ -628,7 +635,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-single-node-cluster-profile
+        - mountPath: /usr/local/e2e-aws-ovn-single-node-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -662,9 +669,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-single-node,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-single-node,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -685,6 +692,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-azure
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -747,7 +755,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-azure,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -768,6 +776,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-gcp
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -834,7 +843,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -855,6 +864,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-gcp-disruptive
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -921,7 +931,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-disruptive,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -942,6 +952,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-gcp-disruptive-five-control-plane-replicas
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1095,12 +1106,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-gcp-disruptive-ovn,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build04
-    context: ci/prow/e2e-gcp-five-control-plane-replicas
+    context: ci/prow/e2e-gcp-ovn-five-control-plane-replicas
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1112,10 +1123,11 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-gcp-five-control-plane-replicas
+    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-gcp-ovn-five-control-plane-replicas
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
-    rerun_command: /test e2e-gcp-five-control-plane-replicas
+    rerun_command: /test e2e-gcp-ovn-five-control-plane-replicas
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1125,8 +1137,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-five-control-plane-replicas-cluster-profile
-        - --target=e2e-gcp-five-control-plane-replicas
+        - --secret-dir=/usr/local/e2e-gcp-ovn-five-control-plane-replicas-cluster-profile
+        - --target=e2e-gcp-ovn-five-control-plane-replicas
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1142,7 +1154,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-five-control-plane-replicas-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-ovn-five-control-plane-replicas-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -1180,14 +1192,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-five-control-plane-replicas,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-ovn-five-control-plane-replicas,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build04
-    context: ci/prow/e2e-gcp-upgrade-five-control-plane-replicas
+    context: ci/prow/e2e-gcp-ovn-upgrade-five-control-plane-replicas
     decorate: true
     decoration_config:
       oauth_token_secret:
@@ -1199,10 +1211,11 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-gcp-upgrade-five-control-plane-replicas
+    name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-gcp-ovn-upgrade-five-control-plane-replicas
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
-    rerun_command: /test e2e-gcp-upgrade-five-control-plane-replicas
+    rerun_command: /test e2e-gcp-ovn-upgrade-five-control-plane-replicas
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1212,8 +1225,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-gcp-upgrade-five-control-plane-replicas-cluster-profile
-        - --target=e2e-gcp-upgrade-five-control-plane-replicas
+        - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-five-control-plane-replicas-cluster-profile
+        - --target=e2e-gcp-ovn-upgrade-five-control-plane-replicas
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1229,7 +1242,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-gcp-upgrade-five-control-plane-replicas-cluster-profile
+        - mountPath: /usr/local/e2e-gcp-ovn-upgrade-five-control-plane-replicas-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -1267,9 +1280,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-gcp-upgrade-five-control-plane-replicas,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-gcp-ovn-upgrade-five-control-plane-replicas,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -1290,6 +1303,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-metal-assisted
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1352,7 +1366,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-assisted,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -1373,6 +1387,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-metal-ipi
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1435,7 +1450,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -1456,6 +1471,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1518,7 +1534,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-ovn-ipv6,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -1539,6 +1555,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-metal-ipi-serial-ipv4
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1601,7 +1618,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-ipi-serial-ipv4,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -1622,6 +1639,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-metal-single-node-live-iso
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:
@@ -1684,7 +1702,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-single-node-live-iso,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
@@ -1704,6 +1722,7 @@ presubmits:
     name: pull-ci-openshift-priv-cluster-etcd-operator-release-4.13-e2e-operator
     path_alias: github.com/openshift/cluster-etcd-operator
     rerun_command: /test e2e-operator
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
     spec:
       containers:
       - args:

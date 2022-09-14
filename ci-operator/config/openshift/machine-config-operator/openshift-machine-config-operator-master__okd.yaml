@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.10"
+    name: "4.12"
     namespace: origin
     tag: base
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
@@ -10,22 +10,28 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
+- build_args:
+  - name: TAGS
+    value: fcos
+  dockerfile_path: Dockerfile
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: machine-config-operator
+promotion:
+  name: "4.12"
+  namespace: origin
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.12"
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.12"
       namespace: origin
 resources:
   '*':

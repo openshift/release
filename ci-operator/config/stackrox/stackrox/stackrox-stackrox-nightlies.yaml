@@ -7,10 +7,6 @@ base_images:
     name: automation-flavors
     namespace: stackrox
     tag: eks-0.3.1
-  golang-1.17.2:
-    name: golang
-    namespace: stackrox
-    tag: 1.17.2
   osd:
     name: automation-flavors
     namespace: stackrox
@@ -89,9 +85,6 @@ images:
   to: docs
 - dockerfile_path: operator/build/Dockerfile.gen
   inputs:
-    golang-1.17.2:
-      as:
-      - golang:1.17.2
     operator-artifacts:
       paths:
       - destination_dir: .
@@ -278,6 +271,36 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
+- as: openshift-oldest-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.6"
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: openshift-penultimate-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.10"
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: openshift-newest-qa-e2e-tests
   cluster_claim:
     architecture: amd64
@@ -285,7 +308,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 5h0m0s
-    version: "4.8"
+    version: "4.11"
   postsubmit: true
   steps:
     env:

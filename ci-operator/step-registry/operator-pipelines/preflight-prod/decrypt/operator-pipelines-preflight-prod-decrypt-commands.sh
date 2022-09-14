@@ -15,10 +15,9 @@ export PFLT_DOCKERCONFIG
 
 if [ -n "${PFLT_DOCKERCONFIG}" ]
 then
-    preflight-trigger decrypt \
+    preflight-trigger decode --value ${PFLT_DOCKERCONFIG} | preflight-trigger decrypt \
     --gpg-decryption-private-key ${gpg_private_key_file} \
     --gpg-decryption-public-key ${gpg_public_key_file} \
-    --pflt-docker-config ${PFLT_DOCKERCONFIG} \
     --output-path ${SHARED_DIR}/decrypted_config.json
 
     echo "Artifacts decrypted and accessible"

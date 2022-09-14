@@ -6,22 +6,23 @@ presubmits:
     - ^ci-perf-hacks$
     - ^ci-perf-hacks-
     cluster: build01
-    context: ci/prow/images
+    context: ci/prow/go-postgres-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-ci-perf-hacks-images
-    rerun_command: /test images
+    name: pull-ci-stackrox-stackrox-ci-perf-hacks-go-postgres-tests
+    rerun_command: /test go-postgres-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --secret-dir=/secrets/stackrox-stackrox-base
+        - --target=go-postgres-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -40,6 +41,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -48,29 +52,33 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
+    trigger: (?m)^/test( | .* )go-postgres-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^ci-perf-hacks$
     - ^ci-perf-hacks-
     cluster: build01
-    context: ci/prow/push-images
+    context: ci/prow/go-unit-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-ci-perf-hacks-push-images
-    rerun_command: /test push-images
+    name: pull-ci-stackrox-stackrox-ci-perf-hacks-go-unit-tests
+    rerun_command: /test go-unit-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=push-images
+        - --secret-dir=/secrets/stackrox-stackrox-base
+        - --target=go-unit-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -89,6 +97,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -97,4 +108,119 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )push-images,?($|\s.*)
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
+    trigger: (?m)^/test( | .* )go-unit-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^ci-perf-hacks$
+    - ^ci-perf-hacks-
+    cluster: build01
+    context: ci/prow/go-unit-tests-release
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-ci-perf-hacks-go-unit-tests-release
+    rerun_command: /test go-unit-tests-release
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
+        - --target=go-unit-tests-release
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
+    trigger: (?m)^/test( | .* )go-unit-tests-release,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^ci-perf-hacks$
+    - ^ci-perf-hacks-
+    cluster: build01
+    context: ci/prow/style-checks
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-ci-perf-hacks-style-checks
+    rerun_command: /test style-checks
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
+        - --target=style-checks
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
+    trigger: (?m)^/test( | .* )style-checks,?($|\s.*)

@@ -98,24 +98,34 @@ mkdir dev-scripts
 tar -xzvf dev-scripts.tar.gz -C /root/dev-scripts
 chown -R root:root dev-scripts
 
-NVME_DEVICE="/dev/nvme0n1"
-if [ -e "\$NVME_DEVICE" ];
+if [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ];
 then
-  mkfs.xfs -f "\${NVME_DEVICE}"
+  mkfs.xfs -f "${NVME_DEVICE}"
   mkdir /opt/dev-scripts
-  mount "\${NVME_DEVICE}" /opt/dev-scripts
+  mount "${NVME_DEVICE}" /opt/dev-scripts
 fi
 
 cd dev-scripts
 
 cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
-echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
+
+if [[ "${ARCHITECTURE}" == "arm64" ]]; then
+  echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" >> /root/dev-scripts/config_root.sh
+  ## Look into making the following IRONIC_IMAGE change a default behavior within `dev-scripts`
+  echo "export IRONIC_IMAGE=\\\$(oc adm release info -a /root/dev-scripts/pull_secret.json \
+    \\\${OPENSHIFT_RELEASE_IMAGE} --image-for=\"ironic\")" >> /root/dev-scripts/config_root.sh
+  ## The following exports should be revisited after this:  https://issues.redhat.com/browse/ARMOCP-434
+  echo "export SUSHY_TOOLS_IMAGE=quay.io/multi-arch/sushy-tools:muiltarch" >> /root/dev-scripts/config_root.sh
+  echo "export VBMC_IMAGE=quay.io/multi-arch/vbmc:arm" >> /root/dev-scripts/config_root.sh
+else
+  echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
+fi
 
 # Inject PR additional configuration, if available
 if [[ -e /root/dev-scripts/dev-scripts-additional-config ]]

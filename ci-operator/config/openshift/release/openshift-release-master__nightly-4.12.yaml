@@ -155,15 +155,11 @@ tests:
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
 - as: e2e-metal-ipi-ovn-ipv4
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-sdn
-  interval: 6h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-sdn-bm
   cluster: build05
   interval: 6h
@@ -173,6 +169,7 @@ tests:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-dualstack-local-gateway
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -183,40 +180,48 @@ tests:
         OVN_LOCAL_GATEWAY_MODE=true
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-sdn-serial-ipv4
+  cluster: build05
   interval: 6h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-serial-ovn-ipv6
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
 - as: e2e-metal-ipi-sdn-serial-virtualmedia
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-virtualmedia
 - as: e2e-metal-ipi-serial-ovn-dualstack
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-dualstack
 - as: e2e-metal-ipi-sdn-serial-compact
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-compact
-- as: e2e-metal-ipi-sdn-upgrade
-  cron: 0 0 1 1 *
+- as: e2e-metal-ipi-sdn-bm-upgrade
+  cluster: build05
+  cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
+      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     workflow: baremetalds-e2e-upgrade-sdn
   timeout: 5h0m0s
 - as: e2e-metal-ipi-upgrade-ovn-ipv6
-  cron: 0 0 1 1 *
+  cluster: build05
+  cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -224,16 +229,19 @@ tests:
     workflow: baremetalds-e2e-upgrade-ovn-ipv6
   timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   interval: 6h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   cron: 0 0 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ovn-ipi-compact
+  cluster: build05
   cron: 0 0 * * 1
   steps:
     cluster_profile: equinix-ocp-metal
@@ -413,7 +421,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-gcp-sdn
 - as: console-aws
-  interval: 48h
+  interval: 12h
   steps:
     cluster_profile: aws-2
     env:
@@ -634,21 +642,6 @@ tests:
     env:
       BASE_DOMAIN: alicloud-dev.devcluster.openshift.com
     workflow: openshift-e2e-alibabacloud-disk-csi
-- as: release-payload-install-analysis
-  cron: '@yearly'
-  steps:
-    env:
-      GOOGLE_SA_CREDENTIAL_FILE: $(GOOGLE_SA_CREDENTIAL_FILE)
-      INFRASTRUCTURE: $(INFRASTRUCTURE)
-      JOB_START_TIME: $(JOB_START_TIME)
-      MINIMUM_SUCCESSFUL_COUNT: $(MINIMUM_SUCCESSFUL_COUNT)
-      NETWORK: $(NETWORK)
-      PAYLOAD_TAG: $(PAYLOAD_TAG)
-      PLATFORM: $(PLATFORM)
-      TEST_GROUP: $(TEST_GROUP)
-      WORKING_DIR: $(ARTIFACT_DIR)/release-payload-install-analysis
-    test:
-    - ref: openshift-release-analysis-test-case-analysis
 - as: e2e-ibmcloud-csi
   interval: 24h
   steps:

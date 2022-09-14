@@ -74,14 +74,16 @@ export INSTALLER_KUBECONFIG={{ REPO_DIR }}/build/kubeconfig
 export PULL_SECRET=\$(cat /root/pull-secret)
 export CI=true
 export OPENSHIFT_CI=true
-export REPO_NAME={{ lookup('env', 'REPO_NAME') }}
-export JOB_TYPE={{ lookup('env', 'JOB_TYPE') }}
-export PULL_NUMBER={{ lookup('env', 'PULL_NUMBER') }}
+export REPO_NAME={{ REPO_NAME }}
+export JOB_TYPE={{ JOB_TYPE }}
+export PULL_NUMBER={{ PULL_NUMBER }}
+export PULL_BASE_REF={{ PULL_BASE_REF }}
 export RELEASE_IMAGE_LATEST={{ RELEASE_IMAGE_LATEST }}
-export SERVICE={{ lookup('env', 'ASSISTED_SERVICE_IMAGE') }}
+export SERVICE={{ ASSISTED_SERVICE_IMAGE }}
 export AGENT_DOCKER_IMAGE={{ ASSISTED_AGENT_IMAGE }}
 export CONTROLLER_IMAGE={{ ASSISTED_CONTROLLER_IMAGE }}
 export INSTALLER_IMAGE={{ ASSISTED_INSTALLER_IMAGE }}
+export IMAGE_SERVICE={{ ASSISTED_IMAGE_SERVICE }}
 export CHECK_CLUSTER_VERSION=True
 export TEST_TEARDOWN=false
 export TEST_FUNC=test_install
@@ -94,14 +96,15 @@ export PULL_SECRET=\$(cat /root/prod/pull-secret)
 export OFFLINE_TOKEN=\$(cat /root/prod/offline-token)
 export REMOTE_SERVICE_URL=https://api.openshift.com
 export NO_MINIKUBE=true
-export MAKEFILE_TARGET='setup test_parallel'
+export MAKEFILE_SETUP_TARGET=setup
+export MAKEFILE_TARGET=test_parallel
 {% endif %}
 
 {% if PROVIDER_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
 export PROVIDER_IMAGE={{ PROVIDER_IMAGE }}
 {% endif %}
 
-{% if PROVIDER_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
+{% if HYPERSHIFT_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
 export HYPERSHIFT_IMAGE={{ HYPERSHIFT_IMAGE }}
 {% endif %}
 
@@ -109,7 +112,7 @@ export HYPERSHIFT_IMAGE={{ HYPERSHIFT_IMAGE }}
 export SERVICE_BRANCH={{ PULL_PULL_SHA }}
 {% endif %}
 
-{% if REPO_NAME != "assisted-service" %}
+{% if JOB_TYPE != "presubmit" or REPO_NAME == "release" %}
 export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ RELEASE_IMAGE_LATEST }}
 {% endif %}
 
@@ -139,14 +142,18 @@ cat > run_test_playbook.yaml <<-"EOF"
     REPO_OWNER: "{{ lookup('env', 'REPO_OWNER') }}"
     REPO_NAME: "{{ lookup('env', 'REPO_NAME') }}"
     REPO_DIR: "{{ DATA_DIR }}/assisted"
-    MINIKUBE_HOME: "{{ DATA_DIR }}/minikube_home"
+    MINIKUBE_HOME: "{{ REPO_DIR }}/minikube_home"
+    PULL_NUMBER: "{{ lookup('env', 'PULL_NUMBER') }}"
+    PULL_BASE_REF: "{{ lookup('env', 'PULL_BASE_REF') }}"
     CI_CREDENTIALS_DIR: "{{ lookup('env', 'CI_CREDENTIALS_DIR') }}"
     CLUSTER_PROFILE_DIR: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}"
     IP: "{{ lookup('env', 'IP') }}"
     SHARED_DIR: "{{ lookup('env', 'SHARED_DIR') }}"
+    ASSISTED_SERVICE_IMAGE: "{{ lookup('env', 'ASSISTED_SERVICE_IMAGE') }}"
     ASSISTED_AGENT_IMAGE: "{{ lookup('env', 'ASSISTED_AGENT_IMAGE') }}"
     ASSISTED_CONTROLLER_IMAGE: "{{ lookup('env', 'ASSISTED_CONTROLLER_IMAGE') }}"
     ASSISTED_INSTALLER_IMAGE: "{{ lookup('env', 'ASSISTED_INSTALLER_IMAGE') }}"
+    ASSISTED_IMAGE_SERVICE: "{{ lookup('env', 'ASSISTED_IMAGE_SERVICE') }}"
     RELEASE_IMAGE_LATEST: "{{ lookup('env', 'RELEASE_IMAGE_LATEST') }}"
     PROVIDER_IMAGE: "{{ lookup('env', 'PROVIDER_IMAGE') }}"
     HYPERSHIFT_IMAGE: "{{ lookup('env', 'HYPERSHIFT_IMAGE') }}"
@@ -225,11 +232,12 @@ cat > run_test_playbook.yaml <<-"EOF"
       set_fact:
         CI_REGISTRIES: "{{ CI_REGISTRIES + [ item.split('/') | first ] }}"
       loop:
+      - quay.io
       - "{{ ASSISTED_AGENT_IMAGE }}"
       - "{{ ASSISTED_CONTROLLER_IMAGE }}"
-      - "{{ RELEASE_IMAGE_LATEST }}"
       - "{{ ASSISTED_INSTALLER_IMAGE }}"
-      - quay.io
+      - "{{ ASSISTED_IMAGE_SERVICE }}"
+      - "{{ RELEASE_IMAGE_LATEST }}"
     - debug:
         msg: "CI_REGISTRIES = {{ CI_REGISTRIES }}"
     - name: Create {{ REPO_DIR }} directory if it does not exist
@@ -253,25 +261,24 @@ cat > run_test_playbook.yaml <<-"EOF"
           mkfs.xfs -f /dev/nvme0n1
           mount /dev/nvme0n1 {{ REPO_DIR }}
         when: "equinix_metadata.json.plan == 'm3.large.x86'"
-      - name: Setup working directory and swap for machine type c3.medium.x86
+      - name: Setup extra swap for machine type {{ equinix_metadata.json.plan }}
         ansible.builtin.shell: |
-          # c3.medium.x86 has 64GB of RAM which is not enough for most of assisted jobs
-          # we need to mount extra swap space in order over commit memory with libvirt/KVM
-          # the machine has 2x240G disks (one is used for the system) and 2x480GB disks
+          # c3.medium.x86 and m3.small.x86 have 64GB of RAM which is not enough for most of assisted jobs.
+          # We need to mount extra swap space in order allow memory overcommit with libvirt/KVM.
+          #
+          # c3.medium.x86 is supposed to have 2x240G disks (one is used for the system) and
+          # 2x480GB disks (sometimes missing).
+          #
+          # m3.small.x86 has 2 x 480GB disks (one is used for the system)
 
           # Get disk where / is mounted
           ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
 
-          # Setup the smallest disk available (240GB) as swap
+          # Setup the smallest disk available as swap
           SWAP_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | head -n1)
           mkswap "${SWAP_DISK}"
           swapon "${SWAP_DISK}"
-
-          # Setup the largest disk available (480GB) for assisted tests
-          REPO_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | tail -n1)
-          mkfs.xfs -f "${REPO_DISK}"
-          mount "${REPO_DISK}" "{{ REPO_DIR }}"
-        when: "equinix_metadata.json.plan == 'c3.medium.x86'"
+        when: "equinix_metadata.json.plan == 'c3.medium.x86' or equinix_metadata.json.plan == 'm3.small.x86'"
       when: '"packet" in CLUSTER_TYPE'
     - name: Create {{ MINIKUBE_HOME }} directory if it does not exist
       ansible.builtin.file:

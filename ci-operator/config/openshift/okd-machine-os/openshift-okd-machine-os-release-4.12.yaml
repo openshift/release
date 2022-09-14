@@ -1,27 +1,42 @@
+base_images:
+  artifacts:
+    name: "4.12"
+    namespace: origin
+    tag: artifacts
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.18
 images:
 - dockerfile_path: Dockerfile.ci
-  to: cosa-build
-- inputs:
-    cosa-build:
+  to: layering-build
+- dockerfile_path: Dockerfile.rpms
+  inputs:
+    artifacts:
+      as:
+      - registry.ci.openshift.org/origin/4.12:artifacts
+  to: okd-rpms
+- dockerfile_path: Dockerfile.generated
+  inputs:
+    artifacts:
+      as:
+      - registry.ci.openshift.org/origin/4.12:artifacts
+    layering-build:
       paths:
       - destination_dir: .
-        source_path: /tmp/Dockerfile
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/manifests/
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/bootstrap/
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/okd-machine-os/extensions/
+        source_path: /tmp/Dockerfile.generated
+  to: fedora-coreos
+- dockerfile_literal: FROM fedora-coreos
+  inputs:
+    fedora-coreos:
+      as:
+      - fedora-coreos
   to: machine-os-content
 promotion:
   disabled: true
   excluded_images:
-  - cosa-build
+  - layering-build
   name: "4.12"
   namespace: origin
 releases:
@@ -45,7 +60,7 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
-- as: e2e-aws
+- as: e2e-aws-ovn
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
