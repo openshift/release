@@ -564,6 +564,7 @@ IBMCLOUD_API_KEY=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD
 IBMCLOUD_APIKEY_CCM_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CCM_CREDS")
 IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_INGRESS_CREDS")
 IBMCLOUD_APIKEY_MACHINEAPI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_MACHINEAPI_CREDS")
+IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CSI_CREDS")
 POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_REGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_REGION")
@@ -675,6 +676,21 @@ stringData:
     IBMCLOUD_AUTHTYPE=iam
     IBMCLOUD_APIKEY=${IBMCLOUD_APIKEY_MACHINEAPI_CREDS}
   ibmcloud_api_key: ${IBMCLOUD_APIKEY_MACHINEAPI_CREDS}
+type: Opaque
+EOF
+
+cat > "${dir}/manifests/openshift-cluster-csi-drivers-ibm-powervs-cloud-credentials-credentials.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: ibm-powervs-cloud-credentials
+  namespace: openshift-cluster-csi-drivers
+stringData:
+  ibm-credentials.env: |-
+    IBMCLOUD_AUTHTYPE=iam
+    IBMCLOUD_APIKEY=${IBMCLOUD_APIKEY_CSI_CREDS}
+  ibmcloud_api_key: ${IBMCLOUD_APIKEY_CSI_CREDS}
 type: Opaque
 EOF
 

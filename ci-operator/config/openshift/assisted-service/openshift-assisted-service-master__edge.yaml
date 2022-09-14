@@ -31,10 +31,6 @@ base_images:
     name: ocm-2.7
     namespace: edge-infrastructure
     tag: cluster-api-provider-agent
-  coreos_centos_stream8:
-    name: stream8
-    namespace: coreos
-    tag: "8"
   coreos_centos_stream9:
     name: stream9
     namespace: coreos
@@ -170,9 +166,6 @@ images:
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   inputs:
-    coreos_centos_stream8:
-      as:
-      - quay.io/centos/centos:stream8
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
@@ -509,6 +502,19 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-compact-day2-workers
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+        NUMBER_OF_DAY2_HOSTS=1
+      NUM_EXTRA_WORKERS: "2"
+    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers
   steps:
     cluster_profile: packet-assisted
@@ -780,7 +786,7 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="setup run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
@@ -925,7 +931,8 @@ tests:
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=12000
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="setup run deploy_capi_env test_kube_api_parallel"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
     workflow: assisted-baremetal
 - as: e2e-vsphere-assisted
@@ -935,6 +942,17 @@ tests:
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-umn
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        USER_MANAGED_NETWORKING=true
         MAKEFILE_TARGET=test
       PLATFORM: vsphere
     workflow: assisted-vsphere

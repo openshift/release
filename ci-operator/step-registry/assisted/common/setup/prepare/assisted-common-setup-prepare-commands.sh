@@ -74,14 +74,16 @@ export INSTALLER_KUBECONFIG={{ REPO_DIR }}/build/kubeconfig
 export PULL_SECRET=\$(cat /root/pull-secret)
 export CI=true
 export OPENSHIFT_CI=true
-export REPO_NAME={{ lookup('env', 'REPO_NAME') }}
-export JOB_TYPE={{ lookup('env', 'JOB_TYPE') }}
-export PULL_NUMBER={{ lookup('env', 'PULL_NUMBER') }}
+export REPO_NAME={{ REPO_NAME }}
+export JOB_TYPE={{ JOB_TYPE }}
+export PULL_NUMBER={{ PULL_NUMBER }}
+export PULL_BASE_REF={{ PULL_BASE_REF }}
 export RELEASE_IMAGE_LATEST={{ RELEASE_IMAGE_LATEST }}
-export SERVICE={{ lookup('env', 'ASSISTED_SERVICE_IMAGE') }}
+export SERVICE={{ ASSISTED_SERVICE_IMAGE }}
 export AGENT_DOCKER_IMAGE={{ ASSISTED_AGENT_IMAGE }}
 export CONTROLLER_IMAGE={{ ASSISTED_CONTROLLER_IMAGE }}
 export INSTALLER_IMAGE={{ ASSISTED_INSTALLER_IMAGE }}
+export IMAGE_SERVICE={{ ASSISTED_IMAGE_SERVICE }}
 export CHECK_CLUSTER_VERSION=True
 export TEST_TEARDOWN=false
 export TEST_FUNC=test_install
@@ -101,7 +103,7 @@ export MAKEFILE_TARGET='setup test_parallel'
 export PROVIDER_IMAGE={{ PROVIDER_IMAGE }}
 {% endif %}
 
-{% if PROVIDER_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
+{% if HYPERSHIFT_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
 export HYPERSHIFT_IMAGE={{ HYPERSHIFT_IMAGE }}
 {% endif %}
 
@@ -109,7 +111,7 @@ export HYPERSHIFT_IMAGE={{ HYPERSHIFT_IMAGE }}
 export SERVICE_BRANCH={{ PULL_PULL_SHA }}
 {% endif %}
 
-{% if REPO_NAME != "assisted-service" %}
+{% if JOB_TYPE != "presubmit" or REPO_NAME == "release" %}
 export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ RELEASE_IMAGE_LATEST }}
 {% endif %}
 
@@ -139,14 +141,18 @@ cat > run_test_playbook.yaml <<-"EOF"
     REPO_OWNER: "{{ lookup('env', 'REPO_OWNER') }}"
     REPO_NAME: "{{ lookup('env', 'REPO_NAME') }}"
     REPO_DIR: "{{ DATA_DIR }}/assisted"
-    MINIKUBE_HOME: "{{ DATA_DIR }}/minikube_home"
+    MINIKUBE_HOME: "{{ REPO_DIR }}/minikube_home"
+    PULL_NUMBER: "{{ lookup('env', 'PULL_NUMBER') }}"
+    PULL_BASE_REF: "{{ lookup('env', 'PULL_BASE_REF') }}"
     CI_CREDENTIALS_DIR: "{{ lookup('env', 'CI_CREDENTIALS_DIR') }}"
     CLUSTER_PROFILE_DIR: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}"
     IP: "{{ lookup('env', 'IP') }}"
     SHARED_DIR: "{{ lookup('env', 'SHARED_DIR') }}"
+    ASSISTED_SERVICE_IMAGE: "{{ lookup('env', 'ASSISTED_SERVICE_IMAGE') }}"
     ASSISTED_AGENT_IMAGE: "{{ lookup('env', 'ASSISTED_AGENT_IMAGE') }}"
     ASSISTED_CONTROLLER_IMAGE: "{{ lookup('env', 'ASSISTED_CONTROLLER_IMAGE') }}"
     ASSISTED_INSTALLER_IMAGE: "{{ lookup('env', 'ASSISTED_INSTALLER_IMAGE') }}"
+    ASSISTED_IMAGE_SERVICE: "{{ lookup('env', 'ASSISTED_IMAGE_SERVICE') }}"
     RELEASE_IMAGE_LATEST: "{{ lookup('env', 'RELEASE_IMAGE_LATEST') }}"
     PROVIDER_IMAGE: "{{ lookup('env', 'PROVIDER_IMAGE') }}"
     HYPERSHIFT_IMAGE: "{{ lookup('env', 'HYPERSHIFT_IMAGE') }}"
@@ -225,11 +231,12 @@ cat > run_test_playbook.yaml <<-"EOF"
       set_fact:
         CI_REGISTRIES: "{{ CI_REGISTRIES + [ item.split('/') | first ] }}"
       loop:
+      - quay.io
       - "{{ ASSISTED_AGENT_IMAGE }}"
       - "{{ ASSISTED_CONTROLLER_IMAGE }}"
-      - "{{ RELEASE_IMAGE_LATEST }}"
       - "{{ ASSISTED_INSTALLER_IMAGE }}"
-      - quay.io
+      - "{{ ASSISTED_IMAGE_SERVICE }}"
+      - "{{ RELEASE_IMAGE_LATEST }}"
     - debug:
         msg: "CI_REGISTRIES = {{ CI_REGISTRIES }}"
     - name: Create {{ REPO_DIR }} directory if it does not exist

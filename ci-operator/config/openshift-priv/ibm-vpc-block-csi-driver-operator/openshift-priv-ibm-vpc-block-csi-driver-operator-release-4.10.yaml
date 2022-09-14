@@ -19,6 +19,9 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: ibm-vpc-block-csi-driver-operator
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: ibm-vpc-block-csi-driver-operator-test
 promotion:
   name: 4.10-priv
   namespace: ocp-private
@@ -48,6 +51,14 @@ tests:
   commands: make verify
   container:
     from: src
+- as: e2e-ibmcloud-csi
+  optional: true
+  steps:
+    cluster_profile: ibmcloud
+    env:
+      TEST_SKIPS: Verify if offline PVC expansion works\| topology should provision
+        a volume and schedule a pod with AllowedTopologies
+    workflow: openshift-e2e-ibmcloud-csi
 zz_generated_metadata:
   branch: release-4.10
   org: openshift-priv
