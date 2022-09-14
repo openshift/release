@@ -1,0 +1,42 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: openshift-dynamic-plugin-sdk-buildroot
+  namespace: ci
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: openshift-dynamic-plugin-sdk-buildroot
+  namespace: ci
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: openshift-dynamic-plugin-sdk-buildroot:go1.18-nodejs16
+      namespace: ci
+  source:
+    dockerfile: |
+      FROM ci-tools-build-root:1.18
+      RUN dnf module reset nodejs && dnf module enable nodejs:16
+      RUN dnf --allowerasing -y module install nodejs:16/common
+      RUN npm config set cache /go/.npm --global
+      RUN npm install -g yarn
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: "ci-tools-build-root:1.18"
+        namespace: ci
+    type: Docker
+  triggers:
+  - type: ConfigChange
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: "centos:stream8"
+        namespace: origin
+    type: ImageChange
