@@ -168,12 +168,14 @@ EOF
 #   manages HW in equinix, this is for virt hosts only
 # If neither can give us a host to use then we fall back to on demaned from equinix
 
-CIRTYPE=cihost
+CIRTYPE=cihost-new
 [[ "$CLUSTERTYPE" == "baremetal" ]] && CIRTYPE=cicluster
 
 if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
-    getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)" && exit_with_success
+    getCIR "https://10.10.129.12/ofcir" && exit_with_success
 fi
+
+exit 1
 
 # No point in continuing, only ofcir_laburl has cir's of type "cicluster"
 [[ "$CLUSTERTYPE" == "baremetal" ]] && exit_with_failure
