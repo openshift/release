@@ -8,17 +8,6 @@ metadata:
   namespace: prow-monitoring
 spec:
   groups:
-  - name: mirroring-failures
-    rules:
-    - alert: mirroring-failures
-      annotations:
-        message: '@patch-manager image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.  If there is a consistent issue, open a bugzilla bug against Test Infrastructure and help drive it to resolution.'
-      expr: |
-        increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
-      for: 1m
-      labels:
-        severity: critical
-        team: patch-manager
   - name: ci-absent
     rules:
     - alert: deckDown
@@ -321,6 +310,16 @@ spec:
           )
         )
         < 0.90
+      for: 1m
+      labels:
+        severity: critical
+  - name: openshift-mirroring-failures
+    rules:
+    - alert: openshift-mirroring-failures
+      annotations:
+        message: OpenShift image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.
+      expr: |
+        increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
       for: 1m
       labels:
         severity: critical
