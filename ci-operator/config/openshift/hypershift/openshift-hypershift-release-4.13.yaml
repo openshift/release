@@ -71,10 +71,6 @@ releases:
       include_built_images: true
       name: "4.13"
       namespace: ocp
-  previous:
-    release:
-      channel: stable
-      version: "4.11"
 resources:
   '*':
     limits:
@@ -124,111 +120,6 @@ tests:
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: assisted-baremetal
-- as: e2e-kubevirt-azure-ovn
-  optional: true
-  steps:
-    cluster_profile: azure4
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:previous
-    test:
-    - as: deploy-cnv
-      cli: latest
-      commands: ./hack/ci/install-cnv.sh
-      from: bin
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: kv-e2e
-      cli: latest
-      commands: |-
-        # install hypershift
-        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
-
-        # compile the e2e tests
-        make e2e
-
-        # run the test
-        bin/test-e2e \
-                  --test.v \
-                  --test.timeout=0 \
-                  --test.run=TestCreateCluster \
-                  --e2e.node-pool-replicas=2 \
-                  --e2e.kubevirt-node-memory="6Gi" \
-                  --e2e.platform="KubeVirt" \
-                  --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-                  --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
-      credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
-      - env: OCP_IMAGE_LATEST
-        name: release:latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      from: bin
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-azure-ovn
-- as: e2e-kubevirt-gcp-ovn
-  optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-  steps:
-    cluster_profile: gcp
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:previous
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-4
-    test:
-    - as: deploy-cnv
-      cli: latest
-      commands: ./hack/ci/install-cnv.sh
-      from: bin
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: kv-e2e
-      cli: latest
-      commands: |-
-        # install hypershift
-        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
-
-        # compile the e2e tests
-        make e2e
-
-        # run the test
-        bin/test-e2e \
-                  --test.v \
-                  --test.timeout=0 \
-                  --test.run=TestCreateCluster \
-                  --e2e.node-pool-replicas=2 \
-                  --e2e.kubevirt-node-memory="6Gi" \
-                  --e2e.platform="KubeVirt" \
-                  --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-                  --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
-      credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
-      - env: OCP_IMAGE_LATEST
-        name: release:latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      from: bin
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp-ovn
 zz_generated_metadata:
   branch: release-4.13
   org: openshift
