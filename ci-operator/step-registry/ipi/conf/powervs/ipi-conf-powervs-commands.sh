@@ -83,7 +83,7 @@ networking:
   - cidr: 10.128.0.0/14
     hostPrefix: 23
   machineNetwork:
-  - cidr: 192.168.0.0/16
+  - cidr: 192.168.0.0/24
   networkType: OpenShiftSDN
   serviceNetwork:
   - 172.30.0.0/16
