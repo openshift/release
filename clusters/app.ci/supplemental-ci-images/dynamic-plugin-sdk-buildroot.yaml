@@ -15,34 +15,26 @@ spec:
   output:
     to:
       kind: ImageStreamTag
-      name: openshift-dynamic-plugin-sdk-buildroot:nodejs16
+      name: openshift-dynamic-plugin-sdk-buildroot:v1
       namespace: ci
   source:
     dockerfile: |
-      FROM quay.io/centos/centos:stream8
+      FROM quay.io/fedora/fedora:36-x86_64
 
-      ENV WORKDIR=/go
-
-      RUN yum install -y epel-release && \
-          rpm -V epel-release && \
-          INSTALL_PKGS="bc bind-utils bsdtar device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glib2-devel hostname iptables jq krb5-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl rsync socat systemd-devel tar tito tree util-linux wget which xfsprogs zip" && \
-          yum install -y $INSTALL_PKGS && \
-          rpm -V $INSTALL_PKGS && \
-          yum clean all && \
-          touch /os-build-image && \
+      RUN dnf update -y && \
+          dnf install git jq -y && \
           git config --system user.name origin-release-container && \
           git config --system user.email origin-release@redhat.com && \
-          mkdir $WORKDIR
-
-      ENV VAULT_DISABLE_MLOCK true
-      RUN yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-          yum install -y vault-1.7.0-1 && \
-          setcap cap_ipc_lock= /usr/bin/vault
-
-      RUN dnf -y module enable nodejs:16 && \
-          dnf -y module install nodejs:16 && \
-          npm config set cache /go/.npm --global && \
-          npm install -g yarn
+          dnf module enable nodejs:16 -y && \
+          dnf module install nodejs:16 -y && \
+          WORKDIR='/go' && \
+          mkdir $WORKDIR && \
+          chgrp -R 0 $WORKDIR && \
+          chmod -R g=u $WORKDIR && \
+          npm config -g set cache $WORKDIR/.npm && \
+          npm install -g --no-update-notifier npm && \
+          npm install -g --no-update-notifier yarn && \
+          dnf clean all
     type: Dockerfile
   strategy:
     dockerStrategy:
