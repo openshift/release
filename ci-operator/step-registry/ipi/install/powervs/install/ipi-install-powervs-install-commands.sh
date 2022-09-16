@@ -620,13 +620,13 @@ IBMCLOUD_APIKEY_CCM_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds
 IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_INGRESS_CREDS")
 IBMCLOUD_APIKEY_MACHINEAPI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_MACHINEAPI_CREDS")
 IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CSI_CREDS")
-POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
-POWERVS_REGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_REGION")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
-POWERVS_ZONE=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_ZONE")
-VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
-CLUSTER_NAME="rdr-multiarch-ci"
+POWERVS_SERVICE_INSTANCE_ID=$(yq eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_REGION=$(yq eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_ZONE=$(yq eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
+VPCREGION=$(yq eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
+CLUSTER_NAME=$(yq eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -772,10 +772,10 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 export TF_LOG=debug
 # Uncomment for even more debugging!
-#export TF_LOG_PROVIDER=TRACE
-#export TF_LOG=TRACE
-#export TF_LOG_PATH=/tmp/tf.log
-#export IBMCLOUD_TRACE=true
+export TF_LOG_PROVIDER=TRACE
+export TF_LOG=TRACE
+export TF_LOG_PATH=/tmp/tf.log
+export IBMCLOUD_TRACE=true
 
 echo "8<--------8<--------8<--------8<-------- BEGIN: create cluster 8<--------8<--------8<--------8<--------"
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
