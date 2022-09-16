@@ -38,8 +38,8 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
   --allow tcp:22,icmp
 
 gcloud compute instances create "${INSTANCE_PREFIX}" \
-  --image=rhel-8-v20220719 \
-  --image-project=rhel-cloud \
+  --image=rhel-8-v20220822-rhel-cloud-microshift-base \
+  --image-project=openshift-gce-devel-ci \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --machine-type e2-standard-8 \
   --boot-disk-type pd-ssd \
