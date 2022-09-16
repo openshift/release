@@ -114,7 +114,12 @@ while IFS= read -r i; do
   mkdir -p ${ARTIFACT_DIR}/nodes/$i
   queue ${ARTIFACT_DIR}/nodes/$i/heap oc --insecure-skip-tls-verify get --request-timeout=20s --raw /api/v1/nodes/$i/proxy/debug/pprof/heap
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false
+  # Due to https://github.com/openshift/machine-config-operator/blob/master/docs/OSUpgrades.md we will always have two boots
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal-previous.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --boot=-1
+  # Try to gather earlier boots if possible
+  for bootn in 2 3 4; do
+    FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/journal-previous-${bootn}.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --boot=-${bootn} || true
+  done
   FILTER=gzip queue ${ARTIFACT_DIR}/nodes/$i/audit.gz oc --insecure-skip-tls-verify adm node-logs $i --unify=false --path=audit/audit.log
 done < /tmp/nodes
 
