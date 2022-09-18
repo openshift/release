@@ -73,6 +73,7 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
   echo "Requested cluster version not available!"
   exit 1
 fi
+OPENSHIFT_VERSION="openshift-v${OPENSHIFT_VERSION}"
 echo "Select openshift version ${OPENSHIFT_VERSION}"
 OPENSHIFT_VERSION="openshift-v${OPENSHIFT_VERSION}"
 
@@ -82,6 +83,7 @@ echo "  Cluster name: ${CLUSTER_NAME}"
 echo "  Cloud provider region: aws"
 echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
+echo "  Compute nodes: ${COMPUTE_NODES}"
 echo "  Multi-az: ${MULTI_AZ}"
 echo "  Compute nodes: ${COMPUTE_NODES}"
 echo "  Openshift version: ${OPENSHIFT_VERSION}"
