@@ -1,0 +1,76 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.9"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: appstudio-e2e-deployment
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.9"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - as: appstudio-e2e-deployment
+      cli: latest
+      commands: |
+        export OFFLINE_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/offline_sso_token)
+        export KCP_KUBECONFIG_SECRET="/usr/local/ci-secrets/redhat-appstudio-qe/kcp_kubeconfig"
+        mkdir -p $HOME/.configs
+        cp "/usr/local/ci-secrets/redhat-appstudio-qe/kcp_kubeconfig" $HOME/.configs
+        chmod -R 755 $HOME/.configs
+        ls -larth $HOME/.configs
+        export KCP_KUBECONFIG="$HOME/.configs/kcp_kubeconfig"
+        cat $KCP_KUBECONFIG
+        (
+          set -x; cd "$(mktemp -d)" &&
+          OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+          ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
+          KREW="krew-${OS}_${ARCH}" &&
+          curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
+          tar zxvf "${KREW}.tar.gz" &&
+          ./"${KREW}" install krew
+        )
+
+        export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+        kubectl krew install oidc-login
+
+        git clone -b v0.8.2 https://github.com/kcp-dev/kcp
+        cd kcp
+        go version
+        go mod vendor
+        make install WHAT='./cmd/kubectl-kcp ./cmd/kubectl-workspaces ./cmd/kubectl-ws'
+        bash <(curl -s https://gist.githubusercontent.com/flacatus/30f9f2b64676421e676c9448d2fd9b0b/raw/9592ccfb18dd80b47bc9d255ed3ed57b2ab1e1ab/CLOUD_SERVICES%2520oauth%2520token%2520robot)
+        export KUBECONFIG=$KCP_KUBECONFIG
+        kubectl config get-contexts
+        kubectl kcp workspace use '~'
+        kubectl get workspaces
+        echo "End"
+      credentials:
+      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
+        name: ci-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: redhat-appstudio-claim
+zz_generated_metadata:
+  branch: main
+  org: redhat-appstudio
+  repo: infra-deployments
