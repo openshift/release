@@ -1,0 +1,31 @@
+# # See https://github.com/coreos/fedora-coreos-config/pull/740
+
+apiVersion: v1
+kind: List
+items:
+  - kind: BuildConfig
+    apiVersion: build.openshift.io/v1
+    metadata:
+      namespace: coreos-arm64
+      name: cosa-continuous
+    spec:
+      successfulBuildsHistoryLimit: 1
+      failedBuildsHistoryLimit: 2
+      output:
+        to:
+          kind: ImageStreamTag
+          name: coreos-assembler:continuous
+      source:
+        git:
+          uri: https://github.com/coreos/coreos-assembler.git
+        type: Git
+        contextDir: continuous
+      strategy:
+        type: Docker
+      triggers:
+        - type: ImageChange
+        - type: ConfigChange
+        - type: "GitHub"
+          github:
+            secretReference:
+              name: "github-coreos-assembler-webhook-secret"
