@@ -210,9 +210,11 @@ EOF
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
-function init_ibmcloud() {
+function install_required_tools() {
   #install the tools required
   cd /tmp || exit 1
+
+  export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
     curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.10.0/IBM_Cloud_CLI_2.10.0_amd64.tar.gz
@@ -235,11 +237,21 @@ function init_ibmcloud() {
     for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
       ibmcloud plugin install ${I}
     done
+    ibmcloud plugin list
+
+    for PLUGIN in cis pi; do
+      if ! ibmcloud ${PLUGIN} > /dev/null 2>&1; then
+        echo "Error: ibmcloud's ${PLUGIN} plugin is not installed?"
+        ls -la ${HOME}/.bluemix/
+        ls -la ${HOME}/.bluemix/plugins/
+        exit 1
+      fi
+    done
   fi
 
   if [ ! -f /tmp/jq ]; then
 
-    for I in $(seq 1 5)
+    for I in $(seq 1 10)
     do
       curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
 
@@ -263,17 +275,54 @@ function init_ibmcloud() {
     PATH=${PATH}:/tmp
   fi
 
+  if [ ! -f /tmp/yq ] || [ ! -f /bin/yq-go ]; then
+
+    uname -m
+    ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
+    echo "ARCH=${ARCH}"
+    if [ -z "${ARCH}" ]; then
+      echo "Error: ARCH is empty!"
+      exit 1
+    fi
+
+    for I in $(seq 1 10)
+    do
+      curl -L "https://github.com/mikefarah/yq/releases/download/v4.25.3/yq_linux_${ARCH}" -o /tmp/yq && chmod +x /tmp/yq
+
+      hash file 2>/dev/null && file /tmp/yq
+      echo "Checking yq version..."
+      if /tmp/yq --version; then
+        break
+      else
+        echo "Error: /tmp/yq is not working?"
+        /bin/rm /tmp/yq
+        sleep 30s
+      fi
+    done
+  fi
+
   PATH=${PATH}:$(pwd)/bin
   export PATH
+}
 
-  BASE64_API_KEY="$(echo -n ${IBMCLOUD_API_KEY} | base64)"
-  export BASE64_API_KEY
-
+function init_ibmcloud() {
   IC_API_KEY=${IBMCLOUD_API_KEY}
   export IC_API_KEY
 
   if ! ibmcloud iam oauth-tokens 1>/dev/null 2>&1
   then
+    if [ -z "${IBMCLOUD_API_KEY}" ]; then
+      echo "Error: IBMCLOUD_API_KEY is empty!"
+      exit 1
+    fi
+    if [ -z "${VPCREGION}" ]; then
+      echo "Error: VPCREGION is empty!"
+      exit 1
+    fi
+    if [ -z "${POWERVS_RESOURCE_GROUP}" ]; then
+      echo "Error: POWERVS_RESOURCE_GROUP is empty!"
+      exit 1
+    fi
     ibmcloud login --apikey "${IBMCLOUD_API_KEY}" -r ${VPCREGION}
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
   fi
@@ -564,6 +613,8 @@ fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
+install_required_tools
+
 IBMCLOUD_API_KEY=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY")
 IBMCLOUD_APIKEY_CCM_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CCM_CREDS")
 IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_INGRESS_CREDS")
@@ -585,7 +636,6 @@ export POWERVS_RESOURCE_GROUP
 export POWERVS_USER_ID
 export VPCREGION
 export CLUSTER_NAME
-export HOME=/tmp
 
 dir=/tmp/installer
 mkdir "${dir}/"
