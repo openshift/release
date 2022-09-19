@@ -35,7 +35,7 @@ set -xeo pipefail
 
 # Get sosreport including sar data
 sos report --batch --tmp-dir /tmp/artifacts --all-logs \
-  -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
+  -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum,cloud_init \
   -k podman.all -k podman.logs
 
 cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true

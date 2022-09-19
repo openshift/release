@@ -215,22 +215,26 @@ function init_ibmcloud() {
   cd /tmp || exit 1
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.9.0/IBM_Cloud_CLI_2.9.0_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.10.0/IBM_Cloud_CLI_2.10.0_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
-    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
-      /tmp/Bluemix_CLI/bin/ibmcloud plugin install ${I}
-    done
+    if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
+      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud does not exist?"
+      exit 1
+    fi
+
+    PATH=${PATH}:/tmp/Bluemix_CLI/bin
 
     hash file 2>/dev/null && file /tmp/Bluemix_CLI/bin/ibmcloud
     echo "Checking ibmcloud version..."
-    if ! /tmp/Bluemix_CLI/bin/ibmcloud --version; then
+    if ! ibmcloud --version; then
       echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud is not working?"
       exit 1
     fi
 
-    #PATH=${PATH}:/tmp/Bluemix_CLI/bin:/tmp/Bluemix_CLI/bin/ibmcloud
-    PATH=${PATH}:/tmp/Bluemix_CLI/bin
+    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
+      ibmcloud plugin install ${I}
+    done
   fi
 
   if [ ! -f /tmp/jq ]; then

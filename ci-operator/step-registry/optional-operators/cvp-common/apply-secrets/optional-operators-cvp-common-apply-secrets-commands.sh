@@ -96,7 +96,7 @@ if [ -n "${LIST_OF_KUBEOBJECTS[0]}" ] ; then
     do
         echo "The following custom kubeobject has been found ! $i"
         echo "Applying kube_objects on to the Namespace $OO_INSTALL_NAMESPACE"
-        oc apply -f "$i"
+        oc apply -f "$i" -n "$OO_INSTALL_NAMESPACE"
     done
 else
     echo "Could not find any kubeobjects please check the vault"
