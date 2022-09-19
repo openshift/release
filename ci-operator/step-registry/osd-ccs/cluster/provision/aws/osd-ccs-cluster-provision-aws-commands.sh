@@ -75,7 +75,6 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
 fi
 OPENSHIFT_VERSION="openshift-v${OPENSHIFT_VERSION}"
 echo "Select openshift version ${OPENSHIFT_VERSION}"
-OPENSHIFT_VERSION="openshift-v${OPENSHIFT_VERSION}"
 
 # Cluster parameters
 echo "Parameters for cluster request:"
@@ -85,7 +84,6 @@ echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Compute nodes: ${COMPUTE_NODES}"
 echo "  Multi-az: ${MULTI_AZ}"
-echo "  Compute nodes: ${COMPUTE_NODES}"
 echo "  Openshift version: ${OPENSHIFT_VERSION}"
 echo "  Channel group: ${CHANNEL_GROUP}"
 echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
