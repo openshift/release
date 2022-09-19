@@ -140,7 +140,6 @@ tests:
           cpu: 500m
           memory: 1Gi
 - as: e2e-openshift
-  optional: true
   steps:
     cluster_profile: aws
     dependencies:
@@ -181,7 +180,6 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-aws
 - as: e2e-openshift-fips
-  optional: true
   steps:
     cluster_profile: aws
     dependencies:
@@ -221,6 +219,63 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
+- as: e2e-openshift-helm
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "false"
+    test:
+    - as: e2e
+      commands: |
+        set -x -e -o pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+        # Install MinIO for rclone & restic
+        ./hack/run-minio.sh
+
+        # Install MinIO again w/ TLS
+        export MINIO_NAMESPACE=minio-tls
+        export MINIO_USE_TLS=1
+        ./hack/run-minio.sh
+
+        # Install VolSync va Helm
+        helm upgrade --install --create-namespace -n volsync-system \
+          --debug \
+          --set image.image=${VOLSYNC_OPERATOR} \
+          --set rclone.image=${MOVER_RCLONE} \
+          --set restic.image=${MOVER_RESTIC} \
+          --set rsync.image=${MOVER_RSYNC} \
+          --set syncthing.image=${MOVER_SYNCTHING} \
+          --set metrics.disableAuth=true \
+          --wait --timeout=5m \
+          volsync ./helm/volsync
+
+        # Add .local/bin to path so we can execute Python packages we install below
+        export PATH="${PATH}:/alabama/.local/bin"
+        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+        make test-e2e-install
+
+        # Run tests
+        make cli
+        make test-e2e
+      dependencies:
+      - env: VOLSYNC_OPERATOR
+        name: volsync
+      - env: MOVER_RSYNC
+        name: volsync-mover-rsync
+      - env: MOVER_RCLONE
+        name: volsync-mover-rclone
+      - env: MOVER_RESTIC
+        name: volsync-mover-restic
+      - env: MOVER_SYNCTHING
+        name: volsync-mover-syncthing
+      from: src-oc
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: backube
