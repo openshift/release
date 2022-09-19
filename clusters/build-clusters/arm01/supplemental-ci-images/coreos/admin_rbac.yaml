@@ -1,0 +1,33 @@
+# ci-operator can promote images in the coreos namespace
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: image-tagger
+  namespace: coreos-arm64
+rules:
+  - apiGroups:
+      - ""
+      - image.openshift.io
+    resources:
+      - imagestreamtags
+      - imagestreams
+    verbs:
+      - create
+      - update
+      - patch
+      - get
+
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: image-tagger-ci-operator
+  namespace: coreos-arm64
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: image-tagger
+subjects:
+  - kind: ServiceAccount
+    name: ci-operator
+    namespace: ci
