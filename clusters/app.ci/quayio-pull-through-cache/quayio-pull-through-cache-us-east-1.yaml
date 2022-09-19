@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: quayio-pull-through-cache-us-east-1
+    namespace: ci
+  spec:
+    to:
+      kind: Service
+      name: quayio-pull-through-cache-us-east-1
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: quayio-pull-through-cache-us-east-1
+    namespace: ci
+  spec:
+    selector:
+      app: quayio-pull-through-cache-us-east-1
+    ports:
+    - port: 5000
+      targetPort: 5000
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: quayio-pull-through-cache-us-east-1
+    namespace: ci
+    labels:
+      app: quayio-pull-through-cache-us-east-1
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: quayio-pull-through-cache-us-east-1
+    template:
+      metadata:
+        labels:
+          app: quayio-pull-through-cache-us-east-1
+      spec:
+        volumes:
+        - name: config
+          configMap:
+            name: quayio-pull-through-cache-config
+        - name: exec
+          configMap:
+            name: quayio-pull-through-cache-exec
+        containers:
+        - name: quayio-cache
+          image: docker.io/registry:2.8.1
+          ports:
+            - name: http
+              containerPort: 5000
+          volumeMounts:
+          - name: config
+            mountPath: /etc/docker/registry/
+          - name: exec
+            mountPath: /opt/
+          command: ["/bin/sh"]
+          args: ["/opt/start.sh"]
+          env:
+          - name: REGISTRY_STORAGE_S3_ACCESSKEY
+            valueFrom:
+              secretKeyRef:
+                name: quayio-pull-through-cache-user
+                key: AWS_ACCESS_KEY_ID
+          - name: REGISTRY_STORAGE_S3_SECRETKEY
+            valueFrom:
+              secretKeyRef:
+                name: quayio-pull-through-cache-user
+                key: AWS_SECRET_ACCESS_KEY
+          - name: REGISTRY_STORAGE
+            value: s3
+          - name: REGISTRY_STORAGE_S3_BUCKET
+            value: quayio-pull-through-cache-us-east-1
+          - name: REGISTRY_STORAGE_S3_REGION
+            value: us-east-1
+          - name: REGISTRY_PROXY_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: quayio-pull-through-cache-user
+                key: QUAY_IO_PULL_SECRET_EMAIL
+          - name: REGISTRY_PROXY_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: quayio-pull-through-cache-user
+                key: QUAY_IO_PULL_SECRET_AUTH
