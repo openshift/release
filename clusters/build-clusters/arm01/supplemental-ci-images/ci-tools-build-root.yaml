@@ -40,7 +40,7 @@ items:
         # openshift/release, causing this image to build ~100x a day. If you change the following
         # Dockerfile, please ensure you run `oc start-build` yourself once the new version is applied.
         dockerfile: |
-          FROM quay.io/centos/centos:stream8
+          FROM --platform=linux/arm64 quay.io/centos/centos:stream8
 
           ENV VERSION=1.16 \
               GOCACHE=/go/.cache \
@@ -63,7 +63,7 @@ items:
 
           RUN \
               set -x &&  \
-              curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
+              curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-arm64.tar.gz | tar -C /usr/local -xzf - && \
               go get golang.org/x/tools/cmd/cover \
                   golang.org/x/tools/cmd/goimports \
                   github.com/tools/godep \
@@ -73,7 +73,7 @@ items:
               rm -rf $GOPATH/* $GOPATH/.cache && \
               mkdir $GOPATH/bin && \
               ln -s /usr/bin/goimports $GOPATH/bin/goimports && \
-              curl -L https://github.com/golang/dep/releases/download/v0.5.4/dep-linux-amd64 > /usr/bin/dep && \
+              curl -L https://github.com/golang/dep/releases/download/v0.5.4/dep-linux-arm64 > /usr/bin/dep && \
               chmod +x /usr/bin/dep
 
           RUN chmod g+xw -R $GOPATH && \
@@ -81,7 +81,7 @@ items:
 
           ENV VAULT_DISABLE_MLOCK true
           RUN yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-              yum install -y vault-1.7.0-1 && \
+              yum install -y vault-1.7.7-1 && \
               setcap cap_ipc_lock= /usr/bin/vault
 
           RUN yum install -y nodejs && npm install -g typescript
@@ -94,10 +94,6 @@ items:
         type: Dockerfile
       strategy:
         dockerStrategy:
-          from:
-            kind: ImageStreamTag
-            name: centos:stream8
-            namespace: origin
           imageOptimizationPolicy: SkipLayers
         type: Docker
       triggers:
@@ -141,7 +137,7 @@ items:
         # openshift/release, causing this image to build ~100x a day. If you change the following
         # Dockerfile, please ensure you run `oc start-build` yourself once the new version is applied.
         dockerfile: |
-          FROM quay.io/centos/centos:stream8
+          FROM --platform=linux/arm64 quay.io/centos/centos:stream8
 
           ENV VERSION=1.17 \
               GOCACHE=/go/.cache \
@@ -164,7 +160,7 @@ items:
 
           RUN \
               set -x &&  \
-              curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
+              curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-arm64.tar.gz | tar -C /usr/local -xzf - && \
               go get golang.org/x/tools/cmd/cover \
                   golang.org/x/tools/cmd/goimports \
                   golang.org/x/lint/golint \
@@ -179,7 +175,7 @@ items:
 
           ENV VAULT_DISABLE_MLOCK true
           RUN yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-              yum install -y vault-1.7.0-1 && \
+              yum install -y vault-1.7.7-1 && \
               setcap cap_ipc_lock= /usr/bin/vault
 
           RUN yum install -y nodejs && npm install -g typescript
@@ -192,10 +188,6 @@ items:
         type: Dockerfile
       strategy:
         dockerStrategy:
-          from:
-            kind: ImageStreamTag
-            name: centos:stream8
-            namespace: origin
           imageOptimizationPolicy: SkipLayers
         type: Docker
       triggers:
@@ -239,7 +231,7 @@ items:
         # openshift/release, causing this image to build ~100x a day. If you change the following
         # Dockerfile, please ensure you run `oc start-build` yourself once the new version is applied.
         dockerfile: |
-          FROM quay.io/centos/centos:stream8
+          FROM --platform=linux/arm64 quay.io/centos/centos:stream8
 
           ENV VERSION=1.18 \
               GOCACHE=/go/.cache \
@@ -261,7 +253,7 @@ items:
 
           RUN \
               set -x &&  \
-              curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-amd64.tar.gz | tar -C /usr/local -xzf - && \
+              curl --fail --retry 3 -L https://golang.org/dl/go$VERSION.linux-arm64.tar.gz | tar -C /usr/local -xzf - && \
               go install golang.org/x/tools/cmd/cover@latest && \
               go install golang.org/x/tools/cmd/goimports@latest && \
               go install golang.org/x/lint/golint@latest && \
@@ -276,7 +268,7 @@ items:
 
           ENV VAULT_DISABLE_MLOCK true
           RUN yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-              yum install -y vault-1.7.0-1 && \
+              yum install -y vault-1.7.7-1 && \
               setcap cap_ipc_lock= /usr/bin/vault
 
           RUN yum install -y nodejs && npm install -g typescript
@@ -289,10 +281,6 @@ items:
         type: Dockerfile
       strategy:
         dockerStrategy:
-          from:
-            kind: ImageStreamTag
-            name: centos:stream8
-            namespace: origin
           imageOptimizationPolicy: SkipLayers
         type: Docker
       triggers:
