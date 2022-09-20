@@ -47,20 +47,24 @@ cat > gather_logs.yaml <<-EOF
           path: /root/.kube/config
         register: kubeconfig
       - name: Extract assisted service logs
-        make:
-          chdir: /home/assisted
-          target: download_service_logs
+        ansible.builtin.shell: |
+          source /root/config.sh
+          make download_service_logs
         environment:
           KUBECONFIG: "/root/.kube/config"
           LOGS_DEST: "{{ LOGS_DIR }}"
+        args:
+          chdir: /home/assisted
         when: kubeconfig.stat.exists
       - name: Extract capi logs
-        make:
-          chdir: /home/assisted
-          target: download_capi_logs
+        ansible.builtin.shell: |
+          source /root/config.sh
+          make download_capi_logs
         environment:
           KUBECONFIG: "/root/.kube/config"
           LOGS_DEST: "{{ LOGS_DIR }}"
+        args:
+          chdir: /home/assisted
         when: kubeconfig.stat.exists and GATHER_CAPI_LOGS == "true"
       - debug:
           msg: "CLUSTER_GATHER = {{ CLUSTER_GATHER }}"

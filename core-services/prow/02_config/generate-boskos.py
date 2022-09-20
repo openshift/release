@@ -151,7 +151,11 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
-        'default': 1,
+        'lon04': 1,
+        'lon06': 1,
+        'mon01': 1,
+        'sao01': 1,
+        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'default': 7,
