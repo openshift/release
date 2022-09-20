@@ -142,31 +142,23 @@ presubmits:
     context: ci/build-farm/arm01-dry
     decorate: true
     labels:
+      ci.openshift.io/cluster: arm01
+      ci.openshift.io/generator: cluster-init
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-arm01-dry
-    optional: true
     rerun_command: /test arm01-dry
     run_if_changed: ^clusters/.*
     spec:
       containers:
       - args:
-        - --config-dir
-        - clusters/build-clusters/arm01
-        - --ignore-file
-        - clusters/build-clusters/common/assets/pod-scaler-admission.yaml
-        - --kubeconfig
-        - /etc/build-farm-credentials/kubeconfig
+        - --config-dir=clusters/build-clusters/arm01
         - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
         - applyconfig
         env:
         - name: HOME
           value: /tmp
-        - name: arm01_id
-          valueFrom:
-            secretKeyRef:
-              key: arm01-id
-              name: arm01-dex-oidc
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""

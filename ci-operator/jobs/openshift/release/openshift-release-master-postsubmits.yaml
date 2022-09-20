@@ -51,6 +51,8 @@ postsubmits:
     cluster: app.ci
     decorate: true
     labels:
+      ci.openshift.io/cluster: arm01
+      ci.openshift.io/generator: cluster-init
       ci.openshift.io/role: infra
     max_concurrency: 1
     name: branch-ci-openshift-release-master-arm01-apply
@@ -58,18 +60,11 @@ postsubmits:
       containers:
       - args:
         - --config-dir=clusters/build-clusters/arm01
-        - --ignore-file=clusters/build-clusters/common/assets/pod-scaler-admission.yaml
-        - --confirm=true
         - --as=
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        - --confirm=true
         command:
         - applyconfig
-        env:
-        - name: arm01_id
-          valueFrom:
-            secretKeyRef:
-              key: arm01-id
-              name: arm01-dex-oidc
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
