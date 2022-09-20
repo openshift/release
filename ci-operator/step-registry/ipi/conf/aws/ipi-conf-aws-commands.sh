@@ -6,224 +6,322 @@ set -o pipefail
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-CONFIG="${SHARED_DIR}/install-config.yaml"
-
-expiration_date=$(date -d '8 hours' --iso=minutes --utc)
-
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
-REGION="${LEASED_RESOURCE}"
+EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
+TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
-# m6a (AMD) are more cost effective than other x86 instance types
-# for general purpose work. Use by default, when supported in the
-# region.
-IS_M6A_REGION="no"
-if aws ec2 describe-instance-type-offerings --region "${REGION}" | grep -q m6a ; then
-  IS_M6A_REGION="yes"
-fi
+CONFIG="${SHARED_DIR}/install-config.yaml"
+PATCH=/tmp/install-config-outpost.yaml.patch
 
-function eval_instance_capacity() {
-  local DESIRED_TYPE="$1"
-  local FALLBACK_TYPE="$2"
-  # During our initial adoption of m6a, AWS has report insufficient capacity at peak hours. For cost effectiveness
-  # and to ensure AWS eventual adds m6a capacity due to these errors, we want to continue to use them. However,
-  # if left unchecked, these peak hour errors can derail a statistically significant number of jobs.
-  # To mitigate the capacity issues, search.ci.openshift.org can tell us if previous jobs have failed to provision
-  # the desired instance type - in this region - in the last x minutes.
-  # If we find such an error, use the fallback instance type.
+REGION="${REGION:-$LEASED_RESOURCE}"
+echo "REGION=${REGION}"
 
-  # Example error
-  # error creating EC2 instance: InsufficientInstanceCapacity: We currently do not have sufficient m6a.xlarge capacity
-  # in the Availability Zone you requested (us-east-1c). Our system will be working on provisioning additional capacity.
-  # You can currently get m6a.xlarge capacity by not specifying an Availability Zone in your request or choosing
-  # us-east-1a, us-east-1b, us-east-1d, us-east-1f.\n	status code: 500, request id: ...
+OUTPOST_ID=$(aws --region "${REGION}" outposts list-outposts | jq -r .Outposts[0].OutpostId)
+OUTPOST_AZ=$(aws --region "${REGION}" outposts list-outposts | jq -r .Outposts[0].AvailabilityZone)
+OUTPOST_ARN=$(aws --region "${REGION}" outposts list-outposts | jq -r .Outposts[0].OutpostArn)
+OUTPOST_INSTANCE_TYPE=$(aws --region "${REGION}" outposts get-outpost-instance-types --outpost-id $OUTPOST_ID | jq -r .InstanceTypes[1].InstanceType)
 
-  set +o errexit
-  local LOOK_BACK_PERIOD="30m"
-  local TARGET_TYPE="${DESIRED_TYPE}"
-  for retry in {1..30}; do
-    if err_count=$(curl -L -s "https://search.ci.openshift.org/search?search=InsufficientInstanceCapacity.*${DESIRED_TYPE}.*${REGION}&maxAge=${LOOK_BACK_PERIOD}&context=0&type=build-log" | jq length); then
-      if [[ "${err_count}" == "0" ]]; then
-        break  # Use DESIRED_TYPE
-      else
-        >&2 echo "Recent instance AWS availability issue for ${DESIRED_TYPE} in ${REGION}; falling back to ${FALLBACK_TYPE}"
-        TARGET_TYPE="${FALLBACK_TYPE}"
-        break
-      fi
-    fi
-    sleep 2
-    >&2 echo "Error querying search.ci.openshift.com for AWS instance availability information (retry ${retry} of 30)."
-  done
+CLUSTER_NAME="$(yq-go r "${CONFIG}" 'metadata.name')"
 
-  echo "${TARGET_TYPE}"
-  set -o errexit
-}
+cat <<_EOF > /tmp/01_vpc.yaml
+AWSTemplateFormatVersion: 2010-09-09
+Description: Template for Best Practice VPC with 1-3 AZs
 
-# Do not change auto-types unless it is coordinated with the cloud
-# financial operations team. Savings plans may be in place to
-# decrease the cost of certain instance families.
-if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
-  if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-    COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
-  else
-    COMPUTE_NODE_TYPE="m6i.xlarge"
-  fi
-fi
+Parameters:
+  VpcCidr:
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
+    Default: 10.0.0.0/16
+    Description: CIDR block for VPC.
+    Type: String
+  SubnetBits:
+    ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/19-27.
+    MinValue: 5
+    MaxValue: 13
+    Default: 12
+    Description: "Size of each subnet to create within the availability zones. (Min: 5 = /27, Max: 13 = /19)"
+    Type: Number
+  AvailabilityZone:
+    ConstraintDescription: The availbility zone used by the outpost instance
+    Description: AWS Outpost Availability Zone.
+    Type: String
+  OutpostArn:
+    ConstraintDescription: The Amazon Resource Name (ARN) of the Outpost.
+    Description: The Amazon Resource Name (ARN) of the Outpost.
+    Type: String
 
-CONTROL_PLANE_INSTANCE_SIZE="xlarge"
-if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  CONTROL_PLANE_INSTANCE_SIZE="8xlarge"
-elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  CONTROL_PLANE_INSTANCE_SIZE="4xlarge"
-elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  CONTROL_PLANE_INSTANCE_SIZE="2xlarge"
-fi
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: "Network Configuration"
+      Parameters:
+      - VpcCidr
+      - SubnetBits
+    - Label:
+        default: "Availability Zone"
+      Parameters:
+      - AvailabilityZone
+      - OutpostArn
+    ParameterLabels:
+      VpcCidr:
+        default: "VPC CIDR"
+      SubnetBits:
+        default: "Bits Per Subnet"
+      AvailabilityZone:
+        default: "Availability Zone"
+      OutpostArn:
+        default: "Outpost Arn"
 
-# BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
-architecture=${OCP_ARCH:-"amd64"}
+Resources:
+  VPC:
+    Type: "AWS::EC2::VPC"
+    Properties:
+      EnableDnsSupport: "true"
+      EnableDnsHostnames: "true"
+      CidrBlock: !Ref VpcCidr
+  PublicSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Ref AvailabilityZone
+  PublicSubnetOutpost:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Ref AvailabilityZone
+      OutpostArn: !Ref OutpostArn
+      Tags:
+      - Key: "kubernetes.io/cluster/outpost-tag"
+        Value: "owned"
+  InternetGateway:
+    Type: "AWS::EC2::InternetGateway"
+  GatewayToInternet:
+    Type: "AWS::EC2::VPCGatewayAttachment"
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PublicRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+  PublicRoute:
+    Type: "AWS::EC2::Route"
+    DependsOn: GatewayToInternet
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  PublicSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetRouteTableAssociationOutpost:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PublicSubnetOutpost
+      RouteTableId: !Ref PublicRouteTable
+  PrivateSubnet:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [2, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Ref AvailabilityZone
+  PrivateRouteTable:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+  PrivateSubnetRouteTableAssociation:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnet
+      RouteTableId: !Ref PrivateRouteTable
+  NAT:
+    DependsOn:
+    - GatewayToInternet
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId:
+        "Fn::GetAtt":
+        - EIP
+        - AllocationId
+      SubnetId: !Ref PublicSubnet
+  EIP:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: vpc
+  Route:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NAT
+  PrivateSubnetOutpost:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select [3, !Cidr [!Ref VpcCidr, 6, !Ref SubnetBits]]
+      AvailabilityZone: !Ref AvailabilityZone
+      OutpostArn: !Ref OutpostArn
+      Tags:
+      - Key: "kubernetes.io/cluster/outpost-tag"
+        Value: "owned"
+  PrivateRouteTableOutpost:
+    Type: "AWS::EC2::RouteTable"
+    Properties:
+      VpcId: !Ref VPC
+  PrivateSubnetRouteTableAssociationOutpost:
+    Type: "AWS::EC2::SubnetRouteTableAssociation"
+    Properties:
+      SubnetId: !Ref PrivateSubnetOutpost
+      RouteTableId: !Ref PrivateRouteTableOutpost
+  NATOutpost:
+    DependsOn:
+    - GatewayToInternet
+    Type: "AWS::EC2::NatGateway"
+    Properties:
+      AllocationId:
+        "Fn::GetAtt":
+        - EIPOutpost
+        - AllocationId
+      SubnetId: !Ref PublicSubnetOutpost
+  EIPOutpost:
+    Type: "AWS::EC2::EIP"
+    Properties:
+      Domain: vpc
+  RouteOutpost:
+    Type: "AWS::EC2::Route"
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTableOutpost
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId:
+        Ref: NATOutpost
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal: '*'
+          Action:
+          - '*'
+          Resource:
+          - '*'
+      RouteTableIds:
+      - !Ref PublicRouteTable
+      - !Ref PrivateRouteTable
+      ServiceName: !Join
+      - ''
+      - - com.amazonaws.
+        - !Ref 'AWS::Region'
+        - .s3
+      VpcId: !Ref VPC
 
-if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
-  architecture="arm64"
-fi
+Outputs:
+  VpcId:
+    Description: ID of the new VPC.
+    Value: !Ref VPC
+  PublicSubnetIds:
+    Description: Subnet IDs of the public subnets.
+    Value:
+      !Join [
+        ",",
+        [!Ref PublicSubnet]
+      ]
+  PrivateSubnetIds:
+    Description: Subnet IDs of the private subnets.
+    Value:
+      !Join [
+        ",",
+        [!Ref PrivateSubnet]
+      ]
+  OutpostPublicSubnetId:
+    Description: Subnet ID of the public subnet in Outpost.
+    Value:
+      !Ref PublicSubnetOutpost
+  OutpostPrivateSubnetId:
+    Description: Subnet ID of the private subnet in Outpost.
+    Value:
+      !Ref PrivateSubnetOutpost
+_EOF
 
-if [[ x"${architecture}" == x"arm64" ]]; then
-  arch_instance_type=m6g
-  CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
-else
-  if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-    CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
-  else
-    CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
-  fi
-  arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
-fi
+STACK_NAME="${CLUSTER_NAME}-vpc"
+aws --region "${REGION}" cloudformation create-stack \
+  --stack-name "${STACK_NAME}" \
+  --template-body "$(cat /tmp/01_vpc.yaml)" \
+  --tags "${TAGS}" &
+    "ParameterKey=AvailabilityZone,ParameterValue=${OUTPOST_AZ}" \
+    "ParameterKey=OutpostArn,ParameterValue=${OUTPOST_ARN}" &
 
-BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
+wait "$!"
+echo "Created stack"
 
-workers=3
-if [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  workers=0
-fi
+aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${STACK_NAME}" &
+wait "$!"
+echo "Waited for stack"
+
+subnets="$(aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME}" | jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]' | sed "s/\"/'/g")"
+echo "Subnets : ${subnets}"
+
+# save stack information to ${SHARED_DIR} for deprovision step
+echo "${STACK_NAME}" >> "${SHARED_DIR}/outpoststackname"
 
 # Generate working availability zones from the region
-mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
-# Generate availability zones with OpenShift Installer required instance types
+# ZONES_COUNT=3
+# mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
+# ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
+# ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
+# echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
 
-if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then ## all regions are the same
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
-elif [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == null && "${COMPUTE_NODE_TYPE}" == null  ]]; then ## two null regions
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
-elif [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == null || "${COMPUTE_NODE_TYPE}" == null ]]; then ## one null region
-  if [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" || "${CONTROL_PLANE_INSTANCE_TYPE}" == "${COMPUTE_NODE_TYPE}" ]]; then ## "one null region and duplicates"
-    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
-  else ## "one null region and no duplicates"
-    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
-  fi
-elif [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" || "${CONTROL_PLANE_INSTANCE_TYPE}" == "${COMPUTE_NODE_TYPE}" ]]; then ## duplicates regions with no null region
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
-elif [[ "${BOOTSTRAP_NODE_TYPE}" != "${COMPUTE_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" != "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then   # three different regions
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 3 ' | awk '{print $2}')
-fi
-# Generate availability zones based on these 2 criteria
-mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
-# Calculate the maximum number of availability zones from the region
-MAX_ZONES_COUNT="${#ZONES[@]}"
-# Save max zones count information to ${SHARED_DIR} for use in other scenarios
-echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 
-existing_zones_setting=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.zones')
-
-if [[ ${existing_zones_setting} == "" ]]; then
-  ZONES_COUNT=${ZONES_COUNT:-2}
-  ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
-  ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
-  echo "AWS region: ${REGION} (zones: ${ZONES_STR})"
-  PATCH="${SHARED_DIR}/install-config-zones.yaml.patch"
-  cat > "${PATCH}" << EOF
-controlPlane:
-  platform:
-    aws:
-      zones: ${ZONES_STR}
+cat > "${PATCH}" << EOF
+platform:
+  aws:
+    subnets: ${subnets}
 compute:
 - platform:
     aws:
-      zones: ${ZONES_STR}
-EOF
-  yq-go m -x -i "${CONFIG}" "${PATCH}"
-else
-  echo "zones already set in install-config.yaml, skipped"
-fi
-
-echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
-echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
-
-PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
-cat > "${PATCH}" << EOF
-baseDomain: ${BASE_DOMAIN}
-platform:
-  aws:
-    region: ${REGION}
-    userTags:
-      expirationDate: ${expiration_date}
-controlPlane:
-  architecture: ${architecture}
-  name: master
-  platform:
-    aws:
-      type: ${CONTROL_PLANE_INSTANCE_TYPE}
-compute:
-- architecture: ${architecture}
-  name: worker
-  replicas: ${workers}
-  platform:
-    aws:
-      type: ${COMPUTE_NODE_TYPE}
+      type: $OUTPOST_INSTANCE_TYPE
+      rootVolume:
+        type: gp2
+        size: 120
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 
-# custom rhcos ami for non-public regions
-RHCOS_AMI=
-if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$REGION" == "cn-north-1" ] || [ "$REGION" == "cn-northwest-1" ]; then
-  # TODO: move repo to a more appropriate location
-  curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
-  oc registry login
-  # ocp_version=4.9 4.10 etc.
-  ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-  RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
-  echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
-fi
-
-if [ ! -z ${RHCOS_AMI} ]; then
-  echo "patching rhcos ami to install-config.yaml"
-  CONFIG_PATCH_AMI="${SHARED_DIR}/install-config-ami.yaml.patch"
-  cat >> "${CONFIG_PATCH_AMI}" << EOF
-platform:
-  aws:
-    amiID: ${RHCOS_AMI}
-EOF
-  yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"
-  cp "${SHARED_DIR}/install-config-ami.yaml.patch" "${ARTIFACT_DIR}/"
-fi
+cp $CONFIG "${CONFIG}.bkp"
+cat $CONFIG
 
 
-if [[ ${AWS_METADATA_SERVICE_AUTH} =~ ^(Required|Optional)$ ]]; then
-  echo "setting up metadata auth in install-config.yaml. Set metadata service auth to: ${AWS_METADATA_SERVICE_AUTH}"
-  METADATA_AUTH_PATCH="${SHARED_DIR}/install-config-metadata-auth.yaml.patch"
+PRV_SUBN=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="PrivateSubnetIds").OutputValue')
+echo $PRV_SUBN
 
-  cat > "${METADATA_AUTH_PATCH}" << EOF
-controlPlane:
-  platform:
-    aws:
-      metadataService:
-        authentication: ${AWS_METADATA_SERVICE_AUTH}
-compute:
-- platform:
-    aws:
-      metadataService:
-        authentication: ${AWS_METADATA_SERVICE_AUTH}
-EOF
+openshift-install --dir $SHARED_DIR create manifests
 
-  yq-go m -x -i "${CONFIG}" "${METADATA_AUTH_PATCH}"
-  cp "${METADATA_AUTH_PATCH}" "${ARTIFACT_DIR}/"
+OUTPOST_PRV_SUBN=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="OutpostPrivateSubnetId").OutputValue')
+sed -i "s/$PRV_SUBN/$OUTPOST_PRV_SUBN/"  $SHARED_DIR/openshift/99_openshift-cluster-api_worker-machineset-0.yaml
+
+cat << _EOF > $SHARED_DIR/manifests/cluster-network-03-config.yml
+apiVersion: operator.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  defaultNetwork:
+_EOF
+
+if [[ "$(yq-go r -j ${CONFIG}.bkp | jq -r '.networking.networkType')" == "OpenShiftSDN" ]]; then
+  echo '    openshiftSDNConfig:'  >> $SHARED_DIR/manifests/cluster-network-03-config.yml
+  echo '      mtu: 1250'          >> $SHARED_DIR/manifests/cluster-network-03-config.yml
+else
+  echo '    ovnKubernetesConfig:' >> $SHARED_DIR/manifests/cluster-network-03-config.yml
+  echo '      mtu: 1200'          >> $SHARED_DIR/manifests/cluster-network-03-config.yml
 fi
