@@ -145,6 +145,8 @@ if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
         if [[ ! -z "${var}" ]]; then
             if [[ "${var}" == *"CNF_BRANCH"* ]]; then
                 CNF_BRANCH="$(echo "${var}" | cut -d'=' -f2)"
+            elif [[ "${var}" == *"FEATURES"* ]]; then
+                FEATURES="$(echo "${var}" | cut -d'=' -f2 | tr -d '"')"
             fi
         fi
     done
