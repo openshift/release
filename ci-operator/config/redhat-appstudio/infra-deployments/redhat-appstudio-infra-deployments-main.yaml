@@ -39,7 +39,7 @@ tests:
         chmod -R 755 $HOME/.configs
         ls -larth $HOME/.configs
         export KCP_KUBECONFIG="$HOME/.configs/kcp_kubeconfig"
-          (
+        (
           set -x; cd "$(mktemp -d)" &&
           OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
           ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
@@ -65,6 +65,8 @@ tests:
         kubectl kcp workspace use '~'
         APPSTUDIO_ROOT=$(kubectl kcp workspace . --short)
 
+        export WORKSPACE_ID=$(date +%s)
+
         cat > hack/preview.env << EOF
         export MY_GIT_FORK_REMOTE="qe"
         export CLUSTER_KUBECONFIG="$CLUSTER_KUBECONFIG"
@@ -73,12 +75,18 @@ tests:
         export MY_GITHUB_TOKEN=$GITHUB_TOKEN
         export COMPUTE="appstudio-0123"
         export ROOT_WORKSPACE=$APPSTUDIO_ROOT
+        export APPSTUDIO_WORKSPACE=ci-$WORKSPACE_ID
         EOF
 
         cat hack/preview.env
+        export YQ_VERSION=v4.25.2
+        curl -Lso $HOME/.configs/yq https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 && chmod +x $HOME/.configs/yq
+        export PATH="$HOME/.configs:$PATH"
+
+        yq --version         
         /bin/bash hack/bootstrap.sh -m preview
         echo "End"
-
+        /bin/bash hack/destroy.sh --kcp-kubeconfig $KCP_KUBECONFIG --cluster-kubeconfig $CLUSTER_KUBECONFIG
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
         name: ci-secrets
