@@ -1,8 +1,4 @@
 base_images:
-  assisted-image-service:
-    name: ocm-2.7
-    namespace: edge-infrastructure
-    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.7
     namespace: edge-infrastructure
@@ -69,11 +65,11 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.11"
+      version: "4.12"
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':
@@ -94,15 +90,11 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+- as: e2e-aws
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-metrics
-  cluster_claim:
-    architecture: amd64
-    as: not_latest
-    cloud: aws
-    owner: hypershift
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.9"
   optional: true
   steps:
     workflow: hypershift-aws-e2e-metrics
@@ -128,109 +120,6 @@ tests:
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: assisted-baremetal
-- as: e2e-kubevirt-azure-ovn
-  optional: true
-  steps:
-    cluster_profile: azure4
-    test:
-    - as: deploy-cnv
-      cli: latest
-      commands: ./hack/ci/install-cnv.sh
-      from: bin
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: kv-e2e
-      cli: latest
-      commands: |-
-        # install hypershift
-        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
-
-        # complie the e2e tests
-        make e2e
-
-        # run the test
-        bin/test-e2e \
-                  --test.v \
-                  --test.timeout=0 \
-                  --test.run=TestCreateCluster \
-                  --e2e.node-pool-replicas=2 \
-                  --e2e.kubevirt-node-memory="6Gi" \
-                  --e2e.platform="KubeVirt" \
-                  --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-                  --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
-      credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
-      - env: OCP_IMAGE_LATEST
-        name: release:latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      from: bin
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-azure-ovn
-- as: e2e-kubevirt-gcp-ovn
-  optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: deploy-cnv
-      cli: latest
-      commands: ./hack/ci/install-cnv.sh
-      from: bin
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: kv-e2e
-      cli: latest
-      commands: |-
-        # install hypershift
-        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
-
-        # complie the e2e tests
-        make e2e
-
-        # run the test
-        bin/test-e2e \
-                  --test.v \
-                  --test.timeout=0 \
-                  --test.run=TestCreateCluster \
-                  --e2e.node-pool-replicas=2 \
-                  --e2e.kubevirt-node-memory="6Gi" \
-                  --e2e.platform="KubeVirt" \
-                  --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-                  --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
-      credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: HYPERSHIFT_RELEASE_LATEST
-        name: hypershift-operator
-      - env: OCP_IMAGE_LATEST
-        name: release:latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      from: bin
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp-ovn
-- as: e2e-aws-nested
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
-  steps:
-    workflow: hypershift-aws-e2e-nested
 zz_generated_metadata:
   branch: main
   org: openshift

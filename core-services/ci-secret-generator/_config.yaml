@@ -1,6 +1,6 @@
 - fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
     name: sa.$(service_account).$(cluster).config
   item_name: build_farm
   params:
@@ -24,8 +24,8 @@
     - github-ldap-user-group-creator
     - cluster-display
 - fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
     name: sa.$(service_account).$(cluster).config
   item_name: build_farm
   params:
@@ -42,8 +42,8 @@
     - ci-operator
     - cluster-display
 - fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
     name: sa.$(service_account).$(cluster).config
   item_name: release-controller
   params:
@@ -93,8 +93,8 @@
     cluster:
     - app.ci
 - fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
     name: sa.$(service_account).$(cluster).config
   item_name: ci-chat-bot
   params:
@@ -109,8 +109,8 @@
     service_account:
     - ci-chat-bot
 - fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
     name: sa.$(service_account).$(cluster).config
   item_name: pod-scaler
   params:
@@ -124,18 +124,8 @@
     service_account:
     - pod-scaler
 - fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      sa create-kubeconfig --namespace bparees $(service_account) | sed "s/$(service_account)/$(cluster)/g"
-    name: sa.$(service_account).$(cluster).config
-  item_name: endurance_cluster
-  params:
-    cluster:
-    - app.ci
-    service_account:
-    - endurance
-- fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
     name: sa.$(service_account).$(cluster).config
   item_name: build_farm
   params:
@@ -147,8 +137,8 @@
     - github-ldap-user-group-creator
     - hive
 - fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
     name: sa.$(service_account).$(cluster).config
   item_name: build_farm
   params:
@@ -164,15 +154,27 @@
     - ci-operator
     - github-ldap-user-group-creator
     - cluster-display
+    - dptp-controller-manager
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.hive.config
-      sa get-token --namespace openshift-monitoring ci
+      create token --namespace openshift-monitoring ci --duration=2419200s
     name: hive-openshift-monitoring-ci-token
   item_name: hive-openshift-monitoring-credentials
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
-      sa create-kubeconfig --namespace ci $(service_account) | sed "s/$(service_account)/$(cluster)/g"
-    name: sa.$(service_account).$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s
+    name: sa.$(service_account).$(cluster).token.txt
+  item_name: build_farm
+  params:
+    cluster:
+    - build01
+    - build02
+    service_account:
+    - sprint-automation
+- fields:
+  - cmd: /usr/bin/oc_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster) $(service_account)
+      ci
+    name: sa.$(service_account).$(cluster).token.txt
   item_name: build_farm
   params:
     cluster:

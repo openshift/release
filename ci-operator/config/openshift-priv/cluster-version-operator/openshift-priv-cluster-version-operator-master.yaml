@@ -80,13 +80,18 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-azure
-- as: e2e-agnostic-upgrade
+- as: e2e-agnostic-upgrade-into-change
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
-    env:
-      TEST_TYPE: upgrade
-      TEST_UPGRADE_OPTIONS: abort-at=100
+    workflow: openshift-upgrade-azure
+- as: e2e-agnostic-upgrade-out-of-change
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-azure
 zz_generated_metadata:
   branch: master

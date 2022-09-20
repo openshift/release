@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 function run_command() {
     local CMD="$1"
     echo "Running Command: ${CMD}"
@@ -51,9 +48,9 @@ if [ X"${OUTBOUND_UDR_TYPE}" == X"NAT" ]; then
   echo "Use NAT for UserDefinedRouting..."
   VNET_FILE="${SHARED_DIR}/customer_vnet_subnets.yaml"
   RESOURCE_GROUP=$(cat ${SHARED_DIR}/resourcegroup)
-  vnet_name=$(/tmp/yq r ${VNET_FILE} 'platform.azure.virtualNetwork')
-  controlPlaneSubnet=$(/tmp/yq r ${VNET_FILE} 'platform.azure.controlPlaneSubnet')
-  computeSubnet=$(/tmp/yq r ${VNET_FILE} 'platform.azure.computeSubnet')
+  vnet_name=$(yq-go r ${VNET_FILE} 'platform.azure.virtualNetwork')
+  controlPlaneSubnet=$(yq-go r ${VNET_FILE} 'platform.azure.controlPlaneSubnet')
+  computeSubnet=$(yq-go r ${VNET_FILE} 'platform.azure.computeSubnet')
   NAT_for_UDR "$RESOURCE_GROUP" "$vnet_name" "$controlPlaneSubnet" "$computeSubnet" || exit 3
 else
   echo "UserDefinedRouting is enabled, but does not define steps here, leave them for user"

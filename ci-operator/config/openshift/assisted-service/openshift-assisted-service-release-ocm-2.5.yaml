@@ -153,7 +153,7 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
 - as: verify-generated-code
-  skip_if_only_changed: ^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
@@ -193,7 +193,7 @@ tests:
     make lint
   container:
     from: assisted-service-build
-  skip_if_only_changed: ^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test
   commands: |
     export ROOT_DIR=/tmp
@@ -206,7 +206,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
-  skip_if_only_changed: ^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test-postsubmit
   commands: |
     export ROOT_DIR=/tmp
@@ -260,7 +260,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 0 */6 * * *
+  cron: 00 00 */1 * 0-5
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -325,7 +325,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.10"
-  cron: 0 */6 * * *
+  cron: 00 00 */1 * 0-5
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -360,7 +360,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -377,15 +377,17 @@ tests:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
+      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
+      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected
   steps:
@@ -398,7 +400,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -416,7 +418,7 @@ tests:
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -448,7 +450,7 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="setup run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
@@ -461,7 +463,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -517,7 +519,8 @@ tests:
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=10240
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="setup run deploy_capi_env test_kube_api_parallel"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
     workflow: assisted-baremetal
 - as: operator-catalog-publish-to-quay

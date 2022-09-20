@@ -4,7 +4,7 @@ chain:
   - as: conformance-tests
     from: tests
     commands: |-
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(echo -n clusters-${CLUSTER_NAME}|sed 's#\.#-#g')"
       export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
@@ -48,6 +48,11 @@ chain:
           export TEST_PROVIDER='{"type":"ibmcloud"}'
           IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
           export IC_API_KEY
+          ;;
+      kubevirt)
+          export TEST_PROVIDER='{"type":"kubevirt"}'
+          openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/conformance/parallel | grep "\[Suite:openshift/conformance/parallel/minimal\]" > /tmp/tests_hs_kv
+          TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests_hs_kv"
           ;;
       *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
       esac

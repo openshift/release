@@ -280,6 +280,58 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
+- as: hco-e2e-image-index-gcp
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+      OO_CHANNEL: 1.6.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: deploy-cr
+      commands: |
+        make deploy_cr
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
+        make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-gcp
+- as: hco-e2e-kv-smoke-gcp
+  run_if_changed: ^(build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+      OO_CHANNEL: 1.6.0
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_PACKAGE: community-kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-test
+      commands: |
+        make deploy_cr
+        make test-kv-smoke-prow
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-gcp
 - as: hco-e2e-upgrade-index-aws
   run_if_changed: ^(assets/.*|build/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:

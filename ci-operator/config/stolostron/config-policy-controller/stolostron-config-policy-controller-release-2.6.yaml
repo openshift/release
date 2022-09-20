@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.18-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.18-linux
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -14,7 +10,7 @@ images:
 - dockerfile_path: build/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.18-linux:
+    root:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: config-policy-controller
@@ -73,7 +69,6 @@ tests:
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish

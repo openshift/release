@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
@@ -16,58 +13,125 @@ expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
 REGION="${LEASED_RESOURCE}"
+
+# m6a (AMD) are more cost effective than other x86 instance types
+# for general purpose work. Use by default, when supported in the
+# region.
+IS_M6A_REGION="no"
+if aws ec2 describe-instance-type-offerings --region "${REGION}" | grep -q m6a ; then
+  IS_M6A_REGION="yes"
+fi
+
+function eval_instance_capacity() {
+  local DESIRED_TYPE="$1"
+  local FALLBACK_TYPE="$2"
+  # During our initial adoption of m6a, AWS has report insufficient capacity at peak hours. For cost effectiveness
+  # and to ensure AWS eventual adds m6a capacity due to these errors, we want to continue to use them. However,
+  # if left unchecked, these peak hour errors can derail a statistically significant number of jobs.
+  # To mitigate the capacity issues, search.ci.openshift.org can tell us if previous jobs have failed to provision
+  # the desired instance type - in this region - in the last x minutes.
+  # If we find such an error, use the fallback instance type.
+
+  # Example error
+  # error creating EC2 instance: InsufficientInstanceCapacity: We currently do not have sufficient m6a.xlarge capacity
+  # in the Availability Zone you requested (us-east-1c). Our system will be working on provisioning additional capacity.
+  # You can currently get m6a.xlarge capacity by not specifying an Availability Zone in your request or choosing
+  # us-east-1a, us-east-1b, us-east-1d, us-east-1f.\n	status code: 500, request id: ...
+
+  set +o errexit
+  local LOOK_BACK_PERIOD="30m"
+  local TARGET_TYPE="${DESIRED_TYPE}"
+  for retry in {1..30}; do
+    if err_count=$(curl -L -s "https://search.ci.openshift.org/search?search=InsufficientInstanceCapacity.*${DESIRED_TYPE}.*${REGION}&maxAge=${LOOK_BACK_PERIOD}&context=0&type=build-log" | jq length); then
+      if [[ "${err_count}" == "0" ]]; then
+        break  # Use DESIRED_TYPE
+      else
+        >&2 echo "Recent instance AWS availability issue for ${DESIRED_TYPE} in ${REGION}; falling back to ${FALLBACK_TYPE}"
+        TARGET_TYPE="${FALLBACK_TYPE}"
+        break
+      fi
+    fi
+    sleep 2
+    >&2 echo "Error querying search.ci.openshift.com for AWS instance availability information (retry ${retry} of 30)."
+  done
+
+  echo "${TARGET_TYPE}"
+  set -o errexit
+}
+
+# Do not change auto-types unless it is coordinated with the cloud
+# financial operations team. Savings plans may be in place to
+# decrease the cost of certain instance families.
+if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+  if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+    COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
+  else
+    COMPUTE_NODE_TYPE="m6i.xlarge"
+  fi
+fi
+
+CONTROL_PLANE_INSTANCE_SIZE="xlarge"
+if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
+  CONTROL_PLANE_INSTANCE_SIZE="8xlarge"
+elif [[ "${SIZE_VARIANT}" == "large" ]]; then
+  CONTROL_PLANE_INSTANCE_SIZE="4xlarge"
+elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
+  CONTROL_PLANE_INSTANCE_SIZE="2xlarge"
+fi
+
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
 architecture=${OCP_ARCH:-"amd64"}
-arch_instance_type=m5
+
 if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
   architecture="arm64"
 fi
 
 if [[ x"${architecture}" == x"arm64" ]]; then
   arch_instance_type=m6g
+  CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+else
+  if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+    CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
+  else
+    CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+  fi
+  arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
 fi
+
 BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 
 workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
 fi
-master_type=null
-if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  master_type=${arch_instance_type}.8xlarge
-elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  master_type=${arch_instance_type}.4xlarge
-elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  master_type=${arch_instance_type}.2xlarge
-fi
 
 # Generate working availability zones from the region
 mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
 # Generate availability zones with OpenShift Installer required instance types
 
-if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${master_type}" ]]; then ## all regions are the same
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
-elif [[ "${master_type}" == null && "${COMPUTE_NODE_TYPE}" == null  ]]; then ## two null regions
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
-elif [[ "${master_type}" == null || "${COMPUTE_NODE_TYPE}" == null ]]; then ## one null region
-  if [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${master_type}" || "${master_type}" == "${COMPUTE_NODE_TYPE}" ]]; then ## "one null region and duplicates"
-    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
+if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then ## all regions are the same
+  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
+elif [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == null && "${COMPUTE_NODE_TYPE}" == null  ]]; then ## two null regions
+  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
+elif [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == null || "${COMPUTE_NODE_TYPE}" == null ]]; then ## one null region
+  if [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" || "${CONTROL_PLANE_INSTANCE_TYPE}" == "${COMPUTE_NODE_TYPE}" ]]; then ## "one null region and duplicates"
+    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
   else ## "one null region and no duplicates"
-    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
+    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
   fi
-elif [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${master_type}" || "${master_type}" == "${COMPUTE_NODE_TYPE}" ]]; then ## duplicates regions with no null region
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
-elif [[ "${BOOTSTRAP_NODE_TYPE}" != "${COMPUTE_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" != "${master_type}" ]]; then   # three different regions
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${master_type}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 3 ' | awk '{print $2}')
+elif [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" || "${CONTROL_PLANE_INSTANCE_TYPE}" == "${COMPUTE_NODE_TYPE}" ]]; then ## duplicates regions with no null region
+  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
+elif [[ "${BOOTSTRAP_NODE_TYPE}" != "${COMPUTE_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" != "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then   # three different regions
+  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 3 ' | awk '{print $2}')
 fi
-# Generate availability zones based on these 2 criterias
+# Generate availability zones based on these 2 criteria
 mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
 # Calculate the maximum number of availability zones from the region
 MAX_ZONES_COUNT="${#ZONES[@]}"
 # Save max zones count information to ${SHARED_DIR} for use in other scenarios
 echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 
-existing_zones_setting=$(/tmp/yq r "${CONFIG}" 'controlPlane.platform.aws.zones')
+existing_zones_setting=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
 if [[ ${existing_zones_setting} == "" ]]; then
   ZONES_COUNT=${ZONES_COUNT:-2}
@@ -85,10 +149,13 @@ compute:
     aws:
       zones: ${ZONES_STR}
 EOF
-  /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
 else
   echo "zones already set in install-config.yaml, skipped"
 fi
+
+echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
+echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF
@@ -103,7 +170,7 @@ controlPlane:
   name: master
   platform:
     aws:
-      type: ${master_type}
+      type: ${CONTROL_PLANE_INSTANCE_TYPE}
 compute:
 - architecture: ${architecture}
   name: worker
@@ -113,7 +180,7 @@ compute:
       type: ${COMPUTE_NODE_TYPE}
 EOF
 
-/tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+yq-go m -x -i "${CONFIG}" "${PATCH}"
 
 # custom rhcos ami for non-public regions
 RHCOS_AMI=
@@ -135,7 +202,7 @@ platform:
   aws:
     amiID: ${RHCOS_AMI}
 EOF
-  /tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"
+  yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH_AMI}"
   cp "${SHARED_DIR}/install-config-ami.yaml.patch" "${ARTIFACT_DIR}/"
 fi
 
@@ -157,6 +224,6 @@ compute:
         authentication: ${AWS_METADATA_SERVICE_AUTH}
 EOF
 
-  /tmp/yq m -x -i "${CONFIG}" "${METADATA_AUTH_PATCH}"
+  yq-go m -x -i "${CONFIG}" "${METADATA_AUTH_PATCH}"
   cp "${METADATA_AUTH_PATCH}" "${ARTIFACT_DIR}/"
 fi

@@ -1,0 +1,51 @@
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.46
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+tests:
+- as: style-checks
+  commands: |
+    .openshift-ci/dispatch.sh style-checks
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
+- as: go-unit-tests
+  commands: |
+    .openshift-ci/dispatch.sh go-unit-tests
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
+- as: go-unit-tests-release
+  commands: |
+    .openshift-ci/dispatch.sh go-unit-tests-release
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
+- as: go-postgres-tests
+  commands: |
+    .openshift-ci/dispatch.sh go-postgres-tests
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
+zz_generated_metadata:
+  branch: ci-perf-hacks
+  org: stackrox
+  repo: stackrox

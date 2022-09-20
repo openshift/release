@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.17-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.17-linux
   stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
@@ -40,7 +36,7 @@ images:
   to: multicluster-global-hub-agent
 promotion:
   disabled: true
-  name: "2.6"
+  name: "2.7"
   namespace: stolostron
 releases:
   initial:
@@ -72,7 +68,7 @@ tests:
   skip_if_only_changed: ^doc/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
   steps:
     env:
-      AWS_CREDENTIALS_SECRET: ocm-obs-china-aws-kind
+      AWS_CREDENTIALS_SECRET: ocm-hub-of-hubs-aws-kind
       AWS_INSTANCE_TYPE: m5ad.xlarge
     post:
     - ref: ocm-e2e-kind-destroy
@@ -105,8 +101,13 @@ tests:
     workflow: ocm-e2e-kind
 - as: sonarcloud
   commands: |
-    export SELF="make"
-    make sonar/go/prow
+    export TMP_BIN="/tmp/bin"
+    export HOME="/tmp"
+    make setup_envtest
+    export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./operator/... ./agent/... ./manager/..."
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
   secrets:
@@ -114,8 +115,13 @@ tests:
     name: acm-sonarcloud-token
 - as: sonarcloud-post-submit
   commands: |
-    export SELF="make"
-    make sonar/go/prow
+    export TMP_BIN="/tmp/bin"
+    export HOME="/tmp"
+    make setup_envtest
+    export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    export SONAR_GO_TEST_ARGS="-coverpkg=./... ./operator/... ./agent/... ./manager/..."
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
   postsubmit: true
@@ -156,7 +162,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.6
+      DESTINATION_BRANCH: release-2.7
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

@@ -27,7 +27,7 @@ function populate_artifact_dir() {
 
 	cp inventory.yaml "${ARTIFACT_DIR}/inventory.yaml"
 	
-	# Make the modified install-config.yaml available for debugging purposes
+	# Make install-config.yaml available for debugging purposes
 	openshift-install create install-config
 	python - 'install-config.yaml' <<-EOF > "${ARTIFACT_DIR}/install-config.yaml"
 		import yaml;
@@ -88,9 +88,6 @@ mkdir -p ~/.ssh
 cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/
 
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
-
-# Fill install-config.yaml gaps with the default values
-openshift-install create install-config
 
 mkdir manifests
 

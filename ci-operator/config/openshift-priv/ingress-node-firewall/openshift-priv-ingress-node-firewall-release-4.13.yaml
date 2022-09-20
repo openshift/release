@@ -3,6 +3,10 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
@@ -28,9 +32,27 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: ingress-node-firewall-daemon
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/origin-ingress-node-firewall:4.12
+    with: pipeline:ingress-node-firewall
+  - pullspec: quay.io/openshift/origin-ingress-node-firewall-daemon:4.12
+    with: pipeline:ingress-node-firewall
 promotion:
   name: 4.13-priv
   namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.13-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.13-priv
+      namespace: ocp-private
 resources:
   '*':
     limits:
@@ -38,15 +60,30 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: 4.13-priv
-  namespace: ocp-private
 tests:
 - as: test-fmt
   commands: |
     make fmt
   container:
     from: src
+- as: unit-test
+  commands: |
+    make test
+  container:
+    from: src
+- as: lint
+  commands: |
+    make lint
+  container:
+    from: src
+- as: ingress-node-firewall-e2e-metal-ipi
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-ingress-node-firewall-e2e
 zz_generated_metadata:
   branch: release-4.13
   org: openshift-priv

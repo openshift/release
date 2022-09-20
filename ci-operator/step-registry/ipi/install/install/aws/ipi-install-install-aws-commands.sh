@@ -1,13 +1,12 @@
 #!/bin/bash
 
+
 set -o nounset
-# set -o errexit
-# set -o pipefail
+set -o errexit
+set -o pipefail
 
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
-CLUSTER_NAME="$(/tmp/yq r "${SHARED_DIR}/install-config.yaml" 'metadata.name')"
-BASE_DOMAIN="$(/tmp/yq r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
+CLUSTER_NAME="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'metadata.name')"
+BASE_DOMAIN="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
 
 function populate_artifact_dir() {
   set +e
@@ -108,8 +107,8 @@ openshift-install --dir="${dir}" create manifests &
 wait "$!"
 
 if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
-  /tmp/yq d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.privateZone
-  /tmp/yq d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.publicZone
+  yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.privateZone
+  yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.publicZone
 fi
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
@@ -140,8 +139,10 @@ done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -p
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
+set +e
 wait "$!"
 ret="$?"
+set -e
 
 if test "${ret}" -ne 0 ; then
   echo "Installation failed [create cluster]"
@@ -274,34 +275,19 @@ EOF
     ret=$?
   fi    
     
-  if test "${ret}" -ne 0 ; then
-    echo "Failed to create stack $APPS_DNS_STACK_NAME"
-    exit $ret
-  else
-    echo "Created stack $APPS_DNS_STACK_NAME"
-  fi
+  echo "Created stack $APPS_DNS_STACK_NAME"
 
   aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${APPS_DNS_STACK_NAME}" &
   wait "$!"
   ret=$?
-  if test "${ret}" -ne 0 ; then
-    echo "Failed to wait stack $APPS_DNS_STACK_NAME"
-    exit $ret
-  else
-    echo "Waited for stack $APPS_DNS_STACK_NAME"
-  fi
+  echo "Waited for stack $APPS_DNS_STACK_NAME"
 
   # completing installation
   TF_LOG=debug openshift-install --dir="${dir}" wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
 
-  if test "${ret}" -ne 0 ; then
-    echo "Installation failed [wait-for install-complete]"
-    exit $ret
-  else
-    echo "Waited for stack $APPS_DNS_STACK_NAME"
-  fi
+  echo "Waited for stack $APPS_DNS_STACK_NAME"
 fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"

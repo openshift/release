@@ -90,6 +90,7 @@ CONFIG = {
         'default': 1000,
     },
     'nutanix-quota-slice': {},
+    'nutanix-qe-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-quota-slice': {
         'default': 7,
@@ -130,6 +131,7 @@ CONFIG = {
     'vsphere-quota-slice':{},
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
+    'vsphere-connected-quota-slice':{},
     'vsphere-multizone-quota-slice':{},
     'vsphere-platform-none-quota-slice':{},
     'osd-ephemeral-quota-slice': {
@@ -149,7 +151,11 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
-        'default': 1,
+        'lon04': 1,
+        'lon06': 1,
+        'mon01': 1,
+        'sao01': 1,
+        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'default': 7,
@@ -161,7 +167,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'alibabacloud-cn-qe-quota-slice': {
-        'cn-hangzhou': 10,
+        'us-east-1': 10,
     },
 }
 
@@ -178,6 +184,9 @@ del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-1-3']
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
 
+for i in range(3):
+    CONFIG['nutanix-qe-quota-slice']['nutanix-qe-segment-{0:0>2}'.format(i)] = 1
+
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1
 
@@ -190,7 +199,10 @@ for i in range(10, 24):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(79,106):
+for i in range(83,93):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(94,106):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):
@@ -201,7 +213,10 @@ for i in range(60,62):
 
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
-    
+
+for i in range(55,56):
+    CONFIG['vsphere-connected-quota-slice']['ci-segment-{}'.format(i)] = 1
+
 for i in range(151,155):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 

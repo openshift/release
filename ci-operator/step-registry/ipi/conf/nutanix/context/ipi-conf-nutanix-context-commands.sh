@@ -10,7 +10,11 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
     exit 1
 fi
 
-NUTANIX_AUTH_PATH=/var/run/vault/nutanix/secrets.sh
+if [[ -f ${CLUSTER_PROFILE_DIR}/secrets.sh ]]; then
+  NUTANIX_AUTH_PATH=${CLUSTER_PROFILE_DIR}/secrets.sh
+else
+  NUTANIX_AUTH_PATH=/var/run/vault/nutanix/secrets.sh
+fi
 
 declare prism_central_host
 declare prism_central_port

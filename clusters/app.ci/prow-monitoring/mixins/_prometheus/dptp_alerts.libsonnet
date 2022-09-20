@@ -187,6 +187,24 @@
           }
         ],
       },
+      {
+        name: 'openshift-mirroring-failures',
+        rules: [
+          {
+            alert: 'openshift-mirroring-failures',
+            expr: |||
+              increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'OpenShift image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.',
+            },
+          }
+        ],
+      },
     ],
   },
 }

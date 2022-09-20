@@ -1,0 +1,28 @@
+workflow:
+  as: operator-pipelines-preflight-prod-claim
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      TEST_ASSET: quay.io/opdev/simple-demo-operator-bundle:latest
+      ASSET_TYPE: operator
+      PFLT_INDEXIMAGE: quay.io/opdev/simple-demo-operator-catalog:latest
+      PFLT_ARTIFACTS: "./artifacts"
+      PFLT_DOCKERCONFIG: ""
+    pre:
+    - ref: operator-pipelines-preflight-prod-health
+    - ref: ipi-install-rbac
+    test:
+    - ref: operator-pipelines-preflight-prod-decrypt
+    - ref: operator-pipelines-preflight-prod-check
+    - ref: operator-pipelines-preflight-prod-encrypt
+    post:
+    - chain: gather
+      best_effort: true
+  documentation: |-
+    This workflows perform shared pre/post actions on clusters obtained from
+    preinstalled pools (https://docs.ci.openshift.org/docs/architecture/ci-operator/#testing-with-a-cluster-from-a-cluster-pool).
+    Claims a cluster with a default configuration on AWS and executes the Preflight
+    tool against a provided asset.
+    Important: Parameter values in `env` are supposed to be used only in rehearsals
+    and serve as "testing defaults". Production jobs should always override them
+    via `preflight-trigger`.

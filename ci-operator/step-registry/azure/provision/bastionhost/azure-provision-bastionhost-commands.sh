@@ -57,8 +57,7 @@ fi
 if [ -z "${VNET_NAME}" ]; then
   vnet_file="${SHARED_DIR}/customer_vnet_subnets.yaml"
   if [ -f "${vnet_file}" ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-    bastion_vnet_name=$(/tmp/yq r ${vnet_file} 'platform.azure.virtualNetwork')
+    bastion_vnet_name=$(yq-go r ${vnet_file} 'platform.azure.virtualNetwork')
   else
     echo "Did not find ${vnet_file}!"
     exit 1
@@ -168,8 +167,8 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
     run_command "${cmd}" &&
     echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip} || :" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
     
-    wait_public_dns "${mirror_registry_dns}" || exit 2
-
+#    wait_public_dns "${mirror_registry_dns}" || exit 2
+    echo "Waiting for ${mirror_registry_dns} to be ready..." && sleep 120s
     # save mirror registry dns info
     echo "${mirror_registry_dns}:5000" > "${SHARED_DIR}/mirror_registry_url"
 fi

@@ -15,10 +15,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: windows-machine-config-operator-test
 releases:
-  initial:
-    integration:
-      name: "4.10"
-      namespace: origin
   latest:
     integration:
       include_built_images: true
@@ -57,8 +53,11 @@ tests:
   container:
     from: src
 - as: aws-e2e-operator
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
+    env:
+      COMMUNITY: "true"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid

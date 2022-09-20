@@ -43,15 +43,6 @@ images:
     COPY . .
   from: src
   to: assisted-test-infra
-- dockerfile_literal: |
-    FROM dev-scripts
-    RUN ansible-galaxy collection install community.general
-    COPY . assisted-test-infra/
-    RUN chgrp -R 0 assisted-test-infra && \
-        chmod -R g=u assisted-test-infra
-    WORKDIR assisted-test-infra/
-  from: dev-scripts
-  to: assisted-test-infra-dev-script
 - dockerfile_path: Dockerfile.assisted-test-infra
   inputs:
     govc:
@@ -82,7 +73,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     env:
-      PACKET_PLAN: c3.medium.x86
+      PACKET_PLAN: m3.small.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-prod
   optional: true
@@ -101,7 +92,7 @@ tests:
         DEPLOY_TARGET=onprem
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-onprem-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -110,7 +101,7 @@ tests:
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-prod-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -119,7 +110,7 @@ tests:
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -135,7 +126,7 @@ tests:
         DISK_ENCRYPTION_MODE=tpmv2
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-tpmv2-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -154,7 +145,7 @@ tests:
         DISK_ENCRYPTION_MODE=tang
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-tang-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -172,7 +163,7 @@ tests:
         OPENSHIFT_VERSION=4.8
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-8-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -189,7 +180,7 @@ tests:
         OPENSHIFT_VERSION=4.9
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-9-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -206,7 +197,7 @@ tests:
         OPENSHIFT_VERSION=4.10
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-10-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -222,6 +213,23 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.11
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-12
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.12
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-12-periodic
+  cron: 00 00 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.12
+      TEST_SUITE: full
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   optional: true
   steps:
@@ -231,7 +239,7 @@ tests:
         OLM_OPERATORS=cnv
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -249,7 +257,7 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -269,7 +277,7 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -299,8 +307,19 @@ tests:
         NUM_WORKERS=0
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-day2-single-node-periodic
+  cron: 00 00 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+        NUM_WORKERS=0
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+      TEST_SUITE: full
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -339,7 +358,7 @@ tests:
         IPv4=no
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -359,7 +378,7 @@ tests:
         IPv4=yes
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv4v6-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -378,7 +397,7 @@ tests:
         PLATFORM=none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-none-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -395,7 +414,7 @@ tests:
         NUM_MASTERS=1
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -404,7 +423,7 @@ tests:
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  optional: true
   steps:
     cluster_profile: packet-assisted
     env:
@@ -415,7 +434,7 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="setup run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api
   optional: true
@@ -427,7 +446,7 @@ tests:
         ENABLE_KUBE_API=true
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="setup run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api-ipv4
@@ -441,7 +460,7 @@ tests:
         IPv4=true
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="setup run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api-ipv6
   optional: true
@@ -454,7 +473,7 @@ tests:
         IPv6=true
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="setup run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-capi
   optional: true
@@ -470,23 +489,9 @@ tests:
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=12000
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="setup run deploy_capi_env test_kube_api_parallel"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-net-suite-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        NUM_MASTERS=1
-        ISO_IMAGE_TYPE=minimal-iso
-        STATIC_IPS=true
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="setup run test_kube_api_parallel"
-      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite
   optional: true
@@ -500,7 +505,7 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -534,7 +539,7 @@ tests:
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: vsphere
     env:
@@ -542,6 +547,7 @@ tests:
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
       PLATFORM: vsphere
+      TEST_SUITE: conformance
     workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-kube-api
   optional: true
@@ -555,7 +561,22 @@ tests:
         IPv4=true
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="setup run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-kube-api-periodic
+  cron: 00 00 */1 * 0-5
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        NUM_WORKERS=0
+        IPv4=true
+        ISO_IMAGE_TYPE=minimal-iso
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-metal-assisted-ipxe
@@ -566,13 +587,57 @@ tests:
       ASSISTED_CONFIG: |
         IPXE_BOOT=true
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-kube-api-reclaim-single-node
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        RECLAIM_HOSTS=true
+        ENABLE_KUBE_API=true
+        TEST_FUNC=test_late_binding_kube_api_sno
+        TEST=./src/tests/test_kube_api.py
+        MAKEFILE_TARGET=test
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-kube-api-reclaim
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        RECLAIM_HOSTS=true
+        ENABLE_KUBE_API=true
+        TEST_FUNC=test_late_binding_kube_api_ipv4_highly_available
+        TEST=./src/tests/test_kube_api.py
+        MAKEFILE_TARGET=test
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipxe-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         IPXE_BOOT=true
+    workflow: assisted-baremetal
+- as: e2e-vsphere-assisted-umn
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        USER_MANAGED_NETWORKING=true
+        MAKEFILE_TARGET=test
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-metal-upgrade-agent
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST=./src/tests/test_upgrade_agent.py
+        TEST_FUNC=test_upgrade_agent
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master

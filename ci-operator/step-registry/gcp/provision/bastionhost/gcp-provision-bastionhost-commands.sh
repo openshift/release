@@ -27,10 +27,6 @@ fi
 #####################################
 ##############Initialize#############
 #####################################
-
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 workdir=`mktemp -d`
 
 curl -L -o ${workdir}/fcos-stable.json https://builds.coreos.fedoraproject.org/streams/stable.json
@@ -68,8 +64,8 @@ echo "Using region: ${REGION}"
 
 VPC_CONFIG="${SHARED_DIR}/customer_vpc_subnets.yaml"
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
-  NETWORK=$(/tmp/yq r "${VPC_CONFIG}" 'platform.gcp.network')
-  CONTROL_PLANE_SUBNET=$(/tmp/yq r "${VPC_CONFIG}" 'platform.gcp.controlPlaneSubnet')
+  NETWORK=$(yq-go r "${VPC_CONFIG}" 'platform.gcp.network')
+  CONTROL_PLANE_SUBNET=$(yq-go r "${VPC_CONFIG}" 'platform.gcp.controlPlaneSubnet')
 fi
 if [[ -z "${NETWORK}" || -z "${CONTROL_PLANE_SUBNET}" ]]; then
   echo "Could not find VPC network and control-plane subnet" && exit 1

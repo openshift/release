@@ -1,16 +1,17 @@
 workflow:
   as: cri-o-integration
   steps:
-    cluster_profile: equinix-ocp-metal
+    cluster_profile: gcp
     pre:
-      - ref: baremetalds-packet-setup
+      - ref: gcp-provision-vpc
+      - ref: gcp-provision-buildhost
     test:
       - ref: cri-o-integration-test
     post:
       - ref: cri-o-integration-gather
-      - ref: baremetalds-packet-teardown
+      - ref: gcp-deprovision-buildhost
     env:
-      PACKET_PLAN: "c3.small.x86"
-      PACKET_OS: "rocky_8"
+      IMAGE_PROJECT: "rocky-linux-cloud"
+      IMAGE_FAMILY: "rocky-linux-8"
   documentation: |-
     This workflow executes the subsystem test suite on a cluster provisioned by running assisted-installer-crio-test on a packet server.

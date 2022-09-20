@@ -9,7 +9,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 mirror_output="${SHARED_DIR}/mirror_output"
 new_pull_secret="${SHARED_DIR}/new_pull_secret"
 install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"
-icsp_file="${SHARED_DIR}/mirror_registry_icsp_file"
+icsp_file="${SHARED_DIR}/local_registry_icsp_file.yaml"
 
 # private mirror registry host
 # <public_dns>:<port>
@@ -31,6 +31,9 @@ echo "target_release_image_repo: $target_release_image_repo"
 readable_version=$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=json | jq .metadata.version)
 echo "readable_version: $readable_version"
 
+# since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
+# unset KUBECONFIG to ensure this step always interact with the build farm.
+unset KUBECONFIG
 oc registry login
 
 # combine custom registry credential and default pull secret

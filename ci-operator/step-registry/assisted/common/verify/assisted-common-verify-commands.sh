@@ -3,50 +3,44 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x
 
 echo "************ assisted common verify command ************"
-
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
 
 if [ "${TEST_SUITE:-full}" == "none" ]; then
     echo "No need to run tests"
     exit 0
 fi
 
-collect_artifacts() {
-    echo "### Fetching results"
-    ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
-}
+case "${CLUSTER_TYPE}" in
+    vsphere)
+        # shellcheck disable=SC1090
+        source "${SHARED_DIR}/govc.sh"
+        export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
+        oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
+        # The test suite requires a vSphere config file with explicit user and password fields.
+        sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
+        sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+        export TEST_PROVIDER=vsphere
+        ;;
 
-trap collect_artifacts EXIT TERM
+    packet-edge)
+        export TEST_PROVIDER=baremetal
+        ;;
 
-# Tests execution
-set +e
+    *)
+        echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+        exit 1
+        ;;
+esac
 
-echo "### Copying test-list file"
-scp -F ${SHARED_DIR}/ssh_config "${SHARED_DIR}/test-list" "root@ci_machine:/tmp/test-list"
+# shellcheck disable=SC2044
+for kubeconfig in $(find ${SHARED_DIR} -name "kubeconfig*" -exec echo {} \;); do
+    export KUBECONFIG=${kubeconfig}
+    name=$(basename ${kubeconfig})
 
-echo "### Running tests"
-timeout --kill-after 5m 120m ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" bash - << EOF
-    # download openshift-tests cli tool from container quay.io/openshift/origin-tests
-    CONTAINER_ID=\$(podman run -d quay.io/openshift/origin-tests)
-    podman cp \${CONTAINER_ID}:/usr/bin/openshift-tests /usr/local/bin/
-    podman rm -f \${CONTAINER_ID}
+    mkdir -p ${ARTIFACT_DIR}/${name}/reports
 
-    for kubeconfig in \$(find \${KUBECONFIG} -type f); do
-        export KUBECONFIG=\${kubeconfig}
-        name=\$(basename \${kubeconfig})
-        openshift-tests run "openshift/conformance/parallel" --dry-run | \
-            grep -Ff /tmp/test-list | \
-            openshift-tests run -o /tmp/artifacts/e2e_\${name}.log --junit-dir /tmp/artifacts/reports -f -
-    done
-EOF
-
-
-rv=$?
-
-set -e
-echo "### Done! (${rv})"
-exit $rv
+    openshift-tests run "openshift/conformance/parallel" --dry-run | \
+        grep -Ff ${SHARED_DIR}/test-list | \
+        openshift-tests run -o ${ARTIFACT_DIR}/${name}/e2e.log --junit-dir ${ARTIFACT_DIR}/${name}/reports -f -
+done

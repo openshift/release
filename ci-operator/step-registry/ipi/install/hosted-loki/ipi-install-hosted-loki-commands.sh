@@ -490,63 +490,6 @@ spec:
     app.kubernetes.io/name: promtail
   type: ClusterIP
 EOF
-cat >> "${SHARED_DIR}/manifest_psp.yml" << EOF
-apiVersion: policy/v1beta1
-kind: PodSecurityPolicy
-metadata:
-  name: loki-promtail
-spec:
-  allowPrivilegeEscalation: false
-  fsGroup:
-    rule: RunAsAny
-  hostIPC: false
-  hostNetwork: false
-  hostPID: false
-  privileged: false
-  readOnlyRootFilesystem: true
-  requiredDropCapabilities:
-  - ALL
-  runAsUser:
-    rule: RunAsAny
-  seLinux:
-    rule: RunAsAny
-  supplementalGroups:
-    rule: RunAsAny
-  volumes:
-  - secret
-  - configMap
-  - hostPath
-EOF
-cat >> "${SHARED_DIR}/manifest_role.yml" << EOF
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: loki-promtail
-  namespace: openshift-e2e-loki
-rules:
-- apiGroups:
-  - extensions
-  resourceNames:
-  - loki-promtail
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-EOF
-cat >> "${SHARED_DIR}/manifest_rolebinding.yml" << EOF
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: loki-promtail
-  namespace: openshift-e2e-loki
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: loki-promtail
-subjects:
-- kind: ServiceAccount
-  name: loki-promtail
-EOF
 cat >> "${SHARED_DIR}/manifest_oauth_role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

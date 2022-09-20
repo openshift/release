@@ -1,0 +1,21 @@
+workflow:
+    as: openshift-e2e-gcp-mount-ns-hiding
+    steps:
+      allow_best_effort_post_steps: true
+      pre:
+      - ref: ipi-install-hosted-loki
+      - chain: ipi-conf-gcp
+      - ref: ovn-conf
+      - chain: ipi-install
+      - ref: mount-ns-hiding
+      test:
+      - ref: openshift-e2e-test
+      post:
+      - chain: gather-network
+      - chain: gather-core-dump
+      - chain: ipi-deprovision
+    documentation: |-
+      The Openshift E2E mount namespace hiding workflow executes the common end-to-end test
+      suite with the OVNKubernetes network plugin. The mount namespace hiding feature is
+      controlled by MOUNT_NS_HIDING_ENABLED. In OCP 4.12, the feature defaults to being
+      disabled, thus this workflow explicitly enables it.

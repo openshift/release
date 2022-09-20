@@ -1,0 +1,25 @@
+ref:
+  as: operator-pipelines-preflight-preprod-decrypt
+  from_image:
+    name: preflight-trigger
+    namespace: ci
+    tag: latest
+  commands: operator-pipelines-preflight-preprod-decrypt-commands.sh
+  env:
+    - name: PFLT_DOCKERCONFIG
+      documentation: |-
+        The full path to a dockerconfigjson file, which is pushed to the target test cluster
+        to access images in private repositories in the DeployableByOLM. If empty, no secret
+        is created and the resource is assumed to be public.
+      default: ''
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 400Mi
+  credentials:
+    - namespace: test-credentials
+      name: operator-pipelines-gpg
+      mount_path: /var/run/operator-pipelines-gpg
+  documentation: |-
+      This step will decrypt artifacts. Currently only one public key is
+      able to decrypt so no additional variables are needed.

@@ -1,6 +1,10 @@
 base_images:
+  ci_nginx-unprivileged_stable:
+    name: nginx-unprivileged
+    namespace: ci
+    tag: stable
   cli:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: cli
   golangci-lint:
@@ -48,6 +52,12 @@ images:
       - destination_dir: .
         source_path: /go/bin/check-gh-automation
   to: check-gh-automation
+- context_dir: images/gh-pull-through-cache/
+  inputs:
+    ci_nginx-unprivileged_stable:
+      as:
+      - registry.ci.openshift.org/ci/nginx-unprivileged:stable
+  to: gh-pull-through-cache
 - context_dir: images/cvp-trigger/
   from: os
   inputs:

@@ -6,6 +6,14 @@ set -o pipefail
 
 echo "************ baremetalds packet setup command ************"
 
+function send_slack(){
+    echo Packet setup failed: $1
+    SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat $CLUSTER_PROFILE_DIR/slackhook)"
+
+    curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet setup failed> $1\n\"}" \
+        "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
+}
+
 function exit_with_success(){
   cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
   <testsuite name="metal infra" tests="1" failures="0">
@@ -87,6 +95,10 @@ EOF
 ansible-playbook packet-config.yaml |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
 function getCIR(){
+    if [ "${ARCHITECTURE}" == "arm64" ]; then
+      return 1
+    fi
+
     OFCIRURL=$1
     echo $OFCIRURL > $SHARED_DIR/ofcir
     echo "Attempting to acquire a Host from OFCIR"
@@ -150,26 +162,22 @@ EOF
 
 # We have 2 ofcir servers,
 # the 1st (contents of ${CLUSTER_PROFILE_DIR}/ofcir_laburl)
-#   manages HW in the lab, at the moment this is all baremetal clusters
+#   manages HW in the lab, this has hosts of type cihost (for virtualized jobs)
+#   and cicluster (for baremetal jobs)
 # the 2nd (contents of ${CLUSTER_PROFILE_DIR}/ofcir)
-#   manages HW in equinix, at the moment this is for virt hosts
-# If neither can give us a host to use then we fall back to on demaned
+#   manages HW in equinix, this is for virt hosts only
+# If neither can give us a host to use then we fall back to on demaned from equinix
 
 CIRTYPE=cihost
-# If baremetal on check the lab ofcir and exit,
-# as equinix doesn't serve baremetal clusters
-if [[ "$CLUSTERTYPE" == "baremetal" ]] ; then
-    CIRTYPE=cicluster
-    if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
-        getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)"
-        exit_with_success
-    fi
-    exit_with_failure
-fi
+[[ "$CLUSTERTYPE" == "baremetal" ]] && CIRTYPE=cicluster
 
 if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
     getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)" && exit_with_success
 fi
+
+# No point in continuing, only ofcir_laburl has cir's of type "cicluster"
+[[ "$CLUSTERTYPE" == "baremetal" ]] && exit_with_failure
+
 if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
     getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)" && exit_with_success
 fi
@@ -191,12 +199,17 @@ cat > packet-setup.yaml <<-EOF
     - cluster_type: "{{ lookup('env', 'CLUSTER_TYPE') }}"
     - packet_project_id: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-project-id') }}"
     - packet_auth_token: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-auth-token') }}"
-
+    - user_data_filename: "{{ lookup('env', 'USER_DATA_FILENAME') }}"
   tasks:
   - name: check cluster type
     fail:
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
     when: "cluster_type is not regex('^packet.*$|^equinix.*$')"
+
+  - name: load user-data file content
+    set_fact:
+      user_data: "{{ lookup('file', lookup('env', 'SHARED_DIR') + '/' + user_data_filename) }}"
+    when: user_data_filename != ""
 
   - name: create Packet host with error handling
     block:
@@ -207,8 +220,9 @@ cat > packet-setup.yaml <<-EOF
         hostnames: "{{ packet_hostname }}"
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
-        facility: any
+        facility: ${PACKET_FACILITY}
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
+        user_data: "{{ user_data | default(omit) }}"
       register: hosts
       no_log: true
     - name: write device info to file
@@ -216,15 +230,6 @@ cat > packet-setup.yaml <<-EOF
         content="{{ hosts }}"
         dest="${SHARED_DIR}/hosts.json"
 EOF
-
-function send_slack(){
-    echo Packet setup failed: $1
-    SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat $CLUSTER_PROFILE_DIR/slackhook)"
-
-    curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet setup failed> $1\n\"}" \
-        "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
-}
-
 
 ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 

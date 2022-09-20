@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # mirror registry
@@ -35,9 +33,9 @@ pullSecret: >
 additionalTrustBundle: |
 `sed 's/^/  /g' "/var/run/vault/mirror-registry/client_ca.crt"`
 EOF
-/tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH}"
+yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
 
 # imageContentSources patch
-/tmp/yq m -x -i "${CONFIG}" "${install_config_icsp_patch}"
+yq-go m -x -i "${CONFIG}" "${install_config_icsp_patch}"
 
 rm -f "${mirror_registry_pull_secret}"

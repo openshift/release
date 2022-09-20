@@ -4,10 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
-
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 GCP_BASE_DOMAIN="$(< ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
@@ -20,13 +16,16 @@ workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
 fi
-master_type=n2-standard-4
+
+# Do not change the default family type without consulting with cloud financial operations as their may
+# be active savings plans targeting this machine class.
+master_type=e2-standard-4
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  master_type=n2-standard-32
+  master_type=e2-standard-32
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  master_type=n2-standard-16
+  master_type=e2-standard-16
 elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  master_type=n2-standard-8
+  master_type=e2-standard-8
 fi
 
 cat >> "${CONFIG}" << EOF
@@ -63,6 +62,5 @@ EOF
 fi
 
 if [[ -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
-  /tmp/yq m -x -i "${CONFIG}" "${SHARED_DIR}/customer_vpc_subnets.yaml"
-  cat "${CONFIG}"
+  yq-go m -x -i "${CONFIG}" "${SHARED_DIR}/customer_vpc_subnets.yaml"
 fi

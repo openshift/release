@@ -32,6 +32,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: pod-scaler-consumer-admission
+  labels:
+    app: pod-scaler-consumer-admission
   namespace: ci
   annotations:
     service.beta.openshift.io/serving-cert-secret-name: pod-scaler-admission-serving-cert
@@ -109,7 +111,7 @@ spec:
           readOnly: true
         resources:
           requests:
-            memory: "2Gi"
+            memory: "4Gi"
             cpu: "250m"
       volumes:
       - name: gcs-credentials
@@ -119,3 +121,22 @@ spec:
         secret:
           defaultMode: 420
           secretName: pod-scaler-admission-serving-cert
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: pod-scaler-consumer-admission
+  name: pod-scaler-consumer-admission
+  namespace: prow-monitoring
+spec:
+  endpoints:
+    - interval: 30s
+      port: metrics
+      scheme: http
+  namespaceSelector:
+    matchNames:
+      - ci
+  selector:
+    matchLabels:
+      app: pod-scaler-consumer-admission

@@ -20,9 +20,6 @@ function getVersion() {
   echo "${version}"
 }
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 REGION="${LEASED_RESOURCE}"
@@ -70,7 +67,7 @@ platform:
   azure:
     outboundType: ${OUTBOUND_TYPE}
 EOF
-    /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+    yq-go m -x -i "${CONFIG}" "${PATCH}"
   else
     echo "${OUTBOUND_TYPE} is not supported yet" || exit 1
   fi
@@ -84,7 +81,7 @@ if [ -n "${version}" ] && [ "$(printf '%s\n' "${REQUIRED_OCP_VERSION}" "${versio
   isOldVersion=false
 fi
 
-PUBLISH=$(/tmp/yq r "${CONFIG}" "publish")
+PUBLISH=$(yq-go r "${CONFIG}" "publish")
 echo "publish: ${PUBLISH}"
 echo "is Old Version: ${isOldVersion}"
 if [ ${isOldVersion} = true ] || [ -z "${PUBLISH}" ] || [ X"${PUBLISH}" == X"External" ]; then
@@ -95,7 +92,7 @@ platform:
   azure:
     baseDomainResourceGroupName: os4-common
 EOF
-    /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+    yq-go m -x -i "${CONFIG}" "${PATCH}"
 else
   echo "Omit baseDomainResourceGroupName for private cluster"
 fi

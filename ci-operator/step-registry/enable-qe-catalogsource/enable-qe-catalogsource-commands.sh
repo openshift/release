@@ -48,12 +48,21 @@ function update_global_auth () {
  # run_command "cat ${new_dockerconfig} | jq"
 
   # update global auth
-  run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}"; ret=$?
+  ret=0
+  run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
   if [[ $ret -eq 0 ]]; then
       echo "update the cluster global auth successfully."
   else
-      echo "!!! fail to add QE optional registry auth"
-      return 1
+      echo "!!! fail to add QE optional registry auth, retry and enable log..."
+      sleep 1
+      ret=0
+      run_command "oc --loglevel=10 set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
+      if [[ $ret -eq 0 ]]; then
+        echo "update the cluster global auth successfully after retry."
+      else
+        echo "!!! still fail to add QE optional registry auth after retry"
+        return 1
+      fi
   fi
 }
 
@@ -120,9 +129,9 @@ EOF
         run_command "oc get pods -o wide -n openshift-marketplace"
         run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
         run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
-        run_command "oc get mcp"
+        run_command "oc get mcp,node"
         run_command "oc get mcp worker -o yaml"
-        run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}')  -o yaml"
+        run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
 
         return 1
     fi

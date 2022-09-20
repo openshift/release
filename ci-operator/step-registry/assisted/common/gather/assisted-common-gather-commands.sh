@@ -31,7 +31,7 @@ cat > gather_logs.yaml <<-EOF
         ansible.builtin.shell: |
           source /root/config.sh
           # Get sosreport including sar data
-          sos report --batch --tmp-dir {{ LOGS_DIR }} \
+          sos report --batch --tmp-dir {{ LOGS_DIR }} --all-logs \
             -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
             -k podman.all -k podman.logs
       - name: Copy libvirt qemu log
@@ -47,18 +47,24 @@ cat > gather_logs.yaml <<-EOF
           path: /root/.kube/config
         register: kubeconfig
       - name: Extract assisted service logs
-        make:
-          chdir: /home/assisted
-          target: download_service_logs
+        ansible.builtin.shell: |
+          source /root/config.sh
+          make download_service_logs
         environment:
           KUBECONFIG: "/root/.kube/config"
+          LOGS_DEST: "{{ LOGS_DIR }}"
+        args:
+          chdir: /home/assisted
         when: kubeconfig.stat.exists
       - name: Extract capi logs
-        make:
-          chdir: /home/assisted
-          target: download_capi_logs
+        ansible.builtin.shell: |
+          source /root/config.sh
+          make download_capi_logs
         environment:
           KUBECONFIG: "/root/.kube/config"
+          LOGS_DEST: "{{ LOGS_DIR }}"
+        args:
+          chdir: /home/assisted
         when: kubeconfig.stat.exists and GATHER_CAPI_LOGS == "true"
       - debug:
           msg: "CLUSTER_GATHER = {{ CLUSTER_GATHER }}"
@@ -67,8 +73,9 @@ cat > gather_logs.yaml <<-EOF
           source /root/config.sh
           make download_cluster_logs
         environment:
-          KUBECONFIG: "/root/.kube/config"
           ADDITIONAL_PARAMS: "{{ CLUSTER_GATHER | join(' ') }}"
+          KUBECONFIG: "/root/.kube/config"
+          LOGS_DEST: "{{ LOGS_DIR }}"
         args:
           chdir: /home/assisted
       - name: Find kubeconfig files
@@ -117,19 +124,11 @@ cat > gather_logs.yaml <<-EOF
         loop: "{{ log_files.files }}"
         loop_control:
           label: "{{ item.path }}"
-      - name: Find all files under LOGS_DIR
-        find:
-          paths: "{{ LOGS_DIR }}"
-          recurse: true
-        register: files_to_download
       - name: Download log files
-        ansible.builtin.fetch:
-          src: "{{ item.path }}"
-          dest: "{{ lookup('env', 'ARTIFACT_DIR') }}/"
-          flat: yes
-        loop: "{{ files_to_download.files }}"
-        loop_control:
-          label: "{{ item.path }}"
+        synchronize:
+          src: "{{ LOGS_DIR }}/"
+          dest: "{{ lookup('env', 'ARTIFACT_DIR') }}"
+          mode: pull
 EOF
 
 ansible-playbook gather_logs.yaml -i ${SHARED_DIR}/inventory -vv

@@ -317,6 +317,7 @@ fi
 ## Generate a service-account-key for signing the bootstrap.ign url
 gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
 if [[ -v IS_XPN ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Save the key id for final deletion (XPN scenario)..."
   private_key_id=$(jq -r .private_key_id service-account-key.json)
   echo "${private_key_id}" > "${SHARED_DIR}/xpn_sa_key_id"
 fi

@@ -5,7 +5,58 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
+    context: ci/prow/aro-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-aro-qa-e2e-tests
+    optional: true
+    rerun_command: /test aro-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=aro-qa-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )aro-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
     context: ci/prow/eks-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -52,11 +103,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )eks-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/gke-kernel-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -103,11 +154,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gke-kernel-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/gke-nongroovy-e2e-tests
     decorate: true
     decoration_config:
@@ -118,6 +169,7 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-gke-nongroovy-e2e-tests
     optional: true
     rerun_command: /test gke-nongroovy-e2e-tests
+    skip_if_only_changed: ^ui/
     spec:
       containers:
       - args:
@@ -153,11 +205,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gke-nongroovy-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/gke-postgres-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -169,6 +221,7 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-gke-postgres-qa-e2e-tests
     optional: true
     rerun_command: /test gke-postgres-qa-e2e-tests
+    skip_if_only_changed: ^ui/
     spec:
       containers:
       - args:
@@ -204,11 +257,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gke-postgres-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/gke-postgres-scale-tests
     decorate: true
     decoration_config:
@@ -258,7 +311,58 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
+    context: ci/prow/gke-postgres-upgrade-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-gke-postgres-upgrade-tests
+    optional: true
+    rerun_command: /test gke-postgres-upgrade-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=gke-postgres-upgrade-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gke-postgres-upgrade-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
     context: ci/prow/gke-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -270,6 +374,7 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-gke-qa-e2e-tests
     optional: true
     rerun_command: /test gke-qa-e2e-tests
+    skip_if_only_changed: ^ui/
     spec:
       containers:
       - args:
@@ -305,11 +410,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gke-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/gke-race-condition-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -356,11 +461,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gke-race-condition-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/gke-scale-tests
     decorate: true
     decoration_config:
@@ -406,11 +511,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gke-scale-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/gke-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -422,6 +527,7 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-gke-ui-e2e-tests
     optional: true
     rerun_command: /test gke-ui-e2e-tests
+    run_if_changed: ^ui/
     spec:
       containers:
       - args:
@@ -457,11 +563,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gke-ui-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/gke-upgrade-tests
     decorate: true
     decoration_config:
@@ -472,6 +578,7 @@ presubmits:
     name: pull-ci-stackrox-stackrox-master-gke-upgrade-tests
     optional: true
     rerun_command: /test gke-upgrade-tests
+    run_if_changed: ^(migrator/|^image/)
     spec:
       containers:
       - args:
@@ -507,11 +614,62 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gke-upgrade-tests,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/gke-version-compatibility-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-gke-version-compatibility-tests
+    optional: true
+    rerun_command: /test gke-version-compatibility-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=gke-version-compatibility-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gke-version-compatibility-tests,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/go-postgres-tests
     decorate: true
     decoration_config:
@@ -527,6 +685,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
         - --target=go-postgres-tests
         command:
         - ci-operator
@@ -546,6 +705,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -554,13 +716,16 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
     trigger: (?m)^/test( | .* )go-postgres-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/go-unit-tests
     decorate: true
     decoration_config:
@@ -576,6 +741,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
         - --target=go-unit-tests
         command:
         - ci-operator
@@ -595,6 +761,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -603,13 +772,16 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
     trigger: (?m)^/test( | .* )go-unit-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/go-unit-tests-release
     decorate: true
     decoration_config:
@@ -625,6 +797,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
         - --target=go-unit-tests-release
         command:
         - ci-operator
@@ -644,6 +817,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -652,13 +828,16 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
     trigger: (?m)^/test( | .* )go-unit-tests-release,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/grouped-static-checks
     decorate: true
     decoration_config:
@@ -707,7 +886,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -756,7 +935,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/integration-unit-tests
     decorate: true
     decoration_config:
@@ -805,7 +984,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/local-roxctl-tests
     decorate: true
     decoration_config:
@@ -855,7 +1034,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/mitre-bundles-checks
     decorate: true
     decoration_config:
@@ -904,8 +1083,8 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/openshift-4-operator-e2e-tests
+    cluster: build05
+    context: ci/prow/openshift-newest-operator-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -913,9 +1092,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-openshift-4-operator-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-openshift-newest-operator-e2e-tests
     optional: true
-    rerun_command: /test openshift-4-operator-e2e-tests
+    rerun_command: /test openshift-newest-operator-e2e-tests
     run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|EXPECTED_GO_VERSION)
     spec:
       containers:
@@ -925,7 +1104,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=openshift-4-operator-e2e-tests
+        - --target=openshift-newest-operator-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -964,14 +1143,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openshift-4-operator-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )openshift-newest-operator-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
-    context: ci/prow/openshift-4-qa-e2e-tests
+    cluster: build05
+    context: ci/prow/openshift-newest-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -979,9 +1158,9 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-stackrox-master-openshift-4-qa-e2e-tests
+    name: pull-ci-stackrox-stackrox-master-openshift-newest-qa-e2e-tests
     optional: true
-    rerun_command: /test openshift-4-qa-e2e-tests
+    rerun_command: /test openshift-newest-qa-e2e-tests
     spec:
       containers:
       - args:
@@ -990,7 +1169,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=openshift-4-qa-e2e-tests
+        - --target=openshift-newest-qa-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1029,13 +1208,209 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openshift-4-qa-e2e-tests,?($|\s.*)
+    trigger: (?m)^/test( | .* )openshift-newest-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
+    context: ci/prow/openshift-oldest-operator-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-openshift-oldest-operator-e2e-tests
+    optional: true
+    rerun_command: /test openshift-oldest-operator-e2e-tests
+    run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|EXPECTED_GO_VERSION)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=openshift-oldest-operator-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )openshift-oldest-operator-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/openshift-oldest-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-openshift-oldest-qa-e2e-tests
+    optional: true
+    rerun_command: /test openshift-oldest-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=openshift-oldest-qa-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )openshift-oldest-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/openshift-penultimate-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-openshift-penultimate-qa-e2e-tests
+    optional: true
+    rerun_command: /test openshift-penultimate-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=openshift-penultimate-qa-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )openshift-penultimate-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
     context: ci/prow/osd-aws-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1086,7 +1461,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/osd-gcp-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1137,7 +1512,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/policy-checks
     decorate: true
     decoration_config:
@@ -1186,7 +1561,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/push-images
     decorate: true
     decoration_config:
@@ -1231,11 +1606,62 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )push-images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/rosa-qa-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-rosa-qa-e2e-tests
+    optional: true
+    rerun_command: /test rosa-qa-e2e-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=rosa-qa-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rosa-qa-e2e-tests,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/shell-unit-tests
     decorate: true
     decoration_config:
@@ -1284,7 +1710,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/stackrox_branding-images
     decorate: true
     decoration_config:
@@ -1335,7 +1761,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/stackrox_branding-push-images
     decorate: true
     decoration_config:
@@ -1386,7 +1812,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/style-checks
     decorate: true
     decoration_config:
@@ -1402,6 +1828,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/stackrox-stackrox-base
         - --target=style-checks
         command:
         - ci-operator
@@ -1421,6 +1848,9 @@ presubmits:
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
+        - mountPath: /secrets/stackrox-stackrox-base
+          name: stackrox-stackrox-base
+          readOnly: true
       serviceAccountName: ci-operator
       volumes:
       - name: pull-secret
@@ -1429,13 +1859,16 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+      - name: stackrox-stackrox-base
+        secret:
+          secretName: stackrox-stackrox-base
     trigger: (?m)^/test( | .* )style-checks,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build05
     context: ci/prow/ui-unit-tests
     decorate: true
     decoration_config:

@@ -39,10 +39,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.10
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
   ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
@@ -64,9 +60,6 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
     ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
@@ -77,9 +70,6 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
     ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
@@ -117,9 +107,9 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -127,9 +117,6 @@ images:
     ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
     ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
@@ -347,6 +334,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-metal-ipi
+  cluster: build05
   optional: true
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
@@ -357,6 +345,7 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-swapped-hosts
+  cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3-io)
   steps:
@@ -368,6 +357,7 @@ tests:
         HOSTS_SWAP_DEFINITION=true
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   run_if_changed: (baremetal|metal3-io)
   steps:
     cluster_profile: equinix-ocp-metal
@@ -377,6 +367,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3-io)
   steps:
@@ -387,6 +378,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
+  cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3-io)
   steps:
@@ -500,12 +492,16 @@ tests:
   run_if_changed: (azure|azurestack)
   steps:
     cluster_profile: azurestack
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     workflow: openshift-e2e-azurestack
 - as: e2e-azurestack-upi
   optional: true
   run_if_changed: ^(upi/(azure|azurestack)/.*)
   steps:
     cluster_profile: azurestack
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     workflow: openshift-e2e-azurestack-upi
 - as: e2e-ibmcloud
   optional: true

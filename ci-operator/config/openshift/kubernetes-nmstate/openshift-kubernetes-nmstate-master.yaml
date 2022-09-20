@@ -7,18 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.11_base:
-    name: "4.12"
-    namespace: ocp
-    tag: base
   ocp_4.12_base:
     name: "4.12"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
@@ -28,27 +20,21 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile.openshift
   inputs:
-    ocp_4.11_base:
-      as:
-      - registry.ci.openshift.org/ocp/4.11:base
     ocp_4.12_base:
       as:
       - registry.ci.openshift.org/ocp/4.12:base
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: kubernetes-nmstate-handler
 - dockerfile_path: build/Dockerfile.operator.openshift
   inputs:
-    ocp_4.11_base:
+    ocp_4.12_base:
       as:
-      - registry.ci.openshift.org/ocp/4.11:base
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      - registry.ci.openshift.org/ocp/4.12:base
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: kubernetes-nmstate-operator
 - dockerfile_literal: |
     FROM src
@@ -99,7 +85,12 @@ tests:
   commands: make test/unit
   container:
     from: src
+- as: check-generate-bundle
+  commands: VERSION= make check-ocp-bundle
+  container:
+    from: src
 - as: e2e-handler-sdn-ipv4
+  cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -109,6 +100,7 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-handler-ovn-ipv4
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -119,6 +111,7 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-operator-sdn-ipv4
+  cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -128,6 +121,7 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-operator
 - as: e2e-operator-ovn-ipv4
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -138,23 +132,12 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-operator
 - as: e2e-handler-sdn-ipv4-nightly-periodic
+  cluster: build05
   cron: '@daily'
   steps:
     cluster_profile: equinix-ocp-metal
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE="OpenShiftSDN"
-        MIRROR_IMAGES=false
-    workflow: kubernetes-nmstate-e2e-handler
-- as: e2e-handler-sdn-ipv4-stable-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
@@ -162,6 +145,7 @@ tests:
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
 - as: e2e-handler-ovn-ipv4-nightly-periodic
+  cluster: build05
   cron: '@daily'
   steps:
     cluster_profile: equinix-ocp-metal
@@ -173,66 +157,6 @@ tests:
         NETWORK_TYPE="OVNKubernetes"
         MIRROR_IMAGES=false
     workflow: kubernetes-nmstate-e2e-handler
-- as: e2e-handler-ovn-ipv4-stable-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE="OVNKubernetes"
-        MIRROR_IMAGES=false
-    workflow: kubernetes-nmstate-e2e-handler
-- as: e2e-operator-sdn-ipv4-nightly-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE="OpenShiftSDN"
-        MIRROR_IMAGES=false
-    workflow: kubernetes-nmstate-e2e-operator
-- as: e2e-operator-sdn-ipv4-stable-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE="OpenShiftSDN"
-        MIRROR_IMAGES=false
-    workflow: kubernetes-nmstate-e2e-operator
-- as: e2e-operator-ovn-ipv4-nightly-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE="OVNKubernetes"
-        MIRROR_IMAGES=false
-    workflow: kubernetes-nmstate-e2e-operator
-- as: e2e-operator-ovn-ipv4-stable-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: equinix-ocp-metal
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE="OVNKubernetes"
-        MIRROR_IMAGES=false
-    workflow: kubernetes-nmstate-e2e-operator
 zz_generated_metadata:
   branch: master
   org: openshift

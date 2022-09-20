@@ -28,6 +28,9 @@ if [[ -z "$IMAGE_TAG" ]]; then
         presubmit)
             log "INFO Building default image tag for a $JOB_TYPE job"
             IMAGE_TAG="pr-${PULL_NUMBER}"
+            if [[ -n "${RELEASE_VERSION-}" ]]; then
+                IMAGE_TAG="${RELEASE_VERSION}-${IMAGE_TAG}"
+            fi
             ;;
         postsubmit)
             log "INFO Building default image tag for a $JOB_TYPE job"

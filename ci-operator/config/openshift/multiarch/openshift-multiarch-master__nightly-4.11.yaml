@@ -130,7 +130,7 @@ resources:
       memory: 200Mi
 tests:
 - as: ocp-e2e-aws-heterogeneous
-  interval: 48h
+  interval: 72h
   steps:
     cluster_profile: aws-2
     dependencies:
@@ -139,7 +139,7 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws
 - as: ocp-e2e-serial-aws-heterogeneous
-  interval: 48h
+  interval: 72h
   steps:
     cluster_profile: aws-2
     dependencies:
@@ -148,7 +148,7 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-serial
 - as: ocp-e2e-aws-arm64
-  interval: 24h
+  cron: 58 16 */1 * 1-5
   steps:
     cluster_profile: aws-arm64
     dependencies:
@@ -157,6 +157,18 @@ tests:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws
+- as: ocp-e2e-metal-ipi-ovn-arm64
+  interval: 72h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ARCHITECTURE: arm64
+      NVME_DEVICE: ""
+      PACKET_FACILITY: da11
+      PACKET_PLAN: c3.large.arm64
+    workflow: baremetalds-e2e-ipv4
 - as: ocp-e2e-upgrade-aws-arm64
   interval: 72h
   steps:
@@ -170,7 +182,7 @@ tests:
       TEST_SUITE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: ocp-installer-e2e-aws-ovn-arm64
-  interval: 24h
+  cron: 19 17 */1 * 1-5
   steps:
     cluster_profile: aws-arm64
     dependencies:
@@ -221,7 +233,7 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws-ovn-serial
 - as: ocp-e2e-aws-ovn-arm64
-  interval: 24h
+  cron: 12 17 */1 * 1-5
   steps:
     cluster_profile: aws-arm64
     dependencies:
@@ -231,7 +243,7 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws-ovn
 - as: ocp-e2e-aws-upi-arm64
-  interval: 24h
+  cron: 42 0 */1 * 1-5
   steps:
     cluster_profile: aws-arm64
     dependencies:
@@ -274,7 +286,7 @@ tests:
     workflow: openshift-e2e-aws-techpreview-serial
 - as: ocp-e2e-remote-libvirt-s390x
   cluster: build01
-  cron: 0 0,18 * * *
+  cron: 0 0 * * *
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -287,7 +299,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-image-ecosystem-remote-libvirt-s390x
   cluster: build01
-  cron: '@yearly'
+  cron: 4 21 18 */12 *
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -299,7 +311,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-jenkins-e2e-remote-libvirt-s390x
   cluster: build01
-  cron: '@yearly'
+  cron: 5 11 20 */12 *
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -311,7 +323,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-serial-remote-libvirt-s390x
   cluster: build01
-  cron: '@yearly'
+  cron: 7 8 22 * *
   steps:
     cluster_profile: libvirt-s390x
     dependencies:
@@ -340,7 +352,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 8,20 * * *
+  cron: 0 8 * * *
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -352,7 +364,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-image-ecosystem-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 17 * * *
+  cron: 4 21 18 */12 *
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -364,7 +376,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-jenkins-e2e-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 2 * * *
+  cron: 5 11 20 */12 *
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -376,7 +388,7 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-serial-remote-libvirt-ppc64le
   cluster: build01
-  cron: 0 19 * * 0
+  cron: 7 8 22 * *
   steps:
     cluster_profile: libvirt-ppc64le
     dependencies:
@@ -403,18 +415,6 @@ tests:
       WORKER_MEMORY: "32768"
       WORKER_REPLICAS: "0"
     workflow: openshift-e2e-libvirt
-- as: ocp-e2e-ppc64le-powervs
-  cluster: build01
-  cron: 0 0,6,12,18 * * *
-  steps:
-    cluster_profile: powervs
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
-    env:
-      ARCH: ppc64le
-      BRANCH: "4.11"
-      TEST_TYPE: conformance-parallel
-    workflow: openshift-e2e-powervs-ipi
 zz_generated_metadata:
   branch: master
   org: openshift

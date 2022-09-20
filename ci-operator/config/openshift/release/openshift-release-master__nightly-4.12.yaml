@@ -67,6 +67,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: gcp-pd-csi-driver-operator-test
+  ibm-vpc-block-csi-driver-operator-test:
+    name: "4.12"
+    namespace: ocp
+    tag: ibm-vpc-block-csi-driver-operator-test
   libvirt-installer:
     name: "4.12"
     namespace: ocp
@@ -151,15 +155,11 @@ tests:
       TEST_FUNC: test_bip_add_worker
     workflow: baremetalds-sno
 - as: e2e-metal-ipi-ovn-ipv4
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-sdn
-  interval: 6h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-sdn-bm
   cluster: build05
   interval: 6h
@@ -169,6 +169,7 @@ tests:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-dualstack-local-gateway
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -179,40 +180,48 @@ tests:
         OVN_LOCAL_GATEWAY_MODE=true
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-sdn-serial-ipv4
+  cluster: build05
   interval: 6h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-ipv4
 - as: e2e-metal-ipi-serial-ovn-ipv6
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
 - as: e2e-metal-ipi-sdn-serial-virtualmedia
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-virtualmedia
 - as: e2e-metal-ipi-serial-ovn-dualstack
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-dualstack
 - as: e2e-metal-ipi-sdn-serial-compact
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-sdn-serial-compact
-- as: e2e-metal-ipi-sdn-upgrade
-  cron: 0 0 1 1 *
+- as: e2e-metal-ipi-sdn-bm-upgrade
+  cluster: build05
+  cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
+      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     workflow: baremetalds-e2e-upgrade-sdn
   timeout: 5h0m0s
 - as: e2e-metal-ipi-upgrade-ovn-ipv6
-  cron: 0 0 1 1 *
+  cluster: build05
+  cron: 0 12 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -220,16 +229,19 @@ tests:
     workflow: baremetalds-e2e-upgrade-ovn-ipv6
   timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   interval: 6h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   cron: 0 0 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ovn-ipi-compact
+  cluster: build05
   cron: 0 0 * * 1
   steps:
     cluster_profile: equinix-ocp-metal
@@ -238,11 +250,6 @@ tests:
         IP_STACK=v6
         NUM_WORKERS=0
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-sdn-virtualmedia
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-sdn-virtualmedia
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -302,7 +309,7 @@ tests:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-csi
-- as: e2e-aws-workers-rhel8
+- as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
   steps:
     cluster_profile: aws
@@ -414,7 +421,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-gcp-sdn
 - as: console-aws
-  interval: 48h
+  interval: 12h
   steps:
     cluster_profile: aws-2
     env:
@@ -475,7 +482,7 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-csi
-- as: e2e-aws-csi-migration
+- as: e2e-aws-ovn-csi-migration
   interval: 48h
   steps:
     cluster_profile: aws-2
@@ -509,7 +516,7 @@ tests:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
-    workflow: openshift-e2e-aws-cgroupsv2
+    workflow: openshift-e2e-aws-sdn-cgroupsv2
 - as: e2e-aws-sdn-crun
   interval: 3h
   steps:
@@ -612,9 +619,12 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-telco5g
-  cluster: build01
-  interval: 6h
+  cluster: build05
+  cron: 21 3 */1 * 1-5
   steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_BRANCH=master
     workflow: telco5g
 - as: e2e-alibaba-ovn
   interval: 24h
@@ -635,6 +645,11 @@ tests:
     env:
       BASE_DOMAIN: alicloud-dev.devcluster.openshift.com
     workflow: openshift-e2e-alibabacloud-disk-csi
+- as: e2e-ibmcloud-csi
+  interval: 24h
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-csi
 zz_generated_metadata:
   branch: master
   org: openshift

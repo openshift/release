@@ -6,9 +6,6 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 workdir=`mktemp -d`
 
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
@@ -289,7 +286,7 @@ proxy:
   username: "${reg_quay_user}"
   password: "${reg_quay_password}"
 EOF
-/tmp/yq m -x -i "${workdir}/registry_config_file_6001" "${patch_file}"
+yq-go m -x -i "${workdir}/registry_config_file_6001" "${patch_file}"
 
 # patch proxy for 6002 brew.registry.redhat.io
 reg_brew_url=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.url')
@@ -301,7 +298,7 @@ proxy:
   username: "${reg_brew_user}"
   password: "${reg_brew_password}"
 EOF
-/tmp/yq m -x -i "${workdir}/registry_config_file_6002" "${patch_file}"
+yq-go m -x -i "${workdir}/registry_config_file_6002" "${patch_file}"
 
 rm -f "${patch_file}"
 

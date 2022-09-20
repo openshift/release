@@ -18,13 +18,12 @@ base_images:
 build_root:
   project_image:
     dockerfile_path: .openshift-ci/build/Dockerfile.build_root
-  use_build_cache: true
 images:
 - build_args:
   - name: BUILDER_ROOT_DIR
     value: /go/src/github.com/stackrox/collector/builder
   dockerfile_path: builder/Dockerfile
-  from: src
+  from: centos8
   to: collector-builder
 - dockerfile_path: .openshift-ci/build/Dockerfile.build_collector
   from: collector-builder
@@ -163,7 +162,7 @@ images:
   to: rhel8-3-drivers
 - build_args:
   - name: SHARDS_DIR
-    value: /tasks/rhel7/shards/
+    value: /tasks/rhel7/0/shards/
   context_dir: .
   dockerfile_path: .openshift-ci/drivers/build.Dockerfile
   inputs:
@@ -173,7 +172,46 @@ images:
     rhel7-base:
       as:
       - replaced-by-osci:builder-base
-  to: rhel7-drivers
+  to: rhel7-0-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel7/1/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel7-1-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel7/2/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel7-2-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel7/3/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel7-3-drivers
 - context_dir: .
   dockerfile_path: .openshift-ci/drivers/drivers.Dockerfile
   from: src
@@ -184,9 +222,18 @@ images:
     pre-build:
       as:
       - replaced-by-osci:pre-build
-    rhel7-drivers:
+    rhel7-0-drivers:
       as:
-      - replaced-by-osci:rhel7-drivers
+      - replaced-by-osci:rhel7-0-drivers
+    rhel7-1-drivers:
+      as:
+      - replaced-by-osci:rhel7-1-drivers
+    rhel7-2-drivers:
+      as:
+      - replaced-by-osci:rhel7-2-drivers
+    rhel7-3-drivers:
+      as:
+      - replaced-by-osci:rhel7-3-drivers
     rhel8-0-drivers:
       as:
       - replaced-by-osci:rhel8-0-drivers
@@ -259,6 +306,8 @@ tests:
         name: collector-slim
       - env: COLLECTOR_FULL
         name: collector-full
+      - env: COLLECTOR_BUILDER
+        name: collector-builder
       from: src
       resources:
         requests:
@@ -269,11 +318,14 @@ tests:
     test:
     - as: collector-unit-tests
       commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
-      from: collector
+      from: collector-binary
       resources:
         requests:
           cpu: 2000m
           memory: 4000Mi
+- as: update-support-packages-from-registry
+  steps:
+    workflow: stackrox-collector-update-support-packages
 - as: rhel-7-ebpf-integration-tests
   steps:
     env:
@@ -301,6 +353,176 @@ tests:
       COLLECTION_METHOD: kernel-module
       IMAGE_FAMILY: rhel-8
       VM_TYPE: rhel
+    workflow: stackrox-collector-integration-tests
+- as: cos-89-lts-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: cos-89-lts
+      VM_TYPE: cos
+    workflow: stackrox-collector-integration-tests
+- as: cos-beta-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: cos-beta
+      VM_TYPE: cos
+    workflow: stackrox-collector-integration-tests
+- as: cos-dev-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: cos-dev
+      VM_TYPE: cos
+    workflow: stackrox-collector-integration-tests
+- as: cos-stable-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: cos-stable
+      VM_TYPE: cos
+    workflow: stackrox-collector-integration-tests
+- as: sles-12-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: sles-12
+      VM_TYPE: suse
+    workflow: stackrox-collector-integration-tests
+- as: sles-12-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: sles-12
+      VM_TYPE: suse
+    workflow: stackrox-collector-integration-tests
+- as: sles-15-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: sles-15
+      VM_TYPE: suse
+    workflow: stackrox-collector-integration-tests
+- as: sles-15-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: sles-15
+      VM_TYPE: suse
+    workflow: stackrox-collector-integration-tests
+- as: ubuntu-1804-lts-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: ubuntu-1804-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: ubuntu-1804-lts-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: ubuntu-1804-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: ubuntu-2004-lts-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: ubuntu-2004-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: ubuntu-2004-lts-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: ubuntu-2004-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: ubuntu-2204-lts-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: ubuntu-2204-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: ubuntu-2204-lts-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: ubuntu-2204-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: ubuntu-pro-1804-lts-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: ubuntu-pro-1804-lts
+      VM_TYPE: ubuntu-os-pro
+    workflow: stackrox-collector-integration-tests
+- as: ubuntu-pro-1804-lts-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: ubuntu-pro-1804-lts
+      VM_TYPE: ubuntu-os-pro
+    workflow: stackrox-collector-integration-tests
+- as: flatcar-stable-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: flatcar-stable
+      VM_TYPE: flatcar
+    workflow: stackrox-collector-integration-tests
+- as: flatcar-stable-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: flatcar-stable
+      VM_TYPE: flatcar
+    workflow: stackrox-collector-integration-tests
+- as: garden-linux-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: garden-linux
+      IMAGE_NAME: gardenlinux-gcp-cloud-gardener--prod-576-9-229156
+      VM_TYPE: garden-linux
+    workflow: stackrox-collector-integration-tests
+- as: garden-linux-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: garden-linux
+      IMAGE_NAME: gardenlinux-gcp-cloud-gardener--prod-576-9-229156
+      VM_TYPE: garden-linux
+    workflow: stackrox-collector-integration-tests
+- as: rhel-84-sap-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: rhel-8-4-sap-ha
+      VM_TYPE: rhel-sap
+    workflow: stackrox-collector-integration-tests
+- as: rhel-84-sap-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: rhel-8-4-sap-ha
+      VM_TYPE: rhel-sap
+    workflow: stackrox-collector-integration-tests
+- as: rhel-86-sap-ebpf-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: rhel-8-6-sap-ha
+      VM_TYPE: rhel-sap
+    workflow: stackrox-collector-integration-tests
+- as: rhel-86-sap-kernel-module-integration-tests
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: rhel-8-6-sap-ha
+      VM_TYPE: rhel-sap
     workflow: stackrox-collector-integration-tests
 - as: merge-lint
   postsubmit: true
@@ -337,11 +559,18 @@ tests:
     test:
     - as: collector-unit-tests
       commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
-      from: collector
+      from: collector-binary
       resources:
         requests:
           cpu: 2000m
           memory: 4000Mi
+- as: merge-update-support-packages-from-registry
+  postsubmit: true
+  steps:
+    env:
+      IMAGE_FAMILY: ubuntu-2204-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-update-support-packages
 - as: merge-push-images
   postsubmit: true
   steps:
@@ -357,6 +586,8 @@ tests:
         name: collector-slim
       - env: COLLECTOR_FULL
         name: collector-full
+      - env: COLLECTOR_BUILDER
+        name: collector-builder
       from: src
       resources:
         requests:
@@ -393,6 +624,200 @@ tests:
       COLLECTION_METHOD: kernel-module
       IMAGE_FAMILY: rhel-8
       VM_TYPE: rhel
+    workflow: stackrox-collector-integration-tests
+- as: merge-cos-89-lts-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: cos-89-lts
+      VM_TYPE: cos
+    workflow: stackrox-collector-integration-tests
+- as: merge-cos-beta-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: cos-beta
+      VM_TYPE: cos
+    workflow: stackrox-collector-integration-tests
+- as: merge-cos-dev-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: cos-dev
+      VM_TYPE: cos
+    workflow: stackrox-collector-integration-tests
+- as: merge-cos-stable-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: cos-stable
+      VM_TYPE: cos
+    workflow: stackrox-collector-integration-tests
+- as: merge-sles-12-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: sles-12
+      VM_TYPE: suse
+    workflow: stackrox-collector-integration-tests
+- as: merge-sles-12-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: sles-12
+      VM_TYPE: suse
+    workflow: stackrox-collector-integration-tests
+- as: merge-sles-15-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: sles-15
+      VM_TYPE: suse
+    workflow: stackrox-collector-integration-tests
+- as: merge-sles-15-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: sles-15
+      VM_TYPE: suse
+    workflow: stackrox-collector-integration-tests
+- as: merge-ubuntu-1804-lts-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: ubuntu-1804-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: merge-ubuntu-1804-lts-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: ubuntu-1804-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: merge-ubuntu-2004-lts-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: ubuntu-2004-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: merge-ubuntu-2004-lts-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: ubuntu-2004-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: merge-ubuntu-2204-lts-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: ubuntu-2204-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: merge-ubuntu-2204-lts-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: ubuntu-2204-lts
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-integration-tests
+- as: merge-ubuntu-pro-1804-lts-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: ubuntu-pro-1804-lts
+      VM_TYPE: ubuntu-os-pro
+    workflow: stackrox-collector-integration-tests
+- as: merge-ubuntu-pro-1804-lts-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: ubuntu-pro-1804-lts
+      VM_TYPE: ubuntu-os-pro
+    workflow: stackrox-collector-integration-tests
+- as: merge-flatcar-stable-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: flatcar-stable
+      VM_TYPE: flatcar
+    workflow: stackrox-collector-integration-tests
+- as: merge-flatcar-stable-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: flatcar-stable
+      VM_TYPE: flatcar
+    workflow: stackrox-collector-integration-tests
+- as: merge-garden-linux-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: garden-linux
+      IMAGE_NAME: gardenlinux-gcp-cloud-gardener--prod-576-9-229156
+      VM_TYPE: garden-linux
+    workflow: stackrox-collector-integration-tests
+- as: merge-garden-linux-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: garden-linux
+      IMAGE_NAME: gardenlinux-gcp-cloud-gardener--prod-576-9-229156
+      VM_TYPE: garden-linux
+    workflow: stackrox-collector-integration-tests
+- as: merge-rhel-84-sap-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: rhel-8-4-sap-ha
+      VM_TYPE: rhel-sap
+    workflow: stackrox-collector-integration-tests
+- as: merge-rhel-84-sap-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: rhel-8-4-sap-ha
+      VM_TYPE: rhel-sap
+    workflow: stackrox-collector-integration-tests
+- as: merge-rhel-86-sap-ebpf-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: rhel-8-6-sap-ha
+      VM_TYPE: rhel-sap
+    workflow: stackrox-collector-integration-tests
+- as: merge-rhel-86-sap-kernel-module-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: rhel-8-6-sap-ha
+      VM_TYPE: rhel-sap
     workflow: stackrox-collector-integration-tests
 - as: drivers-tests
   optional: true

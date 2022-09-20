@@ -29,6 +29,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
 - as: pr-image-mirror
   steps:
     dependencies:
@@ -81,7 +86,6 @@ tests:
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export SELF="make -f Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish
@@ -95,6 +99,16 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
+- as: sonar-pre-submit
+  commands: |
+    export SELF="make -f Makefile.prow"
+    export DEPLOYED_IN_HUB=true
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
     export SELF="make -f Makefile.prow"

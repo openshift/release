@@ -216,6 +216,32 @@ EOF
   done
 }
 
+# inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
+function inject_spot_instance_config() {
+  local dir=${1}
+
+  if [ ! -f /tmp/yq ]; then
+    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+  fi
+
+  PATCH="${SHARED_DIR}/machinesets-spot-instances.yaml.patch"
+  cat > "${PATCH}" << EOF
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          spotMarketOptions: {}
+EOF
+
+  for MACHINESET in $dir/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
+    /tmp/yq m -x -i "${MACHINESET}" "${PATCH}"
+    echo "Patched spotMarketOptions into ${MACHINESET}"
+  done
+
+  echo "Enabled AWS Spot instances for worker nodes"
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
 
@@ -277,6 +303,11 @@ wait "$!"
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
 azure4) inject_boot_diagnostics ${dir} ;;
+aws|aws-arm64|aws-usgov)
+    if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
+      inject_spot_instance_config ${dir}
+    fi
+    ;;
 esac
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
@@ -320,5 +351,9 @@ if test "${ret}" -eq 0 ; then
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 fi
+
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 exit "$ret"

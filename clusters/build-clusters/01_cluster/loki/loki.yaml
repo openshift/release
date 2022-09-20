@@ -2,6 +2,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: loki
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -186,6 +188,13 @@ spec:
               secretKeyRef:
                 name: promtail-prod-creds
                 key: client-secret
+        securityContext:
+          privileged: true
+          runAsNonRoot: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - mountPath: "/tmp/shared"
           name: shared-data
@@ -224,9 +233,11 @@ spec:
           timeoutSeconds: 1
         securityContext:
           privileged: true
+          runAsNonRoot: false
           readOnlyRootFilesystem: true
-          runAsGroup: 0
-          runAsUser: 0
+          capabilities:
+            drop:
+            - ALL
         volumeMounts:
         - mountPath: "/etc/promtail"
           name: config
@@ -244,6 +255,8 @@ spec:
           name: journal
           readOnly: true
       serviceAccountName: loki-promtail
+      securityContext:
+        runAsNonRoot: true
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -273,60 +286,6 @@ spec:
     type: RollingUpdate
     rollingUpdate:
       maxUnavailable: 33%
----
-apiVersion: policy/v1beta1
-kind: PodSecurityPolicy
-metadata:
-  name: loki-promtail
-spec:
-  allowPrivilegeEscalation: false
-  fsGroup:
-    rule: RunAsAny
-  hostIPC: false
-  hostNetwork: false
-  hostPID: false
-  privileged: false
-  readOnlyRootFilesystem: true
-  requiredDropCapabilities:
-  - ALL
-  runAsUser:
-    rule: RunAsAny
-  seLinux:
-    rule: RunAsAny
-  supplementalGroups:
-    rule: RunAsAny
-  volumes:
-  - secret
-  - configMap
-  - hostPath
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: loki-promtail
-  namespace: loki
-rules:
-- apiGroups:
-  - extensions
-  resourceNames:
-  - loki-promtail
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: loki-promtail
-  namespace: loki
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: loki-promtail
-subjects:
-- kind: ServiceAccount
-  name: loki-promtail
 ---
 apiVersion: v1
 kind: ServiceAccount

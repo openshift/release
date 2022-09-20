@@ -3,17 +3,13 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.18-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.18-linux
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.e2etest
   from: base
   inputs:
-    stolostron_builder_go1.18-linux:
+    root:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: grc-policy-framework-tests
@@ -34,45 +30,6 @@ tests:
       IMAGE_REPO: grc-policy-framework-tests
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: test-e2e-kind
-  steps:
-    env:
-      AWS_CREDENTIALS_SECRET: ocm-grc-aws-kind
-      AWS_REGION: us-east-1
-    test:
-    - as: kind-test
-      commands: |
-        echo "IMAGE_REF=$IMAGE_REF"
-        ./build/run-test-kind-prow.sh
-      dependencies:
-      - env: IMAGE_REF
-        name: grc-policy-framework-tests
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ocm-e2e-kind
-- as: test-e2e-kind-deployonhub
-  steps:
-    env:
-      AWS_CREDENTIALS_SECRET: ocm-grc-aws-kind
-      AWS_REGION: us-east-1
-    test:
-    - as: kind-test
-      commands: |
-        echo "IMAGE_REF=$IMAGE_REF"
-        export deployOnHub="true"
-        ./build/run-test-kind-prow.sh
-      dependencies:
-      - env: IMAGE_REF
-        name: grc-policy-framework-tests
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ocm-e2e-kind
 - as: test-e2e-grc-framework
   run_if_changed: ^test/integration/.*
   steps:

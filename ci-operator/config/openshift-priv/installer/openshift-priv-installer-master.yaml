@@ -200,12 +200,12 @@ tests:
   commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
   container:
     from: src
-- as: e2e-aws
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+- as: e2e-aws-ovn
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-proxy
+- as: e2e-aws-ovn-proxy
   optional: true
   run_if_changed: aws
   steps:
@@ -216,13 +216,13 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-upi-proxy
-- as: e2e-aws-shared-vpc
+- as: e2e-aws-ovn-shared-vpc
   optional: true
   run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sharednetwork
-- as: e2e-aws-imdsv2
+- as: e2e-aws-ovn-imdsv2
   optional: true
   run_if_changed: aws
   steps:
@@ -230,8 +230,8 @@ tests:
     env:
       AWS_METADATA_SERVICE_AUTH: Required
     workflow: openshift-e2e-aws
-- as: e2e-gcp
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+- as: e2e-gcp-ovn
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
@@ -247,24 +247,24 @@ tests:
         identity\|\[StatefulSetBasic\] should adopt matching orphans and release non-matching
         pods\|PVC Protection
     workflow: openshift-e2e-alibabacloud
-- as: e2e-gcp-shared-vpc
+- as: e2e-gcp-ovn-shared-vpc
   optional: true
   run_if_changed: gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-sharednetwork
-- as: e2e-azure
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+- as: e2e-azure-ovn
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
-- as: e2e-azure-shared-vpc
+- as: e2e-azure-ovn-shared-vpc
   optional: true
   run_if_changed: azure
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-sharednetwork
-- as: e2e-azure-resourcegroup
+- as: e2e-azure-ovn-resourcegroup
   optional: true
   run_if_changed: azure
   steps:
@@ -275,12 +275,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws-latestinstaller
-- as: e2e-aws-upi
+- as: e2e-aws-ovn-upi
   run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-upi
-- as: e2e-gcp-upi
+- as: e2e-gcp-ovn-upi
   run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
     cluster_profile: gcp
@@ -291,7 +291,7 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-upi-xpn
-- as: e2e-azure-upi
+- as: e2e-azure-ovn-upi
   run_if_changed: ^(upi/(azure|azurestack)/.*)|^(images/installer/Dockerfile\.upi.*)
   steps:
     cluster_profile: azure4
@@ -314,8 +314,9 @@ tests:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp-latestinstaller
 - as: e2e-metal-ipi
+  cluster: build05
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -324,6 +325,7 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-swapped-hosts
+  cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3-io)
   steps:
@@ -335,6 +337,7 @@ tests:
         HOSTS_SWAP_DEFINITION=true
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   run_if_changed: (baremetal|metal3-io)
   steps:
     cluster_profile: equinix-ocp-metal
@@ -344,6 +347,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3-io)
   steps:
@@ -354,6 +358,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
+  cluster: build05
   optional: true
   run_if_changed: (baremetal|metal3-io)
   steps:
@@ -361,7 +366,7 @@ tests:
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-openstack
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|ovirt|powervs|vsphere)/)
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -400,8 +405,8 @@ tests:
   steps:
     cluster_profile: openstack-vexxhost
     workflow: openshift-manifests-openstack
-- as: e2e-vsphere
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs)/)
+- as: e2e-vsphere-ovn
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs)/)
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
@@ -422,7 +427,7 @@ tests:
     workflow: openshift-e2e-gcp-crc
 - as: e2e-libvirt
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-libvirt
@@ -433,11 +438,11 @@ tests:
     workflow: assisted-baremetal
 - as: e2e-ovirt
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere)/)
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere)/)
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal
-- as: e2e-aws-single-node
+- as: e2e-aws-ovn-single-node
   optional: true
   run_if_changed: aws
   steps:
@@ -449,7 +454,7 @@ tests:
   steps:
     cluster_profile: packet-sno
     workflow: baremetalds-sno
-- as: e2e-aws-fips
+- as: e2e-aws-ovn-fips
   optional: true
   run_if_changed: aws
   steps:
@@ -480,16 +485,20 @@ tests:
   run_if_changed: (azure|azurestack)
   steps:
     cluster_profile: azurestack
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     workflow: openshift-e2e-azurestack
 - as: e2e-azurestack-upi
   optional: true
   run_if_changed: ^(upi/(azure|azurestack)/.*)
   steps:
     cluster_profile: azurestack
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     workflow: openshift-e2e-azurestack-upi
-- as: e2e-ibmcloud
+- as: e2e-ibmcloud-ovn
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
@@ -500,6 +509,12 @@ tests:
   steps:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix
+- as: e2e-agent-compact
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
 zz_generated_metadata:
   branch: master
   org: openshift-priv
