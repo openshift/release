@@ -293,19 +293,19 @@ function handle_filters {
 
 function valid_filter {
     filter="$1"
-    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9]{1,}[&]?$'; then
-        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9]{1,}[&]?$"
+    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9_]{1,}[&]?$'; then
+        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9_]{1,}[&]?$"
         exit 1
     fi
     action="$(echo $filter | grep -Eo '^[~]?')"
-    value="$(echo $filter | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $filter | grep -Eo '[a-zA-Z0-9_]{1,}')"
     logical="$(echo $filter | grep -Eo '[&]?$')"
     echo "$action--$value--$logical"
 }
 
 function handle_and_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then
@@ -322,7 +322,7 @@ function handle_and_filter {
 
 function handle_or_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then
