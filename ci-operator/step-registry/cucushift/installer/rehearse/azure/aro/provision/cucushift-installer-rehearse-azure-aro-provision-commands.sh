@@ -18,6 +18,11 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
 
+# workaround for MS graph permissions 
+yum -y remove azure-cli
+yum -y install https://packages.microsoft.com/yumrepos/azure-cli/azure-cli-2.36.0-1.el7.x86_64.rpm
+
+
 echo "az-cli version information"
 az version
 
