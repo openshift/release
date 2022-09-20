@@ -139,6 +139,17 @@ export CNF_BRANCH="${CNF_BRANCH:-master}"
 
 echo "************ telco5g cnf-tests commands ************"
 
+if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
+    readarray -t config <<< "${E2E_TESTS_CONFIG}"
+    for var in "${config[@]}"; do
+        if [[ ! -z "${var}" ]]; then
+            if [[ "${var}" == *"CNF_BRANCH"* ]]; then
+                CNF_BRANCH="$(echo "${var}" | cut -d'=' -f2)"
+            fi
+        fi
+    done
+fi
+
 worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
 --selector='!node-role.kubernetes.io/master' -o name)
 if [ -z "${worker_nodes}" ]; then
@@ -167,6 +178,7 @@ for node in ${test_nodes}; do
     touch "${node}_ready.txt"
 done
 
+echo "running on branch ${CNF_BRANCH}"
 git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'

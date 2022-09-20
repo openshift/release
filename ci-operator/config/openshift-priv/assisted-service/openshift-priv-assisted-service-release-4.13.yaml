@@ -3,6 +3,10 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_4.11_cli:
     name: 4.13-priv
     namespace: ocp-private
@@ -47,6 +51,12 @@ tests:
       SOURCE_IMAGE_REF: agent-installer-api-server
     test:
     - ref: assisted-baremetal-images-publish
+- as: e2e-agent-compact
+  optional: true
+  run_if_changed: ^(Dockerfile\.assisted-service\.ocp)|(cmd/agentbasedinstaller)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
 zz_generated_metadata:
   branch: release-4.13
   org: openshift-priv
