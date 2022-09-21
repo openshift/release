@@ -103,6 +103,13 @@ function deploy_and_test {
         sed -i "s/name\: performance/name\: performance-sriov/g" perf_profile_for_sriov.yaml
         sed -i "s/worker-cnf/${node_label}/g" perf_profile_for_sriov.yaml
         oc apply -f perf_profile_for_sriov.yaml
+        if [[ "${CNF_BRANCH}" == "master" ]]; then
+            # TEMP w/a to deploy sriov on 4.12 OCP.
+            # sriov-operator can't be deployed on OCP 4.12 due to security changes.
+            # This should be fixed in OLM and land in 4.12 nightly.
+            oc create ns "openshift-sriov-network-operator"
+            oc label namespace "openshift-sriov-network-operator" --overwrite pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/enforce-version=v1.24 pod-security.kubernetes.io/audit=privileged
+        fi
     fi
 
     if [[ "${feature}" == "xt_u32" ]] || [[ "${feature}" == "sctp" ]]; then
