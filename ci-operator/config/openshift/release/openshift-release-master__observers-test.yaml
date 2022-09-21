@@ -1,0 +1,48 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 10Mi
+tests:
+- as: observer-test
+  steps:
+    observers:
+      enable:
+      - observers-simple
+    pre:
+    - as: create-kubeconfig
+      commands: |
+        # Uploading a kubeconfig for the observer
+        printf 'fake-kubeconfig' >"${SHARED_DIR}/kubeconfig"
+        echo 'kubeconfig has been properly created'
+      from: os
+      resources:
+        requests:
+          cpu: 10m
+          memory: 10Mi
+    test:
+    - as: sync-observer
+      commands: |
+        # Giving some time to the observer to receive the kubeconfig
+        sleep 120
+        echo "test ended gracefully"
+      from: os
+      resources:
+        requests:
+          cpu: 10m
+          memory: 10Mi
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: observers-test
