@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -xeuo pipefail
+
+echo "$CLUSTER_NAME"
 NAMESPACE="clusters"
 
 gclusters=$(oc get hostedcluster -n "$NAMESPACE" -ojsonpath='{.items[*].metadata.name}')
@@ -17,11 +20,11 @@ do
             --name "$cluster_item" \
             --location "$location"
     elif [ "$platform" == "AWS" ]; then
-        REGION=$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')
+        region=$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')
         hypershift destroy cluster aws \
             --aws-creds config/awscredentials \
             --namespace "$NAMESPACE" \
             --name "$cluster_item" \
-            --region "$REGION"
+            --region "$region"
     fi
 done
