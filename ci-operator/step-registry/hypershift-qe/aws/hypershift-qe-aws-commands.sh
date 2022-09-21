@@ -7,24 +7,16 @@ CLUSTER_NAME="ci-cluster"
 NAMESPACE="clusters"
 
 echo "extract secret/pull-secret"
-oc extract secret/pull-secret -n openshift-config --to=config --confirm
+oc extract secret/pull-secret -n openshift-config --to="$SHARED_DIR" --confirm
 
 echo "get playload image"
 playloadimage=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
-
-echo "export-credentials"
-if [ ! -d config  ];then
-    mkdir config
-fi
-accessKeyID=$(oc get secret -n kube-system aws-creds -o template='{{index .data "aws_access_key_id"|base64decode}}')
-secureKey=$(oc get secret -n kube-system aws-creds -o template='{{index .data "aws_secret_access_key"|base64decode}}')
-echo -e "[default]\naws_access_key_id=$accessKeyID\naws_secret_access_key=$secureKey" > config/awscredentials
 
 region=$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')
 echo "region: $region"
 
 hypershift create cluster aws \
-    --aws-creds config/awscredentials \
+    --aws-creds "$SHARED_DIR/awscredentials" \
     --pull-secret config/.dockerconfigjson \
     --name "$CLUSTER_NAME" \
     --base-domain qe.devcluster.openshift.com \

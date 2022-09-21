@@ -2,7 +2,9 @@
 
 set -xeuo pipefail
 
+BUCKETNAME=$(cat "${SHARED_DIR}/bucket_name")
 echo "$BUCKETNAME"
+
 hypershift install render --format=yaml | oc delete -f -
 
 platform=$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')
