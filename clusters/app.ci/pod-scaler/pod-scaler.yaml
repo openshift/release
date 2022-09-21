@@ -1,0 +1,94 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"pod-scaler:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"pod-scaler\")].image"}]'
+    labels:
+      app: prow
+      component: pod-scaler-producer
+    name: pod-scaler-producer
+    namespace: ci
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: pod-scaler-producer
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: pod-scaler-producer
+      spec:
+        containers:
+        - image: pod-scaler
+          name: pod-scaler
+          args:
+          - --loglevel=debug
+          - --cache-bucket=origin-ci-resource-usage-data
+          - --gcs-credentials-file=/etc/gcs/service-account.json
+          - --mode=producer
+          - --kubeconfig-dir=/var/kubeconfigs
+          ports:
+          - name: metrics
+            containerPort: 9090
+          volumeMounts:
+          - name: kubeconfigs
+            mountPath: /var/kubeconfigs
+          - name: gcs-credentials
+            mountPath: /etc/gcs
+            readOnly: true
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "1000m"
+            limits:
+              memory: "8Gi"
+        volumes:
+        - name: kubeconfigs
+          secret:
+            secretName: pod-scaler
+        - name: gcs-credentials
+          secret:
+            secretName: gce-sa-credentials-resource-usage-data-publisher
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: pod-scaler-producer
+    name: pod-scaler-producer
+  spec:
+    ports:
+      - name: metrics
+        port: 9090
+        protocol: TCP
+        targetPort: 9090
+    selector:
+      app: prow
+      component: pod-scaler-producer
+- apiVersion: monitoring.coreos.com/v1
+  kind: ServiceMonitor
+  metadata:
+    name: pod-scaler-producer
+    namespace: prow-monitoring
+    labels:
+      app: prow
+      component: pod-scaler-producer
+      prow-app: pod-scaler-producer
+  spec:
+    endpoints:
+      - interval: 30s
+        port: metrics
+        scheme: http
+    namespaceSelector:
+      matchNames:
+        - ci
+    selector:
+      matchLabels:
+        app: prow
+        component: pod-scaler-producer

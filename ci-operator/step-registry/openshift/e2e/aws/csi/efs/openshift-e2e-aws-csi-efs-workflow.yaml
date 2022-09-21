@@ -1,0 +1,20 @@
+workflow:
+  as: openshift-e2e-aws-csi-efs
+  steps:
+    pre:
+    - chain: ipi-aws-pre
+    - ref: optional-operators-subscribe
+    - ref: storage-create-csi-aws-efs
+    - ref: storage-conf-wait-for-csi-driver
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-aws-post
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
+      # FIXME after reading proper expected
+      TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+      CLUSTERCSIDRIVER: efs.csi.aws.com
+      TEST_SUITE: openshift/csi
+  documentation: |-
+    The Openshift E2E AWS `csi` workflow executes the `openshift/csi` end-to-end test suite on AWS EFS CSI driver that was installed during cluster setup.

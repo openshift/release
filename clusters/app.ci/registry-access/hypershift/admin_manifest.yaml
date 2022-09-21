@@ -1,0 +1,28 @@
+# this is the Namespace in which your images live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Published Images for HyperShift
+    openshift.io/display-name: HyperShift CI
+  name: hypershift
+---
+# this grants all authenticated users rights to pull images
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: hypershift-image-puller-binding
+  namespace: hypershift
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: system:image-puller
+subjects:
+# this is the set of all authenticated users
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:authenticated
+# this is the set of all unauthenticated users
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: system:unauthenticated

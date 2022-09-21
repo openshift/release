@@ -1,0 +1,126 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    # Although we need longer timeout only for prow.ci.openshift.org
+    # it will apply to all hosts below.
+    # Or we have to separate it to another ingress.
+    haproxy.router.openshift.io/timeout: "90s"
+  name: prow
+  namespace: ci
+spec:
+  tls:
+    - secretName: prow-tls
+      hosts:
+        - config.ci.openshift.org
+        - steps.ci.openshift.org
+        - prow.ci.openshift.org
+        - hook.ci.openshift.org
+        - bugs.ci.openshift.org
+        - slack.ci.openshift.org
+        - docs.ci.openshift.org
+        - cluster-display.ci.openshift.org
+        - selfservice.vault.ci.openshift.org
+        - resources.ci.openshift.org
+        - pr-payload-tests.ci.openshift.org
+  rules:
+  - host: config.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-operator-configresolver
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: steps.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-operator-configresolver
+            port:
+              number: 8082
+        pathType: ImplementationSpecific
+  - host: resources.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: pod-scaler-ui
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: prow.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: deck
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: hook.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: hook
+            port:
+              number: 8888
+        pathType: ImplementationSpecific
+  - host: bugs.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: bugzilla-backporter
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  - host: slack.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: slack-bot
+            port:
+              number: 8888
+        pathType: ImplementationSpecific
+  - host: docs.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-docs
+            port:
+              number: 8080
+        pathType: ImplementationSpecific
+  - host: cluster-display.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: ci-docs
+            port:
+              number: 8090
+        pathType: ImplementationSpecific
+  - host: selfservice.vault.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: vault-secret-collection-manager
+            port:
+              number: 4180
+        pathType: ImplementationSpecific
+  - host: pr-payload-tests.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: payload-testing-ui
+            port:
+              number: 8000
+        pathType: ImplementationSpecific

@@ -1,0 +1,158 @@
+kind: Namespace
+apiVersion: v1
+metadata:
+  name: grafana-loki
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: grafana-loki-admins
+  namespace: grafana-loki
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: grafana-loki-admins
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: grafana
+  namespace: grafana-loki
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: grafana
+    spec:
+      volumes:
+        - name: grafana-config
+          secret:
+            secretName: grafana-config
+            defaultMode: 420
+        - name: grafana-datasources
+          secret:
+            secretName: grafana-datasources
+            defaultMode: 420
+      containers:
+        - name: grafana-sso
+          image: 'quay.io/vrutkovs/grafana:8.5.9'
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          resources: {}
+          volumeMounts:
+            - name: grafana-config
+              mountPath: /etc/grafana
+            - name: grafana-datasources
+              mountPath: /etc/grafana/provisioning/datasources
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      securityContext: {}
+      schedulerName: default-scheduler
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 25%
+      maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: grafana
+  namespace: grafana-loki
+spec:
+  ports:
+    - protocol: TCP
+      port: 3000
+      targetPort: 3000
+  selector:
+    app: grafana
+  type: ClusterIP
+---
+kind: Route
+apiVersion: route.openshift.io/v1
+metadata:
+  name: grafana
+  namespace: grafana-loki
+spec:
+  path: /
+  to:
+    kind: Service
+    name: grafana
+    weight: 100
+  port:
+    targetPort: 3000
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+  wildcardPolicy: None
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-loki-redirect-config
+  namespace: ci
+data:
+  "default.conf": |
+    server {
+      listen 8080;
+      return 302 $scheme://grafana-loki.ci.openshift.org$request_uri;
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: grafana-loki-redirect
+  name: grafana-loki-redirect
+  namespace: ci
+spec:
+  selector:
+    matchLabels:
+      component: grafana-loki-redirect
+  template:
+    metadata:
+      labels:
+        component: grafana-loki-redirect
+    spec:
+      containers:
+      - image: nginxinc/nginx-unprivileged:1.17
+        name: nginx
+        volumeMounts:
+        - name: config
+          mountPath: /etc/nginx/conf.d
+      volumes:
+      - name: config
+        configMap:
+          name: grafana-loki-redirect-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: grafana-loki-redirect
+  name: grafana-loki-redirect
+  namespace: ci
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    component: grafana-loki-redirect
+  sessionAffinity: None
+  type: ClusterIP

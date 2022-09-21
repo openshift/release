@@ -1,0 +1,261 @@
+base_images:
+  ansible:
+    name: "4.6"
+    namespace: ocp
+    tag: ansible
+  base:
+    name: "4.6"
+    namespace: ocp
+    tag: base
+  cluster-logging-operator-e2e:
+    name: "4.6"
+    namespace: ocp
+    tag: cluster-logging-operator-e2e
+  console-tests:
+    name: "4.6"
+    namespace: ocp
+    tag: console-tests
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  libvirt-installer:
+    name: "4.6"
+    namespace: ocp
+    tag: libvirt-installer
+  upi-installer:
+    name: "4.6"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.6"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.6"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-upgrade
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+      TEST_TYPE: upgrade
+    workflow: baremetalds-e2e-upgrade
+- as: e2e-metal-ipi-ipv4
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ipv4
+- as: e2e-metal-ipi-compact
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NUM_WORKERS=0
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-virtualmedia
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-aws-proxy
+  cron: 0 0 */2 * *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-vsphere
+  cron: 0 15 2-30/2 * *
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-release46
+- as: e2e-vsphere-serial
+  cron: 0 15 1-31/2 * *
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-serial
+- as: e2e-vsphere-upi
+  cron: 0 3 2-30/2 * *
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-upi-release46
+- as: e2e-vsphere-upi-serial
+  cron: 0 3 1-31/2 * *
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-upi-serial
+- as: e2e-aws-workers-rhel7
+  cron: '@weekly'
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "7.9"
+    workflow: openshift-e2e-aws-workers-rhel
+- as: e2e-aws
+  cron: 59 13 6,24 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-libvirt-cert-rotation
+  cron: 0 9 * * 1,3,5
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-libvirt-cert-rotation
+- as: e2e-gcp
+  cron: 58 7 7,16 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp
+- as: console-aws
+  cron: 54 20 10,20 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: ./test-prow-e2e.sh release
+      from: console-tests
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: cluster-logging-operator-e2e
+  cron: 49 21 7,21 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm
+      from: cluster-logging-operator-e2e
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+- as: e2e-azure-fips
+  cron: 50 4 5,17 * *
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-azure-pre
+    - ref: fips-check
+    workflow: openshift-e2e-azure
+- as: e2e-aws-fips
+  cron: 11 18 3,27 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-fips
+  cron: 13 11 12,25 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    workflow: openshift-e2e-gcp
+- as: e2e-azure-fips-serial
+  cron: 58 3 8,28 * *
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - chain: ipi-azure-pre
+    - ref: fips-check
+    workflow: openshift-e2e-azure
+- as: e2e-aws-fips-serial
+  cron: 6 20 3,23 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-fips-serial
+  cron: 29 5 12,26 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/serial
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-rt
+  cron: 58 9 3,24 * *
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+      RT_ENABLED: "true"
+    workflow: openshift-e2e-gcp-realtime
+- as: e2e-aws-serial
+  cron: 53 11 6,22 * *
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-serial
+- as: e2e-azure
+  cron: 32 4 3,25 * *
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    workflow: openshift-e2e-azure
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release
+  variant: nightly-4.6

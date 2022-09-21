@@ -1,0 +1,39 @@
+---
+apiVersion: v1
+kind: List
+items:
+
+# Group will have some elevated permissions to deploy/maintain cluster-operator:
+- apiVersion: user.openshift.io/v1
+  kind: Group
+  metadata:
+    name: cluster-operator-team
+  users:
+  - dgoodwin
+  - csrwng
+  - mstaebler
+  - joelddiaz
+  - abutcher
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: cluster-operator-apiregistration
+  rules:
+  - apiGroups: ["apiregistration.k8s.io"]
+    resources: ["apiservice", "apiservices"]
+    verbs: ["create", "get", "list", "watch", "update", "patch", "delete"]
+
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: cluster-operator-apiregistration
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: cluster-operator-apiregistration
+  subjects:
+  - apiGroup: ""
+    kind: Group
+    name: cluster-operator-team
+

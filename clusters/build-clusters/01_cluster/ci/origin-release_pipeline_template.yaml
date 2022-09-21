@@ -1,0 +1,281 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+labels:
+  template: origin-release
+metadata:
+  name: origin-release
+  openshift.io/display-name: Origin Release Environment
+  iconClass: icon-go-gopher
+  template.openshift.io/long-description: |-
+    The OpenShift Origin release environment container provides a workspace
+    in which developers can work with the Origin source code without needing
+    to install any tools other than a container runtime on their system.
+parameters:
+- name: SOURCE_REF
+  displayName: Source Ref
+  description: Git reference to use for building the Origin release environment image
+  value: master
+  required: false
+- name: SOURCE_URL
+  displayName: Source URL
+  description: Git source URL to use for building the Origin release environment image
+  value: https://github.com/openshift/release.git
+  required: false
+- name: PUSH_REPOSITORY
+  value: registry.ci.openshift.org/ci/origin-release
+  required: false
+- name: BASE_REPOSITORY
+  value: quay.io/centos/centos:7
+- description: Namespace
+  name: NAMESPACE
+  required: false
+  value: ci
+objects:
+- kind: ImageStream
+  apiVersion: v1
+  metadata:
+    labels:
+      app: origin-release
+    name: origin-release
+    namespace: ${NAMESPACE}
+  spec:
+    tags:
+    - name: base
+      from:
+        kind: DockerImage
+        name: ${BASE_REPOSITORY}
+        namespace: ${NAMESPACE}
+      importPolicy:
+        scheduled: false
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-golang-1.13"
+    namespace: ${NAMESPACE}
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:golang-1.13"
+      pushSecret:
+        name: "registry-push-credentials-ci-central"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/golang-1.13/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers: []
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-golang-1.14"
+    namespace: ${NAMESPACE}
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:golang-1.14"
+      pushSecret:
+        name: "registry-push-credentials-ci-central"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/golang-1.14/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers: []
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-golang-1.15"
+    namespace: ${NAMESPACE}
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:golang-1.15"
+      pushSecret:
+        name: "registry-push-credentials-ci-central"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/golang-1.15/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers: []
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-golang-1.16"
+    namespace: ${NAMESPACE}
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:golang-1.16"
+      pushSecret:
+        name: "registry-push-credentials-ci-central"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/golang-1.16/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers: []
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-golang-1.17"
+    namespace: ${NAMESPACE}
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:golang-1.17"
+      pushSecret:
+        name: "registry-push-credentials-ci-central"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/golang-1.17/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers: []
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-golang-1.18"
+    namespace: ${NAMESPACE}
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:golang-1.18"
+      pushSecret:
+        name: "registry-push-credentials-ci-central"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/golang-1.18/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: ImageStreamTag
+          name: origin-release:base
+        imageOptimizationPolicy: SkipLayers
+    triggers: []
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-nodejs-8"
+    namespace: ${NAMESPACE}
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:nodejs-8"
+      pushSecret:
+        name: "registry-push-credentials-ci-central"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/nodejs-8/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: centos/nodejs-8-centos7:latest
+        imageOptimizationPolicy: SkipLayers
+    triggers: []
+- apiVersion: v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      app: origin-release
+    name: "origin-release-nodejs-8-browser-tests"
+    namespace: ${NAMESPACE}
+  spec:
+    successfulBuildsHistoryLimit: 1
+    failedBuildsHistoryLimit: 2
+    output:
+      to:
+        kind: DockerImage
+        name: "${PUSH_REPOSITORY}:nodejs-8-browser-tests"
+      pushSecret:
+        name: "registry-push-credentials-ci-central"
+    source:
+      git:
+        ref: "${SOURCE_REF}"
+        uri: "${SOURCE_URL}"
+      contextDir: "clusters/build-clusters/01_cluster/ci/_origin-release-build/nodejs-8-browser-tests/"
+      type: Git
+    strategy:
+      dockerStrategy:
+        from:
+          kind: DockerImage
+          name: openshift/origin-release:nodejs-8
+        imageOptimizationPolicy: SkipLayers
+    triggers: []

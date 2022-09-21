@@ -1,0 +1,21 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: ibmz-eco-openshift-deployer
+  namespace: ibmz-eco
+spec: {}
+# Since we're importing an image from a private registry, then attempting to reference it via pullthrough on a
+# derivative ImageStreamTag via the ImageStreamImage object, we're hitting a bug in the image registry:
+#   https://github.com/openshift/image-registry/pull/271
+# Until that bug is fixed and we've got it rolled out, we need to manually import this image by pulling it
+# from the ICR registry, then pushing it to the clusters themselves.
+# spec:
+#   tags:
+#   - name: latest
+#     from:
+#       kind: DockerImage
+#       name: us.icr.io/tat-openshift-openstack/deployer:latest
+#     importPolicy:
+#       scheduled: true
+#     referencePolicy:
+#       type: Local

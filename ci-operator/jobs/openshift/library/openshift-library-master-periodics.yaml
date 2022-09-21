@@ -1,0 +1,50 @@
+periodics:
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: library
+    workdir: true
+  interval: 15m
+  name: periodic-openshift-library-import
+  reporter_config:
+    slack:
+      channel: '#forum-appsvc-notify'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed. See {{.Status.URL}} for details.
+  spec:
+    containers:
+    - command:
+      - /bin/bash
+      - -c
+      - |
+        #!/bin/bash
+        set -e
+
+        # redirect to devnull so this doesn't print the value of $TOKEN on failure.
+        git remote add pushtarget https://openshift-merge-robot:$TOKEN@github.com/openshift/library &> /dev/null
+        git checkout -b import
+        go run main.go import --config configs/cluster-samples-operator-periodic.yaml
+        git status
+        if [[ -n "$(git status --porcelain)" ]] ; then
+          echo "Committing and pushing new changes"
+          git add -A ./community ./official ./arch ./operator ./online
+          git commit -m "Automatic importer job update"
+        fi
+        # redirect to devnull so this doesn't print the value of $TOKEN on failure.
+        git push pushtarget import:master &> /dev/null
+      env:
+      - name: TOKEN
+        valueFrom:
+          secretKeyRef:
+            key: oauth
+            name: github-credentials-openshift-merge-robot
+      image: registry.ci.openshift.org/openshift/release:golang-1.13
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m

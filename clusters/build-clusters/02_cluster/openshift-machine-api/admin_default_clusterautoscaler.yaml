@@ -1,0 +1,25 @@
+#https://docs.openshift.com/container-platform/4.2/machine_management/applying-autoscaling.html
+#https://coreos.slack.com/archives/CBZHF4DHC/p1578326297014800
+#oc --context build02 get machine -n openshift-machine-api
+#NAME                     PHASE     TYPE             REGION     ZONE         AGE
+#build0-gstfj-m-0         Running   n1-standard-8    us-east1   us-east1-b   3d22h
+#build0-gstfj-m-1         Running   n1-standard-8    us-east1   us-east1-c   3d22h
+#build0-gstfj-m-2         Running   n1-standard-8    us-east1   us-east1-d   3d22h
+#build0-gstfj-w-b-pzxf6   Running   n1-standard-16   us-east1   us-east1-b   3d22h
+#build0-gstfj-w-c-fn56b   Running   n1-standard-16   us-east1   us-east1-c   3d22h
+#build0-gstfj-w-d-x89pq   Running   n1-standard-16   us-east1   us-east1-d   3d22h
+#https://cloud.google.com/compute/docs/machine-types#n1_machine_type
+#Instance Size vCPU	Memory (GiB)
+#n1-standard-16	16	60
+# match api.ci cluster on gce: 40 workers
+# we do 14 workers per zone and 42 workers in total
+---
+apiVersion: "autoscaling.openshift.io/v1"
+kind: "ClusterAutoscaler"
+metadata:
+  name: "default"
+spec:
+  podPriorityThreshold: -10
+  resourceLimits: null
+  scaleDown:
+    enabled: true

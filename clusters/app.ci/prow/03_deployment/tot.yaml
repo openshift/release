@@ -1,0 +1,138 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    name: tot
+  spec:
+    selector:
+      app: prow
+      component: tot
+    ports:
+    - port: 80
+      targetPort: 8888
+    type: ClusterIP
+- kind: PersistentVolumeClaim
+  apiVersion: v1
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: tot
+    name: tot-storage
+  spec:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ci
+    name: tot
+    labels:
+      app: prow
+      component: tot
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: tot
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: tot
+      spec:
+        containers:
+        - name: tot
+          image: gcr.io/k8s-prow/tot:v20220916-01b0897fa8
+          args:
+          - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
+          - --fallback=true
+          - --fallback-bucket=http://gcsweb/gcs/origin-ci-test
+          - --storage=/storage/tot.json
+          - --job-config-path=/etc/job-config
+          ports:
+            - name: http
+              containerPort: 8888
+          volumeMounts:
+          - name: tot-volume
+            mountPath: /storage
+          - name: config
+            mountPath: /etc/config
+          - name: job-config
+            mountPath: /etc/job-config
+            readOnly: true
+          resources:
+            requests:
+              memory: "250Mi"
+              cpu: "20m"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 20
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+        volumes:
+        - name: tot-volume
+          persistentVolumeClaim:
+            claimName: tot-storage
+        - name: config
+          configMap:
+            name: config
+        - name: job-config
+          projected:
+            sources:
+            - configMap:
+                name: job-config-misc
+            - configMap:
+                name: job-config-master-periodics
+            - configMap:
+                name: job-config-master-postsubmits
+            - configMap:
+                name: job-config-master-presubmits
+            - configMap:
+                name: job-config-1.x
+            - configMap:
+                name: job-config-2.x
+            - configMap:
+                name: job-config-3.x
+            - configMap:
+                name: job-config-4.1
+            - configMap:
+                name: job-config-4.2
+            - configMap:
+                name: job-config-4.3
+            - configMap:
+                name: job-config-4.4
+            - configMap:
+                name: job-config-4.5
+            - configMap:
+                name: job-config-4.6
+            - configMap:
+                name: job-config-4.7
+            - configMap:
+                name: job-config-4.8
+            - configMap:
+                name: job-config-4.9
+            - configMap:
+                name: job-config-4.10
+            - configMap:
+                name: job-config-4.11
+            - configMap:
+                name: job-config-4.12
+            - configMap:
+                name: job-config-4.13

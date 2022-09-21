@@ -1,0 +1,19 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: KubeletConfig
+metadata:
+  name: custom-config
+  annotations:
+    reason: "Workaround for https://bugzilla.redhat.com/show_bug.cgi?id=1857446"
+spec:
+  machineConfigPoolSelector:
+    matchExpressions:
+    - key: pools.operator.machineconfiguration.openshift.io/worker
+      operator: Exists
+    - key: custom-kubelet
+      operator: NotIn
+      values:
+      - cpu96
+  kubeletConfig:
+    systemReserved:
+      cpu: 1000m
+      memory: 3Gi

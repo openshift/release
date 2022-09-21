@@ -1,0 +1,46 @@
+base_images:
+  coreos_coreos-assembler_latest:
+    name: coreos-assembler
+    namespace: coreos
+    tag: latest
+  coreos_fcos-buildroot_testing-devel:
+    name: fcos-buildroot
+    namespace: coreos
+    tag: testing-devel
+binary_build_commands: ./ci/build.sh && make install
+build_root:
+  image_stream_tag:
+    name: fcos-buildroot
+    namespace: coreos
+    tag: testing-devel
+images:
+- dockerfile_path: ci/prow/Dockerfile
+  inputs:
+    coreos_coreos-assembler_latest:
+      as:
+      - registry.ci.openshift.org/coreos/coreos-assembler:latest
+    coreos_fcos-buildroot_testing-devel:
+      as:
+      - registry.ci.openshift.org/coreos/fcos-buildroot:testing-devel
+  to: rpmostree-fcos-e2e
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+  fcos-e2e:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
+      memory: 2Gi
+tests:
+- as: fcos-e2e
+  commands: fcos-e2e
+  container:
+    from: rpmostree-fcos-e2e
+zz_generated_metadata:
+  branch: main
+  org: coreos
+  repo: rpm-ostree

@@ -1,0 +1,58 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: alertmanager-expose
+parameters:
+- description: The session secret for the component.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+- description: prow monitoring namespace
+  name: PROW_MONITORING_NAMESPACE
+  value: prow-monitoring
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: alertmanager-tls
+    labels:
+      app: alertmanager
+    name: alertmanager
+    namespace: ${PROW_MONITORING_NAMESPACE}
+  spec:
+    ports:
+    - name: web
+      port: 9093
+      protocol: TCP
+      targetPort: 9093
+    - name: https
+      port: 9095
+      protocol: TCP
+      targetPort: 9095
+    selector:
+      alertmanager: prow
+      app: alertmanager
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: alertmanager
+    namespace: ${PROW_MONITORING_NAMESPACE}
+  spec:
+    port:
+      targetPort: https
+    to:
+      kind: Service
+      name: alertmanager
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: Reencrypt
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    labels:
+      k8s-app: alertmanager
+    name: alertmanager-proxy
+    namespace: ${PROW_MONITORING_NAMESPACE}
+  stringData:
+    session_secret: "${SESSION_SECRET}="

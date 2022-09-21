@@ -1,0 +1,64 @@
+base_images:
+  base:
+    name: "4.12"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: go/dpcr-bugzilla-updater/Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: dpcr-bugzilla-updater
+- dockerfile_path: images/impacts/Dockerfile
+  from: os
+  to: impacts
+- dockerfile_path: images/base/Dockerfile
+  from: os
+  inputs:
+    cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.12:cli
+  to: continuous-release-jobs
+- dockerfile_path: images/render/Dockerfile
+  from: continuous-release-jobs
+  to: continuous-release-jobs-render
+- dockerfile_path: images/applier/Dockerfile
+  from: continuous-release-jobs
+  to: continuous-release-jobs-applier
+- dockerfile_path: images/imperative-apply/Dockerfile
+  from: continuous-release-jobs
+  to: continuous-release-jobs-imperative-apply
+- dockerfile_path: images/imperative-verify/Dockerfile
+  from: continuous-release-jobs
+  to: continuous-release-jobs-imperative-verify
+promotion:
+  namespace: continuous-release-jobs
+  tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: continuous-release-jobs

@@ -1,0 +1,22 @@
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi:latest
+      RUN dnf module enable -y nodejs:16 && \
+            dnf install -y git npm && \
+            npm install -g markdownlint markdownlint-cli2
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: markdownlint
+  commands: |
+    hack/markdownlint.sh
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: runbooks

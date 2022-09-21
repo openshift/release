@@ -1,0 +1,92 @@
+ref:
+  as: ocm-e2e-clusterpool-checkout
+  from_image:
+    namespace: stolostron
+    name: builder
+    tag: go1.18-linux
+  commands: ocm-e2e-clusterpool-checkout-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: acm-cicd-clusterpool-shared
+    mount_path: /etc/acm-cicd-clusterpool-shared
+  - namespace: test-credentials
+    name: ocm-obs-usa-clusterpool
+    mount_path: /etc/ocm-obs-usa-clusterpool
+  - namespace: test-credentials
+    name: ocm-obs-china-clusterpool
+    mount_path: /etc/ocm-obs-china-clusterpool
+  - namespace: test-credentials
+    name: ocm-console-clusterpool
+    mount_path: /etc/ocm-console-clusterpool
+  - namespace: test-credentials
+    name: ocm-grc-clusterpool
+    mount_path: /etc/ocm-grc-clusterpool
+  - namespace: test-credentials
+    name: ocm-mgdsvcs-clusterpool
+    mount_path: /etc/ocm-mgdsvcs-clusterpool
+  - namespace: test-credentials
+    name: ocm-hub-of-hubs-clusterpool
+    mount_path: /etc/ocm-hub-of-hubs-clusterpool
+  env:
+    - name: MAKEFILE
+      default: "/opt/build-harness/Makefile.prow"
+      documentation: |-
+        Location of the build harness Makefile for use on OSCI.
+    - name: CLUSTERPOOL_HOST_API
+      default: "https://api.collective.aws.red-chesterfield.com:6443"
+      documentation: |-
+        API URL of the cluster running the target clusterpool, used in oc login,
+        so port :6443 is required
+    - name: CLUSTERPOOL_HOST_NAMESPACE
+      default: ""
+      documentation: |-
+        Namespace on the cluster pool host to use.
+    - name: CLUSTERPOOL_HOST_PROW_KUBE_SECRET
+      default: ""
+      documentation: |-
+        The name of the kube secret with the kube API user and token.
+    - name: CLUSTERPOOL_GROUP_NAME
+      default: "system:masters"
+      documentation: |-
+        Specifies an RBAC group to be added to the subjects array of the
+        cluster claim. This can be set to the RBAC group for the squad
+        running the test so that all members of that squad can access the
+        cluster checked out.
+    - name: CLUSTERPOOL_LIST
+      default: ""
+      documentation: |-
+        A comma separated list of cluster pools to use when attempting to
+        checkout a cluster.
+    - name: CLUSTERPOOL_LIST_FILE
+      default: "clusterpool-list"
+      documentation: |-
+        File name to use for the cluster pool list to use when attempting to
+        checkout a cluster. Only used if CLUSTERPOOL_LIST is empty.
+    - name: CLUSTERPOOL_HUB_COUNT
+      default: "1"
+      documentation: |-
+        The number of hub clusters to checkout.
+    - name: CLUSTERPOOL_MANAGED_COUNT
+      default: "0"
+      documentation: |-
+        The number of managed clusters to checkout.
+    - name: CLUSTER_CLAIM_FILE
+      default: "cluster-claims"
+      documentation: |-
+        File name to use to store the cluster claim names.
+    - name: CLUSTERPOOL_LIFETIME
+      default: "48h"
+      documentation: |-
+        Lifetime of each cluster that's checked out of the clusterpool. Set to
+        an empty string to not have a lifetime. The lifetime can be any
+        positive value accepted by Go's time.ParseDuration function.
+    - name: CLUSTERPOOL_CHECKOUT_TIMEOUT_MINUTES
+      default: "60"
+      documentation: |-
+        Time to wait for a newly checked out cluster to become ready.
+  documentation: |-
+    This step checks out hub and managed clusters from the given cluster pools.

@@ -1,0 +1,104 @@
+base_images:
+  cincinnati-e2e-latest:
+    name: cincinnati-build-root
+    namespace: cincinnati-ci
+    tag: e2e-test
+  cincinnati-operand-latest:
+    name: cincinnati-build-root
+    namespace: cincinnati-ci
+    tag: deploy
+  ubi8-python36:
+    name: builder
+    namespace: ocp
+    tag: ubi8.python.36
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- dockerfile_path: Dockerfile
+  to: stable
+- dockerfile_path: graph-data.rs/Dockerfile
+  to: graphdata-unittests
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      cat <<DOCKERFILE > /tmp/Dockerfile
+      FROM ubi8-python36
+      WORKDIR /go/src/github.com/openshift/cincinnati-graph-data/hack
+      COPY . .
+      RUN pip3 install -r requirements.txt
+      DOCKERFILE
+    from: ubi8-python36
+    to: src-dockerfile
+- project_directory_image_build_step:
+    from: src
+    inputs:
+      src-dockerfile:
+        paths:
+        - destination_dir: .
+          source_path: /tmp/Dockerfile
+    to: webhook-unittests
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e
+  commands: /usr/local/bin/cincinnati-graph-data
+  container:
+    from: graphdata-unittests
+- as: e2e-latest-cincinnati
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  optional: true
+  steps:
+    test:
+    - as: openshift-e2e-test
+      commands: |
+        cp -Lrvf $KUBECONFIG /tmp/kube
+        unset KUBECONFIG
+        # required to authenticate and pull images from the build cluster
+        oc adm policy add-role-to-group system:image-puller system:authenticated --namespace "${NAMESPACE}"
+        oc adm policy add-role-to-group system:image-puller system:unauthenticated --namespace "${NAMESPACE}"
+        export KUBECONFIG=/tmp/kube
+        bash ./hack/e2e.sh --run-ignored
+      credentials:
+      - mount_path: /tmp/secret/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: CINCINNATI_IMAGE
+        name: cincinnati-operand-latest
+      - env: GRAPHDATA_IMAGE
+        name: stable
+      env:
+      - default: /tmp/secret/pull-secret/.dockerconfigjson
+        name: PULL_SECRET
+      from: cincinnati-e2e-latest
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: errata-webhook-unittests
+  commands: python3 -m unittest
+  container:
+    from: webhook-unittests
+- as: validate-blocked-edges
+  commands: |
+    cd /go/src/github.com/openshift/cincinnati-graph-data
+    exec hack/validate-blocked-edges.py
+  container:
+    from: webhook-unittests
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: cincinnati-graph-data

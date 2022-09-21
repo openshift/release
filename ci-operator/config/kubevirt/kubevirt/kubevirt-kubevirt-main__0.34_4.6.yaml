@@ -1,0 +1,64 @@
+base_images:
+  base:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.6"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-default
+  cron: 18 14 8,24 * *
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: enable-cpu-manager
+      cli: latest
+      commands: |
+        curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
+          bash -s enable_cpu_manager
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: deploy-kubevirt
+      cli: latest
+      commands: |
+        curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
+          bash -s deploy_release_test_setup 0.34
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: test
+      cli: latest
+      commands: |
+        export DOCKER_PREFIX='kubevirt'
+        export KUBEVIRT_E2E_FOCUS='\[rfe_id:273\]\[crit:high\]'
+        export KUBEVIRT_E2E_SKIP='QUARANTINE'
+        curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
+          bash -s test_release 0.34
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    workflow: ipi-azure
+  timeout: 4h0m0s
+zz_generated_metadata:
+  branch: main
+  org: kubevirt
+  repo: kubevirt
+  variant: 0.34_4.6

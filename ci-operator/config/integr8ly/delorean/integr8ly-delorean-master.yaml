@@ -1,0 +1,46 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build/cli BUILD_TARGET="./build/delorean"
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/integr8ly/delorean/build
+  to: delorean
+promotion:
+  name: delorean
+  namespace: integr8ly
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+- as: format
+  commands: make code/check
+  container:
+    from: src
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+- as: vendor
+  commands: make vendor/check
+  container:
+    from: src
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+zz_generated_metadata:
+  branch: master
+  org: integr8ly
+  repo: delorean

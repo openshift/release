@@ -1,0 +1,50 @@
+base_images:
+  base:
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- context_dir: fluentd/
+  dockerfile_path: Dockerfile.centos7
+  from: base
+  to: logging-fluentd
+- context_dir: elasticsearch/
+  dockerfile_path: Dockerfile.centos7
+  from: base
+  to: logging-elasticsearch5
+- context_dir: kibana/
+  dockerfile_path: Dockerfile.centos7
+  from: base
+  to: logging-kibana5
+- context_dir: curator/
+  dockerfile_path: Dockerfile.centos7
+  from: base
+  to: logging-curator5
+- context_dir: eventrouter/
+  dockerfile_path: Dockerfile.centos7
+  from: base
+  to: logging-eventrouter
+promotion:
+  name: origin-v3.11
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 200Mi
+  src:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: origin-v3.11
+  namespace: openshift
+zz_generated_metadata:
+  branch: release-3.11
+  org: openshift
+  repo: origin-aggregated-logging

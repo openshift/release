@@ -1,0 +1,1 @@
+../openshift-e2e-test-commands.sh

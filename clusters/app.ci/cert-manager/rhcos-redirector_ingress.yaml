@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+  name: rhcos-redirector
+  namespace: coreos
+spec:
+  tls:
+    - secretName: rhcos-redirector-tls
+      hosts:
+        - rhcos-redirector.ci.openshift.org
+        - releases-art-rhcos.svc.ci.openshift.org
+  rules:
+  - host: rhcos-redirector.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: rhcos-redirector
+            port:
+              number: 8080
+        pathType: ImplementationSpecific
+  - host: releases-art-rhcos.svc.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: rhcos-redirector
+            port:
+              number: 8080
+        pathType: ImplementationSpecific

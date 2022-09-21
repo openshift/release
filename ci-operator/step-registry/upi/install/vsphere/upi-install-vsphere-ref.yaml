@@ -1,0 +1,29 @@
+ref:
+  as: upi-install-vsphere
+  from: upi-installer
+  grace_period: 10m
+  commands: upi-install-vsphere-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: vsphere-vmc
+    mount_path: /var/run/vault/vsphere
+  - namespace: test-credentials
+    name: ci-ibmcloud
+    mount_path: /var/run/vault/ibmcloud
+  - namespace: test-credentials
+    name: ci-route-53
+    mount_path: /var/run/vault/vsphere-aws
+  env:
+  - name: SECURE_BOOT_ENABLED
+    default: "false"
+    documentation: |-
+      Enable or Disable UEFI Secure Boot for all nodes of cluster on vsphere platform.
+      Once enabled, machines boot using software that is signed certificates, and only trusted code is loaded by EFI firmeware.
+  documentation: >-
+    This step deploys a UPI cluster to the CI vSphere project.
+    It requires properly configured govc.sh, Ignition, metadata.json, and kubeconfig files to exist in the shared directory.
+    These files are used to deploy a cluster to the vSphere project using the UPI workflow.

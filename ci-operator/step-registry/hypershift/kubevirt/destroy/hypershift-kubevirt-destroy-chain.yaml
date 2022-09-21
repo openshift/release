@@ -1,0 +1,29 @@
+chain:
+  as: hypershift-kubevirt-destroy
+  steps:
+  - as: destroy
+    cli: latest
+    env:
+    - name: HYPERSHIFT_BASE_DOMAIN
+      default: "ci.azure.devcluster.openshift.com"
+      documentation: "The cluster's FQDN will be a subdomain of the base domain."
+    commands: |-
+      set -exuo pipefail
+
+      KUBEVIRT_CLUSTER_NAME="kv-nested"
+      echo "$(date) Deleting HyperShift cluster ${KUBEVIRT_CLUSTER_NAME}"
+      bin/hypershift destroy cluster kubevirt \
+        --name ${KUBEVIRT_CLUSTER_NAME} \
+        --cluster-grace-period 15m
+
+      echo "$(date) Finished deleting cluster"
+    from_image:
+      namespace: ocp
+      name: "4.12"
+      tag: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 15m0s

@@ -1,0 +1,88 @@
+base_images:
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- build_args:
+  - name: INSTALL_CCX
+    value: "false"
+  dockerfile_path: Dockerfile.assisted-installer-deployment
+  inputs:
+    coreos_centos_stream8:
+      as:
+      - quay.io/centos/centos:stream8
+  to: assisted-installer-deployment
+promotion:
+  namespace: edge-infrastructure
+  tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: assisted-installer-deployment
+- as: lint-post-submit
+  commands: make lint
+  container:
+    from: assisted-installer-deployment
+  postsubmit: true
+- as: unit-test
+  commands: make unit-test
+  container:
+    from: assisted-installer-deployment
+- as: bump-ocp
+  cron: 0 7 * * 0-5
+  steps:
+    workflow: assisted-tools-bump-ocp
+- as: bump-ocp-dry-run
+  run_if_changed: tools/bump_ocp_releases.py
+  steps:
+    env:
+      DRY_RUN: "true"
+    workflow: assisted-tools-bump-ocp
+- as: ci-status-report
+  cron: 0 7 * * 0-5
+  steps:
+    workflow: assisted-tools-ci-report
+- as: ci-status-report-dry-run
+  run_if_changed: tools/ci_status_report.py
+  steps:
+    env:
+      DRY_RUN: "true"
+    workflow: assisted-tools-ci-report
+- as: triage-status-report
+  cron: 0 7 * * 0-5
+  steps:
+    workflow: assisted-tools-triage-report
+- as: triage-status-report-dry-run
+  run_if_changed: tools/triage_status_report.py
+  steps:
+    env:
+      DRY_RUN: "true"
+    workflow: assisted-tools-triage-report
+- as: snapshot-repos
+  cron: 30 23 * * *
+  steps:
+    workflow: assisted-tools-snapshot-repos
+- as: snapshot-repos-dry-run
+  run_if_changed: tools/update_assisted_installer_yaml.py
+  steps:
+    env:
+      DRY_RUN: "true"
+    workflow: assisted-tools-snapshot-repos
+zz_generated_metadata:
+  branch: master
+  org: openshift-assisted
+  repo: assisted-installer-deployment

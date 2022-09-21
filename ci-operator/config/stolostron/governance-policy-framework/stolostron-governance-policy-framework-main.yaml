@@ -1,0 +1,99 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.e2etest
+  from: base
+  inputs:
+    root:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+  to: grc-policy-framework-tests
+promotion:
+  name: "2.7"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-policy-framework-tests
+    env:
+      IMAGE_REPO: grc-policy-framework-tests
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: test-e2e-grc-framework
+  run_if_changed: ^test/integration/.*
+  steps:
+    dependencies:
+      COMPONENT_IMAGE_REF: grc-policy-framework-tests
+    env:
+      ACM_RELEASE_VERSION: release-2.6
+      CLUSTERPOOL_GROUP_NAME: policy-grc
+      CLUSTERPOOL_HOST_NAMESPACE: acm-grc-security
+      CLUSTERPOOL_HOST_PROW_KUBE_SECRET: ocm-grc-clusterpool
+      CLUSTERPOOL_LIFETIME: 4h
+      CLUSTERPOOL_LIST_EXCLUSION_FILTER: dev\|autoclaims
+      CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
+      PIPELINE_STAGE: dev
+      SKIP_COMPONENT_INSTALL: "true"
+    test:
+    - as: e2e
+      commands: |
+        export SELF="make -f Makefile.prow"
+        ./build/run-e2e-tests-policy-framework-prow.sh
+      from: grc-policy-framework-tests
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-clusterpool
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: grc-policy-framework-tests
+    env:
+      IMAGE_REPO: grc-policy-framework-tests
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: periodic-build
+  cron: 0 6 * * *
+  steps:
+    test:
+    - as: grc-pipeline-validation
+      commands: |
+        export SELF="make -f Makefile.prow"
+        export GITHUB_TOKEN=$(cat ${GITHUB_TOKEN_FILE})
+        ./build/periodic.sh
+      credentials:
+      - mount_path: /etc/acm-cicd-github
+        name: acm-cicd-github
+        namespace: test-credentials
+      env:
+      - default: acm-cicd-github
+        documentation: The GitHub user name.
+        name: GITHUB_USER
+      - default: /etc/acm-cicd-github/token
+        documentation: |-
+          The file that stores the GitHub token. Should match credentials stanza
+          mount path.
+        name: GITHUB_TOKEN_FILE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: governance-policy-framework

@@ -1,0 +1,56 @@
+{
+  "name":"4.5.0-0.ci",
+  "endOfLife": true,
+  "to": "release",
+  "message": "This release contains CI image builds of all code in release-4.5 (master) branches, and is updated each time someone merges.",
+  "mirrorPrefix": "4.5",
+  "expires":"96h",
+  "maxUnreadyReleases": 2,
+  "minCreationIntervalSeconds": 2400,
+  "pullSecretName": "source",
+  "publish":{
+    "mirror-to-origin":{
+      "imageStreamRef":{
+        "namespace": "origin",
+        "name": "4.5",
+        "excludeTags": [
+          "machine-os-content",
+          "machine-config-operator",
+          "machine-config-operator-rpms",
+          "installer",
+          "installer-artifacts",
+          "baremetal-installer",
+          "openstack-installer",
+          "upi-installer",
+          "libvirt-installer",
+          "baremetal-machine-controllers",
+          "baremetal-operator",
+          "sig-storage-local-static-provisioner",
+          "ironic",
+          "ironic-inspector",
+          "ironic-ipa-downloader"
+        ]
+      }
+    },
+    "tag":{"tagRef":{"name":"4.5-ci"}}
+  },
+  "verify":{
+    "gcp":{
+      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.5-e2e-gcp"}
+    },
+    "gcp-serial":{
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-gcp-serial-4.5"}
+    },
+    "upgrade":{
+      "upgrade":true,
+      "optional":true,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade"}
+    },
+    "upgrade-minor":{
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "optional":false,
+      "prowJob":{"name":"release-openshift-origin-installer-e2e-aws-upgrade"}
+    }
+  }
+}

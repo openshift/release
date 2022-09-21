@@ -1,0 +1,59 @@
+base_images:
+  base:
+    name: "4.2"
+    namespace: ocp
+    tag: base
+  base-machine:
+    name: fedora
+    namespace: openshift
+    tag: "29"
+  machine-os-content-base:
+    name: "4.2"
+    namespace: ocp
+    tag: machine-os-content
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.11
+images:
+- context_dir: images/os/
+  from: base
+  inputs:
+    base-machine-with-rpms:
+      as:
+      - fedora:29
+    machine-os-content-base:
+      as:
+      - registry.svc.ci.openshift.org/openshift/origin-v4.2:machine-os-content
+  to: machine-os-content
+raw_steps:
+- rpm_image_injection_step:
+    from: base-machine
+    to: base-machine-with-rpms
+releases:
+  initial:
+    integration:
+      name: "4.2"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.2"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 4Gi
+rpm_build_commands: hack/build-rpms.sh
+tests:
+- as: e2e-aws
+  run_if_changed: ^([^d]|d(d|o(d|cd))*([^do]|o([^cd]|c[^ds])))*(d(d|o(d|cd))*(oc?)?)?$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-1.14
+  org: cri-o
+  repo: cri-o

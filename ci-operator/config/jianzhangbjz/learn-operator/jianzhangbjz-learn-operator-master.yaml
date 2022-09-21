@@ -1,0 +1,70 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.14
+images:
+- dockerfile_path: build/Dockerfile.ci
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /tmp/learn-operator
+      - destination_dir: .
+        source_path: /tmp/bin
+  to: learn-operator
+operator:
+  bundles:
+  - context_dir: manifests
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/olmqe/learn-operator:v1
+    with: learn-operator
+promotion:
+  name: learn-operator-v1
+  namespace: jianzhangbjz
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.7"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: learn-oo-test-aws
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: 0.0.1
+      OO_INSTALL_NAMESPACE: default
+      OO_PACKAGE: learn
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make deploy_cr
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1000Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: master
+  org: jianzhangbjz
+  repo: learn-operator

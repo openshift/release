@@ -1,0 +1,53 @@
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.6"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test-unit
+  commands: |
+    unset GOFLAGS
+    make test-unit
+  container:
+    from: src
+- as: test-e2e
+  steps:
+    cluster_profile: aws
+    env:
+      RELATED_IMAGE_APICAST: quay.io/3scale/apicast:latest
+      RELATED_IMAGE_BACKEND: quay.io/3scale/apisonator:latest
+      RELATED_IMAGE_SYSTEM: quay.io/3scale/porta:latest
+      RELATED_IMAGE_ZYNC: quay.io/3scale/zync:latest
+    test:
+    - as: test-e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        make test-e2e
+      env:
+      - name: RELATED_IMAGE_APICAST
+      - name: RELATED_IMAGE_BACKEND
+      - name: RELATED_IMAGE_SYSTEM
+      - name: RELATED_IMAGE_ZYNC
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: 3scale-2.11-candidate
+  org: 3scale
+  repo: 3scale-operator

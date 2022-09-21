@@ -1,0 +1,55 @@
+ref:
+  as: ipi-conf-powervs
+  from_image:
+    namespace: origin
+    name: centos
+    tag: '8'
+  commands: ipi-conf-powervs-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: powervs-creds
+    mount_path: /var/run/powervs-ipi-cicd-secrets/powervs-creds
+  env:
+  - name: CONTROL_PLANE_REPLICAS
+    default: "3"
+    documentation: |-
+      The number of control plane nodes to create for the cluster.
+
+      This variable should only be supplied in consultation with the etcd team. The
+      etcd operator has to explicitly support the specified number of control plane
+      nodes and values not documented below will result in unhealthy and/or
+      unsupportable clusters.
+
+      Valid values include:
+      * "" (default) - 3 control plane nodes. The standard for stand-alone clusters.
+      * "1" - Supportable for single-node OpenShift (SNO).
+      * "5" - Supportable only for select customers.
+
+  - name: COMPUTE_NODE_TYPE
+    default: "bx2-4x16"
+    documentation: |-
+      The instance type to use for compute nodes (e.g. IBM Cloud VPC
+      https://cloud.ibm.com/docs/containers?topic=containers-planning_worker_nodes#vm-table).
+      We use a 8 core worker to match the median configuration of the fleet.
+  - name: ZONES_COUNT
+    default: "3"
+    documentation: |-
+      The number of AZ's to present in the cluster. Accepted values are 1 to 3.
+  - name: BASE_DOMAIN
+    default: "ocp-dev-ppc64le.com"
+    documentation: |-
+      A fully-qualified domain or subdomain name. The base domain of the cloud
+      provider is used for setting baseDomain variable of the install
+      configuration of the cluster.
+  documentation: >-
+    This step configures an install-config.yaml file to depoloy to the IBM
+    Cloud CI project.
+    An existing install-config.yaml file should already exist in the shared
+    directory.
+    The file is modified to configure the cluster to run in the IBM Cloud CI
+    project.
+    The resulting file remains in the shared directory for future consumption.

@@ -1,0 +1,35 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sync-rover-groups-update
+  namespace: ocp-test-platform
+spec:
+  schedule: "0 1 * * *" # 1 AM every day
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: sync-rover-groups-updater
+            image: registry.ci.openshift.org/ci/sync-rover-groups:latest
+            imagePullPolicy: Always
+            args:
+            - -c
+            - |
+              set -euo pipefail
+              set -x
+              git -C /tmp clone --depth 1 https://github.com/openshift/release.git
+              sync-rover-groups --manifest-dir=/tmp/release/clusters --groups-file=/tmp/groups.yaml --config-file=/tmp/release/core-services/sync-rover-groups/_config.yaml --mapping-file=/tmp/mapping.yaml --log-level=debug
+              export KUBECONFIG=/etc/kube/sa.sync-rover-groups-updater.app.ci.config
+              oc create configmap sync-rover-groups -n ci --from-file=groups.yaml=/tmp/groups.yaml --from-file=mapping.yaml=/tmp/mapping.yaml --dry-run=client -o yaml | oc -n ci apply -f -
+            command:
+            - /bin/bash
+            volumeMounts:
+            - name: kube
+              mountPath: "/etc/kube"
+              readOnly: true
+          restartPolicy: OnFailure
+          volumes:
+          - name: kube
+            secret:
+              secretName: sync-rover-groups-updater-credentials

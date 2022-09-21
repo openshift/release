@@ -1,0 +1,71 @@
+base_images:
+  ocp_cli:
+    name: "4.10"
+    namespace: origin
+    tag: cli
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8.5"
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/origin/centos:stream8
+      RUN dnf install git -y
+images:
+- dockerfile_path: Dockerfile.build
+  from: src
+  inputs:
+    ocp_cli:
+      as:
+      - quay.io/openshift/origin-cli:4.10
+  to: assisted-events-scrape-build
+- dockerfile_path: Dockerfile
+  from: ubi_minimal
+  to: assisted-events-scrape
+promotion:
+  name: ocm-2.5
+  namespace: edge-infrastructure
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: assisted-events-scrape-build
+- as: unit-test
+  commands: make unit-test
+  container:
+    from: assisted-events-scrape-build
+- as: integration-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 30m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make ci-integration-test
+      dependencies:
+      - env: ASSISTED_EVENTS_SCRAPE_IMAGE
+        name: assisted-events-scrape
+      from: assisted-events-scrape-build
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: master
+  org: openshift-assisted
+  repo: assisted-events-scrape

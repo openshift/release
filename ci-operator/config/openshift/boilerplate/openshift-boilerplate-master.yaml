@@ -1,0 +1,28 @@
+build_root:
+  from_repository: true
+images:
+- context_dir: config/
+  dockerfile_path: Dockerfile
+  from: src
+  to: boilerplate
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-check
+  commands: make pr-check
+  container:
+    from: boilerplate
+- as: subscriber-report
+  commands: make subscriber-report
+  container:
+    from: boilerplate
+  postsubmit: true
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: boilerplate

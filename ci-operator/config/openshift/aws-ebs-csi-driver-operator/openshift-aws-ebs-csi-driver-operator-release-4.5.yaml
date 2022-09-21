@@ -1,0 +1,84 @@
+base_images:
+  base:
+    name: "4.5"
+    namespace: ocp
+    tag: base
+  openshift_release_golang-1.13:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    openshift_release_golang-1.13:
+      as:
+      - registry.svc.ci.openshift.org/openshift/release:golang-1.13
+  to: aws-ebs-csi-driver-operator
+- dockerfile_path: Dockerfile.test
+  from: src
+  to: aws-ebs-csi-driver-operator-test
+promotion:
+  name: "4.5"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.5"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.5"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    # Work around broken verify-codegen
+    make verify-bindata verify-deps verify-gofmt verify-golint verify-govet
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml
+  container:
+    from: src
+- as: e2e-operator
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-ebs.yaml
+      TEST_SUITE: openshift/csi
+    test:
+    - as: operator-install
+      cli: latest
+      commands: |
+        # Install the operator
+        hack/start.sh
+        # Copy the manifest for the next step
+        cp -v test/e2e/manifest.yaml $SHARED_DIR/$TEST_CSI_DRIVER_MANIFEST
+        cp -v test/e2e/storageclass.yaml $SHARED_DIR/
+      env:
+      - documentation: See `openshift-e2e-test`.
+        name: TEST_CSI_DRIVER_MANIFEST
+      from: stable:aws-ebs-csi-driver-operator-test
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.5
+  org: openshift
+  repo: aws-ebs-csi-driver-operator

@@ -1,0 +1,21 @@
+#!/bin/bash -e
+#
+# This file serves as the main entrypoint to the azure image.
+#
+# For more information see the documentation in openshift-ansible
+#	https://github.com/openshift/openshift-ansible/blob/master/README_CONTAINER_IMAGE.md
+
+
+# Patch /etc/passwd file with the current user info.
+# The current user's entry must be correctly defined in this file in order for
+# the `ssh` command to work within the created container.
+
+if ! whoami &>/dev/null; then
+  echo "${USER:-default}:x:$(id -u):$(id -g):Default User:$HOME:/sbin/nologin" >>/etc/passwd
+fi
+
+if [[ $# -eq 0 ]]; then
+  exec /bin/bash
+else
+  exec "$@"
+fi

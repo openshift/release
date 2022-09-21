@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: ci-docs
+spec:
+  selector:
+    app: ci-docs
+  ports:
+  - name: ci-docs
+    port: 8080
+  - name: cluster-display
+    port: 8090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: ci-docs
+  labels:
+    app: ci-docs
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-docs:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-docs\")].image"},{"from":{"kind":"ImageStreamTag","name":"cluster-display:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"cluster-display\")].image"}]'
+spec:
+  replicas: 2
+  revisionHistoryLimit: 2
+  selector:
+    matchLabels:
+      app: ci-docs
+  template:
+    metadata:
+      labels:
+        app: ci-docs
+    spec:
+      containers:
+      - name: ci-docs
+        image: ci-docs
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"
+      - args:
+        - --kubeconfig-dir=/etc/build-farm-credentials
+        name: cluster-display
+        image: cluster-display
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 8090
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8090
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 600
+        resources:
+          requests:
+            memory: "250Mi"
+            cpu: "100m"
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+      serviceAccountName: cluster-display
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          secretName: cluster-display

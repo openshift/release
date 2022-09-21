@@ -1,0 +1,67 @@
+chain:
+  as: hypershift-aws-setup-nested-management-cluster
+  steps:
+  - as: create-management-cluster
+    cli: latest
+    env:
+    - name: HYPERSHIFT_NODE_COUNT
+      default: "3"
+      documentation: "The number nodes for the cluster. This number will get mulitplied by three, as there are three AZs"
+    - name: HYPERSHIFT_NAMESPACE
+      default: "clusters"
+      documentation: "The Namespace where to create the HostedCluster and NodePools"
+    - name: HYPERSHIFT_ZONES
+      default: "us-east-1a,us-east-1b,us-east-1c"
+      documentation: "The zones where to create NodePools"
+    commands: |-
+      export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
+      echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
+      bin/hypershift create cluster aws \
+        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+        --aws-creds=/etc/hypershift-ci-jobs-awscreds/credentials \
+        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+        --name=${CLUSTER_NAME} \
+        --region=us-east-1 \
+        --infra-id=${CLUSTER_NAME} \
+        --base-domain=ci.hypershift.devcluster.openshift.com \
+        --instance-type=m5.xlarge \
+        --zones=${HYPERSHIFT_ZONES} \
+        --service-cidr=172.29.0.0/16 \
+        --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
+        --namespace=${HYPERSHIFT_NAMESPACE}
+      echo "Waiting for cluster to become available"
+      oc wait --timeout=10m --for=condition=Available --namespace=${HYPERSHIFT_NAMESPACE} hostedcluster/${CLUSTER_NAME}
+      echo "Cluster became available, creating kubeconfig"
+      bin/hypershift create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/management_cluster_kubeconfig
+      bin/hypershift create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/kubeconfig
+      echo "Waiting for clusteroperators to be ready"
+      export KUBECONFIG=${SHARED_DIR}/management_cluster_kubeconfig
+      until \
+        oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
+        oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
+        oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
+          echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+          sleep 1s
+      done
+      # Data for cluster bot.
+      echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+    credentials:
+    - mount_path: /etc/hypershift-ci-jobs-awscreds
+      name: hypershift-ci-jobs-awscreds
+      namespace: test-credentials
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+    - mount_path: /etc/hypershift-kubeconfig
+      name: hypershift-ci-1
+      namespace: test-credentials
+    from_image:
+      namespace: ocp
+      name: "4.12"
+      tag: hypershift-operator
+    grace_period: 1m0s
+    resources:
+      requests:
+        cpu: 100m
+    timeout: 25m0s

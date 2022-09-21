@@ -1,0 +1,63 @@
+binary_build_commands: ./build.sh
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tests:
+- as: all-packages
+  steps:
+    test:
+    - as: all-packages
+      commands: "export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN) \n./test.sh\n"
+      credentials:
+      - mount_path: /tmp/secret
+        name: hac-core-deploy-tokens
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: 100m
+          memory: 4Gi
+      timeout: 30m0s
+    - as: e2e
+      commands: ./test-prow-e2e.sh
+      from: src
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: 100m
+          memory: 4Gi
+      timeout: 30m0s
+- as: all-packages-coverage-upload
+  postsubmit: true
+  steps:
+    test:
+    - as: all-packages-coverage-upload
+      commands: "export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN) \n./test.sh\n"
+      credentials:
+      - mount_path: /tmp/secret
+        name: hac-core-deploy-tokens
+        namespace: test-credentials
+      from: src
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: 100m
+          memory: 250Mi
+      timeout: 30m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: dynamic-plugin-sdk

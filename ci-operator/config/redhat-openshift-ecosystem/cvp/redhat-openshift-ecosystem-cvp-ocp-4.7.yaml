@@ -1,0 +1,70 @@
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.7"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cvp-common-claim
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.7"
+  cron: '@yearly'
+  steps:
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-3
+      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:23576
+    env:
+      CUSTOM_SCORECARD_TESTCASE: ""
+      OO_CHANNEL: "4.3"
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: e2e-test-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PYXIS_URL: ""
+      TEST_MODE: cvp
+    workflow: optional-operators-cvp-common-claim
+- as: cvp-common-aws
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-cpaas
+    workflow: optional-operators-cvp-common-aws
+- as: cvp-common-powervs
+  cron: '@yearly'
+  steps:
+    workflow: optional-operators-cvp-common-powervs
+- as: cvp-common-ibmz-eco
+  cron: '@yearly'
+  steps:
+    env:
+      CLUSTER_DOMAIN: linux.dfw.ibm.com
+      OCP_VERSION: "4.7"
+      OPENSTACK_COMPUTE_FLAVOR: medium
+      OS_CLOUD: rhcert
+    workflow: optional-operators-cvp-common-ibmz-eco
+- as: probe
+  cron: '@yearly'
+  steps:
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-3
+      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:23576
+    env:
+      OO_CHANNEL: "4.3"
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: e2e-test-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - ref: optional-operators-cvp-common-probe
+zz_generated_metadata:
+  branch: ocp-4.7
+  org: redhat-openshift-ecosystem
+  repo: cvp

@@ -1,0 +1,65 @@
+# this is the Namespace in which your ServiceAccount will live
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Automation ServiceAccounts for Managed Services
+    openshift.io/display-name: Managed Services
+  name: managed-services
+---
+# this is the ServiceAccount whose credentials you will use
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: metrics-viewer
+  namespace: managed-services
+---
+# this grants your ServiceAccount and admins rights to read metrics
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: managed-services-metrics-viewer-binding
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: cluster-monitoring-view
+subjects:
+  - kind: ServiceAccount
+    namespace: managed-services
+    name: metrics-viewer
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: managed-services-admins
+    namespace: managed-services
+---
+# this adds the admins to the project.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: managed-services-viewer-binding
+  namespace: managed-services
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: view
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: managed-services-admins
+    namespace: managed-services
+---
+# this grants the right to read the ServiceAccount's credentials to the admins.
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: managed-services-admins-binding
+  namespace: managed-services
+roleRef:
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+  name: pull-secret-namespace-manager
+subjects:
+  - kind: Group
+    apiGroup: rbac.authorization.k8s.io
+    name: managed-services-admins
+    namespace: managed-services

@@ -1,0 +1,54 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_path: Dockerfile
+  to: kubevirt-template-validator
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unittests
+  steps:
+    test:
+    - as: unittests
+      commands: go test -v ./...
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-functests
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-functests
+      cli: latest
+      commands: |
+        ./hack/env/deploy-latest-kubevirt.sh
+        ./hack/env/install-validator.sh
+        make functests
+      dependencies:
+      - env: VALIDATOR_IMAGE
+        name: kubevirt-template-validator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: master
+  org: kubevirt
+  repo: kubevirt-template-validator

@@ -1,0 +1,62 @@
+base_images:
+  base:
+    name: "4.13"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.11_cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: ./Dockerfile.assisted-service.ocp
+  from: base
+  inputs:
+    ocp_4.11_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.11:cli
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: agent-installer-api-server
+promotion:
+  name: "4.13"
+  namespace: ocp
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: push-pr-image
+  optional: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: agent-installer-api-server
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: e2e-agent-compact
+  optional: true
+  run_if_changed: ^(Dockerfile\.assisted-service\.ocp)|(cmd/agentbasedinstaller)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+zz_generated_metadata:
+  branch: release-4.13
+  org: openshift
+  repo: assisted-service

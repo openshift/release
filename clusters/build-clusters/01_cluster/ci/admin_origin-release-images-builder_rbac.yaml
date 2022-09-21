@@ -1,0 +1,43 @@
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  annotations:
+    openshift.io/description: This SA is used to start origin-release builds
+  name: origin-release-images-builder
+  namespace: ci
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: origin-release-images-builder
+  namespace: ci
+rules:
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - buildconfigs
+  - builds
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - buildconfigs/instantiate
+  verbs:
+  - create
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: origin-release-images-builder
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: origin-release-images-builder
+subjects:
+- kind: ServiceAccount
+  name: origin-release-images-builder
+  namespace: ci

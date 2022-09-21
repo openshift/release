@@ -1,0 +1,48 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make gotest
+  container:
+    from: src
+- as: govet
+  commands: make govet
+  container:
+    from: src
+- as: golangci
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=5m0s
+  container:
+    clone: true
+    from: golangci-lint
+- as: golint
+  commands: make golint
+  container:
+    from: src
+- as: gofmt
+  commands: make gofmt || true
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: openstack-k8s-operators
+  repo: mariadb-operator

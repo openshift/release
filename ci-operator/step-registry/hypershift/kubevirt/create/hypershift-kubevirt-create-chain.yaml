@@ -1,0 +1,144 @@
+chain:
+  as: hypershift-kubevirt-create
+  steps:
+  - as: create-hostedcluster
+    cli: latest
+    env:
+    - name: HYPERSHIFT_NODE_COUNT
+      default: "3"
+      documentation: "The number nodes to automatically create and join to the cluster."
+    commands: |-
+      set -exuo pipefail
+
+      # Deploy HyperConverged custom resource to complete kubevirt's installation
+      oc create -f - <<EOF
+      apiVersion: hco.kubevirt.io/v1beta1
+      kind: HyperConverged
+      metadata:
+        name: kubevirt-hyperconverged
+        namespace: openshift-cnv
+      EOF
+      
+      oc wait HyperConverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m           
+
+      HYPERSHIFT_BASE_DOMAIN=$(oc get ingresscontroller -n openshift-ingress-operator default -o yaml | grep domain | awk '{print $2}')
+      KUBEVIRT_CLUSTER_NAME="kv-nested"
+      CLUSTER_NAMESPACE=clusters-${KUBEVIRT_CLUSTER_NAME}
+      CLUSTER_BASE_DOMAIN=${KUBEVIRT_CLUSTER_NAME}.${HYPERSHIFT_BASE_DOMAIN}
+
+      echo "$(date) Creating HyperShift cluster ${KUBEVIRT_CLUSTER_NAME}"
+      /usr/bin/hypershift create cluster kubevirt \
+        --name ${KUBEVIRT_CLUSTER_NAME} \
+        --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
+        --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --memory 16Gi \
+        --cores 4 \
+        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+        --release-image ${RELEASE_IMAGE_LATEST}
+
+      echo "Waiting for cluster to become available"
+      oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${KUBEVIRT_CLUSTER_NAME}
+      echo "Cluster became available, creating kubeconfig"
+      bin/hypershift create kubeconfig --name=${KUBEVIRT_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+
+      # Enable wildcard routes on the management cluster
+      oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
+        '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
+
+      # Waiting for the default NodePort service to be created on the hosted cluster
+      until \
+        oc --kubeconfig ${SHARED_DIR}/nested_kubeconfig get service router-nodeport-default -n openshift-ingress
+      do
+        echo "router-nodeport-default service wasn't created yet on the hosted cluster. Retrying in 30 seconds."
+        sleep 30s
+      done
+
+      HTTPS_NODEPORT=$(oc --kubeconfig ${SHARED_DIR}/nested_kubeconfig get services -n openshift-ingress router-nodeport-default -o wide | awk '{print $5}' | awk -F "443:" '{print $2}' | awk -F "/" '{print $1}' | tr -d '[:space:]')
+
+      # Create a service for ingress to the nested cluster on the node's VMIs
+      oc create -f - <<EOF
+      apiVersion: v1
+      kind: Service
+      metadata:
+        labels:
+          app: ${KUBEVIRT_CLUSTER_NAME}
+        name: apps-ingress
+        namespace: ${CLUSTER_NAMESPACE}
+      spec:
+        internalTrafficPolicy: Cluster
+        ipFamilies:
+          - IPv4
+        ipFamilyPolicy: SingleStack
+        ports:
+          - name: https-443
+            port: 443
+            protocol: TCP
+            targetPort: ${HTTPS_NODEPORT}
+        selector:
+          kubevirt.io: virt-launcher
+        sessionAffinity: None
+        type: ClusterIP
+      EOF
+
+      # Create a Route for the ingress subdomain of the nested cluster
+      oc create -f - <<EOF
+      apiVersion: route.openshift.io/v1
+      kind: Route
+      metadata:
+        name: ${KUBEVIRT_CLUSTER_NAME}-443
+        namespace: ${CLUSTER_NAMESPACE}
+      spec:
+        host: data.apps.${CLUSTER_BASE_DOMAIN}
+        wildcardPolicy: Subdomain
+        tls:
+          termination: passthrough
+        port:
+          targetPort: https-443
+        to:
+          kind: Service
+          name: apps-ingress
+          weight: 100
+      EOF
+
+      echo "Waiting for all VMIs in ${CLUSTER_NAMESPACE} to reach vmi.status.phase=Running"
+      oc wait -n ${CLUSTER_NAMESPACE} VirtualMachineInstance --all --for=jsonpath='{.status.phase}'=Running --timeout 30m
+
+      echo "Waiting for nested cluster's node count to reach the desired replicas count in the NodePool"
+      until \
+          [[ $(oc get nodepool ${KUBEVIRT_CLUSTER_NAME} -n clusters -o jsonpath='{.spec.replicas}') \
+            == $(oc --kubeconfig=${SHARED_DIR}/nested_kubeconfig get nodes --no-headers | wc -l) ]]; do
+              echo "$(date --rfc-3339=seconds) Nested cluster's node count is not equal to the desired replicas in the NodePool. Retrying in 30 seconds."
+              sleep 30s
+      done
+
+      echo "Waiting for clusteroperators to be ready"
+      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+
+      until \
+        oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
+        oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
+        oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
+          echo "$(date --rfc-3339=seconds) Cluster Operators not yet ready"
+          oc get clusteroperators
+          sleep 1s
+      done
+    from_image:
+      namespace: ocp
+      name: "4.12"
+      tag: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 45m0s
+    credentials:
+    - mount_path: /etc/hypershift-pool-aws-credentials
+      name: hypershift-pool-aws-credentials
+      namespace: test-credentials
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+    dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE_LATEST

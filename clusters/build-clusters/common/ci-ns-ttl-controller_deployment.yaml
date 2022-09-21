@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: namespace-ttl-controller
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-ns-ttl-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"namespace-ttl-controller\")].image"}]'
+  name: namespace-ttl-controller
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: namespace-ttl-controller
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: namespace-ttl-controller
+    spec:
+      serviceAccount: namespace-ttl-controller
+      containers:
+      - image: ci-ns-ttl-controller:latest
+        name: namespace-ttl-controller
+        command:
+        - /ci-ns-ttl-controller
+        - --projected-token-file=/var/sa-token/token
+        volumeMounts:
+        - name: service-account-token
+          mountPath: /var/sa-token
+      volumes:
+      - name: service-account-token
+        projected:
+          sources:
+          - serviceAccountToken:
+              path: token

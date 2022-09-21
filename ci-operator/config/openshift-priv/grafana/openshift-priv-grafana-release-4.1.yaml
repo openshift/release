@@ -1,0 +1,41 @@
+base_images:
+  base:
+    name: 4.1-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+canonical_go_repository: github.com/openshift/grafana
+images:
+- from: base
+  to: grafana
+promotion:
+  name: 4.1-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.1-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.1-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.1
+  org: openshift-priv
+  repo: grafana

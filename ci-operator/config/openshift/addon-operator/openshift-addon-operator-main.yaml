@@ -1,0 +1,102 @@
+binary_build_commands: make
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: config/docker/addon-operator-manager.Dockerfile
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-manager
+  to: addon-operator-manager
+- dockerfile_path: config/docker/addon-operator-webhook.Dockerfile
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/addon-operator-webhook
+  to: addon-operator-webhook
+- dockerfile_path: config/docker/api-mock.Dockerfile
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/addon-operator/bin/linux_amd64/api-mock
+  to: api-mock
+- dockerfile_path: config/docker/Dockerfile.src.ci
+  from: src
+  to: addon-operator-tooling
+operator:
+  bundles:
+  - context_dir: config/openshift
+    dockerfile_path: addon-operator-bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/addon-operator:latest
+    with: addon-operator-manager
+  - pullspec: quay.io/openshift/addon-operator-webhook:latest
+    with: addon-operator-webhook
+promotion:
+  name: addon-operator-manager
+  namespace: addon-operator
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: lint-and-precommit-check
+  commands: make lint && PRE_COMMIT_HOME=/tmp GOLANGCI_LINT_CACHE=/tmp pre-commit
+    run --all-files --show-diff-on-failure
+  container:
+    from: addon-operator-tooling
+- as: operator-e2e
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: addon-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: test
+      commands: ENABLE_WEBHOOK=true make test-e2e
+      dependencies:
+      - env: ADDON_OPERATOR_MANAGER_IMAGE
+        name: addon-operator-manager
+      - env: ADDON_OPERATOR_WEBHOOK_IMAGE
+        name: addon-operator-webhook
+      - env: API_MOCK_IMAGE
+        name: api-mock
+      - env: OO_INDEX
+        name: replaced-by-ci-operator
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: addon-operator

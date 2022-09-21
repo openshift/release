@@ -1,0 +1,79 @@
+base_images:
+  python:
+    name: builder
+    namespace: ocp
+    tag: ubi8.python.36
+binary_build_commands: |-
+  go build -o /bin/pretriage ./cmd/pretriage
+  go build -o /bin/posttriage ./cmd/posttriage
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
+images:
+- dockerfile_literal: FROM bin
+  from: bin
+  to: shiftstack-bugwatcher-image
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi8/python-36
+    COPY ./ ./
+    RUN pip install --requirement requirements.txt
+    RUN pip install pycodestyle
+  from: python
+  to: shiftstack-bugwatcher-bugzilla-image
+- dockerfile_literal: |-
+    FROM shiftstack-bugwatcher-bugzilla-image
+    RUN pip install pycodestyle
+  from: shiftstack-bugwatcher-bugzilla-image
+  to: shiftstack-bugwatcher-bugzilla-test-image
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pep8
+  commands: pycodestyle --verbose ./*.py
+  container:
+    from: shiftstack-bugwatcher-bugzilla-test-image
+- as: go-vet
+  commands: go vet ./...
+  container:
+    from: src
+- as: go-fmt
+  commands: if [ "$(gofmt -s -l cmd | tee /dev/stderr | wc -l)" -gt 0 ]; then exit
+    1; fi
+  container:
+    from: src
+- as: bugwatcher-doctext-bugzilla
+  cron: 0 8 * * 1-5
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-doctext-bugzilla
+- as: bugwatcher-posttriage-bugzilla
+  cron: 0 7 * * *
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-posttriage-bugzilla
+- as: bugwatcher-pretriage-bugzilla
+  cron: '*/30 * * * *'
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-pretriage-bugzilla
+- as: bugwatcher-pretriage
+  cron: '*/30 * * * *'
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-pretriage
+- as: bugwatcher-posttriage
+  cron: 0 7 * * *
+  steps:
+    test:
+    - ref: shiftstack-bugwatcher-posttriage
+zz_generated_metadata:
+  branch: main
+  org: shiftstack
+  repo: bugwatcher

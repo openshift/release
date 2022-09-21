@@ -1,0 +1,227 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make all
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9
+      USER root
+      ENV GOVERSION=1.18.1
+      RUN yum install -y diffutils gcc git jq make openssl python python-pip && \
+          yum clean all && rm -rf /var/cache/dnf/*
+      # Install Go. This version will only be used for unit tests. The
+      # official builds are done via their own container image Dockerfiles
+      RUN rm -rf /usr/local/go && \
+          curl -fsSL https://go.dev/dl/go${GOVERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+      ENV PATH=$PATH:/usr/local/go/bin
+      RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
+          chmod 700 get_helm.sh && \
+          ./get_helm.sh
+      ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
+      RUN mkdir -p $GOCACHE /.cache
+      RUN chmod -R 777 /go /.cache
+      # envtest DLs and saves its files to XDG_DATA_HOME, so we need to make sure there is someplace writable
+      RUN mkdir /.local && chmod 777 /.local
+      ENV XDG_DATA_HOME=/.local
+      WORKDIR $GOPATH/src/github.com/backube/volsync
+images:
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
+- context_dir: .
+  from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - golang:1.18
+  to: volsync
+- context_dir: mover-rclone
+  from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - golang:1.18
+  to: volsync-mover-rclone
+- context_dir: mover-restic
+  from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - golang:1.18
+  to: volsync-mover-restic
+- context_dir: mover-rsync
+  from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - golang:1.18
+  to: volsync-mover-rsync
+- context_dir: mover-syncthing
+  from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - golang:1.18
+  to: volsync-mover-syncthing
+operator:
+  bundles:
+  - as: volsync-bundle
+    base_index: operator-index
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/backube/volsync:latest
+    with: pipeline:volsync
+  - pullspec: quay.io/backube/volsync-mover-rclone:latest
+    with: pipeline:volsync-mover-rclone
+  - pullspec: quay.io/backube/volsync-mover-restic:latest
+    with: pipeline:volsync-mover-restic
+  - pullspec: quay.io/backube/volsync-mover-rsync:latest
+    with: pipeline:volsync-mover-rsync
+  - pullspec: quay.io/backube/volsync-mover-syncthing:latest
+    with: pipeline:volsync-mover-syncthing
+promotion:
+  additional_images:
+    volsync: volsync
+    volsync-mover-rclone: volsync-mover-rclone
+    volsync-mover-restic: volsync-mover-restic
+    volsync-mover-rsync: volsync-mover-rsync
+    volsync-mover-syncthing: volsync-mover-syncthing
+  namespace: volsync
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 6Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: unit
+  steps:
+    test:
+    - as: unit
+      commands: |
+        go version
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+- as: e2e-openshift
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-volsync-bundle
+    env:
+      FIPS_ENABLED: "false"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: volsync
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: |
+        set -x -e -o pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+        # Install MinIO for rclone & restic
+        ./hack/run-minio.sh
+
+        # Install MinIO again w/ TLS
+        export MINIO_NAMESPACE=minio-tls
+        export MINIO_USE_TLS=1
+        ./hack/run-minio.sh
+
+        # Add .local/bin to path so we can execute Python packages we install below
+        export PATH="${PATH}:/alabama/.local/bin"
+        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+        make test-e2e-install
+
+        # Run tests
+        make cli
+        make test-e2e
+      from: src-oc
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: e2e-openshift-fips
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-volsync-bundle
+    env:
+      FIPS_ENABLED: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: volsync
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: |
+        set -x -e -o pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+        # Install MinIO for rclone & restic
+        ./hack/run-minio.sh
+
+        # Install MinIO again w/ TLS
+        export MINIO_NAMESPACE=minio-tls
+        export MINIO_USE_TLS=1
+        ./hack/run-minio.sh
+
+        # Add .local/bin to path so we can execute Python packages we install below
+        export PATH="${PATH}:/alabama/.local/bin"
+        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+        make test-e2e-install
+
+        # Run tests
+        make cli
+        make test-e2e
+      from: src-oc
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: main
+  org: backube
+  repo: volsync

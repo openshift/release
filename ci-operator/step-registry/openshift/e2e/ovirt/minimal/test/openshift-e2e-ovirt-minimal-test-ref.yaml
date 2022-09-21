@@ -1,0 +1,58 @@
+ref:
+  as: openshift-e2e-ovirt-minimal-test
+  from: tests
+  grace_period: 10m
+  commands: openshift-e2e-ovirt-minimal-test-commands.sh
+  timeout: 7200s
+  env:
+    - name: TEST_TYPE
+      default: "suite"
+      documentation: |
+        The type of test to perform.
+
+        * 'suite' - Run the test suite defined by TEST_SUITE. By default this executes the
+                    OpenShift parallel conformance suite. All product components must run the
+                    default suite on pull requests prior to merge.
+        * 'suite-conformance' - Runs the test suite defined by TEST_SUITE, then runs the product conformance
+                    suite to verify the cluster is still functional. This is typically used for testing
+                    disruption from one suite, then confirming that the disruption did not degrade the
+                    product.
+        * 'upgrade' - Perform an upgrade to the image defined by OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE.
+                    The TEST_UPGRADE_OPTIONS flag may be optionally set. All product components
+                    must run the default upgrade test (verify an upgrade completes) on pull requests
+                    prior to merge.
+        * 'upgrade-conformance' - Performs the 'upgrade' test and then executes the full conformance
+                    suite after upgrade completes. Does not honor TEST_SUITE but will respect
+                    TEST_UPGRADE_OPTIONS. All product releases must pass the conformance suite after
+                    an upgrade completes or have explicit logic in their test to tolerate behavior after
+                    upgrade.
+    - name: TEST_SUITE
+      default: openshift/conformance/parallel
+      documentation: The test suite to run.  Use 'openshift-test TEST_COMMAND --help' to list available suites.
+    - name: TEST_SKIPS
+      default: ""
+      documentation: Regular expression (POSIX basic regular expression) of tests to skip.
+    - name: TEST_OPTIONS
+      default: ""
+      documentation: The test command options. Use 'openshift-test TEST_COMMAND --help' to list available options.
+    - name: TEST_INSTALL_CSI_DRIVERS
+      default: ""
+      documentation: The CSI driver(s) to use.  Used by the `openshift-tests` program, see its documentation for details.
+    - name: TEST_CSI_DRIVER_MANIFEST
+      default: ""
+      documentation: |-
+        Name of the CSI driver manifest file to use.  Used by the `openshift-tests`
+        program as TEST_CSI_DRIVER_FILES env. var., see its documentation for
+        details. The file must be present in ${SHARED_DIR}.
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  resources:
+    requests:
+      cpu: "3"
+      memory: 600Mi
+    limits:
+      memory: 4Gi
+  documentation: |-
+    The Openshift E2E step executes the common end-to-end test suite - this step will become a PR to the general e2e
+    tests script, created this step to avoid triggering all e2e jobs.

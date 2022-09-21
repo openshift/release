@@ -1,0 +1,183 @@
+- fields:
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - build01
+    - build02
+    - build03
+    - build04
+    - build05
+    - vsphere
+    service_account:
+    - config-updater
+    - deck
+    - sinker
+    - hook
+    - crier
+    - prow-controller-manager
+    - dptp-controller-manager
+    - ci-operator
+    - promoted-image-governor
+    - github-ldap-user-group-creator
+    - cluster-display
+- fields:
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - app.ci
+    service_account:
+    - config-updater
+    - deck
+    - sinker
+    - hook
+    - crier
+    - prow-controller-manager
+    - pj-rehearse
+    - ci-operator
+    - cluster-display
+- fields:
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: release-controller
+  params:
+    cluster:
+    - app.ci
+    service_account:
+    - release-controller
+    - release-controller-ocp
+    - release-controller-ocp-priv
+    - release-controller-ocp-ppc64le
+    - release-controller-ocp-ppc64le-priv
+    - release-controller-ocp-s390x
+    - release-controller-ocp-s390x-priv
+    - release-controller-ocp-arm64
+    - release-controller-ocp-arm64-priv
+    - release-controller-ocp-multi
+    - release-controller-ocp-multi-priv
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq
+      '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-puller")'|
+      jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq
+      '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output |
+      tr -d '\n'
+    name: token_image-puller_$(cluster)_reg_auth_value.txt
+  item_name: build_farm
+  params:
+    cluster:
+    - app.ci
+    - arm01
+    - build01
+    - build02
+    - build03
+    - build04
+    - build05
+    - vsphere
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq
+      '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="image-pusher")'
+      | jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode |
+      jq '.["image-registry.openshift-image-registry.svc.cluster.local:5000"].auth'
+      --raw-output | tr -d '\n'
+    name: token_image-pusher_$(cluster)_reg_auth_value.txt
+  item_name: build_farm
+  params:
+    cluster:
+    - app.ci
+- fields:
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: ci-chat-bot
+  params:
+    cluster:
+    - arm01
+    - build01
+    - build02
+    - build03
+    - build04
+    - build05
+    - vsphere
+    service_account:
+    - ci-chat-bot
+- fields:
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: pod-scaler
+  params:
+    cluster:
+    - app.ci
+    - build01
+    - build02
+    - build03
+    - build04
+    - build05
+    service_account:
+    - pod-scaler
+- fields:
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) bparees
+    name: sa.$(service_account).$(cluster).config
+  item_name: endurance_cluster
+  params:
+    cluster:
+    - app.ci
+    service_account:
+    - endurance
+- fields:
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - hive
+    service_account:
+    - cluster-display
+    - config-updater
+    - github-ldap-user-group-creator
+    - hive
+- fields:
+  - cmd: /usr/bin/oc_sa_create_kubeconfig.sh /tmp/build-farm-credentials $(cluster)
+      $(service_account) ci
+    name: sa.$(service_account).$(cluster).config
+  item_name: build_farm
+  params:
+    cluster:
+    - arm01
+    service_account:
+    - config-updater
+    - deck
+    - sinker
+    - hook
+    - crier
+    - prow-controller-manager
+    - ci-operator
+    - github-ldap-user-group-creator
+    - cluster-display
+    - dptp-controller-manager
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.hive.config
+      create token --namespace openshift-monitoring ci --duration=2419200s
+    name: hive-openshift-monitoring-ci-token
+  item_name: hive-openshift-monitoring-credentials
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token -n ci $(service_account) --duration=2419200s
+    name: sa.$(service_account).$(cluster).token.txt
+  item_name: build_farm
+  params:
+    cluster:
+    - build01
+    - build02
+    service_account:
+    - sprint-automation

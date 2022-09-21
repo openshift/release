@@ -1,0 +1,86 @@
+base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.17-openshift-4.10
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.9
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+      as:
+      - golang:1.17
+  to: aws-load-balancer-operator
+operator:
+  bundles:
+  - as: aws-load-balancer-operator-bundle
+    base_index: operator-index
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: openshift.io/aws-load-balancer-operator:latest
+    with: pipeline:aws-load-balancer-operator
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: unit
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    export ENVTEST_ASSETS_DIR=$(mktemp -d)
+    make test
+  container:
+    from: src
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-aws-load-balancer-operator-bundle
+    env:
+      OO_CHANNEL: stable-v0.1
+      OO_INSTALL_NAMESPACE: aws-load-balancer-operator
+      OO_PACKAGE: aws-load-balancer-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: aws-load-balancer-install
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: aws-load-balancer-operator

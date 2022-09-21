@@ -1,0 +1,317 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: vault
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    route.openshift.io/termination: passthrough
+  name: vault
+  namespace: vault
+spec:
+  tls:
+    - secretName: vault-tls
+      hosts:
+        - vault.ci.openshift.org
+  rules:
+  - host: vault.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: vault
+            port:
+              number: 8300
+        pathType: ImplementationSpecific
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - name: 1.6.2
+    from:
+      kind: DockerImage
+      # Mirror of docker.io/library/vault:1.6.2 because the cluster hit the ratelimit for that
+      name: quay.io/alvaroaleman/vault:1.6.2
+    referencePolicy:
+      type: Local
+  - name: 1.7.0
+    from:
+      kind: DockerImage
+      # Mirror of docker.io/library/vault:1.6.2 because the cluster hit the ratelimit for that
+      name: quay.io/alvaroaleman/vault:1.7.0
+    referencePolicy:
+      type: Local
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: vault
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault
+  namespace: vault
+spec:
+  ports:
+  - name: vault
+    port: 8300
+    protocol: TCP
+  selector:
+    vault-active: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vault-statefulset
+  namespace: vault
+spec:
+  ports:
+  - port: 8300
+    name: vault
+  clusterIP: None
+  selector:
+    app: vault
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vault
+  namespace: vault
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: vault
+  name: vault-service-discovery
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "watch", "list", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: vault-service-discovery
+  namespace: vault
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: vault-service-discovery
+subjects:
+- kind: ServiceAccount
+  name: vault
+  namespace: vault
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: vault
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"vault-subpath-proxy:latest","namespace":"ci"},"fieldPath":"spec.template.spec.containers[?(@.name==\"subpath-proxy\")].image"}]'
+  name: vault
+  namespace: vault
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: vault
+  serviceName: vault-statefulset
+  template:
+    metadata:
+      labels:
+        app: vault
+      annotations:
+        config.hcl: |
+          api_addr = "https://vault.ci.openshift.org"
+          listener "tcp" {
+            address       = "127.0.0.1:8200"
+            cluster_address = "[::]:8201"
+            # The subpath proxy does the tls termination
+            tls_disable   = "true"
+          }
+
+          storage "gcs" {
+            bucket        = "vault-ci-openshift"
+            ha_enabled    = "true"
+          }
+          disable_mlock = "true"
+          ui = "true"
+          service_registration "kubernetes" {}
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - vault
+              topologyKey: "kubernetes.io/hostname"
+      serviceAccountName: vault
+      terminationGracePeriodSeconds: 60
+      priorityClassName: openshift-user-critical
+      containers:
+      - image: vault-subpath-proxy:latest
+        name: subpath-proxy
+        args:
+        - -kv-mount-path=kv
+        - -listen-addr=0.0.0.0:8300
+        - -tls-cert-file=/var/run/serving-cert/tls.crt
+        - -tls-key-file=/var/run/serving-cert/tls.key
+        - -vault-addr=http://127.0.0.1:8200
+        - -vault-role=vault-subpath-proxy
+        - --kubeconfig-dir=/etc/build-farm-credentials
+        volumeMounts:
+        - name: serving-cert
+          mountPath: /var/run/serving-cert
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sleep", "30"]
+      - image: vault:1.7.0
+        name: unsealer
+        command:
+        - /bin/sh
+        - -c
+        - |-
+          set -u
+          export VAULT_ADDR=http://127.0.0.1:8200
+          until vault status 2>&1 >/dev/null; do
+            vault operator unseal $UNSEAL_KEY
+          done
+          echo "$(date --rfc-2822): Successfully unsealed, starting to sleep"
+          sleep 365d
+        env:
+        - name: UNSEAL_KEY
+          valueFrom:
+            secretKeyRef:
+              name: vault-unseal
+              key: unseal
+      - image: vault:1.7.0
+        name: vault
+        args:
+        - server
+        - -config
+        - /etc/vault/cfg/config.hcl
+        resources:
+          requests:
+            memory: 200Mi
+            cpu: 100m
+        readinessProbe:
+          httpGet:
+            path: /v1/sys/health?standbyok=true
+            port: 8300
+            scheme: HTTPS
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sleep", "30"]
+        ports:
+        - name: https
+          containerPort: 8300
+        env:
+        - name: GOOGLE_APPLICATION_CREDENTIALS
+          value: /var/run/gcs-key/vault-sa-key.json
+        - name: SKIP_SETCAP
+          value: "true"
+        # Need to define this here so it can
+        # be referenced in VAULT_CLUSTER_ADDR
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: VAULT_K8S_POD_NAME
+          valueFrom:
+            fieldRef:
+             fieldPath: metadata.name
+        - name: VAULT_K8S_NAMESPACE
+          valueFrom:
+            fieldRef:
+             fieldPath: metadata.namespace
+        - name: VAULT_ADDR
+          value: "http://127.0.0.1:8200"
+        - name: VAULT_API_ADDR
+          value: "http://$(POD_IP):8200"
+        - name: SKIP_CHOWN
+          value: "true"
+        - name: SKIP_SETCAP
+          value: "true"
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+             fieldPath: metadata.name
+        - name: VAULT_CLUSTER_ADDR
+          value: "https://$(HOSTNAME).vault-statefulset:8201"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/vault/cfg
+        - name: gcs-key
+          mountPath: /var/run/gcs-key
+      volumes:
+      - name: serving-cert
+        secret:
+          secretName: vault-tls
+      - name: gcs-key
+        secret:
+          secretName: vault-gcs
+      - name: config
+        downwardAPI:
+          items:
+          - path: config.hcl
+            fieldRef:
+              fieldPath: metadata.annotations['config.hcl']
+      - name: build-farm-credentials
+        secret:
+          secretName: config-updater
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: role-tokenreview-binding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:auth-delegator
+subjects:
+  - kind: ServiceAccount
+    name: vault
+    namespace: vault
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: secret-generator
+  namespace: ci
+  labels:
+    purpose: vault
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: secret-bootstrap
+  namespace: ci
+  labels:
+    purpose: vault

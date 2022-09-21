@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-upgrade-ovirt-release-4.6-4.7
+  steps:
+    pre:
+    - ref: ipi-install-hosted-loki
+    - chain: ipi-ovirt-pre-upgrade-release-4.6-4.7
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-ovirt-post
+    env:
+      TEST_TYPE: upgrade
+      TEST_UPGRADE_OPTIONS: ""
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    leases:
+      - env: OVIRT_UPGRADE_LEASED_RESOURCE
+        resource_type: ovirt-upgrade-quota-slice
+  documentation: |-
+    The Openshift E2E oVirt upgrade release-4.6,4.7 workflow installs OpenShift cluster on top of oVirt
+    from releases that didn't contain affinity groups and secure connection to the oVirt engine from the installer,
+    therefor it uses a different install config and ovirt-config.
+    Executes an upgrade to the next available version.

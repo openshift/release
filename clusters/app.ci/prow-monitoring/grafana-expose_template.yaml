@@ -1,0 +1,52 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+metadata:
+  name: grafana-expose
+parameters:
+- description: The session secret for the component.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+- description: prow monitoring namespace
+  name: PROW_MONITORING_NAMESPACE
+  value: prow-monitoring
+objects:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: grafana-tls
+    labels:
+      app: grafana
+    name: grafana
+    namespace: ${PROW_MONITORING_NAMESPACE}
+  spec:
+    ports:
+    - name: https
+      port: 3000
+      targetPort: https
+    selector:
+      app: grafana
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: grafana
+    namespace: ${PROW_MONITORING_NAMESPACE}
+  spec:
+    port:
+      targetPort: https
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: Reencrypt
+    to:
+      kind: Service
+      name: grafana
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    labels:
+      k8s-app: grafana
+    name: grafana-proxy
+    namespace: ${PROW_MONITORING_NAMESPACE}
+  stringData:
+    session_secret: "${SESSION_SECRET}="

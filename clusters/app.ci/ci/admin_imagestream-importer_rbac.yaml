@@ -1,0 +1,40 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: imagestream-importer
+    namespace: ci
+- kind: ClusterRole
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: imagestream-importer
+  rules:
+    - apiGroups:
+      - ""
+      - image.openshift.io
+      resources:
+      - imagestreams
+      - imagestreamimports
+      verbs:
+      - get
+    - apiGroups:
+      - ""
+      - image.openshift.io
+      resources:
+      - imagestreamimports
+      verbs:
+      - create
+- kind: ClusterRoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: imagestream-importer
+  roleRef:
+    name: imagestream-importer
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+  subjects:
+  - kind: ServiceAccount
+    name: imagestream-importer
+    namespace: ci

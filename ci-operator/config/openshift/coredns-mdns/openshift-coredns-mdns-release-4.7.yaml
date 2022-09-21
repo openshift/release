@@ -1,0 +1,32 @@
+base_images:
+  base:
+    name: "4.7"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: make fmt
+  container:
+    from: src
+- as: build-coredns
+  commands: make build-coredns
+  container:
+    from: src
+- as: unit
+  commands: make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift
+  repo: coredns-mdns

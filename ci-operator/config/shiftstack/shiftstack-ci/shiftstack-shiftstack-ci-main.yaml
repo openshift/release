@@ -1,0 +1,159 @@
+base_images:
+  installer:
+    name: "4.11"
+    namespace: ocp
+    tag: installer
+build_root:
+  image_stream_tag:
+    name: shellcheck
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_literal: |-
+    FROM src
+    RUN ./hack/dnf_safe -y install python3-openstackclient python3-octaviaclient jq && dnf clean all
+    ADD openshift-install /usr/bin/openshift-install
+  from: src
+  inputs:
+    installer:
+      paths:
+      - destination_dir: .
+        source_path: /bin/openshift-install
+  to: openstack-installer
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: shellcheck
+  commands: find . -type f -name "*.sh" | xargs --verbose --no-run-if-empty shellcheck
+  container:
+    from: src
+- as: cleanup-vexxhost
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+    workflow: shiftstack-cleanup
+- as: cleanup-openstack-nfv
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-nfv
+    workflow: shiftstack-cleanup
+- as: cleanup-openstack-hwoffload
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-hwoffload
+    workflow: shiftstack-cleanup
+- as: cleanup-vh-mecha-central
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+    workflow: shiftstack-cleanup
+- as: cleanup-vh-mecha-az0
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
+    workflow: shiftstack-cleanup
+- as: cleanup-kuryr
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-kuryr
+    workflow: shiftstack-cleanup
+- as: quotas-vexxhost
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: VEXXHOST managed
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+    workflow: shiftstack-quotas
+- as: quotas-openstack-nfv
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: OpenStack NFV
+      CLUSTER_TYPE_OVERRIDE: openstack-nfv
+    workflow: shiftstack-quotas
+- as: quotas-openstack-hwoffload
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: OpenStack HW offload
+      CLUSTER_TYPE_OVERRIDE: openstack-hwoffload
+    workflow: shiftstack-quotas
+- as: quotas-vh-mecha-central
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: mecha central
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+    workflow: shiftstack-quotas
+- as: quotas-vh-mecha-az0
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: mecha az0
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
+    workflow: shiftstack-quotas
+- as: quotas-vh-mecha-kuryr
+  interval: 1h
+  steps:
+    env:
+      CLOUD_NAME: mecha kuryr
+      CLUSTER_TYPE_OVERRIDE: openstack-kuryr
+      MIN_PERCENTAGE: "7"
+    workflow: shiftstack-quotas
+- as: monitor-vexxhost
+  interval: 5m
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+    workflow: shiftstack-monitor
+- as: monitor-openstack-nfv
+  interval: 5m
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-nfv
+    workflow: shiftstack-monitor
+- as: monitor-openstack-hwoffload
+  interval: 5m
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-hwoffload
+    workflow: shiftstack-monitor
+- as: monitor-mecha-central
+  interval: 5m
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+    workflow: shiftstack-monitor
+- as: monitor-mecha-az0
+  interval: 5m
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
+    workflow: shiftstack-monitor
+- as: monitor-mecha-kuryr
+  interval: 5m
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-kuryr
+    workflow: shiftstack-monitor
+- as: liveliness-mecha-central
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+    workflow: shiftstack-liveliness
+zz_generated_metadata:
+  branch: main
+  org: shiftstack
+  repo: shiftstack-ci

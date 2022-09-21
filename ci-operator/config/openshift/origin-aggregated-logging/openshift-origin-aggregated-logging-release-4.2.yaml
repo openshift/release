@@ -1,0 +1,99 @@
+base_images:
+  base_centos:
+    name: centos
+    namespace: openshift
+    tag: "7"
+  ruby-25:
+    name: release
+    namespace: openshift
+    tag: ruby-25
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- dockerfile_path: test/unit/Dockerfile
+  from: ruby-25
+  to: logging-test-unit
+- context_dir: fluentd/
+  dockerfile_path: Dockerfile.centos7
+  from: ruby-25
+  to: logging-fluentd
+- context_dir: elasticsearch/
+  dockerfile_path: Dockerfile.centos7
+  from: base_centos
+  to: logging-elasticsearch5
+- context_dir: kibana/
+  dockerfile_path: Dockerfile.centos7
+  from: base_centos
+  to: logging-kibana5
+- context_dir: curator/
+  dockerfile_path: Dockerfile.centos7
+  from: base_centos
+  to: logging-curator5
+- context_dir: eventrouter/
+  dockerfile_path: Dockerfile.centos7
+  from: base_centos
+  to: logging-eventrouter
+promotion:
+  additional_images:
+    logging-ci-test-runner: src
+  name: "4.2"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.2"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.2"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 200Mi
+  src:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: /tmp/run.sh
+  container:
+    from: logging-test-unit
+- as: full-integ-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: upgrade-full-integ-aws
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        OPENSHIFT_BUILD_NAMESPACE= IMAGE_FORMAT= USE_CUSTOM_IMAGES=true hack/deploy-logging.sh
+        export LOGGING_DEPLOY_MODE=upgrade
+        . openshift/ci-operator/build-image/setup-logging-for-e2e.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.2
+  org: openshift
+  repo: origin-aggregated-logging

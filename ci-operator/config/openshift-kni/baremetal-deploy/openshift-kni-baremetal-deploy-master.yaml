@@ -1,0 +1,76 @@
+base_images:
+  base:
+    name: "4.3"
+    namespace: ocp
+    tag: base
+build_root:
+  project_image:
+    context_dir: features/
+    dockerfile_path: Dockefile.buildimage
+releases:
+  initial:
+    integration:
+      name: "4.3"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.3"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: sctp-e2e-aws
+  optional: true
+  run_if_changed: features/sctp/.*
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: cd features && export FEATURES=sctp && make deploy && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: performance-e2e-aws
+  optional: true
+  run_if_changed: features/performance/.*
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: cd features && source hack/test_env.sh && export FEATURES="mcp performance"
+        && make deploy && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: features-unit-tests
+  commands: cd features && make unittests
+  container:
+    from: src
+  run_if_changed: features/.*
+- as: e2e-aws
+  cron: 6 20 20 */12 *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: cd features && source hack/test_env.sh && make deploy && make functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift-kni
+  repo: baremetal-deploy

@@ -1,0 +1,305 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-test-infra:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+  coreos_centos_stream9:
+    name: stream9
+    namespace: coreos
+    tag: "9"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  edge_infrastructure_swagger_codegen_cli:
+    name: edge-infrastructure-swagger-codegen-cli
+    namespace: ci
+    tag: 2.4.18
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
+  goswagger_swagger:
+    name: goswagger-swagger
+    namespace: ci
+    tag: v0.28.0
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+  postgresql-12-centos7:
+    name: postgresql-12-centos7
+    namespace: edge-infrastructure
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_literal: |
+    FROM quay.io/centos/centos:stream9
+    RUN dnf install -y 'dnf-command(config-manager)' && \
+        dnf config-manager --set-enabled crb && \
+        dnf install -y git unzip make gcc which nmstate-devel
+    COPY --from=registry.ci.openshift.org/openshift/release:golang-1.17 /usr/local/go /usr/local/go
+    ENV GOPATH=/go
+    ENV GOROOT=/usr/local/go
+    ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+    COPY . /assisted-service/
+    WORKDIR /assisted-service/
+    ENV CGO_CFLAGS="-g -O2 -Wno-return-local-addr"
+    RUN go mod vendor
+    RUN chmod 775 -R $GOPATH && chmod 775 -R $(go env GOROOT) && chmod 775 -R /assisted-service/ && \
+        mkdir /.cache && chmod 775 -R /.cache
+  inputs:
+    coreos_centos_stream9:
+      as:
+      - quay.io/centos/centos:stream9
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service-centos9
+- dockerfile_literal: |
+    FROM base
+    RUN dnf install -y postgresql-server
+    RUN cd / && /assisted-service/hack/setup_env.sh test_tools
+  from: assisted-service-centos9
+  to: assisted-service-unit-test
+- dockerfile_literal: |
+    FROM base
+    COPY --from=quay.io/app-sre/golangci-lint:v1.37.1 /usr/bin/golangci-lint /usr/bin/golangci-lint
+  from: assisted-service-centos9
+  inputs:
+    golangci-lint:
+      as:
+      - quay.io/app-sre/golangci-lint:v1.37.1
+  to: assisted-service-lint
+- dockerfile_literal: |
+    FROM base
+    COPY --from=quay.io/openshift/origin-cli:latest /usr/bin/oc /usr/bin
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN make build-openshift-ci-test-bin
+    RUN go mod vendor
+  from: assisted-service-centos9
+  to: assisted-service-subsystem
+- dockerfile_path: Dockerfile.assisted-service-build
+  from: postgresql-12-centos7
+  inputs:
+    edge_infrastructure_swagger_codegen_cli:
+      as:
+      - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service-build
+- dockerfile_path: Dockerfile.assisted-service
+  from: coreos_centos_stream8
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service
+releases:
+  latest:
+    integration:
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mirror-vcsref-image
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: assisted-service
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: lint
+  commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
+    && make lint
+  container:
+    from: assisted-service-lint
+- as: unit-test
+  commands: |
+    export REPORTS=/tmp/reports
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    export GINKGO_REPORTFILE=/tmp/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-unit-test
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+- as: verify-generated-code
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
+- as: subsystem-aws
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    test:
+    - as: subsystem-deploy-and-run
+      cli: latest
+      commands: |
+        export BUILD_TYPE=CI
+        export REPORTS=${ARTIFACT_DIR}
+        export TARGET=oc
+        export PERSISTENT_STORAGE="False"
+        export GENERATE_CRD='false'
+        unset GOFLAGS
+        make ci-deploy-for-subsystem
+        oc get pods
+        make test
+      dependencies:
+      - env: SERVICE
+        name: assisted-service
+      from: assisted-service-subsystem
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: e2e-metal-assisted-single-node
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.8
+        NUM_MASTERS=1
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-onprem
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        DEPLOY_TARGET=onprem
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-day2
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ipv4v6
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        IPv6=yes
+        IPv4=yes
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-8
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.8
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-9
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.9
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-10
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.10
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-11
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OPENSHIFT_VERSION=4.11
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-networking
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        TEST_FUNC=test_networking
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-cnv
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OLM_OPERATORS=cnv
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-odf
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OLM_OPERATORS=odf
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-ocs
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        SERVICE_BASE_REF=cloud_hotfix_releases
+        OLM_OPERATORS=ocs
+        OPENSHIFT_VERSION=4.8
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+zz_generated_metadata:
+  branch: cloud_hotfix_releases
+  org: openshift
+  repo: assisted-service

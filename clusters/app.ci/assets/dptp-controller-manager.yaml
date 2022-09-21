@@ -1,0 +1,215 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: dptp-controller-manager-app-ci
+rules:
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - '*'
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  resourceNames:
+  - dptp-controller-manager
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - create
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  resourceNames:
+  - dptp-controller-manager
+  verbs:
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - events
+  verbs:
+  - create
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: dptp-controller-manager-app-ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: dptp-controller-manager-app-ci
+subjects:
+- kind: ServiceAccount
+  name: dptp-controller-manager
+  namespace: ci
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: dptp-controller-manager
+  name: dptp-controller-manager
+  namespace: prow-monitoring
+spec:
+  # By default up{job="prow-monitoring/dptp-controller-manager"}.
+  # We want up{job="dptp-controller-manager"} instead.
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: dptp-controller-manager
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: http
+    scrapeTimeout: 20s
+  namespaceSelector:
+    matchNames:
+    - ci
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"dptp-controller-manager:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"dptp-controller-manager\")].image"}]'
+  labels:
+    app: dptp-controller-manager
+  name: dptp-controller-manager
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dptp-controller-manager
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: dptp-controller-manager
+    spec:
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth 1
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: gcr.io/google_containers/git-sync:v3.1.6
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --wait=30
+        - --root=/tmp/git-sync
+        - --max-sync-failures=3
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: gcr.io/google_containers/git-sync:v3.1.6
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - image: dptp-controller-manager
+        name: dptp-controller-manager
+        args:
+        - --leader-election-namespace=ci
+        - --release-repo-git-sync-path=/var/repo/release
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        - --registry-cluster-name=app.ci
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.10
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.11
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.12
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:golang-1.13
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-7-golang-1.11
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-7-golang-1.12
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-7-golang-1.13
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.11
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.12
+        - --testImagesDistributorOptions.additional-image-stream-tag=ocp/builder:rhel-golang-1.13
+        - --testImagesDistributorOptions.additional-image-stream-namespace=ci
+        - --testImagesDistributorOptions.additional-image-stream=rhcos/machine-os-content
+        - --testImagesDistributorOptions.ignore-cluster-name=hive
+        - --enable-controller=test_images_distributor
+        - --enable-controller=promotionreconciler
+        - --enable-controller=serviceaccount_secret_refresher
+        - --serviceAccountRefresherOptions.enabled-namespace=ci
+        - --serviceAccountRefresherOptions.enabled-namespace=bparees
+        - --serviceAccountRefresherOptions.remove-old-secrets=true
+        - --serviceAccountRefresherOptions.ignore-service-account=ci/sync-rover-groups-updater
+        - --enable-controller=testimagestreamimportcleaner
+        - --dry-run=false
+        - --kubeconfig-dir=/var/kubeconfigs
+        env:
+        - name: GOMAXPROCS
+          value: "1024"
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-prow-github-app
+              key: appid
+        ports:
+        - name: metrics
+          containerPort: 8080
+        volumeMounts:
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: kubeconfigs
+          mountPath: /var/kubeconfigs
+        - name: release
+          mountPath: /var/repo
+        - name: ci-secret-bootstrap
+          mountPath: /etc/ci-secret-bootstrap
+          readOnly: true
+        - name: secret-mirroring
+          mountPath: /etc/secret-mirroring
+          readOnly: true
+        resources:
+          requests:
+            memory: "11Gi"
+            cpu: "1.5"
+      serviceAccountName: dptp-controller-manager
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-prow-github-app
+      - name: kubeconfigs
+        secret:
+          secretName: dptp-controller-manager
+      - name: release
+        emptyDir: {}
+      - name: ci-secret-bootstrap
+        configMap:
+          name: ci-secret-bootstrap
+      - name: secret-mirroring
+        configMap:
+          name: secret-mirroring

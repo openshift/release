@@ -1,0 +1,257 @@
+##################################################################################
+#                                DO NOT EDIT
+# File generated during execution of: generate-release-controllers.py
+##################################################################################
+
+
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: release-controller
+  namespace: ci
+spec:
+  host: origin-release.apps.ci.l2s4.p1.openshiftapps.com
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: Edge
+  to:
+    kind: Service
+    name: release-controller-api
+---
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-controller
+  namespace: ci
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: release-controller
+---
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: release-controller-api
+  namespace: ci
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: release-controller-api
+---
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  name: release-controller
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: release-controller
+  template:
+    metadata:
+      labels:
+        app: release-controller
+    spec:
+      containers:
+      - command:
+        - /usr/bin/release-controller
+        - --release-namespace=origin
+        - --prow-config=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        - --job-config=/etc/job-config
+        - --prow-namespace=ci
+        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
+        - --job-namespace=ci-release
+        - --tools-image-stream-tag=4.6:tests
+        - --release-architecture=amd64
+        - -v=4
+        image: release-controller:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        name: controller
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
+        volumeMounts:
+        - mountPath: /etc/config
+          name: config
+          readOnly: true
+        - mountPath: /etc/job-config
+          name: job-config
+          readOnly: true
+        - mountPath: /etc/github
+          name: oauth
+          readOnly: true
+        - mountPath: /etc/bugzilla
+          name: bugzilla
+          readOnly: true
+        - mountPath: /etc/jira
+          name: jira
+          readOnly: true
+        - mountPath: /etc/plugins
+          name: plugins
+          readOnly: true
+        - mountPath: /etc/kubeconfig
+          name: release-controller-kubeconfigs
+          readOnly: true
+      serviceAccountName: release-controller
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: config
+        name: config
+      - name: job-config
+        projected:
+          sources:
+          - configMap:
+              name: job-config-misc
+          - configMap:
+              name: job-config-master-periodics
+          - configMap:
+              name: job-config-master-postsubmits
+          - configMap:
+              name: job-config-master-presubmits
+          - configMap:
+              name: job-config-1.x
+          - configMap:
+              name: job-config-2.x
+          - configMap:
+              name: job-config-3.x
+          - configMap:
+              name: job-config-4.1
+          - configMap:
+              name: job-config-4.10
+          - configMap:
+              name: job-config-4.11
+          - configMap:
+              name: job-config-4.12
+          - configMap:
+              name: job-config-4.2
+          - configMap:
+              name: job-config-4.3
+          - configMap:
+              name: job-config-4.4
+          - configMap:
+              name: job-config-4.5
+          - configMap:
+              name: job-config-4.6
+          - configMap:
+              name: job-config-4.7
+          - configMap:
+              name: job-config-4.8
+          - configMap:
+              name: job-config-4.9
+      - name: oauth
+        secret:
+          defaultMode: 420
+          secretName: github-credentials-openshift-merge-robot
+      - name: bugzilla
+        secret:
+          defaultMode: 420
+          secretName: bugzilla-credentials-openshift-bugzilla-robot
+      - name: jira
+        secret:
+          defaultMode: 420
+          secretName: jira-credentials-openshift-jira-robot
+      - configMap:
+          defaultMode: 420
+          name: plugins
+        name: plugins
+      - name: release-controller-kubeconfigs
+        secret:
+          defaultMode: 420
+          items:
+          - key: sa.release-controller.app.ci.config
+            path: kubeconfig
+          secretName: release-controller-kubeconfigs
+---
+#---------------------------------------------------------------------------------
+# origin_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"release-controller-api:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"controller\")].image"}]'
+  name: release-controller-api
+  namespace: ci
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: release-controller-api
+  template:
+    metadata:
+      labels:
+        app: release-controller-api
+    spec:
+      containers:
+      - command:
+        - /usr/bin/release-controller-api
+        - --release-namespace=origin
+        - --prow-namespace=ci
+        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
+        - --job-namespace=ci-release
+        - --tools-image-stream-tag=4.6:tests
+        - --release-architecture=amd64
+        - -v=4
+        image: release-controller-api:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        name: controller
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 10
+          periodSeconds: 3
+          timeoutSeconds: 600
+        volumeMounts:
+        - mountPath: /etc/kubeconfig
+          name: release-controller-kubeconfigs
+          readOnly: true
+      serviceAccountName: release-controller
+      volumes:
+      - name: release-controller-kubeconfigs
+        secret:
+          defaultMode: 420
+          items:
+          - key: sa.release-controller.app.ci.config
+            path: kubeconfig
+          secretName: release-controller-kubeconfigs

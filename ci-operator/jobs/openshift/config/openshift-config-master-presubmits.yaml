@@ -1,0 +1,33 @@
+presubmits:
+  openshift/config:
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
+    context: ci/prow/format
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-config-master-format
+    optional: true
+    rerun_command: /test format
+    spec:
+      containers:
+      - args:
+        - --config-path=./org/config.yaml
+        command:
+        - determinize-peribolos
+        image: determinize-peribolos:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )format,?($|\s.*)

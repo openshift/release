@@ -1,0 +1,81 @@
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: build/Dockerfile
+  to: unused
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: aws-account-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: aws-account-operator-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: validate
+  commands: make validate
+  container:
+    from: src
+- as: integration-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 15m0s
+    version: "4.7"
+  optional: true
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        echo $PULL_NUMBER
+        ## Temporary CI run blocker by PR title,
+        ## only PR with title containing `run-int-test` will continue to run integration tests
+        if curl -s "https://api.github.com/repos/openshift/aws-account-operator/pulls/${PULL_NUMBER}" | grep -ioPq '"title":\s*"\K[^,"]*run-int-test';
+            then
+                echo -e "\nStarting Integration Test\n"
+                make prow-ci-entrypoint
+            else
+                echo -e "\nSkipped Integration Test\n"
+        fi
+      credentials:
+      - mount_path: /tmp/secret/aao-aws-creds
+        name: aao-aws-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: aws-account-operator

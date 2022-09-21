@@ -1,0 +1,78 @@
+#!/bin/sh
+
+set -euo pipefail
+
+# Tag the contents of a branch and push to upstream.
+#
+# Usage: TO= FROM= ./branch [tag|reset|push]
+#
+# Argument:
+# * <empty>: displays latest commit on the branch
+# * tag:     creates the tags and branches locally
+# * reset:   deletes the branches or tags to start over
+# * push:    actually push the branches and tags
+
+base=$( dirname "${BASH_SOURCE[0]}")
+source "${base}/lib/constants.sh"
+
+DIR=${DIR:-/tmp/dist}
+BRANCH=${BRANCH:-master}
+
+for repo in "${MANAGED_REPOS[@]}"; do
+  if [[ ! -d ${DIR}/src/github.com/${repo} ]]; then
+    mkdir -p ${DIR}/src/github.com/${repo}
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    git clone --depth=1 --branch ${BRANCH} git@github.com:${repo} .
+    git remote set-branches origin '*'
+    popd &>/dev/null
+  fi
+done
+
+# clear the repos back to a known state
+if [[ "${1-}" == "reset" ]]; then
+  for repo in "${MANAGED_REPOS[@]}"; do
+    pushd ${DIR}/src/github.com/${repo} &>/dev/null
+    git remote set-branches origin '*'
+    git fetch origin release-${FROM} 2>/dev/null
+    git checkout release-${FROM}
+    git reset origin/release-${FROM} --hard >/dev/null
+    if [[ -n "${TO-}" ]]; then
+      git tag -d v${TO} || true
+    fi
+    popd &>/dev/null
+  done
+  exit 0
+fi
+
+if [[ -z "${FROM-}" ]]; then
+	echo "Must set FROM= to the major/minor version of the current release, e.g. 3.9"
+  exit 1
+fi
+if [[ -z "${TO-}" ]]; then
+  echo "Must set TO= to the desired tag, e.g. 3.10.0"
+  exit 1
+fi
+
+for repo in "${MANAGED_REPOS[@]}"; do
+  pushd ${DIR}/src/github.com/${repo} &>/dev/null
+
+  if [[ "${1-}" == "" ]]; then
+    echo ${repo} '|' $( git log --oneline -1 HEAD )
+    continue
+  fi
+
+  ! git rev-parse release-${FROM} &>/dev/null
+  ! git rev-parse v${TO} &>/dev/null
+
+  git checkout release-${FROM}
+
+  if [[ "${1-}" == "tag" || "${1-}" == "push" ]]; then
+    git tag -f -s -a -m "v${TO}" v${TO}
+  fi
+  if [[ "${1-}" == "push" ]]; then
+    git push origin "v${TO}"
+  fi
+
+  popd &>/dev/null
+done
+

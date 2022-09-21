@@ -1,0 +1,20 @@
+workflow:
+  as: openshift-upgrade-gcp
+  steps:
+    allow_best_effort_post_steps: true
+    pre:
+    - ref: ipi-install-hosted-loki
+    - chain: ipi-gcp-pre-stableinitial
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: ipi-gcp-post
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: "release:initial"
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: "release:latest"
+    env:
+      TEST_TYPE: upgrade
+      TEST_SUITE: ""
+      TEST_UPGRADE_OPTIONS: ""
+  documentation: |-
+    The Openshift E2E GCP workflow executes the upgrade end-to-end test suite on GCP with a default cluster configuration and Loki as log collector, exercising an upgrade during the process.

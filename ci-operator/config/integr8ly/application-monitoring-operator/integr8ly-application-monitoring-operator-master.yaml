@@ -1,0 +1,52 @@
+base_images:
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: unset GOFLAGS && make code/compile COMPILE_TARGET="./build/_output/bin/application-monitoring-operator"
+  GO111MODULE=on
+build_root:
+  image_stream_tag:
+    name: amo-base-image
+    namespace: integr8ly
+    tag: latest
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/integr8ly/application-monitoring-operator/build
+  to: application-monitoring-operator
+promotion:
+  name: application-monitoring-operator
+  namespace: integr8ly
+releases:
+  initial:
+    integration:
+      name: "4.4"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.4"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+tests:
+- as: unit
+  commands: unset GOFLAGS && make test/unit
+  container:
+    from: src
+- as: format
+  commands: unset GOFLAGS && make code/check
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: integr8ly
+  repo: application-monitoring-operator

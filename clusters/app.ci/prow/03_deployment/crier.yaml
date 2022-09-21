@@ -1,0 +1,162 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: crier
+    name: crier
+  spec:
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prow
+      component: crier
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ci
+    name: crier-apps-auth
+    labels:
+      app: prow
+      component: crier
+  spec:
+    # Do not scale up.
+    replicas: 1
+    revisionHistoryLimit: 2
+    strategy:
+      type: Recreate
+    selector:
+      matchLabels:
+        app: prow
+        component: crier
+        flavor: apps-auth
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: crier
+          flavor: apps-auth
+      spec:
+        serviceAccountName: crier
+        containers:
+        - name: crier
+          image: gcr.io/k8s-prow/crier:v20220916-01b0897fa8
+          args:
+          - --github-workers=30
+          - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
+          - --job-config-path=/etc/job-config
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --blob-storage-workers=20
+          - --gcs-credentials-file=/etc/service-account/service-account.json
+          - --kubernetes-blob-storage-workers=20
+          - --slack-workers=5
+          - --slack-token-file=/etc/slack/oauth
+          - --projected-token-file=/var/sa-token/token
+          - --kubeconfig-dir=/etc/build-farm-credentials
+          env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
+          volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
+          - name: slack
+            mountPath: /etc/slack
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: job-config
+            mountPath: /etc/job-config
+            readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
+          - name: service-account
+            mountPath: /etc/service-account
+            readOnly: true
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "600m"
+        volumes:
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
+        - name: slack
+          secret:
+            secretName: slack-credentials-prow
+        - name: config
+          configMap:
+            name: config
+        - name: job-config
+          projected:
+            sources:
+            - configMap:
+                name: job-config-misc
+            - configMap:
+                name: job-config-master-periodics
+            - configMap:
+                name: job-config-master-postsubmits
+            - configMap:
+                name: job-config-master-presubmits
+            - configMap:
+                name: job-config-1.x
+            - configMap:
+                name: job-config-2.x
+            - configMap:
+                name: job-config-3.x
+            - configMap:
+                name: job-config-4.1
+            - configMap:
+                name: job-config-4.2
+            - configMap:
+                name: job-config-4.3
+            - configMap:
+                name: job-config-4.4
+            - configMap:
+                name: job-config-4.5
+            - configMap:
+                name: job-config-4.6
+            - configMap:
+                name: job-config-4.7
+            - configMap:
+                name: job-config-4.8
+            - configMap:
+                name: job-config-4.9
+            - configMap:
+                name: job-config-4.10
+            - configMap:
+                name: job-config-4.11
+            - configMap:
+                name: job-config-4.12
+            - configMap:
+                name: job-config-4.13
+        - name: build-farm-credentials
+          secret:
+            secretName: crier
+        - name: service-account
+          secret:
+            secretName: gce-sa-credentials-gcs-crier-publisher

@@ -1,0 +1,39 @@
+base_images:
+  base:
+    name: 4.4-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/build-machinery-go
+promotion:
+  name: 4.4-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.4-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.4-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 3Gi
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.4
+  org: openshift-priv
+  repo: build-machinery-go

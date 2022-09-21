@@ -1,0 +1,38 @@
+base_images:
+  base:
+    name: plugin-base
+    namespace: azure
+    tag: latest
+binary_build_commands: make all
+build_root:
+  image_stream_tag:
+    name: test-base
+    namespace: azure
+    tag: latest
+images:
+- dockerfile_path: images/azure/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/openshift-azure/azure
+  to: azure
+releases:
+  initial:
+    integration:
+      name: origin-v3.11
+      namespace: openshift
+  latest:
+    integration:
+      include_built_images: true
+      name: origin-v3.11
+      namespace: openshift
+resources:
+  '*':
+    requests:
+      cpu: 10m
+zz_generated_metadata:
+  branch: release-v21
+  org: openshift
+  repo: openshift-azure

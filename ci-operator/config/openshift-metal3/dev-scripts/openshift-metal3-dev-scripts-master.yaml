@@ -1,0 +1,104 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: images/Dockerfile.ci
+  from: src
+  to: dev-scripts
+promotion:
+  name: test
+  namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-metal-ipi-bm
+  cluster: build05
+  skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
+    workflow: baremetalds-e2e-ipv4
+- as: e2e-metal-ipi-upgrade
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+      RUN_UPGRADE_TEST: "true"
+      TEST_SUITE: ""
+      TEST_TYPE: upgrade
+    workflow: baremetalds-e2e-upgrade
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
+- as: e2e-metal-ipi-upgrade-ovn-ipv6
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      TEST_TYPE: upgrade
+    workflow: baremetalds-e2e-upgrade-ovn-ipv6
+- as: e2e-metal-ipi-serial-ipv4
+  cluster: build05
+  skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ipv4
+- as: e2e-metal-ipi-serial-ovn-ipv6
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ovn-ipv6
+- as: e2e-metal-ipi-virtualmedia
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^(agent|docs|.github)/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-agent-compact
+  cluster: build05
+  skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        KNI_INSTALL_FROM_GIT=yesplease
+    workflow: agent-e2e-compact-ipv4
+zz_generated_metadata:
+  branch: master
+  org: openshift-metal3
+  repo: dev-scripts

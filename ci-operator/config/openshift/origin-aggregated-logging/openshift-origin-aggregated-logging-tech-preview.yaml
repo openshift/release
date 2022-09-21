@@ -1,0 +1,262 @@
+base_images:
+  cluster-logging-operator:
+    name: tech-preview
+    namespace: logging
+    tag: cluster-logging-operator
+  cluster-logging-operator-e2e:
+    name: tech-preview
+    namespace: logging
+    tag: cluster-logging-operator-e2e
+  cluster-logging-operator-registry:
+    name: tech-preview
+    namespace: logging
+    tag: cluster-logging-operator-registry
+  elasticsearch-operator:
+    name: tech-preview
+    namespace: logging
+    tag: elasticsearch-operator
+  elasticsearch-operator-registry:
+    name: tech-preview
+    namespace: logging
+    tag: elasticsearch-operator-registry
+  elasticsearch-operator-src:
+    name: tech-preview
+    namespace: logging
+    tag: elasticsearch-operator-src
+  elasticsearch-proxy:
+    name: tech-preview
+    namespace: logging
+    tag: elasticsearch-proxy
+  oauth-proxy:
+    name: "4.7"
+    namespace: ocp
+    tag: oauth-proxy
+  ubi8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-base-openshift-4.6
+  ubi8-nodejs10:
+    name: builder
+    namespace: ocp
+    tag: ubi8.nodejs.10
+  ubi8-python36:
+    name: builder
+    namespace: ocp
+    tag: ubi8.python.36
+  ubi8-ruby25:
+    name: builder
+    namespace: ocp
+    tag: ubi8.ruby.25
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-openshift-4.6
+images:
+- dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+  from: src
+  to: origin-aggregated-logging-tests
+- dockerfile_path: test/unit/Dockerfile.rhel8
+  from: ubi8-ruby25
+  to: logging-test-unit
+- context_dir: fluentd
+  dockerfile_path: Dockerfile
+  from: ubi8-ruby25
+  to: logging-fluentd
+- context_dir: elasticsearch
+  dockerfile_path: Dockerfile.rhel8
+  from: ubi8
+  to: logging-elasticsearch6
+- context_dir: kibana
+  dockerfile_path: Dockerfile.rhel8
+  from: ubi8-nodejs10
+  to: logging-kibana6
+- context_dir: curator
+  dockerfile_path: Dockerfile
+  from: ubi8-python36
+  to: logging-curator5
+- context_dir: eventrouter/
+  dockerfile_path: Dockerfile.centos7
+  from: ubi8
+  to: logging-eventrouter
+promotion:
+  additional_images:
+    logging-ci-test-runner: src
+  name: tech-preview
+  namespace: logging
+releases:
+  initial:
+    integration:
+      name: "4.7"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.7"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 200Mi
+  src:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: /tmp/run.sh
+  container:
+    from: logging-test-unit
+- as: smoke
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    test:
+    - as: test
+      cli: latest
+      commands: make test
+      dependencies:
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      env:
+      - default: m5.4xlarge
+        name: COMPUTE_NODE_TYPE
+      from: pipeline:origin-aggregated-logging-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: elastic-operator-e2e
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e-olm
+      dependencies:
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      env:
+      - default: m5.4xlarge
+        name: COMPUTE_NODE_TYPE
+      from: pipeline:elasticsearch-operator-src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: cluster-logging-operator-e2e
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    test:
+    - as: test
+      cli: latest
+      commands: IMAGE_FORMAT= FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs
+        ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-e2e-olm
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      env:
+      - default: m5.4xlarge
+        name: COMPUTE_NODE_TYPE
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: clo-functional
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    test:
+    - as: test
+      cli: latest
+      commands: IMAGE_FORMAT= FAKE_HOME_DIR=/tmp/home LOG_DIR=/tmp/artifacts/logging-logs
+        ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts make test-functional
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      env:
+      - default: m5.4xlarge
+        name: COMPUTE_NODE_TYPE
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: tech-preview
+  org: openshift
+  repo: origin-aggregated-logging

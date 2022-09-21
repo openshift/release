@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci
+  name: job-trigger-controller-manager
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"job-trigger-controller-manager:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"job-trigger-controller-manager\")].image"}]'
+  labels:
+    app: pr-payload-tests
+    component: job-trigger-controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pr-payload-tests
+      component: job-trigger-controller-manager
+  template:
+    metadata:
+      labels:
+        app: pr-payload-tests
+        component: job-trigger-controller-manager
+    spec:
+      serviceAccount: job-trigger-controller-manager
+      containers:
+      - image: job-trigger-controller-manager:latest
+        name: job-trigger-controller-manager
+        command:
+        - job-trigger-controller-manager
+        args:
+        - --dry-run=false
+        - --namespace=ci
+        - --config-path=/etc/config/config.yaml
+        - --supplemental-prow-config-dir=/etc/config
+        volumeMounts:
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "600m"
+      volumes:
+      - name: config
+        configMap:
+          name: config

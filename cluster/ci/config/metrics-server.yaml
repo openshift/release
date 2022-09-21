@@ -1,0 +1,130 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: metrics-server
+    namespace: kube-system
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: metrics-server-tls
+    labels:
+      kubernetes.io/name: Metrics-server
+    name: metrics-server
+    namespace: kube-system
+  spec:
+    ports:
+    - port: 443
+      protocol: TCP
+      targetPort: 8443
+    selector:
+      app: metrics-server
+    type: ClusterIP
+- apiVersion: extensions/v1beta1
+  kind: Deployment
+  metadata:
+    labels:
+      app: metrics-server
+    name: metrics-server
+    namespace: kube-system
+  spec:
+    selector:
+      matchLabels:
+        app: metrics-server
+    template:
+      metadata:
+        labels:
+          app: metrics-server
+      spec:
+        containers:
+        - command: 
+          - /usr/bin/metrics-server
+          args:
+          - --v=6
+          - --tls-private-key-file=/etc/tls/tls.key
+          - --tls-cert-file=/etc/tls/tls.crt
+          - --source=kubernetes.summary_api:?kubeletPort=10250&kubeletHttps=1
+          - --secure-port=8443
+          image: docker-registry.default.svc:5000/openshift/origin-v3.10:metrics-server
+          imagePullPolicy: IfNotPresent
+          name: metrics-server
+          volumeMounts:
+          - mountPath: /etc/tls
+            name: tls
+        restartPolicy: Always
+        serviceAccount: metrics-server
+        serviceAccountName: metrics-server
+        volumes:
+        - name: tls
+          secret:
+            secretName: metrics-server-tls
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: Role
+  metadata:
+    name: metrics-server
+    namespace: kube-system
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    resourceNames:
+    - extension-apiserver-authentication
+    verbs:
+    - get
+  - apiGroups:
+    - ""
+    resources:
+    - configmaps
+    verbs:
+    - create
+  - apiGroups:
+    - ""
+    resources:
+    - events
+    verbs:
+    - create
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: RoleBinding
+  metadata:
+    name: metrics-server
+    namespace: kube-system
+  subjects:
+  - kind: ServiceAccount
+    apiGroup: ""
+    name: metrics-server
+    namespace: kube-system
+  roleRef:
+    kind: Role
+    apiGroup: rbac.authorization.k8s.io
+    name: metrics-server
+    namespace: kube-system
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: metrics-server
+  subjects:
+  - kind: ServiceAccount
+    apiGroup: ""
+    name: metrics-server
+    namespace: kube-system
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: cluster-reader
+- apiVersion: apiregistration.k8s.io/v1beta1
+  kind: APIService
+  metadata:
+    name: v1beta1.metrics.k8s.io
+  spec:
+    service:
+      name: metrics-server
+      namespace: kube-system
+    group: metrics.k8s.io
+    version: v1beta1
+    insecureSkipTLSVerify: true
+    groupPriorityMinimum: 100
+    versionPriority: 100

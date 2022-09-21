@@ -1,0 +1,40 @@
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: yamllint
+  namespace: ci
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: yamllint
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: yamllint:latest
+      namespace: ci
+  source:
+    dockerfile: |
+      FROM quay.io/centos/centos:stream8
+      RUN dnf config-manager --set-enabled powertools && dnf install -y epel-release epel-next-release && dnf install -y yamllint && dnf clean all && rm -rf /var/cache/dnf
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: "centos:stream8"
+        namespace: origin
+    type: Docker
+  triggers:
+  - type: ConfigChange
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: "centos:stream8"
+        namespace: origin
+    type: ImageChange

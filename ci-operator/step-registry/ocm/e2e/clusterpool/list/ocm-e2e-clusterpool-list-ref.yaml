@@ -1,0 +1,76 @@
+ref:
+  as: ocm-e2e-clusterpool-list
+  from_image:
+    namespace: stolostron
+    name: builder
+    tag: go1.17-linux
+  commands: ocm-e2e-clusterpool-list-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: acm-cicd-clusterpool-shared
+    mount_path: /etc/acm-cicd-clusterpool-shared
+  - namespace: test-credentials
+    name: ocm-obs-usa-clusterpool
+    mount_path: /etc/ocm-obs-usa-clusterpool
+  - namespace: test-credentials
+    name: ocm-obs-china-clusterpool
+    mount_path: /etc/ocm-obs-china-clusterpool
+  - namespace: test-credentials
+    name: ocm-console-clusterpool
+    mount_path: /etc/ocm-console-clusterpool
+  - namespace: test-credentials
+    name: ocm-grc-clusterpool
+    mount_path: /etc/ocm-grc-clusterpool
+  - namespace: test-credentials
+    name: ocm-mgdsvcs-clusterpool
+    mount_path: /etc/ocm-mgdsvcs-clusterpool
+  - namespace: test-credentials
+    name: ocm-hub-of-hubs-clusterpool
+    mount_path: /etc/ocm-hub-of-hubs-clusterpool
+  env:
+    - name: MAKEFILE
+      default: "/opt/build-harness/Makefile.prow"
+      documentation: |-
+        Location of the build harness Makefile for use on OSCI.
+    - name: CLUSTERPOOL_HOST_API
+      default: "https://api.collective.aws.red-chesterfield.com:6443"
+      documentation: |-
+        API URL of the cluster running the target clusterpool, used in oc login,
+        so port :6443 is required
+    - name: CLUSTERPOOL_HOST_NAMESPACE
+      default: ""
+      documentation: |-
+        Namespace on the cluster pool host to use.
+    - name: CLUSTERPOOL_HOST_PROW_KUBE_SECRET
+      default: ""
+      documentation: |-
+        The name of the kube secret with the kube API user and token.
+    - name: CLUSTERPOOL_LIST_INCLUSION_FILTER
+      default: ""
+      documentation: |-
+        A filter used by grep to select a set of cluster pools to use when
+        checking out clusters. If the filter is empty, all cluster pools will
+        be used. This filter is applied before the EXCLUSION filter.
+    - name: CLUSTERPOOL_LIST_EXCLUSION_FILTER
+      default: ""
+      documentation: |-
+        A filter used by grep to prevent a set of cluster pools from being used
+        when checking out clusters. If the filter is empty, no cluster pools
+        will be eliminated. This filter is applied after the INCLUSION filter.
+    - name: CLUSTERPOOL_LIST_ORDER
+      default: "shuffle"
+      documentation: |-
+        Valid values are "sort" and "shuffle". Any other value leaves the
+        list in its original order.
+    - name: CLUSTERPOOL_LIST_FILE
+      default: "clusterpool-list"
+      documentation: |-
+        File name to use for the cluster pool list.
+  documentation: |-
+    This step queries the cluster pool host for a list of available cluster
+    pools, potentially filters and sorts the list of cluster pools, and then
+    writes that list to a file in SHARED_DIR.

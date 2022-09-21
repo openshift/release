@@ -1,0 +1,52 @@
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  to: unused
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.7"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: generate
+  commands: make generate --always-make && git diff --exit-code
+  container:
+    from: src
+- as: test
+  commands: make test
+  container:
+    from: src
+- as: test-integration
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.7"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export NAMESPACE=${NAMESPACE}-test
+        oc new-project $NAMESPACE
+        make test-integration
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: route-monitor-operator

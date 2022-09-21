@@ -1,0 +1,55 @@
+workflow:
+  as: hypershift-aws-conformance-proxy
+  documentation: |-
+    The HyperShift aws conformance workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in the `osd-hypershift` AWS account and is destroyed after tests
+    complete.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Dan Mace (dmace@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    pre:
+    - chain: ipi-aws-pre-proxy
+    - chain: hypershift-install
+    - chain: hypershift-aws-create
+    post:
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy
+    - ref: gather-aws-console
+    - chain: gather
+    - ref: gather-proxy
+    - ref: ipi-deprovision-deprovision
+    - ref: ipi-deprovision-proxy
+    - ref: ipi-deprovision-aws-blackholenetwork
+    test:
+    - chain: hypershift-conformance
+    env:
+      CONTROLPLANE_OPERATOR_IMAGE: "LATEST"
+      EXTRA_ARGS: "--enable-proxy=true"
+      TEST_SKIPS: >-
+        Image append should create images by appending them\|
+        Image extract should extract content from an image\|
+        Image info should display information about images\|
+        Internal connectivity for TCP and UDP on ports 9000-9999 is allowed\|
+        Managed cluster should should expose cluster services outside the cluster\|
+        Networking should provide Internet connection for containers\|
+        The HAProxy router should respond with 503 to unrecognized hosts\|
+        The HAProxy router should serve routes that were created from an ingress\|
+        The HAProxy router should set Forwarded headers appropriately\|
+        The HAProxy router should support reencrypt to services backed by a serving certificate automatically

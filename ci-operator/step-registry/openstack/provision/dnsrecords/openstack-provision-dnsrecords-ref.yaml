@@ -1,0 +1,28 @@
+ref:
+  as: openstack-provision-dnsrecords
+  from: openstack-installer
+  commands: openstack-provision-dnsrecords-commands.sh
+  env:
+    - name: BASE_DOMAIN
+    - name: CONFIG_TYPE
+      documentation: |
+        The type of config for the environment to deploy.
+
+        * 'minimal' - Configure the install-config with the minimal options to make it work on
+                      our tests, which requires the usage of floating IPs. This config type doesn't
+                      require a proxy server to be deployed.
+        * 'proxy' - Configure the install-config to use a pre-created restricted network (BYON) and
+                   a Cluster Proxy.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  credentials:
+  - namespace: test-credentials
+    name: shiftstack-aws
+    mount_path: /var/run/aws
+  documentation: |-
+    This steps creates the required dns records for the ingress
+    and api FIPS. Expects the following to exist ${SHARED_DIR}/API_IP,
+    ${SHARED_DIR}/INGRESS_IP, and ${SHARED_DIR}/CLUSTER_NAME. Creates
+    ${SHARED_DIR}/api-record.json and ${SHARED_DIR}/ingress-record.json.

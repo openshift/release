@@ -1,0 +1,50 @@
+base_images:
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_literal: |-
+    FROM ubi
+    COPY . /opt/app-root/src/
+    WORKDIR /opt/app-root/src/osd-alert-analysis
+    RUN dnf install -y python38 python38-devel gcc gcc-c++ make mariadb-connector-c mariadb-connector-c-devel
+    RUN pip3 install --no-cache-dir --upgrade pip wheel setuptools
+    RUN pip3 install --no-cache-dir -r requirements.txt
+    RUN pip3 install --no-cache-dir pylint black
+  from: ubi
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/osd-alert-analysis
+  to: python-test-runner
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: python3 -m unittest
+  container:
+    from: python-test-runner
+- as: lint
+  commands: pylint --recursive=yes --fail-under=9.5 --ignore-paths=".*venv" .
+  container:
+    from: python-test-runner
+- as: style
+  commands: black --diff --check .
+  container:
+    from: python-test-runner
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: osd-alert-analysis

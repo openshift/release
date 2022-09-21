@@ -1,0 +1,110 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: sinker
+    namespace: ci
+    labels:
+      app: prow
+      component: sinker
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: sinker
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: sinker
+      spec:
+        serviceAccountName: sinker
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --root=/tmp/git-sync
+          - --one-time=true
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: gcr.io/google_containers/git-sync:v3.1.6
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+        containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --wait=30
+          - --root=/tmp/git-sync
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: gcr.io/google_containers/git-sync:v3.1.6
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+        - name: sinker
+          image: gcr.io/k8s-prow/sinker:v20220916-01b0897fa8
+          args:
+          - --config-path=/var/repo/release/core-services/prow/02_config/_config.yaml
+          - --supplemental-prow-config-dir=/var/repo/release/core-services/prow/02_config
+          - --job-config-path=/var/repo/release/ci-operator/jobs
+          - --projected-token-file=/var/sa-token/token
+          - --kubeconfig-dir=/etc/build-farm-credentials
+          - --dry-run=false
+          ports:
+          - name: metrics
+            containerPort: 9090
+          volumeMounts:
+          - name: service-account-token
+            mountPath: /var/sa-token
+          - name: release
+            mountPath: /var/repo
+            readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
+          resources:
+            requests:
+              memory: "1.8Gi"
+              cpu: "50m"
+        volumes:
+        - name: release
+          emptyDir: {}
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+        - name: build-farm-credentials
+          secret:
+            secretName: sinker
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: sinker
+    name: sinker
+  spec:
+    ports:
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    selector:
+      app: prow
+      component: sinker

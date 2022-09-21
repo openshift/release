@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    openshift.io/description: Service Accounts for Operator Pipelines
+    openshift.io/display-name: Operator Pipelines CI
+  name: operator-pipelines
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: operator-pipelines-trigger
+  namespace: operator-pipelines
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: operator-pipelines-trigger
+  namespace: ci
+rules:
+- apiGroups:
+  - prow.k8s.io
+  resources:
+  - prowjobs
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: operator-pipelines-trigger-binding
+  namespace: ci
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: operator-pipelines-trigger
+subjects:
+- kind: ServiceAccount
+  namespace: operator-pipelines
+  name: operator-pipelines-trigger
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: operator-pipelines-admins-binding
+  namespace: operator-pipelines
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: secret-reader
+subjects:
+- kind: Group
+  apiGroup: rbac.authorization.k8s.io
+  name: operator-pipelines-admins
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: secret-reader
+  namespace: operator-pipelines
+rules:
+  - apiGroups:
+    - ""
+    resources:
+    - serviceaccounts
+    - secrets
+    verbs:
+    - get
+    - list

@@ -1,0 +1,29 @@
+binary_build_commands: make install
+build_root:
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.ci.openshift.org/ocp/ubi-python-39:8
+      # Ensure user is root for Prow to checkout the sources
+      USER 0:0
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  make full-install
+tests:
+- as: unit-tests
+  commands: make unit-tests
+  container:
+    from: test-bin
+- as: lint
+  commands: make lint
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: main
+  org: openshift-assisted
+  repo: prow-jobs-scraper

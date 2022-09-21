@@ -1,0 +1,73 @@
+base_images:
+  base:
+    name: 4.7-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.7
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+canonical_go_repository: github.com/kubernetes-csi/external-snapshotter
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: csi-external-snapshotter
+- dockerfile_path: Dockerfile.snapshot-controller.openshift.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: csi-snapshot-controller
+- dockerfile_path: Dockerfile.webhook.openshift.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+  to: csi-snapshot-validation-webhook
+promotion:
+  name: 4.7-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.7-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.7-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: e2e-aws-csi
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-csi
+- as: e2e-ovirt
+  optional: true
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-csi-release-4.6-4.7
+zz_generated_metadata:
+  branch: release-4.7
+  org: openshift-priv
+  repo: csi-external-snapshotter

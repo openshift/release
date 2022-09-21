@@ -1,0 +1,139 @@
+kind: List
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ci
+    labels:
+      app: prow
+      component: pod-scaler-ui
+    name: pod-scaler-ui
+  spec:
+    ports:
+    - name: main
+      port: 80
+      protocol: TCP
+      targetPort: main
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: metrics
+    selector:
+      app: prow
+      component: pod-scaler-ui
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    labels:
+      app: prow
+      component: pod-scaler-ui
+    name: pod-scaler-ui
+    namespace: ci
+  spec:
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    port:
+      targetPort: main
+    to:
+      kind: Service
+      name: pod-scaler-ui
+- apiVersion: monitoring.coreos.com/v1
+  kind: ServiceMonitor
+  metadata:
+    name: pod-scaler-ui
+    namespace: prow-monitoring
+    labels:
+      app: prow
+      component: pod-scaler-ui
+      prow-app: pod-scaler-ui
+  spec:
+    endpoints:
+    - interval: 30s
+      port: metrics
+      scheme: http
+    namespaceSelector:
+      matchNames:
+      - ci
+    selector:
+      matchLabels:
+        app: prow
+        component: pod-scaler-ui
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ci
+    name: pod-scaler-ui
+    annotations:
+      image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"pod-scaler:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"pod-scaler-ui\")].image"}]'
+  spec:
+    replicas: 2
+    strategy:
+      type: RollingUpdate
+    selector:
+      matchLabels:
+        app: prow
+        component: pod-scaler-ui
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: pod-scaler-ui
+      spec:
+        affinity:
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                  - key: component
+                    operator: In
+                    values:
+                    - pod-scaler-ui
+                topologyKey: "kubernetes.io/hostname"
+        containers:
+        - name: pod-scaler-ui
+          image: pod-scaler:latest
+          args:
+          - --loglevel=info
+          - --mode=consumer.ui
+          - --ui-port=8080
+          - --cache-bucket=origin-ci-resource-usage-data
+          - --gcs-credentials-file=/etc/gcs/service-account.json
+          - --data-dir=/tmp
+          ports:
+          - name: main
+            containerPort: 8080
+          - name: metrics
+            containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 3
+            periodSeconds: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 3
+            timeoutSeconds: 600
+          volumeMounts:
+          - name: gcs-credentials
+            mountPath: /etc/gcs
+            readOnly: true
+          - mountPath: /tmp
+            name: tmp
+          resources:
+            requests:
+              memory: "3Gi"
+              cpu: "500m"
+        volumes:
+        - name: gcs-credentials
+          secret:
+            secretName: gce-sa-credentials-resource-usage-data-publisher
+        - emptyDir: {}
+          name: tmp

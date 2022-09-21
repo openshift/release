@@ -1,0 +1,50 @@
+base_images:
+  base-java:
+    name: release
+    namespace: openshift
+    tag: jdk-8
+  cli:
+    name: origin-v3.11
+    namespace: openshift
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- context_dir: cassandra/
+  from: base-java
+  to: metrics-cassandra
+- context_dir: deployer/
+  from: cli
+  to: metrics-deployer
+- context_dir: hawkular-metrics/
+  to: metrics-hawkular-metrics
+- context_dir: heapster/
+  from: heapster-base
+  to: metrics-heapster
+- context_dir: schema-installer/
+  from: base-java
+  to: metrics-schema-installer
+raw_steps:
+- project_directory_image_build_step:
+    context_dir: heapster-base/
+    from: base
+    to: heapster-base
+resources:
+  '*':
+    requests:
+      cpu: "1"
+      memory: 200Mi
+  src:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: origin-v3.11
+  namespace: openshift
+zz_generated_metadata:
+  branch: release-3.11
+  org: openshift
+  repo: origin-metrics

@@ -1,0 +1,61 @@
+periodics:
+- agent: kubernetes
+  cluster: build03
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  interval: 5m
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ipi-deprovision-aws-osd-hypershift
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
+  spec:
+    containers:
+    - command:
+      - ./core-services/ipi-deprovision/aws.sh
+      env:
+      - name: HOME
+        value: /tmp
+      - name: AWS_SHARED_CREDENTIALS_FILE
+        value: /aws/credentials
+      - name: CLUSTER_TTL
+        value: 30 minutes ago
+      - name: HYPERSHIFT_BASE_DOMAIN
+        value: ci.hypershift.devcluster.openshift.com
+      - name: HYPERSHIFT_PRUNER
+        value: "true"
+      - name: KUBECONFIG
+        value: /kubeconfig/hypershift-ops-admin.kubeconfig
+      image: registry.ci.openshift.org/ci/ipi-deprovision:latest
+      imagePullPolicy: Always
+      name: ipi-deprovision
+      resources:
+        requests:
+          cpu: "1"
+          memory: 300Mi
+      volumeMounts:
+      - mountPath: /aws
+        name: cluster-secrets-aws
+      - mountPath: /kubeconfig
+        name: kubeconfig
+    serviceAccountName: ipi-deprovisioner
+    volumes:
+    - name: cluster-secrets-aws
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: hypershift-pool-aws-credentials
+    - name: kubeconfig
+      secret:
+        secretName: hypershift-ci-1

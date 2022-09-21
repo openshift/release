@@ -1,0 +1,112 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_path: Dockerfile
+  to: ssp-operator-container
+- dockerfile_path: validator.Dockerfile
+  to: template-validator-container
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unittests
+  steps:
+    test:
+    - as: unittests
+      commands: export GOFLAGS= && make unittest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-functests
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: e2e-functests
+      cli: latest
+      commands: |
+        export GOFLAGS=
+        ./automation/e2e-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      env:
+      - default: release-v0.16
+        name: CI_BRANCH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-azure
+- as: e2e-upgrade-functests
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: e2e-upgrade-functests
+      cli: latest
+      commands: |
+        export GOFLAGS=
+        ./automation/e2e-upgrade-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      env:
+      - default: release-v0.16
+        name: CI_BRANCH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-azure
+- as: e2e-single-node-functests
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: e2e-single-node-functests
+      cli: latest
+      commands: |
+        export TOPOLOGY_MODE=SingleReplica
+        export GOFLAGS=
+        ./automation/e2e-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      env:
+      - default: release-v0.16
+        name: CI_BRANCH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp-single-node
+zz_generated_metadata:
+  branch: release-v0.16
+  org: kubevirt
+  repo: ssp-operator

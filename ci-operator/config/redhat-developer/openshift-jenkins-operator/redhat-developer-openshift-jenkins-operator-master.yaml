@@ -1,0 +1,41 @@
+base_images:
+  base:
+    name: "4.2"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+images:
+- from: base
+  to: openshift-jenkins-operator
+releases:
+  initial:
+    integration:
+      name: "4.2"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.2"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: e2e
+  commands: make test-e2e
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: redhat-developer
+  repo: openshift-jenkins-operator

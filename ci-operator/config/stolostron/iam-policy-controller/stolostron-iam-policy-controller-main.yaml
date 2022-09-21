@@ -1,0 +1,64 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: ./Dockerfile
+  from: base
+  inputs:
+    root:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+  to: iam-policy-controller
+promotion:
+  name: "2.7"
+  namespace: stolostron
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: iam-policy-controller
+    env:
+      IMAGE_REPO: iam-policy-controller
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: test-unit
+  commands: |
+    export HOME="/tmp"
+    export LOCAL_BIN="${HOME}/bin"
+    make test
+  container:
+    from: src
+- as: sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    export HOME="/tmp"
+    make -f Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: iam-policy-controller
+    env:
+      IMAGE_REPO: iam-policy-controller
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: iam-policy-controller

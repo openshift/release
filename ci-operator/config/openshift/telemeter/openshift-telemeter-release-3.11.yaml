@@ -1,0 +1,34 @@
+base_images:
+  base:
+    name: origin-v3.11
+    namespace: openshift
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.10
+images:
+- from: base
+  to: telemeter
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tag_specification:
+  name: origin-v3.11
+  namespace: openshift
+tests:
+- as: unit
+  commands: make check
+  container:
+    from: src
+- as: integration
+  commands: make test-integration
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-3.11
+  org: openshift
+  repo: telemeter

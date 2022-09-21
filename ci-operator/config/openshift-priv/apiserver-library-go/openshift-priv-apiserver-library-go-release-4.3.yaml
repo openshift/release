@@ -1,0 +1,42 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.12
+canonical_go_repository: github.com/openshift/apiserver-library-go
+promotion:
+  name: 4.3-priv
+  namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 8Gi
+test_binary_build_commands: make build GOFLAGS='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    HOME=$( mktemp -d )
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: release-4.3
+  org: openshift-priv
+  repo: apiserver-library-go

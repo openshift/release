@@ -1,0 +1,54 @@
+ref:
+  as: ocm-ci-image-mirror-periodic
+  from_image:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
+  commands: ocm-ci-image-mirror-periodic-commands.sh
+  credentials:
+  - mount_path: /secrets/acm-cicd-osci-push
+    name: acm-cicd-osci-push
+    namespace: test-credentials
+  - mount_path: /secrets/acm-cicd-quay-push
+    name: acm-cicd-quay-push
+    namespace: test-credentials
+  dependencies:
+  - env: SOURCE_IMAGE_REF
+    name: src
+  env:
+  - name: SECRETS_PATH
+    default: /secrets
+    documentation: |-
+      The directory where credentials will be mounted.
+  - name: REGISTRY_SECRET
+    default: acm-cicd-quay-push
+    documentation: |-
+      The name of the kube secret that contains the registry token file.
+  - name: REGISTRY_SECRET_FILE
+    default: token
+    documentation: |-
+      The name of the file in REGSITRY_SECRET with the contents of
+      the .docker/config.json file encoded in base64.
+  - name: REGISTRY_HOST
+    default: quay.io
+    documentation: |-
+      The hostname (and port) of the destination registry.
+  - name: REGISTRY_ORG
+    default: stolostron
+    documentation: |-
+      The organization of the destination image reference.
+  - name: IMAGE_REPO
+    default: ''
+    documentation: |-
+      The repository name of the destination image reference. Must be provided.
+  - name: IMAGE_TAG
+    default: latest
+    documentation: |-
+      The tag for the destination image reference. 
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: |-
+    This workflow mirrors an image from the CI Registry to a given
+    image ref.
