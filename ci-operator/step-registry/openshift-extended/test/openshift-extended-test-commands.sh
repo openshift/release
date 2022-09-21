@@ -158,13 +158,13 @@ oc get clusterversion version -o yaml || true
 # execute the cases
 function run {
     test_scenarios=""
-    echo "TEST_SCENRAIOS: \"${TEST_SCENRAIOS:-}\""
+    echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
     echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
-    if [[ -n "${TEST_SCENRAIOS:-}" ]]; then
-        readarray -t scenarios <<< "${TEST_SCENRAIOS}"
+    if [[ -n "${TEST_SCENARIOS:-}" ]]; then
+        readarray -t scenarios <<< "${TEST_SCENARIOS}"
         for scenario in "${scenarios[@]}"; do
             test_scenarios="${test_scenarios}|${scenario}"
         done
@@ -174,7 +174,7 @@ function run {
     fi
 
     if [ "W${test_scenarios}W" == "WW" ]; then
-        echo "fail to parse ${TEST_SCENRAIOS}"
+        echo "fail to parse ${TEST_SCENARIOS}"
         exit 1
     fi
     echo "test scenarios: ${test_scenarios:1:-1}"

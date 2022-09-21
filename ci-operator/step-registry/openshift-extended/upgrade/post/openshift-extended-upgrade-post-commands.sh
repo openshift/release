@@ -149,12 +149,12 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 # execute the cases
 function run {
     test_scenarios=""
-    echo "TEST_SCENRAIOS_POSTUPG: \"${TEST_SCENRAIOS_POSTUPG:-}\""
+    echo "TEST_SCENARIOS_POSTUPG: \"${TEST_SCENARIOS_POSTUPG:-}\""
     echo "TEST_ADDITIONAL_POSTUPG: \"${TEST_ADDITIONAL_POSTUPG:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
-    if [[ -n "${TEST_SCENRAIOS_POSTUPG:-}" ]]; then
-        readarray -t scenarios <<< "${TEST_SCENRAIOS_POSTUPG}"
+    if [[ -n "${TEST_SCENARIOS_POSTUPG:-}" ]]; then
+        readarray -t scenarios <<< "${TEST_SCENARIOS_POSTUPG}"
         for scenario in "${scenarios[@]}"; do
             test_scenarios="${test_scenarios}|${scenario}"
         done
@@ -164,7 +164,7 @@ function run {
     fi
 
     if [ "W${test_scenarios}W" == "WW" ]; then
-        echo "fail to parse ${TEST_SCENRAIOS_POSTUPG}"
+        echo "fail to parse ${TEST_SCENARIOS_POSTUPG}"
         exit 1
     fi
     echo "test scenarios: ${test_scenarios:1:-1}"
