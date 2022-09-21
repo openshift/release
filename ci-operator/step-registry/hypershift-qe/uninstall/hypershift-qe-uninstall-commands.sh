@@ -2,6 +2,7 @@
 
 set -xeuo pipefail
 
+echo "$BUCKETNAME"
 hypershift install render --format=yaml | oc delete -f -
 
 platform=$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')
@@ -14,5 +15,5 @@ if [ "$platform" == "AWS" ]; then
     echo -e "[default]\naws_access_key_id=$accessKeyID\naws_secret_access_key=$secureKey" > config/awscredentials
     cp -f "config/awscredentials" "$HOME/.aws/credentials"
     region=$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')
-    aws s3api delete-bucket --bucket lianglieast1 --region "$region"
+    aws s3api delete-bucket --bucket "$BUCKETNAME" --region "$region"
 fi
