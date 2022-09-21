@@ -3,8 +3,8 @@
 NAMESPACE="clusters"
 
 gclusters=$(oc get hostedcluster -n "$NAMESPACE" -ojsonpath='{.items[*].metadata.name}')
-gclusters_arr=(${gclusters})
-for cluster_item in ${gclusters_arr[@]}
+gclusters_arr=("$gclusters")
+for cluster_item in "${gclusters_arr[@]}"
 do
     echo "begin to destroy cluster ${cluster_item}"
     platform=$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')
