@@ -18,6 +18,8 @@ function export-credentials() {
         accessKeyID=$(oc get secret -n kube-system aws-creds -o template='{{index .data "aws_access_key_id"|base64decode}}')
         secureKey=$(oc get secret -n kube-system aws-creds -o template='{{index .data "aws_secret_access_key"|base64decode}}')
         echo -e "[default]\naws_access_key_id=$accessKeyID\naws_secret_access_key=$secureKey" > "$SHARED_DIR/awscredentials"
+        export AWS_ACCESS_KEY_ID="$accessKeyID"
+        export AWS_SECRET_ACCESS_KEY="$secureKey"
     fi
 }
 
@@ -30,8 +32,7 @@ if [ "$platform" == 'Azure' ]; then
         --hypershift-image "quay.io/hypershift/hypershift-operator:latest"
 elif [ "$platform" == "AWS" ]; then
     region=$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')
-    cp -f "$SHARED_DIR/awscredentials" "$HOME/.aws/credentials"
-
+    export AWS_DEFAULT_REGION="$region"
     aws s3api head-bucket --bucket hypershift-qe --region "$region"
     if [ $? -eq 0 ] ; then
         echo "this bucket already exists"
