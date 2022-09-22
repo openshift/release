@@ -8,6 +8,7 @@ echo "$BUCKETNAME"
 hypershift install render --format=yaml | oc delete -f -
 
 platform=$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')
+echo "$platform"
 if [ "$platform" == "AWS" ]; then
     if [ ! -d config  ];then
         mkdir config
