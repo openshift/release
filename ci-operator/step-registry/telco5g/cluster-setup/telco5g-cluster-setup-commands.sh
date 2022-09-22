@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 echo "************ telco cluster setup command ************"
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
+# Fix user IDs in a container
 ~/fix_uid.sh
 
 SSH_PKEY_PATH=/var/run/ci-key/cikey
@@ -102,7 +102,7 @@ EOF
 
 fi
 echo "#############################################################################..."
-echo "========  Deploying plan $PLAN_NAME on cluster $CLUSTER_NAME with$(if ! $BASTION_ENV; then echo "out"; fi) a bastion  ========"
+echo "========  Deploying plan $PLAN_NAME on cluster $CLUSTER_NAME $(if $BASTION_ENV; then echo "with a bastion"; fi)  ========"
 echo "#############################################################################..."
 
 # Start the deployment
