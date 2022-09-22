@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x pipefail
+set -x
 BUCKETNAME="hypershiftqe$RANDOM"
 
 bucket_name_file="${SHARED_DIR}/bucket_name"
