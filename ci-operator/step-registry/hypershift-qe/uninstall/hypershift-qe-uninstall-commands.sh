@@ -10,9 +10,6 @@ hypershift install render --format=yaml | oc delete -f -
 platform=$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')
 echo "$platform"
 if [ "$platform" == "AWS" ]; then
-    if [ ! -d config  ];then
-        mkdir config
-    fi
     accessKeyID=$(oc get secret -n kube-system aws-creds -o template='{{index .data "aws_access_key_id"|base64decode}}')
     secureKey=$(oc get secret -n kube-system aws-creds -o template='{{index .data "aws_secret_access_key"|base64decode}}')
     region=$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')
