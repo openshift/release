@@ -84,6 +84,7 @@ spec:
         - --port=8080
         - --cpu-cap=10
         - --memory-cap=20Gi
+        - --report-credentials-file=/etc/report/credentials
         ports:
           - name: main
             containerPort: 8080
@@ -109,6 +110,9 @@ spec:
         - name: serving-cert
           mountPath: /etc/pki/tls/certs/admission
           readOnly: true
+        - name: report-credentials
+          mountPath: /etc/report
+          readOnly: true
         resources:
           requests:
             memory: "4Gi"
@@ -121,6 +125,9 @@ spec:
         secret:
           defaultMode: 420
           secretName: pod-scaler-admission-serving-cert
+      - name: report-credentials
+        secret:
+          secretName: report-credentials
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
