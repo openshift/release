@@ -16,7 +16,7 @@ validate_egressfirewall_cr () {
 }
 
 validate_egressnetworkpolicy_cr () {
-  kubectl get egressfirewall -n test-migration default -o json | jq .spec | tee current_config
+  kubectl get egressnetworkpolicy -n test-migration default -o json | jq .spec | tee current_config
   echo "$EXPECT_EGRESS_FIREWALL_SPEC" | tee expected_config
   if diff <(jq -S . current_config) <(jq -S . expected_config); then
     echo "configuration is migrated as expected"
