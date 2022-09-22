@@ -33,17 +33,12 @@ if [ "$platform" == 'Azure' ]; then
 elif [ "$platform" == "AWS" ]; then
     region=$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')
     export AWS_DEFAULT_REGION="$region"
-    aws s3api head-bucket --bucket hypershift-qe --region "$region"
-    if [ $? -eq 0 ] ; then
-        echo "this bucket already exists"
+    if [ "$region" == "us-east-1" ]; then
+        aws s3api create-bucket --acl public-read --bucket "$BUCKETNAME" \
+            --region "$region" || true
     else
-        if [ X"${region}" == X"us-east-1" ]; then
-            aws s3api create-bucket --acl public-read --bucket "$BUCKETNAME" \
-                --region "$region"
-        else
-            aws s3api create-bucket --acl public-read --bucket "$BUCKETNAME" \
-                --create-bucket-configuration LocationConstraint="$region" \
-                --region "$region"
-        fi
+        aws s3api create-bucket --acl public-read --bucket "$BUCKETNAME" \
+            --create-bucket-configuration LocationConstraint="$region" \
+            --region "$region" || true
     fi
 fi
