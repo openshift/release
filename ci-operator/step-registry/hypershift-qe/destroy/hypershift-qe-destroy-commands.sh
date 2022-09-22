@@ -2,7 +2,8 @@
 
 set -xeuo pipefail
 
-echo "$CLUSTER_NAME"
+BUCKETNAME=$(cat "${SHARED_DIR}/bucket_name")
+echo "$BUCKETNAME"
 NAMESPACE="clusters"
 
 gclusters=$(oc get hostedcluster -n "$NAMESPACE" -ojsonpath='{.items[*].metadata.name}')
