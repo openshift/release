@@ -66,21 +66,7 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |
-    FROM quay.io/centos/centos:stream9
-    RUN dnf install -y 'dnf-command(config-manager)' && \
-        dnf config-manager --set-enabled crb && \
-        dnf install -y git unzip make gcc which nmstate-devel
-    COPY --from=registry.ci.openshift.org/openshift/release:golang-1.17 /usr/local/go /usr/local/go
-    ENV GOPATH=/go
-    ENV GOROOT=/usr/local/go
-    ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
-    COPY . /assisted-service/
-    WORKDIR /assisted-service/
-    ENV CGO_CFLAGS="-g -O2 -Wno-return-local-addr"
-    RUN go mod vendor
-    RUN chmod 775 -R $GOPATH && chmod 775 -R $(go env GOROOT) && chmod 775 -R /assisted-service/ && \
-        mkdir /.cache && chmod 775 -R /.cache
+- dockerfile_path: ci-images/Dockerfile.base
   inputs:
     coreos_centos_stream9:
       as:
@@ -88,53 +74,26 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: assisted-service-centos9
-- dockerfile_literal: |
-    FROM base
-    RUN dnf install -y postgresql-server
-    RUN cd / && /assisted-service/hack/setup_env.sh test_tools
-  from: assisted-service-centos9
+  to: assisted-service-base
+- dockerfile_path: ci-images/Dockerfile.unit-tests
+  from: assisted-service-base
   to: assisted-service-unit-test
-- dockerfile_literal: |
-    FROM base
-    COPY --from=quay.io/app-sre/golangci-lint:v1.37.1 /usr/bin/golangci-lint /usr/bin/golangci-lint
-  from: assisted-service-centos9
+- dockerfile_path: ci-images/Dockerfile.lint
+  from: assisted-service-base
   inputs:
     golangci-lint:
       as:
       - quay.io/app-sre/golangci-lint:v1.37.1
   to: assisted-service-lint
-- dockerfile_literal: |
-    FROM base
-    COPY --from=quay.io/openshift/origin-cli:latest /usr/bin/oc /usr/bin
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN make build-openshift-ci-test-bin
-    RUN go mod vendor
-  from: assisted-service-centos9
+- dockerfile_path: ci-images/Dockerfile.subsystem
+  from: assisted-service-base
   inputs:
     cli:
       as:
       - quay.io/openshift/origin-cli:latest
   to: assisted-service-subsystem
-- dockerfile_literal: |
-    FROM base
-    ENV VIRTUAL_ENV=/opt/venv
-    ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-    COPY --from=quay.io/goswagger/swagger:v0.28.0 /usr/bin/swagger /usr/bin/goswagger
-    RUN cd / && /assisted-service/hack/setup_env.sh spectral && \
-        /assisted-service/hack/setup_env.sh jq && \
-        /assisted-service/hack/setup_env.sh kustomize && \
-        go install github.com/golang/mock/mockgen@v1.5.0 && \
-        go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.2 && \
-        go install golang.org/x/tools/cmd/goimports@v0.1.5 && \
-        chmod 775 -R $GOPATH
-    RUN curl --retry 5 -L https://github.com/operator-framework/operator-sdk/releases/download/v1.10.1/operator-sdk_linux_amd64 --output /tmp/operator-sdk_linux_amd64 && \
-        chmod +x /tmp/operator-sdk_linux_amd64 && \
-        install /tmp/operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
-    RUN python3 -m venv ${VIRTUAL_ENV} && \
-        python3 -m pip install --upgrade pip && \
-        python3 -m pip install -r /assisted-service/dev-requirements.txt
-  from: assisted-service-centos9
+- dockerfile_path: ci-images/Dockerfile.code-generation
+  from: assisted-service-base
   inputs:
     goswagger_swagger:
       as:
