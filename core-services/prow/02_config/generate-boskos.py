@@ -74,6 +74,9 @@ CONFIG = {
     'equinix-ocp-metal-quota-slice': {
         'default': 40,
     },
+    'equinix-ocp-metal-qe-quota-slice': {
+        'default': 40,
+    },
     'gcp-qe-quota-slice': {
         'us-central1': 70,
     },
