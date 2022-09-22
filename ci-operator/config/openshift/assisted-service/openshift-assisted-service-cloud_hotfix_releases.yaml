@@ -110,6 +110,18 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: assisted-service-build-base
+- dockerfile_literal: |
+    FROM base-build
+    COPY . .
+  inputs:
+    assisted-service-build-base:
+      as:
+      - base-build
+    src:
+      paths:
+      - destination_dir: ./
+        source_path: /go/src/github.com/openshift/assisted-service/.
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
@@ -118,6 +130,30 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: assisted-service
+- dockerfile_literal: |
+    FROM base
+    ENV VIRTUAL_ENV=/opt/venv
+    ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+    COPY --from=quay.io/goswagger/swagger:v0.28.0 /usr/bin/swagger /usr/bin/goswagger
+    RUN cd / && /assisted-service/hack/setup_env.sh spectral && \
+        /assisted-service/hack/setup_env.sh jq && \
+        /assisted-service/hack/setup_env.sh kustomize && \
+        go install github.com/golang/mock/mockgen@v1.5.0 && \
+        go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.2 && \
+        go install golang.org/x/tools/cmd/goimports@v0.1.5 && \
+        chmod 775 -R $GOPATH
+    RUN curl --retry 5 -L https://github.com/operator-framework/operator-sdk/releases/download/v1.10.1/operator-sdk_linux_amd64 --output /tmp/operator-sdk_linux_amd64 && \
+        chmod +x /tmp/operator-sdk_linux_amd64 && \
+        install /tmp/operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
+    RUN python3 -m venv ${VIRTUAL_ENV} && \
+        python3 -m pip install --upgrade pip && \
+        python3 -m pip install -r /assisted-service/dev-requirements.txt
+  from: assisted-service-centos9
+  inputs:
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
+  to: assisted-service-generate
 releases:
   latest:
     integration:
