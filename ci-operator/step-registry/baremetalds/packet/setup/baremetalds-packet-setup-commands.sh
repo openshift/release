@@ -7,7 +7,6 @@ set -o pipefail
 echo "************ baremetalds packet setup command ************"
 
 function send_slack(){
-    echo Packet setup failed: $1
     SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat $CLUSTER_PROFILE_DIR/slackhook)"
 
     curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Packet setup failed> $1\n\"}" \
@@ -24,7 +23,8 @@ EOF
 }
 
 function exit_with_failure(){
-  MESSAGE="Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+  MESSAGE="baremetalds: ${1:-"Failed to create ci resource: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"}"
+  echo $MESSAGE
   cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
   <testsuite name="metal infra" tests="1" failures="1">
     <testcase name="[sig-metal] should get working host from infra provider">
@@ -172,11 +172,14 @@ CIRTYPE=cihost
 [[ "$CLUSTERTYPE" == "baremetal" ]] && CIRTYPE=cicluster
 
 if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
+    if [[ ! "$RELEASE_IMAGE_LATEST" =~ build05 ]] ; then
+        echo "WARNING: Attempting to contact lab ofcir API from the wrong cluster, must be build05 to succeed"
+    fi
     getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)" && exit_with_success
 fi
 
 # No point in continuing, only ofcir_laburl has cir's of type "cicluster"
-[[ "$CLUSTERTYPE" == "baremetal" ]] && exit_with_failure
+[[ "$CLUSTERTYPE" == "baremetal" ]] && exit_with_failure "Failed to get baremetal cluster from ofcir"
 
 if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
     getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)" && exit_with_success
@@ -248,8 +251,8 @@ for _ in $(seq 30) ; do
     if [ "$STATE" == "active" ] && [ -n "$IP" ] ; then
         echo "$IP" >  "${SHARED_DIR}/server-ip"
         # This also has 100 seconds worth of ssh retries
-        bash ${SHARED_DIR}/packet-conf.sh && exit_with_success || exit_with_failure
+        bash ${SHARED_DIR}/packet-conf.sh && exit_with_success || exit_with_failure "Failed to initialize equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
     fi
 done
 
-exit_with_failure
+exit_with_failure "Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
