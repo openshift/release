@@ -2,8 +2,6 @@
 
 set -xeuo pipefail
 
-BUCKETNAME=$(cat "${SHARED_DIR}/bucket_name")
-echo "$BUCKETNAME"
 CLUSTER_NAME="ci-cluster"
 NAMESPACE="clusters"
 

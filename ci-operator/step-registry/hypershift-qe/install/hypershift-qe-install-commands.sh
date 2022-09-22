@@ -41,4 +41,9 @@ elif [ "$platform" == "AWS" ]; then
             --create-bucket-configuration LocationConstraint="$region" \
             --region "$region" || true
     fi
+    hypershift install \
+        --oidc-storage-provider-s3-bucket-name "$BUCKETNAME" \
+        --oidc-storage-provider-s3-credentials "$SHARED_DIR/awscredentials" \
+        --oidc-storage-provider-s3-region "$region" \
+        --hypershift-image "quay.io/hypershift/hypershift-operator:latest"
 fi
