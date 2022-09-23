@@ -3,7 +3,7 @@
 set -x
 BUCKETNAME="hypershiftqe$RANDOM"
 
-bucket_name_file="${SHARED_DIR}/bucket_name"
+bucket_name_file="$SHARED_DIR/bucket_name"
 echo $BUCKETNAME > "$bucket_name_file"
 
 function export-credentials() {
