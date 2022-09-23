@@ -14,7 +14,7 @@ echo "region: $region"
 
 hypershift create cluster aws \
     --aws-creds "$SHARED_DIR/awscredentials" \
-    --pull-secret config/.dockerconfigjson \
+    --pull-secret "$SHARED_DIR/.dockerconfigjson" \
     --name "$CLUSTER_NAME" \
     --base-domain qe.devcluster.openshift.com \
     --namespace "$NAMESPACE" \
