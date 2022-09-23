@@ -7,10 +7,8 @@ NAMESPACE="clusters"
 
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to="$SHARED_DIR" --confirm
-
 echo "get playload image"
 playloadimage=$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
-
 region=$(oc get node -ojsonpath='{.items[].metadata.labels.topology\.kubernetes\.io/region}')
 echo "region: $region"
 
