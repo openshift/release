@@ -64,6 +64,11 @@ cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
 chmod 0600 ~/.ssh/ssh-privatekey || true
 eval export SSH_CLOUD_PRIV_KEY="~/.ssh/ssh-privatekey"
 
+test -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" || echo "ssh-publickey file does not exist"
+cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
+chmod 0644 ~/.ssh/ssh-publickey || true
+eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
+
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
@@ -166,7 +171,9 @@ function run {
     if [[ -n "${TEST_SCENARIOS:-}" ]]; then
         readarray -t scenarios <<< "${TEST_SCENARIOS}"
         for scenario in "${scenarios[@]}"; do
-            test_scenarios="${test_scenarios}|${scenario}"
+            if [ "W${scenario}W" != "WW" ]; then
+                test_scenarios="${test_scenarios}|${scenario}"
+            fi
         done
     else
         echo "there is no scenario"
@@ -177,8 +184,8 @@ function run {
         echo "fail to parse ${TEST_SCENARIOS}"
         exit 1
     fi
-    echo "test scenarios: ${test_scenarios:1:-1}"
-    test_scenarios="${test_scenarios:1:-1}"
+    echo "test scenarios: ${test_scenarios:1}"
+    test_scenarios="${test_scenarios:1}"
 
     test_additional=""
     if [[ -n "${TEST_ADDITIONAL:-}" ]]; then
