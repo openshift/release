@@ -171,7 +171,9 @@ function run {
     if [[ -n "${TEST_SCENARIOS:-}" ]]; then
         readarray -t scenarios <<< "${TEST_SCENARIOS}"
         for scenario in "${scenarios[@]}"; do
-            test_scenarios="${test_scenarios}|${scenario}"
+            if [ "W${scenario}W" != "WW" ]; then
+                test_scenarios="${test_scenarios}|${scenario}"
+            fi
         done
     else
         echo "there is no scenario"
@@ -182,8 +184,8 @@ function run {
         echo "fail to parse ${TEST_SCENARIOS}"
         exit 1
     fi
-    echo "test scenarios: ${test_scenarios:1:-1}"
-    test_scenarios="${test_scenarios:1:-1}"
+    echo "test scenarios: ${test_scenarios:1}"
+    test_scenarios="${test_scenarios:1}"
 
     test_additional=""
     if [[ -n "${TEST_ADDITIONAL:-}" ]]; then
