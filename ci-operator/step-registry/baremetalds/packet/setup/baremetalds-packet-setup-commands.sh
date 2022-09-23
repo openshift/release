@@ -185,12 +185,6 @@ if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
     getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)" && exit_with_success
 fi
 
-# Avoid requesting a bunch of servers at the same time so they
-# don't race each other for available resources in a facility
-SLEEPTIME=$(( RANDOM % 120 ))
-echo "Sleeping for $SLEEPTIME seconds"
-sleep $SLEEPTIME
-
 # Run Ansible playbook
 cat > packet-setup.yaml <<-EOF
 - name: setup Packet host
@@ -204,6 +198,17 @@ cat > packet-setup.yaml <<-EOF
     - packet_auth_token: "{{ lookup('file', lookup('env', 'CLUSTER_PROFILE_DIR') + '/packet-auth-token') }}"
     - user_data_filename: "{{ lookup('env', 'USER_DATA_FILENAME') }}"
   tasks:
+
+  name: Avoid requesting a bunch of servers at the same time so they don't race each other for available resources in a facility
+  block:
+    - name: Get a random number between 1 and 120
+      set_fact:
+        sleep_time: "{{ range(1, 120)| random }}"
+
+    - name: Pause for {{ sleep_time }} seconds
+      ansible.builtin.pause:
+        seconds: {{ sleep_time }}
+
   - name: check cluster type
     fail:
       msg: "Unsupported CLUSTER_TYPE '{{ cluster_type }}'"
@@ -228,31 +233,58 @@ cat > packet-setup.yaml <<-EOF
         user_data: "{{ user_data | default(omit) }}"
       register: hosts
       no_log: true
+
     - name: write device info to file
       copy:
         content="{{ hosts }}"
         dest="${SHARED_DIR}/hosts.json"
+
+    - name: Get device ID
+      set_fact:
+        device_id: "{{ hosts['devices'][0]['id'] }}"
+
+    - name: wait for device {{ device_id }} to be provisionned
+      ansible.builtin.uri:
+        url: "https://api.equinix.com/metal/v1/devices/{{ device_id }}"
+        return_content: yes
+        headers:
+          "X-Auth-Token": "{{ packet_auth_token }}"
+      register: device_info
+      until:
+      - device_info.status == 200
+      - device_info.json.state
+      - device_info.json.state == 'active'
+      - device_info.json.ip_addresses|len >= 1
+      - device_info.json.ip_addresses[0].address
+      retries: 30
+      delay: 60
+      no_log: true
+
+    - name: write device ip to file
+      copy:
+        content="{{ device_info.json.ip_addresses[0].address }}"
+        dest="${SHARED_DIR}/server-ip"
+
+    - name: try to SSH into the machine
+      ansible.builtin.shell: |
+        bash ${SHARED_DIR}/packet-conf.sh
+
+  rescue:
+    - fail:
+        msg:
+          - "Failed to initialize equinix device {{ packet_hostname }}"
+          - "Device ID: {{ device_id | default("undefined") }}"
+          - "State: {{ device_info.json.state  | default("undefined") }}"
+          - "IP: {{ device_info.json.ip_addresses[0].address  | default("undefined") }}"
 EOF
 
-ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+for i in $(seq 1 "${MAX_RETRIES}"); do
+  echo "Try to create a machine ${i}/${MAX_RETRIES}..."
 
-DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
-
-function refresh_device_info(){
-    curl -H "X-Auth-Token: $(cat ${CLUSTER_PROFILE_DIR}/packet-auth-token)"  "https://api.equinix.com/metal/v1/devices/$DEVICEID" > /tmp/device.json
-    STATE=$(jq -r .state < /tmp/device.json)
-    IP=$(jq -r .ip_addresses[0].address < /tmp/device.json)
-}
-
-for _ in $(seq 30) ; do
-    sleep 60
-    refresh_device_info || true
-    echo "Device info: ${DEVICEID} ${STATE} ${IP}"
-    if [ "$STATE" == "active" ] && [ -n "$IP" ] ; then
-        echo "$IP" >  "${SHARED_DIR}/server-ip"
-        # This also has 100 seconds worth of ssh retries
-        bash ${SHARED_DIR}/packet-conf.sh && exit_with_success || exit_with_failure "Failed to initialize equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
-    fi
+  if ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+  then
+    exit_with_success
+  fi
 done
 
 exit_with_failure "Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
