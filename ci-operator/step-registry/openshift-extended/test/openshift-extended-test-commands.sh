@@ -64,6 +64,11 @@ cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
 chmod 0600 ~/.ssh/ssh-privatekey || true
 eval export SSH_CLOUD_PRIV_KEY="~/.ssh/ssh-privatekey"
 
+test -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" || echo "ssh-publickey file does not exist"
+cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
+chmod 0644 ~/.ssh/ssh-publickey || true
+eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
+
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
