@@ -104,6 +104,7 @@ tests:
         export PATH=/usr/local/go/bin:$PATH
         export PATH=$(go env GOPATH)/bin:$PATH
         HOME_DIR="$(pwd)"
+        WORK_DIR=$HOME_DIR
         echo "Start building kcp plugin ..."
         KCP_TAG="$(yq '.images[] | select(.name == "kcp") | .newTag' "ckcp/openshift/overlays/dev/kustomization.yaml")"
         echo "kcp tag:" $KCP_TAG
@@ -123,6 +124,16 @@ tests:
         oc cp "${KUBECONFIG}" default/podman:/kubeconfig
         echo "Start to set up ckcp"
         oc -n default exec pod/podman -- sh -c "export KUBECONFIG=/kubeconfig && /ckcp_setup.sh"
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 800Mi
+    - as: run-pipelinerun
+      cli: latest
+      commands: |
+        CASES=pipelines
+        cd $HOME_DIR/ckcp && ./test.sh
       from: src
       resources:
         requests:
