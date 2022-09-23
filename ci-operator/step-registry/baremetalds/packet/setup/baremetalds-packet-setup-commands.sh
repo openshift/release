@@ -175,8 +175,10 @@ if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_laburl" ] ; then
     if [[ ! "$RELEASE_IMAGE_LATEST" =~ build05 ]] ; then
         echo "WARNING: Attempting to contact lab ofcir API from the wrong cluster, must be build05 to succeed"
     fi
-    getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_laburl)" && exit_with_success
+    getCIR "https://10.10.129.12/ofcir" && exit_with_success
 fi
+
+exit 1
 
 # No point in continuing, only ofcir_laburl has cir's of type "cicluster"
 [[ "$CLUSTERTYPE" == "baremetal" ]] && exit_with_failure "Failed to get baremetal cluster from ofcir"
