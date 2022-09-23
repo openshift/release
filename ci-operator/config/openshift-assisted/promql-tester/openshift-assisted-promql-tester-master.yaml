@@ -1,0 +1,37 @@
+base_images:
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8.6"
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/origin/centos:stream8
+      RUN dnf install git -y
+images:
+- dockerfile_path: Dockerfile.build
+  from: src
+  to: promql-tester-build
+- dockerfile_path: Dockerfile
+  from: ubi_minimal
+  to: promql-tester
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: make lint
+  container:
+    from: promql-tester-build
+- as: unit-test
+  commands: make unit-test
+  container:
+    from: promql-tester-build
+zz_generated_metadata:
+  branch: master
+  org: openshift-assisted
+  repo: promql-tester
