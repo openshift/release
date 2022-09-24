@@ -38,8 +38,8 @@ until \
     sleep 10s
 done
 
-kubedamin_password=$(oc get secret -n "$NAMESPACE-$CLUSTER_NAME" kubeadmin-password -ojsonpath='{.data.password}')
+kubedamin_password=$(oc get secret -n "$NAMESPACE-$CLUSTER_NAME" kubeadmin-password --template='{{.data.password | base64decode}}')
 echo $kubedamin_password > "$SHARED_DIR/hypershift_kubedamin_password"
-cat "$SHARED_DIR/hypershift_kubedamin_password"
+cat "$SHARED_DIR/hostedcluster_kubedamin_password"
 echo "https://$(oc --kubeconfig="$SHARED_DIR"/hostedcluster.kubeconfig -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "$SHARED_DIR/console.url"
-cat "$SHARED_DIR/console.url"
+cat "$SHARED_DIR/hostedcluster_console.url"
