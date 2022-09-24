@@ -20,8 +20,8 @@ hypershift create cluster aws \
     --namespace "$NAMESPACE" \
     --node-pool-replicas 3 \
     --region "$region" \
-    --control-plane-availability-policy HighlyAvailable \
-    --infra-availability-policy HighlyAvailable \
+    --control-plane-availability-policy SingleReplica \
+    --infra-availability-policy SingleReplica \
     --release-image "$playloadimage"
 
 echo "Waiting for cluster to become available"
@@ -35,7 +35,7 @@ until \
   oc wait --kubeconfig="$SHARED_DIR"/hostedcluster.kubeconfig --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
   oc wait --kubeconfig="$SHARED_DIR"/hostedcluster.kubeconfig --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
     echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
-    sleep 1s
+    sleep 10s
 done
 
 kubedamin_password=$(oc get secret -n "$NAMESPACE-$CLUSTER_NAME" kubeadmin-password -ojsonpath='{.data.password}')
