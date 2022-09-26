@@ -171,6 +171,35 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: upstream-e2e-kafka-aws-ocp-411
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.11"
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    test:
+    - as: serverless-kafka-e2e
+      commands: make test-upstream-e2e-kafka-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: e2e-aws-ocp-411-continuous
   cluster_claim:
     architecture: amd64
@@ -184,6 +213,34 @@ tests:
     test:
     - as: serverless-e2e
       commands: make test-e2e-with-kafka test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: upstream-e2e-kafka-aws-ocp-411-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.11"
+  cron: 0 4,16 * * *
+  steps:
+    test:
+    - as: serverless-kafka-e2e
+      commands: make test-upstream-e2e-kafka-no-upgrade
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
