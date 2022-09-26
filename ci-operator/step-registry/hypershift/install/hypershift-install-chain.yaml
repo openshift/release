@@ -11,19 +11,15 @@ chain:
     - name: HYPERSHIFT_AWS_REGION
       default: "us-east-1"
       documentation: "The AWS region of the cluster."
-    commands: |-
+    commands: |-      
       bin/hypershift --version
       bin/hypershift install \
-        --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
+        --oidc-storage-provider-s3-credentials=${CLUSTER_PROFILE_DIR}/.awscred \
         --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
         --oidc-storage-provider-s3-region=us-east-1 \
         --private-platform=AWS \
-        --aws-private-creds=/etc/hypershift-pool-aws-credentials/credentials \
+        --aws-private-creds=${CLUSTER_PROFILE_DIR}/.awscred \
         --aws-private-region=${HYPERSHIFT_AWS_REGION}
-    credentials:
-    - mount_path: /etc/hypershift-pool-aws-credentials
-      name: hypershift-pool-aws-credentials
-      namespace: test-credentials
     grace_period: 1m0s
     resources:
       requests:

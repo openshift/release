@@ -15,7 +15,7 @@ chain:
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
       bin/hypershift destroy cluster aws \
-        --aws-creds=/etc/hypershift-pool-aws-credentials/credentials  \
+        --aws-creds=${CLUSTER_PROFILE_DIR}/.awscred  \
         --name ${CLUSTER_NAME} \
         --region ${HYPERSHIFT_AWS_REGION} \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
@@ -31,7 +31,3 @@ chain:
         cpu: 100m
         memory: 100Mi
     timeout: 15m0s
-    credentials:
-    - mount_path: /etc/hypershift-pool-aws-credentials
-      name: hypershift-pool-aws-credentials
-      namespace: test-credentials

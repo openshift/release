@@ -21,6 +21,8 @@ chain:
       documentation: "Extra args to pass to the create cluster aws command"
     commands: |-
       set -exuo pipefail
+      echo "extract secret/pull-secret"
+      oc extract secret/pull-secret -n openshift-config --to="$SHARED_DIR" --confirm
 
       # We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
       # have to use a hack like this.
@@ -35,8 +37,8 @@ chain:
         --instance-type=m5.xlarge \
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
         --region ${HYPERSHIFT_AWS_REGION} \
-        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-        --aws-creds /etc/hypershift-pool-aws-credentials/credentials \
+        --pull-secret "$SHARED_DIR/.dockerconfigjson" \
+        --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
         --release-image ${RELEASE_IMAGE_LATEST} \
         --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
@@ -65,13 +67,6 @@ chain:
         cpu: 100m
         memory: 100Mi
     timeout: 30m0s
-    credentials:
-    - mount_path: /etc/hypershift-pool-aws-credentials
-      name: hypershift-pool-aws-credentials
-      namespace: test-credentials
-    - mount_path: /etc/ci-pull-credentials
-      name: ci-pull-credentials
-      namespace: test-credentials
     dependencies:
     - name: "release:latest"
       env: RELEASE_IMAGE_LATEST

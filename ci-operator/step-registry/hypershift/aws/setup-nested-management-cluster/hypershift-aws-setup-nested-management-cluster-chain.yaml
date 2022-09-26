@@ -18,8 +18,8 @@ chain:
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
       bin/hypershift create cluster aws \
-        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-        --aws-creds=/etc/hypershift-ci-jobs-awscreds/credentials \
+        --pull-secret "$SHARED_DIR/.dockerconfigjson" \
+        --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
         --name=${CLUSTER_NAME} \
         --region=us-east-1 \
@@ -47,12 +47,6 @@ chain:
       # Data for cluster bot.
       echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
     credentials:
-    - mount_path: /etc/hypershift-ci-jobs-awscreds
-      name: hypershift-ci-jobs-awscreds
-      namespace: test-credentials
-    - mount_path: /etc/ci-pull-credentials
-      name: ci-pull-credentials
-      namespace: test-credentials
     - mount_path: /etc/hypershift-kubeconfig
       name: hypershift-ci-1
       namespace: test-credentials
