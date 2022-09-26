@@ -13,13 +13,21 @@ chain:
     - name: HYPERSHIFT_ZONES
       default: "us-east-1a,us-east-1b,us-east-1c"
       documentation: "The zones where to create NodePools"
+    - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+      default: "false"
+      documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
     commands: |-
+      AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      if [[ "HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT" == "true" ]]; then
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+      fi
+      
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
       bin/hypershift create cluster aws \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-        --aws-creds=/etc/hypershift-ci-jobs-awscreds/credentials \
+        --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
         --name=${CLUSTER_NAME} \
         --region=us-east-1 \
