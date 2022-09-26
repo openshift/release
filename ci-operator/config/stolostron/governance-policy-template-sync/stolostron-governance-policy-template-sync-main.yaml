@@ -31,24 +31,6 @@ tests:
       IMAGE_REPO: governance-policy-template-sync
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: test-unit
-  commands: |
-    export HOME="/tmp"
-    export LOCAL_BIN="${HOME}/bin"
-    make test
-  container:
-    from: src
-- as: sonarcloud
-  commands: |
-    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
-    export HOME="/tmp"
-    export SELF="make -f Makefile.prow"
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: latest-image-mirror
   postsubmit: true
   steps:
