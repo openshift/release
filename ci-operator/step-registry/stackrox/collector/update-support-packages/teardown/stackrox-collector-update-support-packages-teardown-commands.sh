@@ -4,7 +4,7 @@ set -eo pipefail
 
 source .openshift-ci/jobs/update-support-packages/env.sh
 
-.openshift-ci/jobs/integration-tests/gcloud-init.sh
+.openshift-ci/scripts/gcloud-init.sh
 
-.openshift-ci/jobs/integration-tests/teardown-vm.sh
+.openshift-ci/scripts/vms/teardown-vm.sh
 
