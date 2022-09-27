@@ -18,8 +18,11 @@ chain:
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
     commands: |-
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+      
       if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
       fi
       
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
@@ -32,7 +35,7 @@ chain:
         --name=${CLUSTER_NAME} \
         --region=us-east-1 \
         --infra-id=${CLUSTER_NAME} \
-        --base-domain=ci.hypershift.devcluster.openshift.com \
+        --base-domain=${BASE_DOMAIN} \
         --instance-type=m5.xlarge \
         --zones=${HYPERSHIFT_ZONES} \
         --service-cidr=172.29.0.0/16 \
