@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/aro-unit
     decorate: true
     labels:
@@ -53,16 +53,16 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-agent-compact
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.13-e2e-agent-compact
-    optional: true
     rerun_command: /test e2e-agent-compact
     skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
@@ -127,7 +127,81 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
+    context: ci/prow/e2e-agent-mce
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.13-e2e-agent-mce
+    optional: true
+    rerun_command: /test e2e-agent-mce
+    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-agent-mce-cluster-profile
+        - --target=e2e-agent-mce
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-agent-mce-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-mce,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build04
     context: ci/prow/e2e-alibaba
     decorate: true
     labels:
@@ -1009,7 +1083,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -1082,7 +1156,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azure-ovn-resourcegroup
     decorate: true
     labels:
@@ -1156,7 +1230,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azure-ovn-shared-vpc
     decorate: true
     labels:
@@ -1230,7 +1304,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azure-ovn-upi
     decorate: true
     labels:
@@ -1303,7 +1377,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azurestack
     decorate: true
     labels:
@@ -1377,7 +1451,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-azurestack-upi
     decorate: true
     labels:
@@ -1915,7 +1989,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-ibmcloud-ovn
     decorate: true
     labels:
@@ -2067,7 +2141,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal
     decorate: true
     labels:
@@ -2131,7 +2205,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal-assisted
     decorate: true
     labels:
@@ -2142,7 +2216,7 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.13-e2e-metal-assisted
     optional: true
     rerun_command: /test e2e-metal-assisted
-    skip_if_only_changed: (^(docs|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(alibabacloud|aws|azure|gcp|ibmcloud|libvirt|openstack|ovirt|vsphere)/)
+    skip_if_only_changed: (^(docs|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
       containers:
       - args:
@@ -2205,12 +2279,13 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-metal-ipi
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.13-e2e-metal-ipi
@@ -2279,12 +2354,13 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-dualstack
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.13-e2e-metal-ipi-ovn-dualstack
@@ -2353,12 +2429,13 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-metal-ipi-ovn-ipv6
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.13-e2e-metal-ipi-ovn-ipv6
@@ -2426,12 +2503,13 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-metal-ipi-swapped-hosts
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.13-e2e-metal-ipi-swapped-hosts
@@ -2500,12 +2578,13 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-metal-ipi-virtualmedia
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-release-4.13-e2e-metal-ipi-virtualmedia
@@ -2574,7 +2653,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     labels:
@@ -2723,7 +2802,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-openstack
     decorate: true
     labels:
@@ -2797,7 +2876,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-openstack-kuryr
     decorate: true
     labels:
@@ -2871,7 +2950,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-openstack-parallel
     decorate: true
     labels:
@@ -2945,7 +3024,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-openstack-proxy
     decorate: true
     labels:
@@ -3019,7 +3098,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-openstack-upi
     decorate: true
     labels:
@@ -3093,7 +3172,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/e2e-ovirt
     decorate: true
     labels:
@@ -3390,7 +3469,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/gofmt
     decorate: true
     labels:
@@ -3438,7 +3517,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/golint
     decorate: true
     labels:
@@ -3486,7 +3565,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/govet
     decorate: true
     labels:
@@ -3534,7 +3613,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/images
     decorate: true
     labels:
@@ -3595,7 +3674,7 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.13-okd-e2e-aws-ovn
     optional: true
     rerun_command: /test okd-e2e-aws-ovn
-    skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|pkg/.*|images)/(azure|baremetal|gcp|libvirt|openstack|ovirt|vsphere)/)
+    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
       containers:
       - args:
@@ -3671,6 +3750,7 @@ presubmits:
     name: pull-ci-openshift-installer-release-4.13-okd-e2e-aws-upgrade
     optional: true
     rerun_command: /test okd-e2e-aws-upgrade
+    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
       containers:
       - args:
@@ -3967,7 +4047,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/okd-images
     decorate: true
     labels:
@@ -4017,7 +4097,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/okd-unit
     decorate: true
     labels:
@@ -4067,7 +4147,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/okd-verify-codegen
     decorate: true
     labels:
@@ -4116,7 +4196,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/openstack-manifests
     decorate: true
     labels:
@@ -4189,7 +4269,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -4218,7 +4298,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -4248,7 +4328,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -4277,7 +4357,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     labels:
@@ -4325,7 +4405,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/verify-codegen
     decorate: true
     labels:
@@ -4372,7 +4452,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/verify-vendor
     decorate: true
     labels:
@@ -4420,7 +4500,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build01
+    cluster: build04
     context: ci/prow/yaml-lint
     decorate: true
     labels:

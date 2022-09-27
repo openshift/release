@@ -23,8 +23,14 @@ function populate_artifact_dir() {
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
   case "${CLUSTER_TYPE}" in
     powervs)
+      # We don't want debugging in this section
+      unset TF_LOG_PROVIDER
+      unset TF_LOG
+      unset TF_LOG_PATH
+      unset IBMCLOUD_TRACE
+
       echo "8<--------8<--------8<--------8<-------- Instance names, ids, and MAC addresses 8<--------8<--------8<--------8<--------"
-      ibmcloud pi instances --json | jq -r '.Payload.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
+      ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
       echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
       ;;
     *)
@@ -210,32 +216,48 @@ EOF
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
-function init_ibmcloud() {
+function install_required_tools() {
   #install the tools required
   cd /tmp || exit 1
 
+  export HOME=/tmp
+
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.9.0/IBM_Cloud_CLI_2.9.0_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.11.1/IBM_Cloud_CLI_2.11.1_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
-    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
-      /tmp/Bluemix_CLI/bin/ibmcloud plugin install ${I}
-    done
+    if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
+      echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud does not exist?"
+      exit 1
+    fi
+
+    PATH=${PATH}:/tmp/Bluemix_CLI/bin
 
     hash file 2>/dev/null && file /tmp/Bluemix_CLI/bin/ibmcloud
     echo "Checking ibmcloud version..."
-    if ! /tmp/Bluemix_CLI/bin/ibmcloud --version; then
+    if ! ibmcloud --version; then
       echo "Error: /tmp/Bluemix_CLI/bin/ibmcloud is not working?"
       exit 1
     fi
 
-    #PATH=${PATH}:/tmp/Bluemix_CLI/bin:/tmp/Bluemix_CLI/bin/ibmcloud
-    PATH=${PATH}:/tmp/Bluemix_CLI/bin
+    for I in infrastructure-service power-iaas cloud-internet-services cloud-object-storage dl-cli dns; do
+      ibmcloud plugin install ${I}
+    done
+    ibmcloud plugin list
+
+    for PLUGIN in cis pi; do
+      if ! ibmcloud ${PLUGIN} > /dev/null 2>&1; then
+        echo "Error: ibmcloud's ${PLUGIN} plugin is not installed?"
+        ls -la ${HOME}/.bluemix/
+        ls -la ${HOME}/.bluemix/plugins/
+        exit 1
+      fi
+    done
   fi
 
   if [ ! -f /tmp/jq ]; then
 
-    for I in $(seq 1 5)
+    for I in $(seq 1 10)
     do
       curl -L --output /tmp/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /tmp/jq
 
@@ -259,17 +281,54 @@ function init_ibmcloud() {
     PATH=${PATH}:/tmp
   fi
 
+  if [ ! -f /tmp/yq ] || [ ! -f /bin/yq-go ]; then
+
+    uname -m
+    ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
+    echo "ARCH=${ARCH}"
+    if [ -z "${ARCH}" ]; then
+      echo "Error: ARCH is empty!"
+      exit 1
+    fi
+
+    for I in $(seq 1 10)
+    do
+      curl -L "https://github.com/mikefarah/yq/releases/download/v4.25.3/yq_linux_${ARCH}" -o /tmp/yq && chmod +x /tmp/yq
+
+      hash file 2>/dev/null && file /tmp/yq
+      echo "Checking yq version..."
+      if /tmp/yq --version; then
+        break
+      else
+        echo "Error: /tmp/yq is not working?"
+        /bin/rm /tmp/yq
+        sleep 30s
+      fi
+    done
+  fi
+
   PATH=${PATH}:$(pwd)/bin
   export PATH
+}
 
-  BASE64_API_KEY="$(echo -n ${IBMCLOUD_API_KEY} | base64)"
-  export BASE64_API_KEY
-
+function init_ibmcloud() {
   IC_API_KEY=${IBMCLOUD_API_KEY}
   export IC_API_KEY
 
   if ! ibmcloud iam oauth-tokens 1>/dev/null 2>&1
   then
+    if [ -z "${IBMCLOUD_API_KEY}" ]; then
+      echo "Error: IBMCLOUD_API_KEY is empty!"
+      exit 1
+    fi
+    if [ -z "${VPCREGION}" ]; then
+      echo "Error: VPCREGION is empty!"
+      exit 1
+    fi
+    if [ -z "${POWERVS_RESOURCE_GROUP}" ]; then
+      echo "Error: POWERVS_RESOURCE_GROUP is empty!"
+      exit 1
+    fi
     ibmcloud login --apikey "${IBMCLOUD_API_KEY}" -r ${VPCREGION}
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
   fi
@@ -314,7 +373,7 @@ function check_resources() {
   #
   # Quota check for image imports
   #
-  JOBS=$(ibmcloud pi jobs --operation-action imageImport --json | jq -r '.Payload.jobs[] | select (.status.state|test("running")) | .id')
+  JOBS=$(ibmcloud pi jobs --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
   if [ -n "${JOBS}" ]
   then
     echo "JOBS=${JOBS}"
@@ -396,13 +455,31 @@ EOF
 function dump_resources() {
   init_ibmcloud
 
+  # We don't want debugging in this section
+  if declare -p TF_LOG_PROVIDER &>/dev/null; then
+    SAVE_TF_LOG_PROVIDER=${TF_LOG_PROVIDER}
+    unset TF_LOG_PROVIDER
+  fi
+  if declare -p TF_LOG &>/dev/null; then
+    SAVE_TF_LOG=${TF_LOG}
+    unset TF_LOG
+  fi
+  if declare -p TF_LOG_PATH &>/dev/null; then
+    SAVE_TF_LOG_PATH=${TF_LOG_PATH}
+    unset TF_LOG_PATH
+  fi
+  if declare -p IBMCLOUD_TRACE &>/dev/null; then
+    SAVE_IBMCLOUD_TRACE=${IBMCLOUD_TRACE}
+    unset IBMCLOUD_TRACE
+  fi
+
   INFRA_ID=$(jq -r '.infraID' ${dir}/metadata.json)
   echo "INFRA_ID=${INFRA_ID}"
   export INFRA_ID
 
   echo "8<--------8<--------8<--------8<-------- Cloud Connection 8<--------8<--------8<--------8<--------"
 
-  CLOUD_UUID=$(ibmcloud pi connections --json | jq -r '.Payload.cloudConnections[] | select (.name|test("'${INFRA_ID}'")) | .cloudConnectionID')
+  CLOUD_UUID=$(ibmcloud pi connections --json | jq -r '.cloudConnections[] | select (.name|test("'${INFRA_ID}'")) | .cloudConnectionID')
 
   if [ -z "${CLOUD_UUID}" ]
   then
@@ -547,7 +624,23 @@ function dump_resources() {
 
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
-  egrep '(Creation complete|level=error|: [0-9ms]*")' ${dir}/.openshift_install.log > ${SHARED_DIR}/installation_stats.log
+  # Restore any debugging if saved
+  if declare -p SAVE_TF_LOG_PROVIDER &>/dev/null; then
+    export TF_LOG_PROVIDER=${SAVE_TF_LOG_PROVIDER}
+    unset SAVE_TF_LOG_PROVIDER
+  fi
+  if declare -p SAVE_TF_LOG &>/dev/null; then
+    export TF_LOG=${SAVE_TF_LOG}
+    unset SAVE_TF_LOG
+  fi
+  if declare -p SAVE_TF_LOG_PATH &>/dev/null; then
+    export TF_LOG_PATH=${SAVE_TF_LOG_PATH}
+    unset SAVE_TF_LOG_PATH
+  fi
+  if declare -p SAVE_IBMCLOUD_TRACE &>/dev/null; then
+    export IBMCLOUD_TRACE=${SAVE_IBMCLOUD_TRACE}
+    unset SAVE_IBMCLOUD_TRACE
+  fi
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -560,18 +653,20 @@ fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
+install_required_tools
+
 IBMCLOUD_API_KEY=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY")
 IBMCLOUD_APIKEY_CCM_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CCM_CREDS")
 IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_INGRESS_CREDS")
 IBMCLOUD_APIKEY_MACHINEAPI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_MACHINEAPI_CREDS")
 IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CSI_CREDS")
-POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
-POWERVS_REGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_REGION")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
-POWERVS_ZONE=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_ZONE")
-VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
-CLUSTER_NAME="rdr-multiarch-ci"
+POWERVS_SERVICE_INSTANCE_ID=$(yq eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_REGION=$(yq eval '.POWERVS_REGION' "${SHARED_DIR}/powervs-conf.yaml")
+POWERVS_ZONE=$(yq eval '.POWERVS_ZONE' "${SHARED_DIR}/powervs-conf.yaml")
+VPCREGION=$(yq eval '.VPCREGION' "${SHARED_DIR}/powervs-conf.yaml")
+CLUSTER_NAME=$(yq eval '.CLUSTER_NAME' "${SHARED_DIR}/powervs-conf.yaml")
 
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
@@ -581,7 +676,6 @@ export POWERVS_RESOURCE_GROUP
 export POWERVS_USER_ID
 export VPCREGION
 export CLUSTER_NAME
-export HOME=/tmp
 
 dir=/tmp/installer
 mkdir "${dir}/"
@@ -743,6 +837,8 @@ date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 dump_resources
+
+egrep '(Creation complete|level=error|: [0-9ms]*")' ${dir}/.openshift_install.log > ${SHARED_DIR}/installation_stats.log
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"

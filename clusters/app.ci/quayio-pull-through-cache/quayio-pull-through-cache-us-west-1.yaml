@@ -1,0 +1,73 @@
+apiVersion: v1
+kind: List
+items:
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    name: quayio-pull-through-cache-us-west-1
+    namespace: ci
+  spec:
+    to:
+      kind: Service
+      name: quayio-pull-through-cache-us-west-1
+    tls:
+      termination: Edge
+      insecureEdgeTerminationPolicy: Redirect
+- apiVersion: v1
+  kind: Service
+  metadata:
+    name: quayio-pull-through-cache-us-west-1
+    namespace: ci
+  spec:
+    selector:
+      app: quayio-pull-through-cache-us-west-1
+    ports:
+    - port: 5000
+      targetPort: 5000
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: quayio-pull-through-cache-us-west-1
+    namespace: ci
+    labels:
+      app: quayio-pull-through-cache-us-west-1
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: quayio-pull-through-cache-us-west-1
+    template:
+      metadata:
+        labels:
+          app: quayio-pull-through-cache-us-west-1
+      spec:
+        containers:
+        - name: quayio-cache
+          image: registry.ci.openshift.org/ci/quayio-pull-through-cache:latest
+          ports:
+            - name: http
+              containerPort: 5000
+          volumeMounts:
+          - mountPath: /etc/pull-secret
+            name: pull-secret
+            readOnly: true
+          env:
+          - name: REGISTRY_STORAGE_S3_ACCESSKEY
+            valueFrom:
+              secretKeyRef:
+                name: quayio-pull-through-cache-credentials
+                key: AWS_ACCESS_KEY_ID
+          - name: REGISTRY_STORAGE_S3_SECRETKEY
+            valueFrom:
+              secretKeyRef:
+                name: quayio-pull-through-cache-credentials
+                key: AWS_SECRET_ACCESS_KEY
+          - name: REGISTRY_STORAGE_S3_BUCKET
+            value: quayio-pull-through-cache-us-west-1
+          - name: REGISTRY_STORAGE_S3_REGION
+            value: us-west-1
+        volumes:
+        - name: pull-secret
+          secret:
+            secretName: registry-pull-credentials

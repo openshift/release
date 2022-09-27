@@ -52,13 +52,68 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 # Populate install-config with Powervs Platform specifics
 # Note: we will visit this creation of install-config.yaml file section once the profile support is added to the powervs environment
 POWERVS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.powervscred"
-CLUSTER_NAME="rdr-multiarch-ci"
+CLUSTER_NAME="rdr-multiarch-${LEASED_RESOURCE}"
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
-POWERVS_REGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_REGION")
-POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
-POWERVS_ZONE=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_ZONE")
-VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
+
+if [[ -z "${LEASED_RESOURCE}" ]]; then
+  echo "Failed to acquire lease"
+  exit 1
+fi
+
+POWERVS_ZONE=${LEASED_RESOURCE}
+case "${LEASED_RESOURCE}" in
+   "lon04")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04")
+      POWERVS_REGION=lon
+      VPCREGION=eu-gb
+   ;;
+    #  "lon06")
+    #  POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06")
+    #  POWERVS_REGION=lon
+    #  VPCREGION=eu-gb
+    #  ;;
+   "mon01")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MON01")
+      POWERVS_REGION=mon
+      VPCREGION=ca-tor
+   ;;
+   "osa21")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_OSA21")
+      POWERVS_REGION=osa
+      VPCREGION=jp-osa
+   ;;
+   "sao01")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")
+      POWERVS_REGION=sao
+      VPCREGION=br-sao
+   ;;
+   "syd04")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SYD04")
+      POWERVS_REGION=syd
+      VPCREGION=au-syd
+   ;;
+   "tok04")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_TOK04")
+      POWERVS_REGION=tok
+      VPCREGION=jp-tok
+   ;;
+   *)
+      # Default Region & Zone
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID")
+      POWERVS_REGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_REGION")
+      VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
+   ;;
+esac
+
+cat > "${SHARED_DIR}/powervs-conf.yaml" << EOF
+CLUSTER_NAME: ${CLUSTER_NAME}
+POWERVS_SERVICE_INSTANCE_ID: ${POWERVS_SERVICE_INSTANCE_ID}
+POWERVS_REGION: ${POWERVS_REGION}
+POWERVS_ZONE: ${POWERVS_ZONE}
+VPCREGION: ${VPCREGION}
+EOF
+
 export POWERVS_SHARED_CREDENTIALS_FILE
 
 cat > "${CONFIG}" << EOF

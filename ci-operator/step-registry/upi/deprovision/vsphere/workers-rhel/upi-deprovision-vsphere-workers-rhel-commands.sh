@@ -24,7 +24,7 @@ done < "${SHARED_DIR}"/rhel_nodes_info
 
 echo "$(date -u --rfc-3339=seconds) - Delete rhel node dns records from aws route53..."
 cluster_hosted_zone_id="$(<"${SHARED_DIR}"/cluster-hosted-zone.txt)"
-id=$(aws route53 change-resource-record-sets --hosted-zone-id "$cluster_hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/rhel-dns-create.json --query '"ChangeInfo"."Id"' --output text)
+id=$(aws route53 change-resource-record-sets --hosted-zone-id "$cluster_hosted_zone_id" --change-batch file:///"${SHARED_DIR}"/rhel-dns-delete.json --query '"ChangeInfo"."Id"' --output text)
 echo "Waiting for DNS records to sync..."
 aws route53 wait resource-record-sets-changed --id "$id"
 echo "DNS records deleted."
