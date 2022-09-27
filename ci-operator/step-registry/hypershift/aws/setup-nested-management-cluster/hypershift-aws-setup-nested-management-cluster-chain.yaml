@@ -41,6 +41,10 @@ chain:
       echo "Waiting for cluster to become available"
       oc wait --timeout=10m --for=condition=Available --namespace=${HYPERSHIFT_NAMESPACE} hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
+
+      # Data for cluster bot.
+      oc get secret -n${HYPERSHIFT_NAMESPACE} ${CLUSTER_NAME}-kubeadmin-password --template={{.data.password}} | base64 -d > ${SHARED_DIR}/kubeadmin-password
+
       bin/hypershift create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/management_cluster_kubeconfig
       bin/hypershift create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/kubeconfig
       echo "Waiting for clusteroperators to be ready"
