@@ -1,0 +1,90 @@
+base_images:
+# kepler_builder:
+#   namespace: ci
+#   name:  kepler-builder
+#   tag: golang:1.18
+# kepler_base:
+#   namespace: ci
+#   name:  kepler-base
+#   tag: latest
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
+binary_build_commands: make tidy-vendor && make build-manifest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+  use_build_cache: true
+# project_image:
+#   image_stream_tag:
+#     name: kepler
+#     namespace: sustainable_computing_io
+#     tag: latest
+#   build_args:
+#     - name: MAKE_TARGET
+#       value: "cross-build-linux-amd64"
+#   dockerfile_path: "build/Dockerfile"
+#   from: kepler_builder
+#   inputs:
+#     kepler_base:
+#       as:
+#       - quay.io/sustainable_computing_io/kepler_base:latest
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: make format
+  container:
+    from: src
+- as: golint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=5m0s
+  container:
+    clone: true
+    from: golangci-lint
+- as: test
+  commands: |
+    go test --tags="include_gcs include_oss containers_image_openpgp gssapi providerless netgo osusergo gpu" ./... --race --bench=. -cover --count=1 --vet=all
+  container:
+    from: src
+- as: e2e-openshift
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-openshift
+      cli: latest
+      # TODO: These steps are not final, only here for testing
+      commands: |
+        oc apply -k manifests/openshift/kepler
+        sleep 1m
+        ./manifests/openshift/dashboard/deploy-grafana.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: sustainable-computing-io
+  repo: kepler
