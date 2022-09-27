@@ -98,7 +98,7 @@ mkdir dev-scripts
 tar -xzvf dev-scripts.tar.gz -C /root/dev-scripts
 chown -R root:root dev-scripts
 
-if [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ];
+if [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ] && [[ "$(mount | grep ${NVME_DEVICE})" == "" ]];
 then
   mkfs.xfs -f "${NVME_DEVICE}"
   mkdir /opt/dev-scripts

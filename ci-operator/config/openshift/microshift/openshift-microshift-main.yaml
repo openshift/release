@@ -19,32 +19,14 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM libvirt-installer
-    USER root
-    ADD validate-microshift /tmp/
-    COPY microshift-containerized.service /tmp/microshift-containerized.service
-    RUN bash -c 'sed -i "s/autoupdate=registry/autoupdate=local/g" /tmp/microshift-containerized.service'
-    COPY microshift.conf /tmp/microshift.conf
-    COPY oc /usr/bin/oc
-    COPY openshift-tests /usr/bin/openshift-tests
+    COPY validate-microshift /tmp/validate-microshift
   from: libvirt-installer
   inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
     src:
       paths:
-      - destination_dir: validate-microshift
-        source_path: /go/src/github.com/openshift/microshift/validate-microshift/
       - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift/packaging/systemd/microshift-containerized.service
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift/packaging/crio.conf.d/microshift.conf
-    test-bin:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/openshift-tests
-  to: microshift-test-binaries
+        source_path: /go/src/github.com/openshift/microshift/validate-microshift
+  to: microshift-validate
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.10 as builder
     RUN dnf install --setopt=tsflags=nodocs -y \

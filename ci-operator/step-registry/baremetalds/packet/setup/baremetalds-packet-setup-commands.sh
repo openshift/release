@@ -32,7 +32,7 @@ function exit_with_failure(){
    </testcase>
   </testsuite>
 EOF
-  send_slack $MESSAGE
+  send_slack "$MESSAGE"
   exit 1
 }
 
