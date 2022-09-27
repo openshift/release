@@ -7,6 +7,10 @@ base_images:
     name: "4.5"
     namespace: "ocp"
     tag: "cli"
+  openstack-installer:
+    name: "4.10"
+    namespace: ocp
+    tag: openstack-installer
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -64,16 +68,23 @@ tests:
     - as: claim
       commands: |
         cd $HOME
+        mkdir bin
+        cd $HOME/bin
+        curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
+        export PATH=$PATH:$HOME/bin
+        cd $HOME
         rm -rf install_yamls
         git clone https://github.com/openstack-k8s-operators/install_yamls.git
         cd $HOME/install_yamls
+        make namespace
+        sleep 5
         make crc_storage
         sleep 20
         make mariadb
         sleep 90
         make mariadb_deploy
         sleep 90
-      from: cli
+      from: openstack-installer
       resources:
         requests:
           cpu: 1000m
