@@ -12,36 +12,44 @@ resources:
       cpu: "4"
       memory: 4Gi
 tests:
-- as: istio-operator-unit-2-3
+- as: istio-unit-2-3
   commands: |
-    make compile test \
+    make -e T=-v build racetest binaries-test \
+    BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
+    GOFLAGS="-mod=vendor" \
     XDG_CACHE_HOME="/tmp/cache" \
-    TEST_FLAGS="-v"
+    ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
     from: src
   timeout: 4h0m0s
-- as: istio-operator-gencheck-2-3
-  commands: |
-    make gen-check \
-    GOBIN="/gobin" \
-    GOCACHE="/tmp/cache" \
-    GOMODCACHE="/tmp/cache" \
-    XDG_CACHE_HOME="/tmp/cache"
-  container:
-    from: src
-- as: istio-operator-lint-2-3
+- as: istio-lint-2-3
   commands: |
     make lint \
+    BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
-    XDG_CACHE_HOME="/tmp/cache"
+    GOFLAGS="-mod=vendor" \
+    XDG_CACHE_HOME="/tmp/cache" \
+    ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
+  container:
+    from: src
+- as: istio-gencheck-2-3
+  commands: |
+    make gen-check \
+    BUILD_WITH_CONTAINER="0" \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    GOFLAGS="-mod=vendor" \
+    XDG_CACHE_HOME="/tmp/cache" \
+    ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
     from: src
 zz_generated_metadata:
   branch: maistra-2.3
   org: maistra
-  repo: istio-operator
+  repo: istio
