@@ -677,6 +677,9 @@ export POWERVS_USER_ID
 export VPCREGION
 export CLUSTER_NAME
 
+# PowerVS conf for ${LEASED_RESOURCE}
+cat ${SHARED_DIR}/powervs-conf.yaml
+
 dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"

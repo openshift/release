@@ -64,37 +64,37 @@ fi
 POWERVS_ZONE=${LEASED_RESOURCE}
 case "${LEASED_RESOURCE}" in
    "lon04")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04")
+      POWERVS_SERVICE_INSTANCE_ID="ffd79f39-09e1-4929-92cb-d663e5470733"
       POWERVS_REGION=lon
       VPCREGION=eu-gb
    ;;
-    #  "lon06")
-    #  POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06")
-    #  POWERVS_REGION=lon
-    #  VPCREGION=eu-gb
-    #  ;;
+  "lon06")
+      POWERVS_SERVICE_INSTANCE_ID="8bd6217d-0e10-4f7c-b648-cf4f14b64e70"
+      POWERVS_REGION=lon
+      VPCREGION=eu-gb
+      ;;
    "mon01")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MON01")
+      POWERVS_SERVICE_INSTANCE_ID="980bb7d8-c470-498f-be15-784fa5fda604"
       POWERVS_REGION=mon
       VPCREGION=ca-tor
    ;;
    "osa21")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_OSA21")
+      POWERVS_SERVICE_INSTANCE_ID="8c7930fc-e1c5-4318-a3d6-699d2136cb10"
       POWERVS_REGION=osa
       VPCREGION=jp-osa
    ;;
    "sao01")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")
+      POWERVS_SERVICE_INSTANCE_ID="745cb9ea-401d-40ee-b928-dc9ab4e5b39d"
       POWERVS_REGION=sao
       VPCREGION=br-sao
    ;;
    "syd04")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SYD04")
+      POWERVS_SERVICE_INSTANCE_ID="5099094f-0eaf-40e9-9e46-1a9e1f29ccda"
       POWERVS_REGION=syd
       VPCREGION=au-syd
    ;;
    "tok04")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_TOK04")
+      POWERVS_SERVICE_INSTANCE_ID="2a401097-90d1-4be4-acb3-33784b5e99e7"
       POWERVS_REGION=tok
       VPCREGION=jp-tok
    ;;
