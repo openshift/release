@@ -308,6 +308,13 @@ aws|aws-arm64|aws-usgov)
       inject_spot_instance_config ${dir}
     fi
     ;;
+  gcp)
+    if [ X"${WORKER_RHCOS_IMAGE_FROM_GCP_MARKETPLACE}" != X"" ]; then
+      echo "Using GCP marketplace RHCOS image '${WORKER_RHCOS_IMAGE_FROM_GCP_MARKETPLACE}' for compute machinesets..."
+      sed -i -r "s#image: .+$#image: ${WORKER_RHCOS_IMAGE_FROM_GCP_MARKETPLACE}#" "${dir}"/openshift/*worker-machineset*.yaml
+      grep "image" "${dir}"/openshift/*worker-machineset*.yaml
+    fi
+  ;;
 esac
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
