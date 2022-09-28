@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.43.0
   stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
@@ -26,6 +22,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: submariner-addon
 promotion:
+  disabled: true
   name: "2.7"
   namespace: stolostron
 releases:
@@ -63,13 +60,13 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: bin
-- as: integration
-  commands: make test-integration
-  container:
-    from: test-bin
 - as: unit
   commands: |
     make test --warn-undefined-variables
+  container:
+    from: test-bin
+- as: integration
+  commands: make test-integration
   container:
     from: test-bin
 - as: sonarcloud
@@ -87,30 +84,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-- as: pr-merge-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: submariner-addon
-    env:
-      IMAGE_REPO: submariner-addon
-      IMAGE_TAG: latest
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
-- as: fast-forward
-  postsubmit: true
-  steps:
-    env:
-      DESTINATION_BRANCH: release-2.7
-    workflow: ocm-ci-fastforward
-- as: golangci-lint
-  commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    make golangci-lint SHELL=/bin/bash
-  container:
-    from: golangci-lint
 zz_generated_metadata:
-  branch: main
+  branch: release-2.7
   org: stolostron
   repo: submariner-addon
