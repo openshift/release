@@ -26,6 +26,16 @@ build_root:
     tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
 - dockerfile_literal: |
+    FROM libvirt-installer
+    COPY validate-microshift /tmp/validate-microshift
+  from: libvirt-installer
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/validate-microshift
+  to: microshift-validate
+- dockerfile_literal: |
     FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.10 as builder
     RUN dnf install --setopt=tsflags=nodocs -y \
         rpm-build glibc-static gcc selinux-policy-devel util-linux && \
