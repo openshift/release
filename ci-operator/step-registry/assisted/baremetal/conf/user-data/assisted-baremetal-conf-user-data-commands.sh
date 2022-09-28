@@ -10,6 +10,8 @@ tee "${SHARED_DIR}/${USER_DATA_FILENAME}" << EOF
 #cloud-config
 
 packages_upgrade: true
+packages:
+  - qemu-kvm-common
 runcmd:
   - |
     set -o nounset
@@ -34,4 +36,10 @@ runcmd:
       mkswap "\${SWAP_DISK}"
       swapon "\${SWAP_DISK}"
     fi
+  - |
+    # Enable KSM: https://docs.kernel.org/admin-guide/mm/ksm.html
+    # Requires package "qemu-kvm-common"
+
+    systemctl enable --now ksm.service
+    systemctl enable --now ksmtuned.service
 EOF
