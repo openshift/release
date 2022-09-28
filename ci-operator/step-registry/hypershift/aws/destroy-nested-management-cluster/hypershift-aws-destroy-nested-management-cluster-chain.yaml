@@ -29,15 +29,26 @@ chain:
       - name: HYPERSHIFT_NAMESPACE
         default: "clusters"
         documentation: "The Namespace where to create the HostedCluster and NodePools"
+      - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+        default: "false"
+        documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
     commands: |-
+      AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+      
+      if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+      fi
+      
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       bin/hypershift destroy cluster aws \
-      --aws-creds=/etc/hypershift-ci-jobs-awscreds/credentials  \
+      --aws-creds=${HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT}  \
       --name="${CLUSTER_NAME}" \
       --namespace="${HYPERSHIFT_NAMESPACE}" \
       --infra-id=${CLUSTER_NAME} \
-      --base-domain=ci.hypershift.devcluster.openshift.com
+      --base-domain=${BASE_DOMAIN}
     credentials:
     - mount_path: /etc/hypershift-ci-jobs-awscreds
       name: hypershift-ci-jobs-awscreds
