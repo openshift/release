@@ -92,6 +92,41 @@ subjects:
   kind: Group
   name: openshift-cluster-bot-developers
 ---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: ci-chat-bot
+  namespace: ci
+spec:
+  port:
+    targetPort: 8080
+  tls:
+    insecureEdgeTerminationPolicy: Redirect
+    termination: edge
+  to:
+    kind: Service
+    name: ci-chat-bot
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci
+  name: ci-chat-bot
+  labels:
+    app: ci-chat-bot
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+spec:
+  selector:
+    app: ci-chat-bot
+  ports:
+    - name: main
+      port: 8080
+    - name: metrics
+      port: 9090
+  type: ClusterIP
+---
 kind: ServiceAccount
 apiVersion: v1
 metadata:
