@@ -176,15 +176,15 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
-      namespace: ocp
-  stable-4-9:
-    integration:
-      name: "4.9"
+      name: "4.12"
       namespace: ocp
   stable-4-10:
     integration:
       name: "4.10"
+      namespace: ocp
+  stable-4-11:
+    integration:
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -449,7 +449,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DISCONNECTED: "true"
@@ -459,6 +459,9 @@ tests:
   cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DISCONNECTED: "true"
       IP_STACK: v6
@@ -572,43 +575,55 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      IP_STACK: v4v6
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-410
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-411
   optional: true
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-11
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       IP_STACK: v4v6
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-410-periodic
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-411-periodic
   cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-11
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       IP_STACK: v4v6
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp
   optional: true
+  run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      IP_STACK: v4v6
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-periodic
+  cron: 00 00 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      IP_STACK: v4v6
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-411
+  optional: true
+  run_if_changed: ^(deploy/operator/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-11
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
@@ -617,13 +632,12 @@ tests:
       NUM_EXTRA_WORKERS: "3"
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-410
-  optional: true
-  run_if_changed: ^(deploy/operator/.*)$
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-411-periodic
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-11
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
@@ -632,12 +646,27 @@ tests:
       NUM_EXTRA_WORKERS: "3"
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-410-periodic
+- as: e2e-ai-operator-ztp-ipv4v6-3masters
+  optional: true
+  run_if_changed: ^(deploy/operator/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "3"
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic
   cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
