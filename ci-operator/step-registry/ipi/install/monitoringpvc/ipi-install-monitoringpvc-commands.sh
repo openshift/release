@@ -7,6 +7,9 @@ set -o pipefail
 # across reschedules of pods. This may need to be conditionally disabled in the future
 # if certain instance types are used that cannot access persistent volumes.
 
+/tmp/yq
+/tmp/yq -V
+
 CONFIG="${SHARED_DIR}/manifest_cluster-monitoring-config.yaml"
 PATCH="${SHARED_DIR}/cluster-monitoring-config.yaml.patch"
 
