@@ -891,26 +891,20 @@ tests:
           cpu: 100m
           memory: 2000Mi
 - as: cpaas-drivers-tests-post
+  commands: |
+    FAILURES_DIR=/FAILURES/ /scripts/drivers-build-failures.sh
+  container:
+    from: cpaas-drivers
+- as: cpaas-push-drivers-and-support-package-post
   steps:
     test:
-    - as: drivers-build-failures
-      commands: |
-        FAILURES_DIR=/FAILURES/ /scripts/drivers-build-failures.sh
-      from: cpaas-drivers
-      resources:
-        requests:
-          cpu: 100m
-          memory: 2000Mi
-- as: cpaas-push-drivers-post
-  steps:
-    test:
-    - as: push-drivers-and-support-package
+    - as: push-drivers
       commands: |
         GCP_BUCKET=gs://collector-modules-osci/cpaas/
         /scripts/push-drivers.sh "$GCP_BUCKET"
         /scripts/cpaas-support-package.sh "$GCP_BUCKET"
       credentials:
-      - mount_path: /tmp/secrets
+      - mount_path: /tmp/secret/stackrox-collector-driver-push
         name: stackrox-collector-driver-push
         namespace: test-credentials
       from: cpaas-drivers
