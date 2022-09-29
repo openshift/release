@@ -7,6 +7,10 @@ base_images:
     name: centos
     namespace: origin
     tag: stream8
+  cpaas-drivers-base:
+    name: stackrox-drivers
+    namespace: stackrox
+    tag: 0.1.0
   fc36:
     name: fedora
     namespace: coreos
@@ -250,6 +254,17 @@ images:
       as:
       - replaced-by-osci:scripts
   to: drivers
+- context_dir: .
+  dockerfile_path: .openshift-ci/drivers/cpaas.Dockerfile
+  from: src
+  inputs:
+    cpaas-drivers-base:
+      as:
+      - replaced-by-osci:cpaas-drivers-base
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: cpaas-drivers
 promotion:
   excluded_images:
   - collector-builder
@@ -849,7 +864,7 @@ tests:
     test:
     - as: push-drivers
       commands: |
-        /scripts/push-drivers.sh
+        /scripts/push-drivers.sh gs://collector-modules-osci
       credentials:
       - mount_path: /tmp/secret/stackrox-collector-driver-push
         name: stackrox-collector-driver-push
@@ -865,12 +880,36 @@ tests:
     test:
     - as: push-drivers
       commands: |
-        /scripts/push-drivers.sh
+        /scripts/push-drivers.sh gs://collector-modules-osci
       credentials:
       - mount_path: /tmp/secret/stackrox-collector-driver-push
         name: stackrox-collector-driver-push
         namespace: test-credentials
       from: drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
+- as: cpaas-drivers-tests-post
+  commands: |
+    FAILURES_DIR=/FAILURES/ /scripts/drivers-build-failures.sh
+  container:
+    from: cpaas-drivers
+  cron: 0 0 * * *
+- as: cpaas-push-drivers-and-support-package-post
+  cron: 0 0 * * *
+  steps:
+    test:
+    - as: push-drivers
+      commands: |
+        GCP_BUCKET=gs://collector-modules-osci/cpaas/
+        /scripts/push-drivers.sh "$GCP_BUCKET"
+        /scripts/cpaas-support-package.sh "$GCP_BUCKET"
+      credentials:
+      - mount_path: /tmp/secret/stackrox-collector-driver-push
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: cpaas-drivers
       resources:
         requests:
           cpu: 100m
