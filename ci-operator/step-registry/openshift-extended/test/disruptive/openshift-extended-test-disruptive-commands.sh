@@ -166,7 +166,7 @@ function run {
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
-    echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
+    echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     if [[ -n "${TEST_SCENARIOS:-}" ]]; then
         readarray -t scenarios <<< "${TEST_SCENARIOS}"
@@ -206,7 +206,7 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    handle_filters "~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
+    handle_filters "~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then

@@ -199,10 +199,10 @@ function run {
     test_filters=""
     if [[ -n "${TEST_FILTERS_POSTUPG:-}" ]]; then
         # shellcheck disable=SC2153
-        test_filters="~NonUnifyCI&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&;${TEST_FILTERS};${TEST_FILTERS_POSTUPG}"
+        test_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&;${TEST_FILTERS};${TEST_FILTERS_POSTUPG}"
     else
         # shellcheck disable=SC2153
-        test_filters="~NonUnifyCI&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&;${TEST_FILTERS}"
+        test_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&;${TEST_FILTERS}"
     fi
     echo "final test_filters: \"${test_filters}\""
 
