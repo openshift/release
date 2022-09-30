@@ -10,6 +10,15 @@ if [ "${JOB_NAME_SAFE}" != "launch" ]; then
   exit 0
 fi
 
+# If this is a `launch` and we are in the multi-zone range, we also
+# dont want to configure the load balancer
+if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 151 ]; then
+  if [ $((${LEASED_RESOURCE//[!0-9]/})) -le 154 ]; then
+    echo "Multi-zone installation range."
+    exit 0
+  fi
+fi
+
 export AWS_DEFAULT_REGION=us-west-2  # TODO: Derive this?
 export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/vsphere/.awscred
 export AWS_MAX_ATTEMPTS=50
