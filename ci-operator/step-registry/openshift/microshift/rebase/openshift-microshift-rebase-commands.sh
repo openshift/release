@@ -33,6 +33,6 @@ echo "Pull spec for arm64 release image: ${pullspec_release_arm64}"
 
 APP_ID=$(cat /secrets/microshift-pr-creation-test/app_id) \
 KEY=/secrets/microshift-pr-creation-test/key \
-ORG=pmtk \
+ORG=openshift \
 REPO=microshift \
 ./scripts/create_pr.py
