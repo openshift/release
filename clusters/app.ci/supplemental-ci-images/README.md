@@ -18,6 +18,7 @@ These resources provide some supplemental images to be used in CI builds.
 - `html-proofer_is.yaml`, `hugo_is.yaml` and `nginx-unprivileged_is.yaml`: Used by [openshift/ci-docs](../../ci-operator/config/openshift/ci-docs)
 - `insights-operator-tests.yaml`: Used by [openshift/insights-operator](../../ci-operator/config/openshift/insights-operator)
 - `manage-clonerefs.yaml`: Used by [ProwJob/periodic-manage-clonerefs](https://github.com/openshift/release/blob/968b1dca270336a548f87ccca6d96c9fd7940fbe/ci-operator/jobs/infra-periodics.yaml#L8)
+- `openvpn`: Used by `ci-operator` for clusters profiles which request a [VPN connection](https://docs.ci.openshift.org/docs/architecture/step-registry/#vpn-connection).
 - `opm-builder.yaml`: Used by [openshift-kni/performance-addon-operators](../../../ci-operator/config/openshift-kni/performance-addon-operators)
 - `ovirt-prfinder`: used by ovirt prfinder periodic [job](../../../ci-operator/config/openshift/cluster-api-provider-ovirt/)
 - `redhat-operator-index`: Used by optional operators E2E tests
