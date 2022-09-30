@@ -1,0 +1,137 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "OIDCProviderBucketName": {
+      "Type": "String",
+      "Description": "Name of S3 bucket for storing OIDC provider configuration (ref: https://access.redhat.com/documentation/en-us/red_hat_advanced_cluster_management_for_kubernetes/2.6/html/multicluster_engine/multicluster_engine_overview#hosting-service-cluster)",
+      "Default": "hypershift-oidc-provider"
+    },
+    "ExternalDNSFilter": {
+      "Type": "String",
+      "Description": "Service-level domain for service-level DNS for control plane services (ref: https://access.redhat.com/documentation/en-us/red_hat_advanced_cluster_management_for_kubernetes/2.6/html/multicluster_engine/multicluster_engine_overview#hosting-service-cluster)",
+      "Default": "hypershift.hive.ci.openshift.org"
+    },
+    "HyperShiftUserName": {
+      "Type": "String",
+      "Description": "Username for HyperShift service account",
+      "Default": "hypershift"
+    },
+    "HyperShiftUserCredentialsSecretName": {
+      "Type": "String",
+      "Description": "Name of secret containing credentials for HyperShift service account",
+      "Default": "hypershift-credentials"
+    }
+  },
+  "Resources": {
+    "OIDCProviderBucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "BucketName": {
+          "Ref": "OIDCProviderBucketName"
+        },
+        "PublicAccessBlockConfiguration": {
+          "BlockPublicAcls": false,
+          "BlockPublicPolicy": false,
+          "IgnorePublicAcls": false,
+          "RestrictPublicBuckets": false
+        },
+        "OwnershipControls": {
+          "Rules": [
+            {
+              "ObjectOwnership": "BucketOwnerPreferred"
+            }
+          ]
+        }
+      }
+    },
+    "HyperShiftUser": {
+      "Type" : "AWS::IAM::User",
+      "Properties" : {
+        "UserName" : { "Ref" : "HyperShiftUserName" },
+        "Policies" : [
+          {
+            "PolicyName": "hypershift-oidc-provider",
+            "PolicyDocument": {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:GetObject",
+                    "s3:PutObject",
+                    "S3:ListBucket"
+                  ],
+                  "Resource": [
+                    {
+                      "Fn::Join": [
+                        "",
+                        [
+                          "arn:aws:s3:::",
+                          {
+                            "Ref": "OIDCProviderBucketName"
+                          },
+                          "/*"
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "HyperShiftUserAccessKey": {
+      "Type": "AWS::IAM::AccessKey",
+      "Properties": {
+        "UserName": {
+          "Ref": "HyperShiftUser"
+        }
+      }
+    },
+    "HyperShiftUserCredential": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": {
+          "Ref": "HyperShiftUserCredentialsSecretName"
+        },
+        "Description": "Credentials for the hypershift OIDC provider",
+        "SecretString": {
+          "Fn::Join": [
+            "",
+            [
+              "{",
+              "\"access_key_id\": \"",
+              {
+                "Ref": "HyperShiftUserAccessKey"
+              },
+              "\",",
+              "\"secret_access_key\": \"",
+              {
+                "Fn::GetAtt": [
+                  "HyperShiftUserAccessKey",
+                  "SecretAccessKey"
+                ]
+              },
+              "\"",
+              "}"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "OIDCProviderBucketName": {
+      "Value": {
+        "Ref": "OIDCProviderBucket"
+      }
+    },
+    "HyperShiftUserCredentialArn": {
+      "Value": {
+        "Ref": "HyperShiftUserCredential"
+      }
+    }
+  }
+}

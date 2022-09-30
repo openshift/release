@@ -1,0 +1,148 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+    "BaseDomain": {
+      "Type": "String",
+      "Description": "The base domain name for the cluster. This will be used to create the Route53 hosted zone and the wildcard certificate.",
+      "Default": "hypershift.aws-2.ci.openshift.org"
+    },
+    "HyperShiftUserName": {
+      "Type": "String",
+      "Description": "The username for the HyperShift service account.",
+      "Default": "hypershift-hosted"
+    },
+    "HyperShiftGroupName": {
+      "Type": "String",
+      "Description": "The group name for the HyperShift service account.",
+      "Default": "hypershift-hosted"
+    },
+    "HyperShiftUserCredentialsSecretName": {
+      "Type": "String",
+      "Description": "The name of the secret containing the credentials for the HyperShift service account.",
+      "Default": "hypershift-hosted-credentials"
+    }
+  },
+  "Resources": {
+    "BaseDomainZone": {
+      "Type": "AWS::Route53::HostedZone",
+      "Properties": {
+        "Name": {
+          "Ref": "BaseDomain"
+        }
+      }
+    },
+    "HyperShiftUser": {
+      "Type": "AWS::IAM::User",
+      "Properties": {
+        "UserName": {
+          "Ref": "HyperShiftUserName"
+        },
+        "Groups": [
+          {
+            "Ref": "HyperShiftGroup"
+          }
+        ]
+      }
+    },
+    "HyperShiftGroup": {
+      "Type": "AWS::IAM::Group",
+      "Properties": {
+        "GroupName": { "Ref": "HyperShiftGroupName" },
+        "ManagedPolicyArns": [
+          "arn:aws:iam::aws:policy/AmazonEC2FullAccess",
+          "arn:aws:iam::aws:policy/IAMFullAccess",
+          "arn:aws:iam::aws:policy/AmazonS3FullAccess",
+          "arn:aws:iam::aws:policy/ResourceGroupsandTagEditorFullAccess",
+          "arn:aws:iam::aws:policy/AmazonRoute53FullAccess",
+          "arn:aws:iam::aws:policy/ServiceQuotasReadOnlyAccess",
+          "arn:aws:iam::aws:policy/AWSLambda_FullAccess",
+          "arn:aws:iam::aws:policy/AmazonElasticFileSystemFullAccess",
+          "arn:aws:iam::aws:policy/AmazonElasticFileSystemClientFullAccess",
+          "arn:aws:iam::aws:policy/AWSCloudFormationFullAccess"
+        ]
+      }
+    },
+    "ELBServerCertPolicy": {
+      "Type": "AWS::IAM::Policy",
+      "Properties": {
+        "PolicyName": "ELBServerCertPolicy",
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Sid": "ELBServerCert",
+              "Effect": "Allow",
+              "Action": [
+                "iam:ListServerCertificates",
+                "iam:GetServerCertificate",
+                "iam:UploadServerCertificate"
+              ],
+              "Resource": [
+                "*"
+              ]
+            }
+          ]
+        },
+        "Groups": [{ "Ref": "HyperShiftGroup" }]
+      }
+    },
+    "HyperShiftUserAccessKey": {
+      "Type": "AWS::IAM::AccessKey",
+      "Properties": {
+        "UserName": {
+          "Ref": "HyperShiftUser"
+        }
+      }
+    },
+    "HyperShiftUserCredential": {
+      "Type": "AWS::SecretsManager::Secret",
+      "Properties": {
+        "Name": {
+          "Ref": "HyperShiftUserCredentialsSecretName"
+        },
+        "Description": "Credentials for the hypershift IAM user",
+        "SecretString": {
+          "Fn::Join": [
+            "",
+            [
+              "{",
+              "\"access_key_id\": \"",
+              {
+                "Ref": "HyperShiftUserAccessKey"
+              },
+              "\",",
+              "\"secret_access_key\": \"",
+              {
+                "Fn::GetAtt": [
+                  "HyperShiftUserAccessKey",
+                  "SecretAccessKey"
+                ]
+              },
+              "\"",
+              "}"
+            ]
+          ]
+        }
+      }
+    }
+  },
+  "Outputs": {
+    "BaseDomainZoneId": {
+      "Value": {
+        "Ref": "BaseDomainZone"
+      }
+    },
+    "BaseDomainZoneNS": {
+      "Value": {
+        "Fn::Join": ["\n", {
+          "Fn::GetAtt": ["BaseDomainZone", "NameServers"]
+        }]
+      }
+    },
+    "HyperShiftUserCredentialArn": {
+      "Value": {
+        "Ref": "HyperShiftUserCredential"
+      }
+    }
+  }
+}
