@@ -4,6 +4,9 @@ set -e
 set -u
 set -o pipefail
 
+# use it as a bool
+marketplace=0
+
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
         echo "setting the proxy"
@@ -273,7 +276,7 @@ metadata:
     pod-security.kubernetes.io/warn: baseline
   name: openshift-marketplace
 EOF
-
+    marketplace=1
 }
 
 set_proxy
@@ -300,4 +303,8 @@ create_catalog_sources
 # And, there is no brew.registry.redhat.io/redhat/redhat-operator-index:v4.11 , so disable the default CatalogSources.
 # TODO: the Proxy registry support the `registry.redhat.io` images
 # check_default_catalog
-disable_default_catalogsource
+
+# No need to disable the default OperatorHub when marketplace disabled as default.
+if [ $marketplace -eq 0 ]; then
+    disable_default_catalogsource
+fi

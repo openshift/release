@@ -1,0 +1,95 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  libvirt-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: libvirt-installer
+  test-bin:
+    name: "4.12"
+    namespace: ocp
+    tag: tests
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.12 as builder
+    RUN dnf install --setopt=tsflags=nodocs -y \
+        rpm-build glibc-static gcc selinux-policy-devel util-linux && \
+        dnf clean all && \
+        rm -rf /var/cache/dnf/*
+    RUN ls -lA
+    RUN make rpm
+    FROM libvirt-installer
+    USER root
+    ENV HOME=/tmp/secret
+    ENV PAYLOAD_PATH=$HOME/payload
+    WORKDIR $PAYLOAD_PATH
+    COPY oc openshift-tests usr/bin/
+    RUN chmod 755 usr/bin/oc && ln -rs usr/bin/oc usr/bin/kubectl
+    COPY --from=builder /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
+    RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    libvirt-installer:
+      as:
+      - libvirt-installer
+    src:
+      as:
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.12
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/openshift-tests
+  to: dependency-payload
+- dockerfile_literal: |
+    FROM libvirt-installer
+    COPY validate-microshift /tmp/validate-microshift
+  from: libvirt-installer
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/validate-microshift
+  to: microshift-validate
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 800Mi
+tests:
+- as: conformance-parallel
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-microshift-e2e-test
+- as: conformance-serial
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-test
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: microshift
+  variant: periodic-ocp-4.12
