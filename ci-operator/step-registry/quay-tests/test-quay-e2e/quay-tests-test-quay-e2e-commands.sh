@@ -7,6 +7,7 @@ cd quay-frontend-tests
 skopeo -v
 oc version
 terraform version
+podman -v
 (cp -L $KUBECONFIG /tmp/kubeconfig || true) && export KUBECONFIG_PATH=/tmp/kubeconfig
 
 #Create Artifact Directory:
