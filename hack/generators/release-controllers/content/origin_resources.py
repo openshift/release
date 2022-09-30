@@ -156,7 +156,7 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
-                        "volumes": get_rc_volumes(context, None)
+                        "volumes": get_rc_volumes(context)
                     }
                 }
             }
@@ -219,7 +219,7 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
-                        "volumes": get_kubeconfig_volumes(context, namespace=None, secret_name=context.secret_name_tls_api)
+                        "volumes": get_kubeconfig_volumes(context, secret_name=context.secret_name_tls_api)
                     }
                 }
             }
