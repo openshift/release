@@ -29,5 +29,10 @@ echo "Pull spec for amd64 release image: ${pullspec_release_amd64}"
 echo "Pull spec for arm64 release image: ${pullspec_release_arm64}"
 
 # Call rebase script
-echo "./scripts/rebase.sh to \"${pullspec_release_amd64}\" \"${pullspec_release_arm64}\""
 ./scripts/rebase.sh to "${pullspec_release_amd64}" "${pullspec_release_arm64}"
+
+APP_ID=$(cat /secrets/pr-creds/app_id) \
+KEY=/secrets/pr-creds/key.pem \
+ORG=openshift \
+REPO=microshift \
+./scripts/create_pr.py
