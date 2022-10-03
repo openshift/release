@@ -42,10 +42,6 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                         'name': 'release-controller-kubeconfigs',
                         'secret': {
                             'secretName': 'release-controller-kubeconfigs',
-                            'items': [{
-                                'key': 'sa.release-controller-ocp.app.ci.config',
-                                'path': 'kubeconfig'
-                            }]
                         }
                     }, {
                         'name': 'signer',
@@ -62,7 +58,7 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                             'readOnly': True
                         }, {
                             'name': 'release-controller-kubeconfigs',
-                            'mountPath': '/etc/kubeconfig',
+                            'mountPath': '/etc/kubeconfigs',
                             'readOnly': True
                         }, {
                             'name': 'signer',
@@ -74,7 +70,6 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                             '--release-namespace=ocp',
                             '--release-namespace=origin',
                             '--job-namespace=ci-release',
-                            '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                             '--tools-image-stream-tag=4.6:tests',
                             '--audit=gs://openshift-ci-release/releases',
                             '--sign=/etc/release-controller/signer/openshift-ci.gpg',

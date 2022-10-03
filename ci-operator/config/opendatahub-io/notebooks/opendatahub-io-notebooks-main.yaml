@@ -2,7 +2,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: rhel-8-release-golang-1.17-openshift-4.10
 images:
 - context_dir: base/ubi8-python-3.8
   dockerfile_path: Dockerfile
@@ -14,6 +14,12 @@ images:
 promotion:
   namespace: opendatahub-io
   tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.10"
 resources:
   '*':
     requests:
@@ -22,7 +28,6 @@ resources:
 tests:
 - as: notebook-base-ubi8-python-3-8-image-mirror
   postsubmit: true
-  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: base-ubi8-python-3.8
@@ -41,7 +46,6 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - as: notebook-jupyter-minimal-ubi8-python-3-8-image-mirror
   postsubmit: true
-  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: jupyter-minimal-ubi8-python-3.8
@@ -58,6 +62,29 @@ tests:
       IMAGE_REPO: notebooks
       RELEASE_VERSION: jupyter-minimal-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
+- as: notebooks-e2e-tests
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: jupyter-minimal-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-minimal-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
+        make deploy-jupyter-minimal-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-minimal-ubi8-python-3.8
+        make undeploy-jupyter-minimal-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_MINIMAL_IMAGE
+        name: jupyter-minimal-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

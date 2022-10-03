@@ -7,10 +7,6 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: libvirt-installer
-  openshift-tests-cli-4-12:
-    name: "4.12"
-    namespace: ocp
-    tag: tests
   test-bin:
     name: "4.10"
     namespace: ocp
@@ -84,6 +80,10 @@ images:
 - dockerfile_literal: |
     FROM src
     COPY yq /usr/bin/yq
+    RUN yum install -y --nodocs python3-devel && \
+        pip3 install pygithub GitPython && \
+        dnf clean all && \
+        rm -rf /var/cache/dnf/*
   from: src
   inputs:
     yq-cli:
@@ -97,12 +97,12 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.10"
+      version: "4.11"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.10"
+      version: "4.11"
 resources:
   '*':
     limits:

@@ -201,19 +201,6 @@ spec:
       - name: build-cluster-kubeconfigs
         secret:
           secretName: ci-chat-bot-kubeconfigs
-          items:
-            - key: sa.ci-chat-bot.build01.config
-              path: build01.kubeconfig
-            - key: sa.ci-chat-bot.build02.config
-              path: build02.kubeconfig
-            - key: sa.ci-chat-bot.build03.config
-              path: build03.kubeconfig
-            - key: sa.ci-chat-bot.build04.config
-              path: build04.kubeconfig
-            - key: sa.ci-chat-bot.build05.config
-              path: build05.kubeconfig
-            - key: sa.ci-chat-bot.vsphere.config
-              path: vsphere.kubeconfig
       - name: workflows-config
         configMap:
           name: ci-chat-bot-workflows-config
@@ -244,6 +231,11 @@ spec:
             secretKeyRef:
               name: ci-chat-bot-slack-app
               key: slack-app-bot-app-token
+        - name: BOT_SIGNING_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: ci-chat-bot-slack-app
+              key: slack-app-bot-signing-secret
         command:
         - /usr/bin/ci-chat-bot
         - --prow-config=/etc/config/config.yaml
@@ -252,5 +244,4 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-endpoint=https://api.github.com
         - --force-pr-owner=system:serviceaccount:ci:ci-chat-bot
-        - --build-cluster-kubeconfig=/var/build-cluster-kubeconfigs/build01.kubeconfig
         - --workflow-config-path=/etc/workflows-config/workflows-config.yaml
