@@ -89,6 +89,22 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-rpm-install
+- as: conformance-serial
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-test
+- as: conformance-parallel
+  optional: true
+  run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-microshift-e2e-test
 - as: e2e-openshift-conformance-sig-api-machinery
   run_if_changed: ^(cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
