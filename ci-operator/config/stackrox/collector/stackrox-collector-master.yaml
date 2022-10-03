@@ -1,4 +1,8 @@
 base_images:
+  apollo-ci:
+    name: apollo-ci
+    namespace: stackrox
+    tag: collector-0.3.44-1-gb00ffc52af
   centos7:
     name: centos
     namespace: openshift
@@ -19,34 +23,36 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+binary_build_commands: |
+  export SRC_ROOT_DIR=/go/src/github.com/stackrox/collector
+  "${SRC_ROOT_DIR}/.openshift-ci/build/build-collector.sh"
+  make container-dockerfile
 build_root:
   project_image:
-    dockerfile_path: .openshift-ci/build/Dockerfile.build_root
+    dockerfile_path: builder/Dockerfile
+  use_build_cache: true
 images:
-- build_args:
-  - name: BUILDER_ROOT_DIR
-    value: /go/src/github.com/stackrox/collector/builder
-  dockerfile_path: builder/Dockerfile
-  from: centos8
-  to: collector-builder
-- dockerfile_path: .openshift-ci/build/Dockerfile.build_collector
-  from: collector-builder
-  to: collector-binary
-- dockerfile_path: .openshift-ci/build/Dockerfile.create_bundle
-  from: collector-binary
-  to: collector-bundle
 - build_args:
   - name: ROOT_DIR
     value: /go/src/github.com/stackrox/collector/collector/container/rhel
-  context_dir: collector/container/rhel
-  dockerfile_path: collector/container/Dockerfile.gen
+  context_dir: collector
+  dockerfile_path: container/Dockerfile.gen
   from: ubi-minimal
   inputs:
-    collector-bundle:
+    bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/stackrox/collector/.
+        source_path: /go/src/github.com/stackrox/collector/collector/container
   to: collector-slim
+- context_dir: .openshift-ci/jobs/apollo-src/
+  dockerfile_path: Dockerfile
+  from: apollo-ci
+  inputs:
+    bin:
+      as:
+      - pr-data
+      - replaced-by-osci:bin
+  to: apollo-src
 - context_dir: .
   dockerfile_path: .openshift-ci/build/Dockerfile.latest
   inputs:
@@ -59,7 +65,7 @@ images:
   to: collector-full
 - context_dir: .openshift-ci
   dockerfile_path: jobs/integration-tests/Dockerfile
-  from: src
+  from: apollo-src
   to: integration-tests
 - context_dir: .
   dockerfile_path: .openshift-ci/drivers/scripts.Dockerfile
@@ -93,7 +99,7 @@ images:
   - name: USE_KERNELS_FILE
     value: "true"
   dockerfile_path: .openshift-ci/drivers/pre-build.Dockerfile
-  from: src
+  from: apollo-src
   inputs:
     scripts:
       as:
@@ -218,7 +224,7 @@ images:
   to: rhel7-3-drivers
 - context_dir: .
   dockerfile_path: .openshift-ci/drivers/drivers.Dockerfile
-  from: src
+  from: apollo-src
   inputs:
     fc36-drivers:
       as:
@@ -267,9 +273,7 @@ images:
   to: cpaas-drivers
 promotion:
   excluded_images:
-  - collector-builder
   - collector-drivers
-  - collector-bundle
   namespace: stackrox
   tag: osci-test
 resources:
@@ -281,32 +285,11 @@ resources:
       memory: 2Gi
 tests:
 - as: lint
-  steps:
-    test:
-    - as: clang-format
-      commands: make -C collector check
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: shfmt-check
-      commands: make shfmt-check
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: test-scripts
-  steps:
-    test:
-    - as: shellcheck-all
-      commands: make shellcheck-all
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
+  commands: |
+    make linters
+  container:
+    clone: true
+    from: apollo-ci
 - as: push-images
   steps:
     test:
@@ -322,25 +305,17 @@ tests:
       - env: COLLECTOR_FULL
         name: collector-full
       - env: COLLECTOR_BUILDER
-        name: collector-builder
-      from: src
+        name: root
+      from: apollo-src
       resources:
         requests:
           cpu: 2000m
           memory: 4000Mi
 - as: unit-tests
-  steps:
-    test:
-    - as: collector-unit-tests
-      commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
-      from: collector-binary
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: update-support-packages-from-registry
-  steps:
-    workflow: stackrox-collector-update-support-packages
+  commands: |
+    /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
+  container:
+    from: bin
 - as: rhel-7-ebpf-integration-tests
   steps:
     env:
@@ -540,45 +515,21 @@ tests:
       VM_TYPE: rhel-sap
     workflow: stackrox-collector-integration-tests
 - as: merge-lint
+  commands: |
+    make linters
+  container:
+    clone: true
+    from: apollo-src
   postsubmit: true
-  steps:
-    test:
-    - as: clang-format
-      commands: make -C collector check
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: shfmt-check
-      commands: make shfmt-check
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: merge-test-scripts
-  postsubmit: true
-  steps:
-    test:
-    - as: shellcheck-all
-      commands: make shellcheck-all
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
 - as: merge-unit-tests
+  commands: |
+    /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
+  container:
+    from: bin
   postsubmit: true
+- as: update-support-packages-from-registry
   steps:
-    test:
-    - as: collector-unit-tests
-      commands: /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
-      from: collector-binary
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
+    workflow: stackrox-collector-update-support-packages
 - as: merge-update-support-packages-from-registry
   postsubmit: true
   steps:
@@ -602,8 +553,8 @@ tests:
       - env: COLLECTOR_FULL
         name: collector-full
       - env: COLLECTOR_BUILDER
-        name: collector-builder
-      from: src
+        name: root
+      from: apollo-src
       resources:
         requests:
           cpu: 2000m
