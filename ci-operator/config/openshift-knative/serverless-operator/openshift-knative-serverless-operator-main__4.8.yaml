@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.6"
+    name: "4.8"
     namespace: ocp
     tag: base
   cli:
-    name: "4.6"
+    name: "4.8"
     namespace: ocp
     tag: cli
   openshift_knative-v1.1.0_knative-eventing-kafka-src:
@@ -98,7 +98,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.6"
+      version: "4.8"
 resources:
   '*':
     limits:
@@ -107,10 +107,44 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-ocp-46-continuous
+- as: ui-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.8"
+  run_if_changed: test/ui
+  steps:
+    test:
+    - as: serverless-ui
+      commands: make test-ui-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: e2e-aws-ocp-48-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.8"
   cron: 33 18 14,28 * *
   steps:
-    cluster_profile: aws
     test:
     - as: serverless-e2e
       commands: make test-e2e-with-kafka test-upstream-e2e-no-upgrade
@@ -128,11 +162,17 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
-- as: upgrade-tests-aws-ocp-46-continuous
+    workflow: generic-claim
+- as: upgrade-tests-aws-ocp-48-continuous
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.8"
   cron: 5 12 7,19 * *
   steps:
-    cluster_profile: aws
     test:
     - as: serverless-e2e
       commands: make test-upgrade
@@ -150,9 +190,9 @@ tests:
         requests:
           cpu: "4"
           memory: 6Gi
-    workflow: openshift-e2e-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: "4.6"
+  variant: "4.8"
