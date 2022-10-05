@@ -308,7 +308,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.11-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -324,6 +324,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-serverless-operator-main-4.11-operator-e2e-aws-ocp-411
     rerun_command: /test 4.11-operator-e2e-aws-ocp-411
+    skip_if_only_changed: test/ui
     spec:
       containers:
       - args:
@@ -374,7 +375,74 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.11-operator-e2e-aws-ocp-411,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/4.11-ui-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.11"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.11"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-main-4.11-ui-tests
+    rerun_command: /test 4.11-ui-tests
+    run_if_changed: test/ui
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=ui-tests
+        - --variant=4.11
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.11-ui-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -391,6 +459,7 @@ presubmits:
     name: pull-ci-openshift-knative-serverless-operator-main-4.11-upgrade-tests-aws-ocp-411
     optional: true
     rerun_command: /test 4.11-upgrade-tests-aws-ocp-411
+    skip_if_only_changed: test/ui
     spec:
       containers:
       - args:
@@ -441,7 +510,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.11-upgrade-tests-aws-ocp-411,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -458,6 +527,7 @@ presubmits:
     name: pull-ci-openshift-knative-serverless-operator-main-4.11-upstream-e2e-aws-ocp-411
     optional: true
     rerun_command: /test 4.11-upstream-e2e-aws-ocp-411
+    skip_if_only_changed: test/ui
     spec:
       containers:
       - args:
@@ -508,7 +578,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.11-upstream-e2e-aws-ocp-411,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -525,6 +595,7 @@ presubmits:
     name: pull-ci-openshift-knative-serverless-operator-main-4.11-upstream-e2e-kafka-aws-ocp-411
     optional: true
     rerun_command: /test 4.11-upstream-e2e-kafka-aws-ocp-411
+    skip_if_only_changed: test/ui
     spec:
       containers:
       - args:
@@ -575,7 +646,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.11-upstream-e2e-kafka-aws-ocp-411,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -592,6 +663,7 @@ presubmits:
     name: pull-ci-openshift-knative-serverless-operator-main-4.11-upstream-e2e-mesh-aws-ocp-411
     optional: true
     rerun_command: /test 4.11-upstream-e2e-mesh-aws-ocp-411
+    skip_if_only_changed: test/ui
     spec:
       containers:
       - args:
@@ -647,16 +719,16 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/4.6-images
+    context: ci/prow/4.8-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "4.6"
+      ci-operator.openshift.io/variant: "4.8"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serverless-operator-main-4.6-images
-    rerun_command: /test 4.6-images
+    name: pull-ci-openshift-knative-serverless-operator-main-4.8-images
+    rerun_command: /test 4.8-images
     spec:
       containers:
       - args:
@@ -664,7 +736,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=4.6
+        - --variant=4.8
         command:
         - ci-operator
         image: ci-operator:latest
@@ -691,7 +763,73 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.6-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.8-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/4.8-ui-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.8"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-main-4.8-ui-tests
+    rerun_command: /test 4.8-ui-tests
+    run_if_changed: test/ui
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=ui-tests
+        - --variant=4.8
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.8-ui-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
