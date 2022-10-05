@@ -1,14 +1,52 @@
 base_images:
+  base:
+    name: "4.10"
+    namespace: ocp
+    tag: base
   golangci-lint:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-binary_build_commands: make build
+binary_build_commands: unset GOFLAGS && make manifests build bundle
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9
+      USER root
+      ENV GOVERSION=1.18.1
+      RUN yum install -y gcc git jq make skopeo sqlite && \
+          yum clean all && rm -rf /var/cache/dnf/*
+      # Install Go. This version will only be used for unit tests. The
+      # official builds are done via their own container image Dockerfiles
+      RUN rm -rf /usr/local/go && \
+          curl -fsSL https://go.dev/dl/go${GOVERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+      ENV PATH=$PATH:/usr/local/go/bin
+      ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
+      RUN mkdir -p $GOCACHE /.cache
+      RUN chmod -R 777 /go /.cache
+      RUN mkdir /.bin && chmod 777 /.bin
+      WORKDIR /.bin
+      RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+      RUN cp ./kustomize /usr/local/bin
+      RUN curl -s -L "https://github.com/operator-framework/operator-registry/releases/latest/download/linux-amd64-opm" -o opm
+      RUN chmod +x ./opm
+      RUN cp ./opm /usr/local/bin
+      RUN curl -s -L "https://github.com/operator-framework/operator-sdk/releases/latest/download/operator-sdk_linux_amd64" -o operator-sdk
+      RUN chmod +x ./operator-sdk
+      RUN cp ./operator-sdk /usr/local/bin
+      WORKDIR $GOPATH/src/
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: mariadb-operator
+- dockerfile_path: bundle.Dockerfile
+  from: bin
+  to: mariadb-operator-bundle
+operator:
+  bundles:
+  - as: mariadb-bundle
+    base_index: bin
+    dockerfile_path: bundle.Dockerfile
 resources:
   '*':
     limits:
@@ -42,6 +80,10 @@ tests:
   commands: make gofmt || true
   container:
     from: src
+- as: checkoutputs
+  commands: ls -l && ls -l bin
+  container:
+    from: bin
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
