@@ -1,24 +1,25 @@
-postsubmits:
+presubmits:
   stackrox/collector:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/cos-89-lts-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-drivers-tests-post
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-cos-89-lts-ebpf-integration-tests
+    rerun_command: /test cos-89-lts-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=drivers-tests-post
+        - --target=cos-89-lts-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -45,26 +46,402 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cos-89-lts-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/cos-beta-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-cos-beta-ebpf-integration-tests
+    rerun_command: /test cos-beta-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=cos-beta-ebpf-integration-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cos-beta-ebpf-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/cos-dev-ebpf-integration-tests
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-cos-dev-ebpf-integration-tests
+    rerun_command: /test cos-dev-ebpf-integration-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=cos-dev-ebpf-integration-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cos-dev-ebpf-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/cos-stable-ebpf-integration-tests
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-cos-stable-ebpf-integration-tests
+    rerun_command: /test cos-stable-ebpf-integration-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=cos-stable-ebpf-integration-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )cos-stable-ebpf-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/drivers-tests
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-drivers-tests
+    optional: true
+    rerun_command: /test drivers-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=drivers-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )drivers-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/flatcar-stable-ebpf-integration-tests
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-flatcar-stable-ebpf-integration-tests
+    rerun_command: /test flatcar-stable-ebpf-integration-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=flatcar-stable-ebpf-integration-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )flatcar-stable-ebpf-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/flatcar-stable-kernel-module-integration-tests
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-flatcar-stable-kernel-module-integration-tests
+    rerun_command: /test flatcar-stable-kernel-module-integration-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=flatcar-stable-kernel-module-integration-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )flatcar-stable-kernel-module-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/garden-linux-ebpf-integration-tests
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-garden-linux-ebpf-integration-tests
+    rerun_command: /test garden-linux-ebpf-integration-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=garden-linux-ebpf-integration-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )garden-linux-ebpf-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/garden-linux-kernel-module-integration-tests
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-garden-linux-kernel-module-integration-tests
+    rerun_command: /test garden-linux-kernel-module-integration-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=garden-linux-kernel-module-integration-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )garden-linux-kernel-module-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/images
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-images
+    rerun_command: /test images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -82,9 +459,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -93,31 +467,30 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/lint
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-cos-89-lts-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-lint
+    rerun_command: /test lint
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-cos-89-lts-ebpf-integration-tests
+        - --target=lint
         command:
         - ci-operator
         image: ci-operator:latest
@@ -144,25 +517,28 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/push-drivers
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-cos-beta-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-push-drivers
+    optional: true
+    rerun_command: /test push-drivers
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-cos-beta-ebpf-integration-tests
+        - --target=push-drivers
         command:
         - ci-operator
         image: ci-operator:latest
@@ -189,25 +565,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )push-drivers,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/push-images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-cos-dev-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-push-images
+    rerun_command: /test push-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-cos-dev-ebpf-integration-tests
+        - --target=push-images
         command:
         - ci-operator
         image: ci-operator:latest
@@ -234,25 +612,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )push-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/rhel-7-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-cos-stable-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-rhel-7-ebpf-integration-tests
+    rerun_command: /test rhel-7-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-cos-stable-ebpf-integration-tests
+        - --target=rhel-7-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -279,25 +659,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-7-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/rhel-7-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-flatcar-stable-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-rhel-7-kernel-module-integration-tests
+    rerun_command: /test rhel-7-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-flatcar-stable-ebpf-integration-tests
+        - --target=rhel-7-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -324,25 +706,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-7-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/rhel-8-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-flatcar-stable-kernel-module-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-rhel-8-ebpf-integration-tests
+    rerun_command: /test rhel-8-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-flatcar-stable-kernel-module-integration-tests
+        - --target=rhel-8-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -369,25 +753,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-8-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/rhel-8-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-garden-linux-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-rhel-8-kernel-module-integration-tests
+    rerun_command: /test rhel-8-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-garden-linux-ebpf-integration-tests
+        - --target=rhel-8-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -414,25 +800,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-8-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/rhel-84-sap-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-garden-linux-kernel-module-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-rhel-84-sap-ebpf-integration-tests
+    rerun_command: /test rhel-84-sap-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-garden-linux-kernel-module-integration-tests
+        - --target=rhel-84-sap-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -459,25 +847,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-84-sap-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/rhel-84-sap-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-lint
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-rhel-84-sap-kernel-module-integration-tests
+    rerun_command: /test rhel-84-sap-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-lint
+        - --target=rhel-84-sap-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -504,25 +894,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-84-sap-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/rhel-86-sap-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-push-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-rhel-86-sap-ebpf-integration-tests
+    rerun_command: /test rhel-86-sap-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-push-images
+        - --target=rhel-86-sap-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -549,25 +941,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-86-sap-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/rhel-86-sap-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-rhel-7-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-rhel-86-sap-kernel-module-integration-tests
+    rerun_command: /test rhel-86-sap-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-rhel-7-ebpf-integration-tests
+        - --target=rhel-86-sap-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -594,25 +988,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-86-sap-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/sles-12-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-rhel-7-kernel-module-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-sles-12-ebpf-integration-tests
+    rerun_command: /test sles-12-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-rhel-7-kernel-module-integration-tests
+        - --target=sles-12-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -639,25 +1035,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sles-12-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/sles-12-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-rhel-8-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-sles-12-kernel-module-integration-tests
+    rerun_command: /test sles-12-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-rhel-8-ebpf-integration-tests
+        - --target=sles-12-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -684,25 +1082,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sles-12-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/sles-15-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-rhel-8-kernel-module-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-sles-15-ebpf-integration-tests
+    rerun_command: /test sles-15-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-rhel-8-kernel-module-integration-tests
+        - --target=sles-15-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -729,25 +1129,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sles-15-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/sles-15-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-rhel-84-sap-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-sles-15-kernel-module-integration-tests
+    rerun_command: /test sles-15-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-rhel-84-sap-ebpf-integration-tests
+        - --target=sles-15-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -774,25 +1176,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )sles-15-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/ubuntu-1804-lts-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-rhel-84-sap-kernel-module-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-ubuntu-1804-lts-ebpf-integration-tests
+    rerun_command: /test ubuntu-1804-lts-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-rhel-84-sap-kernel-module-integration-tests
+        - --target=ubuntu-1804-lts-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -819,25 +1223,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ubuntu-1804-lts-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/ubuntu-1804-lts-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-rhel-86-sap-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-ubuntu-1804-lts-kernel-module-integration-tests
+    rerun_command: /test ubuntu-1804-lts-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-rhel-86-sap-ebpf-integration-tests
+        - --target=ubuntu-1804-lts-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -864,25 +1270,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ubuntu-1804-lts-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/ubuntu-2004-lts-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-rhel-86-sap-kernel-module-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-ubuntu-2004-lts-ebpf-integration-tests
+    rerun_command: /test ubuntu-2004-lts-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-rhel-86-sap-kernel-module-integration-tests
+        - --target=ubuntu-2004-lts-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -909,25 +1317,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ubuntu-2004-lts-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/ubuntu-2004-lts-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-sles-12-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-ubuntu-2004-lts-kernel-module-integration-tests
+    rerun_command: /test ubuntu-2004-lts-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-sles-12-ebpf-integration-tests
+        - --target=ubuntu-2004-lts-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -954,25 +1364,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ubuntu-2004-lts-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/ubuntu-2204-lts-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-sles-12-kernel-module-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-ubuntu-2204-lts-ebpf-integration-tests
+    rerun_command: /test ubuntu-2204-lts-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-sles-12-kernel-module-integration-tests
+        - --target=ubuntu-2204-lts-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -999,25 +1411,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ubuntu-2204-lts-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/ubuntu-2204-lts-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-sles-15-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-ubuntu-2204-lts-kernel-module-integration-tests
+    rerun_command: /test ubuntu-2204-lts-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-sles-15-ebpf-integration-tests
+        - --target=ubuntu-2204-lts-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1044,25 +1458,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ubuntu-2204-lts-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/ubuntu-pro-1804-lts-ebpf-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-sles-15-kernel-module-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-ubuntu-pro-1804-lts-ebpf-integration-tests
+    rerun_command: /test ubuntu-pro-1804-lts-ebpf-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-sles-15-kernel-module-integration-tests
+        - --target=ubuntu-pro-1804-lts-ebpf-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1089,25 +1505,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ubuntu-pro-1804-lts-ebpf-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/ubuntu-pro-1804-lts-kernel-module-integration-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-ubuntu-1804-lts-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-ubuntu-pro-1804-lts-kernel-module-integration-tests
+    rerun_command: /test ubuntu-pro-1804-lts-kernel-module-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-ubuntu-1804-lts-ebpf-integration-tests
+        - --target=ubuntu-pro-1804-lts-kernel-module-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1134,25 +1552,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ubuntu-pro-1804-lts-kernel-module-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/unit-tests
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-ubuntu-1804-lts-kernel-module-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-unit-tests
+    rerun_command: /test unit-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-ubuntu-1804-lts-kernel-module-integration-tests
+        - --target=unit-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1179,25 +1599,27 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build03
+    - ^mauro-collector-root-from-repository$
+    - ^mauro-collector-root-from-repository-
+    cluster: build01
+    context: ci/prow/update-support-packages-from-registry
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-ubuntu-2004-lts-ebpf-integration-tests
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-mauro-collector-root-from-repository-update-support-packages-from-registry
+    rerun_command: /test update-support-packages-from-registry
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=merge-ubuntu-2004-lts-ebpf-integration-tests
+        - --target=update-support-packages-from-registry
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1224,363 +1646,4 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-ubuntu-2004-lts-kernel-module-integration-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-ubuntu-2004-lts-kernel-module-integration-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-ubuntu-2204-lts-ebpf-integration-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-ubuntu-2204-lts-ebpf-integration-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-ubuntu-2204-lts-kernel-module-integration-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-ubuntu-2204-lts-kernel-module-integration-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-ubuntu-pro-1804-lts-ebpf-integration-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-ubuntu-pro-1804-lts-ebpf-integration-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-ubuntu-pro-1804-lts-kernel-module-integration-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-ubuntu-pro-1804-lts-kernel-module-integration-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-unit-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-unit-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-merge-update-support-packages-from-registry
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=merge-update-support-packages-from-registry
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    cluster: build03
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-stackrox-collector-master-push-drivers-post
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=push-drivers-post
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )update-support-packages-from-registry,?($|\s.*)
