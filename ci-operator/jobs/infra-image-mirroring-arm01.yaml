@@ -1,0 +1,46 @@
+periodics:
+- agent: kubernetes
+  cluster: arm01
+  cron: '@daily'
+  decorate: true
+  labels:
+    ci.openshift.io/area: supplemental-ci-images-arm01
+    ci.openshift.io/role: infra
+  name: periodic-image-mirroring-supplemental-ci-images-arm01
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        failures=0
+        for mapping in /etc/imagemirror/mapping_supplemental_ci_images_*; do
+          echo "Running: oc image mirror --filter-by-os=linux/arm64 -f=$mapping --skip-multiple-scopes"
+          attempts=3
+          for attempt in $( seq $attempts ); do
+            if oc image mirror --filter-by-os=linux/arm64 -f="$mapping" --skip-multiple-scopes; then
+              break
+            fi
+            if [[ $attempt -eq $attempts ]]; then
+              echo "ERROR: Failed to mirror images from $mapping after $attempts attempts"
+              failures=$((failures+1))
+            fi
+          done
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      image: registry.arm-build01.arm-build.devcluster.openshift.com/ocp-arm64/4.11:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/imagemirror
+        name: config
+    serviceAccount: builder
+    volumes:
+    - configMap:
+        name: image-mirror-mappings-arm01
+      name: config
