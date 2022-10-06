@@ -204,6 +204,12 @@ spec:
       - name: workflows-config
         configMap:
           name: ci-chat-bot-workflows-config
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       containers:
       - name: bot
         image: ci-chat-bot:latest
@@ -219,6 +225,9 @@ spec:
           readOnly: true
         - name: workflows-config
           mountPath: /etc/workflows-config
+          readOnly: true
+        - mountPath: /etc/boskos
+          name: boskos
           readOnly: true
         env:
         - name: BOT_TOKEN
@@ -247,3 +256,4 @@ spec:
         - --workflow-config-path=/etc/workflows-config/workflows-config.yaml
         - --kubeconfig-dir=/var/build-cluster-kubeconfigs
         - --kubeconfig-suffix=.config
+        - --lease-server-credentials-file=/etc/boskos/credentials
