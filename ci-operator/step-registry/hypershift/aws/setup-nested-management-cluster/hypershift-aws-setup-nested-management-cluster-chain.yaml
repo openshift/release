@@ -19,6 +19,9 @@ chain:
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
       documentation: "Release image used for the HostedCluster. Empty by default so it will use the based code defaulting"
+    - name: HYPERSHIFT_HC_NODE_SELECTOR
+      default: ""
+      documentation: "A Node selector for the HostedCluster pods to land on"
     commands: |-
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
@@ -31,6 +34,12 @@ chain:
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
+      
+      HYPERSHIFT_HC_NODE_SELECTOR_FLAG=""
+      if [ ! -z "$HYPERSHIFT_HC_NODE_SELECTOR" ]; then
+        HYPERSHIFT_HC_NODE_SELECTOR_FLAG="--node-selector=${HYPERSHIFT_HC_NODE_SELECTOR}"
+      fi
+      
       bin/hypershift create cluster aws \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
@@ -44,7 +53,7 @@ chain:
         --service-cidr=172.29.0.0/16 \
         --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
         --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
-        --namespace=${HYPERSHIFT_NAMESPACE}
+        --namespace=${HYPERSHIFT_NAMESPACE} ${HYPERSHIFT_HC_NODE_SELECTOR_FLAG}
       echo "Waiting for cluster to become available"
       oc wait --timeout=10m --for=condition=Available --namespace=${HYPERSHIFT_NAMESPACE} hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
