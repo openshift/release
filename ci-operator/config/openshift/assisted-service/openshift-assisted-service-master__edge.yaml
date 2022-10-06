@@ -164,6 +164,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.11"
+  candidate-4-11-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.11"
   candidate-4-11-multi:
     candidate:
       architecture: multi
@@ -412,6 +418,19 @@ tests:
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-arm64
+  optional: true
+  run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|deploy/assisted-controller/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11-multi
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:candidate-4-11-arm64
+    env:
+      ARCHITECTURE: arm64
+      NVME_DEVICE: ""
+      PACKET_PLAN: c3.large.arm64
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
   cron: 00 00 */1 * 0-5
