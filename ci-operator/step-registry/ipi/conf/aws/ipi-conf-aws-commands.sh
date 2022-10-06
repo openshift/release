@@ -182,14 +182,48 @@ EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+rm /tmp/pull-secret
+
+# excluding older releases because of the bug fixed in 4.10, see: https://bugzilla.redhat.com/show_bug.cgi?id=1960378
+if (( ocp_minor_version > 9 || ocp_major_version > 4 )); then
+  MIRROR_REGION="us-east-1"
+  if [ "$REGION" == "us-west-1" ] || [ "$REGION" == "us-east-2" ] || [ "$REGION" == "us-west-2" ] ; then
+    MIRROR_REGION="${REGION}"
+  fi
+
+  PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
+  cat > "${PATCH}" << EOF
+imageContentSources:
+- mirrors:
+  - quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com
+  source: quay.io
+EOF
+
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+
+  pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+  mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
+  pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
+
+  PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
+  cat > "${PATCH}" << EOF
+pullSecret: >
+  $(echo "${pull_secret_aws}" | jq -c .)
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  rm "${PATCH}"
+fi
+
 # custom rhcos ami for non-public regions
 RHCOS_AMI=
 if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$REGION" == "cn-north-1" ] || [ "$REGION" == "cn-northwest-1" ]; then
   # TODO: move repo to a more appropriate location
   curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
-  oc registry login
-  # ocp_version=4.9 4.10 etc.
-  ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
   RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
   echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
 fi
