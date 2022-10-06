@@ -63,6 +63,7 @@ function annotate() {
 
 for release in ${releases[@]}; do
 	annotate "origin" "${release}" "okd-${release}.json"
+	annotate "origin" "scos-${release}" "okd-scos-${release}.json"
 	annotate "ocp" "${release}" "ocp-${release}-ci.json"
 	annotate "ocp" "${release}-art-latest" "ocp-${release}.json"
 	annotate "ocp-s390x" "${release}-art-latest-s390x" "ocp-${release}-s390x.json"
@@ -77,6 +78,7 @@ for release in ${releases[@]}; do
 done
 
 annotate "origin" "release" "okd-4.y-stable.json"
+annotate "origin" "release-scos" "okd-scos-4.y-stable.json"
 annotate "ocp" "release" "ocp-4.y-stable.json"
 annotate "ocp-s390x" "release-s390x" "ocp-4.y-stable-s390x.json"
 annotate "ocp-ppc64le" "release-ppc64le" "ocp-4.y-stable-ppc64le.json"
