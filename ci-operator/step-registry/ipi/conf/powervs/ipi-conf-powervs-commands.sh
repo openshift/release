@@ -68,11 +68,11 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=lon
       VPCREGION=eu-gb
    ;;
-    #  "lon06")
-    #  POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06")
-    #  POWERVS_REGION=lon
-    #  VPCREGION=eu-gb
-    #  ;;
+   "lon06")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06")
+      POWERVS_REGION=lon
+      VPCREGION=eu-gb
+      ;;
    "mon01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MON01")
       POWERVS_REGION=mon
@@ -92,6 +92,11 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SYD04")
       POWERVS_REGION=syd
       VPCREGION=au-syd
+   ;;
+   "tor01")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_TOR01")
+      POWERVS_REGION=tor
+      VPCREGION=ca-tor
    ;;
    "tok04")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_TOK04")
