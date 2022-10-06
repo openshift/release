@@ -3,10 +3,6 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
   ocp_builder_rhel-8-golang-1.17-openshift-4.11:
     name: builder
     namespace: ocp
@@ -38,24 +34,6 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/slave-base/.
   to: jenkins-agent-base
-- context_dir: agent-maven
-  dockerfile_path: Dockerfile.rhel8
-  from: jenkins-agent-base
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/agent-maven/.
-  to: jenkins-agent-maven
-- context_dir: agent-nodejs-12
-  dockerfile_path: Dockerfile.rhel8
-  from: jenkins-agent-base
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/agent-nodejs-12/.
-  to: jenkins-agent-nodejs
 releases:
   initial:
     integration:
@@ -82,7 +60,7 @@ tests:
   commands: IMAGE_NAME=stable:jenkins make smoke
   container:
     clone: true
-    from: ocp_builder_rhel-8-golang-1.17-openshift-4.10
+    from: ocp_builder_rhel-8-golang-1.17-openshift-4.11
 - as: e2e-aws
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

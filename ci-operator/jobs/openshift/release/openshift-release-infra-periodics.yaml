@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -398,6 +398,203 @@ periodics:
   cron: '@yearly'
   decorate: true
   labels:
+    config-type: modern
+    job-architecture: amd64
+    job-env: aws-2
+    job-type: launch
+  name: release-openshift-origin-installer-launch-aws-2-modern
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.9"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-aws
+          - as: launch-proxy
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-proxy
+          - as: launch-ovn
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-ovn
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-aws-ovn-hybrid
+          - as: launch-shared-vpc
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-sharednetwork
+          - as: launch-fips
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FIPS_ENABLED: "true"
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              pre:
+              - chain: ipi-aws-pre
+              - ref: fips-check
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
+          - as: launch-single-node
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-single-node
+          - as: launch-cgroupsv2
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-cgroupsv2
+          - as: launch-techpreview
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-techpreview
+          - as: launch-sdn
+            steps:
+              cluster_profile: aws-2
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-sdn
+          - as: upgrade
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)-2
+              env:
+                TEST_SUITE: "all"
+                BASE_DOMAIN: aws-2.ci.openshift.org
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: TEST_COMMAND
+        value: sleep $(CLUSTER_DURATION) & wait
+      - name: NAMESPACE
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: build05
+  cron: '@yearly'
+  decorate: true
+  labels:
     config-type: legacy
     job-architecture: amd64
     job-env: aws
@@ -560,7 +757,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -1558,6 +1755,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: upi-$(CLUSTER_TYPE)-clusterbot
+          - as: launch-multi-zone
+            steps:
+              cluster_profile: vsphere-multizone
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
           - as: launch-ovn-hybrid
             steps:
               cluster_profile: $(CLUSTER_PROFILE)
@@ -1812,7 +2017,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2216,7 +2421,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2408,7 +2613,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2466,9 +2671,11 @@ periodics:
             steps:
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
+                HYPERSHIFT_HC_RELEASE_IMAGE: $(RELEASE_IMAGE_LATEST)
                 HYPERSHIFT_NODE_COUNT: 2
                 HYPERSHIFT_ZONES: "us-east-1a"
                 HYPERSHIFT_NAMESPACE: "cluster-bot"
+                HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
               test:
               - ref: clusterbot-wait
               cluster_profile: hypershift
@@ -2519,7 +2726,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -2606,7 +2813,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build05
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:

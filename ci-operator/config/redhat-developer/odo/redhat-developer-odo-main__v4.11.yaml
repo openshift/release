@@ -33,12 +33,40 @@ resources:
       memory: 6Gi
 tests:
 - as: integration-e2e-periodic
-  cron: 15 23 */1 * 1-5
+  cron: 0 0 * * *
   steps:
     cluster_profile: aws
     test:
     - as: integration-e2e-periodic-steps
       commands: scripts/openshiftci-periodic-tests.sh
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+      timeout: 4h0m0s
+    workflow: ipi-aws
+- as: integration-e2e
+  skip_if_only_changed: ^website/|docs/|\.md$|\.adoc$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: integration-e2e-steps
+      commands: scripts/openshiftci-presubmit-all-tests.sh
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+      timeout: 4h0m0s
+    workflow: ipi-aws
+- as: sbo-nightly-odo-tests
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: sbo-nightly-odo-tests-steps
+      commands: scripts/openshiftci-Nightly-SBO-tests.sh
       from: oc-bin-image
       resources:
         requests:

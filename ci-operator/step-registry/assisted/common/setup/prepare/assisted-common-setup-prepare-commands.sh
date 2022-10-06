@@ -96,7 +96,8 @@ export PULL_SECRET=\$(cat /root/prod/pull-secret)
 export OFFLINE_TOKEN=\$(cat /root/prod/offline-token)
 export REMOTE_SERVICE_URL=https://api.openshift.com
 export NO_MINIKUBE=true
-export MAKEFILE_TARGET='setup test_parallel'
+export MAKEFILE_SETUP_TARGET=setup
+export MAKEFILE_TARGET=test_parallel
 {% endif %}
 
 {% if PROVIDER_IMAGE != ASSISTED_CONTROLLER_IMAGE %}

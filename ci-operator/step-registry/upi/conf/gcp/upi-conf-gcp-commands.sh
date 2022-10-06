@@ -136,6 +136,16 @@ data["spec"]["endpointPublishingStrategy"]["loadBalancer"]["scope"] = "External"
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 fi
 
+### Inject customized manifests
+echo "Will include manifests:"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
+
+while IFS= read -r -d '' item
+do
+  manifest="$( basename "${item}" )"
+  cp "${item}" "${dir}/manifests/${manifest##manifest_}"
+done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+
 ### Create Ignition configs
 echo "Creating Ignition configs..."
 openshift-install --dir="${dir}" create ignition-configs &

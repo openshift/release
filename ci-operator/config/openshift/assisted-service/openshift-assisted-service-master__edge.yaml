@@ -66,21 +66,7 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |
-    FROM quay.io/centos/centos:stream9
-    RUN dnf install -y 'dnf-command(config-manager)' && \
-        dnf config-manager --set-enabled crb && \
-        dnf install -y git unzip make gcc which nmstate-devel
-    COPY --from=registry.ci.openshift.org/openshift/release:golang-1.17 /usr/local/go /usr/local/go
-    ENV GOPATH=/go
-    ENV GOROOT=/usr/local/go
-    ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
-    COPY . /assisted-service/
-    WORKDIR /assisted-service/
-    ENV CGO_CFLAGS="-g -O2 -Wno-return-local-addr"
-    RUN go mod vendor
-    RUN chmod 775 -R $GOPATH && chmod 775 -R $(go env GOROOT) && chmod 775 -R /assisted-service/ && \
-        mkdir /.cache && chmod 775 -R /.cache
+- dockerfile_path: ci-images/Dockerfile.base
   inputs:
     coreos_centos_stream9:
       as:
@@ -88,53 +74,26 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: assisted-service-centos9
-- dockerfile_literal: |
-    FROM base
-    RUN dnf install -y postgresql-server
-    RUN cd / && /assisted-service/hack/setup_env.sh test_tools
-  from: assisted-service-centos9
+  to: assisted-service-base
+- dockerfile_path: ci-images/Dockerfile.unit-tests
+  from: assisted-service-base
   to: assisted-service-unit-test
-- dockerfile_literal: |
-    FROM base
-    COPY --from=quay.io/app-sre/golangci-lint:v1.37.1 /usr/bin/golangci-lint /usr/bin/golangci-lint
-  from: assisted-service-centos9
+- dockerfile_path: ci-images/Dockerfile.lint
+  from: assisted-service-base
   inputs:
     golangci-lint:
       as:
       - quay.io/app-sre/golangci-lint:v1.37.1
   to: assisted-service-lint
-- dockerfile_literal: |
-    FROM base
-    COPY --from=quay.io/openshift/origin-cli:latest /usr/bin/oc /usr/bin
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN make build-openshift-ci-test-bin
-    RUN go mod vendor
-  from: assisted-service-centos9
+- dockerfile_path: ci-images/Dockerfile.subsystem
+  from: assisted-service-base
   inputs:
     cli:
       as:
       - quay.io/openshift/origin-cli:latest
   to: assisted-service-subsystem
-- dockerfile_literal: |
-    FROM base
-    ENV VIRTUAL_ENV=/opt/venv
-    ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-    COPY --from=quay.io/goswagger/swagger:v0.28.0 /usr/bin/swagger /usr/bin/goswagger
-    RUN cd / && /assisted-service/hack/setup_env.sh spectral && \
-        /assisted-service/hack/setup_env.sh jq && \
-        /assisted-service/hack/setup_env.sh kustomize && \
-        go install github.com/golang/mock/mockgen@v1.5.0 && \
-        go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.2 && \
-        go install golang.org/x/tools/cmd/goimports@v0.1.5 && \
-        chmod 775 -R $GOPATH
-    RUN curl --retry 5 -L https://github.com/operator-framework/operator-sdk/releases/download/v1.10.1/operator-sdk_linux_amd64 --output /tmp/operator-sdk_linux_amd64 && \
-        chmod +x /tmp/operator-sdk_linux_amd64 && \
-        install /tmp/operator-sdk_linux_amd64 /usr/local/bin/operator-sdk
-    RUN python3 -m venv ${VIRTUAL_ENV} && \
-        python3 -m pip install --upgrade pip && \
-        python3 -m pip install -r /assisted-service/dev-requirements.txt
-  from: assisted-service-centos9
+- dockerfile_path: ci-images/Dockerfile.code-generation
+  from: assisted-service-base
   inputs:
     goswagger_swagger:
       as:
@@ -217,15 +176,15 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
-      namespace: ocp
-  stable-4-9:
-    integration:
-      name: "4.9"
+      name: "4.12"
       namespace: ocp
   stable-4-10:
     integration:
       name: "4.10"
+      namespace: ocp
+  stable-4-11:
+    integration:
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -277,9 +236,9 @@ tests:
     make lint
   container:
     from: assisted-service-lint
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: verify-generated-code
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
@@ -294,7 +253,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test-postsubmit
   commands: |
     export REPORTS=/tmp/reports
@@ -442,7 +401,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ai-operator-ztp
-  run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
+  run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|deploy/assisted-controller/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -488,7 +447,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DISCONNECTED: "true"
@@ -498,6 +457,9 @@ tests:
   cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       DISCONNECTED: "true"
       IP_STACK: v6
@@ -512,8 +474,22 @@ tests:
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
+        NUMBER_OF_DAY2_HOSTS=2
+      NUM_EXTRA_WORKERS: "5"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-compact-day2-masters
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
         NUMBER_OF_DAY2_HOSTS=1
-      NUM_EXTRA_WORKERS: "2"
+        DAY2_MASTERS=True
+      NUM_EXTRA_WORKERS: "4"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers
   steps:
@@ -592,43 +568,55 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: cluster-api-provider-agent
     workflow: assisted-baremetal-operator-capi
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-49
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      IP_STACK: v4v6
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-410
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-411
   optional: true
   run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-11
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       IP_STACK: v4v6
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-410-periodic
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-411-periodic
   cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-11
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       IP_STACK: v4v6
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-49
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp
   optional: true
+  run_if_changed: ^(deploy/operator/.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-9
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      IP_STACK: v4v6
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-periodic
+  cron: 00 00 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      IP_STACK: v4v6
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-411
+  optional: true
+  run_if_changed: ^(deploy/operator/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-11
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
@@ -636,13 +624,12 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-410
-  optional: true
-  run_if_changed: ^(deploy/operator/.*)$
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-411-periodic
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-11
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |
@@ -650,12 +637,26 @@ tests:
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-410-periodic
+- as: e2e-ai-operator-ztp-ipv4v6-3masters
+  optional: true
+  run_if_changed: ^(deploy/operator/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+      IP_STACK: v4v6
+      NUM_EXTRA_WORKERS: "3"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-ipv4v6-3masters-periodic
   cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable-4-10
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
       ASSISTED_ZTP_CONFIG: |

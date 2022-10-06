@@ -10,6 +10,11 @@ HOST_PREFIX="$(         yq -r '.networking.clusterNetwork[0].hostPrefix' "${SHAR
 OS_NETWORKING_TYPE="$(  yq -r '.networking.networkType'                  "${SHARED_DIR}/install-config.yaml")"
 OS_EXTERNAL_DNS="$(     yq -c '.platform.openstack.externalDNS'          "${SHARED_DIR}/install-config.yaml")"
 
+if [[ ! -f '/var/lib/openshift-install/upi/inventory.yaml' ]]; then
+	echo 'ERROR: Missing inventory file at /var/lib/openshift-install/upi/inventory.yaml. The step requires OCP v4.12 or above.'
+	exit 1
+fi
+
 declare errexit=0
 
 if [[ "$OS_SUBNET_RANGE" == 'null' ]]; then

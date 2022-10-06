@@ -1,4 +1,20 @@
 base_images:
+  aro:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aro-0.3.8
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.3.1
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-0.3.6
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.3.8
   ubi:
     name: ubi
     namespace: ocp
@@ -122,6 +138,31 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
+- as: eks-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-eks-e2e
+  timeout: 5h0m0s
+- as: osd-aws-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-aws-e2e
+  timeout: 5h0m0s
+- as: osd-gcp-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-gcp-e2e
+  timeout: 5h0m0s
+- as: aro-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-aro-e2e
+  timeout: 5h0m0s
+- as: rosa-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-rosa-e2e
+  timeout: 5h0m0s
 - as: merge-push-and-release
   postsubmit: true
   steps:

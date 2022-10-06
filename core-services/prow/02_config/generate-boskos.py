@@ -74,6 +74,9 @@ CONFIG = {
     'equinix-ocp-metal-quota-slice': {
         'default': 40,
     },
+    'equinix-ocp-metal-qe-quota-slice': {
+        'default': 40,
+    },
     'gcp-qe-quota-slice': {
         'us-central1': 70,
     },
@@ -151,7 +154,9 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
-        'default': 1,
+        'mon01': 1,
+        'syd04': 1,
+        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'default': 7,
@@ -195,7 +200,10 @@ for i in range(10, 24):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(83,106):
+for i in range(83,93):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(94,106):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):

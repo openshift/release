@@ -1,0 +1,49 @@
+chain:
+  as: hypershift-ibmcloud-install
+  steps:
+  - as: install-hypershift-operator
+    cli: latest
+    commands: |-
+      export KUBECONFIG="${MANAGEMENT_CLUSTER_KUBECONFIG}"
+      bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST} --exclude-etcd true
+    credentials:
+    - mount_path: /etc/ibmcloud/secrets
+      name: hypershift-ibm-managed-ci-creds
+      namespace: test-credentials
+    dependencies:
+    - env: HYPERSHIFT_RELEASE_LATEST
+      name: hypershift-operator
+    env:
+    - name: MANAGEMENT_CLUSTER_KUBECONFIG
+    from_image:
+      namespace: ocp
+      name: "4.12"
+      tag: hypershift-operator
+    grace_period: 1m0s
+    no_kubeconfig: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 5m0s
+  - as: patch-hypershift-operator
+    commands: |-
+      export KUBECONFIG="${MANAGEMENT_CLUSTER_KUBECONFIG}"
+      oc patch deploy -n hypershift operator --type=json -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--registry-overrides=quay.io/openshift-release-dev/ocp-v4.0-art-dev=registry.ng.bluemix.net/armada-master/ocp-release"}]'
+    credentials:
+    - mount_path: /etc/ibmcloud/secrets
+      name: hypershift-ibm-managed-ci-creds
+      namespace: test-credentials
+    env:
+    - name: MANAGEMENT_CLUSTER_KUBECONFIG
+    from_image:
+      name: ibm-hypershift-testing
+      namespace: ci
+      tag: latest
+    grace_period: 1m0s
+    no_kubeconfig: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 5m0s

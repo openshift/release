@@ -29,6 +29,40 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: e2e
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: e2e
+      commands: |
+        echo $(ls -ltr /etc/secret)
+        echo $(pwd)
+        export QUAY_TOKEN=$(cat /etc/secret/credentials)
+        echo "COMPONENT_IMAGE_REF=$COMPONENT_IMAGE_REF"
+        export SELF="make -f Makefile.prow"
+        set -o pipefail
+        make -f Makefile.prow test-e2e
+        set +o pipefail
+      credentials:
+      - mount_path: /etc/secret
+        name: ocm-obs-usa-quaytoken
+        namespace: test-credentials
+      dependencies:
+      - env: COMPONENT_IMAGE_REF
+        name: search-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
 - as: pr-image-mirror
   steps:
     dependencies:
