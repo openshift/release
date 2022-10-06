@@ -34,7 +34,9 @@ else
 fi
 
 cd verification-tests
+set -x
 cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit || true
+set +x
 
 echo "Summarizing test result..."
 failures=$(grep '<testsuite failures="[1-9].*"' "${ARTIFACT_DIR}" -r | wc -l || true)

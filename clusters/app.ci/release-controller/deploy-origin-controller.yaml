@@ -83,7 +83,6 @@ spec:
         - --supplemental-prow-config-dir=/etc/config
         - --job-config=/etc/job-config
         - --prow-namespace=ci
-        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
         - --job-namespace=ci-release
         - --tools-image-stream-tag=4.6:tests
         - --release-architecture=amd64
@@ -122,7 +121,7 @@ spec:
         - mountPath: /etc/plugins
           name: plugins
           readOnly: true
-        - mountPath: /etc/kubeconfig
+        - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
       serviceAccountName: release-controller
@@ -191,9 +190,6 @@ spec:
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
-          items:
-          - key: sa.release-controller.app.ci.config
-            path: kubeconfig
           secretName: release-controller-kubeconfigs
 ---
 #---------------------------------------------------------------------------------
@@ -222,7 +218,6 @@ spec:
         - /usr/bin/release-controller-api
         - --release-namespace=origin
         - --prow-namespace=ci
-        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
         - --job-namespace=ci-release
         - --tools-image-stream-tag=4.6:tests
         - --release-architecture=amd64
@@ -243,7 +238,7 @@ spec:
           periodSeconds: 3
           timeoutSeconds: 600
         volumeMounts:
-        - mountPath: /etc/kubeconfig
+        - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
       serviceAccountName: release-controller
@@ -251,7 +246,4 @@ spec:
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
-          items:
-          - key: sa.release-controller.app.ci.config
-            path: kubeconfig
           secretName: release-controller-kubeconfigs

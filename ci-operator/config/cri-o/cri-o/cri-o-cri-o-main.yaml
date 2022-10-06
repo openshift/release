@@ -1,32 +1,41 @@
 base_images:
   base:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: base
   base-machine:
-    name: fedora
+    name: centos
     namespace: openshift
-    tag: "29"
-  rhcos_machine-os-content_4.11:
-    name: machine-os-content
-    namespace: rhcos
-    tag: "4.11"
+    tag: stream9
+  rhel-coreos-8-base:
+    name: "4.12"
+    namespace: ocp
+    tag: rhel-coreos-8
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.18
 images:
-- context_dir: images/os/
-  from: base
+- dockerfile_literal: |
+    # This uses the new rhel-coreos-8 base image
+    # https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
+    FROM quay.io/centos/centos:stream9 as build
+    # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
+    # in a container https://github.com/coreos/rpm-ostree/issues/4034
+    RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download cri-o
+    # See also https://issues.redhat.com/browse/ART-4352
+    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-8
+    COPY --from=build /*.rpm /
+    RUN rpm -Uvh --oldpackage /*.rpm && rm -f /*.rpm
   inputs:
     base-machine-with-rpms:
       as:
-      - fedora:29
-    rhcos_machine-os-content_4.11:
+      - quay.io/centos/centos:stream9
+    rhel-coreos-8-base:
       as:
-      - registry.ci.openshift.org/rhcos/machine-os-content:4.11
-  to: machine-os-content
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-8
+  to: rhel-coreos-8
 raw_steps:
 - rpm_image_injection_step:
     from: base-machine
@@ -34,12 +43,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':

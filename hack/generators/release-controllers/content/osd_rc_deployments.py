@@ -268,7 +268,6 @@ def _add_osd_rc_deployment(gendoc):
                                         '--job-config=/etc/job-config',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
-                                        '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',
                                         '--tools-image-stream-tag=release-controller-bootstrap:tests',
                                         f'--release-architecture={context.get_supported_architecture_name()}',
@@ -311,7 +310,7 @@ def _add_osd_rc_deployment(gendoc):
                             },
                         }],
                     'serviceAccountName': f'release-controller-{context.is_namespace}',
-                    'volumes': get_rc_volumes(context, context.is_namespace)
+                    'volumes': get_rc_volumes(context)
                 }
             }
         }
@@ -354,7 +353,6 @@ def _add_osd_rc_deployment(gendoc):
                                         f'--release-namespace={context.is_namespace}',
                                         f'--artifacts={context.fc_app_url}',
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
-                                        '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',
                                         '--tools-image-stream-tag=release-controller-bootstrap:tests',
                                         f'--release-architecture={context.get_supported_architecture_name()}',
@@ -384,7 +382,7 @@ def _add_osd_rc_deployment(gendoc):
                             },
                         }],
                     'serviceAccountName': f'release-controller-{context.is_namespace}',
-                    'volumes': get_kubeconfig_volumes(context, namespace=context.is_namespace, secret_name=context.secret_name_tls_api)
+                    'volumes': get_kubeconfig_volumes(context, secret_name=context.secret_name_tls_api)
                 }
             }
         }
