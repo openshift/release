@@ -2542,3 +2542,85 @@ periodics:
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: 0 0 * * */5
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: origin
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-update-origin-disruption-alert-data
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+
+        leeway_percent=30
+
+        echo "Updating alerts data"
+        /usr/bin/job-run-aggregator analyze-historical-data \
+        --current ./origin/pkg/synthetictests/allowedalerts/query_results.json \
+        --output-file ./origin/pkg/synthetictests/allowedalerts/query_results.json \
+        --data-type alerts \
+        --leeway $leeway_percent \
+        --google-service-account-credential-file /etc/bigquery/token
+
+        echo "Updating disruptions data"
+        /usr/bin/job-run-aggregator analyze-historical-data \
+        --current ./origin/pkg/synthetictests/allowedbackenddisruption/query_results.json \
+        --output-file ./origin/pkg/synthetictests/allowedbackenddisruption/query_results.json \
+        --data-type disruptions \
+        --leeway $leeway_percent \
+        --google-service-account-credential-file /etc/bigquery/token
+
+        mv pr_message.md /var/tmp/
+
+        extra_flag=""
+        if [ -f "require_review" ]; then
+            echo "review required"
+            cat require_review
+            extra_flag="-pr-assignee dgoodwin"
+            rm require_review
+        else
+            echo "review not required"
+            # off for now
+            # extra_flag="-self-approve"
+        fi
+
+        /usr/bin/prcreator \
+        -github-token-path=/etc/github/oauth \
+        -organization=openshift \
+        -repo=origin \
+        -git-message="Updated synthetic tests"
+        -pr-message "$(cat /var/tmp/pr_message.md)" \
+        -pr-title="Automated - Update synthetic test data" \
+        $extra_flag
+      command:
+      - /bin/bash
+      image: registry.ci.openshift.org/ci/auto-aggregator-job-names:latest
+      imagePullPolicy: Always
+      name: auto-aggregator-job-names
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/github
+        name: token
+        readOnly: true
+      - mountPath: /etc/bigquery
+        name: bg-token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+    - name: bg-token
+      secret:
+        secretName: ci-data-bigquery-readonly
