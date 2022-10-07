@@ -20,7 +20,7 @@ resources:
       cpu: 1000m
       memory: 2Gi
 tests:
-- as: nb-ux-on-private
+- as: nb-on-private
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -29,11 +29,25 @@ tests:
     timeout: 1h30m0s
     version: "4.11"
   steps:
+    pre:
+    - as: prepare
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods run_notebook_scale_test_on_private prepare
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
     test:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods run_private_notebook_ux_e2e_scale_test
+        run ods run_notebook_scale_test_on_private
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -44,7 +58,7 @@ tests:
           cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
-- as: nb-ux-on-customer
+- as: nb-on-customer
   steps:
     post:
     - as: destroy-clusters
@@ -78,7 +92,7 @@ tests:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods run_customer_notebook_ux_e2e_scale_test
+        run ods notebook_scale_test run_ci_test
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -88,7 +102,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: nb-ux-on-ocp
+- as: nb-on-ocp
   steps:
     post:
     - as: destroy-clusters
@@ -118,11 +132,10 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-    test:
-    - as: test
+    - as: prepare
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_ux_e2e_scale_test run_ci_e2e_test
+        run ods notebook_scale_test prepare_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -132,7 +145,21 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: nb-ux-on-osd
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods notebook_scale_test run_ci_test
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+- as: nb-on-osd
   steps:
     post:
     - as: destroy-clusters
@@ -162,11 +189,10 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-    test:
-    - as: test
+    - as: prepare
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_ux_e2e_scale_test run_ci_e2e_test
+        run ods notebook_scale_test prepare_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -176,7 +202,21 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: nb-ux-on-single
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods notebook_scale_test run_ci_test
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+- as: nb-on-single
   steps:
     post:
     - as: destroy-clusters
@@ -206,11 +246,10 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-    test:
-    - as: test
+    - as: prepare
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_ux_e2e_scale_test run_ci_e2e_test
+        run ods notebook_scale_test prepare_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -220,7 +259,21 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: get-cluster
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods notebook_ux_e2e_scale_test run_ci_test
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+- as: nb-get-cluster
   steps:
     post:
     - as: destroy-clusters
@@ -250,11 +303,10 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-    test:
-    - as: test
+    - as: prepare
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_ux_e2e_scale_test run_ci_e2e_test
+        run ods notebook_ux_e2e_scale_test prepare_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -264,31 +316,25 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: plot-nb-ux-on-osd
-  steps:
     test:
     - as: test
-      commands: run ods generate_matrix-benchmarking osd
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run ods notebook_ux_e2e_scale_test run_ci_test
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
       from: ci-artifacts
       resources:
         requests:
           cpu: 1000m
-          memory: 1Gi
-- as: plot-nb-ux-on-ocp
+          memory: 500Mi
+- as: nb-plot
   steps:
     test:
     - as: test
-      commands: run ods generate_matrix-benchmarking ocp
-      from: ci-artifacts
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 1Gi
-- as: plot-nb-ux-on-single
-  steps:
-    test:
-    - as: test
-      commands: run ods generate_matrix-benchmarking single
+      commands: run ods generate_matrix-benchmarking
       from: ci-artifacts
       resources:
         requests:
