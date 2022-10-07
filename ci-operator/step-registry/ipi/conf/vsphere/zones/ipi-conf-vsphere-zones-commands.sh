@@ -27,6 +27,7 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 cat >> "${CONFIG}" << EOF
 baseDomain: $base_domain
+featureSet: TechPreviewNoUpgrade
 controlPlane:
   name: "master"
   replicas: 3
@@ -96,16 +97,6 @@ networking:
   networkType: OpenShiftSDN
   machineNetwork:
   - cidr: "${machine_cidr}"
-EOF
-
-
-cat >> ${SHARED_DIR}/manifest_externalFeatureGate.yaml << EOF
-apiVersion: config.openshift.io/v1
-kind: FeatureGate
-metadata:
-  name: cluster
-spec:
-  featureSet: TechPreviewNoUpgrade
 EOF
 
 # TODO: Add this back in once we have an vsphere
