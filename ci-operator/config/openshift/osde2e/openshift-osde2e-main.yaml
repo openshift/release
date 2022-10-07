@@ -20,19 +20,22 @@ resources:
 tests:
 - as: verify
   commands: |
-    set -o pipefail
-
-    export HOME=$(mktemp -d)
+    make check
+    make build
     export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,prod,e2e-suite"
+    export OCM_CCS="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/sd-cicd-aws-prod"
 
-    ci/prow_pr_check.sh
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
   container:
-    from: src
+    clone: true
+    from: osde2e
   secrets:
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
   - mount_path: /usr/local/sd-cicd-aws-prod
     name: sd-cicd-aws-prod
 - as: aro-ovn-e2e-default
