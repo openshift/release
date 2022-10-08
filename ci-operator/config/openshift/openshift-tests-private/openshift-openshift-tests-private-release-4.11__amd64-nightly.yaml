@@ -98,24 +98,19 @@ tests:
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-aws-ipi-hypershift
+- as: e2e-aws-ipi-ovn-hypershift-p2
   cron: 0 4 */7 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-openshiftsdn and not @fips'
-      TAG_VERSION: '@4.11'
-      TEST_SCENARIOS: Hypershift
-    post:
-    - chain: hypershift-aws-destroy
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-provision
-    - chain: hypershift-install
-    - chain: hypershift-aws-create
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;HyperShiftMGMT&
+      TEST_SCENARIOS: MCO|ETCD|PSAP|SDN|STORAGE|API_Server|Authentication|Cluster_Operator
+        Cluster_Infrastructure|OLM|Network_Edge|Operator_SDK Workloads|Image_Registry|Container_Engine_Tools
+        NODE|OTA|PerfScale|Cluster_Observability|Security_and_Compliance|LOGGING|Hypershift
     test:
-    - chain: openshift-e2e-test-qe
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: e2e-aws-ipi-ovn
   cron: 0 6 */7 * *
   steps:
