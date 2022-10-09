@@ -127,6 +127,31 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: publish-multicluster-global-hub-operator
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-global-hub-operator
+    env:
+      IMAGE_REPO: multicluster-global-hub-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make"
+        export OSCI_COMPONENT_NAME="multicluster-global-hub-operator"
+        export OSCI_PUBLISH_DELAY="0"
+        make osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: release-270-operator-image-mirror
   postsubmit: true
   steps:
