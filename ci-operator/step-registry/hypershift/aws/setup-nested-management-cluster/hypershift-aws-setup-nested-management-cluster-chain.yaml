@@ -16,17 +16,21 @@ chain:
     - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
       default: "false"
       documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
+    - name: HYPERSHIFT_BASE_DOMAIN
+      default: ""
+      documentation: "The cluster's FQDN will be a subdomain of the base domain."
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
       documentation: "Release image used for the HostedCluster. Empty by default so it will use the based code defaulting"
     commands: |-
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
-      BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+      DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
       
       if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
         AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-        BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+        DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
       fi
+      DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
       
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
@@ -38,7 +42,7 @@ chain:
         --name=${CLUSTER_NAME} \
         --region=us-east-1 \
         --infra-id=${CLUSTER_NAME} \
-        --base-domain=${BASE_DOMAIN} \
+        --base-domain=${DOMAIN} \
         --instance-type=m5.xlarge \
         --zones=${HYPERSHIFT_ZONES} \
         --service-cidr=172.29.0.0/16 \
