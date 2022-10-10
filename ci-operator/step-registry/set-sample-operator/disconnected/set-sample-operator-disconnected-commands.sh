@@ -130,12 +130,12 @@ function check_mirror_registry () {
 }
 
 set_proxy
-run_command "oc get config.samples.operator.openshift.io cluster"; ret=$?
+ret=0
+run_command "oc get config.samples.operator.openshift.io cluster" || ret=$?
 if [[ $ret -eq 0 ]]; then
     echo "The Sample operator installed in the cluster, continue..."
 else
-    echo "!!! the sample operaro NOT installed in the cluster, skip..."
-    return 0
+    echo "!!! the sample operaro NOT installed in the cluster, but still need to config the trust CA..."
 fi
 
 # vmc.mirror-registry.qe.devcluster.openshift.com:5000
@@ -147,5 +147,7 @@ unset http_proxy
 unset https_proxy
 mirror_tag_images
 set_proxy
-config_samples_operator
+if [[ $ret -eq 0 ]]; then
+    config_samples_operator
+fi
 check_mirror_registry
