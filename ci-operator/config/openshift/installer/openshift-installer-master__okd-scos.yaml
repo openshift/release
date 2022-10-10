@@ -97,11 +97,13 @@ tests:
   commands: go test ./pkg/...
   container:
     from: src
+  optional: true
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-codegen
   commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
   container:
     from: src
+  optional: true
 - as: e2e-aws-ovn
   optional: true
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
@@ -129,15 +131,6 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
-- as: e2e-aws-ovn-testing-stream
-  cron: 30 0 * * *
-  steps:
-    cluster_profile: aws
-    pre:
-    - chain: ipi-conf-aws
-    - ref: ipi-conf-aws-fcos-ami
-    - chain: ipi-install
-    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: master
   org: openshift
