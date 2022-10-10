@@ -27,7 +27,10 @@ collect_bootstrap_logs() {
 			CLUSTER_ID=${BOOTSTRAP_NODE%-bootstrap}
 			openstack security group rule create ${CLUSTER_ID}-master --protocol tcp --dst-port 22:22 --remote-ip 0.0.0.0/0
 			if [[ $CREATE_FIPS == 1 ]]; then
-				IP=$(openstack floating ip create "$OPENSTACK_EXTERNAL_NETWORK" --description "${CLUSTER_ID}-bootstrap" --format value --column floating_ip_address)
+				IP=$(openstack floating ip list --port ${CLUSTER_ID}-bootstrap-port -c "Floating IP Address" -f value)
+				if [[ ${IP} == "" ]]; then
+					IP=$(openstack floating ip create "$OPENSTACK_EXTERNAL_NETWORK" --description "${CLUSTER_ID}-bootstrap" --format value --column floating_ip_address)
+				fi
 				FIPS+=("${IP}")
 				openstack server add floating ip ${CLUSTER_ID}-bootstrap ${IP}
 			else
