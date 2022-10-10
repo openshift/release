@@ -59,14 +59,25 @@ function eval_instance_capacity() {
   set -o errexit
 }
 
+
+# BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
+architecture=${OCP_ARCH:-"amd64"}
+if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
+  architecture="arm64"
+fi
+
 # Do not change auto-types unless it is coordinated with the cloud
 # financial operations team. Savings plans may be in place to
 # decrease the cost of certain instance families.
 if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
-  if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-    COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
+  if [ "${architecture}" = "arm64" ]; then
+    COMPUTE_NODE_TYPE="m6g.xlarge"
   else
-    COMPUTE_NODE_TYPE="m6i.xlarge"
+    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+      COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
+    else
+      COMPUTE_NODE_TYPE="m6i.xlarge"
+    fi
   fi
 fi
 
@@ -77,13 +88,6 @@ elif [[ "${SIZE_VARIANT}" == "large" ]]; then
   CONTROL_PLANE_INSTANCE_SIZE="4xlarge"
 elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
   CONTROL_PLANE_INSTANCE_SIZE="2xlarge"
-fi
-
-# BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
-architecture=${OCP_ARCH:-"amd64"}
-
-if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
-  architecture="arm64"
 fi
 
 if [[ x"${architecture}" == x"arm64" ]]; then
