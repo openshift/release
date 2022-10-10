@@ -1,0 +1,195 @@
+base_images:
+  base_fedora:
+    name: fedora
+    namespace: coreos
+    tag: "34"
+  libguestfs_tools:
+    name: libguestfs-tools
+    namespace: ci
+    tag: v0.52.0
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
+images:
+- dockerfile_path: automation/generatetasks/build/Dockerfile
+  from: base_fedora
+  to: base-tests
+- context_dir: modules/create-vm/
+  dockerfile_path: build/create-vm/Dockerfile
+  from: ubi_minimal
+  to: tekton-task-create-vm
+- context_dir: modules/copy-template/
+  dockerfile_path: build/copy-template/Dockerfile
+  from: ubi_minimal
+  to: tekton-task-copy-template
+- context_dir: modules/execute-in-vm/
+  dockerfile_path: build/execute-in-vm/Dockerfile
+  from: ubi
+  to: tekton-task-execute-in-vm
+- context_dir: modules/generate-ssh-keys/
+  dockerfile_path: build/generate-ssh-keys/Dockerfile
+  from: ubi
+  to: tekton-task-generate-ssh-keys
+- context_dir: modules/disk-virt-customize/
+  dockerfile_path: build/disk-virt-customize/Dockerfile
+  from: libguestfs_tools
+  to: tekton-task-disk-virt-customize
+- context_dir: modules/disk-virt-sysprep/
+  dockerfile_path: build/disk-virt-sysprep/Dockerfile
+  from: libguestfs_tools
+  to: tekton-task-disk-virt-sysprep
+- context_dir: modules/wait-for-vmi-status/
+  dockerfile_path: build/wait-for-vmi-status/Dockerfile
+  from: ubi_minimal
+  to: tekton-task-wait-for-vmi-status
+- context_dir: modules/modify-vm-template/
+  dockerfile_path: build/modify-vm-template/Dockerfile
+  from: ubi_minimal
+  to: tekton-task-modify-vm-template
+- context_dir: modules/modify-data-object
+  dockerfile_path: build/modify-data-object/Dockerfile
+  from: ubi_minimal
+  to: tekton-task-modify-data-object
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit-tests:
+    requests:
+      cpu: "1"
+      memory: 2Gi
+  yaml-consistency-tests:
+    requests:
+      cpu: "1"
+      memory: 1Gi
+test_binary_build_commands: automation/build-test.sh
+tests:
+- as: unit-tests
+  commands: |
+    make test-with-reports
+  container:
+    from: test-bin
+- as: yaml-consistency-tests
+  commands: |
+    /usr/local/bin/entrypoint
+
+    make test-yaml-consistency
+  container:
+    from: base-tests
+- as: e2e-tests-namespace-scope
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: namespace-scope-test
+      cli: latest
+      commands: |
+        # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L "${KUBECONFIG}" /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+
+        if ! hash kubectl 2>/dev/null; then
+          pushd $(dirname $(which oc))
+          ln -s oc kubectl
+          popd
+        fi
+        automation/build-test.sh
+        export PATH=$PATH:$(pwd)/go/bin
+        SCOPE=namespace \
+        NUM_NODES=4 \
+          make e2e-tests
+      dependencies:
+      - env: CREATE_VM_IMAGE
+        name: tekton-task-create-vm
+      - env: COPY_TEMPLATE_IMAGE
+        name: tekton-task-copy-template
+      - env: EXECUTE_IN_VM_IMAGE
+        name: tekton-task-execute-in-vm
+      - env: GENERATE_SSH_KEYS_IMAGE
+        name: tekton-task-generate-ssh-keys
+      - env: DISK_VIRT_CUSTOMIZE_IMAGE
+        name: tekton-task-disk-virt-customize
+      - env: DISK_VIRT_SYSPREP_IMAGE
+        name: tekton-task-disk-virt-sysprep
+      - env: WAIT_FOR_VMI_STATUS_IMAGE
+        name: tekton-task-wait-for-vmi-status
+      - env: MODIFY_VM_TEMPLATE_IMAGE
+        name: tekton-task-modify-vm-template
+      - env: MODIFY_DATA_OBJECT_IMAGE
+        name: tekton-task-modify-data-object
+      from: base-tests
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-azure
+- as: e2e-tests-cluster-scope
+  steps:
+    cluster_profile: azure4
+    test:
+    - as: cluster-scope-test
+      cli: latest
+      commands: |
+        # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
+        cp -L "${KUBECONFIG}" /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
+
+        if ! hash kubectl 2>/dev/null; then
+          pushd $(dirname $(which oc))
+          ln -s oc kubectl
+          popd
+        fi
+        automation/build-test.sh
+        export PATH=$PATH:$(pwd)/go/bin
+        SCOPE=cluster \
+        NUM_NODES=4 \
+          make e2e-tests
+      dependencies:
+      - env: CREATE_VM_IMAGE
+        name: tekton-task-create-vm
+      - env: COPY_TEMPLATE_IMAGE
+        name: tekton-task-copy-template
+      - env: EXECUTE_IN_VM_IMAGE
+        name: tekton-task-execute-in-vm
+      - env: GENERATE_SSH_KEYS_IMAGE
+        name: tekton-task-generate-ssh-keys
+      - env: DISK_VIRT_CUSTOMIZE_IMAGE
+        name: tekton-task-disk-virt-customize
+      - env: DISK_VIRT_SYSPREP_IMAGE
+        name: tekton-task-disk-virt-sysprep
+      - env: WAIT_FOR_VMI_STATUS_IMAGE
+        name: tekton-task-wait-for-vmi-status
+      - env: MODIFY_VM_TEMPLATE_IMAGE
+        name: tekton-task-modify-vm-template
+      - env: MODIFY_DATA_OBJECT_IMAGE
+        name: tekton-task-modify-data-object
+      from: base-tests
+      resources:
+        requests:
+          cpu: "4"
+          memory: 4Gi
+    workflow: ipi-azure
+zz_generated_metadata:
+  branch: release-v0.12
+  org: kubevirt
+  repo: kubevirt-tekton-tasks
