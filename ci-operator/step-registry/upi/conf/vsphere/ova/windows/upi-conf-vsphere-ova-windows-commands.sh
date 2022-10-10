@@ -11,7 +11,7 @@ echo "$(date -u --rfc-3339=seconds) - Configuring govc exports."
 source "${SHARED_DIR}/govc.sh"
 
 # TODO: read VM template information from environment variable
-VM_TEMPLATE="windows-golden-images/windows-server-2004-template"
+VM_TEMPLATE="windows-golden-images/windows-server-2022-template-with-docker"
 VM_TEMPLATE_USERNAME="Administrator"
 
 echo "$(date -u --rfc-3339=seconds) - Finding template ${VM_TEMPLATE} in vCenter..."

@@ -1,0 +1,36 @@
+base_images:
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    release:
+      channel: fast
+      version: "4.11"
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-ovn-upgrade-rollback
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=99
+    workflow: openshift-upgrade-aws-ovn
+  timeout: 6h0m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: origin
+  variant: 4.12-upgrade-from-stable-4.11

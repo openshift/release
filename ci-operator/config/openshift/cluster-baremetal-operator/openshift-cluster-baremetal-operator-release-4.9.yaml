@@ -68,28 +68,29 @@ tests:
 - as: unit
   commands: ./hack/ci-test.sh
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.9
 - as: lint
   commands: make lint
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.9
 - as: gofmt
   commands: make fmt
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.9
 - as: govet
   commands: make vet
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.9
 - as: generate-check
   commands: make generate-check
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.9
 - as: e2e-agnostic
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-metal-ipi
+  cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -98,10 +99,12 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-serial-ipv4
+  cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-upgrade
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -114,6 +117,7 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -122,6 +126,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -131,6 +136,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
