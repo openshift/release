@@ -27,6 +27,7 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 cat >> "${CONFIG}" << EOF
 baseDomain: $base_domain
+featureSet: TechPreviewNoUpgrade
 controlPlane:
   name: "master"
   replicas: 3
@@ -56,7 +57,7 @@ platform:
     network: ${LEASED_RESOURCE}
     datacenter: "${vsphere_datacenter}"
     cluster: vcs-mdcnc-workload-1
-    defaultDatastore: workload_share_vcsmdcncworkload_Yfyf6
+    defaultDatastore: mdcnc-ds-shared
     failureDomains:
     - name: us-east-1
       region: us-east
@@ -65,7 +66,7 @@ platform:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-1
         networks:
         - ${LEASED_RESOURCE}
-        datastore: workload_share_vcsmdcncworkload_Yfyf6
+        datastore: mdcnc-ds-1
     - name: us-east-2
       region: us-east
       zone: us-east-2a
@@ -73,7 +74,7 @@ platform:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-2
         networks:
         - ${LEASED_RESOURCE}
-        datastore: workload_share_vcsmdcncworkload2_vyC6a
+        datastore: mdcnc-ds-2
     - name: us-east-3
       region: us-east
       zone: us-east-3a
@@ -81,7 +82,7 @@ platform:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-3
         networks:
         - ${LEASED_RESOURCE}
-        datastore: workload_share_vcsmdcncworkload3_joYiR
+        datastore: mdcnc-ds-3
     - name: us-west-1
       region: us-west
       zone: us-west-1a
@@ -90,22 +91,12 @@ platform:
         computeCluster: /datacenter-2/host/vcs-mdcnc-workload-4
         networks:
         - ${LEASED_RESOURCE}
-        datastore: workload_share_vcsmdcncworkload3_joYiR
+        datastore: mdcnc-ds-4
 
 networking:
   networkType: OpenShiftSDN
   machineNetwork:
   - cidr: "${machine_cidr}"
-EOF
-
-
-cat >> ${SHARED_DIR}/manifest_externalFeatureGate.yaml << EOF
-apiVersion: config.openshift.io/v1
-kind: FeatureGate
-metadata:
-  name: cluster
-spec:
-  featureSet: TechPreviewNoUpgrade
 EOF
 
 # TODO: Add this back in once we have an vsphere

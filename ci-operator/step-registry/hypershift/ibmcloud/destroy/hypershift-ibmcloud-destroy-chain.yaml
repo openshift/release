@@ -1,0 +1,27 @@
+chain:
+  as: hypershift-ibmcloud-destroy
+  steps:
+  - as: destroy-and-cleanup
+    commands: |-
+      export CLUSTER_ID="${BUILD_ID}"
+      ./cluster-destroy.sh
+      oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" delete deploy -n hypershift operator
+    credentials:
+    - mount_path: /etc/ibmcloud/secrets
+      name: hypershift-ibm-managed-ci-creds
+      namespace: test-credentials
+    env:
+    - name: BOM_VERSION
+    - name: MANAGED_CLUSTER_TYPE
+    - name: MANAGEMENT_CLUSTER_KUBECONFIG
+    from_image:
+      name: ibm-hypershift-testing
+      namespace: ci
+      tag: latest
+    grace_period: 10m0s
+    no_kubeconfig: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 30m0s

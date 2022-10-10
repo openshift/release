@@ -71,7 +71,7 @@ export -f setExternalFlagKCMO
 
 function waitForCCMPodsReadiness() {
   echo "$(date -u --rfc-3339=seconds) - Wait for CCCMO operands to be ready"
-  waitFor 3m oc wait --all -n "${CCM_NAMESPACE}" --for=condition=ready pods
+  waitFor 10m oc wait --all -n "${CCM_NAMESPACE}" --for=condition=ready pods
 }
 
 function waitFor() {
