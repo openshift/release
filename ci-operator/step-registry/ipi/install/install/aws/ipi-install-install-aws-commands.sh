@@ -49,7 +49,7 @@ function wait_router_lb_provision() {
       echo "waiting on router-default service load balancer ingress..."
       sleep 30
       SERVICE="$(oc -n openshift-ingress get service router-default -o json)"
-      try="((try + 1))"
+      let try+=1
     done
     if [ "$try" -eq "$retries" ]; then
       echo "${SERVICE}"
