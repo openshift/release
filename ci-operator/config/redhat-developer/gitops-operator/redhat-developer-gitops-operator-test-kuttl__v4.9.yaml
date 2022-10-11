@@ -45,7 +45,7 @@ resources:
       cpu: 800m
       memory: 6Gi
 tests:
-- as: e2e
+- as: kuttl-sequential
   steps:
     cluster_profile: aws
     dependencies:
@@ -57,7 +57,9 @@ tests:
       OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e-steps
-      commands: scripts/openshiftci-olm-kuttl-tests.sh
+      commands: |
+        scripts/openshiftci-olm-kuttl-tests.sh
+        make kuttl-sequential
       dependencies:
       - env: OO_INDEX
         name: ci-index-gitops-operator-bundle
@@ -71,23 +73,22 @@ tests:
         requests:
           cpu: "2"
           memory: 6Gi
-    - as: kuttl-parallel
-      commands: make kuttl-parallel
-      dependencies:
-      - env: OO_INDEX
-        name: ci-index-gitops-operator-bundle
-      env:
-      - name: OO_CHANNEL
-      - name: OO_INSTALL_NAMESPACE
-      - name: OO_PACKAGE
-      - name: OO_TARGET_NAMESPACES
-      from: oc-bin-image
-      resources:
-        requests:
-          cpu: "2"
-          memory: 6Gi
-    - as: kuttl-sequential
-      commands: make kuttl-sequential
+    workflow: optional-operators-ci-aws
+- as: kuttl-parallel
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-gitops-operator-bundle
+    env:
+      OO_CHANNEL: latest
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: openshift-gitops-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-steps
+      commands: |
+        scripts/openshiftci-olm-kuttl-tests.sh
+        make kuttl-parallel
       dependencies:
       - env: OO_INDEX
         name: ci-index-gitops-operator-bundle
