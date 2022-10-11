@@ -117,7 +117,7 @@ echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 
 if [[ "${ARCHITECTURE}" == "arm64" ]]; then
   echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" >> /root/dev-scripts/config_root.sh
-  ## Look into making the following IRONIC_IMAGE change a default behavior within `dev-scripts`
+  ## Look into making the following IRONIC_IMAGE change a default behavior within 'dev-scripts'
   echo "export IRONIC_IMAGE=\\\$(oc adm release info -a /root/dev-scripts/pull_secret.json \
     \\\${OPENSHIFT_RELEASE_IMAGE} --image-for=\"ironic\")" >> /root/dev-scripts/config_root.sh
   ## The following exports should be revisited after this:  https://issues.redhat.com/browse/ARMOCP-434
