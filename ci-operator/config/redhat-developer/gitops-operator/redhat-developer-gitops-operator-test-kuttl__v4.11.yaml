@@ -1,0 +1,110 @@
+base_images:
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.11
+binary_build_commands: make bin
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/build-root/Dockerfile
+images:
+- context_dir: openshift-ci/build-root/source-image
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: oc-bin-image
+operator:
+  bundles:
+  - as: gitops-operator-bundle
+    base_index: operator-index
+    context_dir: bundle/
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/redhat-developer/gitops-backend:test
+    with: oc-bin-image
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 800m
+      memory: 6Gi
+tests:
+- as: kuttl-sequential
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-gitops-operator-bundle
+    env:
+      OO_CHANNEL: latest
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: openshift-gitops-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: sequential-e2e-steps
+      commands: |
+        scripts/openshiftci-olm-kuttl-tests.sh
+        make kuttl-sequential
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index-gitops-operator-bundle
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: optional-operators-ci-aws
+- as: kuttl-parallel
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-gitops-operator-bundle
+    env:
+      OO_CHANNEL: latest
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: openshift-gitops-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: parallel-e2e-steps
+      commands: |
+        scripts/openshiftci-olm-kuttl-tests.sh
+        make kuttl-parallel
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index-gitops-operator-bundle
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: test-kuttl
+  org: redhat-developer
+  repo: gitops-operator
+  variant: v4.11
