@@ -55,64 +55,6 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: e2e-aws-ipi-p3
-  cron: 0 0 */28 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-aws-ipi-destructive-p3
-  cron: 0 0 */28 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @destructive'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-aws-ipi-long-duration-p3-part1-3
-  cron: 0 1 */28 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @long-duration'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe-long-duration
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-aws-ipi-long-duration-p3-part2-3
-  cron: 0 2 */28 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @long-duration'
-      TAG_VERSION: '@4.12'
-      TEST_SCENARIOS: MCO|Cluster_Infrastructure
-    test:
-    - chain: openshift-e2e-test-qe-long-duration
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-aws-ipi-long-duration-p3-part3-3
-  cron: 0 3 */28 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @long-duration'
-      TAG_VERSION: '@4.12'
-      TEST_SCENARIOS: Cluster_Operator
-      TEST_TIMEOUT: "90"
-    test:
-    - chain: openshift-e2e-test-qe-long-duration
-    workflow: cucushift-installer-rehearse-aws-ipi
 - as: e2e-aws-ipi-byo-iam-role-p2
   cron: 0 12 */7 * *
   steps:
@@ -124,17 +66,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
-- as: e2e-aws-ipi-private-disasterrecovery-p2
-  cron: 0 1 * * 2
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
-      TEST_SCENARIOS: DR_Testing
-    test:
-    - ref: openshift-extended-test-longduration
-    workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: e2e-aws-ipi-byo-route53-p2
   cron: 0 2 */7 * *
   steps:
@@ -159,6 +90,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: e2e-aws-ipi-disconnected-private-sdn-workers-rhcos-rhel8-p2
+  cron: 0 11 */7 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @disconnected and @network-openshiftsdn and not
+        @fips'
+      TAG_VERSION: '@4.12'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sdn-workers-rhcos-rhel8
 - as: e2e-aws-ipi-disconnected-private-sno-p1
   cron: 0 1 * * *
   steps:
@@ -203,17 +147,6 @@ tests:
     - chain: hypershift-aws-create
     test:
     - chain: openshift-e2e-test-qe
-- as: e2e-aws-ipi-ovn-p3
-  cron: 0 21 */28 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: e2e-aws-ipi-ovn-fips-p2
   cron: 0 5 */7 * *
   steps:
@@ -225,7 +158,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-fips
-- as: e2e-aws-ipi-ovn-fips-destructive-p3
+- as: e2e-aws-ipi-ovn-fips-p3-destructive
   cron: 0 5 */28 * *
   steps:
     cluster_profile: aws-qe
@@ -237,28 +170,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-fips
-- as: e2e-aws-ipi-ovn-ipsec-p1
-  cron: 0 7 * * *
+- as: e2e-aws-ipi-ovn-hypershift-install-p1
+  cron: 0 1 * * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;HyperShiftINSTALL&
+      TEST_SCENARIOS: Hypershift
     test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: e2e-aws-ipi-ovn-ipsec-destructive-p3
-  cron: 0 7 */28 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @destructive'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: e2e-aws-ipi-ovn-ingress-nlb-p1
   cron: 0 8 * * *
   steps:
@@ -270,6 +192,39 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ingress-nlb
+- as: e2e-aws-ipi-ovn-ipsec-p1
+  cron: 0 7 * * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: e2e-aws-ipi-ovn-ipsec-p3-destructive
+  cron: 0 7 */28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @destructive'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: e2e-aws-ipi-ovn-p3
+  cron: 0 21 */28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: e2e-aws-ipi-ovn-sdn2ovn-p2
   cron: 0 9 */7 * *
   steps:
@@ -281,17 +236,74 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-sdn2ovn
-- as: e2e-aws-ipi-private-p1
-  cron: 0 10 * * *
+- as: e2e-aws-ipi-p3
+  cron: 0 0 */28 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @disconnected and @network-ovnkubernetes and not
-        @fips'
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.12'
     test:
     - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-aws-ipi-p3-destructive
+  cron: 0 0 */28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @destructive'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-aws-ipi-p3-long-duration-part1-3
+  cron: 0 1 */28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @long-duration'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe-long-duration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-aws-ipi-p3-long-duration-part2-3
+  cron: 0 2 */28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @long-duration'
+      TAG_VERSION: '@4.12'
+      TEST_SCENARIOS: MCO|Cluster_Infrastructure
+    test:
+    - chain: openshift-e2e-test-qe-long-duration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-aws-ipi-p3-long-duration-part3-3
+  cron: 0 3 */28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @long-duration'
+      TAG_VERSION: '@4.12'
+      TEST_SCENARIOS: Cluster_Operator
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-qe-long-duration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-aws-ipi-private-disasterrecovery-p2
+  cron: 0 1 * * 2
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
+      TEST_SCENARIOS: DR_Testing
+    test:
+    - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: e2e-aws-ipi-private-ovn-ipsec-p2
   cron: 0 11 */7 * *
@@ -304,17 +316,18 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-private-ovn-ipsec
-- as: e2e-aws-ipi-proxy-p1
-  cron: 0 12 * * *
+- as: e2e-aws-ipi-private-p1
+  cron: 0 10 * * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @proxy and @network-ovnkubernetes and not @fips'
+      E2E_RUN_TAGS: '@aws-ipi and @disconnected and @network-ovnkubernetes and not
+        @fips'
       TAG_VERSION: '@4.12'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+    workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: e2e-aws-ipi-proxy-cco-manual-security-token-service-p1
   cron: 0 14 * * *
   steps:
@@ -326,6 +339,28 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: e2e-aws-ipi-proxy-p1
+  cron: 0 12 * * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @proxy and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy
+- as: e2e-aws-ipi-proxy-sdn-workers-rhel8-p2
+  cron: 0 12 */7 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @proxy and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn-workers-rhel8
 - as: e2e-aws-ipi-proxy-techpreview-p3
   cron: 0 16 */28 * *
   steps:
@@ -348,30 +383,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-workers-rhel8
-- as: e2e-aws-ipi-sdn-p1
-  cron: 0 21 * * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-openshiftsdn and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-sdn
-- as: e2e-aws-ipi-disconnected-private-sdn-workers-rhcos-rhel8-p2
-  cron: 0 11 */7 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @disconnected and @network-openshiftsdn and not
-        @fips'
-      TAG_VERSION: '@4.12'
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sdn-workers-rhcos-rhel8
 - as: e2e-aws-ipi-sdn-migration-ovn-p2
   cron: 0 6 */7 * *
   steps:
@@ -383,17 +394,28 @@ tests:
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-aws-ipi-sdn
-- as: e2e-aws-ipi-proxy-sdn-workers-rhel8-p2
-  cron: 0 12 */7 * *
+- as: e2e-aws-ipi-sdn-mtu-migrate-p3
+  cron: 0 18 */28 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @proxy and @network-openshiftsdn and not @fips'
+      E2E_RUN_TAGS: '@aws-ipi and @network-openshiftsdn and not @fips'
       TAG_VERSION: '@4.12'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-sdn-workers-rhel8
+    workflow: cucushift-installer-rehearse-aws-ipi-sdn-mtu-migrate
+- as: e2e-aws-ipi-sdn-p1
+  cron: 0 21 * * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-sdn
 - as: e2e-aws-ipi-workers-marketplace-p2
   cron: '@weekly'
   steps:
@@ -418,17 +440,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-disconnected-private
-- as: e2e-aws-usgov-ipi-private-p3
-  cron: 0 22 */28 * *
-  steps:
-    cluster_profile: aws-usgov-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @proxy and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private
 - as: e2e-aws-usgov-ipi-private-cco-manual-security-token-svc-p3
   cron: 0 23 */28 * *
   steps:
@@ -440,6 +451,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
+- as: e2e-aws-usgov-ipi-private-p3
+  cron: 0 22 */28 * *
+  steps:
+    cluster_profile: aws-usgov-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @proxy and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-usgov-ipi-private
 - as: e2e-aws-usgov-ipi-private-workers-marketplace-p2
   cron: 0 22 */7 * *
   steps:
@@ -451,30 +473,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-workers-marketplace
-- as: e2e-azure-ipi-p3
-  cron: 0 3 */28 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@azure-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi
-- as: e2e-azure-ipi-disconnected-p1
-  cron: 0 3 * * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@azure-ipi and @disconnected and @network-ovnkubernetes and not
-        @fips'
-      TAG_VERSION: '@4.12'
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-disconnected
 - as: e2e-azure-ipi-disconnected-fullyprivate-p2
   cron: 0 4 */7 * *
   steps:
@@ -488,6 +486,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+- as: e2e-azure-ipi-disconnected-p1
+  cron: 0 3 * * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-ipi and @disconnected and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.12'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected
 - as: e2e-azure-ipi-disk-encryption-set-p2
   cron: 0 0 */7 * *
   steps:
@@ -521,30 +532,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate
-- as: e2e-azure-ipi-private-disasterrecovery-p2
-  cron: 0 3 * * 2
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
-      TEST_SCENARIOS: DR_Testing
-    test:
-    - ref: openshift-extended-test-longduration
-    workflow: cucushift-installer-rehearse-azure-ipi-private
-- as: e2e-azure-ipi-sdn-p1
-  cron: 0 8 * * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@azure-ipi and @network-openshiftsdn and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-sdn
-- as: e2e-azure-ipi-ovn-p3
-  cron: 0 7 */28 * *
+- as: e2e-azure-ipi-ingress-custom-ingresscontroller-p3
+  cron: 0 16 */28 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -553,6 +542,17 @@ tests:
       TAG_VERSION: '@4.12'
     test:
     - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-ingresscontroller
+- as: e2e-azure-ipi-ovn-hypershift-install-p1
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;HyperShiftINSTALL&
+      TEST_SCENARIOS: Hypershift
+    test:
+    - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-ovn
 - as: e2e-azure-ipi-ovn-ipsec-p1
   cron: 0 9 * * *
@@ -565,6 +565,39 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
+- as: e2e-azure-ipi-ovn-p3
+  cron: 0 7 */28 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn
+- as: e2e-azure-ipi-p3
+  cron: 0 3 */28 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: e2e-azure-ipi-private-disasterrecovery-p2
+  cron: 0 3 * * 2
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
+      TEST_SCENARIOS: DR_Testing
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-azure-ipi-private
 - as: e2e-azure-ipi-private-p1
   cron: 0 11 * * *
   steps:
@@ -632,6 +665,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-resourcegroup
+- as: e2e-azure-ipi-sdn-p1
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-ipi and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-sdn
 - as: e2e-azure-ipi-sharednetwork-p1
   cron: 0 5 * * *
   steps:
@@ -665,28 +709,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-workers-rhel8
-- as: e2e-azure-ipi-ingress-custom-ingresscontroller-p3
-  cron: 0 16 */28 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@azure-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-ingresscontroller
-- as: e2e-azure-upi-p3
-  cron: 0 18 */28 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@azure-upi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-upi
 - as: e2e-azure-upi-disconnected-p2
   cron: 0 19 */7 * *
   steps:
@@ -700,6 +722,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-upi-disconnected
+- as: e2e-azure-upi-p3
+  cron: 0 18 */28 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-upi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-upi
 - as: e2e-azure-upi-proxy-p2
   cron: 0 21 */7 * *
   steps:
@@ -711,8 +744,18 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-upi-proxy
-- as: e2e-gcp-ipi-p3
-  cron: 0 0 */28 * *
+- as: e2e-baremetalds-ipi-ovn-ipv4-p1
+  cron: 0 5 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      E2E_RUN_TAGS: '@baremetal-ipi and @arm64 and @network-ovnkubernetes and not
+        @fips'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4
+- as: e2e-gcp-ipi-cco-manual-workload-identity-p1
+  cron: 0 13 * * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -720,7 +763,7 @@ tests:
       TAG_VERSION: '@4.12'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
 - as: e2e-gcp-ipi-disconnected-p2
   cron: 0 1 */7 * *
   steps:
@@ -769,6 +812,67 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-workers-rhel8
+- as: e2e-gcp-ipi-ovn-ipsec-p1
+  cron: 0 9 * * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@gcp-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
+- as: e2e-gcp-ipi-ovn-mtu-migrate-p2
+  cron: 0 22 */7 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@gcp-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-mtu-migrate
+- as: e2e-gcp-ipi-ovn-p3
+  cron: 0 9 */28 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@gcp-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn
+- as: e2e-gcp-ipi-p3
+  cron: 0 0 */28 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@gcp-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: e2e-gcp-ipi-private-disasterrecovery-p2
+  cron: 0 1 * * 5
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
+      TEST_SCENARIOS: DR_Testing
+    test:
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-gcp-ipi-private
+- as: e2e-gcp-ipi-private-p1
+  cron: 0 10 * * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@gcp-ipi and @disconnected and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-private
 - as: e2e-gcp-ipi-proxy-p1
   cron: 0 1 * * *
   steps:
@@ -789,57 +893,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-techpreview
-- as: e2e-gcp-ipi-cco-manual-workload-identity-p1
-  cron: 0 13 * * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      E2E_RUN_TAGS: '@gcp-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
-- as: e2e-gcp-ipi-sdn-p1
-  cron: 0 8 * * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      E2E_RUN_TAGS: '@gcp-ipi and @network-openshiftsdn and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-sdn
-- as: e2e-gcp-ipi-ovn-p3
-  cron: 0 9 */28 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      E2E_RUN_TAGS: '@gcp-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-ovn
-- as: e2e-gcp-ipi-ovn-ipsec-p1
-  cron: 0 9 * * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      E2E_RUN_TAGS: '@gcp-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
-- as: e2e-gcp-ipi-private-p1
-  cron: 0 10 * * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      E2E_RUN_TAGS: '@gcp-ipi and @disconnected and @network-ovnkubernetes and not
-        @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-private
 - as: e2e-gcp-ipi-realtime-kernel-p2
   cron: 0 11 */7 * *
   steps:
@@ -850,6 +903,16 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-realtime-kernel
+- as: e2e-gcp-ipi-sdn-p1
+  cron: 0 8 * * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@gcp-ipi and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-sdn
 - as: e2e-gcp-ipi-workers-rhel8-p2
   cron: 0 12 */7 * *
   steps:
@@ -860,16 +923,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-workers-rhel8
-- as: e2e-gcp-ipi-private-disasterrecovery-p2
-  cron: 0 1 * * 5
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&
-      TEST_SCENARIOS: DR_Testing
-    test:
-    - ref: openshift-extended-test-longduration
-    workflow: cucushift-installer-rehearse-gcp-ipi-private
 - as: e2e-gcp-upi-baselinecaps-v411-p2
   cron: 0 15 */7 * *
   steps:
@@ -880,16 +933,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-upi-baselinecaps-v411
-- as: e2e-gcp-upi-p3
-  cron: 0 16 */28 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      E2E_RUN_TAGS: '@gcp-upi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-upi
 - as: e2e-gcp-upi-disconnected-p2
   cron: 0 17 */7 * *
   steps:
@@ -902,6 +945,16 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-upi-disconnected
+- as: e2e-gcp-upi-p3
+  cron: 0 16 */28 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      E2E_RUN_TAGS: '@gcp-upi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-upi
 - as: e2e-gcp-upi-private-xpn-p2
   cron: 0 19 */7 * *
   steps:
@@ -942,36 +995,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-upi-xpn
-- as: e2e-gcp-ipi-ovn-mtu-migrate-p2
-  cron: 0 22 */7 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      E2E_RUN_TAGS: '@gcp-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-mtu-migrate
-- as: e2e-vsphere-ipi-p3
-  cron: 0 0 10 * *
-  steps:
-    cluster_profile: vsphere
-    env:
-      E2E_RUN_TAGS: '@vsphere-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-vsphere-ipi
-- as: e2e-vsphere-ipi-sdn-p2
-  cron: 0 12 * * 0
-  steps:
-    cluster_profile: vsphere
-    env:
-      E2E_RUN_TAGS: '@vsphere-ipi and @network-openshiftsdn and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-vsphere-ipi-sdn
 - as: e2e-vsphere-ipi-ovn-ipsec-p2
   cron: 0 12 * * 1
   steps:
@@ -1002,6 +1025,16 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-shared-to-local-gateway-mode-migration
+- as: e2e-vsphere-ipi-p3
+  cron: 0 0 10 * *
+  steps:
+    cluster_profile: vsphere
+    env:
+      E2E_RUN_TAGS: '@vsphere-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: e2e-vsphere-ipi-proxy-p2
   cron: 0 12 * * 4
   steps:
@@ -1022,6 +1055,16 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8
+- as: e2e-vsphere-ipi-sdn-p2
+  cron: 0 12 * * 0
+  steps:
+    cluster_profile: vsphere
+    env:
+      E2E_RUN_TAGS: '@vsphere-ipi and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-vsphere-ipi-sdn
 - as: e2e-vsphere-ipi-zones-techpreview-p3
   cron: 0 0 12 * *
   steps:
@@ -1032,16 +1075,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones-techpreview
-- as: e2e-vsphere-upi-p3
-  cron: 0 0 11 * *
-  steps:
-    cluster_profile: vsphere
-    env:
-      E2E_RUN_TAGS: '@vsphere-upi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-vsphere-upi
 - as: e2e-vsphere-upi-disconnected-p3
   cron: 0 0 13 * *
   steps:
@@ -1054,28 +1087,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected
-- as: e2e-vsphere-upi-disconnected-secureboot-p2
-  cron: 0 18 * * 0
-  steps:
-    cluster_profile: vsphere-discon
-    env:
-      E2E_RUN_TAGS: '@vsphere-upi and @disconnected and @network-ovnkubernetes and
-        not @fips'
-      TAG_VERSION: '@4.12'
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
-- as: e2e-vsphere-upi-proxy-p2
-  cron: 0 12 * * 6
-  steps:
-    cluster_profile: vsphere-discon
-    env:
-      E2E_RUN_TAGS: '@vsphere-upi and @proxy and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-vsphere-upi-proxy
 - as: e2e-vsphere-upi-disconnected-sdn-workers-rhcos-rhel8-p2
   cron: 0 0 * * 0
   steps:
@@ -1088,49 +1099,38 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-sdn-workers-rhcos-rhel8
-- as: aws-ipi-ovn-hypershift-install-p1
-  cron: 0 1 * * *
+- as: e2e-vsphere-upi-disconnected-secureboot-p2
+  cron: 0 18 * * 0
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: vsphere-discon
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;HyperShiftINSTALL&
-      TEST_SCENARIOS: Hypershift
+      E2E_RUN_TAGS: '@vsphere-upi and @disconnected and @network-ovnkubernetes and
+        not @fips'
+      TAG_VERSION: '@4.12'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&
     test:
-    - ref: openshift-extended-test-longduration
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn
-- as: e2e-aws-ipi-sdn-mtu-migrate-p3
-  cron: 0 18 */28 * *
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-vsphere-upi-disconnected-secureboot
+- as: e2e-vsphere-upi-p3
+  cron: 0 0 11 * *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: vsphere
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-openshiftsdn and not @fips'
+      E2E_RUN_TAGS: '@vsphere-upi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.12'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-sdn-mtu-migrate
-- as: azure-ipi-ovn-hypershift-install-p1
-  cron: 0 1 * * *
+    workflow: cucushift-installer-rehearse-vsphere-upi
+- as: e2e-vsphere-upi-proxy-p2
+  cron: 0 12 * * 6
   steps:
-    cluster_profile: azure-qe
+    cluster_profile: vsphere-discon
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;HyperShiftINSTALL&
-      TEST_SCENARIOS: Hypershift
-    test:
-    - ref: openshift-extended-test-longduration
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn
-- as: ocp-e2e-metal-libvirt-ipi-ovn-p1
-  cron: 0 5 * * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      E2E_RUN_TAGS: '@baremetal-ipi and @arm64 and @network-ovnkubernetes and not
-        @fips'
+      E2E_RUN_TAGS: '@vsphere-upi and @proxy and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.12'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4
+    workflow: cucushift-installer-rehearse-vsphere-upi-proxy
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
