@@ -52,4 +52,6 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
     ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow USE_CONMONRS=$USE_CONMONRS" --connection=local -vvv --tags setup,e2e
+    sudo chown -R deadbeef /tmp/artifacts/*
+    sudo chmod -R 777 /tmp/artifacts/*
 EOF

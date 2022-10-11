@@ -51,6 +51,6 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     cd "\${REPO_DIR}/contrib/test/ci"
     echo "localhost" >> hosts
     ansible-playbook integration-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv
-    sudo chown deadbeef /tmp/artifacts/kube-apiserver-audit.log
-    sudo chmod 777 /tmp/artifacts/kube-apiserver-audit.log
+    sudo chown -R deadbeef /tmp/artifacts/*
+    sudo chmod -R 777 /tmp/artifacts/*
 EOF
