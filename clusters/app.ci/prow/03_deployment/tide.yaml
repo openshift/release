@@ -53,9 +53,8 @@ items:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
           - --dry-run=false
+          - --github-token-path=/etc/github/oauth
           - --job-config-path=/etc/job-config
-          - --github-app-id=$(GITHUB_APP_ID)
-          - --github-app-private-key-path=/etc/github/cert
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
@@ -65,12 +64,6 @@ items:
           - --projected-token-file=/var/sa-token/token
           - --sync-hourly-tokens=-1
           - --status-hourly-tokens=-1
-          env:
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: openshift-prow-github-app
-                key: appid
           ports:
           - name: main
             containerPort: 8888
@@ -79,7 +72,7 @@ items:
           volumeMounts:
           - name: service-account-token
             mountPath: /var/sa-token
-          - name: github-app-credentials
+          - name: oauth
             mountPath: /etc/github
             readOnly: true
           - name: config
@@ -103,9 +96,9 @@ items:
             sources:
             - serviceAccountToken:
                 path: token
-        - name: github-app-credentials
+        - name: oauth
           secret:
-            secretName: openshift-prow-github-app
+            secretName: github-credentials-openshift-merge-robot
         - name: config
           configMap:
             name: config
