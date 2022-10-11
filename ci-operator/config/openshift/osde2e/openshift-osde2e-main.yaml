@@ -3,6 +3,10 @@ base_images:
     name: ci-base
     namespace: azure
     tag: latest
+  base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
   osde2e:
     name: osde2e
     namespace: ci
@@ -18,21 +22,34 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: verify
+- as: code-quality-checks
   commands: |
-    set -o pipefail
-
+    export GOFLAGS=""
     export HOME=$(mktemp -d)
     export REPORT_DIR="$ARTIFACT_DIR"
 
-    ci/prow_pr_check.sh
+    make check
+  container:
+    from: src
+- as: verify
+  commands: |
+    export GOFLAGS=""
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,prod,pr-check"
+    export GINKGO_SKIP="Must Gather Operator"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/sd-cicd-aws-prod"
+
+    go mod tidy
+    make build
+
+    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
   container:
     from: src
   secrets:
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
   - mount_path: /usr/local/sd-cicd-aws-prod
     name: sd-cicd-aws-prod
 - as: aro-ovn-e2e-default
