@@ -14,6 +14,10 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
 fi
 bastion_ignition_base64=$(base64 -w0 < "${bastion_ignition_file}")
 
+if [[ -z "${BASTION_HOST_SUBNET}" ]]; then
+  BASTION_HOST_SUBNET=${LEASE_RESOURCE}
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
