@@ -15,7 +15,8 @@ fi
 bastion_ignition_base64=$(base64 -w0 < "${bastion_ignition_file}")
 
 if [[ -z "${BASTION_HOST_SUBNET}" ]]; then
-  BASTION_HOST_SUBNET=${LEASE_RESOURCE}
+  echo "Not define env BASTION_HOST_SUBNET, bastion host will be provisioned in network defined as LEASED_RESOURCE..."
+  BASTION_HOST_SUBNET=${LEASED_RESOURCE}
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
