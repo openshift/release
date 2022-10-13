@@ -1,0 +1,147 @@
+base_images:
+  must-gather:
+    name: "4.12"
+    namespace: ocp
+    tag: must-gather
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.11
+  operator-registry:
+    name: "4.12"
+    namespace: ocp
+    tag: operator-registry
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: build/Dockerfile.build
+  from: os
+  to: ocs-operator
+- dockerfile_path: openshift-ci/Dockerfile.registry.build
+  from: operator-registry
+  to: ocs-registry
+- context_dir: openshift-ci/
+  dockerfile_path: index.Dockerfile
+  from: operator-index
+  to: noobaa-index
+- dockerfile_path: openshift-ci/Dockerfile.registry
+  from: operator-registry
+  to: ocs-registry-quay
+- context_dir: must-gather/
+  dockerfile_path: Dockerfile
+  from: must-gather
+  to: ocs-must-gather
+operator:
+  bundles:
+  - as: ocs-operator-bundle
+    base_index: noobaa-index
+    context_dir: deploy/
+    dockerfile_path: Dockerfile
+  substitutions:
+  - pullspec: quay.io/ocs-dev/ocs-operator:latest
+    with: ocs-operator
+promotion:
+  excluded_images:
+  - operator-registry-base
+  - noobaa-index
+  - ocs-registry
+  - ocs-registry-master
+  name: odf-4.12
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify-latest-csv
+  commands: |
+    make verify-latest-csv
+  container:
+    from: src
+- as: ocs-operator-ci
+  commands: |
+    export GOFLAGS=''; make ocs-operator-ci
+  container:
+    from: src
+- as: ocs-operator-bundle-e2e-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      CATALOG_FULL_IMAGE_NAME: ocs-registry
+      MUST_GATHER_FULL_IMAGE_NAME: ocs-must-gather
+      OO_INDEX: ci-index-ocs-operator-bundle
+    env:
+      OCP_MUST_GATHER_DIR: ${ARTIFACT_DIR}/ocp-must-gather
+      OCS_MUST_GATHER_DIR: ${ARTIFACT_DIR}/ocs-must-gather
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-storage
+      OO_PACKAGE: ocs-operator
+      OO_TARGET_NAMESPACES: '!install'
+    post:
+    - as: ocs-must-gather
+      cli: latest
+      commands: hack/dump-debug-info.sh
+      dependencies:
+      - env: MUST_GATHER_FULL_IMAGE_NAME
+        name: ocs-must-gather
+      env:
+      - name: OCP_MUST_GATHER_DIR
+      - name: OCS_MUST_GATHER_DIR
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - chain: ipi-deprovision
+    test:
+    - as: tests
+      commands: |
+        export GOFLAGS=''; make functest
+      dependencies:
+      - env: CATALOG_FULL_IMAGE_NAME
+        name: ocs-registry
+      - env: MUST_GATHER_FULL_IMAGE_NAME
+        name: ocs-must-gather
+      - env: OO_INDEX
+        name: ci-index
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: red-hat-storage-ocs-ci-e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
+      dependencies:
+      - env: CATALOG_FULL_IMAGE_NAME
+        name: ci-index-ocs-operator-bundle
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.12
+  org: red-hat-storage
+  repo: ocs-operator

@@ -84,7 +84,72 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
+    context: ci/prow/e2e-claim-aws
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-logging-operator-master-e2e-claim-aws
+    optional: true
+    rerun_command: /test e2e-claim-aws
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-claim-aws
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-claim-aws,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/functional
     decorate: true
     decoration_config:
@@ -147,7 +212,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -196,7 +261,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -245,7 +310,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:

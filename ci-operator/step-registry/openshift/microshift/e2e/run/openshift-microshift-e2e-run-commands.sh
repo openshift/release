@@ -36,6 +36,8 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 
 cat  > "${HOME}"/run-test.sh <<'EOF'
+#!/bin/bash
+set -euo pipefail
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
 openshift-tests run -v 2 --provider=none -f suite.txt -o /home/rhel8user/e2e.log --junit-dir /home/rhel8user/junit
 chown rhel8user:rhel8user /home/rhel8user/e2e.log

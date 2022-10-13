@@ -1,0 +1,25 @@
+binary_build_commands: ./mage build:binaries
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+promotion:
+  namespace: package-operator
+  tag: latest
+resources:
+  '*':
+    limits:
+      memory: 5Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: ./mage test:lint && ./mage test:unit
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: package-operator
+  repo: package-operator
