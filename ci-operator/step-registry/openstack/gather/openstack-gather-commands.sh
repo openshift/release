@@ -3,6 +3,8 @@
 set -o nounset
 set -x
 
+cd /tmp || exit
+
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
@@ -34,7 +36,8 @@ collect_bootstrap_logs() {
 				FIPS+=("${IP}")
 				openstack server add floating ip ${CLUSTER_ID}-bootstrap ${IP}
 			else
-				IP=$(openstack server show ${BOOTSTRAP_NODE} --colum addresses --format json | jq -r '.addresses | .[][0]')
+				ADDRESSES=$(openstack server show "${BOOTSTRAP_NODE}" --column addresses --format json)
+				IP=$(echo "${ADDRESSES}" | jq -r '.addresses[][0]')
 			fi
 			GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${IP}")
 			
@@ -45,7 +48,8 @@ collect_bootstrap_logs() {
 						FIPS+=("${IP}")
 						openstack server add floating ip ${CLUSTER_ID}-master-${idx} ${IP}
 					else
-						IP=$(openstack server show ${CLUSTER_ID}-master-${idx} --colum addresses --format json | jq -r '.addresses | .[][0]')
+						ADDRESSES=$(openstack server show "${CLUSTER_ID}-master-${idx}" --column addresses --format json)
+						IP=$(echo "${ADDRESSES}" | jq -r '.addresses[][0]')
 					fi
 					GATHER_BOOTSTRAP_ARGS+=('--master' "${IP}")
 				fi
