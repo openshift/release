@@ -123,6 +123,13 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
   to: main-rcd
+- dockerfile_path: .openshift-ci/build/Dockerfile.build-mock-grpc-server
+  from: ubi-minimal
+  inputs:
+    root:
+      as:
+      - replaced-by-osci:root
+  to: mock-grpc-server
 promotion:
   excluded_images:
   - main-bundle
@@ -164,6 +171,8 @@ tests:
         name: operator-bundle
       - env: OPERATOR_BUNDLE_INDEX_MAGE
         name: operator-bundle-index
+      - env: MOCK_GRPC_SERVER_IMAGE
+        name: mock-grpc-server
       from: src
       resources:
         requests:
@@ -308,6 +317,12 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
+- as: gke-postgres-ui-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: gke-nongroovy-e2e-tests
   optional: true
   steps:
@@ -443,6 +458,8 @@ tests:
         name: operator-bundle
       - env: OPERATOR_BUNDLE_INDEX_MAGE
         name: operator-bundle-index
+      - env: MOCK_GRPC_SERVER_IMAGE
+        name: mock-grpc-server
       from: src
       resources:
         requests:
@@ -565,6 +582,12 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: merge-gke-ui-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-postgres-ui-e2e-tests
   postsubmit: true
   steps:
     test:

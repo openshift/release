@@ -33,12 +33,12 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-openshift-tests run --dry-run --provider=none "${TEST_SUITE}" > "${HOME}"/suite.txt
+${PAYLOAD_PATH}/usr/bin/openshift-tests run --dry-run --provider=none "${TEST_SUITE}" > "${HOME}"/suite.txt
 chmod +r "${HOME}"/suite.txt
 
 # scp and install microshift.service
-  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/suite.txt rhel8user@"${INSTANCE_PREFIX}":~/suite.txt
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+--quiet \
+--project "${GOOGLE_PROJECT_ID}" \
+--zone "${GOOGLE_COMPUTE_ZONE}" \
+--recurse "${HOME}"/suite.txt rhel8user@"${INSTANCE_PREFIX}":~/suite.txt
