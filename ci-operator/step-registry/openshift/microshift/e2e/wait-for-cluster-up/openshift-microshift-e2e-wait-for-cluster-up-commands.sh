@@ -48,6 +48,7 @@ do
   echo "Waiting for kubeconfig..."
   sleep 5;
 done
+sudo chmod 755 /var/lib/microshift/resources/kubeadmin/kubeconfig
 EOF
 chmod +x "${HOME}"/start_microshift.sh
 
@@ -77,4 +78,5 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse rhel8user@"${INSTANCE_PREFIX}":/var/lib/microshift/resources/kubeadmin/kubeconfig "${KUBECONFIG}"
-oc config set-cluster microshift --server=https://$
+
+oc get pods -A
