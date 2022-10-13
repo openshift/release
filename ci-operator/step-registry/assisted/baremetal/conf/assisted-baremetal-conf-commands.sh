@@ -33,7 +33,13 @@ EOF
         ;;
 
     conformance)
-        INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run)
+        # shellcheck disable=SC2044
+        for kubeconfig in $(find ${SHARED_DIR} -name "kubeconfig*" -exec echo {} \;); do
+            # Spoke cluster's kubeconfig has a random name, so we only need the first found
+            export KUBECONFIG=${kubeconfig}
+            INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run --provider '{"type":"${TEST_PROVIDER}"}')
+            break
+        done
         ;;
 
     full)

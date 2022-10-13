@@ -1,9 +1,7 @@
 binary_build_commands: ./build.sh
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: tectonic-console-builder-v23
+  project_image:
+    dockerfile_path: docker/Dockerfile.ci-operator-buildroot
 resources:
   '*':
     limits:
@@ -16,7 +14,9 @@ tests:
   steps:
     test:
     - as: all-packages
-      commands: "export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN) \n./test.sh\n"
+      commands: |
+        export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN)
+        ./test.sh
       credentials:
       - mount_path: /tmp/secret
         name: hac-core-deploy-tokens
@@ -44,7 +44,9 @@ tests:
   steps:
     test:
     - as: all-packages-coverage-upload
-      commands: "export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN) \n./test.sh\n"
+      commands: |
+        export CODECOV_TOKEN=$(cat /tmp/secret/SDK_CODECOV_TOKEN)
+        ./test.sh
       credentials:
       - mount_path: /tmp/secret
         name: hac-core-deploy-tokens

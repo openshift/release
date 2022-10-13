@@ -122,6 +122,7 @@ tests:
     product: ocp
     timeout: 2h0m0s
     version: "4.11"
+  skip_if_only_changed: test/ui
   steps:
     allow_skip_on_success: true
     test:
@@ -151,6 +152,7 @@ tests:
     timeout: 2h0m0s
     version: "4.11"
   optional: true
+  skip_if_only_changed: test/ui
   steps:
     allow_skip_on_success: true
     test:
@@ -180,6 +182,7 @@ tests:
     timeout: 2h0m0s
     version: "4.11"
   optional: true
+  skip_if_only_changed: test/ui
   steps:
     allow_skip_on_success: true
     test:
@@ -293,6 +296,7 @@ tests:
     timeout: 2h0m0s
     version: "4.11"
   optional: true
+  skip_if_only_changed: test/ui
   steps:
     allow_skip_on_success: true
     test:
@@ -350,6 +354,7 @@ tests:
     timeout: 2h0m0s
     version: "4.11"
   optional: true
+  skip_if_only_changed: test/ui
   steps:
     allow_skip_on_success: true
     test:
@@ -371,6 +376,34 @@ tests:
           memory: 6Gi
     workflow: generic-claim
 - as: ui-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.11"
+  run_if_changed: test/ui
+  steps:
+    test:
+    - as: serverless-ui
+      commands: make test-ui-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: ui-tests-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
