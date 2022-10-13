@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/aro-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -56,7 +56,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/eks-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -107,7 +107,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-kernel-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -158,7 +158,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-nongroovy-e2e-tests
     decorate: true
     decoration_config:
@@ -209,7 +209,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-postgres-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -261,7 +261,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-postgres-scale-tests
     decorate: true
     decoration_config:
@@ -307,11 +307,63 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )gke-postgres-scale-tests,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/gke-postgres-ui-e2e-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 5h0m0s
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-master-gke-postgres-ui-e2e-tests
+    optional: true
+    rerun_command: /test gke-postgres-ui-e2e-tests
+    run_if_changed: ^ui/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=gke-postgres-ui-e2e-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gke-postgres-ui-e2e-tests,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-postgres-upgrade-tests
     decorate: true
     decoration_config:
@@ -362,7 +414,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -414,7 +466,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-race-condition-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -465,7 +517,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-scale-tests
     decorate: true
     decoration_config:
@@ -515,7 +567,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-ui-e2e-tests
     decorate: true
     decoration_config:
@@ -567,7 +619,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-upgrade-tests
     decorate: true
     decoration_config:
@@ -618,7 +670,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/gke-version-compatibility-tests
     decorate: true
     decoration_config:
@@ -669,7 +721,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/go-postgres-tests
     decorate: true
     decoration_config:
@@ -725,7 +777,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/go-unit-tests
     decorate: true
     decoration_config:
@@ -781,7 +833,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/go-unit-tests-release
     decorate: true
     decoration_config:
@@ -837,7 +889,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/grouped-static-checks
     decorate: true
     decoration_config:
@@ -886,7 +938,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -935,7 +987,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/integration-unit-tests
     decorate: true
     decoration_config:
@@ -984,7 +1036,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/local-roxctl-tests
     decorate: true
     decoration_config:
@@ -1034,7 +1086,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/mitre-bundles-checks
     decorate: true
     decoration_config:
@@ -1083,7 +1135,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/openshift-newest-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -1149,7 +1201,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/openshift-newest-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1214,7 +1266,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/openshift-oldest-operator-e2e-tests
     decorate: true
     decoration_config:
@@ -1280,7 +1332,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/openshift-oldest-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1345,7 +1397,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/openshift-penultimate-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1410,7 +1462,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/osd-aws-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1461,7 +1513,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/osd-gcp-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1512,7 +1564,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/policy-checks
     decorate: true
     decoration_config:
@@ -1561,7 +1613,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/push-images
     decorate: true
     decoration_config:
@@ -1610,7 +1662,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/rosa-qa-e2e-tests
     decorate: true
     decoration_config:
@@ -1661,7 +1713,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/shell-unit-tests
     decorate: true
     decoration_config:
@@ -1710,7 +1762,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/stackrox_branding-images
     decorate: true
     decoration_config:
@@ -1761,7 +1813,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/stackrox_branding-push-images
     decorate: true
     decoration_config:
@@ -1812,7 +1864,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/style-checks
     decorate: true
     decoration_config:
@@ -1868,7 +1920,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/ui-unit-tests
     decorate: true
     decoration_config:
