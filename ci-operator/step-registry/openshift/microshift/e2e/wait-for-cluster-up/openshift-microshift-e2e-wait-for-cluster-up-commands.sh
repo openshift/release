@@ -48,7 +48,8 @@ do
   echo "Waiting for kubeconfig..."
   sleep 5;
 done
-sudo chmod 755 /var/lib/microshift/resources/kubeadmin/kubeconfig
+sudo cp "/var/lib/microshift/resources/kubeadmin/kubeconfig" /home/rhel8user/
+sudo chown rhel8user:rhel8user /home/rhel8user/kubeconfig
 EOF
 chmod +x "${HOME}"/start_microshift.sh
 
@@ -69,14 +70,14 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   rhel8user@"${INSTANCE_PREFIX}" \
   --command '/home/rhel8user/start_microshift.sh'
 
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse rhel8user@"${INSTANCE_PREFIX}":~/kubeconfig "${KUBECONFIG}"
+
+oc get pods -A
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'cd ~/validate-microshift  && sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig ./kuttl-test.sh'
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse rhel8user@"${INSTANCE_PREFIX}":/var/lib/microshift/resources/kubeadmin/kubeconfig "${KUBECONFIG}"
-
-oc get pods -A
