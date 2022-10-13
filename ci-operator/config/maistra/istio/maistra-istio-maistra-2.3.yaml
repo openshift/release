@@ -49,6 +49,25 @@ tests:
     ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
     from: src
+- as: istio-integration-pilot-2-3
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: test
+      commands: make test.integration.pilot.kube.presubmit BUILD_WITH_CONTAINER="0"
+      from: src
+      resources:
+        requests:
+          cpu: "1"
+          memory: 1Gi
+      timeout: 4h0m0s
+    workflow: generic-claim
 zz_generated_metadata:
   branch: maistra-2.3
   org: maistra
