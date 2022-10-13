@@ -11,10 +11,6 @@ AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 
-# workaround for MS graph permissions 
-yum -y remove azure-cli
-yum -y install https://packages.microsoft.com/yumrepos/azure-cli/azure-cli-2.36.0-1.el7.x86_64.rpm
-
 
 echo "logging into Azure cloud"
 # log in with az
