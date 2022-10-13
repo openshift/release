@@ -4,6 +4,8 @@ set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+export KUBECONFIG="${SHARED_DIR}"/kubeconfig
+
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
@@ -41,27 +43,12 @@ trap "sudo journalctl -eu microshift" EXIT
 
 sudo systemctl enable microshift --now
 
-# If condition is true there is podman, it's not a rpm install.
-if [[ $(command -v podman) ]]; then
-  # podman is present so copy the config file
-  sudo mkdir -p /var/lib/microshift/resources/kubeadmin/
-  sudo podman cp microshift:/var/lib/microshift/resources/kubeadmin/kubeconfig /var/lib/microshift/resources/kubeadmin/kubeconfig  
-else
-  echo "This is rpm run";
-  # test if microshift is running
-  sudo systemctl status microshift;
-
-  # test if microshift created the kubeconfig under /var/lib/microshift/resources/kubeadmin/kubeconfig
-  while ! sudo test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig";
-  do
-    echo "Waiting for kubeconfig..."
-    sleep 5;
-  done
-  sudo ls -la /var/lib/microshift
-  sudo ls -la /var/lib/microshift/resources/kubeadmin/kubeconfig
-fi
+while ! sudo test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig";
+do
+  echo "Waiting for kubeconfig..."
+  sleep 5;
+done
 EOF
-
 chmod +x "${HOME}"/start_microshift.sh
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
@@ -85,3 +72,9 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'cd ~/validate-microshift  && sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig ./kuttl-test.sh'
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse rhel8user@"${INSTANCE_PREFIX}":/var/lib/microshift/resources/kubeadmin/kubeconfig "${KUBECONFIG}"
+oc config set-cluster microshift --server=https://$

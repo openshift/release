@@ -35,8 +35,7 @@ gcloud compute networks subnets create "${INSTANCE_PREFIX}" \
   --range=10.0.0.0/9
 gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
   --network "${INSTANCE_PREFIX}" \
-  --allow tcp:22,icmp
-
+  --allow tcp:22,tcp:6443,icmp
 gcloud compute instances create "${INSTANCE_PREFIX}" \
   --image=rhel-8-v20220719 \
   --image-project=rhel-cloud \
