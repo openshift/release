@@ -7,7 +7,8 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-binary_build_commands: unset GOFLAGS && make manifests build bundle && chmod -R 777 bundle
+binary_build_commands: unset GOFLAGS && make manifests build bundle && chmod -R 777
+  bundle
 build_root:
   project_image:
     dockerfile_literal: |
@@ -38,34 +39,17 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
-  to: mariadb-operator
-- dockerfile_literal: |
-    FROM scratch
-    # Core bundle labels.
-    LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
-    LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
-    LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
-    LABEL operators.operatorframework.io.bundle.package.v1=mariadb-operator
-    LABEL operators.operatorframework.io.bundle.channels.v1=alpha
-    LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.23.0
-    LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
-    LABEL operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v3
-    # Labels for testing.
-    LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
-    LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
-    # Copy files to locations specified by labels.
-    COPY bundle/manifests /manifests/
-    COPY bundle/metadata /metadata/
-    COPY bundle/tests/scorecard /tests/scorecard/
-  from: bin
   inputs:
     bin:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/openstack-k8s-operators/mariadb-operator/bundle
-      - destination_dir: .
-        source_path: /go/src/github.com/openstack-k8s-operators/mariadb-operator/bundle.Dockerfile
-  to: mariadb-operator-bundle
+        source_path: /go/src/github.com/openstack-k8s-operators/mariadb-operator/.
+  to: mariadb-operator
+operator:
+  bundles:
+  - as: mariadb-index
+    base_index: mariadb-operator
+    dockerfile_path: bundle.Dockerfile
 resources:
   '*':
     limits:
