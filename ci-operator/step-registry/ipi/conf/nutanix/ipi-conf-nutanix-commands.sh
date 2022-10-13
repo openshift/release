@@ -28,7 +28,6 @@ cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
 credentialsMode: Manual
 platform:
-  nutanix:${RHCOS_PATCH}
     apiVIP: ${API_VIP}
     ingressVIP: ${INGRESS_VIP}
     prismCentral:
@@ -50,7 +49,7 @@ networking:
     hostPrefix: 23
   machineNetwork:
   - cidr: 10.0.0.0/16
-  networkType: OVNKubernetes
+  networkType: OpenShiftSDN
   serviceNetwork:
   - 172.30.0.0/16
 compute:
