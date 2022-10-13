@@ -130,19 +130,13 @@ compute:
 - architecture: ppc64le
   hyperthreading: Enabled
   name: worker
-  platform:
-    powervs:
-      processors: 1
-      procType: "Dedicated"
+  platform: {}
   replicas: 2
 controlPlane:
   architecture: ppc64le
   hyperthreading: Enabled
   name: master
-  platform:
-    powervs:
-      processors: 1
-      procType: "Dedicated"
+  platform: {}
   replicas: 3
 networking:
   clusterNetwork:
