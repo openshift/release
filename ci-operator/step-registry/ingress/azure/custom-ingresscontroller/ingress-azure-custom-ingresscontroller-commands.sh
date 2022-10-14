@@ -22,6 +22,7 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 AZURE_BASE_DOMAIN="$(oc get -o jsonpath='{.spec.baseDomain}' dns.config cluster)"
 Infra_ID=$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)
 canary_host=$(oc get route canary -n openshift-ingress-canary -o jsonpath='{.spec.host}')
+Image_ID=$(oc get machines -n openshift-machine-api -o jsonpath='{.items[0].spec.providerSpec.value.image.resourceID}')
 
 echo "$(date -u --rfc-3339=seconds) Create a new subnet for the infrastructure nodes"
 az network vnet subnet create -g ${CLUSTER_NAME}-rg --vnet-name ${CLUSTER_NAME}-vnet -n ${CLUSTER_NAME}-ingress-subnet --address-prefixes 10.0.64.0/24 --network-security-group ${CLUSTER_NAME}-nsg
@@ -80,7 +81,7 @@ spec:
           image:
             offer: ""
             publisher: ""
-            resourceID: /resourceGroups/${Infra_ID}-rg/providers/Microsoft.Compute/images/${Infra_ID}-gen2
+            resourceID: ${Image_ID}
             sku: ""
             version: ""
           kind: AzureMachineProviderSpec
