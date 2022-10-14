@@ -28,7 +28,7 @@ cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
 credentialsMode: Manual
 platform:
-  nutanix:${RHCOS_PATCH}
+  nutanix:
     apiVIP: ${API_VIP}
     ingressVIP: ${INGRESS_VIP}
     prismCentral:
