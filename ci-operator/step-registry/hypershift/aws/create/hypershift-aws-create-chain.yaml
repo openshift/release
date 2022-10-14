@@ -8,7 +8,7 @@ chain:
       default: "3"
       documentation: "The number nodes to automatically create and join to the cluster."
     - name: HYPERSHIFT_BASE_DOMAIN
-      default: "ci.hypershift.devcluster.openshift.com"
+      default: ""
       documentation: "The cluster's FQDN will be a subdomain of the base domain."
     - name: HYPERSHIFT_AWS_REGION
       default: "us-east-1"
@@ -19,8 +19,19 @@ chain:
     - name: EXTRA_ARGS
       default: ""
       documentation: "Extra args to pass to the create cluster aws command"
+    - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+      default: "false"
+      documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
     commands: |-
       set -exuo pipefail
+      AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+      DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
+      
+      if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
+        AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+        DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+      fi
+      DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
 
       # We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
       # have to use a hack like this.
@@ -33,10 +44,10 @@ chain:
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
         --instance-type=m5.xlarge \
-        --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --base-domain ${DOMAIN} \
         --region ${HYPERSHIFT_AWS_REGION} \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-        --aws-creds /etc/hypershift-pool-aws-credentials/credentials \
+        --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
         --release-image ${RELEASE_IMAGE_LATEST} \
         --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"

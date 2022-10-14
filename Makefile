@@ -61,13 +61,11 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20220928-43c5445b67 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20221013-86c528dbe3 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/go/src/github.com/openshift/release:z" -e GOPATH=/go registry.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/sanitize-prow-jobs:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs:z" registry.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml
+	$(MAKE) ci-operator-prowgen
+	$(MAKE) sanitize-prow-jobs
 
 ci-operator-checkconfig:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-checkconfig:latest
@@ -77,6 +75,14 @@ ci-operator-checkconfig:
 ci-operator-config:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/determinize-ci-operator:latest
 	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
+
+ci-operator-prowgen:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/go/src/github.com/openshift/release:z" -e GOPATH=/go registry.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo $(WHAT)
+
+sanitize-prow-jobs:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/sanitize-prow-jobs:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs:z" registry.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml $(WHAT)
 
 registry-metadata:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/generate-registry-metadata:latest

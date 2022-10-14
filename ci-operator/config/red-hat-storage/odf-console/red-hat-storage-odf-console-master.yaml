@@ -18,12 +18,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':
@@ -50,14 +50,19 @@ tests:
       ODF_CONSOLE_FULL_IMG_NAME: odf-console
     env:
       COMPUTE_NODE_TYPE: m4.2xlarge
-      ZONES_COUNT: "1"
+      ZONES_COUNT: "3"
     test:
     - as: tests
       cli: latest
-      commands: ./test-prow-e2e.sh ${ODF_CONSOLE_FULL_IMG_NAME};
+      commands: |
+        export PULL_SECRET="$(cat /etc/odf-console-e2e/odf-e2e-credentials/config-pull-secret)"
+        ./test-prow-e2e.sh ${ODF_CONSOLE_FULL_IMG_NAME}
       credentials:
       - mount_path: /var/run/operator-secret
         name: operator-secret
+        namespace: test-credentials
+      - mount_path: /etc/odf-console-e2e/odf-e2e-credentials
+        name: odf-e2e-credentials
         namespace: test-credentials
       dependencies:
       - env: ODF_CONSOLE_FULL_IMG_NAME
@@ -65,8 +70,8 @@ tests:
       from: src
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 1000m
+          memory: 1Gi
     workflow: ipi-aws
 zz_generated_metadata:
   branch: master
