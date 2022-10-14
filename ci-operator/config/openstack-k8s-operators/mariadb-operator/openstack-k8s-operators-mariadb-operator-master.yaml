@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
   base:
     name: "4.10"
     namespace: ocp
@@ -7,16 +11,15 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-binary_build_commands: unset GOFLAGS && make manifests build bundle && chmod -R 777
-  bundle
+binary_build_commands: unset GOFLAGS && make manifests build bundle
 build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9
       USER root
       ENV GOVERSION=1.18.1
-      RUN yum install -y gcc git jq make skopeo sqlite && \
-          yum clean all && rm -rf /var/cache/dnf/*
+      RUN dnf install -y gcc git jq make podman shadow-utils skopeo sqlite && \
+          dnf clean all && rm -rf /var/cache/dnf/*
       # Install Go. This version will only be used for unit tests. The
       # official builds are done via their own container image Dockerfiles
       RUN rm -rf /usr/local/go && \
@@ -35,21 +38,60 @@ build_root:
       RUN curl -s -L "https://github.com/operator-framework/operator-sdk/releases/latest/download/operator-sdk_linux_amd64" -o operator-sdk
       RUN chmod +x ./operator-sdk
       RUN cp ./operator-sdk /usr/local/bin
+      RUN mkdir /.local && chmod 777 /.local
+      ENV XDG_DATA_HOME=/.local
       WORKDIR $GOPATH/src/
 images:
-- dockerfile_path: Dockerfile
-  from: base
+- dockerfile_literal: |
+    FROM bin
+    COPY oc /usr/bin/oc
+  from: src
   inputs:
-    bin:
+    cli:
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/openstack-k8s-operators/mariadb-operator/.
+        source_path: /usr/bin/oc
+  to: src-oc
+- dockerfile_path: Dockerfile
+  from: src
   to: mariadb-operator
-operator:
-  bundles:
-  - as: mariadb-index
-    base_index: mariadb-operator
-    dockerfile_path: bundle.Dockerfile
+- dockerfile_literal: |
+    FROM golang:1.18 AS builder
+
+    # CI should replace this pullspec in manifest files during bundle build
+    ARG IMAGE_TAG_BASE=quay.io/openstack-k8s-operators/mariadb-operator
+    ARG VERSION=0.0.1
+
+    WORKDIR /mariadb-operator
+    RUN curl -s -L "https://github.com/operator-framework/operator-sdk/releases/latest/download/operator-sdk_linux_amd64" -o operator-sdk
+    RUN chmod +x ./operator-sdk
+    RUN mv ./operator-sdk /usr/local/bin
+
+    COPY . .
+    RUN IMG=${IMAGE_TAG_BASE}:v${VERSION} make manifests build bundle
+
+    FROM scratch
+
+    # Core bundle labels.
+    LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
+    LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
+    LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
+    LABEL operators.operatorframework.io.bundle.package.v1=mariadb-operator
+    LABEL operators.operatorframework.io.bundle.channels.v1=alpha
+    LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.22.1
+    LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
+    LABEL operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v3
+
+    # Labels for testing.
+    LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
+    LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
+
+    # Copy files to locations specified by labels.
+    COPY --from=builder /mariadb-operator/bundle/manifests/ /manifests/
+    COPY --from=builder /mariadb-operator/bundle/metadata /metadata/
+    COPY --from=builder /mariadb-operator/bundle/tests/scorecard /tests/scorecard/
+  from: src
+  to: mariadb-operator-bundle
 resources:
   '*':
     limits:
@@ -83,10 +125,21 @@ tests:
   commands: make gofmt || true
   container:
     from: src
-- as: checkoutputs
-  commands: ls -l && cat bundle.Dockerfile
-  container:
-    from: bin
+- as: testbin
+  steps:
+    test:
+    - as: testbin
+      from: src-oc
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+      commands:  |
+        env
+        sleep 1800
+      dependencies:
+      - name: pipeline:mariadb-operator-bundle
+        env: MARIADB_OPERATOR_BUNDLE
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
