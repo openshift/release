@@ -1,18 +1,67 @@
 base_images:
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
   golangci-lint:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-  openstack-installer:
-    name: "4.10"
-    namespace: ocp
-    tag: openstack-installer
-binary_build_commands: make build
+binary_build_commands: |
+  env
+  unset GOFLAGS
+  export OS_REGISTRY=registry.build04.ci.openshift.org
+  export IMAGE_TAG_BASE=${OS_REGISTRY}/${OPENSHIFT_BUILD_NAMESPACE}/pipeline
+  export BUNDLE_IMG=${IMAGE_TAG_BASE}:mariadb-operator-bundle
+  sed -i 's/--version $(VERSION)//' Makefile
+  IMG=${IMAGE_TAG_BASE}:mariadb-operator make manifests build bundle
+  opm index add --bundles ${BUNDLE_IMG} --out-dockerfile index.Dockerfile --generate --permissive
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi9
+      USER root
+      ENV GOVERSION=1.18.1
+      RUN yum install -y gcc git jq make skopeo sqlite && \
+          yum clean all && rm -rf /var/cache/dnf/*
+      # Install Go. This version will only be used for unit tests. The
+      # official builds are done via their own container image Dockerfiles
+      RUN rm -rf /usr/local/go && \
+          curl -fsSL https://go.dev/dl/go${GOVERSION}.linux-amd64.tar.gz | tar -C /usr/local -xzf -
+      ENV PATH=$PATH:/usr/local/go/bin
+      ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
+      RUN mkdir -p $GOCACHE /.cache
+      RUN chmod -R 777 /go /.cache
+      RUN mkdir /.bin && chmod 777 /.bin
+      WORKDIR /.bin
+      RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+      RUN cp ./kustomize /usr/local/bin
+      RUN curl -s -L "https://github.com/operator-framework/operator-registry/releases/latest/download/linux-amd64-opm" -o opm
+      RUN chmod +x ./opm
+      RUN cp ./opm /usr/local/bin
+      RUN curl -s -L "https://github.com/operator-framework/operator-sdk/releases/latest/download/operator-sdk_linux_amd64" -o operator-sdk
+      RUN chmod +x ./operator-sdk
+      RUN cp ./operator-sdk /usr/local/bin
+      RUN curl -s -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /usr/local/bin oc
+      RUN chmod +x /usr/local/bin/oc
+      WORKDIR $GOPATH/src/
+images:
+- dockerfile_path: Dockerfile
+  to: mariadb-operator
+- dockerfile_path: bundle.Dockerfile
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openstack-k8s-operators/mariadb-operator/.
+  to: mariadb-operator-bundle
+- dockerfile_path: index.Dockerfile
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openstack-k8s-operators/mariadb-operator/.
+  to: mariadb-operator-index
 releases:
   latest:
     integration:

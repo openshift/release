@@ -2,14 +2,11 @@
 
 set -ex
 
-cd $HOME
-# Setting up kustomize, needed by install_yamls makefile
-mkdir bin
-export PATH=$PATH:$HOME/bin
-cd $HOME/bin
-curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"  | bash
-cd $HOME
+#DEBUG
+env
+
 # Get install_yamls
+cd $HOME
 rm -rf install_yamls
 git clone https://github.com/openstack-k8s-operators/install_yamls.git
 cd $HOME/install_yamls
@@ -21,9 +18,11 @@ sleep 5
 # Creates storage needed for mariadb
 make crc_storage
 sleep 20
+# DEBUG
+sleep 7200
 # Deploy mariadb operator
-make mariadb
-sleep 120
+make mariadb MARIADB_IMG=${MARIADB_OPERATOR_INDEX}
+sleep 160
 # Deploy mariadb service
 make mariadb_deploy
 sleep 120
@@ -31,3 +30,4 @@ sleep 120
 oc get all
 # Show mariadb databases
 oc exec -it  pod/mariadb-openstack -- mysql -uroot -p12345678 -e "show databases;"
+sleep 1800
