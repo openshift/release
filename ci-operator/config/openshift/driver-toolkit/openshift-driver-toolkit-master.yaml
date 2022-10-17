@@ -40,6 +40,24 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: check-commits-count
+  commands: |
+    git fetch upstream
+    commits_count=$(git rev-list --count HEAD ^upstream/master)
+    # When Prow is testing a PR, it is creating a branch for it but then merges it
+    # into the "main" branch for testing, therefore, we also get the "merge commit"
+    # in addition to the original commit.
+    if [[ ${commits_count} != 2 ]]; then
+        echo '
+        All PRs must contain a single commit.
+        Please refer to https://github.com/openshift/driver-toolkit/blob/master/CONTRIBUTING.md
+        '
+        exit 1
+    fi
+
+  container:
+    from: src
+
 - as: verify
   commands: make verify
   container:
