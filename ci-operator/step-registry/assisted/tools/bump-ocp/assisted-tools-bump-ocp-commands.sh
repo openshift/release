@@ -6,6 +6,9 @@ set -o pipefail
 
 echo "************ assisted tools bump ocp command ************"
 
+echo "This infrastructure is deprecated. Please refer to https://gitlab.cee.redhat.com/assisted-installer-ops/assisted-installer-cicd/-/tree/main/src/assisted_installer_cicd/bump_ocp_upstream"
+exit 1
+
 workdir=$(pwd)
 
 cd /tmp/  # entering a writable dir
