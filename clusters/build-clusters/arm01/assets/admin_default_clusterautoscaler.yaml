@@ -1,0 +1,31 @@
+#https://docs.openshift.com/container-platform/4.11/machine_management/applying-autoscaling.html
+#https://coreos.slack.com/archives/CBZHF4DHC/p1578326297014800
+#oc --kubeconfig ./.kube/arm01.config get machine -n openshift-machine-api
+#NAME                                        PHASE     TYPE           REGION      ZONE         AGE
+#arm-build01-dh7m2-master-3                  Running   m6gd.2xlarge   us-east-1   us-east-1c   38d
+#arm-build01-dh7m2-master-4                  Running   m6gd.2xlarge   us-east-1   us-east-1d   38d
+#arm-build01-dh7m2-master-5                  Running   m6gd.2xlarge   us-east-1   us-east-1f   38d
+#arm-build01-dh7m2-worker-us-east-1a-hndc2   Running   m6gd.4xlarge   us-east-1   us-east-1a   12d
+#arm-build01-dh7m2-worker-us-east-1b-qssb4   Running   m6gd.4xlarge   us-east-1   us-east-1b   12d
+#arm-build01-dh7m2-worker-us-east-1c-c9b9f   Running   m6gd.4xlarge   us-east-1   us-east-1c   12d
+#arm-build01-dh7m2-worker-us-east-1d-bk64v   Running   m6gd.4xlarge   us-east-1   us-east-1d   12d
+#arm-build01-dh7m2-worker-us-east-1f-bsp6s   Running   m6gd.4xlarge   us-east-1   us-east-1f   12d
+
+#https://aws.amazon.com/ec2/instance-types/m5/
+#Instance Size vCPU	Memory (GiB)
+#m6gd.4xlarge	  16	  64
+# match api.ci cluster on gce: 40 workers
+# we do 14 workers per zone and 42 workers in total
+# Limits as Apr. 06 2020
+# IOPS: 1344k =  84 X 16k
+# CPUs: 1600 = 100 X 16 (including 3 masters of 24 CPUs)
+---
+apiVersion: "autoscaling.openshift.io/v1"
+kind: "ClusterAutoscaler"
+metadata:
+  name: "default"
+spec:
+  podPriorityThreshold: -10
+  resourceLimits: null
+  scaleDown:
+    enabled: true
