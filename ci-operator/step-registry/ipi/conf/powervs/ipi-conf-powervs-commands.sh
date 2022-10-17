@@ -61,6 +61,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+CONFIG_PLATFORM="  platform: {}"
 POWERVS_ZONE=${LEASED_RESOURCE}
 case "${LEASED_RESOURCE}" in
    "lon04")
@@ -72,7 +73,7 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06")
       POWERVS_REGION=lon
       VPCREGION=eu-gb
-      ;;
+   ;;
    "mon01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MON01")
       POWERVS_REGION=mon
@@ -82,6 +83,11 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_OSA21")
       POWERVS_REGION=osa
       VPCREGION=jp-osa
+      read -r -d '' CONFIG_PLATFORM << '___EOF___'
+  platform:
+    powervs:
+      sysType: e980
+___EOF___
    ;;
    "sao01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")
@@ -130,13 +136,13 @@ compute:
 - architecture: ppc64le
   hyperthreading: Enabled
   name: worker
-  platform: {}
+${CONFIG_PLATFORM}
   replicas: 2
 controlPlane:
   architecture: ppc64le
   hyperthreading: Enabled
   name: master
-  platform: {}
+${CONFIG_PLATFORM}
   replicas: 3
 networking:
   clusterNetwork:
