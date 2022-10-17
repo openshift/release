@@ -1,3 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: prow
+    component: retester
+  name: retester
+  namespace: prow-monitoring
+spec:
+  jobLabel: app
+  selector:
+    matchLabels:
+      app: prow
+      component: retester
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: http
+    scrapeTimeout: 20s
+  namespaceSelector:
+    matchNames:
+    - ci
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -38,6 +60,9 @@ spec:
         - --job-config-path=/etc/job-config
         - --cache-file=/cache/backoff
         - --config-file=/etc/retester/_config.yaml
+        ports:
+        - name: metrics
+          containerPort: 9090
         volumeMounts:
         - name: github-token
           mountPath: /etc/oauth
@@ -114,8 +139,8 @@ spec:
         configMap:
           name: retester-config
 ---
-kind: PersistentVolumeClaim
 apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
   labels:
     app: prow
