@@ -69,11 +69,6 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=lon
       VPCREGION=eu-gb
    ;;
-   "lon06")
-      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON06")
-      POWERVS_REGION=lon
-      VPCREGION=eu-gb
-   ;;
    "mon01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_MON01")
       POWERVS_REGION=mon
