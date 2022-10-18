@@ -18,6 +18,8 @@ fi
 upuser1=$(echo "${USERS}" | cut -d ',' -f 30)
 upuser2=$(echo "${USERS}" | cut -d ',' -f 29)
 export BUSHSLICER_CONFIG="
+global:
+  browser: chrome
 environments:
   ocp4:
     static_users_map:
@@ -29,7 +31,9 @@ export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=${USERS}
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/upgrade-prepare"
 
 cd verification-tests
+set -x
 cucumber --tags "${UPGRADE_PRE_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit || true
+set +x
 
 echo "Summarizing test result..."
 failures=$(grep '<testsuite failures="[1-9].*"' "${ARTIFACT_DIR}" -r | wc -l || true)

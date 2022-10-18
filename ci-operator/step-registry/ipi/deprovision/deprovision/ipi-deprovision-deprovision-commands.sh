@@ -4,7 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function save_logs() {
+    echo "Copying the Installer logs to the artifacts directory..."
+    cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'save_logs' EXIT TERM
 
 export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export AWS_SHARED_CREDENTIALS_FILE=$CLUSTER_PROFILE_DIR/.awscred
@@ -57,10 +63,8 @@ wait "$!"
 ret="$?"
 set -e
 
-echo "Copying the Installer logs to the artifacts directory..."
-cp /tmp/installer/.openshift_install.log "${ARTIFACT_DIR}"
 if [[ -s /tmp/installer/quota.json ]]; then
-	cp /tmp/installer/quota.json "${ARTIFACT_DIR}"
+        cp /tmp/installer/quota.json "${ARTIFACT_DIR}"
 fi
 
 exit "$ret"

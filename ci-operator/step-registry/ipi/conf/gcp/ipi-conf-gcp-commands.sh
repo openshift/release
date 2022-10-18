@@ -64,3 +64,34 @@ fi
 if [[ -s "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
   yq-go m -x -i "${CONFIG}" "${SHARED_DIR}/customer_vpc_subnets.yaml"
 fi
+
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+rm /tmp/pull-secret
+
+if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+  SERVICE="quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com"
+  PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
+  cat > "${PATCH}" << EOF
+imageContentSources:
+- mirrors:
+  - ${SERVICE}
+  source: quay.io
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+
+  pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+  mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
+  pull_secret_gcp=$(jq --arg auth ${mirror_auth} --arg repo "${SERVICE}" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
+
+  PATCH="/tmp/install-config-pull-secret-gcp.yaml.patch"
+  cat > "${PATCH}" << EOF
+pullSecret: >
+  $(echo "${pull_secret_gcp}" | jq -c .)
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  rm "${PATCH}"
+fi

@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: '@yearly'
   decorate: true
   labels:
@@ -293,6 +293,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-aws-sharednetwork
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: aws
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
           - as: launch-fips
             steps:
               cluster_profile: aws
@@ -560,7 +569,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: '@yearly'
   decorate: true
   labels:
@@ -639,6 +648,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)-sharednetwork
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
           - as: launch-fips
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -985,6 +1003,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-single-node
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: launch-fips
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -1247,7 +1274,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -1558,6 +1585,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: upi-$(CLUSTER_TYPE)-clusterbot
+          - as: launch-multi-zone
+            steps:
+              cluster_profile: vsphere-multizone
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
           - as: launch-ovn-hybrid
             steps:
               cluster_profile: $(CLUSTER_PROFILE)
@@ -1812,7 +1847,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: '@yearly'
   decorate: true
   labels:
@@ -2216,7 +2251,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: '@yearly'
   decorate: true
   labels:
@@ -2408,7 +2443,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: '@yearly'
   decorate: true
   labels:
@@ -2466,9 +2501,11 @@ periodics:
             steps:
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
+                HYPERSHIFT_HC_RELEASE_IMAGE: $(RELEASE_IMAGE_LATEST)
                 HYPERSHIFT_NODE_COUNT: 2
                 HYPERSHIFT_ZONES: "us-east-1a"
                 HYPERSHIFT_NAMESPACE: "cluster-bot"
+                HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
               test:
               - ref: clusterbot-wait
               cluster_profile: hypershift
@@ -2519,7 +2556,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -2606,7 +2643,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: '@yearly'
   decorate: true
   labels:

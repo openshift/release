@@ -56,6 +56,11 @@ cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
 chmod 0600 ~/.ssh/ssh-privatekey || true
 eval export SSH_CLOUD_PRIV_KEY="~/.ssh/ssh-privatekey"
 
+test -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" || echo "ssh-publickey file does not exist"
+cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
+chmod 0644 ~/.ssh/ssh-publickey || true
+eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
+
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
@@ -149,14 +154,16 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 # execute the cases
 function run {
     test_scenarios=""
-    echo "TEST_SCENRAIOS_PREUPG: \"${TEST_SCENRAIOS_PREUPG:-}\""
+    echo "TEST_SCENARIOS_PREUPG: \"${TEST_SCENARIOS_PREUPG:-}\""
     echo "TEST_ADDITIONAL_PREUPG: \"${TEST_ADDITIONAL_PREUPG:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
-    if [[ -n "${TEST_SCENRAIOS_PREUPG:-}" ]]; then
-        readarray -t scenarios <<< "${TEST_SCENRAIOS_PREUPG}"
+    if [[ -n "${TEST_SCENARIOS_PREUPG:-}" ]]; then
+        readarray -t scenarios <<< "${TEST_SCENARIOS_PREUPG}"
         for scenario in "${scenarios[@]}"; do
-            test_scenarios="${test_scenarios}|${scenario}"
+            if [ "W${scenario}W" != "WW" ]; then
+                test_scenarios="${test_scenarios}|${scenario}"
+            fi
         done
     else
         echo "there is no scenario"
@@ -164,11 +171,11 @@ function run {
     fi
 
     if [ "W${test_scenarios}W" == "WW" ]; then
-        echo "fail to parse ${TEST_SCENRAIOS_PREUPG}"
+        echo "fail to parse ${TEST_SCENARIOS_PREUPG}"
         exit 1
     fi
-    echo "test scenarios: ${test_scenarios:1:-1}"
-    test_scenarios="${test_scenarios:1:-1}"
+    echo "test scenarios: ${test_scenarios:1}"
+    test_scenarios="${test_scenarios:1}"
 
     test_additional=""
     if [[ -n "${TEST_ADDITIONAL_PREUPG:-}" ]]; then
@@ -192,10 +199,10 @@ function run {
     test_filters=""
     if [[ -n "${TEST_FILTERS_PREUPG:-}" ]]; then
         # shellcheck disable=SC2153
-        test_filters="~NonUnifyCI&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS};${TEST_FILTERS_PREUPG}"
+        test_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS};${TEST_FILTERS_PREUPG}"
     else
         # shellcheck disable=SC2153
-        test_filters="~NonUnifyCI&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS}"
+        test_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS}"
     fi
     echo "final test_filters: \"${test_filters}\""
 

@@ -1,53 +1,53 @@
 apiVersion: v1
 kind: List
 items:
-- kind: ImageStream
-  apiVersion: image.openshift.io/v1
-  metadata:
-    name: content-mirror
-    namespace: ci
-- kind: BuildConfig
-  apiVersion: build.openshift.io/v1
-  metadata:
-    name: content-mirror
-    namespace: ci
-  spec:
-    successfulBuildsHistoryLimit: 1
-    failedBuildsHistoryLimit: 2
-    output:
-      to:
-        kind: ImageStreamTag
-        name: content-mirror:latest
-    source:
-      git:
-        ref: master
-        uri: https://github.com/openshift/content-mirror.git
-      dockerfile: |
-        FROM golang:1.9
-        COPY . /go/src/github.com/openshift/content-mirror/
-        RUN GOPATH=/go go install github.com/openshift/content-mirror/cmd/content-mirror
-        FROM centos:7
-        COPY --from=0 /go/bin/content-mirror /usr/bin/content-mirror
-        COPY nginx.repo /etc/yum.repos.d/nginx.repo
-        RUN INSTALL_PKGS=" \
-        nginx \
-        " && \
-        yum install --enablerepo=nginx -y ${INSTALL_PKGS} && rpm -V ${INSTALL_PKGS} && \
-        yum clean all && \
-        rm -rf /var/lib/rpm /var/lib/yum/history && \
-        mkdir -p /var/cache/nginx /var/log/nginx /run && \
-        chmod -R uga+rwx /var/cache/nginx /var/log/nginx /run
-        USER 1001
-    strategy:
-      dockerStrategy:
-        from:
-          kind: DockerImage
-          name: quay.io/centos/centos:stream8
-        imageOptimizationPolicy: SkipLayers
-      type: Docker
-    triggers:
-    - type: ConfigChange
-    - type: GitHub
-      github:
-        secretReference:
-          name: github-deploymentconfig-trigger
+  - kind: ImageStream
+    apiVersion: image.openshift.io/v1
+    metadata:
+      name: content-mirror
+      namespace: ci-arm64
+  - kind: BuildConfig
+    apiVersion: build.openshift.io/v1
+    metadata:
+      name: content-mirror
+      namespace: ci-arm64
+    spec:
+      successfulBuildsHistoryLimit: 1
+      failedBuildsHistoryLimit: 2
+      output:
+        to:
+          kind: ImageStreamTag
+          name: content-mirror:latest
+      source:
+        git:
+          ref: master
+          uri: https://github.com/openshift/content-mirror.git
+        dockerfile: |
+          FROM golang:1.9
+          COPY . /go/src/github.com/openshift/content-mirror/
+          RUN GOPATH=/go go install github.com/openshift/content-mirror/cmd/content-mirror
+          FROM centos:7
+          COPY --from=0 /go/bin/content-mirror /usr/bin/content-mirror
+          COPY nginx.repo /etc/yum.repos.d/nginx.repo
+          RUN INSTALL_PKGS=" \
+          nginx \
+          " && \
+          yum install --enablerepo=nginx -y ${INSTALL_PKGS} && rpm -V ${INSTALL_PKGS} && \
+          yum clean all && \
+          rm -rf /var/lib/rpm /var/lib/yum/history && \
+          mkdir -p /var/cache/nginx /var/log/nginx /run && \
+          chmod -R uga+rwx /var/cache/nginx /var/log/nginx /run
+          USER 1001
+      strategy:
+        dockerStrategy:
+          from:
+            kind: DockerImage
+            name: quay.io/centos/centos:stream8
+          imageOptimizationPolicy: SkipLayers
+        type: Docker
+      triggers:
+        - type: ConfigChange
+        - type: GitHub
+          github:
+            secretReference:
+              name: github-deploymentconfig-trigger

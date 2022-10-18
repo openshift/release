@@ -19,6 +19,10 @@ base_images:
     name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
   coreos_centos_stream8:
     name: stream8
     namespace: coreos
@@ -47,31 +51,13 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.17
-  postgresql-12-centos7:
-    name: postgresql-12-centos7
-    namespace: edge-infrastructure
-    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.17
 images:
-- dockerfile_literal: |
-    FROM quay.io/centos/centos:stream9
-    RUN dnf install -y 'dnf-command(config-manager)' && \
-        dnf config-manager --set-enabled crb && \
-        dnf install -y git unzip make gcc which nmstate-devel
-    COPY --from=registry.ci.openshift.org/openshift/release:golang-1.17 /usr/local/go /usr/local/go
-    ENV GOPATH=/go
-    ENV GOROOT=/usr/local/go
-    ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
-    COPY . /assisted-service/
-    WORKDIR /assisted-service/
-    ENV CGO_CFLAGS="-g -O2 -Wno-return-local-addr"
-    RUN go mod vendor
-    RUN chmod 775 -R $GOPATH && chmod 775 -R $(go env GOROOT) && chmod 775 -R /assisted-service/ && \
-        mkdir /.cache && chmod 775 -R /.cache
+- dockerfile_path: ci-images/Dockerfile.base
   inputs:
     coreos_centos_stream9:
       as:
@@ -79,43 +65,24 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: assisted-service-centos9
-- dockerfile_literal: |
-    FROM base
-    RUN dnf install -y postgresql-server
-    RUN cd / && /assisted-service/hack/setup_env.sh test_tools
-  from: assisted-service-centos9
+  to: assisted-service-base
+- dockerfile_path: ci-images/Dockerfile.unit-tests
+  from: assisted-service-base
   to: assisted-service-unit-test
-- dockerfile_literal: |
-    FROM base
-    COPY --from=quay.io/app-sre/golangci-lint:v1.37.1 /usr/bin/golangci-lint /usr/bin/golangci-lint
-  from: assisted-service-centos9
+- dockerfile_path: ci-images/Dockerfile.lint
+  from: assisted-service-base
   inputs:
     golangci-lint:
       as:
       - quay.io/app-sre/golangci-lint:v1.37.1
   to: assisted-service-lint
-- dockerfile_literal: |
-    FROM base
-    COPY --from=quay.io/openshift/origin-cli:latest /usr/bin/oc /usr/bin
-    RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN make build-openshift-ci-test-bin
-    RUN go mod vendor
-  from: assisted-service-centos9
-  to: assisted-service-subsystem
-- dockerfile_path: Dockerfile.assisted-service-build
-  from: postgresql-12-centos7
+- dockerfile_path: ci-images/Dockerfile.subsystem
+  from: assisted-service-base
   inputs:
-    edge_infrastructure_swagger_codegen_cli:
+    cli:
       as:
-      - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
-    goswagger_swagger:
-      as:
-      - quay.io/goswagger/swagger:v0.28.0
-    openshift_release_golang-1.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: assisted-service-build
+      - quay.io/openshift/origin-cli:latest
+  to: assisted-service-subsystem
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
   inputs:
@@ -123,6 +90,13 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: assisted-service
+- dockerfile_path: ci-images/Dockerfile.code-generation
+  from: assisted-service-base
+  inputs:
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
+  to: assisted-service-generate
 releases:
   latest:
     integration:
@@ -277,6 +251,17 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         OLM_OPERATORS=cnv
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-lvm
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=lvm
+        MASTERS_COUNT=1
+        MASTER_MEMORY=18000
+        MASTER_CPU=9
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
   optional: true

@@ -1,0 +1,42 @@
+# # See https://github.com/coreos/fedora-coreos-config/pull/740
+
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: image.openshift.io/v1
+    kind: ImageStream
+    metadata:
+      name: fedora-coreos
+      namespace: coreos-arm64
+    spec:
+      tags:
+        - name: continuous
+  - kind: BuildConfig
+    apiVersion: build.openshift.io/v1
+    metadata:
+      namespace: coreos-arm64
+      name: fcos-continuous
+    spec:
+      successfulBuildsHistoryLimit: 1
+      failedBuildsHistoryLimit: 2
+      output:
+        to:
+          kind: ImageStreamTag
+          name: fedora-coreos:continuous
+      source:
+        git:
+          uri: https://github.com/coreos/fedora-coreos-config.git
+          ref: testing-devel
+        type: Git
+        contextDir: ci/continuous
+      strategy:
+        dockerStrategy:
+          imageOptimizationPolicy: SkipLayers
+        type: Docker
+      triggers:
+        - type: ImageChange
+        - type: ConfigChange
+        - type: "GitHub"
+          github:
+            secretReference:
+              name: "github-coreos-assembler-webhook-secret"

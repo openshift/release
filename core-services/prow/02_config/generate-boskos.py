@@ -57,6 +57,12 @@ CONFIG = {
         'eastus2': 8,
         'westus': 8
     },
+    'azure-arm64-quota-slice': {
+        'centralus': 3,
+        'eastus': 3,
+        'eastus2': 3,
+        'westus2': 3
+    },
     'azurestack-quota-slice': {
         'ppe3': 2
     },
@@ -68,10 +74,18 @@ CONFIG = {
         'westus3': 10,
         'centralus': 10
     },
+    'azure-arm64-qe-quota-slice': {
+        'northeurope': 10,
+        'westus2': 5,
+        'westeurope': 5
+    },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5
     },
     'equinix-ocp-metal-quota-slice': {
+        'default': 40,
+    },
+    'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
     },
     'gcp-qe-quota-slice': {
@@ -151,11 +165,9 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
-        'lon04': 1,
-        'lon06': 1,
         'mon01': 1,
-        'sao01': 1,
-        'tok04': 1
+        'osa21': 1,
+        'tor01': 1
     },
     'ibmcloud-quota-slice': {
         'default': 7,
@@ -199,7 +211,10 @@ for i in range(10, 24):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(83,106):
+for i in range(83,93):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(94,106):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):

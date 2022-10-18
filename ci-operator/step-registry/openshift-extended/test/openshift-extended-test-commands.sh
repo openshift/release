@@ -64,6 +64,11 @@ cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
 chmod 0600 ~/.ssh/ssh-privatekey || true
 eval export SSH_CLOUD_PRIV_KEY="~/.ssh/ssh-privatekey"
 
+test -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" || echo "ssh-publickey file does not exist"
+cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
+chmod 0644 ~/.ssh/ssh-publickey || true
+eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
+
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
@@ -158,15 +163,17 @@ oc get clusterversion version -o yaml || true
 # execute the cases
 function run {
     test_scenarios=""
-    echo "TEST_SCENRAIOS: \"${TEST_SCENRAIOS:-}\""
+    echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
-    echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
+    echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
-    if [[ -n "${TEST_SCENRAIOS:-}" ]]; then
-        readarray -t scenarios <<< "${TEST_SCENRAIOS}"
+    if [[ -n "${TEST_SCENARIOS:-}" ]]; then
+        readarray -t scenarios <<< "${TEST_SCENARIOS}"
         for scenario in "${scenarios[@]}"; do
-            test_scenarios="${test_scenarios}|${scenario}"
+            if [ "W${scenario}W" != "WW" ]; then
+                test_scenarios="${test_scenarios}|${scenario}"
+            fi
         done
     else
         echo "there is no scenario"
@@ -174,11 +181,11 @@ function run {
     fi
 
     if [ "W${test_scenarios}W" == "WW" ]; then
-        echo "fail to parse ${TEST_SCENRAIOS}"
+        echo "fail to parse ${TEST_SCENARIOS}"
         exit 1
     fi
-    echo "test scenarios: ${test_scenarios:1:-1}"
-    test_scenarios="${test_scenarios:1:-1}"
+    echo "test scenarios: ${test_scenarios:1}"
+    test_scenarios="${test_scenarios:1}"
 
     test_additional=""
     if [[ -n "${TEST_ADDITIONAL:-}" ]]; then
@@ -199,7 +206,7 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    handle_filters "~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
+    handle_filters "~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
@@ -293,19 +300,19 @@ function handle_filters {
 
 function valid_filter {
     filter="$1"
-    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9]{1,}[&]?$'; then
-        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9]{1,}[&]?$"
+    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9_]{1,}[&]?$'; then
+        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9_]{1,}[&]?$"
         exit 1
     fi
     action="$(echo $filter | grep -Eo '^[~]?')"
-    value="$(echo $filter | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $filter | grep -Eo '[a-zA-Z0-9_]{1,}')"
     logical="$(echo $filter | grep -Eo '[&]?$')"
     echo "$action--$value--$logical"
 }
 
 function handle_and_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then
@@ -322,7 +329,7 @@ function handle_and_filter {
 
 function handle_or_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then

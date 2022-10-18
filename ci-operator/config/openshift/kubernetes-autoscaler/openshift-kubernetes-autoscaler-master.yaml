@@ -3,10 +3,6 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
@@ -19,17 +15,14 @@ images:
 - dockerfile_path: images/cluster-autoscaler/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
   dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
@@ -38,6 +31,12 @@ promotion:
   name: "4.12"
   namespace: ocp
 releases:
+  hosted-ocp-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.12"
   initial:
     integration:
       name: "4.12"
@@ -134,6 +133,10 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: e2e-hypershift
+  optional: true
+  steps:
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: master
   org: openshift

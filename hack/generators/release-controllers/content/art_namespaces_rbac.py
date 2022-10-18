@@ -130,7 +130,8 @@ def add_imagestream_namespace_rbac(gendoc):
                     'apiGroups': ['image.openshift.io'],
                     'resourceNames': ['release',
                                       *context.config.releases,
-                                      ],
+                                      'scos-4.12',
+                                      'scos-4.13'],
                     'resources': ['imagestreams'],
                     'verbs': ['get', 'list', 'watch', 'update', 'patch']
                 },
