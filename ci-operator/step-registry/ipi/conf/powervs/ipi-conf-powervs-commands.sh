@@ -99,6 +99,11 @@ ___EOF___
       POWERVS_REGION=syd
       VPCREGION=au-syd
    ;;
+   "syd05")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SYD05")
+      POWERVS_REGION=syd
+      VPCREGION=au-syd
+   ;;
    "tor01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_TOR01")
       POWERVS_REGION=tor
