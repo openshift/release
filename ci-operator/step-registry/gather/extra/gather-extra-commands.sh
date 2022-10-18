@@ -33,6 +33,9 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+echo "Getting jq..."
+curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
+
 echo "Gathering artifacts ..."
 mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds
 
@@ -214,8 +217,12 @@ else
   prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
 fi
 if [[ -n "${prometheus}" ]]; then
-	echo "Snapshotting prometheus from ${prometheus} (may take 15s) ..."
-	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+  # TODO this requires --web.enable-admin-api
+  oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -X POST -G http://localhost:9090/api/v1/admin/tsdb/snapshot" > ${ARTIFACT_DIR}/metrics/prometheus-tsdb-snapshot.json
+  SNAPSHOT_FOLDER=$(cat ${ARTIFACT_DIR}/metrics/prometheus-tsdb-snapshot.json | /tmp/jq ${ARTIFACT_DIR}/metrics/prometheus-admin-tsdb-snapshot.json -r .data.name)
+
+	echo "Snapshotting prometheus from ${prometheus} and snapshot folder ${SNAPSHOT_FOLDER} (may take 15s) ..."
+	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C "/prometheus/snapshots/${SNAPSHOT_FOLDER}" .
 
 	cat >> ${SHARED_DIR}/custom-links.txt <<-EOF
 	<script>
@@ -551,7 +558,6 @@ queue ${ARTIFACT_DIR}/metrics/job_metrics.json oc --insecure-skip-tls-verify rsh
 wait
 
 # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
-curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 >/tmp/jq && chmod ug+x /tmp/jq
 mkdir -p ${ARTIFACT_DIR}/junit/
 <${ARTIFACT_DIR}/clusteroperators.json /tmp/jq -r 'def one(condition; t): t as $t | first([.[] | select(condition)] | map(.type=t)[]) // null; def msg: "Operator \(.type) (\(.reason)): \(.message)"; def xmlfailure: if .failure then "<failure message=\"\(.failure | @html)\">\(.failure | @html)</failure>" else "" end; def xmltest: "<testcase name=\"\(.name | @html)\">\( xmlfailure )</testcase>"; def withconditions: map({name: "operator conditions \(.metadata.name)"} + ((.status.conditions // [{type:"Available",status: "False",message:"operator is not reporting conditions"}]) | (one(.type=="Available" and .status!="True"; "unavailable") // one(.type=="Degraded" and .status=="True"; "degraded") // one(.type=="Progressing" and .status=="True"; "progressing") // null) | if . then {failure: .|msg} else null end)); .items | withconditions | "<testsuite name=\"Operator results\" tests=\"\( length )\" failures=\"\( [.[] | select(.failure)] | length )\">\n\( [.[] | xmltest] | join("\n"))\n</testsuite>"' >${ARTIFACT_DIR}/junit/junit_install_status.xml
 
