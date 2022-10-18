@@ -110,7 +110,7 @@ CONFIG = {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {
-        'default': 18,
+        'default': 9,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
