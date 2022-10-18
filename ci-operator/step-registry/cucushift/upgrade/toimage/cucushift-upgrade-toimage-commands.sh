@@ -190,6 +190,12 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
 
+    echo "Make sure every operator reports correct version"
+    if incorrect_version=$(${OC} get clusteroperator --no-headers | awk -v var="${TARGET_VERSION}" '$2 != var') && [[ ${incorrect_version} != "" ]]; then
+        echo >&2 "Incorrect CO Version: ${incorrect_version}"
+        (( tmp_ret += 1 ))
+    fi
+
     # In disconnected install, marketplace often get into False state, so it is better to remove it from cluster from flexy post-action
     echo "Make sure every operator's AVAILABLE column is True"
     if unavailable_operator=$(${OC} get clusteroperator | awk '$3 == "False"' | grep "False"); then
@@ -234,8 +240,8 @@ function wait_clusteroperators_continous_success() {
     done
     if (( continous_successful_check != passed_criteria )); then
         echo >&2 "Some cluster operator does not get ready or not stable"
-        echo "Debug: current clusterverison output is:"
-        oc get clusterversion
+        echo "Debug: current CO output is:"
+        oc get co
         return 1
     else
         echo "All cluster operators status check PASSED"
