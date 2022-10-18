@@ -150,7 +150,7 @@ networking:
     hostPrefix: 23
   machineNetwork:
   - cidr: 192.168.124.0/24
-  networkType: OpenShiftSDN
+  networkType: OVNKubernetes
   serviceNetwork:
   - 172.30.0.0/16
 platform:
