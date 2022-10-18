@@ -18,6 +18,8 @@ fi
 upuser1=$(echo "${USERS}" | cut -d ',' -f 30)
 upuser2=$(echo "${USERS}" | cut -d ',' -f 29)
 export BUSHSLICER_CONFIG="
+global:
+  browser: chrome
 environments:
   ocp4:
     static_users_map:
