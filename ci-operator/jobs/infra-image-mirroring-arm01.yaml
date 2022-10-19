@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: arm01
+  cluster: app.ci
   cron: '@daily'
   decorate: true
   labels:
@@ -15,10 +15,10 @@ periodics:
         set -o errexit
         failures=0
         for mapping in /etc/imagemirror/mapping_supplemental_ci_images_*; do
-          echo "Running: oc image mirror --filter-by-os=linux/arm64 -f=$mapping --skip-multiple-scopes"
+          echo "Running: oc image mirror --skip-missing=true --filter-by-os=linux/arm64 -f=$mapping --skip-multiple-scopes"
           attempts=3
           for attempt in $( seq $attempts ); do
-            if oc image mirror --filter-by-os=linux/arm64 -f="$mapping" --skip-multiple-scopes; then
+            if oc image mirror --skip-missing=true --filter-by-os=linux/arm64 -f="$mapping" --skip-multiple-scopes; then
               break
             fi
             if [[ $attempt -eq $attempts ]]; then
@@ -30,7 +30,10 @@ periodics:
         exit $failures
       command:
       - /bin/bash
-      image: registry.arm-build01.arm-build.devcluster.openshift.com/ocp-arm64/4.11:cli
+      env:
+      - name: HOME
+        value: /home/mirror
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -40,6 +43,7 @@ periodics:
       - mountPath: /home/mirror/.docker/config.json
         name: push
         readOnly: true
+        subPath: .dockerconfigjson
       - mountPath: /etc/imagemirror
         name: config
     volumes:
