@@ -8,10 +8,10 @@ periodics:
     org: openshift
     repo: hypershift
   labels:
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/variant: periodics-4.12
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-main-periodics-conformance-aws-ovn-4-12
+  name: periodic-ci-openshift-hypershift-main-periodics-4.12-conformance-aws-ovn
   reporter_config:
     slack:
       channel: '#team-hypershift'
@@ -25,8 +25,8 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=conformance-aws-ovn-4-12
-      - --variant=periodics
+      - --target=conformance-aws-ovn
+      - --variant=periodics-4.12
       command:
       - ci-operator
       image: ci-operator:latest
@@ -53,78 +53,6 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build05
-  cron: 0 */6 * * *
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: hypershift
-  labels:
-    ci-operator.openshift.io/cloud: azure4
-    ci-operator.openshift.io/cloud-cluster-profile: azure4
-    ci-operator.openshift.io/variant: periodics
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-main-periodics-conformance-azure-ovn-4-12
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/conformance-azure-ovn-4-12-cluster-profile
-      - --target=conformance-azure-ovn-4-12
-      - --variant=periodics
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/conformance-azure-ovn-4-12-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-azure4
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -142,10 +70,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/variant: periodics-4.12
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-main-periodics-conformance-proxy-aws-ovn-4-12
+  name: periodic-ci-openshift-hypershift-main-periodics-4.12-conformance-aws-ovn-proxy
   reporter_config:
     slack:
       channel: '#team-hypershift'
@@ -160,9 +88,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/conformance-proxy-aws-ovn-4-12-cluster-profile
-      - --target=conformance-proxy-aws-ovn-4-12
-      - --variant=periodics
+      - --secret-dir=/usr/local/conformance-aws-ovn-proxy-cluster-profile
+      - --target=conformance-aws-ovn-proxy
+      - --variant=periodics-4.12
       command:
       - ci-operator
       image: ci-operator:latest
@@ -178,7 +106,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/conformance-proxy-aws-ovn-4-12-cluster-profile
+      - mountPath: /usr/local/conformance-aws-ovn-proxy-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -218,10 +146,82 @@ periodics:
     org: openshift
     repo: hypershift
   labels:
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure4
+    ci-operator.openshift.io/variant: periodics-4.12
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-main-periodics-e2e-aws-ovn-periodic-conformance-serial
+  name: periodic-ci-openshift-hypershift-main-periodics-4.12-conformance-azure-ovn
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/conformance-azure-ovn-cluster-profile
+      - --target=conformance-azure-ovn
+      - --variant=periodics-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/conformance-azure-ovn-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure4
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 0 */6 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: hypershift
+  labels:
+    ci-operator.openshift.io/variant: periodics-4.12
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-hypershift-main-periodics-4.12-e2e-aws-ovn-periodic-conformance-serial
   spec:
     containers:
     - args:
@@ -230,7 +230,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-ovn-periodic-conformance-serial
-      - --variant=periodics
+      - --variant=periodics-4.12
       command:
       - ci-operator
       image: ci-operator:latest
@@ -272,10 +272,10 @@ periodics:
     org: openshift
     repo: hypershift
   labels:
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/variant: periodics-4.12
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-main-periodics-e2e-aws-periodic
+  name: periodic-ci-openshift-hypershift-main-periodics-4.12-e2e-aws-periodic
   reporter_config:
     slack:
       channel: '#project-hypershift'
@@ -291,7 +291,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-aws-periodic
-      - --variant=periodics
+      - --variant=periodics-4.12
       command:
       - ci-operator
       image: ci-operator:latest
@@ -335,10 +335,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure4
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/variant: periodics-4.12
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-main-periodics-e2e-conformance-kubevirt
+  name: periodic-ci-openshift-hypershift-main-periodics-4.12-e2e-conformance-kubevirt
   spec:
     containers:
     - args:
@@ -349,7 +349,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-conformance-kubevirt-cluster-profile
       - --target=e2e-conformance-kubevirt
-      - --variant=periodics
+      - --variant=periodics-4.12
       command:
       - ci-operator
       image: ci-operator:latest
@@ -405,10 +405,10 @@ periodics:
     org: openshift
     repo: hypershift
   labels:
-    ci-operator.openshift.io/variant: periodics
+    ci-operator.openshift.io/variant: periodics-4.12
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-main-periodics-e2e-powervs-periodic
+  name: periodic-ci-openshift-hypershift-main-periodics-4.12-e2e-powervs-periodic
   reporter_config:
     slack:
       channel: '#project-hypershift'
@@ -424,7 +424,7 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-powervs-periodic
-      - --variant=periodics
+      - --variant=periodics-4.12
       command:
       - ci-operator
       image: ci-operator:latest
