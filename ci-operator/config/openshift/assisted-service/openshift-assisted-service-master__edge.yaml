@@ -223,9 +223,17 @@ tests:
   steps:
     test:
     - ref: assisted-baremetal-operator-publish
-- as: operator-catalog-publish-to-quay
+- as: assisted-operator-catalog-publish
   postsubmit: true
   steps:
+    test:
+    - ref: assisted-baremetal-operator-catalog-publish
+- as: assisted-operator-catalog-publish-verify
+  run_if_changed: ^(deploy/olm-catalog/.*)$
+  steps:
+    env:
+      REGISTRY_BUNDLE_REPOSITORY_NAME: assisted-service-operator-bundle-test
+      REGISTRY_CATALOG_REPOSITORY_NAME: assisted-service-index-test
     test:
     - ref: assisted-baremetal-operator-catalog-publish
 - as: lint
