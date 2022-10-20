@@ -26,7 +26,7 @@ Then create a pull request based on the changes and merge it.
 ### Generate New Tokens
 
 #### Config-Updater
-The tokens in [dptp/config-updater](https://vault.ci.openshift.org/ui/vault/secrets/kv/show/dptp/config-updater) has to be refreshed manually.
+The tokens in [dptp/config-updater](https://vault.ci.openshift.org/ui/vault/secrets/kv/show/dptp/config-updater) have to be refreshed manually.
 If it is for a cluster managed by us, we can get the kubeconfig by
 
 > make CLUSTER=${CLUSTER} API_SERVER_URL=$API_SERVER_URL config-updater-kubeconfig
