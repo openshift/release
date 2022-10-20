@@ -1,10 +1,10 @@
 presubmits:
-  code-ready/snc:
+  crc-org/snc:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^4\.9$
-    - ^4\.9-
+    - ^release-4\.11$
+    - ^release-4\.11-
     cluster: build02
     context: ci/prow/e2e-snc
     decorate: true
@@ -15,7 +15,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-code-ready-snc-4.9-e2e-snc
+    name: pull-ci-crc-org-snc-release-4.11-e2e-snc
     rerun_command: /test e2e-snc
     spec:
       containers:
@@ -24,6 +24,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-snc-cluster-profile
         - --target=e2e-snc
         command:
@@ -37,6 +38,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-snc-cluster-profile
           name: cluster-profile
@@ -57,6 +61,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -74,8 +81,8 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^4\.9$
-    - ^4\.9-
+    - ^release-4\.11$
+    - ^release-4\.11-
     cluster: build02
     context: ci/prow/images
     decorate: true
@@ -84,7 +91,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-code-ready-snc-4.9-images
+    name: pull-ci-crc-org-snc-release-4.11-images
     rerun_command: /test images
     spec:
       containers:
