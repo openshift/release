@@ -64,7 +64,7 @@ echo scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" 
 scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no /tmp/secret/new_pull_secret ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/
 
 echo ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} "oc adm release -a /tmp/new_pull_secret mirror --insecure=true --from=registry.ci.openshift.org/ocp/release:4.12.0-0.nightly-2022-10-18-192348 --to=${BASTION_IP}:5000/ci-op-9yflvkc4/release --to-release-image=${BASTION_IP}:5000/ci-op-9yflvkc4/release:4.12.0-0.nightly-2022-10-18-192348"
-ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} "oc adm release -a /tmp/new_pull_secret mirror --insecure=true --from=registry.ci.openshift.org/ocp/release:4.12.0-0.nightly-2022-10-18-192348 --to=${BASTION_IP}:5000/ci-op-9yflvkc4/release --to-release-image=${BASTION_IP}:5000/ci-op-9yflvkc4/release:4.12.0-0.nightly-2022-10-18-192348"
+
 
 sleep 18000
 
