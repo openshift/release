@@ -1,0 +1,32 @@
+chain:
+  as: hypershift-aws-run-e2e-external
+  steps:
+  - as: run-e2e
+    cli: latest
+    commands: make ci-test-e2e
+    credentials:
+      - mount_path: /etc/hypershift-pool-aws-credentials
+        name: hypershift-pool-aws-credentials
+        namespace: test-credentials
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+    dependencies:
+      - env: OCP_IMAGE_LATEST
+        name: release:latest
+      - env: OCP_IMAGE_PREVIOUS
+        name: release:hosted-ocp-previous
+    env:
+      - default: ${SHARED_DIR}/management_cluster_kubeconfig
+        name: KUBECONFIG
+    from_image:
+      namespace: ocp
+      name: "4.12"
+      tag: hypershift-tests
+    grace_period: 30m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 1h0m0s
+

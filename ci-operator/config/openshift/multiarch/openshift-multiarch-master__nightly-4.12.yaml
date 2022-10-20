@@ -130,23 +130,29 @@ resources:
       memory: 200Mi
 tests:
 - as: ocp-e2e-aws-ovn-heterogeneous
-  interval: 72h
+  cron: 08 11 * * 5
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
-    workflow: openshift-e2e-aws
+    workflow: openshift-e2e-aws-heterogeneous
 - as: ocp-e2e-serial-aws-ovn-heterogeneous
-  interval: 72h
+  cron: 19 23 * * 2
   steps:
     cluster_profile: aws-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
-    workflow: openshift-e2e-aws-serial
+      TEST_SKIPS: EgressIPs can be assigned automatically\| OpenShift alerting rules\|
+        pods should have the assigned EgressIPs\| only pods matched by the pod selector
+        should have the EgressIPs\| Image signature workflow can push a signed image
+        to openshift registry and verify it\| Multi-AZ Clusters should spread the
+        pods of a service across zones\| pods should keep the assigned EgressIPs
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-e2e-aws-heterogeneous
 - as: ocp-e2e-aws-sdn-arm64
   interval: 72h
   steps:
@@ -155,7 +161,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws-sdn
 - as: ocp-e2e-upgrade-aws-ovn-arm64
   interval: 72h
@@ -166,7 +171,6 @@ tests:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
       TEST_SUITE: upgrade-conformance
     workflow: openshift-upgrade-aws
 - as: ocp-installer-e2e-aws-ovn-arm64
@@ -177,7 +181,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: ipi-aws-ovn
 - as: ocp-image-ecosystem-aws-ovn-arm64
   interval: 96h
@@ -187,7 +190,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws-image-ecosystem
 - as: ocp-jenkins-e2e-aws-ovn-arm64
   interval: 96h
@@ -197,7 +199,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
       TEST_SUITE: openshift/jenkins-e2e-rhel-only
     workflow: openshift-e2e-aws
 - as: ocp-e2e-sdn-serial-aws-arm64
@@ -208,7 +209,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws-sdn-serial
 - as: ocp-e2e-ovn-serial-aws-arm64
   interval: 72h
@@ -218,7 +218,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws-ovn-serial
 - as: ocp-e2e-aws-ovn-arm64
   interval: 72h
@@ -228,7 +227,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws-ovn
 - as: ocp-e2e-aws-upi-ovn-arm64
   interval: 72h
@@ -272,7 +270,7 @@ tests:
       BASE_DOMAIN: arm-ci.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
     workflow: openshift-e2e-aws-techpreview-serial
-- as: ocp-e2e-sdn-remote-libvirt-s390x
+- as: ocp-e2e-ovn-remote-libvirt-s390x
   cluster: build01
   interval: 96h
   steps:
@@ -285,7 +283,7 @@ tests:
       NODE_TUNING: "true"
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt
-- as: ocp-image-ecosystem-sdn-remote-libvirt-s390x
+- as: ocp-image-ecosystem-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 15 15 29 * *
   steps:
@@ -297,7 +295,7 @@ tests:
       BRANCH: "4.12"
       TEST_TYPE: image-ecosystem
     workflow: openshift-e2e-libvirt
-- as: ocp-jenkins-e2e-sdn-remote-libvirt-s390x
+- as: ocp-jenkins-e2e-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 19 18 24 * *
   steps:
@@ -309,7 +307,7 @@ tests:
       BRANCH: "4.12"
       TEST_TYPE: jenkins-e2e-rhel-only
     workflow: openshift-e2e-libvirt
-- as: ocp-e2e-serial-sdn-remote-libvirt-s390x
+- as: ocp-e2e-serial-ovn-remote-libvirt-s390x
   cluster: build01
   cron: 43 4 26 * *
   steps:
@@ -321,7 +319,7 @@ tests:
       BRANCH: "4.12"
       TEST_TYPE: conformance-serial
     workflow: openshift-e2e-libvirt
-- as: ocp-e2e-compact-sdn-remote-libvirt-s390x
+- as: ocp-e2e-compact-ovn-remote-libvirt-s390x
   cluster: build01
   cron: '@yearly'
   steps:
@@ -338,7 +336,7 @@ tests:
       WORKER_MEMORY: "32768"
       WORKER_REPLICAS: "0"
     workflow: openshift-e2e-libvirt
-- as: ocp-e2e-sdn-remote-libvirt-ppc64le
+- as: ocp-e2e-ovn-remote-libvirt-ppc64le
   cluster: build01
   interval: 96h
   steps:
@@ -350,7 +348,7 @@ tests:
       BRANCH: "4.12"
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-libvirt
-- as: ocp-image-ecosystem-sdn-remote-libvirt-ppc64le
+- as: ocp-image-ecosystem-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 15 15 29 * *
   steps:
@@ -362,7 +360,7 @@ tests:
       BRANCH: "4.12"
       TEST_TYPE: image-ecosystem
     workflow: openshift-e2e-libvirt
-- as: ocp-jenkins-e2e-sdn-remote-libvirt-ppc64le
+- as: ocp-jenkins-e2e-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 19 18 24 * *
   steps:
@@ -374,7 +372,7 @@ tests:
       BRANCH: "4.12"
       TEST_TYPE: jenkins-e2e-rhel-only
     workflow: openshift-e2e-libvirt
-- as: ocp-e2e-serial-sdn-remote-libvirt-ppc64le
+- as: ocp-e2e-serial-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: 43 4 26 * *
   steps:
@@ -386,7 +384,7 @@ tests:
       BRANCH: "4.12"
       TEST_TYPE: conformance-serial
     workflow: openshift-e2e-libvirt
-- as: ocp-e2e-compact-sdn-remote-libvirt-ppc64le
+- as: ocp-e2e-compact-ovn-remote-libvirt-ppc64le
   cluster: build01
   cron: '@yearly'
   steps:
@@ -403,9 +401,9 @@ tests:
       WORKER_MEMORY: "32768"
       WORKER_REPLICAS: "0"
     workflow: openshift-e2e-libvirt
-- as: ocp-e2e-ppc64le-powervs
+- as: ocp-e2e-ovn-ppc64le-powervs
   cluster: build01
-  cron: 0 0,6,12,18 * * *
+  cron: 0 0,3,6,9,12,15,18,21 * * *
   steps:
     cluster_profile: powervs
     dependencies:

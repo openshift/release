@@ -622,6 +622,9 @@ function dump_resources() {
     jq -r 'select (.type|test("Available"))' ${F_FILE}
 )
 
+  echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
+  ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
+
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
   # Restore any debugging if saved
@@ -711,7 +714,11 @@ date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
-echo
+
+# @BEGIN TEMPORARY-FIX
+export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="rhcos-powervs-images-${VPCREGION}/rhcos-412-86-202208090152-0-ppc64le-powervs.ova.gz"
+echo "OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE=${OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE}"
+# @END TEMPORARY-FIX
 
 openshift-install version
 

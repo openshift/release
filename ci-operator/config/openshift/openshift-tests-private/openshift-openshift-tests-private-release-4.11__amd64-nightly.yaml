@@ -43,6 +43,7 @@ build_root:
 releases:
   latest:
     candidate:
+      architecture: amd64
       product: ocp
       stream: nightly
       version: "4.11"
@@ -98,24 +99,30 @@ tests:
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-aws-ipi-hypershift
+- as: e2e-aws-ipi-ovn-hypershift-mgmt-p2
   cron: 0 4 */7 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-openshiftsdn and not @fips'
-      TAG_VERSION: '@4.11'
-      TEST_SCENARIOS: Hypershift
-    post:
-    - chain: hypershift-aws-destroy
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-provision
-    - chain: hypershift-install
-    - chain: hypershift-aws-create
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
     test:
-    - chain: openshift-e2e-test-qe
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: e2e-aws-ipi-ovn-hypershift-guest-p2
+  cron: 0 5 */7 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;HyperShiftGUEST&
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: e2e-aws-ipi-ovn
   cron: 0 6 */7 * *
   steps:
@@ -576,6 +583,7 @@ tests:
     - ref: openshift-extended-test
     workflow: ipi-openstack
 - as: extended-baremetal-ipi
+  cluster: build05
   cron: 0 19 */7 * *
   steps:
     cluster_profile: equinix-ocp-metal
@@ -621,18 +629,19 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: e2e-rosa-nightly-sts
-  cron: 0 9 * * 3
+- as: e2e-aws-rosa-sts-p1
+  cron: 0 8 * * 3
   steps:
     cluster_profile: aws-qe
     env:
+      CHANNEL_GROUP: nightly
       E2E_RUN_TAGS: '@aws-ipi and @rosa and @network-openshiftsdn and not @fips'
       OPENSHIFT_VERSION: "4.11"
       TAG_VERSION: '@4.11'
-      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;ROSA&
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;ROSA&
     test:
     - chain: openshift-e2e-test-qe
-    workflow: rosa-nightly-sts
+    workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: release-4.11
   org: openshift

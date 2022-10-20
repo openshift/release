@@ -57,6 +57,12 @@ CONFIG = {
         'eastus2': 8,
         'westus': 8
     },
+    'azure-arm64-quota-slice': {
+        'centralus': 3,
+        'eastus': 3,
+        'eastus2': 3,
+        'westus2': 3
+    },
     'azurestack-quota-slice': {
         'ppe3': 2
     },
@@ -67,6 +73,11 @@ CONFIG = {
         'northcentralus': 10,
         'westus3': 10,
         'centralus': 10
+    },
+    'azure-arm64-qe-quota-slice': {
+        'northeurope': 10,
+        'westus2': 5,
+        'westeurope': 5
     },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5
@@ -99,7 +110,7 @@ CONFIG = {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {
-        'default': 18,
+        'default': 9,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -154,8 +165,9 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
-        'mon01': 1,
         'syd04': 1,
+        'syd05': 1,
+        'tor01': 1,
         'tok04': 1
     },
     'ibmcloud-quota-slice': {

@@ -95,6 +95,19 @@ releases:
       product: ocp
       stream: nightly
       version: "4.12"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.12"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -456,6 +469,16 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-ovn-multi
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-sdn-serial
   interval: 48h
   steps:
@@ -639,6 +662,26 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud-csi
+- as: e2e-aws-ovn-upi
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-upi
+- as: e2e-azure-ovn-upi
+  interval: 48h
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-upi
+- as: e2e-gcp-ovn-upi
+  interval: 48h
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-upi
+- as: e2e-azurestack-ovn-upi
+  interval: 48h
+  steps:
+    cluster_profile: azurestack
+    workflow: openshift-e2e-azurestack-upi
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -156,7 +156,7 @@ networking:
   - cidr: 10.128.0.0/14
     hostPrefix: 23
   machineCIDR: 192.168.${CLUSTER_SUBNET}.0/24
-  networkType: OpenShiftSDN
+  networkType: OVNKubernetes
   serviceNetwork:
   - 172.30.0.0/16
 compute:
