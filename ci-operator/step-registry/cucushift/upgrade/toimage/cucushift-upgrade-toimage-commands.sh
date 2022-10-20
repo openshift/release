@@ -350,8 +350,8 @@ function check_signed() {
 
 # Check if admin ack is required before upgrade
 function admin_ack() {
-    if [[ "${SOURCE_MINOR_VERSION}" -eq "${TARGET_MINOR_VERSION}" ]]; then
-        echo "Upgrade between z-stream version does not require admin ack" && return
+    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
+        echo "Admin ack is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi   
     
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
