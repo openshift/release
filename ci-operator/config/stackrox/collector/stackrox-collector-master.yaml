@@ -62,6 +62,14 @@ images:
       as:
       - replaced-by-osci:drivers
   to: collector-full
+- context_dir: .
+  dockerfile_path: .openshift-ci/build/Dockerfile.cpaas
+  from: collector-slim
+  inputs:
+    apollo-ci:
+      as:
+      - quay.io/stackrox-io/apollo-ci:collector-0.3.44-1-gb00ffc52af
+  to: collector-cpaas
 - context_dir: .openshift-ci
   dockerfile_path: jobs/integration-tests/Dockerfile
   from: apollo-src
@@ -343,6 +351,54 @@ tests:
       IMAGE_FAMILY: rhel-8
       VM_TYPE: rhel
     workflow: stackrox-collector-integration-tests
+- as: rhel-7-ebpf-cpaas-tests
+  cron: 0 2 * * *
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: rhel-7
+      VM_TYPE: rhel
+    workflow: stackrox-collector-cpaas
+- as: rhel-7-kernel-module-cpaas-tests
+  cron: 0 2 * * *
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: rhel-7
+      VM_TYPE: rhel
+    workflow: stackrox-collector-cpaas
+- as: rhel-8-ebpf-cpaas-tests
+  cron: 0 2 * * *
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: rhel-8
+      VM_TYPE: rhel
+    workflow: stackrox-collector-cpaas
+- as: rhel-8-kernel-module-cpaas-tests
+  cron: 0 2 * * *
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: rhel-8
+      VM_TYPE: rhel
+    workflow: stackrox-collector-cpaas
+- as: rhel-86-sap-ebpf-cpaas-tests
+  cron: 0 2 * * *
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      IMAGE_FAMILY: rhel-8-6-sap-ha
+      VM_TYPE: rhel-sap
+    workflow: stackrox-collector-cpaas
+- as: rhel-86-sap-kernel-module-cpaas-tests
+  cron: 0 2 * * *
+  steps:
+    env:
+      COLLECTION_METHOD: kernel-module
+      IMAGE_FAMILY: rhel-8-6-sap-ha
+      VM_TYPE: rhel-sap
+    workflow: stackrox-collector-cpaas
 - as: cos-89-lts-ebpf-integration-tests
   steps:
     env:
