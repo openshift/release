@@ -16,7 +16,7 @@ validate_egressip_cr () {
 }
 
 validate_sdn_egressip_crs () {
-  HOSTSUBNET_NAME=$(oc get hostsubnets -o=jsonpath='{.items[0].host}')
+  HOSTSUBNET_NAME=$(oc get hostsubnets -o=jsonpath='{.items[3].host}')
   NETNAMESPACE_NAME="test-migration"
 
   kubectl get hostsubnet -n test-migration $HOSTSUBNET_NAME -o json | jq .egressCIDRs | tee current_egressCIDRs

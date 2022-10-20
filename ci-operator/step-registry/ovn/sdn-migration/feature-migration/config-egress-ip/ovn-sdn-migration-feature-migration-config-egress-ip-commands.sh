@@ -4,8 +4,8 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-# First get a hostsubnet and netnamespace
-HOSTSUBNET_NAME=$(oc get hostsubnets -o=jsonpath='{.items[0].host}')
+# First get a hostsubnet corresponding to a worker node and netnamespace
+HOSTSUBNET_NAME=$(oc get hostsubnets -o=jsonpath='{.items[3].host}')
 NETNAMESPACE_NAME="test-migration"
 
 # Namespace may or may not be created already, creating just in case.
