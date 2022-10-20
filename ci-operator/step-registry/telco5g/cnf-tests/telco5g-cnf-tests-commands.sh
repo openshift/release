@@ -21,6 +21,13 @@ sriov "Webhook resource injector"
 sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
 # need to investigate why it's failing
 sriov "Test Connectivity Connectivity between client and server Should work over a SR-IOV device"
+# this test needs both sriov and sctp available in the cluster.
+# since we run them in parallel we can't run this test.
+sriov "Allow access only to a specific port/protocol SCTP"
+
+# this test needs both sriov and sctp available in the cluster.
+# since we run them in parallel we can't run this test.
+sctp "Allow access only to a specific port/protocol SCTP"
 EOF
 }
 
