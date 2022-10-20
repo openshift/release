@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "All artifacts in $ARTIFACT_DIR"
 
-ls -R
+ls -R $ARTIFACT_DIR
 
 which curl
 which jq
