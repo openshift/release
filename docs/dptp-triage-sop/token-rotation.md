@@ -15,7 +15,9 @@ To expire the tokens,
 
 - Delete the secret that the old tokens were previously bound to. It will expire the old tokens. Since the old secret's manifests is still in the release repo, it will be created with a new uid and to be prepared the next rotation.
 
-> oc --context ${CLUSTER} delete secret -A -l ci.openshift.io/token-bound-object=$(TOKEN_BOUND_OBJECT_NAME_SUFFIX)  --dry-run=server --as system:admin
+```console
+oc --context ${CLUSTER} delete secret -A -l ci.openshift.io/token-bound-object=$(TOKEN_BOUND_OBJECT_NAME_SUFFIX)  --dry-run=none --as system:admin
+```
 
 ## Non-Expiring Tokens
 We use non-expiring tokens [DPTP-3087](https://issues.redhat.com/browse/DPTP-3087) in the following cases:
