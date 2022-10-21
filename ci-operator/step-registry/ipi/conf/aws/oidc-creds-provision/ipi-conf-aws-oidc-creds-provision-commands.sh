@@ -10,16 +10,19 @@ infra_name=${NAMESPACE}-${JOB_NAME_HASH}
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION="${LEASED_RESOURCE}"
 
-# extract aws credentials requests from the release image
+echo "> Extract aws credentials requests from the release image"
 oc registry login
 oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
 
-# create required credentials infrastructure and installer manifests
+echo "> Generated the following CredentialsRequests"
+ls /tmp/credrequests
+
+echo "> Create required credentials infrastructure and installer manifests"
 ccoctl aws create-all --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
 
-# copy generated service account signing from ccoctl target directory into shared directory
-cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"
+echo "> Copy generated service account signing from ccoctl target directory into shared directory"
+cp -v "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"
 
-# copy generated secret manifests from ccoctl target directory into shared directory
+echo "> Copy generated secret manifests from ccoctl target directory into shared directory"
 cd "/tmp/manifests"
-for FILE in *; do cp $FILE "${MPREFIX}_$FILE"; done
+for FILE in *; do cp -v $FILE "${MPREFIX}/$FILE"; done
