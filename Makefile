@@ -372,22 +372,21 @@ refresh-token-version:
 .PHONY: refresh-token-version
 
 DRY_RUN ?= server
+CLUSTER ?= app.ci
+API_SERVER_URL ?= "https://api.ci.l2s4.p1.openshiftapps.com:6443"
+TMPDIR ?= /tmp
 
 expire-token-version:
 ifndef EXPIRE_TOKEN_VERSION
 	echo "EXPIRE_TOKEN_VERSION is not defined, existing"
 	false
 endif
-	oc --context app.ci -n ci delete secret -l ci.openshift.io/token-version=version-$(EXPIRE_TOKEN_VERSION)  --dry-run=$(DRY_RUN) --as system:admin
+	oc --context ${CLUSTER} -n ci delete secret -l ci.openshift.io/token-version=version-$(EXPIRE_TOKEN_VERSION)  --dry-run=$(DRY_RUN) --as system:admin
 .PHONY: increase-token-version
 
 list-token-secrets:
-	oc --context app.ci -n ci get secret -l ci.openshift.io/token-version --show-labels
+	oc --context ${CLUSTER} -n ci get secret -l ci.openshift.io/token-version --show-labels
 .PHONY: list-token-secrets
-
-CLUSTER ?= app.ci
-API_SERVER_URL ?= "https://api.ci.l2s4.p1.openshiftapps.com:6443"
-TMPDIR ?= /tmp
 
 config-updater-kubeconfig:
 	$(timeout_cmd) 60 ./clusters/psi/create_kubeconfig.sh "$(TMPDIR)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} $@ ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
