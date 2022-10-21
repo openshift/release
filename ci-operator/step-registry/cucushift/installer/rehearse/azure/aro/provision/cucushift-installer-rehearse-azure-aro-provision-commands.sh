@@ -62,7 +62,7 @@ echo "$AROINFO" > ${SHARED_DIR}/clusterinfo
 echo "Retrieving credentials"
 
 KUBEAPI=$(echo "$AROINFO" | jq -r '.apiserverProfile.url')
-KUBECRED=$(az aro list-credentials --name $CLUSTER_NAME --resource-group $CLUSTER_NAME)
+KUBECRED=$(az aro list-credentials --name $CLUSTER --resource-group $CLUSTER)
 KUBEUSER=$(echo "$KUBECRED" | jq -r '.kubeadminUsername')
 KUBEPASS=$(echo "$KUBECRED" | jq -r '.kubeadminPassword')
 
