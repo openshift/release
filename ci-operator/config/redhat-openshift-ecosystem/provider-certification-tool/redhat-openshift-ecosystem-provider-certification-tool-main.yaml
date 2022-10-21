@@ -3,12 +3,17 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: upi-installer
-binary_build_commands: make linux-amd64
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.17
+images:
+- dockerfile_literal: |
+    FROM registry.access.redhat.com/ubi8/ubi
+    RUN curl --silent --location --output /usr/local/bin/openshift-provider-cert-linux-amd64 \
+        https://github.com/redhat-openshift-ecosystem/provider-certification-tool/releases/latest/download/openshift-provider-cert-linux-amd64
+  to: provider-certification-tool-bin
 releases:
   latest:
     release:
