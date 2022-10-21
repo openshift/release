@@ -21,8 +21,8 @@ KCP_KUBECONFIG_SECRET="/usr/local/ci-secrets/redhat-appstudio-qe/kcp_kubeconfig"
 
 mkdir -p $HOME/.configs
 
+# Cannot read a kubeconfig from /usr/local/***
 cp "/usr/local/ci-secrets/redhat-appstudio-qe/kcp_kubeconfig" $HOME/.configs && chmod -R 755 $HOME/.configs
-KCP_KUBECONFIG="$HOME/.configs/kcp_kubeconfig"
 
 git config --global user.name "redhat-appstudio-qe-bot"
 git config --global user.email redhat-appstudio-qe-bot@redhat.com
