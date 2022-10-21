@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: make build BUILD_TAGS=clusterapi
 build_root:
   from_repository: true
@@ -26,11 +30,20 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: vertical-pod-autoscaler
 promotion:
   name: "4.13"
   namespace: ocp
 releases:
+  hosted-ocp-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.12"
   initial:
     integration:
       name: "4.13"
@@ -127,6 +140,10 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: e2e-hypershift
+  optional: true
+  steps:
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

@@ -1,20 +1,22 @@
 postsubmits:
-  openshift-priv/openshift-tests:
+  openshift-priv/jenkins:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.5$
-    cluster: build04
+    - ^master$
+    cluster: build01
     decorate: true
     decoration_config:
-      skip_cloning: true
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
     hidden: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-priv-openshift-tests-release-4.5-images
-    path_alias: github.com/openshift/openshift-tests
+    name: branch-ci-openshift-priv-jenkins-master-images
+    path_alias: github.com/openshift/jenkins
     spec:
       containers:
       - args:
@@ -51,9 +53,6 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
