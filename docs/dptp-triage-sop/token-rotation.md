@@ -1,7 +1,21 @@
 # Rotate Service Account Tokens
 
+The Kubernetes community considers [bound service account tokens](https://github.com/kubernetes/enhancements/tree/master/keps/sig-auth/1205-bound-service-account-tokens) as best practice although [non-expiring ones](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/#manually-create-a-service-account-api-token) are still supported. 
+
 ## Prow Components and CI-Tools
-TODO
+Bound SA tokens are used for Prow components and ci-tools except the following cases in the next section.
+Each SA's token is created by `prowjob/periodic-ci-secret-generator` and bound to the same object `secret/token-bound-object-{0|1}` in the same namespace.
+To expire the tokens,
+
+- Bind all tokens to the other secret in [the generator's configuration file](../../core-services/ci-secret-generator/_config.yaml), e.g., bind to `secret/token-bound-object-{1}` if `secret/token-bound-object-0` currently. Create a PR and Merge it.
+
+- Trigger `prowjob/periodic-ci-secret-generator` to generator the tokens bound to the new secret.
+
+> make job JOB=periodic-ci-secret-generator
+
+- Delete the secret that the old tokens were previously bound to. It will expire the old tokens. Since the old secret's manifests is still in the release repo, it will be created with a new uid and to be prepared the next rotation.
+
+> oc --context ${CLUSTER} delete secret -A -l ci.openshift.io/token-bound-object=$(TOKEN_BOUND_OBJECT_NAME_SUFFIX)  --dry-run=server --as system:admin
 
 ## Non-Expiring Tokens
 We use non-expiring tokens [DPTP-3087](https://issues.redhat.com/browse/DPTP-3087) in the following cases:
