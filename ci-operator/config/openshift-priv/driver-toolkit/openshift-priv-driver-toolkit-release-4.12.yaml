@@ -13,10 +13,18 @@ images:
   dockerfile_path: Dockerfile
   from: base
   to: driver-toolkit
+- dockerfile_literal: |
+    FROM src
+    RUN yum -y install git && \
+        yum clean all && rm -rf /var/cache/yum/*
+  from: src
+  to: git-client
 promotion:
   additional_images:
     driver-toolkit-tests: src
   disabled: true
+  excluded_images:
+  - git-client
   name: 4.12-priv
   namespace: ocp-private
 releases:
@@ -46,6 +54,12 @@ tests:
   commands: make verify
   container:
     from: src
+- as: check-commits-count
+  commands: |
+    ci/prow/check-commits-count
+  container:
+    from: git-client
+  optional: true
 - as: verify-imagestream
   commands: |
     ls /manifests/01-openshift-imagestream.yaml
