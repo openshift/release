@@ -35,6 +35,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
 build_root:
   from_repository: true
 images:
@@ -69,27 +73,27 @@ tests:
 - as: unit
   commands: ./hack/ci-test.sh
   container:
-    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
+    from: ocp_builder_rhel-8-golang-1.19-openshift-4.12
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
 - as: lint
   commands: make lint
   container:
-    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
+    from: ocp_builder_rhel-8-golang-1.19-openshift-4.12
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
 - as: gofmt
   commands: make fmt
   container:
-    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
+    from: ocp_builder_rhel-8-golang-1.19-openshift-4.12
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
 - as: govet
   commands: make vet
   container:
-    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
+    from: ocp_builder_rhel-8-golang-1.19-openshift-4.12
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
 - as: generate-check
   commands: make generate-check
   container:
-    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
+    from: ocp_builder_rhel-8-golang-1.19-openshift-4.12
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
 - as: e2e-agnostic
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
@@ -104,13 +108,13 @@ tests:
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ipv4
-- as: e2e-metal-ipi-serial-ipv4
+- as: e2e-metal-ipi-sdn-serial-ipv4
   cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
-- as: e2e-metal-ipi-bm-upgrade
+- as: e2e-metal-ipi-sdn-upgrade
   cluster: build05
   optional: true
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
@@ -148,14 +152,14 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-virtualmedia
+- as: e2e-metal-ipi-sdn-virtualmedia
   cluster: build05
   optional: true
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-metal-assisted
+- as: e2e-metal-sdn-assisted
   optional: true
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
