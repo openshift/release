@@ -66,5 +66,5 @@ $ make -C ./clusters/psi apply_credentials
 After merging of the pull request, we expire the token with a previous version
 
 ```console
-$ make EXPIRE_TOKEN_VERSION=1 DRY_RUN=none expire-token-version
+$ make CLUSTER=${CLUSTER} EXPIRE_TOKEN_VERSION=1 DRY_RUN=none expire-token-version
 ```
