@@ -94,6 +94,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-serial
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -102,6 +103,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6-ipsec
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -182,27 +184,31 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      TEST_SKIPS: Alerts shouldn't report any alerts in firing or pending state\|
-        Prometheus when installed on the cluster shouldn't report any alerts in firing
-        state apart from Watchdog and AlertmanagerReceiversNotConfigured
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
     - ref: ovn-sdn-migration
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-sdn
-- as: e2e-network-migration-rollback
+- as: e2e-sdn-network-migration-rollback
   steps:
     cluster_profile: aws
     env:
-      TEST_SKIPS: Alerts shouldn't report any alerts in firing or pending state\|
-        Prometheus when installed on the cluster shouldn't report any alerts in firing
-        state apart from Watchdog and AlertmanagerReceiversNotConfigured
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
     - ref: ovn-sdn-migration
     - ref: ovn-sdn-migration-rollback
     - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-sdn
 - as: e2e-aws-single-node
@@ -237,6 +243,7 @@ tests:
     workflow: openshift-e2e-gcp-ovn
   timeout: 5h0m0s
 - as: e2e-network-mtu-migration-ovn-ipv6
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal

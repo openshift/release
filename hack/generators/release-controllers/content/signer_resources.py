@@ -1,5 +1,43 @@
 
 def generate_signer_resources(gendoc):
+    resources = gendoc
+    context = gendoc.context
+
+    resources.append({
+        'apiVersion': 'authorization.openshift.io/v1',
+        'kind': 'Role',
+        'metadata': {
+            'name': 'release-controller-signer',
+            'namespace': 'ocp'
+        },
+        'rules': [
+            {
+                'apiGroups': [''],
+                'resourceNames': ['release-upgrade-graph'],
+                'resources': ['secrets'],
+                'verbs': ['get', 'list', 'watch']
+            }
+        ]
+    })
+
+    resources.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'release-controller-signer-binding',
+            'namespace': 'ocp',
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Role',
+            'name': 'release-controller-signer'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'release-controller',
+            'namespace': context.config.rc_deployment_namespace
+        }]
+    })
 
     gendoc.add_comments("""
 The signer watches all release tags and signs those that have the correct metadata and images are reachable (according

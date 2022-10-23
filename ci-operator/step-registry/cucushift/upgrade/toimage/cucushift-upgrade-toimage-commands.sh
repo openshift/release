@@ -41,6 +41,40 @@ EOF
     fi
 }
 
+# Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual
+function cco_annotation(){
+    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
+        echo "CCO annotation change is not required in either z-stream upgrade or 4.7 and earlier" && return
+    fi   
+
+    local cco_mode; cco_mode="$(oc get cloudcredential cluster -o jsonpath='{.spec.credentialsMode}')"
+    if [[ ${cco_mode} != "Manual" ]]; then
+        echo "CCO annotation change is not required in non-manual mode" && return
+    fi  
+
+    echo "Require CCO annotation change"
+    local wait_time_loop_var=0; to_version="$(echo "${TARGET_VERSION}" | cut -f1 -d-)"
+    oc patch cloudcredential.operator.openshift.io/cluster --patch '{"metadata":{"annotations": {"cloudcredential.openshift.io/upgradeable-to": "'"${to_version}"'"}}}' --type=merge
+    
+    echo "CCO annotation patch gets started"
+            
+    echo -e "sleep 5 min wait CCO annotation patch to be valid...\n"
+    while (( wait_time_loop_var < 5 )); do
+        sleep 1m
+        echo -e "wait_time_passed=${wait_time_loop_var} min.\n"
+        if ! oc adm upgrade | grep "MissingUpgradeableAnnotation"; then
+            echo -e "CCO annotation patch PASSED\n"
+            return 0              
+        else
+            echo -e "CCO annotation patch still in processing, waiting...\n"
+        fi
+        (( wait_time_loop_var += 1 ))
+    done
+    if (( wait_time_loop_var >= 5 )); then
+        echo >&2 "Timed out waiting for CCO annotation completing, exiting" && return 1
+    fi        
+}
+
 # Update RHEL repo before upgrade
 function rhel_repo(){
     echo "Updating RHEL node repo"
@@ -190,6 +224,12 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
 
+    echo "Make sure every operator reports correct version"
+    if incorrect_version=$(${OC} get clusteroperator --no-headers | awk -v var="${TARGET_VERSION}" '$2 != var') && [[ ${incorrect_version} != "" ]]; then
+        echo >&2 "Incorrect CO Version: ${incorrect_version}"
+        (( tmp_ret += 1 ))
+    fi
+
     # In disconnected install, marketplace often get into False state, so it is better to remove it from cluster from flexy post-action
     echo "Make sure every operator's AVAILABLE column is True"
     if unavailable_operator=$(${OC} get clusteroperator | awk '$3 == "False"' | grep "False"); then
@@ -234,8 +274,8 @@ function wait_clusteroperators_continous_success() {
     done
     if (( continous_successful_check != passed_criteria )); then
         echo >&2 "Some cluster operator does not get ready or not stable"
-        echo "Debug: current clusterverison output is:"
-        oc get clusterversion
+        echo "Debug: current CO output is:"
+        oc get co
         return 1
     else
         echo "All cluster operators status check PASSED"
@@ -350,8 +390,8 @@ function check_signed() {
 
 # Check if admin ack is required before upgrade
 function admin_ack() {
-    if [[ "${SOURCE_MINOR_VERSION}" -eq "${TARGET_MINOR_VERSION}" ]]; then
-        echo "Upgrade between z-stream version does not require admin ack" && return
+    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
+        echo "Admin ack is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi   
     
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
@@ -478,6 +518,7 @@ do
     fi
     if [[ "${FORCE_UPDATE}" == "false" ]]; then
         admin_ack
+        cco_annotation
     fi
       
     upgrade 

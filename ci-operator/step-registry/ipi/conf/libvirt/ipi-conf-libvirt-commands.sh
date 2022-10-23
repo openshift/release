@@ -178,6 +178,13 @@ sshKey: |
   $(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 EOF
 
+if [ ${FIPS_ENABLED} = "true" ]; then
+	echo "Adding 'fips: true' to install-config.yaml"
+	cat >> "${CONFIG}" << EOF
+fips: true
+EOF
+fi
+
 # DNS records for libvirt versions that don't support dnsmasq options
 cat >> ${SHARED_DIR}/worker-hostrecords.xml << EOF
 <host ip='192.168.${CLUSTER_SUBNET}.1'>

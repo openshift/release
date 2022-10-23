@@ -223,9 +223,17 @@ tests:
   steps:
     test:
     - ref: assisted-baremetal-operator-publish
-- as: operator-catalog-publish-to-quay
+- as: assisted-operator-catalog-publish
   postsubmit: true
   steps:
+    test:
+    - ref: assisted-baremetal-operator-catalog-publish
+- as: assisted-operator-catalog-publish-verify
+  run_if_changed: ^(deploy/olm-catalog/.*)$
+  steps:
+    env:
+      REGISTRY_BUNDLE_REPOSITORY_NAME: assisted-service-operator-bundle-test
+      REGISTRY_CATALOG_REPOSITORY_NAME: assisted-service-index-test
     test:
     - ref: assisted-baremetal-operator-catalog-publish
 - as: lint
@@ -852,7 +860,7 @@ tests:
         OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
-  optional: true
+  run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -860,7 +868,7 @@ tests:
         OLM_OPERATORS=cnv
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
-  optional: true
+  run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -871,7 +879,7 @@ tests:
         MASTER_CPU=9
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
-  optional: true
+  run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -880,7 +888,7 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
-  optional: true
+  run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -960,6 +968,7 @@ tests:
         MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
         MAKEFILE_TARGET="test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
+      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-vsphere-assisted
   optional: true
