@@ -15,7 +15,7 @@ chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 DSHVIP="$(cat /var/run/ds-hv-ip/dshvip)"
-COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=60 -o ServerAliveInterval=30"
+COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 KCLI_PARAM=""
 if [[ "$PROW_JOB_ID" =~ "nightly" ]]; then
@@ -54,6 +54,10 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
   hosts: bastion
   gather_facts: false
   tasks:
+  - name: Wait 300 seconds, but only start checking after 10 seconds
+    wait_for_connection:
+      delay: 10
+      timeout: 300
   - name: Discover cluster to run job
     command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -e $CL_SEARCH
     register: cluster
