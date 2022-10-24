@@ -7,7 +7,7 @@ set -o pipefail
 if [ -f "${SHARED_DIR}/dedicated" ]
 then
   # Run the tool in dedicated mode with watch flag set.
-  echo "Found node dedicatd to provider tool"
+  echo "Found node dedicated to provider tool"
   ./openshift-provider-cert-linux-amd64 run --watch --dedicated > /dev/null
 else
   echo "No nodes dedicated to provider tool"
