@@ -18,7 +18,7 @@ read -d '#' INCL << EOF
 [sig-node] ConfigMap should fail to create ConfigMap with empty key
 [sig-apps] ReplicationController should release no longer matching pods
 [sig-api-machinery] ResourceQuota should create a ResourceQuota and capture the life of a pod.
-[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] Simple CustomResourceDefinition creating/deleting custom resource definition objects works 
+[sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] Simple CustomResourceDefinition creating/deleting custom resource definition objects works
 [sig-api-machinery] CustomResourceDefinition resources [Privileged:ClusterAdmin] custom resource defaulting for requests and from storage works
 [sig-api-machinery] CustomResourcePublishOpenAPI [Privileged:ClusterAdmin] updates the published spec when one version gets renamed
 [k8s.io] Kubelet when scheduling a busybox command that always fails in a pod should be possible to delete
@@ -125,16 +125,16 @@ cat <(echo "$INCL") > "${SHARED_DIR}/test-list"
 # just a temporary approach for smoothly migrating to the full execution of openshift/conformance suite
 
 read -d '#' INCL_EXT << EOF
-[sig-cluster-lifecycle][Feature:Machines][Early] Managed cluster should have same number of Machines and Nodes [Suite:openshift/conformance/parallel]
+[sig-cluster-lifecycle][Feature:Machines][Early] Managed cluster should have same number of Machines and Nodes [apigroup:machine.openshift.io] [Suite:openshift/conformance/parallel]
 [sig-auth][Feature:SCC][Early] should not have pod creation failures during install [Suite:openshift/conformance/parallel]
 [sig-apps] Daemon set [Serial] should retry creating failed daemon pods [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
 [Serial] [sig-auth][Feature:OAuthServer] [RequestHeaders] [IdP] test RequestHeaders IdP [Suite:openshift/conformance/serial]
 [sig-apps] Daemon set [Serial] should rollback without unnecessary restarts [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
-[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream admission TestImageStreamTagsAdmission [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream admission TestImageStreamTagsAdmission [apigroup:image.openshift.io] [Suite:openshift/conformance/serial]
 [k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] evicts pods from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-arch] ocp payload should be based on existing source [Serial] olm version should contain the source commit id [Suite:openshift/conformance/serial]
 [sig-network] Service endpoints latency should not be very high [Conformance] [Serial] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
-[sig-auth][Feature:ProjectAPI][Serial] TestUnprivilegedNewProjectDenied [Suite:openshift/conformance/serial]
+[sig-auth][Feature:ProjectAPI][Serial]  TestUnprivilegedNewProjectDenied [apigroup:authorization.openshift.io][apigroup:project.openshift.io] [Suite:openshift/conformance/serial]
 [sig-storage] EmptyDir wrapper volumes should not cause race condition when used for configmaps [Serial] [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
 [sig-scheduling] SchedulerPredicates [Serial] validates that taints-tolerations is respected if matching [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-cli] Kubectl client Kubectl taint [Serial] should update the taint on a node [Suite:openshift/conformance/serial] [Suite:k8s]
@@ -143,10 +143,10 @@ read -d '#' INCL_EXT << EOF
 [k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] eventually evict pod with finite tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-network] IngressClass [Feature:Ingress] should set default value on new IngressClass [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-apps] Daemon set [Serial] should run and stop complex daemon with node affinity [Suite:openshift/conformance/serial] [Suite:k8s]
-[sig-auth][Feature:LDAP][Serial] ldap group sync can sync groups from ldap [Suite:openshift/conformance/serial]
+[sig-auth][Feature:LDAP][Serial] ldap group sync can sync groups from ldap [apigroup:user.openshift.io][apigroup:authorization.openshift.io][apigroup:security.openshift.io] [Suite:openshift/conformance/serial]
 [k8s.io] [sig-node] NoExecuteTaintManager Multiple Pods [Serial] only evicts pods without tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-api-machinery] Namespaces [Serial] should ensure that all services are removed when a namespace is deleted [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
-[sig-api-machinery] API data in etcd should be stored at the correct location and version for all resources [Serial] [Suite:openshift/conformance/serial]
+[sig-api-machinery] API data in etcd should be stored at the correct location and version for all resources [Serial][apigroup:config.openshift.io] [Suite:openshift/conformance/serial]
 [sig-api-machinery] Namespaces [Serial] should delete fast enough (90 percent of 100 namespaces in 150 seconds) [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-apps] Daemon set [Serial] should update pod when spec was updated and update strategy is RollingUpdate [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
 [sig-scheduling] SchedulerPreemption [Serial] PriorityClass endpoints verify PriorityClass endpoints can be operated with different HTTP methods [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
@@ -157,18 +157,18 @@ read -d '#' INCL_EXT << EOF
 [sig-scheduling] SchedulerPreemption [Serial] PreemptionExecutionPath runs ReplicaSets to verify preemption running path [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
 [sig-api-machinery] Namespaces [Serial] should patch a Namespace [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
 [sig-apps] Daemon set [Serial] should run and stop complex daemon [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
-[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream admission TestImageStreamAdmitStatusUpdate [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream admission TestImageStreamAdmitStatusUpdate [apigroup:image.openshift.io] [Suite:openshift/conformance/serial]
 [k8s.io] [sig-node] NoExecuteTaintManager Single Pod [Serial] doesn't evict pod with tolerations from tainted nodes [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-network] IngressClass [Feature:Ingress] should prevent Ingress creation if more than 1 IngressClass marked as default [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-scheduling] SchedulerPreemption [Serial] validates lower priority pod preemption by critical pod [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
 [sig-apps] Daemon set [Serial] should run and stop simple daemon [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
 [sig-apps] DisruptionController evictionsmaxUnavailable deny evictions, integer => should not allow an eviction [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]
-[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream API TestImageStreamWithoutDockerImageConfig [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream API TestImageStreamWithoutDockerImageConfig [apigroup:image.openshift.io] [Suite:openshift/conformance/serial]
 [sig-apps] Daemon set [Serial] should not update pod when spec was updated and update strategy is OnDelete [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-cli] Kubectl client Kubectl taint [Serial] should remove all the taints with the same key off a node [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-api-machinery] Namespaces [Serial] should ensure that all pods are removed when a namespace is deleted [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
-[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream admission TestImageStreamAdmitSpecUpdate [Suite:openshift/conformance/serial]
-[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream API TestImageStreamTagLifecycleHook [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream admission TestImageStreamAdmitSpecUpdate [apigroup:image.openshift.io] [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream API TestImageStreamTagLifecycleHook [apigroup:image.openshift.io] [Suite:openshift/conformance/serial]
 [sig-scheduling] SchedulerPreemption [Serial] PodTopologySpread Preemption validates proper pods are preempted [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-storage] PersistentVolumes-local Pods sharing a single local PV [Serial] all pods should be running [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector is respected if not matching [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
@@ -178,17 +178,17 @@ read -d '#' INCL_EXT << EOF
 [k8s.io] [sig-node] kubelet [k8s.io] [sig-node] Clean up pods on node kubelet should be able to delete 10 pods per node in 1m0s. [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-api-machinery] Namespaces [Serial] should always delete fast (ALL of 100 namespaces in 150 seconds) [Feature:ComprehensiveNamespaceDraining] [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-scheduling] SchedulerPredicates [Serial] PodTopologySpread Filtering validates 4 pods with MaxSkew=1 are evenly distributed into 2 nodes [Suite:openshift/conformance/serial] [Suite:k8s]
-[sig-auth][Feature:OpenShiftAuthorization][Serial] authorization TestAuthorizationResourceAccessReview should succeed [Suite:openshift/conformance/serial]
+[sig-auth][Feature:OpenShiftAuthorization][Serial] authorization  TestAuthorizationResourceAccessReview should succeed [apigroup:authorization.openshift.io] [Suite:openshift/conformance/serial]
 [sig-storage] CSI Volumes [Drivercsi-hostpath] [TestpatternDynamic PV (filesystem volmode)] volumeLimits should support volume limits [Serial] [Suite:openshift/conformance/serial] [Suite:k8s]
 [sig-scheduling] SchedulerPredicates [Serial] validates that NodeSelector is respected if matching [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]
-[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream API TestImageStreamMappingCreate [Suite:openshift/conformance/serial]
+[sig-imageregistry][Feature:ImageTriggers][Serial] ImageStream API TestImageStreamMappingCreate [apigroup:image.openshift.io] [Suite:openshift/conformance/serial]
 [sig-scheduling] SchedulerPredicates [Serial] validates that NodeAffinity is respected if not matching [Suite:openshift/conformance/serial] [Suite:k8s]
-[sig-etcd] etcd leader changes are not excessive [Late] [Suite:openshift/conformance/parallel]
+[sig-etcd] etcd leader changes are not excessive [Late][apigroup:config.openshift.io] [Suite:openshift/conformance/parallel]
 [sig-api-machinery][Feature:APIServer][Late] kube-apiserver terminates within graceful termination period [Suite:openshift/conformance/parallel]
 [sig-node][Late] should not have pod creation failures due to systemd timeouts [Suite:openshift/conformance/parallel]
 [sig-api-machinery][Feature:APIServer][Late] API LBs follow /readyz of kube-apiserver and stop sending requests [Suite:openshift/conformance/parallel]
 [sig-api-machinery][Feature:APIServer][Late] API LBs follow /readyz of kube-apiserver and don't send request early [Suite:openshift/conformance/parallel]
-[sig-network-edge] DNS should answer A and AAAA queries for a dual-stack service [Suite:openshift/conformance/parallel]
+[sig-network-edge] DNS should answer A and AAAA queries for a dual-stack service [apigroup:config.openshift.io] [Suite:openshift/conformance/parallel]
 #
 EOF
 
