@@ -137,5 +137,8 @@ proxy_credential=$(cat /var/run/vault/proxy/proxy_creds)
 proxy_private_url="http://${proxy_credential}@${bastion_ip}:3128"
 echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
 
+# echo proxy IP to ${SHARED_DIR}/proxyip
+echo "${bastion_ip}" > "${SHARED_DIR}/proxyip"
+
 echo "Sleeping 5 mins, make sure that the bastion host is fully started."
 sleep 300
