@@ -433,17 +433,18 @@ function upgrade() {
 function check_upgrade_status() {
     local wait_upgrade="${TIMEOUT}" out avail progress
     while (( wait_upgrade > 0 )); do
-        echo "oc get clusterversion" && oc get clusterversion
+        sleep 5m
+        (( wait_upgrade -= 5 ))
+        if ! ( echo "oc get clusterversion" && oc get clusterversion ); then
+            continue
+        fi
         out="$(oc get clusterversion --no-headers)"
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
             echo -e "Upgrade succeed\n\n"
             return 0
-        else
-            sleep 5m
-            (( wait_upgrade -= 5 ))
-        fi        
+        fi       
     done
     if (( wait_upgrade <= 0 )); then
         echo >&2 "Upgrade timeout, exiting" && return 1
