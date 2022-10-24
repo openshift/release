@@ -25,6 +25,19 @@ tests:
   run_if_changed: ^.github/workflows/pr-checks-build-images.yaml$|^apis|^build|^config|^controllers|^hack/get-test-namespace|^hack/remove-sbr-finalizers.sh$|^hack/test-cleanup.sh$|^controllers|^make/acceptance.mk$|^make/build.mk$|^make/common.mk$|^make/release.mk$|^make/version.mk$|^pkg|^test/acceptance|^tools|^vendor|^Dockerfile$|^go.mod$|^go.sum$|^install.sh$|^main.go$
   steps:
     cluster_profile: aws
+    post:
+    - as: gather-must-gather
+      commands: |
+        curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/must-gather/gather-must-gather-commands.sh | /bin/bash -s
+      from: cli
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 30m0s
+    - ref: gather-extra
+    - ref: gather-audit-logs
     test:
     - as: test
       cli: latest
@@ -44,6 +57,19 @@ tests:
   cron: 52 19 1,18 * *
   steps:
     cluster_profile: aws
+    post:
+    - as: gather-must-gather
+      commands: |
+        curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/must-gather/gather-must-gather-commands.sh | /bin/bash -s
+      from: cli
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 30m0s
+    - ref: gather-extra
+    - ref: gather-audit-logs
     test:
     - as: test
       cli: latest
