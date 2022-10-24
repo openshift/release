@@ -110,6 +110,7 @@ function deploy_and_test {
         sed -i "s/name\: performance/name\: performance-sriov/g" perf_profile_for_sriov.yaml
         sed -i "s/worker-cnf/${node_label}/g" perf_profile_for_sriov.yaml
         oc apply -f perf_profile_for_sriov.yaml
+        FEATURES_ENVIRONMENT="${features_env}" FEATURES="multinetworkpolicy" make feature-deploy
     fi
 
     if [[ "${feature}" == "xt_u32" ]] || [[ "${feature}" == "sctp" ]]; then
