@@ -102,7 +102,7 @@ EOF
 # camgi is a tool that creates an html document for investigating an OpenShift cluster
 # see https://github.com/elmiko/camgi.rs for more information
 function installCamgi() {
-    CAMGI_VERSION="0.7.2"
+    CAMGI_VERSION="0.8.0"
     pushd /tmp
 
     curl -L -o camgi.tar https://github.com/elmiko/camgi.rs/releases/download/v"$CAMGI_VERSION"/camgi-"$CAMGI_VERSION"-linux-x86_64.tar
