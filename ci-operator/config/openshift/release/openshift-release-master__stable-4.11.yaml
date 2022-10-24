@@ -1,8 +1,22 @@
 base_images:
+  cli:
+    name: "4.11"
+    namespace: origin
+    tag: cli
   upi-installer:
     name: "4.11"
     namespace: ocp
     tag: upi-installer
+build_root:
+  from_repository: true
+  use_build_cache: true
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/origin/centos:stream8
+    RUN curl --silent --location --output /usr/local/bin/openshift-provider-cert-linux-amd64 https://github.com/redhat-openshift-ecosystem/provider-certification-tool/releases/latest/download/openshift-provider-cert-linux-amd64 && \
+        chmod +x /usr/local/bin/openshift-provider-cert-linux-amd64
+  from: cli
+  to: opct-image
 releases:
   latest:
     release:
