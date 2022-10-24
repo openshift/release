@@ -75,9 +75,10 @@ CONFIG = {
         'centralus': 10
     },
     'azure-arm64-qe-quota-slice': {
-        'northeurope': 10,
-        'westus2': 5,
-        'westeurope': 5
+        'centralus': 6,
+        'eastus': 6,
+        'eastus2': 4,
+        'northeurope': 4
     },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5
