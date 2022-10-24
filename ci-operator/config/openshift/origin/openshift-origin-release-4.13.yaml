@@ -75,6 +75,12 @@ resources:
       cpu: "3"
       memory: 8Gi
 tests:
+- as: unit
+  commands: GOTEST_FLAGS='-p 8' hack/test-go.sh
+  container:
+    from: src
+    memory_backed_volume:
+      size: 4Gi
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
@@ -242,7 +248,7 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-sdn-multi
-- as: e2e-metal-ipi
+- as: e2e-metal-ipi-sdn
   cluster: build05
   optional: true
   steps:
@@ -301,7 +307,7 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-single-node
-- as: e2e-openstack
+- as: e2e-openstack-ovn
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -309,15 +315,6 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-serial
-  optional: true
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-kuryr
   optional: true
@@ -333,6 +330,15 @@ tests:
         application \| Services should serve multiport endpoints from pods \| Services
         should serve a basic endpoint from pods
       TEST_SUITE: kubernetes/conformance
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-serial
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-aws-csi-migration
   optional: true

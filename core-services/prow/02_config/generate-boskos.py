@@ -110,7 +110,7 @@ CONFIG = {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {
-        'default': 18,
+        'default': 9,
     },
     'openstack-operators-vexxhost-quota-slice': {
         'default': 2,
@@ -165,9 +165,10 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
-        'mon01': 1,
-        'osa21': 1,
-        'tor01': 1
+        'syd04': 1,
+        'syd05': 1,
+        'tor01': 1,
+        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'default': 7,

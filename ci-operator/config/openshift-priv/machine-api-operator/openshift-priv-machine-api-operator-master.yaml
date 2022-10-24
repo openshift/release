@@ -7,10 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
+    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -19,9 +19,9 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: machine-api-operator
 promotion:
   name: 4.12-priv
@@ -140,6 +140,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-metal-ipi-sdn
+  cluster: build05
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -150,6 +151,7 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-upgrade
+  cluster: build05
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -163,6 +165,7 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -173,6 +176,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -183,6 +187,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
+  cluster: build05
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -199,6 +204,13 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-libvirt
+- as: e2e-nutanix
+  cluster: build01
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
 - as: e2e-vsphere
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -225,12 +237,6 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-upgrade-vsphere
-- as: e2e-aws-disruptive
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-disruption
 - as: e2e-openstack
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

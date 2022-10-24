@@ -36,6 +36,11 @@ deck:
       github_team_slugs:
       - org: openshift
         slug: team-qe
+  - repo: openshift/osde2e
+    rerun_auth_configs:
+      github_team_slugs:
+      - org: openshift
+        slug: team-sd-sre-cicd
   external_agent_logs:
   - agent: jenkins
     selector: master=ci.openshift.redhat.com
@@ -48,6 +53,7 @@ deck:
     gcs_browser_prefixes:
       '*': https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift-priv: https://gcsweb-private-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
+      openshift-psap/ci-artifacts-priv: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/cucushift: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
       openshift/openshift-tests-private: https://gcsweb-qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/
     gcs_browser_prefixes_by_bucket:
@@ -81,6 +87,8 @@ deck:
           - pod didn't start running within
           - 'failed to update leases: exceeded number of retries for lease'
           - Step .* failed after
+          - ^make.*:.*\*\*\*
+          - '[Ee]xit.*\s(code|status)\b.*\s[1-9][0-9]*\b'
         name: buildlog
       required_files:
       - ^build-log.txt
@@ -141,6 +149,9 @@ jenkins_operators:
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
+    openshift-psap/ci-artifacts-priv: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
+      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
       index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
     openshift/cucushift: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
       index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
@@ -203,17 +214,17 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20221013-86c528dbe3
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20221013-86c528dbe3
-        initupload: gcr.io/k8s-prow/initupload:v20221013-86c528dbe3
-        sidecar: gcr.io/k8s-prow/sidecar:v20221013-86c528dbe3
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20221021-f6c02074bb
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20221021-f6c02074bb
+        initupload: gcr.io/k8s-prow/initupload:v20221021-f6c02074bb
+        sidecar: gcr.io/k8s-prow/sidecar:v20221021-f6c02074bb
   - cluster: arm01
     config:
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20221013-86c528dbe3-arm64
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20221013-86c528dbe3-arm64
-        initupload: gcr.io/k8s-prow/initupload:v20221013-86c528dbe3-arm64
-        sidecar: gcr.io/k8s-prow/sidecar:v20221013-86c528dbe3-arm64
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20221021-f6c02074bb-arm64
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20221021-f6c02074bb-arm64
+        initupload: gcr.io/k8s-prow/initupload:v20221021-f6c02074bb-arm64
+        sidecar: gcr.io/k8s-prow/sidecar:v20221021-f6c02074bb-arm64
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -237,7 +248,7 @@ plank:
       timeout: 23h0m0s
     repo: openshift/openshift-tests-private
   - config:
-      timeout: 8h0m0s
+      timeout: 12h0m0s
     repo: openshift/verification-tests
   - config:
       timeout: 6h0m0s
@@ -246,6 +257,7 @@ plank:
     '*': https://prow.ci.openshift.org/view/
     openshift-priv: https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift-priv/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
+    openshift-psap/ci-artifacts-priv: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/cucushift: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
     openshift/openshift-tests-private: https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/view/
   job_url_template: https://{{if .Spec.Hidden }}deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/view/gs/origin-ci-private/{{else}}prow.ci.openshift.org/view/gs/origin-ci-test/{{end}}
@@ -284,6 +296,10 @@ prowjob_default_entries:
   config:
     tenant_id: qe-private
   repo: openshift/cucushift
+- cluster: '*'
+  config:
+    tenant_id: qe-private
+  repo: openshift-psap/ci-artifacts-priv
 prowjob_namespace: ci
 push_gateway:
   interval: 1m0s

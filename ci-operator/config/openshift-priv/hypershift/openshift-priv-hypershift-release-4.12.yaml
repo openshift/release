@@ -58,6 +58,8 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: hypershift
 promotion:
+  additional_images:
+    hypershift-tests: test-bin
   disabled: true
   name: 4.12-priv
   namespace: ocp-private
@@ -128,6 +130,26 @@ tests:
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: assisted-baremetal
+- as: e2e-ibmcloud-iks
+  optional: true
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    env:
+      BOM_VERSION: 4.10.26_openshift
+      MANAGED_CLUSTER_TYPE: iks
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
+    workflow: hypershift-ibmcloud-e2e
+- as: e2e-ibmcloud-roks
+  optional: true
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    env:
+      BOM_VERSION: 4.11.0_openshift
+      MANAGED_CLUSTER_TYPE: openshift
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
+    workflow: hypershift-ibmcloud-e2e
 zz_generated_metadata:
   branch: release-4.12
   org: openshift-priv

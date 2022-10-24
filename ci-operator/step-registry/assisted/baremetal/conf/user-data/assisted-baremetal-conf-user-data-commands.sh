@@ -6,6 +6,11 @@ set -o pipefail
 
 echo "************ baremetalds assisted baremetal conf user-data command ************"
 
+if [ -z "${USER_DATA_FILENAME}" ]; then
+  echo "No user data file supplied. Exiting!"
+  exit 0
+fi
+
 tee "${SHARED_DIR}/${USER_DATA_FILENAME}" << EOF
 #cloud-config
 
