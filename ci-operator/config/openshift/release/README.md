@@ -19,6 +19,7 @@ Variables:
    * `ci`: A release generated from a CI stream (the `ocp/4.8` image stream)
    * `nightly`: A release generated from the published ART nightly release stream (the `ocp/4.8-art-latest` image stream)
    * `okd`: A release generated downstream of the CI stream that includes images specific to the `OKD` release
+   * `okd-scos`: A release generated downstream of the CI stream that includes images specific to the `OKD` release based on CentOS Stream CoreOS (SCOS)
    * `stable`: A published public OCP release (which are renamed `nightly` builds) such as `4.6.10`
 * `<release_number>` must be of the form `4.<number>`, i.e. `4.8`
 * `<relative>` may be set to `previous` if upgrading across two streams
