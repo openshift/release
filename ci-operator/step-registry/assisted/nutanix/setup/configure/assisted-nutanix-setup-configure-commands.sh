@@ -43,20 +43,16 @@ subnet_name=$(echo "${subnets_json}" | jq -r ".entities[] | select (.metadata.uu
 echo "$(date -u --rfc-3339=seconds) - PE Name: ${pe_name}"
 echo "$(date -u --rfc-3339=seconds) - Subnet Name: ${subnet_name}"
 
-base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
-
 # Create variables file
 cat >> "${SHARED_DIR}"/platform-conf.sh << EOF
 export PLATFORM=nutanix
-export VIP_DHCP_ALLOCATION=false
+export VIP_DHCP_ALLOCATION=true
 export NUTANIX_USERNAME='${NUTANIX_USERNAME}'
 export NUTANIX_PASSWORD='${NUTANIX_PASSWORD}'
 export NUTANIX_ENDPOINT='${NUTANIX_HOST}'
 export NUTANIX_PORT="${NUTANIX_PORT}"
 export NUTANIX_CLUSTER_NAME="${pe_name}"
 export NUTANIX_SUBNET_NAME="${subnet_name}"
-export API_VIP="${API_VIP}"
-export INGRESS_VIP="${INGRESS_VIP}"
-export BASE_DOMAIN="${base_domain}"
 export CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+export ROUTE53_SECRET="$(base64 -w0 /var/run/vault/route53/.awscred)"
 EOF
