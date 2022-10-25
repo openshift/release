@@ -6,15 +6,14 @@ set -o pipefail
 
 BUILD_INFO_FILE="${ARTIFACT_DIR}/ocp-build-info"
 
-if [[ -n "${RELEASE_IMAGE_LATEST}" ]]; then
-    echo "Release info for: ${RELEASE_IMAGE_LATEST}"
-    oc adm release info "${RELEASE_IMAGE_LATEST}" || true
-    LATEST_VERSION="$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=jsonpath="{.metadata.version}")"
-    echo "${LATEST_VERSION}" >> "${BUILD_INFO_FILE}"
-fi
-if [[ -n "${RELEASE_IMAGE_TARGET}" ]]; then 
-    echo "Release info for: ${RELEASE_IMAGE_TARGET}"
-    oc adm release info "${RELEASE_IMAGE_TARGET}" || true
-    TARGET_VERSION="$(oc adm release info "${RELEASE_IMAGE_TARGET}" --output=jsonpath="{.metadata.version}")"
-    echo "${TARGET_VERSION}" >> "${BUILD_INFO_FILE}"
-fi
+release_info() {
+    local PAYLOAD_IMAGE=$1
+    echo "Release info for: ${PAYLOAD_IMAGE}"
+    oc adm release info "${PAYLOAD_IMAGE}" || true
+    local VERSION
+    VERSION="$(oc adm release info "${PAYLOAD_IMAGE}" --output=jsonpath="{.metadata.version}")"
+    echo "${VERSION}" >> "${BUILD_INFO_FILE}"
+}
+
+release_info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+release_info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"
