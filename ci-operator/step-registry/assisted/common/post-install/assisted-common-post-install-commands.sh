@@ -19,4 +19,5 @@ source /root/assisted-post-install.sh
 EOF
 
 echo "### Copying kubeconfig files"
-scp -F "${SHARED_DIR}/ssh_config" -r "root@ci_machine:/home/assisted/build/kubeconfig/*" "${SHARED_DIR}" || true
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+ssh -F "${SHARED_DIR}/ssh_config" "root@ci_machine" "find \${KUBECONFIG} -type f -exec cat {} \;" > ${KUBECONFIG} 

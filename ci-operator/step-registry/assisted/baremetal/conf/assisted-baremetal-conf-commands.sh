@@ -7,6 +7,7 @@ set -o verbose
 
 echo "************ baremetalds e2e assisted conf command ************"
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
 case "${CLUSTER_TYPE}" in
     vsphere)
         export TEST_PROVIDER=vsphere
@@ -33,13 +34,7 @@ EOF
         ;;
 
     conformance)
-        # shellcheck disable=SC2044
-        for kubeconfig in $(find ${SHARED_DIR} -name "kubeconfig*" -exec echo {} \;); do
-            # Spoke cluster's kubeconfig has a random name, so we only need the first found
-            export KUBECONFIG=${kubeconfig}
-            INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run --provider '{"type":"${TEST_PROVIDER}"}')
-            break
-        done
+        INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run --provider '{"type":"${TEST_PROVIDER}"}')
         ;;
 
     full)

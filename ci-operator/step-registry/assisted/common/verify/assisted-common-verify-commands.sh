@@ -33,14 +33,9 @@ case "${CLUSTER_TYPE}" in
         ;;
 esac
 
-# shellcheck disable=SC2044
-for kubeconfig in $(find ${SHARED_DIR} -name "kubeconfig*" -exec echo {} \;); do
-    export KUBECONFIG=${kubeconfig}
-    name=$(basename ${kubeconfig})
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+mkdir -p ${ARTIFACT_DIR}/reports
 
-    mkdir -p ${ARTIFACT_DIR}/${name}/reports
-
-    openshift-tests run "openshift/conformance/parallel" --dry-run | \
-        grep -Ff ${SHARED_DIR}/test-list | \
-        openshift-tests run -o ${ARTIFACT_DIR}/${name}/e2e.log --junit-dir ${ARTIFACT_DIR}/${name}/reports -f -
-done
+openshift-tests run "openshift/conformance/parallel" --dry-run | \
+    grep -Ff ${SHARED_DIR}/test-list | \
+    openshift-tests run -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/reports -f -

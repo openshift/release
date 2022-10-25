@@ -8,13 +8,6 @@ echo "************ nutanix assisted test-infra post-install ************"
 source ${SHARED_DIR}/platform-conf.sh
 source ${SHARED_DIR}/nutanix_context.sh
 
-# Find the first kubeconfig saved by assisted common post-install step
-# shellcheck disable=SC2044
-for kubeconfig in $(find ${SHARED_DIR} -name "kubeconfig*" -exec echo {} \;); do
-    # Copy kubeconfig so that other nutanix steps could use it
-    cp -rvf ${kubeconfig} ${SHARED_DIR}/kubeconfig
-    break
-done
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 oc project default
 
