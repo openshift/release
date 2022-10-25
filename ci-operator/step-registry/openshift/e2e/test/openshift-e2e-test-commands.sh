@@ -123,7 +123,7 @@ aws|aws-arm64)
     export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
     export KUBE_SSH_USER=core
     ;;
-azure4) export TEST_PROVIDER=azure;;
+azure4|azure-arm64) export TEST_PROVIDER=azure;;
 azurestack)
     export TEST_PROVIDER="none"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json

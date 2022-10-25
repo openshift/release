@@ -29,6 +29,14 @@ def _add_origin_rbac(gendoc):
                           'patch']
             },
             {
+                'apiGroups': ['release.openshift.io'],
+                'resources': ['releasepayloads'],
+                'verbs': ['get',
+                          'list',
+                          'watch',
+                          'create']
+            },
+            {
                 'apiGroups': [''],
                 'resources': ['events'],
                 'verbs': ['create', 'patch', 'update']

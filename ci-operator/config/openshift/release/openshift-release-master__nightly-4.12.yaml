@@ -95,6 +95,19 @@ releases:
       product: ocp
       stream: nightly
       version: "4.12"
+  multi-initial:
+    candidate:
+      architecture: multi
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.12"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -167,6 +180,9 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
+    observers:
+      enable:
+      - observers-resource-watch
     workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-ovn-dualstack-local-gateway
   cluster: build05
@@ -191,12 +207,12 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
-- as: e2e-metal-ipi-sdn-serial-virtualmedia
+- as: e2e-metal-ipi-sdn-serial-virtualmedia-bond
   cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-sdn-serial-virtualmedia
+    workflow: baremetalds-e2e-sdn-serial-virtualmedia-bond
 - as: e2e-metal-ipi-serial-ovn-dualstack
   cluster: build05
   interval: 48h
@@ -233,6 +249,9 @@ tests:
   interval: 6h
   steps:
     cluster_profile: equinix-ocp-metal
+    observers:
+      enable:
+      - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
@@ -448,6 +467,9 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
+    observers:
+      enable:
+      - observers-resource-watch
     workflow: openshift-upgrade-aws-sdn
 - as: e2e-aws-sdn
   interval: 48h
@@ -456,12 +478,25 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-ovn-multi
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-ovn
 - as: e2e-aws-sdn-serial
   interval: 48h
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
     workflow: openshift-e2e-aws-sdn-serial
 - as: e2e-aws-ovn-serial
   interval: 8h
@@ -639,6 +674,26 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud-csi
+- as: e2e-aws-ovn-upi
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-upi
+- as: e2e-azure-ovn-upi
+  interval: 48h
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-upi
+- as: e2e-gcp-ovn-upi
+  interval: 48h
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-upi
+- as: e2e-azurestack-ovn-upi
+  interval: 48h
+  steps:
+    cluster_profile: azurestack
+    workflow: openshift-e2e-azurestack-upi
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
   stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
@@ -16,18 +20,17 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: cluster-templates-operator
-- dockerfile_path: bundle.Dockerfile
-  from: base
-  inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
-  to: cluster-templates-operator-bundle
+operator:
+  bundles:
+  - as: cluster-templates-bundle
+    base_index: operator-index
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/stolostron/cluster-templates-operator:latest
+    with: cluster-templates-operator
 promotion:
   name: latest
   namespace: stolostron
@@ -99,6 +102,14 @@ tests:
       SOURCE_IMAGE_REF: cluster-templates-operator
     env:
       IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: bundle-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-templates-bundle
+    env:
+      IMAGE_REPO: cluster-templates-bundle
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:

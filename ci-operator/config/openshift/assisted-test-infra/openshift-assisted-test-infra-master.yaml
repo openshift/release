@@ -125,16 +125,6 @@ tests:
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tpmv2
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-tpmv2-periodic
-  cron: 45 00 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        DISK_ENCRYPTION_ROLES=all
-        DISK_ENCRYPTION_MODE=tpmv2
-      TEST_SUITE: full
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-tang
   optional: true
   steps:
@@ -143,16 +133,6 @@ tests:
       ASSISTED_CONFIG: |
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tang
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-tang-periodic
-  cron: 00 01 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        DISK_ENCRYPTION_ROLES=all
-        DISK_ENCRYPTION_MODE=tang
-      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-8
   optional: true
@@ -350,7 +330,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
-  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -663,6 +643,29 @@ tests:
         TEST=./src/tests/test_upgrade_agent.py
         TEST_FUNC=test_upgrade_agent
     workflow: assisted-baremetal
+- as: e2e-nutanix-assisted
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-periodic
+  cluster: build01
+  interval: 48h
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
 zz_generated_metadata:
   branch: master
   org: openshift
