@@ -100,7 +100,7 @@ spec:
           subnet: ${CLUSTER_NAME}-ingress-subnet
           userDataSecret:
             name: worker-user-data
-          vmSize: Standard_D4s_v3
+          vmSize: ${COMPUTE_NODE_TYPE}
           vnet: ${CLUSTER_NAME}-vnet
           zone: ""
 EOF
