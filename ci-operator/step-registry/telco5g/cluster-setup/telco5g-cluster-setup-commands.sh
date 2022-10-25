@@ -56,8 +56,12 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
   tasks:
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
-      delay: 10
-      timeout: 300
+      timeout: 125
+      connect_timeout: 90
+    register: sshresult
+    until: sshresult is success
+    retries: 15
+    delay: 2
   - name: Discover cluster to run job
     command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -e $CL_SEARCH
     register: cluster
@@ -68,8 +72,11 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     delegate_to: localhost
 EOF
 
+# Check connectivity
+ping ${BASTION_IP} -c 10 || true
+echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
 
-ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vv
+ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"

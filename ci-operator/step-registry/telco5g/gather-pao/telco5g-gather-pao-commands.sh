@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Check if cluster exists
+if [[ ! -e ${SHARED_DIR}/cluster_name ]]; then
+    echo "Cluster doesn't exist, job failed, no need to run gather"
+    exit 1
+fi
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
