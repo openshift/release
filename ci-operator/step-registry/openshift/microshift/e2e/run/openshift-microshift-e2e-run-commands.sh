@@ -52,6 +52,9 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/run-test.sh rhel8user@"${INSTANCE_PREFIX}":~/run-test.sh
 
+# Do not exit in case run-test.sh exits with non-zero code
+set +e
+
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
