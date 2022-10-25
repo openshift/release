@@ -6,6 +6,104 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build04
+    context: ci/prow/bundle-pr-image-mirror
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-cluster-templates-operator-main-bundle-pr-image-mirror
+    rerun_command: /test bundle-pr-image-mirror
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=bundle-pr-image-mirror
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )bundle-pr-image-mirror,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/ci-index-cluster-templates-bundle
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-cluster-templates-operator-main-ci-index-cluster-templates-bundle
+    rerun_command: /test ci-index-cluster-templates-bundle
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=ci-index-cluster-templates-bundle
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-index-cluster-templates-bundle,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
