@@ -47,12 +47,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -77,7 +77,7 @@ tests:
   container:
     from: src
 - as: gosec
-  commands: make gosec/exclude
+  commands: make gosec
   container:
     from: src
 - as: test-cases-lint
@@ -96,7 +96,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.11"
   optional: true
   steps:
     test:
@@ -112,10 +112,14 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - as: multitenant-rhoam-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
   steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m4.xlarge
     test:
     - as: test
       cli: latest
@@ -127,7 +131,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: manifest
   commands: make manifest/check
   container:
@@ -137,6 +141,10 @@ tests:
   container:
     from: src
   run_if_changed: pkg/apis/integreatly/v1alpha1/rhmi_types.go
+- as: commits
+  commands: make commits/check
+  container:
+    from: src
 - as: coverage
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
