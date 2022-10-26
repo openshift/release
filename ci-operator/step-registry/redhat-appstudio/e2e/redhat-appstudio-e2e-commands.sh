@@ -32,7 +32,6 @@ GIT_CREDS_PATH="${HOME}/creds/file"
 git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
 echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
-cd "$(mktemp -d)"
 
 # Puting infra-deployments repo by default. All periodic jobs are running there.
 REPO_NAME=${REPO_NAME:-"infra-deployments"}
@@ -40,6 +39,7 @@ if [[ "$REPO_NAME" == "e2e-tests" ]]
 then
     /bin/bash scripts/install-appstudio-kcp.sh -kc kcp-stable-root -kk "$HOME/.configs/kcp_kubeconfig" -ck $KUBECONFIG -s --e2e
 else
+    cd "$(mktemp -d)"
     curl https://raw.githubusercontent.com/redhat-appstudio/e2e-tests/main/scripts/install-appstudio-kcp.sh -o appstudio-kcp.sh && chmod +x appstudio-kcp.sh
     /bin/bash ./appstudio-kcp.sh -kc kcp-stable-root -kk "$HOME/.configs/kcp_kubeconfig" -ck $KUBECONFIG -s --e2e
 fi
