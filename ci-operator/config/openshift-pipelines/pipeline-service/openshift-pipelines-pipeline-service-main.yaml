@@ -85,7 +85,8 @@ tests:
         export ALLOW_ROOTLESS=true
         HOME_DIR="$(pwd)"
         echo "Start building kcp plugin ..."
-        KCP_TAG="$(yq '.images[] | select(.name == "kcp") | .newTag' "ckcp/openshift/overlays/dev/kustomization.yaml")"
+        CKCP_DIR=$(find "$PWD" -type f -name openshift_dev_setup.sh -exec dirname {} +)
+        KCP_TAG="$(yq '.images[] | select(.name == "kcp") | .newTag' "$CKCP_DIR/openshift/overlays/dev/kustomization.yaml")"
         echo "kcp tag:" $KCP_TAG
         git clone https://github.com/kcp-dev/kcp.git
         cd $HOME_DIR/kcp
@@ -93,7 +94,7 @@ tests:
         make install
         kubectl-kcp --version
         echo "\n\nStart ckcp setup ..."
-        cd $HOME_DIR/ckcp && ./openshift_dev_setup.sh -d
+        cd $CKCP_DIR && ./openshift_dev_setup.sh -d
         EOF
 
         chmod +x ckcp_setup.sh

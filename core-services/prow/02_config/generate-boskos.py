@@ -19,6 +19,9 @@ CONFIG = {
         'us-west-1': 35,
         'us-west-2': 35,
     },
+    'aws-1-qe-quota-slice': {
+        'us-east-1': 5,
+    },
     'aws-2-quota-slice': {
         'us-east-1': 40,
         'us-east-2': 40,
@@ -177,6 +180,9 @@ CONFIG = {
     },
     'ibmcloud-quota-slice': {
         'default': 7,
+    },
+    'ibmcloud-qe-quota-slice': {
+        'default': 10,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
