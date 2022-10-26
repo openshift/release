@@ -822,10 +822,10 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 export TF_LOG=debug
 # Uncomment for even more debugging!
-#export TF_LOG_PROVIDER=TRACE
-#export TF_LOG=TRACE
-#export TF_LOG_PATH=/tmp/tf.log
-#export IBMCLOUD_TRACE=true
+export TF_LOG_PROVIDER=TRACE
+export TF_LOG=TRACE
+export TF_LOG_PATH=/tmp/tf.log
+export IBMCLOUD_TRACE=true
 
 echo "8<--------8<--------8<--------8<-------- BEGIN: create cluster 8<--------8<--------8<--------8<--------"
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
