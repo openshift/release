@@ -25,3 +25,5 @@ platform:
 EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
+
+jq .client_email /var/run/secrets/ci.openshift.io/cluster-profile/gce.json
