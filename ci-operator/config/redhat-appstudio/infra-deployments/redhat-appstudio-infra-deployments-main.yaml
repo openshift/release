@@ -1,8 +1,6 @@
-base_images:
-  test_runner:
-    name: redhat-appstudio-e2e-test-runner
-    namespace: ci
-    tag: latest
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
 releases:
   latest:
     release:
@@ -17,7 +15,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: redhat-appstudio-e2e
+- as: appstudio-e2e-kcp-stable
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -25,7 +23,20 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.11"
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  optional: true
+  steps:
+    test:
+    - ref: redhat-appstudio-e2e
+    workflow: redhat-appstudio-claim
+- as: appstudio-e2e-kcp-stable-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  cron: 0 */24 * * *
   steps:
     test:
     - ref: redhat-appstudio-e2e
@@ -33,4 +44,4 @@ tests:
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio
-  repo: e2e-tests
+  repo: infra-deployments
