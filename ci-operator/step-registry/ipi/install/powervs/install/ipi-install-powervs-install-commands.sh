@@ -625,6 +625,9 @@ function dump_resources() {
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
   ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
 
+  echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
+  ibmcloud pi jobs --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
   # Restore any debugging if saved
