@@ -12,7 +12,11 @@ release_info() {
     oc adm release info "${PAYLOAD_IMAGE}" || true
     local VERSION
     VERSION="$(oc adm release info "${PAYLOAD_IMAGE}" --output=jsonpath="{.metadata.version}")"
-    echo "${VERSION}" >> "${BUILD_INFO_FILE}"
+    if ! [[ -f "${BUILD_INFO_FILE}" ]] ; then
+        echo -n "${VERSION}" > "${BUILD_INFO_FILE}"
+    else
+        echo -n " ${VERSION}" >> "${BUILD_INFO_FILE}"
+    fi
 }
 
 release_info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
