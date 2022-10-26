@@ -104,13 +104,22 @@ function deploy_and_test {
         features_env="typical-baremetal"
     fi
 
+    if [[ "${feature}" == "sriov" ]] || [[ "${feature}" == "dpdk" ]]; then
+        perf_profile_config="perf_profile_for_${feature}.yaml"
+        rm -f "${perf_profile_config}"
+        oc kustomize feature-configs/typical-baremetal/performance > "${perf_profile_config}"
+        sed -i "s/name\: performance/name\: performance-${feature}/g" "${perf_profile_config}"
+        sed -i "s/worker-cnf/${node_label}/g" "${perf_profile_config}"
+        oc apply -f "${perf_profile_config}"
+        export PERF_TEST_PROFILE="performance-${feature}"
+    fi
+
     if [[ "${feature}" == "sriov" ]]; then
-        rm -f perf_profile_for_sriov.yaml
-        oc kustomize feature-configs/typical-baremetal/performance > perf_profile_for_sriov.yaml
-        sed -i "s/name\: performance/name\: performance-sriov/g" perf_profile_for_sriov.yaml
-        sed -i "s/worker-cnf/${node_label}/g" perf_profile_for_sriov.yaml
-        oc apply -f perf_profile_for_sriov.yaml
         FEATURES_ENVIRONMENT="${features_env}" FEATURES="multinetworkpolicy" make feature-deploy
+    fi
+
+    if [[ "${feature}" == "dpdk" ]]; then
+        FEATURES_ENVIRONMENT="${features_env}" FEATURES="sriov" make feature-deploy
     fi
 
     if [[ "${feature}" == "xt_u32" ]] || [[ "${feature}" == "sctp" ]]; then
@@ -188,6 +197,9 @@ for node in ${test_nodes}; do
     touch "${node}_ready.txt"
 done
 
+CNF_REPO="https://github.com/sabinaaledort/cnf-features-deploy.git"
+CNF_BRANCH="separate_ns"
+
 echo "running on branch ${CNF_BRANCH}"
 git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
@@ -196,6 +208,8 @@ make setup-build-index-image
 cd -
 
 create_tests_skip_list_file
+
+FEATURES="sriov dpdk performance sctp xt_u32 ovn bondcni vrf tuningcni"
 
 # run cnf-tests by feature in a thread on a free worker node
 for feature in ${FEATURES}; do
