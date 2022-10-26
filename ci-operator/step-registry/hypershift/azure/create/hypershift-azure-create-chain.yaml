@@ -13,6 +13,9 @@ chain:
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
       documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
+    - name: HYPERSHIFT_AZURE_LOCATION
+      default: "eastus"
+      documentation: "The Azure location of the cluster."
     commands: |-
       set -exuo pipefail
 
@@ -27,7 +30,8 @@ chain:
         --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --azure-creds ${CLUSTER_PROFILE_DIR}/osServicePrincipal.json \
-        --release-image ${RELEASE_IMAGE} \
+        --location ${HYPERSHIFT_AZURE_LOCATION} \
+        --release-image ${RELEASE_IMAGE}
 
       # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
       echo "Waiting for cluster to become available"
