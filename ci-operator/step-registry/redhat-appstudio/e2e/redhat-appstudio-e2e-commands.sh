@@ -32,7 +32,6 @@ GIT_CREDS_PATH="${HOME}/creds/file"
 git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
 echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
-
 # Puting infra-deployments repo by default. All periodic jobs are running there.
 REPO_NAME=${REPO_NAME:-"infra-deployments"}
 if [[ "$REPO_NAME" == "e2e-tests" ]]
