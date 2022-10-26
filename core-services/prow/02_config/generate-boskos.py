@@ -29,6 +29,7 @@ CONFIG = {
         'us-east-1': 40,
     },
     'aws-qe-quota-slice': {
+        'us-east-1': 20,
         'us-east-2': 25,
     },
     'aws-outpost-quota-slice': {
@@ -78,9 +79,10 @@ CONFIG = {
         'centralus': 10
     },
     'azure-arm64-qe-quota-slice': {
-        'northeurope': 10,
-        'westus2': 5,
-        'westeurope': 5
+        'centralus': 6,
+        'eastus': 6,
+        'eastus2': 4,
+        'northeurope': 4
     },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5

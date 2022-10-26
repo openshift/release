@@ -1,28 +1,8 @@
-base_images:
-  checkov-image:
-    name: checkov
-    namespace: ci
-    tag: "2"
-  hadolint-image:
-    name: hadolint
-    namespace: ci
-    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.18
-images:
-- dockerfile_literal: |-
-    FROM src
-    RUN pip3 install --upgrade setuptools pip && pip3 install yamllint && yamllint --version && \
-        SHELLCHECK_VERSION=0.7.1 && \
-        curl --fail -sSL  https://github.com/koalaman/shellcheck/releases/download/v$SHELLCHECK_VERSION/shellcheck-v$SHELLCHECK_VERSION.linux.x86_64.tar.xz | tar -xJvf - shellcheck-v$SHELLCHECK_VERSION/shellcheck && \
-        mv shellcheck-v$SHELLCHECK_VERSION/shellcheck /usr/local/bin/shellcheck && \
-        chmod 755 /usr/local/bin/shellcheck && \
-        shellcheck -V
-  from: src
-  to: yamllint-shellcheck-image
 releases:
   latest:
     release:
@@ -129,39 +109,6 @@ tests:
           cpu: 300m
           memory: 800Mi
     workflow: generic-claim
-- as: plnsvc-shellcheck
-  steps:
-    test:
-    - as: run-shellcheck
-      cli: latest
-      commands: |
-        find . -name "*.sh" -exec shellcheck {} +
-      from: yamllint-shellcheck-image
-      resources:
-        requests:
-          cpu: 100m
-- as: plnsvc-yaml-lint
-  steps:
-    test:
-    - as: run-yamllint
-      commands: |
-        yamllint -c test/config/yamllint.yaml .
-      from: yamllint-shellcheck-image
-      resources:
-        requests:
-          cpu: 100m
-- as: plnsvc-hadolint
-  commands: |
-    find . -name Dockerfile -exec hadolint -c test/config/hadolint.yaml {} +
-  container:
-    clone: true
-    from: hadolint-image
-- as: plnsvc-checkov
-  commands: |
-    checkov --directory . --config-file test/config/checkov.yaml
-  container:
-    clone: true
-    from: checkov-image
 zz_generated_metadata:
   branch: main
   org: openshift-pipelines

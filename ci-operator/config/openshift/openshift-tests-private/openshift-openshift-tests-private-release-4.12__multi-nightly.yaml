@@ -1,0 +1,86 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.12"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.12"
+  tools:
+    name: "4.12"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: e2e-aws-ipi-p2
+  cron: 0 6 */7 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @heterogeneous and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: e2e-aws-ipi-ovn-ipsec-p2
+  cron: 0 9 */7 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @heterogeneous and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.12'
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+zz_generated_metadata:
+  branch: release-4.12
+  org: openshift
+  repo: openshift-tests-private
+  variant: multi-nightly
