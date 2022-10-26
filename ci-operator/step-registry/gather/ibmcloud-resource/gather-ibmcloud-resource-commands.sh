@@ -126,8 +126,19 @@ function gather_cos {
 
 # Gather CIS resources
 function gather_cis {
-    command_retry "${IBMCLOUD_CLI}" cis instance-set "Openshift-IPI-CI-CIS"
-    DOMAIN_ID=$(command_retry "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk '/ci-ibmcloud.devcluster.openshift.com/{print $1}')
+    local cisName BASE_DOMAIN
+    if [ -f "${CLUSTER_PROFILE_DIR}/ibmcloud-cis" ]; then
+        cisName="$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-cis")"
+        BASE_DOMAIN="$(cat "${CLUSTER_PROFILE_DIR}/ibmcloud-cis-domain")"
+    else
+        cisName="Openshift-IPI-CI-CIS"
+        BASE_DOMAIN="ci-ibmcloud.devcluster.openshift.com"
+    fi
+    echo -e "#cisName: ${cisName}"
+    command_retry "${IBMCLOUD_CLI}" cis instance-set ${cisName}
+
+    echo -e "#baseDomain: ${BASE_DOMAIN}"
+    DOMAIN_ID=$(command_retry "${IBMCLOUD_CLI}" cis domains | grep ${BASE_DOMAIN} | awk '{print $1}')
     {
         echo -e "# ibmcloud cis domains\n"
         command_retry "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk -v filter="${DOMAIN_ID}" '$0 ~ filter'
