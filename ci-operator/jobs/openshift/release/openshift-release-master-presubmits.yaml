@@ -937,6 +937,32 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build03
+    context: ci/prow/multi-arch-gen-valid
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-multi-arch-gen-valid
+    rerun_command: /test multi-arch-gen-valid
+    run_if_changed: ^(core-services/image-mirroring)
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/image-mirroring/validate-multi-arch-image-mirror-gen.sh
+        image: registry.ci.openshift.org/ci/python-validation
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )multi-arch-gen-valid,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
