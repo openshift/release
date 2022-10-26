@@ -1,27 +1,20 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
-set -o pipefail
+set +o errexit
+set +o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
-export AWS_SHARED_CREDENTIALS_FILE=$CLUSTER_PROFILE_DIR/.awscred
-export AZURE_AUTH_LOCATION=$CLUSTER_PROFILE_DIR/osServicePrincipal.json
-export GOOGLE_CLOUD_KEYFILE_JSON=$CLUSTER_PROFILE_DIR/gce.json
-export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
-export OVIRT_CONFIG=${SHARED_DIR}/ovirt-config.yaml
-
-if [[ "${CLUSTER_TYPE}" == "ibmcloud" ]]; then
-  IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
-  export IC_API_KEY
-fi
+POWERVS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.powervscred"
+export POWERVS_SHARED_CREDENTIALS_FILE
 
 if [[ "${CLUSTER_TYPE}" == "powervs" ]]; then
-  IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/powervs-api-key")"
-  export IC_API_KEY
+  IBMCLOUD_API_KEY=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY")
+  export IBMCLOUD_API_KEY
 fi
+
+export POWERVS_AUTH_FILEPATH=${SHARED_DIR}/powervs-config.json
 
 echo "Deprovisioning cluster ..."
 if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
@@ -31,28 +24,24 @@ fi
 
 echo ${SHARED_DIR}/metadata.json
 
-if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
-  export AZURE_AUTH_LOCATION=$SHARED_DIR/osServicePrincipal.json
-fi
-
 echo "Copying the installation artifacts to the Installer's asset directory..."
 cp -ar "${SHARED_DIR}" /tmp/installer
 
-# TODO: remove once BZ#1926093 is done and backported
-if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
-  echo "Destroy bootstrap..."
-  set +e
-  openshift-install --dir /tmp/installer destroy bootstrap
-  set -e
-fi
-
 echo "Running the Installer's 'destroy cluster' command..."
 OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT="true"; export OPENSHIFT_INSTALL_REPORT_QUOTA_FOOTPRINT
-openshift-install --dir /tmp/installer destroy cluster &
-
+# TODO: Remove after infra bugs are fixed 
+# TO confirm resources are cleared properly
 set +e
-wait "$!"
-ret="$?"
+for i in {1..3}; do 
+  echo "Destroying cluster $i attempt..."
+  echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
+  openshift-install --dir /tmp/installer destroy cluster 
+  ret="$?"
+  echo "ret=${ret}"
+  if [ ${ret} -eq 0 ]; then
+    break
+  fi
+done
 set -e
 
 echo "Copying the Installer logs to the artifacts directory..."
@@ -61,4 +50,5 @@ if [[ -s /tmp/installer/quota.json ]]; then
 	cp /tmp/installer/quota.json "${ARTIFACT_DIR}"
 fi
 
-exit "$ret"
+echo "Exiting with ret=${ret}"
+exit "${ret}"

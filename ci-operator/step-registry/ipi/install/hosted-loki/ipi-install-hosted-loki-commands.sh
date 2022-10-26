@@ -6,7 +6,7 @@ set -o pipefail
 
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
-export LOKI_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+export LOKI_ENDPOINT=https://observatorium-mst.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
@@ -18,6 +18,8 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: openshift-e2e-loki
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
 EOF
 cat >> "${SHARED_DIR}/manifest_clusterrole.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1
@@ -487,63 +489,6 @@ spec:
   selector:
     app.kubernetes.io/name: promtail
   type: ClusterIP
-EOF
-cat >> "${SHARED_DIR}/manifest_psp.yml" << EOF
-apiVersion: policy/v1beta1
-kind: PodSecurityPolicy
-metadata:
-  name: loki-promtail
-spec:
-  allowPrivilegeEscalation: false
-  fsGroup:
-    rule: RunAsAny
-  hostIPC: false
-  hostNetwork: false
-  hostPID: false
-  privileged: false
-  readOnlyRootFilesystem: true
-  requiredDropCapabilities:
-  - ALL
-  runAsUser:
-    rule: RunAsAny
-  seLinux:
-    rule: RunAsAny
-  supplementalGroups:
-    rule: RunAsAny
-  volumes:
-  - secret
-  - configMap
-  - hostPath
-EOF
-cat >> "${SHARED_DIR}/manifest_role.yml" << EOF
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: loki-promtail
-  namespace: openshift-e2e-loki
-rules:
-- apiGroups:
-  - extensions
-  resourceNames:
-  - loki-promtail
-  resources:
-  - podsecuritypolicies
-  verbs:
-  - use
-EOF
-cat >> "${SHARED_DIR}/manifest_rolebinding.yml" << EOF
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: loki-promtail
-  namespace: openshift-e2e-loki
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: loki-promtail
-subjects:
-- kind: ServiceAccount
-  name: loki-promtail
 EOF
 cat >> "${SHARED_DIR}/manifest_oauth_role.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1

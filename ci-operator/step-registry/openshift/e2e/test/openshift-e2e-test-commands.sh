@@ -103,6 +103,8 @@ fi
 case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
+    # In k8s 1.24 this is required to run GCP PD tests. See: https://github.com/kubernetes/kubernetes/pull/109541
+    export ENABLE_STORAGE_GCE_PD_DRIVER="yes"
     export KUBE_SSH_USER=core
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
@@ -121,7 +123,7 @@ aws|aws-arm64)
     export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
     export KUBE_SSH_USER=core
     ;;
-azure4) export TEST_PROVIDER=azure;;
+azure4|azure-arm64) export TEST_PROVIDER=azure;;
 azurestack)
     export TEST_PROVIDER="none"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
@@ -159,6 +161,7 @@ ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
     ;;
+nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
@@ -350,8 +353,33 @@ done
 # wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
 # any e2e tests that might require specific workload capacity.
 echo "$(date) - waiting for nodes to be ready..."
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-echo "$(date) - all nodes are ready"
+ret=0
+oc wait nodes --all --for=condition=Ready=true --timeout=10m || ret=$?
+if [[ "$ret" == 0 ]]; then
+      cat >"${ARTIFACT_DIR}/junit_node_ready.xml" <<EOF
+      <testsuite name="cluster nodes ready" tests="1" failures="0">
+        <testcase name="all nodes should be ready"/>
+      </testsuite>
+EOF
+    echo "$(date) - all nodes are ready"
+else
+    set +e
+    getNodeResult=$(oc get nodes)
+    set -e
+    cat >"${ARTIFACT_DIR}/junit_node_ready.xml" <<EOF
+    <testsuite name="cluster nodes ready" tests="1" failures="1">
+      <testcase name="all nodes should be ready">
+        <failure message="">
+          Timed out waiting for nodes to be ready. Return code: $ret.
+          oc get nodes
+          $getNodeResult
+        </failure>
+      </testcase>
+    </testsuite>
+EOF
+    echo "Timed out waiting for nodes to be ready. Return code: $ret."
+    exit 1
+fi
 
 # wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
 # time before we run our e2e tests.
@@ -364,7 +392,7 @@ echo "$(date) - waiting for non-samples imagesteams to import..."
 count=0
 while :
 do
-  non_imported_imagestreams=$(oc -n openshift get is -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
+  non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
   if [ -z "${non_imported_imagestreams}" ]
   then
     break

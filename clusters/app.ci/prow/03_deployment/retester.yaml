@@ -1,3 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  labels:
+    app: prow
+    component: retester
+  name: retester
+  namespace: prow-monitoring
+spec:
+  jobLabel: component
+  selector:
+    matchLabels:
+      app: prow
+      component: retester
+  podMetricsEndpoints:
+  - port: metrics
+    scheme: http
+    scrapeTimeout: 20s
+  namespaceSelector:
+    matchNames:
+    - ci
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -37,7 +59,10 @@ spec:
         - --github-token-path=/etc/oauth/oauth
         - --job-config-path=/etc/job-config
         - --cache-file=/cache/backoff
-        - --enable-on-repo=openshift/ci-tools
+        - --config-file=/etc/retester/_config.yaml
+        ports:
+        - name: metrics
+          containerPort: 9090
         volumeMounts:
         - name: github-token
           mountPath: /etc/oauth
@@ -50,9 +75,12 @@ spec:
           readOnly: true
         - name: cache
           mountPath: /cache
+        - name: config
+          mountPath: /etc/retester
+          readOnly: true
         resources:
           requests:
-            memory: "500Mi"
+            memory: "3Gi"
             cpu: "250m"
       volumes:
       - name: prow-config
@@ -72,6 +100,10 @@ spec:
               name: job-config-master-postsubmits
           - configMap:
               name: job-config-master-presubmits
+          - configMap:
+              name: job-config-1.x
+          - configMap:
+              name: job-config-2.x
           - configMap:
               name: job-config-3.x
           - configMap:
@@ -98,12 +130,17 @@ spec:
               name: job-config-4.11
           - configMap:
               name: job-config-4.12
+          - configMap:
+              name: job-config-4.13
       - name: cache
         persistentVolumeClaim:
           claimName: retester
+      - name: config
+        configMap:
+          name: retester-config
 ---
-kind: PersistentVolumeClaim
 apiVersion: v1
+kind: PersistentVolumeClaim
 metadata:
   labels:
     app: prow

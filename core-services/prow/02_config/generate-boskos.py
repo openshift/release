@@ -25,7 +25,11 @@ CONFIG = {
         'us-west-1': 35,
         'us-west-2': 40,
     },
+    'aws-3-quota-slice': {
+        'us-east-1': 40,
+    },
     'aws-qe-quota-slice': {
+        'us-east-1': 20,
         'us-east-2': 25,
     },
     'aws-china-qe-quota-slice': {
@@ -54,6 +58,12 @@ CONFIG = {
         'eastus2': 8,
         'westus': 8
     },
+    'azure-arm64-quota-slice': {
+        'centralus': 3,
+        'eastus': 3,
+        'eastus2': 3,
+        'westus2': 3
+    },
     'azurestack-quota-slice': {
         'ppe3': 2
     },
@@ -61,12 +71,23 @@ CONFIG = {
         'usgovvirginia': 5
     },
     'azure-qe-quota-slice': {
-        'northcentralus': 5
+        'northcentralus': 10,
+        'westus3': 10,
+        'centralus': 10
+    },
+    'azure-arm64-qe-quota-slice': {
+        'centralus': 6,
+        'eastus': 6,
+        'eastus2': 4,
+        'northeurope': 4
     },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5
     },
     'equinix-ocp-metal-quota-slice': {
+        'default': 40,
+    },
+    'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
     },
     'gcp-qe-quota-slice': {
@@ -85,12 +106,16 @@ CONFIG = {
         'default': 1000,
     },
     'nutanix-quota-slice': {},
+    'nutanix-qe-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-quota-slice': {
         'default': 7,
     },
     'openstack-vexxhost-quota-slice': {
-        'default': 18,
+        'default': 9,
+    },
+    'openstack-operators-vexxhost-quota-slice': {
+        'default': 2,
     },
     'openstack-hwoffload-quota-slice': {
         'default': 5,
@@ -122,6 +147,8 @@ CONFIG = {
     'vsphere-quota-slice':{},
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
+    'vsphere-connected-quota-slice':{},
+    'vsphere-multizone-quota-slice':{},
     'vsphere-platform-none-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
@@ -140,7 +167,10 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
-        'default': 1,
+        'syd04': 1,
+        'syd05': 1,
+        'tor01': 1,
+        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'default': 7,
@@ -152,7 +182,7 @@ CONFIG = {
         'us-east-1': 10,
     },
     'alibabacloud-cn-qe-quota-slice': {
-        'cn-hangzhou': 10,
+        'us-east-1': 10,
     },
 }
 
@@ -166,8 +196,11 @@ for i in range(3):
 # Reserve one for internal debugging use
 del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-1-3']
 
-for i in range(2):
+for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
+
+for i in range(3):
+    CONFIG['nutanix-qe-quota-slice']['nutanix-qe-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1
@@ -181,7 +214,10 @@ for i in range(10, 24):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(76,103):
+for i in range(83,93):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(94,106):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):
@@ -192,6 +228,12 @@ for i in range(60,62):
 
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(55,56):
+    CONFIG['vsphere-connected-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(151,155):
+    CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],

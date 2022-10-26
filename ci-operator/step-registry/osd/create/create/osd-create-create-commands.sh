@@ -13,6 +13,35 @@ read_profile_file() {
   fi
 }
 
+set_expiration_time() {
+  local cluster_id="${1}"
+  local expiration_time="${2}"
+  echo "Set the expiration time '${expiration_time}' for the cluster with id '${cluster_id}'."
+  # Properly format the time and then send the request via ocm patch
+  expiration_time=$(date -u -d "${expiration_time}" "+%Y-%m-%dT%H:%M:%S.00000Z") && \
+    echo "The expiration time was formatted to '${expiration_time}'." && \
+    echo '{ "expiration_timestamp": "'"${expiration_time}"'" }' | ocm patch "/api/clusters_mgmt/v1/clusters/${cluster_id}"
+}
+
+handle_installation_failure() {
+  local cluster_id="${1}"
+  local installation_log
+  # Print cluster status
+  echo "Status for the cluster with id '${cluster_id}'."
+  ocm get "/api/clusters_mgmt/v1/clusters/${cluster_id}" | jq -r '.status'
+  # Archive installation log
+  installation_log="${ARTIFACT_DIR}/.osd_install.log"
+  echo "Archive installation log to '${installation_log}'."
+  ocm get "/api/clusters_mgmt/v1/clusters/${cluster_id}/logs/install" > "${installation_log}" || echo "error: Unable to pull installation log."
+  # Set expiration time if requested
+  if [[ -n "${CLUSTER_DURATION_AFTER_FAILURE}" ]]; then
+    echo "Set the expiration time after the failure."
+    set_expiration_time "${cluster_id}" "+${CLUSTER_DURATION_AFTER_FAILURE}sec"
+    echo "Delete the file '${HOME}/cluster-id' to avoid cluster deletion."
+    rm -rf "${HOME}/cluster-id"
+  fi
+}
+
 CLUSTER_NAME=${CLUSTER_NAME:-$NAMESPACE}
 CLUSTER_VERSION=${CLUSTER_VERSION:-}
 CLUSTER_MULTI_AZ=${CLUSTER_MULTI_AZ:-false}
@@ -109,8 +138,8 @@ echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 # In case things go wrong in our flow, give the cluster an initial expiration
 # that will minimize wasted compute if post steps are not successful.
 # After installation, the expiration will be bumped according to CLUSTER_DURATION.
-INIT_EXPIRATION_DATE=$(date -u -d "+3hours" "+%Y-%m-%dT%H:%M:%S.00000Z")
-echo '{ "expiration_timestamp": "'"${INIT_EXPIRATION_DATE}"'" }' | ocm patch "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"
+echo "Set the initial expiration time"
+set_expiration_time "${CLUSTER_ID}" "+3hours"
 
 # Store the cluster ID for the delete operation
 echo -n "${CLUSTER_ID}" > "${HOME}/cluster-id"
@@ -127,19 +156,19 @@ while true; do
   fi
   if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
     echo "error: Timed out while waiting for cluster to be ready"
+    handle_installation_failure "${CLUSTER_ID}"
     exit 1
   fi
   if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" ]]; then
-    ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.osd_install.log" || echo "error: Unable to pull installation log."
     echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
+    handle_installation_failure "${CLUSTER_ID}"
     exit 1
   fi
 done
 
 if [[ -n "${CLUSTER_DURATION}" ]]; then
-  # Set the expiration according to desired cluster TTL
-  EXPIRATION_DATE=$(date -u -d "+${CLUSTER_DURATION}sec" "+%Y-%m-%dT%H:%M:%S.00000Z")
-  echo '{ "expiration_timestamp": "'"${EXPIRATION_DATE}"'" }' | ocm patch "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"
+  echo "Set the expiration time as set in CLUSTER_DURATION"
+  set_expiration_time "${CLUSTER_ID}" "+${CLUSTER_DURATION}sec"
 fi
 
 ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.osd_install.log"

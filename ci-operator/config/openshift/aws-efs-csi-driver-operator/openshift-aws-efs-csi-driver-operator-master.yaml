@@ -1,34 +1,38 @@
 base_images:
   base:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: base
   driver-operand:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: aws-efs-csi-driver
   livenessprobe-operand:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: csi-livenessprobe
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.18-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
   operator-index:
     name: redhat-operator-index
     namespace: ci
     tag: v4.10
   provisioner-operand:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: csi-external-provisioner
   proxy-operand:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: kube-rbac-proxy
   registrar-operand:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: csi-node-driver-registrar
 binary_build_commands: make
@@ -38,16 +42,19 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
@@ -70,17 +77,17 @@ operator:
   - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
-  name: "4.11"
+  name: "4.12"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':

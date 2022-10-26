@@ -3,29 +3,29 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.17-linux:
+  stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.17-linux:
+    stolostron_builder_go1.18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: idp-mgmt-operator
 - dockerfile_path: Dockerfile.cypress
   inputs:
-    stolostron_builder_go1.17-linux:
+    stolostron_builder_go1.18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: idp-mgmt-operator-e2e-tests
 promotion:
   disabled: true
@@ -51,6 +51,7 @@ tests:
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export SONAR_ORG=identitatem
+    export HOME="/tmp"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -61,6 +62,7 @@ tests:
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export SONAR_ORG=identitatem
+    export HOME="/tmp"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src

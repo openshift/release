@@ -33,6 +33,7 @@ tests:
       OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:40523
     env:
       CLUSTER_DURATION: "10800"
+      CLUSTER_DURATION_AFTER_FAILURE: "86400"
       CLUSTER_VERSION: "4.10"
       COMPUTE_NODES: "3"
       CUSTOM_SCORECARD_TESTCASE: ""
@@ -43,13 +44,24 @@ tests:
       PYXIS_URL: ""
       TEST_MODE: msp
     post:
-    - ref: gather-must-gather
+    - as: gather-must-gather
+      best_effort: true
+      commands: |
+        curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/must-gather/gather-must-gather-commands.sh | /bin/bash -s
+      from: cli
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 30m0s
     - ref: gather-extra
     - ref: gather-audit-logs
     - ref: osd-delete-delete
     pre:
     - ref: ipi-install-rbac
     - ref: osd-create-create
+    - ref: osd-grant-cluster-editor
     - ref: optional-operators-configure-proxy-registry
     - ref: optional-operators-cvp-common-apply-secrets
     - ref: optional-operators-subscribe

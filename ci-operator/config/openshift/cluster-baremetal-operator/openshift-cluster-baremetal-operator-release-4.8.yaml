@@ -1,22 +1,26 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -67,28 +71,36 @@ tests:
 - as: unit
   commands: ./hack/ci-test.sh
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.8
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
 - as: lint
   commands: make lint
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.8
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
 - as: gofmt
   commands: make fmt
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.8
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
 - as: govet
   commands: make vet
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.8
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT|manifests\/)$
 - as: generate-check
   commands: make generate-check
   container:
-    from: src
+    from: ocp_builder_rhel-8-golang-1.16-openshift-4.8
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
 - as: e2e-agnostic
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
 - as: e2e-metal-ipi
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -97,10 +109,14 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-serial-ipv4
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-upgrade
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -112,6 +128,8 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -120,6 +138,8 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -128,14 +148,18 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-virtualmedia
+  cluster: build05
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-metal-assisted
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
 - as: e2e-aws
+  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws

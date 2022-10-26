@@ -51,13 +51,12 @@ function wait_for_sriov_pods() {
 }
 
 oc_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
-case "${oc_version}" in
-    # Remove 4.11 once it's GA
-    4.11)
-        echo "OpenShift 4.11 was detected"
-        is_dev_version=1 ;;
-    *) ;;
-esac
+ocp_url="curl -o /dev/null -s -w '%{http_code}\n' https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-${oc_version}/"
+
+if [ "$(eval "${ocp_url}")" != "200" ]; then
+    echo "${oc_version} is not a supported version of the sriov-network-operator yet, will deploy it from source"
+    is_dev_version=1
+fi
 
 if [ -n "${is_dev_version:-}" ]; then
     echo "The SR-IOV will be installed from Github using release-${oc_version} branch."

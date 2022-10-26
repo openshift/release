@@ -13,13 +13,12 @@ source "${SHARED_DIR}/packet-conf.sh"
 # Get dev-scripts logs and other configuration
 finished()
 {
-  #Save exit code for must-gather to generate junit
-  echo "$?" > "${SHARED_DIR}/install-status.txt"
-  set +e
+  # Remember dev-scripts setup exit code
+  retval=$?
 
   echo "Fetching kubeconfig, other credentials..."
-  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeconfig" "${SHARED_DIR}/"
-  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/ostest/auth/kubeadmin-password" "${SHARED_DIR}/"
+  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeconfig" "${SHARED_DIR}/"
+  scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeadmin-password" "${SHARED_DIR}/"
 
   echo "Adding proxy-url in kubeconfig"
   sed -i "/- cluster/ a\    proxy-url: http://$IP:8213/" "${SHARED_DIR}"/kubeconfig
@@ -34,6 +33,16 @@ finished()
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
+
+  # Save exit code for must-gather to generate junit. Make eats exit
+  # codes, so we try to fetch it from the dev-scripts artifacts if we can.
+  status_file=${ARTIFACT_DIR}/root/dev-scripts/logs/installer-status.txt
+  if [ -f "$status_file"  ];
+  then
+    cp "$status_file" "${SHARED_DIR}/install-status.txt"
+  else
+    echo "$retval" > "${SHARED_DIR}/install-status.txt"
+  fi
 }
 trap finished EXIT TERM
 
@@ -65,6 +74,9 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 fi
 
+[ -e "${SHARED_DIR}/bm.json" ] && scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "root@${IP}:bm.json"
+
+
 timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeuo pipefail
@@ -73,9 +85,6 @@ set -xeuo pipefail
 # The problem is that sos expects it to be a directory. Since we don't care
 # about the Packet provisioner, remove the file if it's present.
 test -f /usr/config && rm -f /usr/config || true
-
-# TODO: remove this once rocky is marked as supported in dev-scripts
-sed -i -e 's/rocky/centos/g; s/Rocky/CentOS/g' /etc/os-release
 
 yum install -y git sysstat sos make
 systemctl start sysstat
@@ -86,24 +95,37 @@ mkdir dev-scripts
 tar -xzvf dev-scripts.tar.gz -C /root/dev-scripts
 chown -R root:root dev-scripts
 
-NVME_DEVICE="/dev/nvme0n1"
-if [ -e "\$NVME_DEVICE" ];
+if [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ] && [[ "\$(mount | grep ${NVME_DEVICE})" == "" ]];
 then
-  mkfs.xfs -f "\${NVME_DEVICE}"
+  mkfs.xfs -f "${NVME_DEVICE}"
   mkdir /opt/dev-scripts
-  mount "\${NVME_DEVICE}" /opt/dev-scripts
+  mount "${NVME_DEVICE}" /opt/dev-scripts
 fi
+
+# Needed if setting "EXTRA_NETWORK_NAMES" to avoid
+sysctl -w net.ipv6.conf.\$(ip -o route get 1.1.1.1 | cut -f 5 -d ' ').accept_ra=2
 
 cd dev-scripts
 
 cp /root/pull-secret /root/dev-scripts/pull_secret.json
 
-echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
 echo "export ADDN_DNS=\$(awk '/nameserver/ { print \$2;exit; }' /etc/resolv.conf)" >> /root/dev-scripts/config_root.sh
 echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
+
+if [[ "${ARCHITECTURE}" == "arm64" ]]; then
+  echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" >> /root/dev-scripts/config_root.sh
+  ## Look into making the following IRONIC_IMAGE change a default behavior within 'dev-scripts'
+  echo "export IRONIC_IMAGE=\\\$(oc adm release info -a /root/dev-scripts/pull_secret.json \
+    \\\${OPENSHIFT_RELEASE_IMAGE} --image-for=\"ironic\")" >> /root/dev-scripts/config_root.sh
+  ## The following exports should be revisited after this:  https://issues.redhat.com/browse/ARMOCP-434
+  echo "export SUSHY_TOOLS_IMAGE=quay.io/multi-arch/sushy-tools:muiltarch" >> /root/dev-scripts/config_root.sh
+  echo "export VBMC_IMAGE=quay.io/multi-arch/vbmc:arm" >> /root/dev-scripts/config_root.sh
+else
+  echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE}" >> /root/dev-scripts/config_root.sh
+fi
 
 # Inject PR additional configuration, if available
 if [[ -e /root/dev-scripts/dev-scripts-additional-config ]]
@@ -115,9 +137,27 @@ then
   cat /root/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
 fi
 
-echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
+if [ -e /root/bm.json ] ; then
+    . /root/dev-scripts-additional-config
 
-timeout -s 9 105m make
+    cp /root/bm.json /root/dev-scripts/bm.json
+
+    nmcli --fields UUID c show | grep -v UUID | xargs -t -n 1 nmcli con delete
+    nmcli con add ifname \${CLUSTER_NAME}bm type bridge con-name \${CLUSTER_NAME}bm bridge.stp off
+    nmcli con add type ethernet ifname eth2 master \${CLUSTER_NAME}bm con-name \${CLUSTER_NAME}bm-eth2
+    nmcli con reload
+    sleep 10
+
+    echo "export KUBECONFIG=/root/dev-scripts/ocp/\${CLUSTER_NAME}/auth/kubeconfig" >> /root/.bashrc
+else
+    echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
+fi
+
+timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
+
+if [ -e /root/bm.json ] ; then
+    sudo firewall-cmd --add-port=8213/tcp --zone=libvirt
+fi
 EOF
 
 # Copy dev-scripts variables to be shared with the test step

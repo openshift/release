@@ -61,6 +61,10 @@ data["compute"] = [ { "name": "worker", "replicas": 0 } ];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 ### Enable private cluster setting (optional)
+origin_publish="$(yq-go r install-config.yaml 'publish')"
+if [[ ${origin_publish} = "" ]]; then
+  origin_publish="External"
+fi
 if [[ -v IS_XPN ]]; then
   echo "Enabling private cluster setting..."
   python -c '
@@ -122,7 +126,7 @@ if [[ -v IS_XPN ]]; then
 fi
 
 ### Enable external ingress (optional)
-if [[ -v IS_XPN ]]; then
+if [[ -v IS_XPN ]] && [[ ${origin_publish} = "External" ]]; then
   echo "Removing publish:internal bits..."
   python -c '
 import yaml;
@@ -131,6 +135,16 @@ data = yaml.load(open(path));
 data["spec"]["endpointPublishingStrategy"]["loadBalancer"]["scope"] = "External";
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 fi
+
+### Inject customized manifests
+echo "Will include manifests:"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
+
+while IFS= read -r -d '' item
+do
+  manifest="$( basename "${item}" )"
+  cp "${item}" "${dir}/manifests/${manifest##manifest_}"
+done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
 ### Create Ignition configs
 echo "Creating Ignition configs..."

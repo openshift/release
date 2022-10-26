@@ -9,13 +9,22 @@ canonical_go_repository: github.com/openshift/driver-toolkit
 images:
 - build_args:
   - name: RHEL_VERSION
-    value: "8.4"
+    value: "8.6"
   dockerfile_path: Dockerfile
   from: base
   to: driver-toolkit
+- dockerfile_literal: |
+    FROM src
+    RUN yum -y install git && \
+        yum clean all && rm -rf /var/cache/yum/*
+  from: src
+  to: git-client
 promotion:
   additional_images:
     driver-toolkit-tests: src
+  disabled: true
+  excluded_images:
+  - git-client
   name: 4.12-priv
   namespace: ocp-private
 releases:
@@ -32,7 +41,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.10"
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -45,6 +54,18 @@ tests:
   commands: make verify
   container:
     from: src
+- as: check-commits-count
+  commands: |
+    ci/prow/check-commits-count
+  container:
+    from: git-client
+  optional: true
+- as: verify-imagestream
+  commands: |
+    ls /manifests/01-openshift-imagestream.yaml
+    ls /manifests/image-references
+  container:
+    from: driver-toolkit
 - as: image-contents
   commands: cat /etc/driver-toolkit-release.json
   container:

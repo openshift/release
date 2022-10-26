@@ -28,7 +28,6 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.17-linux
   to: search-operator-bundle
 promotion:
-  disabled: true
   name: "2.5"
   namespace: stolostron
 resources:
@@ -48,12 +47,11 @@ tests:
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export SELF="make"
         export OSCI_COMPONENT_NAME="search-operator-bundle"
-        export OSCI_COMPONENT_VERSION="2.5.0"
+        export OSCI_COMPONENT_VERSION="2.5"
         export OSCI_PUBLISH_DELAY="0"
-        make osci/publish
+        make -f Makefile.prow osci/publish
       credentials:
       - mount_path: /etc/github
         name: acm-cicd-github
@@ -80,6 +78,11 @@ tests:
       IMAGE_REPO: search-operator-bundle
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make -f Makefile.prow lint
+  container:
+    from: src
 - as: unit-test
   commands: |
     export SELF="make -f Makefile.prow"
@@ -92,12 +95,12 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: search-v2-operator
     env:
-      IMAGE_REPO: search-indexer
+      IMAGE_REPO: search-v2-operator
       REGISTRY_ORG: stolostron
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
+        export OSCI_COMPONENT_NAME="search-v2-operator"
         export OSCI_COMPONENT_VERSION="2.5"
         export SELF="make -f Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
@@ -119,7 +122,7 @@ tests:
       SOURCE_IMAGE_REF: search-v2-operator
     env:
       IMAGE_REPO: search-v2-operator
-      IMAGE_TAG: latest
+      IMAGE_TAG: 2.5-latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: latest-bundle-mirror
@@ -129,7 +132,7 @@ tests:
       SOURCE_IMAGE_REF: search-operator-bundle
     env:
       IMAGE_REPO: search-operator-bundle
-      IMAGE_TAG: latest
+      IMAGE_TAG: 2.5-latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: sonar-post-submit

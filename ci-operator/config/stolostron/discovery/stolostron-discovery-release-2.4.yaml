@@ -3,37 +3,35 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.17-linux:
+  stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 images:
 - dockerfile_path: Dockerfile.prow
   from: base
   inputs:
-    stolostron_builder_go1.17-linux:
+    stolostron_builder_go1.18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: discovery-operator
 - dockerfile_path: Dockerfile.test.prow
-  from: base
   inputs:
-    stolostron_builder_go1.17-linux:
+    stolostron_builder_go1.18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: discovery-operator-tests
 - dockerfile_path: Dockerfile.testserver.prow
-  from: base
   inputs:
-    stolostron_builder_go1.17-linux:
+    stolostron_builder_go1.18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: discovery-testserver
 promotion:
   name: "2.4"
@@ -80,7 +78,6 @@ tests:
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
@@ -106,7 +103,6 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME="discovery-operator-tests"
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
@@ -132,7 +128,6 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME="discovery-testserver"
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish

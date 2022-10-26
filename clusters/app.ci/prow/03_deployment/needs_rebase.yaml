@@ -37,10 +37,9 @@ items:
       spec:
         containers:
         - name: needs-rebase
-          image: gcr.io/k8s-prow/needs-rebase:v20220509-4308c44986
+          image: gcr.io/k8s-prow/needs-rebase:v20221024-d0c013ee2d
           args:
-          - --github-app-id=$(GITHUB_APP_ID)
-          - --github-app-private-key-path=/etc/github/cert
+          - --github-token-path=/etc/github/oauth
           - --hmac-secret-file=/etc/webhook/hmac.yaml
           - --plugin-config=/etc/plugins/plugins.yaml
           - --supplemental-plugin-config-dir=/etc/plugins
@@ -50,12 +49,6 @@ items:
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --github-hourly-tokens=0
           - --cache-valid-time=3600
-          env:
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: openshift-prow-github-app
-                key: appid
           ports:
             - name: http
               containerPort: 8888
@@ -63,7 +56,7 @@ items:
           - name: hmac
             mountPath: /etc/webhook
             readOnly: true
-          - name: github-app-credentials
+          - name: oauth
             mountPath: /etc/github
             readOnly: true
           - name: plugins
@@ -87,9 +80,9 @@ items:
         - name: hmac
           secret:
             secretName: github-webhook-credentials
-        - name: github-app-credentials
+        - name: oauth
           secret:
-            secretName: openshift-prow-github-app
+            secretName: github-credentials-openshift-merge-robot
         - name: plugins
           configMap:
             name: plugins

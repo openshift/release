@@ -3,6 +3,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
 binary_build_commands: make install
 build_root:
   project_image:
@@ -16,6 +20,9 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/kafka-controller
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: knative-eventing-kafka-broker-kafka-controller
 - dockerfile_path: openshift/ci-operator/knative-images/broker-dispatcher/Dockerfile
   to: knative-eventing-kafka-broker-dispatcher
@@ -28,10 +35,16 @@ images:
       paths:
       - destination_dir: .
         source_path: /go/bin/webhook-kafka
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: knative-eventing-kafka-broker-webhook-kafka
 - dockerfile_path: openshift/ci-operator/knative-test-images/committed-offset/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -40,6 +53,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/consumer-group-lag-provider-test/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -48,6 +64,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/event-flaker/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -56,6 +75,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/event-library/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -64,6 +86,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/event-sender/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -72,6 +97,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/heartbeats/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -80,6 +108,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/kafka-consumer/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -88,6 +119,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/partitions-replication-verifier/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -96,6 +130,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/performance/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -104,6 +141,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/print/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -112,6 +152,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/recordevents/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -120,6 +163,9 @@ images:
 - dockerfile_path: openshift/ci-operator/knative-test-images/request-sender/Dockerfile
   from: base
   inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
     test-bin:
       paths:
       - destination_dir: .
@@ -220,59 +266,6 @@ tests:
     - as: test
       cli: latest
       commands: make test-conformance
-      dependencies:
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
-        name: knative-eventing-kafka-broker-kafka-controller
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
-        name: knative-eventing-kafka-broker-webhook-kafka
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
-        name: knative-eventing-kafka-broker-test-committed-offset
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_CONSUMER_GROUP_LAG_PROVIDER_TEST
-        name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_FLAKER
-        name: knative-eventing-kafka-broker-test-event-flaker
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_LIBRARY
-        name: knative-eventing-kafka-broker-test-event-library
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
-        name: knative-eventing-kafka-broker-test-event-sender
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_HEARTBEATS
-        name: knative-eventing-kafka-broker-test-heartbeats
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
-        name: knative-eventing-kafka-broker-test-kafka-consumer
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PARTITIONS_REPLICATION_VERIFIER
-        name: knative-eventing-kafka-broker-test-partitions-replication-verifier
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PERFORMANCE
-        name: knative-eventing-kafka-broker-test-performance
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
-        name: knative-eventing-kafka-broker-test-print
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_RECORDEVENTS
-        name: knative-eventing-kafka-broker-test-recordevents
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
-        name: knative-eventing-kafka-broker-test-request-sender
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 4h0m0s
-    workflow: generic-claim
-- as: e2e-aws-ocp-49-continuous
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.9"
-  cron: 0 */12 * * 1-5
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
       dependencies:
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller

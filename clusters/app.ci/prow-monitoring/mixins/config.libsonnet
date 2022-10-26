@@ -29,6 +29,11 @@
         channel: '#build-cop-alerts',
         notify: 'build-cop',
       },
+      'patch-manager': {
+        team: 'patch-manager',
+        channel: '#notifications-ci',
+        notify: 'patch-manager',
+      },
       'endurance-cluster': {
         team: 'build-cop',
         channel: '#build-cop-alerts',

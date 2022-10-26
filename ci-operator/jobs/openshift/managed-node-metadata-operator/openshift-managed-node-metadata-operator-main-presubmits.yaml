@@ -5,22 +5,22 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
-    context: ci/prow/generate
+    cluster: build02
+    context: ci/prow/coverage
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.7"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-managed-node-metadata-operator-main-generate
-    rerun_command: /test generate
+    name: pull-ci-openshift-managed-node-metadata-operator-main-coverage
+    rerun_command: /test coverage
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=generate
+        - --secret-dir=/secrets/managed-node-metadata-operator-codecov-token
+        - --target=coverage
         command:
         - ci-operator
         image: ci-operator:latest
@@ -33,6 +33,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/managed-node-metadata-operator-codecov-token
+          name: managed-node-metadata-operator-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -41,24 +44,26 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: managed-node-metadata-operator-codecov-token
+        secret:
+          secretName: managed-node-metadata-operator-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )generate,?($|\s.*)
+    trigger: (?m)^/test( | .* )coverage,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/images
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.7"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-managed-node-metadata-operator-main-images
     rerun_command: /test images
@@ -101,12 +106,58 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
+    context: ci/prow/lint
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-managed-node-metadata-operator-main-lint
+    rerun_command: /test lint
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=lint
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )lint,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/test
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.7"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-managed-node-metadata-operator-main-test
     rerun_command: /test test
@@ -144,3 +195,50 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )test,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/validate
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-managed-node-metadata-operator-main-validate
+    rerun_command: /test validate
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=validate
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )validate,?($|\s.*)

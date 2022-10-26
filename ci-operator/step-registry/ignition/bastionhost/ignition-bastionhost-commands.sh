@@ -6,9 +6,6 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 workdir=`mktemp -d`
 
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
@@ -96,7 +93,7 @@ http_port 3128
 EOF
 
 ## PROXY Service
-cat > ${workdir}/squid-proxy.service << EOF
+cat > ${workdir}/squid.service << EOF
 [Unit]
 Description=OpenShift QE Squid Proxy Server
 After=network.target syslog.target
@@ -128,7 +125,7 @@ EOF
 PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/proxy_creds_encrypted_apr1)
 PROXY_CREDENTIAL_CONTENT="$(echo -e ${PROXY_CREDENTIAL_ARP1} | base64 -w0)"
 PROXY_CONFIG_CONTENT=$(cat ${workdir}/squid.conf | base64 -w0)
-PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/squid-proxy.service | sed 's/\"/\\"/g')
+PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/squid.service | sed 's/\"/\\"/g')
 
 # proxy ignition
 proxy_ignition_patch=$(mktemp)
@@ -174,7 +171,7 @@ cat > "${proxy_ignition_patch}" << EOF
       {
         "contents": "${PROXY_SERVICE_CONTENT}",
         "enabled": true,
-        "name": "squid-proxy.service"
+        "name": "squid.service"
       }
     ]
   }
@@ -217,7 +214,7 @@ ExecStart=/usr/bin/podman run --name poc-registry-${port} \
 -v /opt/registry-${port}/auth:/auth \
 -v /opt/registry-${port}/certs:/certs:z \
 -v /opt/registry-${port}/config.yaml:/etc/docker/registry/config.yml \
-registry:2
+quay.io/openshifttest/registry:2
 
 ExecReload=-/usr/bin/podman stop "poc-registry-${port}"
 ExecReload=-/usr/bin/podman rm "poc-registry-${port}"
@@ -289,7 +286,7 @@ proxy:
   username: "${reg_quay_user}"
   password: "${reg_quay_password}"
 EOF
-/tmp/yq m -x -i "${workdir}/registry_config_file_6001" "${patch_file}"
+yq-go m -x -i "${workdir}/registry_config_file_6001" "${patch_file}"
 
 # patch proxy for 6002 brew.registry.redhat.io
 reg_brew_url=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.url')
@@ -301,7 +298,7 @@ proxy:
   username: "${reg_brew_user}"
   password: "${reg_brew_password}"
 EOF
-/tmp/yq m -x -i "${workdir}/registry_config_file_6002" "${patch_file}"
+yq-go m -x -i "${workdir}/registry_config_file_6002" "${patch_file}"
 
 rm -f "${patch_file}"
 

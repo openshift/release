@@ -6,8 +6,6 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # subnet and AZs
@@ -35,4 +33,4 @@ compute:
     aws:
       zones: $(cat "${availability_zones}")
 EOF
-/tmp/yq m -x -i "${CONFIG}" "${CONFIG_PATCH}"
+yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"

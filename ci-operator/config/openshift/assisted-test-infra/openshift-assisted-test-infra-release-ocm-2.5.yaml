@@ -19,10 +19,18 @@ base_images:
     name: ocm-2.5
     namespace: edge-infrastructure
     tag: assisted-service
+  cluster-api-provider-agent:
+    name: ocm-2.5
+    namespace: edge-infrastructure
+    tag: cluster-api-provider-agent
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  govc:
+    name: govc
+    namespace: ci
+    tag: v0.29.0
   hypershift-operator:
     name: "4.10"
     namespace: ocp
@@ -36,19 +44,18 @@ images:
   from: src
   to: assisted-test-infra
 - dockerfile_path: Dockerfile.assisted-test-infra
+  inputs:
+    govc:
+      as:
+      - quay.io/ocp-splat/govc:v0.29.0
   to: assisted-test-infra-internal
 promotion:
   name: ocm-2.5
   namespace: edge-infrastructure
 releases:
-  initial:
-    integration:
-      name: "4.9"
-      namespace: ocp
   latest:
     integration:
-      include_built_images: true
-      name: "4.9"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
@@ -61,20 +68,8 @@ tests:
     make lint
   container:
     from: assisted-test-infra-internal
-- as: assisted-packet-check
-  cron: 0 */2 * * *
-  steps:
-    cluster_profile: packet-assisted
-    test:
-    - ref: baremetalds-packet-check
-- as: sno-packet-check
-  cron: 0 */2 * * *
-  steps:
-    cluster_profile: packet-sno
-    test:
-    - ref: baremetalds-packet-check
 - as: e2e-metal-assisted-periodic
-  cron: '@daily'
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -92,57 +87,6 @@ tests:
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tpmv2
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-tpmv2-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        DISK_ENCRYPTION_ROLES=all
-        DISK_ENCRYPTION_MODE=tpmv2
-      TEST_SUITE: full
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv
-  optional: true
-  run_if_changed: .*operator.*
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        OLM_OPERATORS=cnv
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        OLM_OPERATORS=cnv
-      TEST_SUITE: full
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ocs
-  optional: true
-  run_if_changed: .*operator.*
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        OLM_OPERATORS=ocs
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ocs-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        OLM_OPERATORS=ocs
-      TEST_SUITE: full
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
   run_if_changed: ^(.*/day2/.*|.*/cluster/.*)$
@@ -152,16 +96,6 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.5
         TEST_FUNC=test_deploy_day2_nodes_cloud
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2-periodic
-  cron: '@daily'
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        TEST_FUNC=test_deploy_day2_nodes_cloud
-      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
@@ -201,7 +135,7 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-capi
   optional: true
@@ -209,6 +143,7 @@ tests:
     cluster_profile: packet-assisted
     dependencies:
       HYPERSHIFT_IMAGE: hypershift-operator
+      PROVIDER_IMAGE: cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.5
@@ -217,15 +152,17 @@ tests:
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=10240
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-capi-periodic
-  cron: '@daily'
+  cron: 30 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
       HYPERSHIFT_IMAGE: hypershift-operator
+      PROVIDER_IMAGE: cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.5
@@ -234,12 +171,13 @@ tests:
         MINIKUBE_DISK_SIZE=70g
         MINIKUBE_RAM_MB=10240
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="create_full_environment run deploy_capi_env test_kube_api_parallel"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite-periodic
-  cron: '@daily'
+  cron: 00 01 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
@@ -251,7 +189,7 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
       TEST_SUITE: full
     workflow: assisted-baremetal
 zz_generated_metadata:

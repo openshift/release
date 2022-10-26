@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.17-linux:
-    name: builder
-    namespace: stolostron
-    tag: go1.17-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
@@ -46,6 +42,7 @@ tests:
     from: bin
 - as: verify
   commands: |
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
     make verify -k --warn-undefined-variables
   container:
     from: bin
@@ -94,7 +91,6 @@ tests:
       commands: |-
         export OSCI_COMPONENT_NAME=work
         export OSCI_COMPONENT_VERSION=2.4.0
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export SELF="make -f /opt/build-harness/Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
         make -f /opt/build-harness/Makefile.prow osci/publish

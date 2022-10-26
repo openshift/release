@@ -6,7 +6,7 @@
 #
 FROM quay.io/centos/centos:stream8
 
-ENV VERSION=1.18 \
+ENV VERSION=1.18.1 \
     GOCACHE=/go/.cache \
     GOARM=5 \
     GOPATH=/go \

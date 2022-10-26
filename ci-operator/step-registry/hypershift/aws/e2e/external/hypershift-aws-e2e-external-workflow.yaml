@@ -1,0 +1,28 @@
+workflow:
+  as: hypershift-aws-e2e-external
+  documentation: |-
+    The HyperShift aws e2e workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team. For now, please direct all questions and comments to:
+
+    - Alberto Lamela (agarcial@redhat.com)
+    - Seth Jennings (sjenning@redhat.com)
+    - Cesar Wong (cewong@redhat.com)
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    post:
+    - chain: hypershift-aws-destroy-nested-management-cluster
+    test:
+    - chain: hypershift-aws-run-e2e-external
+    pre:
+    - ref: ipi-install-rbac
+    - chain: hypershift-aws-setup-nested-management-cluster
+    - chain: hypershift-install-external
+    env:
+      HYPERSHIFT_NODE_COUNT: "4"

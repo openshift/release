@@ -4,13 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
-existing_rg=$(/tmp/yq r "${CONFIG}" 'platform.azure.resourceGroupName')
-cloud_name=$(/tmp/yq r "${CONFIG}" 'platform.azure.cloudName')
+existing_rg=$(yq-go r "${CONFIG}" 'platform.azure.resourceGroupName')
+cloud_name=$(yq-go r "${CONFIG}" 'platform.azure.cloudName')
 
 # az should already be there
 command -v az

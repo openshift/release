@@ -7,10 +7,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.18-openshift-4.11
 build_root:
   from_repository: true
 canonical_go_repository: github.com/metal3-io/baremetal-operator
@@ -18,12 +18,11 @@ images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: baremetal-operator
 promotion:
-  disabled: true
   name: 4.11-priv
   namespace: ocp-private
 releases:
@@ -47,32 +46,42 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(docs|examples|config)/)|(\.md$)|((^|/)OWNERS$)
+- as: vendor
+  commands: make vendor && git diff --exit-code
+  container:
+    from: src
+  run_if_changed: (go\.(mod|sum)$)|(^(apis|pkg/hardwareutils)/)
 - as: lint
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache make linters
   container:
     from: src
   skip_if_only_changed: (^(docs|examples)/)|(\.md$)|((^|/)OWNERS$)
 - as: e2e-metal-ipi
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-serial-ipv4
+  cluster: build05
   skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   skip_if_only_changed: (^(docs|examples)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-virtualmedia
+  cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia

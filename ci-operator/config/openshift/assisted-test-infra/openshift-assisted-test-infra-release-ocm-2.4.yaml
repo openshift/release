@@ -2,7 +2,7 @@ base_images:
   assisted-image-service:
     name: ocm-2.4
     namespace: edge-infrastructure
-    tag: assisted-installer
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.4
     namespace: edge-infrastructure
@@ -37,14 +37,9 @@ promotion:
   name: ocm-2.4
   namespace: edge-infrastructure
 releases:
-  initial:
-    integration:
-      name: "4.8"
-      namespace: ocp
   latest:
     integration:
-      include_built_images: true
-      name: "4.8"
+      name: "4.9"
       namespace: ocp
 resources:
   '*':
@@ -59,15 +54,6 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.4
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-periodic
-  cron: 0 0 */3 * *
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true
@@ -123,23 +109,7 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         KUBE_API=yes
         ENABLE_KUBE_API=true
-        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
-        TEST_FUNC=test_kubeapi
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-periodic
-  cron: 0 0 */3 * *
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.4
-        NUM_MASTERS=1
-        IPv6=yes
-        IPv4=no
-        ISO_IMAGE_TYPE=minimal-iso
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MAKEFILE_TARGET="create_full_environment run test_kube_api_parallel"
+        MAKEFILE_TARGET="test_kube_api_parallel"
         TEST_FUNC=test_kubeapi
     workflow: assisted-baremetal
 zz_generated_metadata:

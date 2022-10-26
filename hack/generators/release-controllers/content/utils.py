@@ -2,7 +2,7 @@
 def get_kubeconfig_volume_mounts():
     return [
         {
-            'mountPath': '/etc/kubeconfig',
+            'mountPath': '/etc/kubeconfigs',
             'name': 'release-controller-kubeconfigs',
             'readOnly': True
         }]
@@ -31,17 +31,18 @@ def get_rc_volume_mounts():
             'readOnly': True
         },
         {
+            'mountPath': '/etc/jira',
+            'name': 'jira',
+            'readOnly': True
+        },
+        {
             'mountPath': '/etc/plugins',
             'name': 'plugins',
             'readOnly': True
         }] + get_kubeconfig_volume_mounts()
 
 
-def get_kubeconfig_volumes(context, namespace=None, secret_name=None):
-    suffix = ''
-    if namespace is not None and len(namespace) > 0:
-        suffix = f'-{namespace}'
-
+def get_kubeconfig_volumes(context, secret_name=None):
     if secret_name is None:
         secret_name = context.secret_name_tls
 
@@ -51,16 +52,12 @@ def get_kubeconfig_volumes(context, namespace=None, secret_name=None):
             'name': 'release-controller-kubeconfigs',
             'secret': {
                 'defaultMode': 420,
-                'items': [{
-                    'key': f'sa.release-controller{suffix}.app.ci.config',
-                    'path': 'kubeconfig'
-                }],
                 'secretName': 'release-controller-kubeconfigs'
             }
         }]
 
 
-def get_rc_volumes(context, namespace=None):
+def get_rc_volumes(context):
     return [
         {
             'configMap': {
@@ -95,6 +92,16 @@ def get_rc_volumes(context, namespace=None):
                     },
                     {
                         'configMap': {
+                            'name': 'job-config-1.x'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-2.x'
+                        }
+                    },
+                    {
+                        'configMap': {
                             'name': 'job-config-3.x'
                         }
                     },
@@ -117,12 +124,19 @@ def get_rc_volumes(context, namespace=None):
             }
         },
         {
+            'name': 'jira',
+            'secret': {
+                'defaultMode': 420,
+                'secretName': 'jira-credentials-openshift-jira-robot'
+            }
+        },
+        {
             'configMap': {
                 'defaultMode': 420,
                 'name': 'plugins'
             },
             'name': 'plugins'
-        }] + get_kubeconfig_volumes(context, namespace=namespace, secret_name=context.secret_name_tls)
+        }] + get_kubeconfig_volumes(context, secret_name=context.secret_name_tls)
 
 
 def _get_dynamic_deployment_volumes(context, secret_name):

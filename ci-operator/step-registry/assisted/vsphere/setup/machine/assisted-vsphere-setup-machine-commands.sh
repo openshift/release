@@ -28,7 +28,7 @@ cd /home/assisted-test-infra/build/terraform
 
 # Create variables file
 cat >> vsphere-params.hcl << EOF
-vsphere_vcenter = "${GOVC_URL}"
+vsphere_server = "${GOVC_URL}"
 vsphere_username = "${GOVC_USERNAME}"
 vsphere_password = "${GOVC_PASSWORD}"
 vsphere_datacenter = "${GOVC_DATACENTER}"
@@ -39,8 +39,8 @@ template_name = "assisted-test-infra-machine-template"
 build_id = "${BUILD_ID}"
 EOF
 
-terraform init .
-terraform apply -var-file=vsphere-params.hcl -auto-approve
+terraform init -input=false
+terraform apply -var-file=vsphere-params.hcl -input=false -auto-approve
 IP=$(terraform output ip_address)
 
 cd ..

@@ -5,12 +5,13 @@ chain:
     cli: latest
     commands: |-
       set -exuo pipefail
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
       --dump-guest-cluster=true \
-      --name="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+      --name="${CLUSTER_NAME}"
     from_image:
       namespace: ocp
-      name: "4.11"
+      name: "4.12"
       tag: hypershift-operator
     resources:
       requests:

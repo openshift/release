@@ -1,30 +1,30 @@
 base_images:
   base:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: base
   cli:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: cli
   hco-index:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.7.0-unstable
+    tag: 1.9.0-unstable
   hco-index-prev:
     name: hyperconverged-cluster-index
     namespace: ci
-    tag: 1.6.0-unstable
-  open-cluster-management_builder_go1.17-linux:
+    tag: 1.8.0-unstable
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
-    namespace: open-cluster-management
-    tag: go1.17-linux
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: make install
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.17-openshift-4.10
+    tag: rhel-8-release-golang-1.19-openshift-4.12
 images:
 - dockerfile_path: build/Dockerfile.okd
   from: base
@@ -47,9 +47,9 @@ images:
   to: virt-artifacts-server
 - dockerfile_path: build/Dockerfile.functest.ci
   inputs:
-    open-cluster-management_builder_go1.17-linux:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: hyperconverged-cluster-functest
 - dockerfile_path: deploy/Dockerfile.src.ci
   from: src
@@ -92,22 +92,15 @@ operator:
     with: hyperconverged-cluster-webhook
   - pullspec: +ARTIFACTS_SERVER_IMAGE_TO_REPLACE+
     with: virt-artifacts-server
-promotion:
-  additional_images:
-    hyperconverged-cluster-operator-tests: src
-  excluded_images:
-  - hco-oc-bin-image-nightly
-  name: "4.11"
-  namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':
@@ -120,7 +113,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
-      OO_CHANNEL: 1.7.0
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -151,7 +144,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
-      OO_CHANNEL: 1.7.0
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -184,7 +177,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.7.0
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -205,7 +198,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.8.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -224,7 +217,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: 1.7.0
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -257,7 +250,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.7.0
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -278,7 +271,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.8.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -296,7 +289,7 @@ tests:
   steps:
     cluster_profile: azure4
     env:
-      OO_CHANNEL: 1.7.0
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -316,7 +309,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: 1.7.0
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -346,7 +339,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: 1.7.0
+      COMPUTE_NODE_TYPE: n2-standard-4
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -376,7 +370,8 @@ tests:
   steps:
     cluster_profile: gcp
     env:
-      OO_CHANNEL: 1.7.0
+      COMPUTE_NODE_TYPE: n2-standard-4
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -398,7 +393,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.7.0
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -418,7 +413,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-bundle
     env:
-      OO_CHANNEL: 1.7.0
+      OO_CHANNEL: 1.9.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -438,7 +433,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.8.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'
@@ -458,7 +453,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index-hco-upgrade-prev-bundle
     env:
-      OO_CHANNEL: 1.6.0
+      OO_CHANNEL: 1.8.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
       OO_PACKAGE: community-kubevirt-hyperconverged
       OO_TARGET_NAMESPACES: '!all'

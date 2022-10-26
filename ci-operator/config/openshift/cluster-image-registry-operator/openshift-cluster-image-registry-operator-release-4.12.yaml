@@ -3,21 +3,22 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.18-openshift-4.12
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: cluster-image-registry-operator
 promotion:
+  disabled: true
   name: "4.12"
   namespace: ocp
 releases:
@@ -89,7 +90,7 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-azure
+- as: e2e-azure-ovn
   optional: true
   run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
   steps:
@@ -133,7 +134,7 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-ovirt
+- as: e2e-ovirt-sdn
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

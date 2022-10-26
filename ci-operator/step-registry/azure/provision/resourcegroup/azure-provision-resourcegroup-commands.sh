@@ -31,4 +31,4 @@ az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIEN
 az group create -l "${REGION}" -n "${RG_NAME}"
 
 # save resource group information to ${SHARED_DIR} for reference and deprovision step
-echo "${RG_NAME}" > "${SHARED_DIR}/resouregroup"
+echo "${RG_NAME}" > "${SHARED_DIR}/resourcegroup"

@@ -74,6 +74,17 @@ SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 export CLUSTER_NAME
 export BASE_DOMAIN
 
+az_deployment_optional_parameters=""
+
+provisioned_vnet_file="${SHARED_DIR}/customer_vnet_subnets.yaml"
+if [ -f "${provisioned_vnet_file}" ]; then
+    echo "vnet already created"
+    vnet_name=$(python3 -c "import yaml;data = yaml.full_load(open('${provisioned_vnet_file}'));print(data['platform']['azure']['virtualNetwork'])")
+    vnet_basename=$(echo "${vnet_name}" | sed 's/-vnet$//')
+    az_deployment_optional_parameters="--parameters vnetBaseName=${vnet_basename}"
+    [ -z "${vnet_basename}" ] && echo "Did not get vnet basename" && exit 1
+fi
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo "Creating manifests"
 openshift-install --dir=${ARTIFACT_DIR}/installer create manifests
@@ -86,6 +97,12 @@ sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluste
 sed -i "/publicZone/,+1d" manifests/cluster-dns-02-config.yml
 sed -i "/privateZone/,+1d" manifests/cluster-dns-02-config.yml
 
+if [ -v vnet_basename ] && [ -n "${vnet_basename}" ]; then
+  echo "Editing vnet NSG from the existing vnet"
+  installer_infraID=$(cat .openshift_install_state.json | jq -j '."*installconfig.ClusterID".InfraID')
+  nsg_name="${vnet_basename}-nsg"
+  sed -i "s/${installer_infraID}-nsg/${nsg_name}/g" manifests/cloud-provider-config.yaml
+fi
 popd
 
 echo "Creating ignition configs"
@@ -122,8 +139,14 @@ INFRA_ID="$(jq -r .infraID ${ARTIFACT_DIR}/installer/metadata.json)"
 RESOURCE_GROUP="${INFRA_ID}-rg"
 echo "Infra ID: ${INFRA_ID}"
 
-echo "Creating resource group ${RESOURCE_GROUP}"
-az group create --name $RESOURCE_GROUP --location $AZURE_REGION
+provisioned_rg_file="${SHARED_DIR}/resourcegroup"
+if [ -f "${provisioned_rg_file}" ]; then
+  RESOURCE_GROUP=$(cat "${provisioned_rg_file}")
+  echo "Using an existing resource group: ${RESOURCE_GROUP}"
+else
+  echo "Creating resource group ${RESOURCE_GROUP}"
+  az group create --name $RESOURCE_GROUP --location $AZURE_REGION
+fi
 
 echo "Creating identity"
 az identity create -g $RESOURCE_GROUP -n ${INFRA_ID}-identity
@@ -180,13 +203,18 @@ az role assignment create --assignee "$PRINCIPAL_ID" --role 'Contributor' --scop
 
 pushd /tmp/azure
 
-echo "Deploying 01_vnet"
-az deployment group create -g $RESOURCE_GROUP \
-  --template-file "01_vnet.json" \
-  --parameters baseName="$INFRA_ID"
+if [ -v vnet_name ] && [ -n "${vnet_name}" ]; then
+  echo "Using the existing existing ${vnet_name}"
+else
+  echo "Deploying 01_vnet"
+  az deployment group create -g $RESOURCE_GROUP \
+    --template-file "01_vnet.json" \
+    --parameters baseName="$INFRA_ID"
+  vnet_name="${INFRA_ID}-vnet"
+fi
 
 echo "Linking VNet to private DNS zone"
-az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${INFRA_ID}-network-link -v "${INFRA_ID}-vnet" -e false
+az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n ${INFRA_ID}-network-link -v "${vnet_name}" -e false
 
 echo "Deploying 02_storage"
 VHD_BLOB_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv)
@@ -199,7 +227,7 @@ echo "Deploying 03_infra"
 az deployment group create -g $RESOURCE_GROUP \
   --template-file "03_infra.json" \
   --parameters privateDNSZoneName="${CLUSTER_NAME}.${BASE_DOMAIN}" \
-  --parameters baseName="$INFRA_ID"
+  --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}
 
 set +e
 PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-master-pip'] | [0].ipAddress" -o tsv)
@@ -220,7 +248,7 @@ az deployment group create -g $RESOURCE_GROUP \
   --template-file "04_bootstrap.json" \
   --parameters bootstrapIgnition="$BOOTSTRAP_IGNITION" \
   --parameters sshKeyData="$SSH_PUB_KEY" \
-  --parameters baseName="$INFRA_ID"
+  --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}
 
 BOOTSTRAP_PUBLIC_IP=$(az network public-ip list -g $RESOURCE_GROUP --query "[?name=='${INFRA_ID}-bootstrap-ssh-pip'] | [0].ipAddress" -o tsv)
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_PUBLIC_IP}"
@@ -232,7 +260,7 @@ az deployment group create -g $RESOURCE_GROUP \
   --parameters masterIgnition="$MASTER_IGNITION" \
   --parameters sshKeyData="$SSH_PUB_KEY" \
   --parameters privateDNSZoneName="${CLUSTER_NAME}.${BASE_DOMAIN}" \
-  --parameters baseName="$INFRA_ID"
+  --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}
 
 MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig --query "privateIpAddress" -o tsv)
 MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig --query "privateIpAddress" -o tsv)
@@ -246,7 +274,7 @@ az deployment group create -g $RESOURCE_GROUP \
   --template-file "06_workers.json" \
   --parameters workerIgnition="$WORKER_IGNITION" \
   --parameters sshKeyData="$SSH_PUB_KEY" \
-  --parameters baseName="$INFRA_ID"
+  --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}
 
 popd
 echo "Waiting for bootstrap to complete"
@@ -254,25 +282,41 @@ openshift-install --dir=${ARTIFACT_DIR}/installer wait-for bootstrap-complete &
 wait "$!" || gather_bootstrap_and_fail
 
 echo "Bootstrap complete, destroying bootstrap resources"
-az network nsg rule delete -g $RESOURCE_GROUP --nsg-name ${INFRA_ID}-nsg --name bootstrap_ssh_in
-az vm stop -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap
+if [ ! -v nsg_name ]; then
+    nsg_name=${INFRA_ID}-nsg
+fi
+az network nsg rule delete -g $RESOURCE_GROUP --nsg-name ${nsg_name} --name bootstrap_ssh_in
+az vm stop -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap --skip-shutdown
 az vm deallocate -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap
 az vm delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap --yes
 az disk delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap_OSDisk --no-wait --yes
-az network nic delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap-nic --no-wait
+az network nic delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap-nic
 az storage blob delete --account-key $ACCOUNT_KEY --account-name $ACCOUNT_NAME --container-name files --name bootstrap.ign
 az network public-ip delete -g $RESOURCE_GROUP --name ${INFRA_ID}-bootstrap-ssh-pip
 
-echo "Adding ingress DNS records"
-
 export KUBECONFIG=${ARTIFACT_DIR}/installer/auth/kubeconfig
 
+echo "$(date -u --rfc-3339=seconds) - Approving the CSR requests for nodes..."
+function approve_csrs() {
+  while [[ ! -f /tmp/install-complete ]]; do
+      # even if oc get csr fails continue
+      oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
+      sleep 15 & wait
+  done
+}
+approve_csrs &
+
+echo "Adding ingress DNS records"
+## Wait for the default-router to have an external ip...(and not <pending>)
+echo "$(date -u --rfc-3339=seconds) - Waiting for the default-router to have an external ip..."
 set +e
-public_ip_router="<pending>"
-while [[ $public_ip_router =~ "pending" ]]
-do
-  public_ip_router=$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')
-  echo $public_ip_router
+public_ip_router="$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')"
+max_retries=30
+try=0
+while [[ "$public_ip_router" == "" || "$public_ip_router" == "<pending>" ]] && [ ${try} -lt ${max_retries} ]; do
+  sleep 30;
+  (( try++ ))
+  public_ip_router="$(oc -n openshift-ingress get service router-default --no-headers | awk '{print $4}')"
 done
 set -e
 
@@ -281,23 +325,6 @@ az network dns record-set a add-record -g $BASE_DOMAIN_RESOURCE_GROUP -z ${BASE_
 az network private-dns record-set a create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps --ttl 300
 az network private-dns record-set a add-record -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${BASE_DOMAIN} -n *.apps -a $public_ip_router
 
-function approve_csrs() {
-  oc version --client
-  while true; do
-    if [[ ! -f /tmp/install-complete ]]; then
-      # even if oc get csr fails continue
-      oc get csr -ojson | jq -r '.items[] | select(.status == {} ) | .metadata.name' | xargs --no-run-if-empty oc adm certificate approve || true
-      sleep 15 & wait
-      continue
-    else
-      break
-    fi
-  done
-}
-
-echo "Approving pending CSRs"
-export KUBECONFIG=${ARTIFACT_DIR}/installer/auth/kubeconfig
-approve_csrs &
 
 set +x
 echo "Completing UPI setup"

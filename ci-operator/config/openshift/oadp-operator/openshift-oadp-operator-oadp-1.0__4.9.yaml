@@ -3,10 +3,10 @@ base_images:
     name: "4.9"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.16-openshift-4.9:
+  openshift_release_golang-1.17:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.9
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
   image_stream_tag:
     name: release
@@ -17,7 +17,7 @@ images:
   from: base
   to: oadp-operator
 - dockerfile_path: build/ci-Dockerfile
-  from: ocp_builder_rhel-8-golang-1.16-openshift-4.9
+  from: openshift_release_golang-1.17
   to: test-oadp-operator
 operator:
   bundles:
@@ -60,7 +60,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: operator-unit-test-periodic
-  cron: 0 4 * * *
+  cron: 27 6 14,26 * *
   steps:
     test:
     - as: unit-periodic
@@ -76,7 +76,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: stable-1.0
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -95,13 +95,13 @@ tests:
           memory: 512Mi
     workflow: optional-operators-ci-aws
 - as: operator-e2e-aws-periodic-slack
-  cron: 0 4 * * *
+  cron: 13 19 14,28 * *
   steps:
     cluster_profile: aws
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: stable-1.0
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -120,13 +120,13 @@ tests:
           memory: 512Mi
     workflow: optional-operators-ci-aws
 - as: operator-e2e-gcp-periodic-slack
-  cron: 0 4 * * *
+  cron: 10 7 1,28 * *
   steps:
     cluster_profile: gcp
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: stable-1.0
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -145,13 +145,13 @@ tests:
           memory: 512Mi
     workflow: optional-operators-ci-gcp
 - as: operator-e2e-azure-periodic-slack
-  cron: 0 4 * * *
+  cron: 12 1 7,17 * *
   steps:
     cluster_profile: azure4
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: stable
+      OO_CHANNEL: stable-1.0
       OO_INSTALL_NAMESPACE: openshift-adp
       OO_PACKAGE: oadp-operator
       OO_TARGET_NAMESPACES: '!install'

@@ -1,16 +1,16 @@
 base_images:
   base:
-    name: 4.11-priv
+    name: 4.12-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
+    tag: rhel-8-golang-1.19-openshift-4.12
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/router
@@ -18,9 +18,9 @@ images:
 - dockerfile_path: images/router/base/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   optional: true
   to: haproxy-router-base
 - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
@@ -30,17 +30,17 @@ images:
   from: haproxy-router-base
   to: f5-router
 promotion:
-  name: 4.11-priv
+  name: 4.12-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.11-priv
+      name: 4.12-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.11-priv
+      name: 4.12-priv
       namespace: ocp-private
 resources:
   '*':
@@ -58,9 +58,10 @@ tests:
     from: src
 - as: e2e-agnostic
   steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -70,6 +71,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -83,6 +85,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
 - as: e2e-metal-ipi-ovn-router
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal

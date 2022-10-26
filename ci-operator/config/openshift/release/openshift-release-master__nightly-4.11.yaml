@@ -7,28 +7,8 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: ansible
-  assisted-image-service:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-image-service
-  assisted-installer:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-installer
-  assisted-installer-agent:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-installer-agent
-  assisted-installer-controller:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-installer-controller
-  assisted-service:
-    name: ocm-2.6
-    namespace: edge-infrastructure
-    tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -44,11 +24,11 @@ base_images:
     namespace: ocp
     tag: base
   cnv-ci-src:
-    name: "4.10"
+    name: "4.11"
     namespace: cnv
     tag: cnv-ci-src
   cnv-ci-src-upgrade:
-    name: "4.10"
+    name: "4.11"
     namespace: cnv
     tag: cnv-ci-src-upgrade
   console-tests:
@@ -67,6 +47,10 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: gcp-pd-csi-driver-operator-test
+  ibm-vpc-block-csi-driver-operator-test:
+    name: "4.11"
+    namespace: ocp
+    tag: ibm-vpc-block-csi-driver-operator-test
   libvirt-installer:
     name: "4.11"
     namespace: ocp
@@ -91,24 +75,22 @@ releases:
       product: ocp
       stream: nightly
       version: "4.11"
+  oldest-supported-credentials-request:
+    release:
+      channel: candidate
+      version: 4.11.0-fc.0
+  oldest-supported-z-rollback:
+    release:
+      channel: candidate
+      version: 4.11.0-fc.0
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-assisted
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_AGENT_IMAGE: pipeline:assisted-installer-agent
-      ASSISTED_CONTROLLER_IMAGE: pipeline:assisted-installer-controller
-      ASSISTED_INSTALLER_IMAGE: pipeline:assisted-installer
-      ASSISTED_SERVICE_IMAGE: pipeline:assisted-service
-    workflow: assisted-baremetal
 - as: e2e-aws-single-node-workers
-  interval: 24h
+  cron: 35 12 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
@@ -116,21 +98,21 @@ tests:
     workflow: openshift-e2e-aws-single-node-workers
   timeout: 3h0m0s
 - as: openshift-e2e-aws-single-node-workers-upgrade-conformance
-  interval: 24h
+  cron: 48 11 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-single-node-workers-upgrade-conformance
 - as: e2e-aws-single-node
-  interval: 24h
+  cron: 3 5 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-single-node
 - as: e2e-aws-single-node-serial
-  interval: 24h
+  cron: 35 16 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
@@ -138,16 +120,28 @@ tests:
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-aws-single-node
 - as: e2e-metal-single-node-live-iso
-  interval: 24h
+  cron: 16 0 */1 * 1-5
   steps:
     cluster_profile: packet-sno
     workflow: baremetalds-sno
-- as: e2e-metal-ipi
-  interval: 6h
+- as: e2e-metal-single-node-with-worker-live-iso
+  cron: 24 1 */1 * 1-5
+  steps:
+    cluster_profile: packet-sno
+    env:
+      PACKET_PLAN: c3.medium.x86
+      TEST_FUNC: test_bip_add_worker
+    workflow: baremetalds-sno
+- as: e2e-metal-ipi-bm
+  cluster: build05
+  cron: 19 16 */1 * 1-5
   steps:
     cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-ovn-dualstack-local-gateway
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
@@ -157,56 +151,75 @@ tests:
         NETWORK_TYPE=OVNKubernetes
         OVN_LOCAL_GATEWAY_MODE=true
     workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-ipv4
+  cluster: build05
+  interval: 48h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv4
 - as: e2e-metal-ipi-serial-ipv4
-  interval: 6h
+  cluster: build05
+  cron: 20 21 */1 * 1-5
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-serial-ovn-ipv6
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-ipv6
 - as: e2e-metal-ipi-serial-virtualmedia
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-virtualmedia
 - as: e2e-metal-ipi-serial-ovn-dualstack
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ovn-dualstack
 - as: e2e-metal-ipi-serial-compact
+  cluster: build05
   interval: 48h
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-compact
-- as: e2e-metal-ipi-upgrade
-  cron: 0 0 1 1 *
+- as: e2e-metal-ipi-bm-upgrade
+  cluster: build05
+  cron: 0 6 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
+      CLUSTERTYPE: baremetal
       TEST_TYPE: upgrade-conformance
     workflow: baremetalds-e2e-upgrade
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-upgrade-ovn-ipv6
-  cron: 0 0 1 1 *
+  cluster: build05
+  cron: 0 6 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       TEST_TYPE: upgrade-conformance
     workflow: baremetalds-e2e-upgrade-ovn-ipv6
+  timeout: 5h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
-  interval: 6h
+  cluster: build05
+  cron: 37 15 */1 * 1-5
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   cron: 0 0 1 1 *
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-compact
+  cluster: build05
   cron: 0 0 * * 1
   steps:
     cluster_profile: equinix-ocp-metal
@@ -215,11 +228,6 @@ tests:
         IP_STACK=v6
         NUM_WORKERS=0
     workflow: baremetalds-e2e
-- as: e2e-metal-ipi-virtualmedia
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-virtualmedia
 - as: e2e-aws-proxy
   cron: 0 0 */2 * *
   steps:
@@ -247,7 +255,7 @@ tests:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
-  interval: 24h
+  cron: 12 11 */1 * 1-5
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-ovn
@@ -272,37 +280,39 @@ tests:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi-serial
 - as: e2e-vsphere-csi
-  interval: 24h
+  cron: 25 16 */1 * 1-5
   steps:
     cluster_profile: vsphere
+    env:
+      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
+        on the same node
     workflow: openshift-e2e-vsphere-csi
 - as: e2e-aws-workers-rhel8
-  cron: '@daily'
+  cron: 1 21 */1 * 1-5
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
       PLATFORM_VERSION: "8.4"
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-ovirt
-  cron: 0 2,8,14,20 * * *
+  cron: 0 2,10,18 * * *
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-conformance
 - as: e2e-ovirt-ovn
-  cron: 0 6,18 * * *
+  cron: 0 4,12,20 * * *
   steps:
     cluster_profile: ovirt
     env:
       NETWORK_TYPE: OVNKubernetes
     workflow: openshift-e2e-ovirt-conformance
 - as: e2e-ovirt-csi
-  interval: 24h
+  cron: 13 8 */1 * 1-5
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-csi
 - as: e2e-gcp-libvirt-cert-rotation
-  cron: '@daily'
+  cron: 8 0 */1 * 1-5
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-libvirt-cert-rotation
@@ -344,7 +354,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-gcp
 - as: e2e-gcp-csi
-  interval: 24h
+  cron: 29 19 */1 * 1-5
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-csi
@@ -389,7 +399,7 @@ tests:
     - ref: fips-check
     workflow: openshift-e2e-gcp
 - as: console-aws
-  interval: 48h
+  interval: 12h
   steps:
     cluster_profile: aws-2
     env:
@@ -411,11 +421,30 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
-      COMPUTE_NODE_TYPE: n1-standard-8
+      COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp-realtime
+- as: e2e-aws-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
+- as: credentials-request-freeze
+  interval: 48h
+  steps:
+    dependencies:
+      OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
+      OPENSHIFT_LATEST_RELEASE_IMAGE: release:latest
+    workflow: openshift-credentials-request-freeze
 - as: e2e-aws-upgrade
-  interval: 24h
+  cron: 21 17 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
@@ -437,22 +466,14 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-serial
 - as: e2e-aws-ovn-serial
-  interval: 48h
+  cron: 29 16 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-ovn-serial
-- as: e2e-aws-canary
-  interval: 24h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_SUITE: experimental/reliability/minimal
-    workflow: openshift-e2e-aws
 - as: e2e-aws-csi
-  interval: 24h
+  cron: 52 4 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
@@ -473,33 +494,35 @@ tests:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure
 - as: e2e-azure-csi
-  interval: 24h
+  cron: 38 17 */1 * 1-5
   steps:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     workflow: openshift-e2e-azure-csi
 - as: e2e-azurestack-csi
-  interval: 24h
+  cron: 58 7 */1 * 1-5
   steps:
     cluster_profile: azurestack
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     workflow: openshift-e2e-azurestack-upi-csi
 - as: e2e-aws-cgroupsv2
-  interval: 3h
+  cron: 57 8 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-cgroupsv2
 - as: e2e-aws-crun
-  interval: 3h
+  cron: 49 20 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-crun
 - as: e2e-azure-deploy-cnv
-  interval: 12h
+  cron: 53 7 */1 * 1-5
   steps:
     cluster_profile: azure-2
     env:
@@ -507,7 +530,12 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make deploy_test
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.11 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make deploy_test
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
@@ -517,7 +545,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.45.0
+      - default: v0.53.2
         name: KUBEVIRT_RELEASE
       - default: "4.11"
         name: OCP_VERSION
@@ -525,7 +553,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "true"
+      - default: "false"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src
       resources:
@@ -534,14 +562,19 @@ tests:
           memory: 600Mi
     workflow: ipi-azure
 - as: e2e-azure-upgrade-cnv
-  interval: 12h
+  cron: 53 15 */1 * 1-5
   steps:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
     test:
     - as: test
-      commands: make upgrade_test
+      commands: |
+        curl -L https://github.com/openshift-cnv/cnv-ci/tarball/release-4.11 -o /tmp/cnv-ci.tgz
+        mkdir -p /tmp/cnv-ci
+        tar -xvzf /tmp/cnv-ci.tgz -C /tmp/cnv-ci --strip-components=1
+        cd /tmp/cnv-ci
+        make upgrade_test
       credentials:
       - mount_path: /var/run/cnv-ci-brew-pull-secret
         name: cnv-ci-brew-pull-secret
@@ -551,7 +584,7 @@ tests:
         name: BREW_IMAGE_REGISTRY_USERNAME
       - default: /var/run/cnv-ci-brew-pull-secret/token
         name: BREW_IMAGE_REGISTRY_TOKEN_PATH
-      - default: v0.45.0
+      - default: v0.53.2
         name: KUBEVIRT_RELEASE
       - default: "4.11"
         name: OCP_VERSION
@@ -559,7 +592,7 @@ tests:
         name: ARTIFACTS_DIR
       - default: openshift-cnv
         name: TARGET_NAMESPACE
-      - default: "true"
+      - default: "false"
         name: PRODUCTION_RELEASE
       from: cnv-ci-src-upgrade
       resources:
@@ -568,7 +601,7 @@ tests:
           memory: 600Mi
     workflow: ipi-azure
 - as: e2e-aws-driver-toolkit
-  cron: 0 */8 * * *
+  cron: 29 12 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
@@ -583,12 +616,16 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-telco5g
-  cluster: build01
-  interval: 48h
+  cluster: build05
+  cron: 21 22 */1 * 1-5
   steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_BRANCH=release-4.11
+        FEATURES="sriov performance sctp xt_u32 ovn"
     workflow: telco5g
 - as: e2e-alibaba
-  interval: 24h
+  cron: 46 18 */1 * 1-5
   steps:
     cluster_profile: alibabacloud
     env:
@@ -600,12 +637,37 @@ tests:
         pods\|PVC Protection
     workflow: openshift-e2e-alibabacloud
 - as: e2e-alibaba-csi
-  interval: 24h
+  cron: 48 17 */1 * 1-5
   steps:
     cluster_profile: alibabacloud
     env:
       BASE_DOMAIN: alicloud-dev.devcluster.openshift.com
     workflow: openshift-e2e-alibabacloud-disk-csi
+- as: e2e-aws-upi
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-upi
+- as: e2e-azure-upi
+  interval: 48h
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-upi
+- as: e2e-gcp-upi
+  interval: 48h
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-upi
+- as: e2e-azurestack-upi
+  interval: 48h
+  steps:
+    cluster_profile: azurestack
+    workflow: openshift-e2e-azurestack-upi
+- as: e2e-ibmcloud-csi
+  interval: 48h
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-csi
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -1,16 +1,16 @@
 base_images:
   cli:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
+    tag: rhel-8-golang-1.18-openshift-4.12
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
@@ -19,10 +19,10 @@ binary_build_commands: make all
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi8
+      FROM registry.access.redhat.com/ubi9
       USER root
-      ENV GOVERSION=1.17.9
-      RUN yum install -y gcc make diffutils openssl git && \
+      ENV GOVERSION=1.18.1
+      RUN yum install -y diffutils gcc git jq make openssl python python-pip && \
           yum clean all && rm -rf /var/cache/dnf/*
       # Install Go. This version will only be used for unit tests. The
       # official builds are done via their own container image Dockerfiles
@@ -54,53 +54,56 @@ images:
 - context_dir: .
   from: ubi_minimal
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - golang:1.17
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - golang:1.18
   to: volsync
 - context_dir: mover-rclone
   from: ubi_minimal
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - golang:1.17
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - golang:1.18
   to: volsync-mover-rclone
 - context_dir: mover-restic
   from: ubi_minimal
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - golang:1.17
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - golang:1.18
   to: volsync-mover-restic
 - context_dir: mover-rsync
   from: ubi_minimal
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - golang:1.17
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - golang:1.18
   to: volsync-mover-rsync
 - context_dir: mover-syncthing
   from: ubi_minimal
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
-      as:
-      - golang:1.17
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - golang:1.18
   to: volsync-mover-syncthing
+operator:
+  bundles:
+  - as: volsync-bundle
+    base_index: operator-index
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/backube/volsync:latest
+    with: pipeline:volsync
+  - pullspec: quay.io/backube/volsync-mover-rclone:latest
+    with: pipeline:volsync-mover-rclone
+  - pullspec: quay.io/backube/volsync-mover-restic:latest
+    with: pipeline:volsync-mover-restic
+  - pullspec: quay.io/backube/volsync-mover-rsync:latest
+    with: pipeline:volsync-mover-rsync
+  - pullspec: quay.io/backube/volsync-mover-syncthing:latest
+    with: pipeline:volsync-mover-syncthing
 promotion:
   additional_images:
     volsync: volsync
@@ -115,7 +118,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.11"
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -125,29 +128,49 @@ resources:
       memory: 1Gi
 tests:
 - as: unit
-  commands: |
-    go version
-    make test
-  container:
-    from: src
+  steps:
+    test:
+    - as: unit
+      commands: |
+        go version
+        make test
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
 - as: e2e-openshift
-  optional: true
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-volsync-bundle
     env:
-      FIPS_ENABLED: "true"
+      FIPS_ENABLED: "false"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: volsync
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e
       commands: |
-        # TODO: optimize this
-        set -x
-        KUBECONFIG="${SHARED_DIR}/kubeconfig"
-        export KUBECONFIG
-        cp $(echo "${KUBECONFIG}") /go/src/github.com/backube/volsync/test-kuttl/kubeconfig
-        helm repo add bitnami https://charts.bitnami.com/bitnami
-        helm repo update
-        # minio version should be kept in sync with https://github.com/backube/volsync/blob/main/hack/run-minio.sh
-        helm install --create-namespace -n minio --set accessKey.password=access --set secretKey.password=password --set defaultBuckets=mybucket --set containerSecurityContext.enabled=false --set podSecurityContext.enabled=false --version 9.0.5 --wait --timeout=300s minio bitnami/minio
+        set -x -e -o pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+        # Install MinIO for rclone & restic
+        ./hack/run-minio.sh
+
+        # Install MinIO again w/ TLS
+        export MINIO_NAMESPACE=minio-tls
+        export MINIO_USE_TLS=1
+        ./hack/run-minio.sh
+
+        # Add .local/bin to path so we can execute Python packages we install below
+        export PATH="${PATH}:/alabama/.local/bin"
+        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+        make test-e2e-install
+
+        # Run tests
         make cli
         make test-e2e
       from: src-oc
@@ -155,7 +178,104 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-aws-volsync-csi
+    workflow: optional-operators-ci-aws
+- as: e2e-openshift-fips
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-volsync-bundle
+    env:
+      FIPS_ENABLED: "true"
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: volsync
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: |
+        set -x -e -o pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+        # Install MinIO for rclone & restic
+        ./hack/run-minio.sh
+
+        # Install MinIO again w/ TLS
+        export MINIO_NAMESPACE=minio-tls
+        export MINIO_USE_TLS=1
+        ./hack/run-minio.sh
+
+        # Add .local/bin to path so we can execute Python packages we install below
+        export PATH="${PATH}:/alabama/.local/bin"
+        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+        make test-e2e-install
+
+        # Run tests
+        make cli
+        make test-e2e
+      from: src-oc
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+- as: e2e-openshift-helm
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "false"
+    test:
+    - as: e2e
+      commands: |
+        set -x -e -o pipefail
+        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+
+        # Install MinIO for rclone & restic
+        ./hack/run-minio.sh
+
+        # Install MinIO again w/ TLS
+        export MINIO_NAMESPACE=minio-tls
+        export MINIO_USE_TLS=1
+        ./hack/run-minio.sh
+
+        # Install VolSync va Helm
+        helm upgrade --install --create-namespace -n volsync-system \
+          --debug \
+          --set image.image=${VOLSYNC_OPERATOR} \
+          --set rclone.image=${MOVER_RCLONE} \
+          --set restic.image=${MOVER_RESTIC} \
+          --set rsync.image=${MOVER_RSYNC} \
+          --set syncthing.image=${MOVER_SYNCTHING} \
+          --set metrics.disableAuth=true \
+          --wait --timeout=5m \
+          volsync ./helm/volsync
+
+        # Add .local/bin to path so we can execute Python packages we install below
+        export PATH="${PATH}:/alabama/.local/bin"
+        # Ansible k8s modules don't use the standard KUBECONFIG env var. WTF?
+        export K8S_AUTH_KUBECONFIG="${KUBECONFIG}"
+        make test-e2e-install
+
+        # Run tests
+        make cli
+        make test-e2e
+      dependencies:
+      - env: VOLSYNC_OPERATOR
+        name: volsync
+      - env: MOVER_RSYNC
+        name: volsync-mover-rsync
+      - env: MOVER_RCLONE
+        name: volsync-mover-rclone
+      - env: MOVER_RESTIC
+        name: volsync-mover-restic
+      - env: MOVER_SYNCTHING
+        name: volsync-mover-syncthing
+      from: src-oc
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: backube

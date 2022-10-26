@@ -1,5 +1,4 @@
 
-
 def add_imagestream_namespace_rbac(gendoc):
     resources = gendoc
     context = gendoc.context
@@ -88,6 +87,14 @@ def add_imagestream_namespace_rbac(gendoc):
                           'patch']
             },
             {
+                'apiGroups': ['release.openshift.io'],
+                'resources': ['releasepayloads'],
+                'verbs': ['get',
+                          'list',
+                          'watch',
+                          'create']
+            },
+            {
                 'apiGroups': [''],
                 'resources': ['events'],
                 'verbs': ['create', 'patch', 'update']
@@ -118,14 +125,25 @@ def add_imagestream_namespace_rbac(gendoc):
                 'name': 'release-controller-modify-ocp',
                 'namespace': 'origin'
             },
-            'rules': [{
-                'apiGroups': ['image.openshift.io'],
-                'resourceNames': ['release',
-                                  *context.config.releases,
-                                  ],
-                'resources': ['imagestreams'],
-                'verbs': ['get', 'list', 'watch', 'update', 'patch']
-            }]
+            'rules': [
+                {
+                    'apiGroups': ['image.openshift.io'],
+                    'resourceNames': ['release',
+                                      *context.config.releases,
+                                      'scos-4.12',
+                                      'scos-4.13'],
+                    'resources': ['imagestreams'],
+                    'verbs': ['get', 'list', 'watch', 'update', 'patch']
+                },
+                {
+                    'apiGroups': ['release.openshift.io'],
+                    'resources': ['releasepayloads'],
+                    'verbs': ['get',
+                              'list',
+                              'watch',
+                              'create']
+                }
+            ]
         })
 
     resources.append({

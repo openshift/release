@@ -6,66 +6,87 @@ set -o pipefail
 
 echo "************ assisted common setup prepare command ************"
 
+# Get packet | vsphere configuration
+# shellcheck source=/dev/null
+if source "${SHARED_DIR}/packet-conf.sh"; then
+  export IP
+  export SSH_KEY_FILE="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+else
+  source "${SHARED_DIR}/ci-machine-config.sh"
+fi
+
 mkdir -p build/ansible
 cd build/ansible
 
 cat > packing-test-infra.yaml <<-EOF
-- name: Packing assisted-test-infra
+- name: Prepare locally
   hosts: localhost
   collections:
     - community.general
   gather_facts: no
   vars:
     ansible_remote_tmp: ../tmp
+    SHARED_DIR: "{{ lookup('env', 'SHARED_DIR') }}"
   tasks:
-    - name: Compress
-      community.general.archive:
-        path: ../../
-        exclude_path:
-          - ../../build
-        dest: assisted-test-infra.tgz
+    - name: Ensuring assisted-additional-config existence
+      ansible.builtin.file:
+        path: "{{ SHARED_DIR }}/assisted-additional-config"
+        state: touch
+    - name: Ensuring platform-conf.sh existence
+      ansible.builtin.file:
+        path: "{{ SHARED_DIR }}/platform-conf.sh"
+        state: touch
+    - name: Create ansible inventory
+      ansible.builtin.copy:
+        dest: "{{ SHARED_DIR }}/inventory"
+        content: |
+          [all]
+          {{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+    - name: Create ssh config file
+      ansible.builtin.copy:
+        dest: "{{ SHARED_DIR }}/ssh_config"
+        content: |
+          Host ci_machine
+            User root
+            HostName {{ lookup('env', 'IP') }}
+            ConnectTimeout 5
+            StrictHostKeyChecking no
+            ServerAliveInterval 90
+            LogLevel ERROR
+            IdentityFile {{ lookup('env', 'SSH_KEY_FILE') }}
 EOF
 
 ansible-playbook packing-test-infra.yaml
 
-# Get packet | vsphere configuration
-# shellcheck source=/dev/null
-set +e
-source "${SHARED_DIR}/packet-conf.sh"
-source "${SHARED_DIR}/ci-machine-config.sh"
-set -e
-
 # shellcheck disable=SC2034
 export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
-touch ${SHARED_DIR}/assisted-additional-config
 
 # TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
 ~/fix_uid.sh
 
-cat << EOF > inventory
-[all]
-${IP} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file=${SSH_KEY_FILE} ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
-EOF
+echo "********** ${ASSISTED_CONFIG} ************* "
 
 cat << EOF > config.sh.j2
+export DATA_DIR={{ DATA_DIR }}
 export REPO_DIR={{ REPO_DIR }}
 export MINIKUBE_HOME={{ MINIKUBE_HOME }}
 export INSTALLER_KUBECONFIG={{ REPO_DIR }}/build/kubeconfig
 export PULL_SECRET=\$(cat /root/pull-secret)
 export CI=true
 export OPENSHIFT_CI=true
-export REPO_NAME={{ lookup('env', 'REPO_NAME') }}
-export JOB_TYPE={{ lookup('env', 'JOB_TYPE') }}
-export PULL_NUMBER={{ lookup('env', 'PULL_NUMBER') }}
+export REPO_NAME={{ REPO_NAME }}
+export JOB_TYPE={{ JOB_TYPE }}
+export PULL_NUMBER={{ PULL_NUMBER }}
+export PULL_BASE_REF={{ PULL_BASE_REF }}
 export RELEASE_IMAGE_LATEST={{ RELEASE_IMAGE_LATEST }}
-export SERVICE={{ lookup('env', 'ASSISTED_SERVICE_IMAGE') }}
+export SERVICE={{ ASSISTED_SERVICE_IMAGE }}
 export AGENT_DOCKER_IMAGE={{ ASSISTED_AGENT_IMAGE }}
 export CONTROLLER_IMAGE={{ ASSISTED_CONTROLLER_IMAGE }}
 export INSTALLER_IMAGE={{ ASSISTED_INSTALLER_IMAGE }}
+export IMAGE_SERVICE={{ ASSISTED_IMAGE_SERVICE }}
 export CHECK_CLUSTER_VERSION=True
 export TEST_TEARDOWN=false
 export TEST_FUNC=test_install
-export MAKEFILE_TARGET='setup run test_parallel'
 export ASSISTED_SERVICE_HOST={{ IP }}
 export PUBLIC_CONTAINER_REGISTRIES="{{ CI_REGISTRIES | join(',') }}"
 
@@ -75,14 +96,15 @@ export PULL_SECRET=\$(cat /root/prod/pull-secret)
 export OFFLINE_TOKEN=\$(cat /root/prod/offline-token)
 export REMOTE_SERVICE_URL=https://api.openshift.com
 export NO_MINIKUBE=true
-export MAKEFILE_TARGET='setup test_parallel'
+export MAKEFILE_SETUP_TARGET=setup
+export MAKEFILE_TARGET=test_parallel
 {% endif %}
 
 {% if PROVIDER_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
 export PROVIDER_IMAGE={{ PROVIDER_IMAGE }}
 {% endif %}
 
-{% if PROVIDER_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
+{% if HYPERSHIFT_IMAGE != ASSISTED_CONTROLLER_IMAGE %}
 export HYPERSHIFT_IMAGE={{ HYPERSHIFT_IMAGE }}
 {% endif %}
 
@@ -90,18 +112,11 @@ export HYPERSHIFT_IMAGE={{ HYPERSHIFT_IMAGE }}
 export SERVICE_BRANCH={{ PULL_PULL_SHA }}
 {% endif %}
 
-{% if REPO_NAME != "assisted-service" %}
+{% if JOB_TYPE != "presubmit" or REPO_NAME == "release" %}
 export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ RELEASE_IMAGE_LATEST }}
 {% endif %}
 
-{% if PLATFORM == "vsphere" %}
-export PLATFORM=vsphere
-export VIP_DHCP_ALLOCATION=false
-export VSPHERE_PARENT_FOLDER=assisted-test-infra-ci
-export VSPHERE_FOLDER="build-{{ lookup('env', 'BUILD_ID') }}"
-export TEST_TEARDOWN=true
-source /root/vsphere_test_infra.sh
-{% endif %}
+source /root/platform-conf.sh
 
 {# Additional mechanism to inject assisted additional variables directly #}
 {% if ASSISTED_CONFIG is defined %}
@@ -109,33 +124,44 @@ source /root/vsphere_test_infra.sh
 {% set custom_param_list = ASSISTED_CONFIG.split('\n') %}
 # Custom parameters
 {% for item in custom_param_list %}
+{% if item|trim|length %}
 export {{ item }}
+{% endif %}
 {% endfor %}
 {% endif %}
 EOF
 
-cat > run_test_playbook.yaml <<-EOF
+cat > run_test_playbook.yaml <<-"EOF"
 - name: Prepare remote host
   hosts: all
   vars:
     PLATFORM: "{{ lookup('env', 'PLATFORM') }}"
     PULL_PULL_SHA: "{{ lookup('env', 'PULL_PULL_SHA') | default('master', True) }}"
     JOB_TYPE: "{{ lookup('env', 'JOB_TYPE') }}"
+    DATA_DIR: /home
     REPO_OWNER: "{{ lookup('env', 'REPO_OWNER') }}"
     REPO_NAME: "{{ lookup('env', 'REPO_NAME') }}"
-    REPO_DIR: /home/assisted
+    REPO_DIR: "{{ DATA_DIR }}/assisted"
     MINIKUBE_HOME: "{{ REPO_DIR }}/minikube_home"
+    PULL_NUMBER: "{{ lookup('env', 'PULL_NUMBER') }}"
+    PULL_BASE_REF: "{{ lookup('env', 'PULL_BASE_REF') }}"
     CI_CREDENTIALS_DIR: "{{ lookup('env', 'CI_CREDENTIALS_DIR') }}"
     CLUSTER_PROFILE_DIR: "{{ lookup('env', 'CLUSTER_PROFILE_DIR') }}"
     IP: "{{ lookup('env', 'IP') }}"
     SHARED_DIR: "{{ lookup('env', 'SHARED_DIR') }}"
+    ASSISTED_SERVICE_IMAGE: "{{ lookup('env', 'ASSISTED_SERVICE_IMAGE') }}"
     ASSISTED_AGENT_IMAGE: "{{ lookup('env', 'ASSISTED_AGENT_IMAGE') }}"
     ASSISTED_CONTROLLER_IMAGE: "{{ lookup('env', 'ASSISTED_CONTROLLER_IMAGE') }}"
     ASSISTED_INSTALLER_IMAGE: "{{ lookup('env', 'ASSISTED_INSTALLER_IMAGE') }}"
+    ASSISTED_IMAGE_SERVICE: "{{ lookup('env', 'ASSISTED_IMAGE_SERVICE') }}"
     RELEASE_IMAGE_LATEST: "{{ lookup('env', 'RELEASE_IMAGE_LATEST') }}"
     PROVIDER_IMAGE: "{{ lookup('env', 'PROVIDER_IMAGE') }}"
     HYPERSHIFT_IMAGE: "{{ lookup('env', 'HYPERSHIFT_IMAGE') }}"
     ENVIRONMENT: "{{ lookup('env', 'ENVIRONMENT') }}"
+    POST_INSTALL_COMMANDS: "{{ lookup('env', 'POST_INSTALL_COMMANDS') }}"
+    ASSISTED_CONFIG: "{{ lookup('env', 'ASSISTED_CONFIG') }}"
+    ASSISTED_TEST_INFRA_IMAGE: "{{ lookup('env', 'ASSISTED_TEST_INFRA_IMAGE')}}"
+    CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE')}}"
   tasks:
     - name: Fail on unsupported environment
       fail:
@@ -148,11 +174,6 @@ cat > run_test_playbook.yaml <<-EOF
       ansible.builtin.file:
         path: /usr/config
         state: absent
-    - name: Copy tar to remote
-      become: true
-      ansible.builtin.copy:
-        src: assisted-test-infra.tgz
-        dest: /root/assisted.tar.gz
     - name: Copy pull-secret to remote
       become: true
       ansible.builtin.copy:
@@ -175,8 +196,8 @@ cat > run_test_playbook.yaml <<-EOF
     - name: Copy vsphere credentials file
       become: true
       ansible.builtin.copy:
-        src: "{{ SHARED_DIR }}/vsphere_test_infra.sh"
-        dest: /root/vsphere_test_infra.sh
+        src: "{{ SHARED_DIR }}/platform-conf.sh"
+        dest: /root/platform-conf.sh
     - name: Install packages
       dnf:
         name:
@@ -185,6 +206,8 @@ cat > run_test_playbook.yaml <<-EOF
         - sos
         - jq
         - make
+        - podman
+        - rsync
         state: present
     - name: Restart service sysstat
       ansible.builtin.service:
@@ -193,6 +216,10 @@ cat > run_test_playbook.yaml <<-EOF
     - name: Create artifacts directory if it does not exist
       ansible.builtin.file:
         path: /tmp/artifacts
+        state: directory
+    - name: Create repo directory if it does not exist
+      ansible.builtin.file:
+        path: "{{ REPO_DIR }}"
         state: directory
     - name: Create minikube directory if it does not exist
       ansible.builtin.file:
@@ -205,38 +232,85 @@ cat > run_test_playbook.yaml <<-EOF
       set_fact:
         CI_REGISTRIES: "{{ CI_REGISTRIES + [ item.split('/') | first ] }}"
       loop:
+      - quay.io
       - "{{ ASSISTED_AGENT_IMAGE }}"
       - "{{ ASSISTED_CONTROLLER_IMAGE }}"
-      - "{{ RELEASE_IMAGE_LATEST }}"
       - "{{ ASSISTED_INSTALLER_IMAGE }}"
-      - quay.io
+      - "{{ ASSISTED_IMAGE_SERVICE }}"
+      - "{{ RELEASE_IMAGE_LATEST }}"
     - debug:
         msg: "CI_REGISTRIES = {{ CI_REGISTRIES }}"
-    # NVMe makes it faster
-    - name: Save state of VNVME device to the nvme register
-      stat:
-        path: /dev/nvme0n1
-      register: nvme
+    - name: Create {{ REPO_DIR }} directory if it does not exist
+      ansible.builtin.file:
+        path: "{{ REPO_DIR }}"
+        state: directory
+    - debug:
+        var: CLUSTER_TYPE
+    - name: Customize equinix machine
+      block:
+      - name: Fetch equinix metadata
+        ansible.builtin.uri:
+          url: "https://metadata.platformequinix.com/metadata"
+          return_content: yes
+        register: equinix_metadata
+        until: equinix_metadata.status == 200
+        retries: 5
+        delay: 5
+      - name: Setup working directory for machine type m3.large.x86
+        ansible.builtin.shell: |
+          mkfs.xfs -f /dev/nvme0n1
+          mount /dev/nvme0n1 {{ REPO_DIR }}
+        when: "equinix_metadata.json.plan == 'm3.large.x86'"
+      - name: Setup extra swap for machine type {{ equinix_metadata.json.plan }}
+        ansible.builtin.shell: |
+          # c3.medium.x86 and m3.small.x86 have 64GB of RAM which is not enough for most of assisted jobs.
+          # We need to mount extra swap space in order allow memory overcommit with libvirt/KVM.
+          #
+          # c3.medium.x86 is supposed to have 2x240G disks (one is used for the system) and
+          # 2x480GB disks (sometimes missing).
+          #
+          # m3.small.x86 has 2 x 480GB disks (one is used for the system)
+
+          # Get disk where / is mounted
+          ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
+
+          # Setup the smallest disk available as swap
+          SWAP_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | head -n1)
+          mkswap "${SWAP_DISK}"
+          swapon "${SWAP_DISK}"
+        when: "equinix_metadata.json.plan == 'c3.medium.x86' or equinix_metadata.json.plan == 'm3.small.x86'"
+      when: '"packet" in CLUSTER_TYPE'
+    - name: Create {{ MINIKUBE_HOME }} directory if it does not exist
+      ansible.builtin.file:
+        path: "{{ MINIKUBE_HOME }}"
+        state: directory
     - name: Build config.sh file
       template:
         src: ./config.sh.j2
         dest: /root/config.sh
     - name: Print config file content
       debug:
-        msg: "{{ lookup('template', './config.sh.j2') }}"
-    - name: Use nvme device if exists
-      ansible.builtin.shell: |
-        mkfs.xfs -f /dev/nvme0n1
-        mount /dev/nvme0n1 {{ REPO_DIR }}
-      when: nvme.stat.exists
-    - name: Extract test-infra repo archive
-      ansible.builtin.unarchive:
-        src: /root/assisted.tar.gz
-        dest: "{{ REPO_DIR }}"
-        remote_src: yes
-        owner: root
-        group: root
-        mode: 0755
+        msg: "{{ lookup('template', './config.sh.j2').split('\n') }}"
+    - name: Retrieve assisted-test-infra sources
+      block:
+        - name: Pull {{ ASSISTED_TEST_INFRA_IMAGE }}
+          ansible.builtin.shell: |
+            podman pull "{{ ASSISTED_TEST_INFRA_IMAGE }}"
+        - name: Get working directory in {{ ASSISTED_TEST_INFRA_IMAGE }}
+          ansible.builtin.shell: |
+            podman inspect --format "{% raw %}{{ .Config.WorkingDir }}{% endraw %}" "{{ ASSISTED_TEST_INFRA_IMAGE }}"
+          register: assisted_test_infra_src_path
+        - name: Copy assisted-test-infra sources from {{ ASSISTED_TEST_INFRA_IMAGE }}:{{ assisted_test_infra_src_path.stdout }} to {{ REPO_DIR }}
+          ansible.builtin.shell: |
+            podman create --name src "{{ ASSISTED_TEST_INFRA_IMAGE }}"
+            podman cp "src:{{ assisted_test_infra_src_path.stdout }}/." "{{ REPO_DIR }}"
+            podman rm -f src
+    - name: Create post install script
+      ansible.builtin.copy:
+        dest: /root/assisted-post-install.sh
+        content: |
+          {{ POST_INSTALL_COMMANDS }}
+          echo "Finish running post installation script"
 EOF
 
-ansible-playbook run_test_playbook.yaml -i inventory
+ansible-playbook run_test_playbook.yaml -i "${SHARED_DIR}/inventory"

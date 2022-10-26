@@ -3,34 +3,30 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-base-openshift-4.11:
+  ocp_builder_rhel-9-base-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-base-openshift-4.11
+    tag: rhel-9-base-openshift-4.12
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
   from: base
   inputs:
-    ocp_builder_rhel-8-base-openshift-4.11:
+    ocp_builder_rhel-9-base-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.12
   to: ironic
 promotion:
+  disabled: true
   name: "4.12"
   namespace: ocp
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
       #NOTE(elfosardo): use ironic repos, cause we're special
-      curl http://base-4-11-rhel-8-server-ironic.ocp.svc > /etc/yum.repos.d/base-4-11-rhel-8-server-ironic.repo
-      #NOTE(elfosardo): remove this once rhel8.6 content is available for all CI
-      #remove ci conflicting repos
-      rm -f /etc/yum.repos.d/ci-rpm-mirrors.repo
-      #use rhel8.6 beta repos
-      curl http://base-4-11-rhel86.ocp.svc > /etc/yum.repos.d/base-4-11-rhel86.repo
-    from: ocp_builder_rhel-8-base-openshift-4.11
+      curl http://base-4-12-rhel-9-server-ironic.ocp.svc > /etc/yum.repos.d/base-4-12-rhel-9-server-ironic.repo
+    from: ocp_builder_rhel-9-base-openshift-4.12
     to: base
 releases:
   initial:
@@ -48,12 +44,16 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ipi
+- as: e2e-metal-ipi-bm
+  cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal
+    env:
+      CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-virtualmedia
+  cluster: build05
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|.*packages-list.*)$
   steps:
     cluster_profile: equinix-ocp-metal

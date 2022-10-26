@@ -9,10 +9,12 @@ set -x
 echo "${KUBECONFIG}"
 
 helm upgrade --install --create-namespace -n volsync-system \
+    --debug \
     --set image.image=${VOLSYNC_OPERATOR} \
     --set rclone.image=${MOVER_RCLONE} \
     --set restic.image=${MOVER_RESTIC} \
     --set rsync.image=${MOVER_RSYNC} \
+    --set syncthing.image=${MOVER_SYNCTHING} \
     --set metrics.disableAuth=true \
     volsync ./helm/volsync
 

@@ -19,6 +19,11 @@ export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+# prepare for the future usage on the kubeconfig generation of different workflow
+test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
+test -f "${KUBECONFIG}" && (ls -l "${KUBECONFIG}" || true) || echo "kubeconfig file does not exist"
+ls -l ${SHARED_DIR}/kubeconfig || echo "no kubeconfig in shared_dir"
+
 # create link for oc to kubectl
 mkdir -p "${HOME}"
 if ! which kubectl; then
@@ -26,29 +31,6 @@ if ! which kubectl; then
     ln -s "$(which oc)" ${HOME}/kubectl
 fi
 
-# configure go env
-export GOPATH=/tmp/goproject
-export GOCACHE=/tmp/gocache
-export GOROOT=/usr/local/go
-
-# compile extended-platform-tests if it does not exist.
-# if [ -f "/usr/bin/extended-platform-tests" ]; then
-if ! [ -f "/usr/bin/extended-platform-tests" ]; then
-    echo "extended-platform-tests does not exist, and try to compile it"
-    mkdir -p /tmp/extendedbin
-    export PATH=/tmp/extendedbin:$PATH
-    cd /tmp/goproject
-    user_name=$(cat /var/run/tests-private-account/name)
-    user_token=$(cat /var/run/tests-private-account/token)
-    git clone https://${user_name}:${user_token}@github.com/openshift/openshift-tests-private.git
-    cd openshift-tests-private
-    make build
-    cp bin/extended-platform-tests /tmp/extendedbin
-    cp pipeline/handleresult.py /tmp/extendedbin
-    export REPORT_HANDLE_PATH="/tmp/extendedbin"
-    cd ..
-    rm -fr openshift-tests-private
-fi
 which extended-platform-tests
 
 # setup proxy
@@ -67,7 +49,25 @@ if test -f "${SHARED_DIR}/bastion_private_address"
 then
     QE_BASTION_PRIVATE_ADDRESS=$(cat "${SHARED_DIR}/bastion_private_address")
     export QE_BASTION_PRIVATE_ADDRESS
+    if ! whoami &> /dev/null; then
+        if [[ -w /etc/passwd ]]; then
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+        fi
+    fi
 fi
+if test -f "${SHARED_DIR}/bastion_ssh_user"
+then
+    QE_BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
+fi
+mkdir -p ~/.ssh
+cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
+chmod 0600 ~/.ssh/ssh-privatekey || true
+eval export SSH_CLOUD_PRIV_KEY="~/.ssh/ssh-privatekey"
+
+test -f "${CLUSTER_PROFILE_DIR}/ssh-publickey" || echo "ssh-publickey file does not exist"
+cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
+chmod 0644 ~/.ssh/ssh-publickey || true
+eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
 
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
@@ -75,10 +75,9 @@ case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
     export KUBE_SSH_USER=core
-    export SSH_CLOUD_PRIV_GCP_USER=core
+    export SSH_CLOUD_PRIV_GCP_USER="${QE_BASTION_SSH_USER:-core}"
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
-    eval export SSH_CLOUD_PRIV_KEY="~/.ssh/google_compute_engine"
     PROJECT="$(oc get -o jsonpath='{.status.platformStatus.gcp.projectID}' infrastructure cluster)"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.gcp.region}' infrastructure cluster)"
     export TEST_PROVIDER="{\"type\":\"gce\",\"region\":\"${REGION}\",\"multizone\": true,\"multimaster\":true,\"projectid\":\"${PROJECT}\"}"
@@ -86,19 +85,23 @@ gcp)
 aws)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_aws_rsa || true
-    eval export SSH_CLOUD_PRIV_KEY="~/.ssh/kube_aws_rsa"
     export PROVIDER_ARGS="-provider=aws -gce-zone=us-east-1"
     REGION="$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster)"
     ZONE="$(oc get -o jsonpath='{.items[0].metadata.labels.failure-domain\.beta\.kubernetes\.io/zone}' nodes)"
     export TEST_PROVIDER="{\"type\":\"aws\",\"region\":\"${REGION}\",\"zone\":\"${ZONE}\",\"multizone\":true,\"multimaster\":true}"
     export KUBE_SSH_USER=core
-    export SSH_CLOUD_PRIV_AWS_USER=core
+    export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
+    ;;
+aws-usgov)
+    mkdir -p ~/.ssh
+    export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
+    export KUBE_SSH_USER=core
+    export TEST_PROVIDER="none"
     ;;
 azure4)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
-    eval export SSH_CLOUD_PRIV_KEY="~/.ssh/kube_azure_rsa"
-    export SSH_CLOUD_PRIV_AZURE_USER=core
+    export SSH_CLOUD_PRIV_AZURE_USER="${QE_BASTION_SSH_USER:-core}"
     export TEST_PROVIDER=azure
     ;;
 azurestack)
@@ -121,7 +124,15 @@ openstack*)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal)
     export TEST_PROVIDER='{"type":"skeleton"}';;
-*) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
+*)
+    echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+    if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+        echo "do not force success exit"
+        exit 1
+    fi
+    echo "force success exit"
+    exit 0
+    ;;
 esac
 
 # create execution directory
@@ -147,18 +158,22 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=10m
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+oc get clusterversion version -o yaml || true
 
 # execute the cases
 function run {
     test_scenarios=""
-    echo "TEST_SCENRAIOS: \"${TEST_SCENRAIOS:-}\""
+    echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
+    echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
-    echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
+    echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
-    if [[ -n "${TEST_SCENRAIOS:-}" ]]; then
-        readarray -t scenarios <<< "${TEST_SCENRAIOS}"
+    if [[ -n "${TEST_SCENARIOS:-}" ]]; then
+        readarray -t scenarios <<< "${TEST_SCENARIOS}"
         for scenario in "${scenarios[@]}"; do
-            test_scenarios="${test_scenarios}|${scenario}"
+            if [ "W${scenario}W" != "WW" ]; then
+                test_scenarios="${test_scenarios}|${scenario}"
+            fi
         done
     else
         echo "there is no scenario"
@@ -166,14 +181,32 @@ function run {
     fi
 
     if [ "W${test_scenarios}W" == "WW" ]; then
-        echo "fail to parse ${TEST_SCENRAIOS}"
+        echo "fail to parse ${TEST_SCENARIOS}"
         exit 1
     fi
-    echo "scenarios: ${test_scenarios:1:-1}"
-    extended-platform-tests run all --dry-run | \
-        grep -E "${test_scenarios:1:-1}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
+    echo "test scenarios: ${test_scenarios:1}"
+    test_scenarios="${test_scenarios:1}"
 
-    handle_filters "~Flaky&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
+    test_additional=""
+    if [[ -n "${TEST_ADDITIONAL:-}" ]]; then
+        readarray -t additionals <<< "${TEST_ADDITIONAL}"
+        for additional in "${additionals[@]}"; do
+            test_additional="${test_additional}|${additional}"
+        done
+    else
+        echo "there is no additional"
+    fi
+
+    if [ "W${test_additional}W" != "WW" ]; then
+        echo "test additional: ${test_additional:1:-1}"
+        test_scenarios="${test_scenarios}|${test_additional:1:-1}"
+    fi
+
+    echo "final scenarios: ${test_scenarios}"
+    extended-platform-tests run all --dry-run | \
+        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
+
+    handle_filters "~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
@@ -214,8 +247,10 @@ function run {
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+        echo "force success exit"
         exit 1
     fi
+    echo "normal exit"
     exit 0
 }
 
@@ -265,19 +300,19 @@ function handle_filters {
 
 function valid_filter {
     filter="$1"
-    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9]{1,}[&]?$'; then
-        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9]{1,}[&]?$"
+    if ! echo ${filter} | grep -E '^[~]?[a-zA-Z0-9_]{1,}[&]?$'; then
+        echo "the filter ${filter} is not correct format. it should be ^[~]?[a-zA-Z0-9_]{1,}[&]?$"
         exit 1
     fi
     action="$(echo $filter | grep -Eo '^[~]?')"
-    value="$(echo $filter | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $filter | grep -Eo '[a-zA-Z0-9_]{1,}')"
     logical="$(echo $filter | grep -Eo '[&]?$')"
     echo "$action--$value--$logical"
 }
 
 function handle_and_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then
@@ -294,7 +329,7 @@ function handle_and_filter {
 
 function handle_or_filter {
     action="$(echo $1 | grep -Eo '^[~]?')"
-    value="$(echo $1 | grep -Eo '[a-zA-Z0-9]{1,}')"
+    value="$(echo $1 | grep -Eo '[a-zA-Z0-9_]{1,}')"
 
     ret=0
     if [ "W${action}W" == "WW" ]; then

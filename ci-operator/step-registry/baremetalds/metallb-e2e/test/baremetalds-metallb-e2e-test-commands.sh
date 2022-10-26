@@ -13,6 +13,7 @@ METALLB_SRC_DIR="/go/src/github.com/openshift/metallb"
 METALLB_OPERATOR_SRC_DIR="/go/src/github.com/openshift/metallb-operator"
 METALLB_REPO=${METALLB_REPO:-"https://github.com/openshift/metallb.git"}
 METALLB_BRANCH=${METALLB_BRANCH:-"main"}
+DONT_DEPLOY_OPERATOR=${DONT_DEPLOY_OPERATOR:-}
 
 if [ -d "${METALLB_SRC_DIR}" ]; then
   echo "### Copying metallb directory"
@@ -48,8 +49,9 @@ if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
   done
 fi
 
-echo "### deploying metallb through operator"
-ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./deploy_metallb.sh"
-
+if [[ -z $DONT_DEPLOY_OPERATOR ]]; then
+  echo "### deploying metallb through operator"
+  ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./deploy_metallb.sh"
+fi
 echo "### running metallb E2E tests"
 ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/metallb/openshift-ci/ && ${vars} ./run_e2e.sh"

@@ -1,12 +1,11 @@
 {
   "name":"4.12.0-0.ci",
-  "hide":true,
   "to": "release",
   "message": "This release contains CI image builds of all code in release-4.12 (master) branches, and is updated each time someone merges.",
   "mirrorPrefix": "4.12",
   "expires":"72h",
   "maxUnreadyReleases": 1,
-  "minCreationIntervalSeconds": 1800,
+  "minCreationIntervalSeconds": 21600,
   "pullSecretName": "source",
   "publish":{
     "mirror-to-origin":{
@@ -14,9 +13,10 @@
         "namespace": "origin",
         "name": "4.12",
         "excludeTags": [
-          "machine-os-content",
+          "rhel-coreos-8",
+          "rhel-coreos-8-extensions",
           "machine-config-operator",
-          "machine-config-operator-rpms",
+          "machine-os-content",
           "installer",
           "installer-artifacts",
           "baremetal-installer",
@@ -34,24 +34,93 @@
           "ironic-static-ip-manager",
           "cluster-samples-operator",
           "operator-marketplace",
-          "cluster-update-keys"
+          "cluster-update-keys",
+          "machine-os-images"
+        ]
+      }
+    },
+    "mirror-to-okd-scos": {
+      "imageStreamRef": {
+        "namespace": "origin",
+        "name": "scos-4.12",
+        "excludeTags": [
+          "rhel-coreos-8",
+          "rhel-coreos-8-extensions",
+          "machine-config-operator",
+          "machine-os-content",
+          "installer",
+          "installer-artifacts",
+          "baremetal-installer",
+          "openstack-installer",
+          "upi-installer",
+          "libvirt-installer",
+          "ovirt-installer",
+          "sig-storage-local-static-provisioner",
+          "ironic",
+          "ironic-agent",
+          "ironic-hardware-inventory-recorder",
+          "ironic-inspector",
+          "ironic-ipa-downloader",
+          "ironic-machine-os-downloader",
+          "ironic-static-ip-manager",
+          "cluster-samples-operator",
+          "operator-marketplace",
+          "cluster-update-keys",
+          "machine-os-images"
         ]
       }
     },
     "tag":{"tagRef":{"name":"4.12-ci"}}
   },
   "verify":{
-    "gcp":{
+    "gcp-sdn":{
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-e2e-gcp"}
+      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-e2e-gcp-sdn"}
     },
-    "aws-serial":{
-      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-e2e-aws-serial"}
+    "aws-sdn-serial":{
+      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-e2e-aws-sdn-serial"}
     },
     "upgrade":{
+      "disabled":true,
       "upgrade":true,
       "optional":true,
-      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-e2e-gcp-upgrade"}
+      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-e2e-gcp-sdn-upgrade"}
+    },
+    "upgrade-minor-sdn":{
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "optional":true,
+      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-aws-sdn-upgrade"}
+    },
+    "upgrade-minor-aws-ovn":{
+      "disabled":true,
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "optional":true,
+      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-aws-ovn-upgrade"}
+    },
+    "aggregated-aws-ovn-upgrade-4.12-micro":{
+      "upgrade":true,
+      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-e2e-aws-ovn-upgrade"},
+      "aggregatedProwJob": {
+        "analysisJobCount": 10
+      }
+    },
+    "aggregated-aws-ovn-upgrade-4.12-minor":{
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-aws-ovn-upgrade"},
+      "aggregatedProwJob": {
+        "analysisJobCount": 10
+      }
+    },
+    "aggregated-azure-sdn-upgrade-4.12-minor": {
+      "upgrade":true,
+      "upgradeFrom": "PreviousMinor",
+      "prowJob":{"name":"periodic-ci-openshift-release-master-ci-4.12-upgrade-from-stable-4.11-e2e-azure-sdn-upgrade"},
+      "aggregatedProwJob": {
+        "analysisJobCount": 10
+      }
     }
   }
 }

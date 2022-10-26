@@ -7,6 +7,7 @@ set -o pipefail
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
+export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
@@ -102,6 +103,8 @@ fi
 case "${CLUSTER_TYPE}" in
 gcp)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
+    # In k8s 1.24 this is required to run GCP PD tests. See: https://github.com/kubernetes/kubernetes/pull/109541
+    export ENABLE_STORAGE_GCE_PD_DRIVER="yes"
     export KUBE_SSH_USER=core
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/google_compute_engine || true
@@ -134,12 +137,31 @@ vsphere)
     sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
     sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
     export TEST_PROVIDER=vsphere;;
+alibabacloud)
+    mkdir -p ~/.ssh
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_alibaba_rsa || true
+    export PROVIDER_ARGS="-provider=alibabacloud -gce-zone=us-east-1"
+    # TODO: make openshift-tests auto-discover this from cluster config
+    REGION="$(oc get -o jsonpath='{.status.platformStatus.alibabacloud.region}' infrastructure cluster)"
+    export TEST_PROVIDER="{\"type\":\"alibabacloud\",\"region\":\"${REGION}\",\"multizone\":true,\"multimaster\":true}"
+    export KUBE_SSH_USER=core
+;;
 openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
-    export TEST_PROVIDER='{"type":"openstack"}';;
+    if test -n "${HTTP_PROXY:-}" -o -n "${HTTPS_PROXY:-}"; then
+        export TEST_PROVIDER='{"type":"openstack","disconnected":true}'
+    else
+        export TEST_PROVIDER='{"type":"openstack"}'
+    fi
+    ;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-kubevirt) export TEST_PROVIDER='{"type":"kubevirt"}';;
+ibmcloud)
+    export TEST_PROVIDER='{"type":"ibmcloud"}'
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    export IC_API_KEY
+    ;;
+nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
 
@@ -266,44 +288,112 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
+# wait up to 10m for the number of nodes to match the number of machines
+i=0
+while true
+do
+    MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
+    NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
+    if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
+    then
+      cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
+      <testsuite name="cluster nodes" tests="1" failures="0">
+        <testcase name="node count should match or exceed machine count"/>
+      </testsuite>
+EOF
+        echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
+        break
+    fi
+    echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+    sleep 30
+    i=$((i+1))
+    if [ $i -gt 20 ]; then
+      MACHINELIST="$(kubectl get machines -A)"
+      NODELIST="$(kubectl get nodes)"
+      cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
+      <testsuite name="cluster nodes" tests="1" failures="1">
+        <testcase name="node count should match or exceed machine count">
+          <failure message="">
+            Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT).
+            $MACHINELIST
+            $NODELIST
+          </failure>
+        </testcase>
+      </testsuite>
+EOF
+
+        echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
+        # If we enabled the ssh bastion pod, attempt to gather journal logs from each machine, regardless
+        # if it made it to a node or not.
+        if [[ -n "${TEST_REQUIRES_SSH-}" ]]; then
+            echo "Attempting to gather system journal logs from each machine via ssh bastion pod"
+            mkdir -p "${ARTIFACT_DIR}/ssh-bastion-gather/"
+
+            # This returns each IP all on one line, separated by spaces:
+            machine_ips="$(oc --insecure-skip-tls-verify get machines -n openshift-machine-api -o 'jsonpath={.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
+            echo "Found machine IPs: $machine_ips"
+            ingress_host="$(oc get service --all-namespaces -l run=ssh-bastion -o go-template='{{ with (index (index .items 0).status.loadBalancer.ingress 0) }}{{ or .hostname .ip }}{{end}}')"
+            echo "Ingress host: $ingress_host"
+
+            # Disable errors so we keep trying hosts if any of these commands fail.
+            set +e
+            for ip in $machine_ips
+            do
+                echo "Gathering journalctl logs from ${ip}"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo journalctl --no-pager" > "${ARTIFACT_DIR}/ssh-bastion-gather/${ip}-journal.log"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo /sbin/ip addr show" > "${ARTIFACT_DIR}/ssh-bastion-gather/${ip}-ip-addr-show.log"
+                ssh -i "${KUBE_SSH_KEY_PATH}" -o StrictHostKeyChecking=no -o ProxyCommand="ssh -i ${KUBE_SSH_KEY_PATH} -A -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -W %h:%p core@${ingress_host}" core@$ip "sudo /sbin/ip route show" > "${ARTIFACT_DIR}/ssh-bastion-gather/${ip}-ip-route-show.log"
+            done
+            set -e
+        fi
+
+        exit 1
+    fi
+done
+
+# wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
+# any e2e tests that might require specific workload capacity.
+echo "$(date) - waiting for nodes to be ready..."
+ret=0
+oc wait nodes --all --for=condition=Ready=true --timeout=10m || ret=$?
+if [[ "$ret" == 0 ]]; then
+      cat >"${ARTIFACT_DIR}/junit_node_ready.xml" <<EOF
+      <testsuite name="cluster nodes ready" tests="1" failures="0">
+        <testcase name="all nodes should be ready"/>
+      </testsuite>
+EOF
+    echo "$(date) - all nodes are ready"
+else
+    set +e
+    getNodeResult=$(oc get nodes)
+    set -e
+    cat >"${ARTIFACT_DIR}/junit_node_ready.xml" <<EOF
+    <testsuite name="cluster nodes ready" tests="1" failures="1">
+      <testcase name="all nodes should be ready">
+        <failure message="">
+          Timed out waiting for nodes to be ready. Return code: $ret.
+          oc get nodes
+          $getNodeResult
+        </failure>
+      </testcase>
+    </testsuite>
+EOF
+    echo "Timed out waiting for nodes to be ready. Return code: $ret."
+    exit 1
+fi
+
 # wait for all clusteroperators to reach progressing=false to ensure that we achieved the configuration specified at installation
 # time before we run our e2e tests.
 echo "$(date) - waiting for clusteroperators to finish progressing..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
 echo "$(date) - all clusteroperators are done progressing."
 
-# wait up to 10m for the number of nodes to match the number of machines
-i=0
-while true
-do
-  MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
-  NODECOUNT="$(kubectl get nodes --no-headers | wc -l)"
-  if [ "${MACHINECOUNT}" -le "${NODECOUNT}" ]
-  then
-    echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
-    break
-  fi
-  echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
-  sleep 30
-  ((i++))
-  if [ $i -gt 20 ]; then
-    echo "Timed out waiting for node count ($NODECOUNT) to equal or exceed machine count ($MACHINECOUNT)."
-    exit 1
-  fi
-done
-
-# wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
-# any e2e tests that might require specific workload capacity.
-echo "$(date) - waiting for nodes to be ready..."
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-echo "$(date) - all nodes are ready"
-
 # this works around a problem where tests fail because imagestreams aren't imported.  We see this happen for exec session.
 echo "$(date) - waiting for non-samples imagesteams to import..."
 count=0
 while :
 do
-  non_imported_imagestreams=$(oc -n openshift get is -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
+  non_imported_imagestreams=$(oc -n openshift get imagestreams -o go-template='{{range .items}}{{$namespace := .metadata.namespace}}{{$name := .metadata.name}}{{range .status.tags}}{{if not .items}}{{$namespace}}/{{$name}}:{{.tag}}{{"\n"}}{{end}}{{end}}{{end}}')
   if [ -z "${non_imported_imagestreams}" ]
   then
     break

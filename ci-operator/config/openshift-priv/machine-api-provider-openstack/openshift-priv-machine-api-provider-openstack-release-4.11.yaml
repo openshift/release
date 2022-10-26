@@ -3,10 +3,10 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.18-openshift-4.11
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -15,12 +15,11 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: openstack-machine-api-provider
 promotion:
-  disabled: true
   name: 4.11-priv
   namespace: ocp-private
 releases:
@@ -63,7 +62,6 @@ tests:
   container:
     from: src
 - as: e2e-openstack
-  optional: true
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -76,6 +74,20 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-proxy
+- as: e2e-openstack-nfv-intel
+  steps:
+    cluster_profile: openstack-nfv
+    workflow: openshift-e2e-openstack-nfv
+- as: e2e-openstack-nfv-mellanox
+  optional: true
+  skip_if_only_changed: ^docs/
+  steps:
+    cluster_profile: openstack-nfv
+    env:
+      ADDITIONAL_WORKERS_NETWORKS: mellanox-dpdk
+      OPENSTACK_DPDK_NETWORK: mellanox-dpdk
+      OPENSTACK_SRIOV_NETWORK: mellanox-sriov
+    workflow: openshift-e2e-openstack-nfv
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-priv

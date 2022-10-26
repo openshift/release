@@ -3,10 +3,10 @@ base_images:
     name: 4.11-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.18-openshift-4.11
   openstack-installer:
     name: 4.11-priv
     namespace: ocp-private
@@ -34,23 +34,23 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: sriov-network-operator
 - dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: sriov-network-config-daemon
 - dockerfile_path: Dockerfile.webhook.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: sriov-network-webhook
 operator:
   bundles:
@@ -71,7 +71,6 @@ operator:
   - pullspec: quay.io/openshift/origin-sriov-network-operator:4.11
     with: pipeline:sriov-network-operator
 promotion:
-  disabled: true
   name: 4.11-priv
   namespace: ocp-private
 releases:
@@ -131,6 +130,16 @@ tests:
     cluster_profile: openstack-nfv
     dependencies:
       OO_INDEX: ci-index
+    workflow: openshift-e2e-openstack-sriov
+- as: e2e-openstack-nfv-hwoffload
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      ADDITIONAL_WORKERS_NETWORKS: ""
+      OPENSTACK_SRIOV_NETWORK: mellanox-hwoffload
     workflow: openshift-e2e-openstack-sriov
 zz_generated_metadata:
   branch: release-4.11

@@ -45,7 +45,7 @@ yq --version
 az version
 
 # install newest oc
-curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+curl -L --fail https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
 chmod ug+x /tmp/bin/oc
 
 echo "$(date -u --rfc-3339=seconds) - Collecting parameters..."

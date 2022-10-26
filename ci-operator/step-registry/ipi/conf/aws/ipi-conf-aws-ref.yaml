@@ -2,7 +2,7 @@ ref:
   as: ipi-conf-aws
   from_image:
     namespace: ocp
-    name: "4.5"
+    name: "4.12"
     tag: upi-installer
   commands: ipi-conf-aws-commands.sh
   resources:
@@ -25,9 +25,15 @@ ref:
       in some regions or accounts due to quota issues.
 
   - name: COMPUTE_NODE_TYPE
-    default: "m5.xlarge"
+    default: ""
     documentation: |-
-      The instance type to use for compute nodes (e.g. AWS https://aws.amazon.com/ec2/instance-types/). We use a 4 core worker to match the median configuration of the fleet.
+      The instance type to use for compute nodes (e.g. AWS https://aws.amazon.com/ec2/instance-types/). When "" (default),
+      the step uses the lowest cost 4 CPU / 16G supported worker instance type for the region.
+  - name: OCP_ARCH
+    default: "amd64"
+    documentation: |-
+      The architecture of the control plane nodes (e.g., amd64, arm64).
+
   - name: ZONES_COUNT
     default: "2"
     documentation: |-
@@ -36,5 +42,18 @@ ref:
     default: "origin-ci-int-aws.dev.rhcloud.com"
     documentation: |-
       A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
+  - name: AWS_METADATA_SERVICE_AUTH
+    default: ""
+    documentation: |-
+      The state of IMDSv2 (requirement of auth on instance metadata service).
+      More info:
+      https://github.com/openshift/enhancements/blob/master/enhancements/machine-api/aws-imds-v2-support.md
+      https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configuring-instance-metadata-service.html
+      
+      Valid values are:
+      * "" (default) - corresponds to "Optional" behaviour. 
+      * "Required" - sets IMDSv2 to Required for all machines in install-config, metadata service is not accessible without auth procedure.
+      * "Optional" - auth procedure on metadata service is optional
+
   documentation: |-
     The IPI AWS configure step generates the AWS-specific install-config.yaml contents based on the cluster profile and optional input files.

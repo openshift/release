@@ -3,25 +3,23 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.19-openshift-4.12
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: ibm-vpc-node-label-updater
 promotion:
+  disabled: true
   name: "4.12"
   namespace: ocp
 releases:
@@ -47,6 +45,11 @@ tests:
   commands: go test -v -race ./pkg/...
   container:
     from: src
+- as: e2e-ibmcloud-csi
+  optional: true
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-csi
 zz_generated_metadata:
   branch: release-4.12
   org: openshift

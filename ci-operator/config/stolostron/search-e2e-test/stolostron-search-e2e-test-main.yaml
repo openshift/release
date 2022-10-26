@@ -8,7 +8,7 @@ images:
 - dockerfile_path: Dockerfile
   to: search-e2e
 promotion:
-  name: "2.5"
+  name: "2.7"
   namespace: stolostron
 resources:
   '*':
@@ -16,13 +16,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: backplane-fast-forward
+- as: git-fast-forward
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.5
+      DESTINATION_BRANCH: release-2.7
     workflow: ocm-ci-fastforward
-- as: e2e
+- as: deploy-and-run-e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     dependencies:
@@ -36,7 +36,7 @@ tests:
       CLUSTERPOOL_LIST_INCLUSION_FILTER: prow
       CLUSTERPOOL_MANAGED_COUNT: "1"
       DEPLOY_TIMEOUT: "2700"
-      PIPELINE_STAGE: dev
+      PIPELINE_STAGE: integration
     test:
     - as: import
       commands: |

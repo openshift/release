@@ -48,9 +48,6 @@ spec:
       energy_perf_bias=performance
       min_perf_pct=100
 
-      [service]
-      service.stalld=start,enable
-
       [vm]
       transparent_hugepages=never
 
@@ -66,7 +63,7 @@ spec:
       [sysctl]
       kernel.hung_task_timeout_secs = 600
       kernel.nmi_watchdog = 0
-      kernel.sched_rt_runtime_us = -1
+      kernel.sched_rt_runtime_us = 950000
       kernel.timer_migration = 0
       kernel.numa_balancing=0
       net.core.busy_read=50

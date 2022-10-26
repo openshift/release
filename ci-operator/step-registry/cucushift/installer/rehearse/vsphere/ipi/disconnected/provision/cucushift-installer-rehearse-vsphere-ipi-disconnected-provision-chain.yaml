@@ -3,10 +3,20 @@ chain:
   steps:
   - chain: ipi-conf-vsphere
   - ref: ipi-install-rbac
-  - ref: ipi-conf-vsphere-mirror-registry
+  - chain: vsphere-provision-bastionhost
   - ref: mirror-images-by-oc-adm
   - ref: ipi-conf-mirror
   - ref: ipi-install-install
   - ref: ipi-install-vsphere-registry
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: set-sample-operator-disconnected
+  env:
+  - name: REGISTER_MIRROR_REGISTRY_DNS
+    default: "yes"
+    documentation: |-
+      Register DNS for mirror registry.
+  - name: BASTION_HOST_SUBNET
+    default: "qe-segment"
+    documentation: the subnet to provision bastion host
   documentation: |-
     Create an IPI cluster in disconnected network on vSphere for QE e2e tests.

@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.9"
+    name: "4.10"
     namespace: ocp
     tag: base
   elasticsearch-operator:
@@ -36,7 +36,7 @@ base_images:
     namespace: logging
     tag: logging-eventrouter
   logging-fluentd:
-    name: v1.14.x
+    name: v1.14.5
     namespace: logging
     tag: logging-fluentd
   logging-kibana6:
@@ -44,35 +44,20 @@ base_images:
     namespace: logging
     tag: logging-kibana6
   oauth-proxy:
-    name: "4.9"
+    name: "4.10"
     namespace: ocp
     tag: oauth-proxy
-  ocp_4.8_cli:
-    name: "4.8"
-    namespace: ocp
-    tag: cli
-  ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.8
   operator-index:
     name: redhat-operator-index
     namespace: ci
-    tag: v4.9
+    tag: v4.10
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.16
+    tag: golang-1.17
 images:
 - from: base
-  inputs:
-    ocp_4.8_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.8:cli
-    ocp_builder_rhel-8-golang-1.16-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8
   to: cluster-logging-operator
 - dockerfile_path: olm_deploy/operatorregistry/Dockerfile
   from: base
@@ -99,7 +84,7 @@ releases:
   latest:
     release:
       channel: stable
-      version: "4.9"
+      version: "4.10"
 resources:
   '*':
     requests:
@@ -110,6 +95,7 @@ tests:
   commands: make lint
   container:
     from: src
+  timeout: 15m0s
 - as: unit
   commands: make test-unit
   container:
@@ -153,6 +139,7 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: openshift-e2e-gcp-hosted-loki
+  timeout: 5h0m0s
 - as: functional
   steps:
     cluster_profile: gcp

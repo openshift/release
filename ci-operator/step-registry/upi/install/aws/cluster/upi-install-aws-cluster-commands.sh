@@ -60,6 +60,7 @@ openshift-install --dir=${ARTIFACT_DIR}/installer create manifests
 sed -i '/^  channel:/d' ${ARTIFACT_DIR}/installer/manifests/cvo-overrides.yaml
 rm -f ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f ${ARTIFACT_DIR}/installer/openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+rm -f ${ARTIFACT_DIR}/installer/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" ${ARTIFACT_DIR}/installer/manifests/cluster-scheduler-02-config.yml
 
 echo "Creating ignition configs"
@@ -73,7 +74,7 @@ export BOOTSTRAP_URI
 # begin bootstrapping
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >coreos.json; then
   RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.architectures.x86_64.images.aws.regions[$region].image' coreos.json)"
-  if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
+  if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
     RHCOS_AMI="$(jq -r --arg region "$AWS_REGION" '.architectures.aarch64.images.aws.regions[$region].image' coreos.json)"
   fi
 else

@@ -3,10 +3,6 @@ base_images:
     name: html-proofer
     namespace: ci
     tag: 3.19.0
-  hugo:
-    name: hugo
-    namespace: ci
-    tag: 0.80.0-ext-ubuntu
   nginx-unprivileged:
     name: nginx-unprivileged
     namespace: ci
@@ -18,17 +14,9 @@ build_root:
     tag: golang-1.15
 images:
 - from: nginx-unprivileged
-  inputs:
-    hugo:
-      as:
-      - klakegg/hugo:0.75.1-ext-ubuntu
   to: ci-docs
 - dockerfile_path: Dockerfile.links
   from: html-proofer-base
-  inputs:
-    hugo:
-      as:
-      - klakegg/hugo:0.75.1-ext-ubuntu
   to: html-proofer
 promotion:
   excluded_images:
@@ -43,23 +31,45 @@ resources:
 tests:
 - as: links
   commands: |
-    htmlproofer \
-      --root-dir /src/public/ \
-      --check_sri \
-      --http-status-ignore 403,405 \
-      --hydra '{"max_concurrency": 1}' \
-      --url-ignore "$(paste -sd , <<'EOF'
-    /mojo.redhat.com/
-    /sippy.ci.openshift.org/
-    /github.com\/openshift\/ci-docs\/edit/
-    /github.com\/openshift\/ci-docs\/new/
-    /github.com\/openshift\/ci-docs\/issues\/new/
-    /source.redhat.com/
-    /rover.redhat.com/
+    ruby -e "$(cat <<EOF
+    require 'html-proofer'
+
+    puts "Using html-proofer version: #{HTMLProofer::VERSION}"
+    puts "With config options https://github.com/gjtorikian/html-proofer/blob/v#{HTMLProofer::VERSION}/lib/html-proofer/configuration.rb"
+
+    opts = {
+        :root_dir => '/src/public/',
+        :check_sri => true,
+        :http_status_ignore => [
+            403,
+            405,
+        ],
+        :url_ignore => [
+            /mojo.redhat.com/,
+            /source.redhat.com/,
+            /rover.redhat.com/,
+            /sippy.ci.openshift.org/,
+            /github.com\/openshift\/ci-docs\/edit/,
+            /github.com\/openshift\/ci-docs\/new/,
+            /github.com\/openshift\/ci-docs\/issues\/new/,
+            /github.com\/openshift\/ci-docs\/tree\/master\/content\/en\/docs\/*\/.*.md/,
+        ],
+        :hydra => {
+            :max_concurrency => 1,
+        },
+    }
+
+    proofer = HTMLProofer.check_directories(['.'], opts)
+    proofer.before_request do |request|
+        # If checking against github, we add a random delay of 0-2 seconds to requests to avoid 429 throttling
+        sleep(rand(2)) if request.base_url =~ /github.com/
+    end
+    proofer.run
     EOF
     )"
   container:
     from: html-proofer
+  optional: true
 zz_generated_metadata:
   branch: master
   org: openshift

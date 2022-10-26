@@ -29,6 +29,14 @@ def _add_origin_rbac(gendoc):
                           'patch']
             },
             {
+                'apiGroups': ['release.openshift.io'],
+                'resources': ['releasepayloads'],
+                'verbs': ['get',
+                          'list',
+                          'watch',
+                          'create']
+            },
+            {
                 'apiGroups': [''],
                 'resources': ['events'],
                 'verbs': ['create', 'patch', 'update']
@@ -127,7 +135,6 @@ def _add_origin_resources(gendoc):
                                     "--supplemental-prow-config-dir=/etc/config",
                                     "--job-config=/etc/job-config",
                                     "--prow-namespace=ci",
-                                    "--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig",
                                     "--job-namespace=ci-release",
                                     "--tools-image-stream-tag=4.6:tests",
                                     "--release-architecture=amd64",
@@ -156,7 +163,7 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
-                        "volumes": get_rc_volumes(context, None)
+                        "volumes": get_rc_volumes(context)
                     }
                 }
             }
@@ -190,7 +197,6 @@ def _add_origin_resources(gendoc):
                                     "/usr/bin/release-controller-api",
                                     "--release-namespace=origin",
                                     "--prow-namespace=ci",
-                                    "--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig",
                                     "--job-namespace=ci-release",
                                     "--tools-image-stream-tag=4.6:tests",
                                     "--release-architecture=amd64",
@@ -219,7 +225,7 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
-                        "volumes": get_kubeconfig_volumes(context, namespace=None, secret_name=context.secret_name_tls_api)
+                        "volumes": get_kubeconfig_volumes(context, secret_name=context.secret_name_tls_api)
                     }
                 }
             }

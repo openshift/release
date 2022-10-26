@@ -29,12 +29,9 @@ timeout -s 9 20m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.
 set -xeo pipefail
 
 # Get sosreport including sar data
-sos report --batch --tmp-dir /tmp/artifacts \
+sos report --batch --tmp-dir /tmp/artifacts --all-logs \
   -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
   -k podman.all -k podman.logs
-
-# TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
-cp -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
 cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
 ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true

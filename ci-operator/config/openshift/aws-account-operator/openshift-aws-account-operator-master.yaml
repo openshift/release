@@ -42,6 +42,39 @@ tests:
   commands: make validate
   container:
     from: src
+- as: integration-test
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 15m0s
+    version: "4.7"
+  optional: true
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        echo $PULL_NUMBER
+        ## Temporary CI run blocker by PR title,
+        ## only PR with title containing `run-int-test` will continue to run integration tests
+        if curl -s "https://api.github.com/repos/openshift/aws-account-operator/pulls/${PULL_NUMBER}" | grep -ioPq '"title":\s*"\K[^,"]*run-int-test';
+            then
+                echo -e "\nStarting Integration Test\n"
+                make prow-ci-entrypoint
+            else
+                echo -e "\nSkipped Integration Test\n"
+        fi
+      credentials:
+      - mount_path: /tmp/secret/aao-aws-creds
+        name: aao-aws-creds
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift

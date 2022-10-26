@@ -1,8 +1,8 @@
 base_images:
-  cli:
-    name: "4.9"
+  base:
+    name: ubi-minimal
     namespace: ocp
-    tag: cli
+    tag: "8"
 build_root:
   image_stream_tag:
     name: builder
@@ -10,11 +10,7 @@ build_root:
     tag: go1.17-linux
 images:
 - dockerfile_path: Dockerfile
-  from: cli
-  inputs:
-    cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.9:cli
+  from: base
   to: must-gather
 promotion:
   name: "2.4"
@@ -48,7 +44,6 @@ tests:
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export SELF="make -f Makefile.prow"
         export OSCI_PUBLISH_DELAY="0"
         make -f Makefile.prow osci/publish

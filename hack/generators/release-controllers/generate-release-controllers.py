@@ -63,13 +63,17 @@ def generate_app_ci_content(config, git_clone_dir):
             continue
         if '-stable' in annotation_path.name:  # There are no stable streams in private release controllers
             continue
+        if '-dev-preview' in annotation_path.name:  # There are no dev-preview streams in private release controllers
+            continue
         annotation_filename = os.path.basename(annotation_path)
         with open(annotation_path, mode='r', encoding='utf-8') as f:
             pub_annotation = json.load(f)
         print(str(annotation_path))
         priv_annotation = dict(pub_annotation)
         priv_annotation['name'] += '-priv'
-        priv_annotation['mirrorPrefix'] += '-priv'
+        # The "mirrorPrefix" is technically optional:
+        if 'mirrorPrefix' in pub_annotation:
+            priv_annotation['mirrorPrefix'] += '-priv'
         # The "multi" release-controller purposefully does not use the "to" annotation:
         if 'to' in pub_annotation:
             priv_annotation['to'] += '-priv'
@@ -104,6 +108,9 @@ def generate_app_ci_content(config, git_clone_dir):
 
     # TRT RBAC
     content.generate_trt_rbac(config)
+
+    # Release Payload Controller
+    content.add_release_payload_controller_resources(config, context)
 
 
 def run(git_clone_dir, bump=False):

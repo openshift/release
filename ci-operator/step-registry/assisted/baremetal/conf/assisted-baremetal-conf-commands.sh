@@ -3,8 +3,24 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -o verbose
 
 echo "************ baremetalds e2e assisted conf command ************"
+
+case "${CLUSTER_TYPE}" in
+    vsphere)
+        export TEST_PROVIDER=vsphere
+        ;;
+
+    packet-edge|nutanix)
+        export TEST_PROVIDER=baremetal
+        ;;
+
+    *)
+        echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
+        exit 1
+        ;;
+esac
 
 # List of include cases
 
@@ -14,6 +30,16 @@ case "${TEST_SUITE:-full}" in
 [sig-cli] Kubectl client Kubectl api-versions should check if v1 is in available api versions
 #
 EOF
+        ;;
+
+    conformance)
+        # shellcheck disable=SC2044
+        for kubeconfig in $(find ${SHARED_DIR} -name "kubeconfig*" -exec echo {} \;); do
+            # Spoke cluster's kubeconfig has a random name, so we only need the first found
+            export KUBECONFIG=${kubeconfig}
+            INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run --provider '{"type":"${TEST_PROVIDER}"}')
+            break
+        done
         ;;
 
     full)
@@ -131,3 +157,5 @@ esac
 
 
 cat <(echo "$INCL") > "${SHARED_DIR}/test-list"
+
+cp "${SHARED_DIR}/test-list" "${ARTIFACT_DIR}"

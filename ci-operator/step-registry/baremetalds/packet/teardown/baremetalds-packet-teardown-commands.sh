@@ -9,7 +9,8 @@ echo "************ baremetalds packet teardown command ************"
 set -x
 CIRFILE=$SHARED_DIR/cir
 if [ -e $CIRFILE ] ; then
-    curl -kfX DELETE -H "Host: ofcir.apps.ostest.test.metalkube.org" "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)/$(jq -r .name < $CIRFILE)?name=$JOB_NAME/$BUILD_ID" || true
+    OFCIRURL=$(cat $SHARED_DIR/ofcir)
+    curl -kfX DELETE -H "Host: ofcir.apps.ostest.test.metalkube.org" "$OFCIRURL/$(jq -r .name < $CIRFILE)?name=$JOB_NAME/$BUILD_ID" || true
     exit 0
 fi
 set +x

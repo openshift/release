@@ -1,0 +1,108 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+binary_build_commands: GOARGS="-mod=mod" make binary
+build_root:
+  project_image:
+    dockerfile_path: .openshift-ci/build-root/Dockerfile
+  use_build_cache: true
+images:
+- dockerfile_literal: |-
+    FROM bin AS builder
+    FROM registry.access.redhat.com/ubi8-minimal:8.6
+    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleet-manager /usr/local/bin/
+    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleetshard-sync /usr/local/bin/
+    WORKDIR /
+  from: base
+  inputs:
+    bin:
+      as:
+      - bin
+  to: acs-fleet-manager
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 6000Mi
+tests:
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    as: custom
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.7"
+  steps:
+    test:
+    - as: claim
+      cli: custom
+      commands: |
+        if [ -x ".openshift-ci/tests/e2e.sh" ]; then
+          ./.openshift-ci/tests/e2e.sh
+        else
+          echo "No e2e configured, skipping."
+        fi
+      credentials:
+      - mount_path: /var/run/rhacs-ms-e2e-tests
+        name: rhacs-ms-e2e-tests
+        namespace: test-credentials
+      dependencies:
+      - env: FLEET_MANAGER_IMAGE
+        name: acs-fleet-manager
+      from: bin
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 6000Mi
+    workflow: generic-claim
+- as: image-push
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: to-quay
+      best_effort: true
+      cli: latest
+      commands: |
+        entrypoint=".openshift-ci/image-push/entrypoint.sh"
+        if [ -x "$entrypoint" ]; then
+          echo "Executing image-push entrypoint."
+          $entrypoint
+        else
+          echo "No image-push entrypoint ($entrypoint) found."
+          exit 1
+        fi
+      credentials:
+      - mount_path: /var/run/rhacs-ms-push
+        name: rhacs-ms-push
+        namespace: test-credentials
+      dependencies:
+      - env: FLEET_MANAGER_IMAGE
+        name: acs-fleet-manager
+      from: bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 15m0s
+zz_generated_metadata:
+  branch: main
+  org: stackrox
+  repo: acs-fleet-manager

@@ -1,0 +1,682 @@
+base_images:
+  ci_nginx-unprivileged_stable:
+    name: nginx-unprivileged
+    namespace: ci
+    tag: stable
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: make production-install
+build_root:
+  from_repository: true
+images:
+- context_dir: images/sprint-automation/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sprint-automation
+  to: sprint-automation
+- context_dir: images/pod-scaler/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pod-scaler
+  to: pod-scaler
+- context_dir: images/pr-reminder/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pr-reminder
+  to: pr-reminder
+- context_dir: images/check-gh-automation/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/check-gh-automation
+  to: check-gh-automation
+- context_dir: images/gh-pull-through-cache/
+  inputs:
+    ci_nginx-unprivileged_stable:
+      as:
+      - registry.ci.openshift.org/ci/nginx-unprivileged:stable
+  to: gh-pull-through-cache
+- context_dir: images/cvp-trigger/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/cvp-trigger
+  to: cvp-trigger
+- context_dir: images/template-deprecator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/template-deprecator
+  to: template-deprecator
+- context_dir: images/blocking-issue-creator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/blocking-issue-creator
+  to: blocking-issue-creator
+- context_dir: images/result-aggregator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/result-aggregator
+  to: result-aggregator
+- context_dir: images/ci-operator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator
+  to: ci-operator
+- context_dir: images/ci-operator-checkconfig/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-checkconfig
+  to: ci-operator-checkconfig
+- context_dir: images/bugzilla-backporter/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/bugzilla-backporter
+  to: bugzilla-backporter
+- context_dir: images/ci-operator-prowgen/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-prowgen
+  to: ci-operator-prowgen
+- context_dir: images/sanitize-prow-jobs/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sanitize-prow-jobs
+  to: sanitize-prow-jobs
+- context_dir: images/pj-rehearse/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pj-rehearse
+  to: pj-rehearse
+- context_dir: images/slack-bot/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/slack-bot
+  to: slack-bot
+- context_dir: images/config-shard-validator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/config-shard-validator
+  to: config-shard-validator
+- context_dir: images/config-brancher/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/config-brancher
+  to: config-brancher
+- context_dir: images/dptp-controller-manager
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/dptp-controller-manager
+  to: dptp-controller-manager
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD dptp-pools-cm /usr/bin/dptp-pools-cm
+    ENTRYPOINT ["dptp-pools-cm"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/dptp-pools-cm
+  to: dptp-pools-cm
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD promoted-image-governor /usr/bin/promoted-image-governor
+    ENTRYPOINT ["promoted-image-governor"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/promoted-image-governor
+  to: promoted-image-governor
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD prcreator /usr/bin/prcreator
+    ENTRYPOINT ["prcreator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: prcreator
+- context_dir: images/autoconfigbrancher/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoconfigbrancher
+      - destination_dir: .
+        source_path: /go/bin/config-brancher
+      - destination_dir: .
+        source_path: /go/bin/determinize-ci-operator
+      - destination_dir: .
+        source_path: /go/bin/sanitize-prow-jobs
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-prowgen
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-config-mirror
+      - destination_dir: .
+        source_path: /go/bin/private-prow-configs-mirror
+      - destination_dir: .
+        source_path: /go/bin/template-deprecator
+      - destination_dir: .
+        source_path: /go/bin/determinize-prow-config
+      - destination_dir: .
+        source_path: /go/bin/registry-replacer
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-yaml-creator
+      - destination_dir: .
+        source_path: /go/bin/clusterimageset-updater
+      - destination_dir: .
+        source_path: /go/bin/promoted-image-governor
+  to: auto-config-brancher
+- context_dir: images/prowjobdispatcher
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/prow-job-dispatcher
+      - destination_dir: .
+        source_path: /go/bin/sanitize-prow-jobs
+  to: prow-job-dispatcher
+- context_dir: images/autotestgridgenerator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/testgrid-config-generator
+      - destination_dir: .
+        source_path: /go/bin/autotestgridgenerator
+  to: auto-testgrid-generator
+- context_dir: images/repo-brancher/
+  from: root
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/repo-brancher
+  to: repo-brancher
+- context_dir: images/determinize-ci-operator/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/determinize-ci-operator
+  to: determinize-ci-operator
+- context_dir: images/determinize-peribolos/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/determinize-peribolos
+  to: determinize-peribolos
+- context_dir: images/applyconfig
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/applyconfig
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: applyconfig
+- context_dir: images/autoowners
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoowners
+  to: autoowners
+- context_dir: images/config-change-trigger
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/config-change-trigger
+  to: config-change-trigger
+- context_dir: images/testgrid-config-generator
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/testgrid-config-generator
+  to: testgrid-config-generator
+- context_dir: images/entrypoint-wrapper
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/entrypoint-wrapper
+  to: entrypoint-wrapper
+- context_dir: images/ci-operator-configresolver
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-configresolver
+  to: ci-operator-configresolver
+- context_dir: images/determinize-prow-config
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/determinize-prow-config
+  to: determinize-prow-config
+- context_dir: images/repo-init
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/repo-init
+      - destination_dir: .
+        source_path: /go/bin/sanitize-prow-jobs
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-prowgen
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-checkconfig
+  to: repo-init
+- context_dir: images/private-org-sync/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/private-org-sync
+  to: private-org-sync
+- context_dir: images/ci-secret-bootstrap
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-secret-bootstrap
+  to: ci-secret-bootstrap
+- context_dir: images/ci-secret-generator
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-secret-generator
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: ci-secret-generator
+- context_dir: images/ci-operator-config-mirror
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-config-mirror
+  to: ci-operator-config-mirror
+- context_dir: images/private-prow-configs-mirror/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/private-prow-configs-mirror
+  to: private-prow-configs-mirror
+- context_dir: images/private-org-peribolos-sync/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/private-org-peribolos-sync
+  to: private-org-peribolos-sync
+- context_dir: images/autoperibolossync/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autoperibolossync
+      - destination_dir: .
+        source_path: /go/bin/private-org-peribolos-sync
+  to: auto-peribolos-sync
+- context_dir: images/registry-replacer/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/registry-replacer
+  to: registry-replacer
+- context_dir: images/autopublicizeconfig
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/autopublicizeconfig
+  to: autopublicizeconfig
+- context_dir: images/generate-registry-metadata/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/generate-registry-metadata
+  to: generate-registry-metadata
+- context_dir: images/publicize/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/publicize
+  to: publicize
+- context_dir: images/backport-verifier/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/backport-verifier
+  to: backport-verifier
+- context_dir: images/serviceaccount-secret-rotation-trigger
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/serviceaccount-secret-rotation-trigger
+  to: serviceaccount-secret-rotation-trigger
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git diffutils && dnf clean all && rm -rf /var/cache/dnf
+    ADD sippy-config-generator /usr/bin/sippy-config-generator
+    ADD prcreator /usr/bin/prcreator
+    ENTRYPOINT ["/usr/bin/sippy-config-generator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sippy-config-generator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: auto-sippy-config-generator
+- context_dir: images/ocp-build-data-enforcer/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ocp-build-data-enforcer
+  to: ocp-build-data-enforcer
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD vault-subpath-proxy /usr/bin/vault-subpath-proxy
+    ENTRYPOINT ["/usr/bin/vault-subpath-proxy"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/vault-subpath-proxy
+  to: vault-subpath-proxy
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD cluster-display /usr/bin/cluster-display
+    ENTRYPOINT ["/usr/bin/cluster-display"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/cluster-display
+  to: cluster-display
+- context_dir: images/cluster-init/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/cluster-init
+  to: cluster-init
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD vault-secret-collection-manager /usr/bin/vault-secret-collection-manager
+    ENTRYPOINT ["/usr/bin/vault-secret-collection-manager"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/vault-secret-collection-manager
+  to: vault-secret-collection-manager
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD bugzilla-config-manager /usr/bin/bugzilla-config-manager
+    ADD prcreator /usr/bin/prcreator
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/bugzilla-config-manager
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: bugzilla-config-manager
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN  dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD ci-operator-yaml-creator /usr/bin/ci-operator-yaml-creator
+    ENTRYPOINT ["ci-operator-yaml-creator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-operator-yaml-creator
+  to: ci-operator-yaml-creator
+- context_dir: images/clusterimageset-updater
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/clusterimageset-updater
+  to: clusterimageset-updater
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD github-ldap-user-group-creator /usr/bin/github-ldap-user-group-creator
+    ENTRYPOINT ["github-ldap-user-group-creator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/github-ldap-user-group-creator
+  to: github-ldap-user-group-creator
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD payload-testing-prow-plugin /usr/bin/payload-testing-prow-plugin
+    ENTRYPOINT ["/usr/bin/payload-testing-prow-plugin"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/payload-testing-prow-plugin
+  to: payload-testing-prow-plugin
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD schedule-generator /usr/bin/schedule-generator
+    RUN yum install -y git && yum clean all && rm -rf /var/cache/yum
+    ENTRYPOINT ["/usr/bin/schedule-generator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/schedule-generator
+  to: schedule-generator
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD job-trigger-controller-manager /usr/bin/job-trigger-controller-manager
+    ENTRYPOINT ["/usr/bin/job-trigger-controller-manager"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/job-trigger-controller-manager
+  to: job-trigger-controller-manager
+- context_dir: images/payload-testing-ui
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/payload-testing-ui
+  to: payload-testing-ui
+- context_dir: images/job-run-aggregator
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/job-run-aggregator
+  to: job-run-aggregator
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD job-run-aggregator /usr/bin/job-run-aggregator
+    ADD prcreator /usr/bin/prcreator
+    ENTRYPOINT ["job-run-aggregator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/job-run-aggregator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: auto-aggregator-job-names
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD sync-rover-groups /usr/bin/sync-rover-groups
+    ADD usr/bin/oc /usr/bin/oc
+    ENTRYPOINT ["sync-rover-groups"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sync-rover-groups
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: sync-rover-groups
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD retester /usr/bin/retester
+    ENTRYPOINT ["/usr/bin/retester"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/retester
+  to: retester
+promotion:
+  namespace: nmoraitis
+  tag: latest
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make race-install
+tests:
+- as: unit
+  commands: make test TESTFLAGS='-count=25'
+  container:
+    from: src
+zz_generated_metadata:
+  branch: master
+  org: droslean
+  repo: ci-tools

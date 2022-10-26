@@ -43,7 +43,7 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
 fi
 
 if [ -z "${RESOURCE_GROUP}" ]; then
-  rg_file="${SHARED_DIR}/resouregroup"
+  rg_file="${SHARED_DIR}/resourcegroup"
   if [ -f "${rg_file}" ]; then
     bastion_rg=$(cat "${rg_file}")
   else
@@ -57,8 +57,7 @@ fi
 if [ -z "${VNET_NAME}" ]; then
   vnet_file="${SHARED_DIR}/customer_vnet_subnets.yaml"
   if [ -f "${vnet_file}" ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
-    bastion_vnet_name=$(/tmp/yq r ${vnet_file} 'platform.azure.virtualNetwork')
+    bastion_vnet_name=$(yq-go r ${vnet_file} 'platform.azure.virtualNetwork')
   else
     echo "Did not find ${vnet_file}!"
     exit 1
@@ -136,10 +135,14 @@ vnet_subnet_address_parameter="--address-prefixes ${bastion_subnet_cidr}"
 run_command "az network vnet subnet create -g ${bastion_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg}" || exit 2
 
 echo "Create bastion vm"
-run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --os-disk-size-gb 99 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}'" || exit 2
+run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --os-disk-size-gb 199 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}'" || exit 2
 
-bastion_private_ip=$(az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | jq -r ".[].virtualMachine.network.privateIpAddresses[]") &&
-bastion_public_ip=$(az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | jq -r ".[].virtualMachine.network.publicIpAddresses[].ipAddress") || exit 2
+# wait for a while, so that azure api return IP successfully
+sleep 60
+vm_ip_info_file=$(mktemp)
+run_command "az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | tee '${vm_ip_info_file}'" || exit 2
+bastion_private_ip=$(jq -r ".[].virtualMachine.network.privateIpAddresses[]" "${vm_ip_info_file}")
+bastion_public_ip=$(jq -r ".[].virtualMachine.network.publicIpAddresses[].ipAddress" "${vm_ip_info_file}")
 if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; then
     echo "Did not found public or internal IP!"
     exit 1
@@ -162,9 +165,10 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
     echo "Adding public DNS record for mirror registry"
     cmd="az network dns record-set a add-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}"
     run_command "${cmd}" &&
-    echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip}" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
-    wait_public_dns "${mirror_registry_dns}" || exit 2
-
+    echo "az network dns record-set a remove-record -g ${BASE_RESOURCE_GROUP} -z ${BASE_DOMAIN} -n ${mirror_registry_host} -a ${bastion_public_ip} || :" >>"${SHARED_DIR}/remove_resources_by_cli.sh"
+    
+#    wait_public_dns "${mirror_registry_dns}" || exit 2
+    echo "Waiting for ${mirror_registry_dns} to be ready..." && sleep 120s
     # save mirror registry dns info
     echo "${mirror_registry_dns}:5000" > "${SHARED_DIR}/mirror_registry_url"
 fi
@@ -184,3 +188,6 @@ echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${bastion_public_ip}" > "${SHARED_DIR}/proxyip"
+
+echo "Sleeping 5 mins, make sure that the bastion host is fully started."
+sleep 300

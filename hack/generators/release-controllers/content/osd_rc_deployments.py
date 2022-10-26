@@ -25,7 +25,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.11:tests'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.12:tests'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -226,7 +226,7 @@ def _add_osd_rc_deployment(gendoc):
 
     # Creating Cluster Groups for the AMD64 jobs...
     if context.arch == 'x86_64':
-        extra_rc_args.append('--cluster-group=build01,build03,build04')
+        extra_rc_args.append('--cluster-group=build01,build02,build03,build04,build05')
         extra_rc_args.append('--cluster-group=vsphere')
 
     gendoc.append({
@@ -268,7 +268,6 @@ def _add_osd_rc_deployment(gendoc):
                                         '--job-config=/etc/job-config',
                                         '--listen=' + ('127.0.0.1:8080' if context.private else ':8080'),
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
-                                        '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',
                                         '--tools-image-stream-tag=release-controller-bootstrap:tests',
                                         f'--release-architecture={context.get_supported_architecture_name()}',
@@ -280,9 +279,12 @@ def _add_osd_rc_deployment(gendoc):
                                         '--bugzilla-endpoint=https://bugzilla.redhat.com',
                                         '--bugzilla-api-key-path=/etc/bugzilla/api',
                                         '--bugzilla-auth-method=bearer',
+                                        '--verify-bugzilla',
+                                        '--jira-endpoint=https://issues.redhat.com',
+                                        '--jira-bearer-token-file=/etc/jira/api',
+                                        '--verify-jira',
                                         '--plugin-config=/etc/plugins/plugins.yaml',
                                         '--supplemental-plugin-config-dir=/etc/plugins',
-                                        '--verify-bugzilla',
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
                                         f'--art-suffix={context.art_suffix}'
                                         ],
@@ -308,7 +310,7 @@ def _add_osd_rc_deployment(gendoc):
                             },
                         }],
                     'serviceAccountName': f'release-controller-{context.is_namespace}',
-                    'volumes': get_rc_volumes(context, context.is_namespace)
+                    'volumes': get_rc_volumes(context)
                 }
             }
         }
@@ -351,7 +353,6 @@ def _add_osd_rc_deployment(gendoc):
                                         f'--release-namespace={context.is_namespace}',
                                         f'--artifacts={context.fc_app_url}',
                                         f'--prow-namespace={context.config.rc_deployment_namespace}',
-                                        '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                                         f'--job-namespace={context.jobs_namespace}',
                                         '--tools-image-stream-tag=release-controller-bootstrap:tests',
                                         f'--release-architecture={context.get_supported_architecture_name()}',
@@ -381,7 +382,7 @@ def _add_osd_rc_deployment(gendoc):
                             },
                         }],
                     'serviceAccountName': f'release-controller-{context.is_namespace}',
-                    'volumes': get_kubeconfig_volumes(context, namespace=context.is_namespace, secret_name=context.secret_name_tls_api)
+                    'volumes': get_kubeconfig_volumes(context, secret_name=context.secret_name_tls_api)
                 }
             }
         }

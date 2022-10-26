@@ -16,17 +16,23 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
-# Install an updated version of the client
-mkdir -p /tmp/client
-curl https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar --directory=/tmp/client -xzf -
-PATH=/tmp/client:$PATH
 oc version --client
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    echo "Setting proxy"
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 echo "$(date -u --rfc-3339=seconds) - Validating parsed Ansible inventory"
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 echo "$(date -u --rfc-3339=seconds) - Running RHEL worker scaleup"
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" playbooks/scaleup.yml -vvv
 
+
+if [[ "${REMOVE_RHCOS_WORKER}" == "no" ]]; then
+    echo "RHCOS worker will not be removed!"
+    exit 0
+fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
@@ -55,7 +61,7 @@ oc wait clusteroperator.config.openshift.io \
     --for=condition=Available=True \
     --for=condition=Progressing=False \
     --for=condition=Degraded=False \
-    --timeout=10m \
+    --timeout=20m \
     --all
 
 echo "$(date -u --rfc-3339=seconds) - RHEL worker scaleup complete"

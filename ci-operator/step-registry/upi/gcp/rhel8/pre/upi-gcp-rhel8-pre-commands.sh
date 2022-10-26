@@ -37,12 +37,12 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
   --network "${INSTANCE_PREFIX}" \
   --allow tcp:22,icmp
 
-# TODO: make this rhel8, need subscription
 gcloud compute instances create "${INSTANCE_PREFIX}" \
-  --image=microshift-rhel-base \
+  --image=rhel-8-v20220719 \
+  --image-project=rhel-cloud \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --machine-type e2-standard-8 \
   --boot-disk-type pd-ssd \
   --subnet "${INSTANCE_PREFIX}" \
   --network "${INSTANCE_PREFIX}" \
-  --hostname "release-ci-${INSTANCE_PREFIX}.microshift-ci.com"
+  --hostname "release-ci-${INSTANCE_PREFIX}.openshift-ci.com"

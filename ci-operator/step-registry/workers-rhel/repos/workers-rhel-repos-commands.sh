@@ -21,10 +21,6 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
-# Install an updated version of the client
-mkdir -p /tmp/client
-curl https://mirror2.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar --directory=/tmp/client -xzf -
-PATH=/tmp/client:$PATH
 oc version --client
 
 MIRROR_USERNAME="$(<'/var/run/mirror-repo-basic-auth/username')"
@@ -181,6 +177,11 @@ metadata_expire = 86400
 enabled_metadata = 1
 module_hotfixes = 1
 EOF
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    echo "Setting proxy"
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" prep.yaml -vvv

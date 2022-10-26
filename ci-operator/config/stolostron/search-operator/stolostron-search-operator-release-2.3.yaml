@@ -3,22 +3,22 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.17-linux:
+  stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.17-linux:
+    stolostron_builder_go1.18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: search-operator
 promotion:
   name: "2.3"
@@ -62,6 +62,30 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: publish
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: search-operator
+    env:
+      IMAGE_REPO: search-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export SELF="make -f Makefile.prow"
+        export OSCI_PUBLISH_DELAY="0"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
   branch: release-2.3
   org: stolostron

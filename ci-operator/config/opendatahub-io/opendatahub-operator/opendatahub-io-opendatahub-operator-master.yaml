@@ -26,12 +26,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.7"
+      name: "4.10"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.7"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
@@ -53,12 +53,12 @@ tests:
     make test-junit
   container:
     from: src
-  cron: 30 0 * * *
+  cron: 16 17 10,24 * *
 - as: operator-e2e
   steps:
     cluster_profile: gcp
     env:
-      COMPUTE_NODE_TYPE: n1-standard-8
+      COMPUTE_NODE_TYPE: n2-standard-8
       OO_CHANNEL: rolling
       OO_INSTALL_NAMESPACE: opendatahub-operator
       OO_PACKAGE: opendatahub-operator
@@ -69,15 +69,15 @@ tests:
       from: odh-tests
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 2000m
+          memory: 3Gi
     workflow: optional-operators-ci-gcp
 - as: operator-e2e-nightly
-  cron: 30 3 * * *
+  cron: 52 15 5,19 * *
   steps:
     cluster_profile: gcp
     env:
-      COMPUTE_NODE_TYPE: n1-standard-8
+      COMPUTE_NODE_TYPE: n2-standard-8
       OO_CHANNEL: rolling
       OO_INSTALL_NAMESPACE: opendatahub-operator
       OO_PACKAGE: opendatahub-operator
@@ -88,8 +88,8 @@ tests:
       from: odh-tests
       resources:
         requests:
-          cpu: 100m
-          memory: 200Mi
+          cpu: 2000m
+          memory: 3Gi
     workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: master

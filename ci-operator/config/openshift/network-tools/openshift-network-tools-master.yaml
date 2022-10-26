@@ -1,14 +1,14 @@
 base_images:
-  ocp_4.11_ovn-kubernetes:
-    name: "4.11"
+  ocp_4.12_ovn-kubernetes:
+    name: "4.12"
     namespace: ocp
     tag: ovn-kubernetes
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.19-openshift-4.12
   tools:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: tools
 binary_build_commands: '"make build --warn-undefined-variables"'
@@ -18,25 +18,25 @@ images:
 - dockerfile_path: Dockerfile
   from: tools
   inputs:
-    ocp_4.11_ovn-kubernetes:
+    ocp_4.12_ovn-kubernetes:
       as:
-      - registry.ci.openshift.org/ocp/4.11:ovn-kubernetes
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+      - registry.ci.openshift.org/ocp/4.12:ovn-kubernetes
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: network-tools
 promotion:
-  name: "4.11"
+  name: "4.12"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':
@@ -47,7 +47,7 @@ resources:
       memory: 200Mi
 test_binary_build_commands: '"make build GO_BUILD_FLAGS:=''-race'' --warn-undefined-variables"'
 tests:
-- as: e2e-aws
+- as: e2e-aws-ovn
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws

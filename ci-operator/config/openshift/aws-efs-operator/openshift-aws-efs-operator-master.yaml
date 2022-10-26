@@ -4,10 +4,7 @@ base_images:
     namespace: ocp
     tag: base
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.13
+  from_repository: true
 images:
 - dockerfile_path: build/Dockerfile
   from: base
@@ -27,6 +24,10 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: aws-efs-operator-codecov-token
+- as: lint
+  commands: make lint
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -4,8 +4,21 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# TODO: move to image
-curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+function getVersion() {
+  local release_image=""
+  if [ -n "${RELEASE_IMAGE_INITIAL-}" ]; then
+    release_image=${RELEASE_IMAGE_INITIAL}
+  elif [ -n "${RELEASE_IMAGE_LATEST-}" ]; then
+    release_image=${RELEASE_IMAGE_LATEST}     
+  fi
+  
+  local version=""
+  if [ ${release_image} != "" ]; then
+    oc registry login
+    version=$(oc adm release info ${release_image} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)    
+  fi
+  echo "${version}"
+}
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
@@ -17,27 +30,39 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
 fi
 master_type=null
+master_type_prefix=""
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  master_type=Standard_D32s_v3
+  master_type_prefix=Standard_D32
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  master_type=Standard_D16s_v3
+  master_type_prefix=Standard_D16
 elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  master_type=Standard_D8s_v3
+  master_type_prefix=Standard_D8
 fi
+if [ -n "${master_type_prefix}" ]; then
+  if [ "${OCP_ARCH}" = "amd64" ]; then
+    master_type=${master_type_prefix}s_v3
+  elif [ "${OCP_ARCH}" = "arm64" ]; then
+    master_type=${master_type_prefix}ps_v5
+  fi
+fi
+
+echo "Using control plane instance type: ${master_type}"
+echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
 platform:
   azure:
-    baseDomainResourceGroupName: os4-common
     region: ${REGION}
 controlPlane:
+  architecture: ${OCP_ARCH}
   name: master
   platform:
     azure:
       type: ${master_type}
 compute:
-- name: worker
+- architecture: ${OCP_ARCH}
+  name: worker
   replicas: ${workers}
   platform:
     azure:
@@ -55,8 +80,32 @@ platform:
   azure:
     outboundType: ${OUTBOUND_TYPE}
 EOF
-    /tmp/yq m -x -i "${CONFIG}" "${PATCH}"
+    yq-go m -x -i "${CONFIG}" "${PATCH}"
   else
     echo "${OUTBOUND_TYPE} is not supported yet" || exit 1
   fi
+fi
+
+version=$(getVersion)
+echo "get ocp version: ${version}"
+REQUIRED_OCP_VERSION="4.12"
+isOldVersion=true
+if [ -n "${version}" ] && [ "$(printf '%s\n' "${REQUIRED_OCP_VERSION}" "${version}" | sort --version-sort | head -n1)" = "${REQUIRED_OCP_VERSION}" ]; then
+  isOldVersion=false
+fi
+
+PUBLISH=$(yq-go r "${CONFIG}" "publish")
+echo "publish: ${PUBLISH}"
+echo "is Old Version: ${isOldVersion}"
+if [ ${isOldVersion} = true ] || [ -z "${PUBLISH}" ] || [ X"${PUBLISH}" == X"External" ]; then
+  echo "Write the 'baseDomainResourceGroupName: os4-common' to install-config"
+  PATCH="${SHARED_DIR}/install-config-baseDomainRG.yaml.patch"
+    cat > "${PATCH}" << EOF
+platform:
+  azure:
+    baseDomainResourceGroupName: os4-common
+EOF
+    yq-go m -x -i "${CONFIG}" "${PATCH}"
+else
+  echo "Omit baseDomainResourceGroupName for private cluster"
 fi

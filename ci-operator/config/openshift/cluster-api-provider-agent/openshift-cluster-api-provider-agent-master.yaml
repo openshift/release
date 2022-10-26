@@ -1,26 +1,34 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service
+  assisted-service-index:
+    name: assisted-service-index
+    namespace: edge-infrastructure
+    tag: latest
+  assisted-service-scripts:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -46,17 +54,12 @@ images:
   from: base
   to: cluster-api-provider-agent
 promotion:
-  name: ocm-2.6
+  name: ocm-2.7
   namespace: edge-infrastructure
 releases:
-  initial:
-    integration:
-      name: "4.9"
-      namespace: ocp
   latest:
     integration:
-      include_built_images: true
-      name: "4.9"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -95,7 +98,7 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
-- as: e2e-capi-provider-hypershift
+- as: e2e-metal-assisted-capi
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -106,13 +109,14 @@ tests:
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=10240
+        MINIKUBE_RAM_MB=12000
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="setup run deploy_capi_env test_kube_api_parallel"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="deploy_capi_env test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
     workflow: assisted-baremetal
-- as: e2e-capi-provider-hypershift-periodic
-  cron: '@daily'
+- as: e2e-metal-assisted-capi-periodic
+  cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -123,12 +127,24 @@ tests:
         KUBE_API=yes
         ENABLE_KUBE_API=true
         MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=10240
+        MINIKUBE_RAM_MB=12000
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="setup run deploy_capi_env test_kube_api_parallel"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test_kube_api_parallel"
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: full
     workflow: assisted-baremetal
+- as: e2e-ai-operator-ztp-capi
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      INDEX_IMAGE: assisted-service-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
+    workflow: assisted-baremetal-operator-capi
 zz_generated_metadata:
   branch: master
   org: openshift

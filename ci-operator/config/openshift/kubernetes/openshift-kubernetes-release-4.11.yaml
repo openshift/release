@@ -23,10 +23,10 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: oc-rpms
-  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.10
+    tag: rhel-8-golang-1.18-openshift-4.11
   tools:
     name: "4.11"
     namespace: ocp
@@ -39,16 +39,16 @@ images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
   from: base
@@ -64,14 +64,13 @@ images:
   dockerfile_path: Dockerfile.Rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: pod
 promotion:
   additional_images:
     artifacts: artifacts
-  disabled: true
   excluded_images:
   - machine-os-content
   name: "4.11"
@@ -284,6 +283,7 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
+  timeout: 5h0m0s
 - as: e2e-aws-csi
   optional: true
   steps:
@@ -327,6 +327,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sdn-multi
 - as: e2e-metal-ipi
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -336,6 +337,7 @@ tests:
         NETWORK_TYPE=OpenShiftSDN
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -345,6 +347,7 @@ tests:
         NETWORK_TYPE=OVNKubernetes
     workflow: baremetalds-e2e
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal

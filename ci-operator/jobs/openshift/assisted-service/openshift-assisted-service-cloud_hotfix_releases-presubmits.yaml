@@ -80,7 +80,7 @@ presubmits:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
     cluster: build04
-    context: ci/prow/e2e-metal-assisted-4-6
+    context: ci/prow/e2e-metal-assisted-4-11
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -89,8 +89,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-6
-    rerun_command: /test e2e-metal-assisted-4-6
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-11
+    rerun_command: /test e2e-metal-assisted-4-11
     spec:
       containers:
       - args:
@@ -99,8 +99,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-4-6-cluster-profile
-        - --target=e2e-metal-assisted-4-6
+        - --secret-dir=/usr/local/e2e-metal-assisted-4-11-cluster-profile
+        - --target=e2e-metal-assisted-4-11
         command:
         - ci-operator
         image: ci-operator:latest
@@ -116,7 +116,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-4-6-cluster-profile
+        - mountPath: /usr/local/e2e-metal-assisted-4-11-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -147,7 +147,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-4-6,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-4-11,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -312,8 +312,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-cnv
-    optional: true
     rerun_command: /test e2e-metal-assisted-cnv
+    run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
     spec:
       containers:
       - args:
@@ -520,6 +520,81 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-metal-assisted-ipv4v6,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^cloud_hotfix_releases$
+    - ^cloud_hotfix_releases-
+    cluster: build04
+    context: ci/prow/e2e-metal-assisted-lvm
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-lvm
+    rerun_command: /test e2e-metal-assisted-lvm
+    run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-assisted-lvm-cluster-profile
+        - --target=e2e-metal-assisted-lvm
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-assisted-lvm-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-packet-assisted
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-lvm,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^cloud_hotfix_releases$
@@ -609,8 +684,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-ocs
-    optional: true
     rerun_command: /test e2e-metal-assisted-ocs
+    run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
     spec:
       containers:
       - args:
@@ -684,8 +759,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-odf
-    optional: true
     rerun_command: /test e2e-metal-assisted-odf
+    run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
     spec:
       containers:
       - args:
@@ -990,7 +1065,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
@@ -1004,6 +1079,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-subsystem-aws
     rerun_command: /test subsystem-aws
+    run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
     spec:
       containers:
       - args:
@@ -1067,7 +1143,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-unit-test
     rerun_command: /test unit-test
-    skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+    skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
     spec:
       containers:
       - args:
@@ -1124,7 +1200,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-verify-generated-code
     rerun_command: /test verify-generated-code
-    skip_if_only_changed: ^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNER_ALIASES)$
+    skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
     spec:
       containers:
       - args:

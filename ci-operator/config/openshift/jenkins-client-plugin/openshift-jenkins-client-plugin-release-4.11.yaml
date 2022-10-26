@@ -1,30 +1,14 @@
-base_images:
-  jenkins-agent-base:
-    name: "4.11"
-    namespace: ocp
-    tag: jenkins-agent-base
-  original_jenkins:
-    name: "4.11"
-    namespace: ocp
-    tag: jenkins
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.16
 images:
 - dockerfile_path: Dockerfile
-  from: original_jenkins
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins-client-plugin/.
   to: jenkins
 promotion:
   additional_images:
     jenkins-client-plugin-tests: src
-  disabled: true
   excluded_images:
   - jenkins
   name: "4.11"
@@ -46,6 +30,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-jenkins-client-plugin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
@@ -55,15 +40,13 @@ tests:
       dependencies:
       - env: JENKINS_IMAGE
         name: pipeline:jenkins
-      - env: JENKINS_AGENT_BASE_IMAGE
-        name: pipeline:jenkins-agent-base
       from: src
       resources:
         requests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-aws-jenkins-client-plugin-continuous
-  cron: 0 */12 * * *
+  cron: 47 5 */1 * 1-5
   steps:
     cluster_profile: aws
     test:

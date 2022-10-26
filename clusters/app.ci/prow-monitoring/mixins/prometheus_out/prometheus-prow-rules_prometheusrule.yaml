@@ -8,17 +8,6 @@ metadata:
   namespace: prow-monitoring
 spec:
   groups:
-  - name: mirroring-failures
-    rules:
-    - alert: mirroring-failures
-      annotations:
-        message: '@build-cop image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.  If there is a consistent issue, open a bugzilla bug against Test Infrastructure and assign it to Clayton Coleman.'
-      expr: |
-        increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
-      for: 1m
-      labels:
-        severity: critical
-        team: build-cop
   - name: ci-absent
     rules:
     - alert: deckDown
@@ -122,6 +111,14 @@ spec:
         message: The service pod-scaler-ui has been down for 5 minutes.
       expr: |
         absent(up{job="pod-scaler-ui"} == 1)
+      for: 5m
+      labels:
+        severity: critical
+    - alert: retesterDown
+      annotations:
+        message: The service retester has been down for 5 minutes.
+      expr: |
+        absent(up{job="retester"} == 1)
       for: 5m
       labels:
         severity: critical
@@ -320,7 +317,17 @@ spec:
             rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
           )
         )
-        < 0.95
+        < 0.90
+      for: 1m
+      labels:
+        severity: critical
+  - name: openshift-mirroring-failures
+    rules:
+    - alert: openshift-mirroring-failures
+      annotations:
+        message: OpenShift image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.
+      expr: |
+        increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
       for: 1m
       labels:
         severity: critical
@@ -503,3 +510,22 @@ spec:
       labels:
         severity: critical
         team: release-controller
+  - name: release-controller-jira-errors
+    rules:
+    - alert: releaseControllerJiraError
+      annotations:
+        message: Release-controller has reported errors in jira verification.
+      expr: rate(release_controller_jira_errors_total[5m]) > 0
+      labels:
+        severity: critical
+        team: release-controller
+  - name: tide-missing
+    rules:
+    - alert: TideNotMergingPRs
+      annotations:
+        message: Tide has not merged any pull requests in the last hour, likely indicating an outage in the service.
+      expr: |
+        (sum(rate(merges_count[60m])) and on () (day_of_week() <= 5 and day_of_week() >= 1) and on() (hour() > 7 and hour() < 22 )) == 0
+      for: 60m
+      labels:
+        severity: critical

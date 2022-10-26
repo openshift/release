@@ -4,8 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export LOKI_STAGE_ENDPOINT=https://observatorium.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
-export LOKI_PROD_ENDPOINT=https://observatorium.api.openshift.com/api/logs/v1/dptp/loki/api/v1
+export LOKI_STAGE_ENDPOINT=https://observatorium-mst.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+export LOKI_PROD_ENDPOINT=https://observatorium-mst.api.openshift.com/api/logs/v1/dptp/loki/api/v1
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
 

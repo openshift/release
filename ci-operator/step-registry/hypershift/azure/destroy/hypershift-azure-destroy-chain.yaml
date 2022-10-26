@@ -13,7 +13,7 @@ chain:
     commands: |-
       set -exuo pipefail
 
-      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|cut -d- -f-2)"
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
       bin/hypershift destroy cluster azure \
         --azure-creds=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json  \
@@ -23,7 +23,7 @@ chain:
       echo "$(date) Finished deleting cluster"
     from_image:
       namespace: ocp
-      name: "4.11"
+      name: "4.12"
       tag: hypershift-operator
     grace_period: 5m0s
     resources:

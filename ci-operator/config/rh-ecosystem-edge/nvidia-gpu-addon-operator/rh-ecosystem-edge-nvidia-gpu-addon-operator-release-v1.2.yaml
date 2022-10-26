@@ -1,0 +1,72 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.43.0
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  to: nvidia-gpu-addon-operator
+- build_args:
+  - name: VERSION
+    value: "1.2"
+  dockerfile_path: must-gather.Dockerfile
+  to: nvidia-gpu-addon-operator-must-gather
+promotion:
+  name: "1.2"
+  namespace: edge-infrastructure
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    clone: true
+    from: golangci-lint
+- as: unit-test
+  commands: |
+    export REPORTS=${ARTIFACT_DIR}
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make test
+  container:
+    clone: true
+    from: golangci-lint
+- as: mirror-vcsref-image-operator-1-2
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: nvidia-gpu-addon-operator
+    env:
+      IMAGE_REPO: nvidia-gpu-addon-operator
+      IMAGE_TAG: "1.2"
+    test:
+    - ref: assisted-baremetal-images-publish
+- as: mirror-vcsref-image-operator-must-gather-1-2
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: nvidia-gpu-addon-operator-must-gather
+    env:
+      IMAGE_REPO: nvidia-gpu-addon-operator-must-gather
+      IMAGE_TAG: "1.2"
+    test:
+    - ref: assisted-baremetal-images-publish
+zz_generated_metadata:
+  branch: release-v1.2
+  org: rh-ecosystem-edge
+  repo: nvidia-gpu-addon-operator

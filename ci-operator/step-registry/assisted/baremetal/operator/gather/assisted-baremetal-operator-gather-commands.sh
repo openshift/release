@@ -27,16 +27,16 @@ trap getlogs EXIT
 
 echo "### Gathering logs..."
 # shellcheck disable=SC2087
-timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
+timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
+# prepending each printed line with a timestamp
+exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
+
 set -xeo pipefail
 
 # Get sosreport including sar data
-sos report --batch --tmp-dir /tmp/artifacts \
-  -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
+sos report --batch --tmp-dir /tmp/artifacts --all-logs \
+  -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum,cloud_init \
   -k podman.all -k podman.logs
-
-# TODO: remove when https://github.com/sosreport/sos/pull/2594 is available
-cp -r /var/lib/libvirt/dnsmasq /tmp/artifacts/libvirt-dnsmasq
 
 cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
 ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true
@@ -44,18 +44,17 @@ ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.
 cp -R ./reports /tmp/artifacts || true
 
 REPO_DIR="/home/assisted-service"
-if [ ! -d "\${REPO_DIR}" ]; then
-  mkdir -p "\${REPO_DIR}"
+if [ ! -d "${REPO_DIR}" ]; then
+  mkdir -p "${REPO_DIR}"
 
   echo "### Untar assisted-service code..."
-  tar -xzvf /root/assisted-service.tar.gz -C "\${REPO_DIR}"
+  tar -xzvf /root/assisted-service.tar.gz -C "${REPO_DIR}"
 fi
 
-cd "\${REPO_DIR}"
+cd "${REPO_DIR}"
 
 # Get assisted logs
 export LOGS_DEST=/tmp/artifacts
-export DISCONNECTED="${DISCONNECTED:-}"
 deploy/operator/gather.sh
 
 EOF

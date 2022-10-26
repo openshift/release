@@ -86,7 +86,7 @@ objects:
         serviceAccountName: deck
         containers:
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20220509-4308c44986
+          image: gcr.io/k8s-prow/deck:v20221024-d0c013ee2d
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -104,8 +104,10 @@ objects:
           - --spyglass=true
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
+          - --plugin-config=/etc/plugins/plugins.yaml
           - --supplemental-plugin-config-dir=/etc/plugins
           - --kubeconfig-dir=/etc/build-farm-credentials
+          - --kubeconfig-suffix=config
           env:
           - name: GITHUB_APP_ID
             valueFrom:
@@ -139,6 +141,9 @@ objects:
           - name: config
             mountPath: /etc/config
             readOnly: true
+          - name: plugins
+            mountPath: /etc/plugins
+            readOnly: true
           - name: extensions
             mountPath: /var/run/ko/static/extensions
             readOnly: true
@@ -170,6 +175,9 @@ objects:
         - name: config
           configMap:
             name: config
+        - name: plugins
+          configMap:
+            name: plugins
         - name: extensions
           configMap:
             name: deck-extensions
@@ -190,6 +198,10 @@ objects:
                 name: job-config-master-postsubmits
             - configMap:
                 name: job-config-master-presubmits
+            - configMap:
+                name: job-config-1.x
+            - configMap:
+                name: job-config-2.x
             - configMap:
                 name: job-config-3.x
             - configMap:
@@ -216,6 +228,8 @@ objects:
                 name: job-config-4.11
             - configMap:
                 name: job-config-4.12
+            - configMap:
+                name: job-config-4.13
         - name: build-farm-credentials
           secret:
             secretName: deck
@@ -307,7 +321,7 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20220509-4308c44986
+          image: gcr.io/k8s-prow/deck:v20221024-d0c013ee2d
           args:
           - --github-oauth-config-file=/etc/oauth/config.json
           - --github-app-id=$(GITHUB_APP_ID)
@@ -327,8 +341,10 @@ objects:
           - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-private/service-account.json
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
+          - --plugin-config=/etc/plugins/plugins.yaml
           - --supplemental-plugin-config-dir=/etc/plugins
           - --kubeconfig-dir=/etc/build-farm-credentials
+          - --kubeconfig-suffix=config
           env:
           - name: GITHUB_APP_ID
             valueFrom:
@@ -338,6 +354,21 @@ objects:
           ports:
             - name: http
               containerPort: 8080
+            - name: metrics
+              containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 600
           volumeMounts:
           - name: github-app-credentials
             mountPath: /etc/github
@@ -351,6 +382,9 @@ objects:
             name: session-secret
           - name: config
             mountPath: /etc/config
+            readOnly: true
+          - name: plugins
+            mountPath: /etc/plugins
             readOnly: true
           - name: extensions
             mountPath: /var/run/ko/static/extensions
@@ -366,8 +400,8 @@ objects:
             readOnly: true
           resources:
             requests:
-              memory: "3Gi"
-              cpu: "600m"
+              memory: "5Gi"
+              cpu: "500m"
         volumes:
         - name: github-app-credentials
           secret:
@@ -380,6 +414,9 @@ objects:
         - name: config
           configMap:
             name: config
+        - name: plugins
+          configMap:
+            name: plugins
         - name: extensions
           configMap:
             name: deck-internal-extensions
@@ -407,6 +444,10 @@ objects:
             - configMap:
                 name: job-config-master-presubmits
             - configMap:
+                name: job-config-1.x
+            - configMap:
+                name: job-config-2.x
+            - configMap:
                 name: job-config-3.x
             - configMap:
                 name: job-config-4.1
@@ -432,6 +473,8 @@ objects:
                 name: job-config-4.11
             - configMap:
                 name: job-config-4.12
+            - configMap:
+                name: job-config-4.13
         - name: build-farm-credentials
           secret:
             secretName: deck

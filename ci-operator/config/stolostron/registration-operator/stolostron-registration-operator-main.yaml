@@ -3,31 +3,39 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  stolostron_builder_go1.18-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.18-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.16-linux
+    tag: go1.18-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
+  inputs:
+    stolostron_builder_go1.18-linux:
+      as:
+      - golang:1.18
   to: registration-operator
 promotion:
   additional_images:
     registration-operator-src: src
   disabled: true
-  name: "2.0"
+  name: "2.2"
   namespace: stolostron
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.10"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.8"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
@@ -48,6 +56,33 @@ tests:
       IMAGE_TAG: main
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: sonar-pre-submit
+  commands: |
+    export SONAR_GO_TEST_ARGS="./..."
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: sonar-post-submit
+  commands: |
+    export SONAR_GO_TEST_ARGS="./..."
+    export SELF="make -f /opt/build-harness/Makefile.prow"
+    make -f /opt/build-harness/Makefile.prow sonar/go/prow
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /etc/sonarcloud/
+    name: acm-sonarcloud-token
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: backplane-2.2
+    workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main
   org: stolostron

@@ -1,0 +1,76 @@
+base_images:
+  ansible:
+    name: "4.11"
+    namespace: ocp
+    tag: ansible
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.11"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.11"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.11"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: installer-rehearse-aws
+  interval: 960h
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-aws-ipi-private
+- as: installer-rehearse-gcp
+  cluster: build05
+  interval: 960h
+  steps:
+    cluster_profile: gcp-qe
+    workflow: cucushift-installer-rehearse-gcp-ipi-workers-rhel8-fips
+- as: installer-rehearse-azure
+  interval: 960h
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+    workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
+- as: installer-rehearse-vsphere
+  interval: 960h
+  steps:
+    cluster_profile: vsphere
+    workflow: cucushift-installer-rehearse-vsphere-upi-ovn-sdn2ovn-rollback
+- as: installer-rehearse-vsphere-connected
+  interval: 960h
+  steps:
+    cluster_profile: vsphere-connected
+    workflow: cucushift-installer-rehearse-vsphere-upi-disconnecting-network
+- as: installer-rehearse-nutanix
+  cluster: build01
+  interval: 960h
+  steps:
+    cluster_profile: nutanix-qe
+    workflow: cucushift-installer-rehearse-nutanix-ipi
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: verification-tests
+  variant: installer-rehearse-4.11

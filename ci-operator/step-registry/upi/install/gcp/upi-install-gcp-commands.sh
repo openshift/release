@@ -26,6 +26,12 @@ if ! gcloud --version; then
   popd
 fi
 
+if [[ -s "${SHARED_DIR}/xpn.json" ]] && [[ -f "${CLUSTER_PROFILE_DIR}/xpn_creds.json" ]]; then
+  echo "Activating XPN service-account..."
+  GOOGLE_CLOUD_XPN_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/xpn_creds.json"
+  gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_XPN_KEYFILE_JSON}"
+  GOOGLE_CLOUD_XPN_SA=$(jq -r .client_email "${GOOGLE_CLOUD_XPN_KEYFILE_JSON}")
+fi
 export GOOGLE_CLOUD_KEYFILE_JSON="${CLUSTER_PROFILE_DIR}/gce.json"
 gcloud auth activate-service-account --key-file="${GOOGLE_CLOUD_KEYFILE_JSON}"
 gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
@@ -90,19 +96,24 @@ WORKER_IGNITION="$(cat worker.ign)"
 echo "Using infra_id: ${INFRA_ID}"
 
 ### Read XPN config, if exists
+HOST_PROJECT="${PROJECT_NAME}"
+PROJECT_OPTION="--project ${HOST_PROJECT}"
 if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   echo "Reading variables from ${SHARED_DIR}/xpn.json..."
   IS_XPN=1
   HOST_PROJECT="$(jq -r '.hostProject' "${SHARED_DIR}/xpn.json")"
+  PROJECT_OPTION="--project ${HOST_PROJECT}"
   HOST_PROJECT_NETWORK="$(jq -r '.clusterNetwork' "${SHARED_DIR}/xpn.json")"
   HOST_PROJECT_COMPUTE_SUBNET="$(jq -r '.computeSubnet' "${SHARED_DIR}/xpn.json")"
   HOST_PROJECT_CONTROL_SUBNET="$(jq -r '.controlSubnet' "${SHARED_DIR}/xpn.json")"
   HOST_PROJECT_COMPUTE_SERVICE_ACCOUNT="$(jq -r '.computeServiceAccount' "${SHARED_DIR}/xpn.json")"
   HOST_PROJECT_CONTROL_SERVICE_ACCOUNT="$(jq -r '.controlServiceAccount' "${SHARED_DIR}/xpn.json")"
   HOST_PROJECT_PRIVATE_ZONE_NAME="$(jq -r '.privateZoneName' "${SHARED_DIR}/xpn.json")"
-else
-  # Set HOST_PROJECT to the cluster project so commands with `--project` work in both scenarios.
-  HOST_PROJECT="${PROJECT_NAME}"
+
+  if [[ -v GOOGLE_CLOUD_XPN_SA ]]; then
+    echo "Using XPN configurations..."
+    PROJECT_OPTION="${PROJECT_OPTION} --account ${GOOGLE_CLOUD_XPN_SA}"
+  fi
 fi
 
 ## Create the VPC
@@ -112,6 +123,11 @@ if [[ -v IS_XPN ]]; then
   CLUSTER_NETWORK="${HOST_PROJECT_NETWORK}"
   COMPUTE_SUBNET="${HOST_PROJECT_COMPUTE_SUBNET}"
   CONTROL_SUBNET="${HOST_PROJECT_CONTROL_SUBNET}"
+elif [[ -f "${SHARED_DIR}/customer_vpc_subnets.yaml" ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Using pre-configured custom VPC..."
+  CLUSTER_NETWORK="$(gcloud compute networks describe "${CLUSTER_NAME}-network" --format json | jq -r .selfLink)"
+  CONTROL_SUBNET="$(gcloud compute networks subnets describe "${CLUSTER_NAME}-master-subnet" "--region=${REGION}" --format json | jq -r .selfLink)"
+  COMPUTE_SUBNET="$(gcloud compute networks subnets describe "${CLUSTER_NAME}-worker-subnet" "--region=${REGION}" --format json | jq -r .selfLink)"
 else
   cat <<EOF > 01_vpc.yaml
 imports:
@@ -125,7 +141,6 @@ resources:
     master_subnet_cidr: '${MASTER_SUBNET_CIDR}'
     worker_subnet_cidr: '${WORKER_SUBNET_CIDR}'
 EOF
-
   gcloud deployment-manager deployments create "${INFRA_ID}-vpc" --config 01_vpc.yaml
 
   ## Configure VPC variables
@@ -224,10 +239,10 @@ CLUSTER_PUBLIC_IP="$(gcloud compute addresses describe "${INFRA_ID}-cluster-publ
 ### Add internal DNS entries
 echo "$(date -u --rfc-3339=seconds) - Adding internal DNS entries..."
 if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-gcloud --project="${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
-gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
-gcloud --project="${HOST_PROJECT}" dns record-sets transaction add "${CLUSTER_IP}" --name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
-gcloud --project="${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
+gcloud ${PROJECT_OPTION} dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
+gcloud ${PROJECT_OPTION} dns record-sets transaction add "${CLUSTER_IP}" --name "api.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+gcloud ${PROJECT_OPTION} dns record-sets transaction add "${CLUSTER_IP}" --name "api-int.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+gcloud ${PROJECT_OPTION} dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
 
 ### Add external DNS entries (optional)
 echo "$(date -u --rfc-3339=seconds) - Adding external DNS entries..."
@@ -301,6 +316,11 @@ fi
 
 ## Generate a service-account-key for signing the bootstrap.ign url
 gcloud iam service-accounts keys create service-account-key.json "--iam-account=${MASTER_SERVICE_ACCOUNT}"
+if [[ -v IS_XPN ]]; then
+  echo "$(date -u --rfc-3339=seconds) - Save the key id for final deletion (XPN scenario)..."
+  private_key_id=$(jq -r .private_key_id service-account-key.json)
+  echo "${private_key_id}" > "${SHARED_DIR}/xpn_sa_key_id"
+fi
 
 ## Create the cluster image.
 echo "$(date -u --rfc-3339=seconds) - Creating the cluster image..."
@@ -343,7 +363,7 @@ resources:
     cluster_network: '${CLUSTER_NETWORK}'
     control_subnet: '${CONTROL_SUBNET}'
     image: '${CLUSTER_IMAGE}'
-    machine_type: 'n1-standard-4'
+    machine_type: 'n2-standard-4'
     root_volume_size: '128'
     bootstrap_ign: '${BOOTSTRAP_IGN}'
 EOF
@@ -381,7 +401,7 @@ resources:
     - '${ZONE_2}'
     control_subnet: '${CONTROL_SUBNET}'
     image: '${CLUSTER_IMAGE}'
-    machine_type: 'n1-standard-4'
+    machine_type: 'n2-standard-4'
     root_volume_size: '128'
     service_account_email: '${MASTER_SERVICE_ACCOUNT}'
     ignition: '${MASTER_IGNITION}'
@@ -413,16 +433,16 @@ GATHER_BOOTSTRAP_ARGS+=('--master' "${MASTER0_IP}" '--master' "${MASTER1_IP}" '-
 ## Add DNS entries for control plane etcd
 echo "$(date -u --rfc-3339=seconds) - Adding DNS entries for control plane etcd..."
 if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-gcloud "--project=${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
-gcloud "--project=${HOST_PROJECT}" dns record-sets transaction add "${MASTER0_IP}" --name "etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
-gcloud "--project=${HOST_PROJECT}" dns record-sets transaction add "${MASTER1_IP}" --name "etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
-gcloud "--project=${HOST_PROJECT}" dns record-sets transaction add "${MASTER2_IP}" --name "etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
-gcloud "--project=${HOST_PROJECT}" dns record-sets transaction add \
+gcloud ${PROJECT_OPTION} dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
+gcloud ${PROJECT_OPTION} dns record-sets transaction add "${MASTER0_IP}" --name "etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+gcloud ${PROJECT_OPTION} dns record-sets transaction add "${MASTER1_IP}" --name "etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+gcloud ${PROJECT_OPTION} dns record-sets transaction add "${MASTER2_IP}" --name "etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${PRIVATE_ZONE_NAME}"
+gcloud ${PROJECT_OPTION} dns record-sets transaction add \
   "0 10 2380 etcd-0.${CLUSTER_NAME}.${BASE_DOMAIN}." \
   "0 10 2380 etcd-1.${CLUSTER_NAME}.${BASE_DOMAIN}." \
   "0 10 2380 etcd-2.${CLUSTER_NAME}.${BASE_DOMAIN}." \
   --name "_etcd-server-ssl._tcp.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 60 --type SRV --zone "${PRIVATE_ZONE_NAME}"
-gcloud "--project=${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
+gcloud ${PROJECT_OPTION} dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
 
 MASTER_IG_0="$(gcloud compute instance-groups list --filter "network:${CLUSTER_NETWORK} AND name~^${INFRA_ID}-master-${ZONE_0}-" --format "value(name)")"
 MASTER_IG_1="$(gcloud compute instance-groups list --filter "network:${CLUSTER_NETWORK} AND name~^${INFRA_ID}-master-${ZONE_1}-" --format "value(name)")"
@@ -463,7 +483,7 @@ for compute in {0..2}; do
     zone: '${ZONES[(( $compute % ${#ZONES[@]} ))]}'
     compute_subnet: '${COMPUTE_SUBNET}'
     image: '${CLUSTER_IMAGE}'
-    machine_type: 'n1-standard-4'
+    machine_type: 'n2-standard-4'
     root_volume_size: '128'
     service_account_email: '${WORKER_SERVICE_ACCOUNT}'
     ignition: '${WORKER_IGNITION}'
@@ -533,9 +553,9 @@ fi
 if [[ -v IS_XPN ]]; then
   echo "$(date -u --rfc-3339=seconds) - Creating default router DNS entries..."
   if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-  gcloud "--project=${HOST_PROJECT}" dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
-  gcloud "--project=${HOST_PROJECT}" dns record-sets transaction add "${ROUTER_IP}" --name "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 300 --type A --zone "${PRIVATE_ZONE_NAME}"
-  gcloud "--project=${HOST_PROJECT}" dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
+  gcloud ${PROJECT_OPTION} dns record-sets transaction start --zone "${PRIVATE_ZONE_NAME}"
+  gcloud ${PROJECT_OPTION} dns record-sets transaction add "${ROUTER_IP}" --name "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}." --ttl 300 --type A --zone "${PRIVATE_ZONE_NAME}"
+  gcloud ${PROJECT_OPTION} dns record-sets transaction execute --zone "${PRIVATE_ZONE_NAME}"
 
   if [ -f transaction.yaml ]; then rm transaction.yaml; fi
   gcloud dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"

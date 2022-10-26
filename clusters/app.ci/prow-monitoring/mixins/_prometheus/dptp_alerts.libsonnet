@@ -175,7 +175,7 @@
                  rate(prowjob_state_transitions{job="prow-controller-manager",job_name=~".*-images",org="openshift-priv",state=~"success|failure|aborted"}[12h])
                )
              )
-             < 0.95
+             < 0.90
             |||,
             'for': '1m',
             labels: {
@@ -183,6 +183,24 @@
             },
             annotations: {
               message: 'openshift-priv image-building jobs are failing at a high rate. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=*-images|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/openshift-priv-image-building-jobs.md|SOP>.',
+            },
+          }
+        ],
+      },
+      {
+        name: 'openshift-mirroring-failures',
+        rules: [
+          {
+            alert: 'openshift-mirroring-failures',
+            expr: |||
+              increase(prowjob_state_transitions{job_name="periodic-image-mirroring-openshift",state="failure"}[5m]) > 0
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'OpenShift image mirroring jobs have failed. View failed jobs at the <https://prow.ci.openshift.org/?job=periodic-image-mirroring-openshift|overview>.',
             },
           }
         ],

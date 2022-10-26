@@ -3,26 +3,29 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  builder-go1.17:
+  stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.18-linux
 images:
 - dockerfile_path: build/Dockerfile.prow
   from: base
   inputs:
-    builder-go1.17:
+    stolostron_builder_go1.18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.17-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: multiclusterhub-operator
 - dockerfile_path: build/Dockerfile.test.prow
-  from: builder-go1.17
+  inputs:
+    stolostron_builder_go1.18-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: multiclusterhub-operator-tests
 promotion:
   name: "2.4"
@@ -69,7 +72,6 @@ tests:
     test:
     - as: publish
       commands: |-
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish
@@ -95,7 +97,6 @@ tests:
     - as: publish
       commands: |-
         export OSCI_COMPONENT_NAME="multiclusterhub-operator-tests"
-        export OSCI_IMAGE_REMOTE_REPO_SRC="registry.ci.openshift.org/stolostron"
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish

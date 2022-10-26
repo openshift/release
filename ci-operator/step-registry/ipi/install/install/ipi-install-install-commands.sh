@@ -191,6 +191,57 @@ EOF
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
+# inject_boot_diagnostics is an azure specific function for enabling boot diagnostics on Azure workers.
+function inject_boot_diagnostics() {
+  local dir=${1}
+
+  if [ ! -f /tmp/yq ]; then
+    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+  fi
+
+  PATCH="${SHARED_DIR}/machinesets-boot-diagnostics.yaml.patch"
+  cat > "${PATCH}" << EOF
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          diagnostics:
+            boot:
+              storageAccountType: AzureManaged
+EOF
+
+  for MACHINESET in $dir/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
+    /tmp/yq m -x -i "${MACHINESET}" "${PATCH}"
+  done
+}
+
+# inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
+function inject_spot_instance_config() {
+  local dir=${1}
+
+  if [ ! -f /tmp/yq ]; then
+    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+  fi
+
+  PATCH="${SHARED_DIR}/machinesets-spot-instances.yaml.patch"
+  cat > "${PATCH}" << EOF
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          spotMarketOptions: {}
+EOF
+
+  for MACHINESET in $dir/openshift/99_openshift-cluster-api_worker-machineset-*.yaml; do
+    /tmp/yq m -x -i "${MACHINESET}" "${PATCH}"
+    echo "Patched spotMarketOptions into ${MACHINESET}"
+  done
+
+  echo "Enabled AWS Spot instances for worker nodes"
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM
 
@@ -201,7 +252,6 @@ fi
 
 echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 export SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-export PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME}/${BUILD_ID}
 export HOME=/tmp
 
@@ -218,7 +268,7 @@ fi
 
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
-azure4|azuremag) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
+azure4|azuremag|azure-arm64) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
 azurestack) export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 ibmcloud)
@@ -232,6 +282,7 @@ openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
 ovirt) export OVIRT_CONFIG="${SHARED_DIR}/ovirt-config.yaml" ;;
+nutanix) ;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
 
@@ -248,6 +299,16 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
+
+# Platform specific manifests adjustments
+case "${CLUSTER_TYPE}" in
+azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
+aws|aws-arm64|aws-usgov)
+    if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
+      inject_spot_instance_config ${dir}
+    fi
+    ;;
+esac
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
@@ -290,5 +351,9 @@ if test "${ret}" -eq 0 ; then
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 fi
+
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 exit "$ret"

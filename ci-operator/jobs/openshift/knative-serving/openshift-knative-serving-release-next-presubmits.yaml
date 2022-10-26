@@ -5,18 +5,18 @@ presubmits:
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build03
-    context: ci/prow/4.10-e2e-aws-ocp-410
+    cluster: build02
+    context: ci/prow/411-e2e-aws-ocp-411
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "4.10"
+      ci-operator.openshift.io/variant: "411"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.10-e2e-aws-ocp-410
+    name: pull-ci-openshift-knative-serving-release-next-411-e2e-aws-ocp-411
     path_alias: knative.dev/serving
-    rerun_command: /test 4.10-e2e-aws-ocp-410
+    rerun_command: /test 411-e2e-aws-ocp-411
     spec:
       containers:
       - args:
@@ -25,8 +25,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ocp-410
-        - --variant=4.10
+        - --target=e2e-aws-ocp-411
+        - --variant=411
         command:
         - ci-operator
         image: ci-operator:latest
@@ -65,89 +65,34 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.10-e2e-aws-ocp-410,?($|\s.*)
+    trigger: (?m)^/test( | .* )411-e2e-aws-ocp-411,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build03
-    context: ci/prow/4.10-images
+    cluster: build02
+    context: ci/prow/411-e2e-aws-ocp-tls-411
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "4.10"
+      ci-operator.openshift.io/variant: "411"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.10-images
+    name: pull-ci-openshift-knative-serving-release-next-411-e2e-aws-ocp-tls-411
     path_alias: knative.dev/serving
-    rerun_command: /test 4.10-images
+    rerun_command: /test 411-e2e-aws-ocp-tls-411
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=4.10
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.10-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-next$
-    - ^release-next-
-    cluster: build03
-    context: ci/prow/4.6-e2e-aws-ocp-46
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: "4.6"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.6-e2e-aws-ocp-46
-    path_alias: knative.dev/serving
-    rerun_command: /test 4.6-e2e-aws-ocp-46
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ocp-46-cluster-profile
-        - --target=e2e-aws-ocp-46
-        - --variant=4.6
+        - --target=e2e-aws-ocp-tls-411
+        - --variant=411
         command:
         - ci-operator
         image: ci-operator:latest
@@ -157,16 +102,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-ocp-46-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -176,42 +119,36 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.6-e2e-aws-ocp-46,?($|\s.*)
+    trigger: (?m)^/test( | .* )411-e2e-aws-ocp-tls-411,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build03
-    context: ci/prow/4.6-images
+    cluster: build02
+    context: ci/prow/411-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "4.6"
+      ci-operator.openshift.io/variant: "411"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.6-images
+    name: pull-ci-openshift-knative-serving-release-next-411-images
     path_alias: knative.dev/serving
-    rerun_command: /test 4.6-images
+    rerun_command: /test 411-images
     spec:
       containers:
       - args:
@@ -219,7 +156,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=4.6
+        - --target=src
+        - --variant=411
         command:
         - ci-operator
         image: ci-operator:latest
@@ -246,153 +184,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.6-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )411-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build03
-    context: ci/prow/4.7-e2e-aws-ocp-47
+    cluster: build02
+    context: ci/prow/48-e2e-aws-ocp-48
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: "4.7"
+      ci-operator.openshift.io/variant: "48"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.7-e2e-aws-ocp-47
+    name: pull-ci-openshift-knative-serving-release-next-48-e2e-aws-ocp-48
     path_alias: knative.dev/serving
-    rerun_command: /test 4.7-e2e-aws-ocp-47
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-ocp-47-cluster-profile
-        - --target=e2e-aws-ocp-47
-        - --variant=4.7
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-aws-ocp-47-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.7-e2e-aws-ocp-47,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-next$
-    - ^release-next-
-    cluster: build03
-    context: ci/prow/4.7-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "4.7"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.7-images
-    path_alias: knative.dev/serving
-    rerun_command: /test 4.7-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=4.7
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.7-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-next$
-    - ^release-next-
-    cluster: build03
-    context: ci/prow/4.8-e2e-aws-ocp-48
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "4.8"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.8-e2e-aws-ocp-48
-    path_alias: knative.dev/serving
-    rerun_command: /test 4.8-e2e-aws-ocp-48
+    rerun_command: /test 48-e2e-aws-ocp-48
     spec:
       containers:
       - args:
@@ -402,7 +211,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ocp-48
-        - --variant=4.8
+        - --variant=48
         command:
         - ci-operator
         image: ci-operator:latest
@@ -441,24 +250,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.8-e2e-aws-ocp-48,?($|\s.*)
+    trigger: (?m)^/test( | .* )48-e2e-aws-ocp-48,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build03
-    context: ci/prow/4.8-images
+    cluster: build02
+    context: ci/prow/48-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "4.8"
+      ci-operator.openshift.io/variant: "48"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.8-images
+    name: pull-ci-openshift-knative-serving-release-next-48-images
     path_alias: knative.dev/serving
-    rerun_command: /test 4.8-images
+    rerun_command: /test 48-images
     spec:
       containers:
       - args:
@@ -466,7 +275,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=4.8
+        - --target=src
+        - --variant=48
         command:
         - ci-operator
         image: ci-operator:latest
@@ -493,24 +303,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.8-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )48-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build03
-    context: ci/prow/4.9-e2e-aws-ocp-49
+    cluster: build02
+    context: ci/prow/49-e2e-aws-ocp-49
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "4.9"
+      ci-operator.openshift.io/variant: "49"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.9-e2e-aws-ocp-49
+    name: pull-ci-openshift-knative-serving-release-next-49-e2e-aws-ocp-49
     path_alias: knative.dev/serving
-    rerun_command: /test 4.9-e2e-aws-ocp-49
+    rerun_command: /test 49-e2e-aws-ocp-49
     spec:
       containers:
       - args:
@@ -520,7 +330,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
         - --target=e2e-aws-ocp-49
-        - --variant=4.9
+        - --variant=49
         command:
         - ci-operator
         image: ci-operator:latest
@@ -559,24 +369,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.9-e2e-aws-ocp-49,?($|\s.*)
+    trigger: (?m)^/test( | .* )49-e2e-aws-ocp-49,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-next$
     - ^release-next-
-    cluster: build03
-    context: ci/prow/4.9-images
+    cluster: build02
+    context: ci/prow/49-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "4.9"
+      ci-operator.openshift.io/variant: "49"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-next-4.9-images
+    name: pull-ci-openshift-knative-serving-release-next-49-images
     path_alias: knative.dev/serving
-    rerun_command: /test 4.9-images
+    rerun_command: /test 49-images
     spec:
       containers:
       - args:
@@ -584,7 +394,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=4.9
+        - --target=src
+        - --variant=49
         command:
         - ci-operator
         image: ci-operator:latest
@@ -611,4 +422,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.9-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )49-images,?($|\s.*)

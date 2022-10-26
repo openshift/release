@@ -6,7 +6,7 @@ set -o pipefail
 
 export PATH=/usr/libexec/origin:$PATH
 # Initial check
-if [[ "${CLUSTER_TYPE}" != "libvirt-ppc64le" ]] && [[ "${CLUSTER_TYPE}" != "libvirt-s390x" ]] ; then
+if [[ "${CLUSTER_TYPE}" != "libvirt-ppc64le" ]] && [[ "${CLUSTER_TYPE}" != "libvirt-s390x" ]] && [[ "${CLUSTER_TYPE}" != "powervs" ]] ; then
     echo "Unsupported cluster type '${CLUSTER_TYPE}'"
     exit 1
 fi
@@ -43,7 +43,8 @@ function urlencode() {
 
 function prometheus_var_init() {
 	HOSTNAME=$(oc get routes/prometheus-k8s -n openshift-monitoring -o json | jq -r '.spec.host')
-	TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s)
+	# Do not exit with err if a token was not obtained. Collecting metrics is optional and should not fail the whole run
+	TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s || true)
 	export HOSTNAME
 	export TOKEN
 }
@@ -299,7 +300,8 @@ EOSCRIPT
       TEST_ARGS="${TEST_ARGS:-} --file ${SHARED_DIR}/tests"
     fi
 
-    if [ "$BRANCH" = "4.6" ]; then
+    case ${BRANCH} in
+    4.6)
 # use s390x or ppc64le builds of e2e test images
 # this is a multi-arch image
         cat << EOREGISTRY > ${SHARED_DIR}/kube-test-repo-list
@@ -314,9 +316,11 @@ promoterE2eRegistry: quay.io/multiarch-k8s-e2e
 sigStorageRegistry: quay.io/multiarch-k8s-e2e
 EOREGISTRY
 export KUBE_TEST_REPO_LIST=${SHARED_DIR}/kube-test-repo-list
-    else
+        ;;
+    4.[789]|4.10)
         TEST_ARGS="${TEST_ARGS:-} --from-repository=quay.io/multi-arch/community-e2e-images"
-    fi
+        ;;
+    esac
 
     VERBOSITY="" # "--v 9"
     set -x
@@ -337,15 +341,18 @@ declare -a WATCHERS
 trap 'echo "Killing WATCHERS"; for PID in ${WATCHERS[@]}; do kill -9 ${PID} >/dev/null 2>&1 || true; done' TERM
 
 prometheus_var_init
+if [ -n "$TOKEN" ]; then
+    prometheus_cmrss_loop &
+	WATCHERS+=( "$!" )
 
-prometheus_cmrss_loop &
-WATCHERS+=( "$!" )
+	prometheus_kaebb_loop &
+	WATCHERS+=( "$!" )
 
-prometheus_kaebb_loop &
-WATCHERS+=( "$!" )
-
-prometheus_GRPCRequestsSlow_loop &
-WATCHERS+=( "$!" )
+	prometheus_GRPCRequestsSlow_loop &
+	WATCHERS+=( "$!" )
+else
+    echo "Failed to get a token from prometheus service account. Skipping metrics collection"
+fi
 
 oc_adm_top_nodes_loop &
 WATCHERS+=( "$!" )

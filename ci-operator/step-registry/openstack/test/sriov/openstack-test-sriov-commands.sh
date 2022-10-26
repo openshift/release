@@ -76,6 +76,11 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: ${CNF_NAMESPACE}
+  labels:
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+    pod-security.kubernetes.io/audit: "privileged"
+    pod-security.kubernetes.io/enforce: "privileged"
+    pod-security.kubernetes.io/warn: "privileged"
 EOF
 )
 echo "Created \"$CNF_NAMESPACE\" Namespace"
@@ -108,8 +113,11 @@ metadata:
   name: testpmd-host-device-sriov
   namespace: ${CNF_NAMESPACE}
   annotations:
+    cpu-load-balancing.crio.io: "disable"
+    cpu-quota.crio.io: "disable"
     ${ANNOTATIONS:-}
 spec:
+  runtimeClassName: performance-cnf-performanceprofile
   containers:
   - name: testpmd
     command: ["sleep", "99999"]
@@ -153,7 +161,7 @@ else
     exit 1
 fi
 
-TESTPMD_OUTPUT=$(oc -n "${CNF_NAMESPACE}" rsh "${CNF_POD}" bash -c "yes | testpmd -l 2-3 --in-memory -w 00:${PCI_DEVICE}.0 --socket-mem 1024 -n 4 --proc-type auto --file-prefix pg  -- --disable-rss  --nb-cores=1 --rxq=1 --txq=1 --auto-start --forward-mode=mac")
+TESTPMD_OUTPUT=$(oc -n "${CNF_NAMESPACE}" rsh "${CNF_POD}" bash -c "yes | testpmd -l 2-3 --in-memory --allow 00:${PCI_DEVICE}.0 --socket-mem 1024 -n 4 --proc-type auto --file-prefix pg  -- --disable-rss  --nb-cores=1 --rxq=1 --txq=1 --auto-start --forward-mode=mac")
 echo "${TESTPMD_OUTPUT}"
 if [[ "${TESTPMD_OUTPUT}" == *"forwards packets on 1 streams"* ]]; then
     echo "Testpmd could run successfully"

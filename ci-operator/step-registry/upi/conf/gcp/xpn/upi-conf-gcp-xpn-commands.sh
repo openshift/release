@@ -24,15 +24,22 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-HOST_PROJECT="openshift-dev-installer"
-CLUSTER_NETWORK="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/global/networks/installer-shared-vpc"
-CONTROL_SUBNET="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/regions/us-east1/subnetworks/installer-shared-vpc-subnet-1"
-COMPUTE_SUBNET="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/regions/us-east1/subnetworks/installer-shared-vpc-subnet-2"
-COMPUTE_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
-CONTROL_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
-PRIVATE_ZONE_NAME="ci-op-xpn-private-zone"
+if [[ -f "${CLUSTER_PROFILE_DIR}/xpn_project_setting.json" ]]; then
 
-cat > "${SHARED_DIR}/xpn.json" << EOF
+    echo "Using XPN configurations..."
+    cp "${CLUSTER_PROFILE_DIR}/xpn_project_setting.json" "${SHARED_DIR}/xpn.json"
+
+else
+
+    HOST_PROJECT="openshift-dev-installer"
+    CLUSTER_NETWORK="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/global/networks/installer-shared-vpc"
+    CONTROL_SUBNET="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/regions/us-east1/subnetworks/installer-shared-vpc-subnet-1"
+    COMPUTE_SUBNET="https://www.googleapis.com/compute/v1/projects/openshift-dev-installer/regions/us-east1/subnetworks/installer-shared-vpc-subnet-2"
+    COMPUTE_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
+    CONTROL_SERVICE_ACCOUNT="do-not-delete-ci-xpn@openshift-gce-devel-ci.iam.gserviceaccount.com"
+    PRIVATE_ZONE_NAME="ci-op-xpn-private-zone"
+
+    cat > "${SHARED_DIR}/xpn.json" << EOF
 {
     "hostProject": "${HOST_PROJECT}",
     "clusterNetwork": "${CLUSTER_NETWORK}",
@@ -43,3 +50,5 @@ cat > "${SHARED_DIR}/xpn.json" << EOF
     "privateZoneName": "${PRIVATE_ZONE_NAME}"
 }
 EOF
+
+fi

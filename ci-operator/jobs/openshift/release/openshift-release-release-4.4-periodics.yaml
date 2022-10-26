@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -29,7 +29,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -133,9 +133,6 @@ periodics:
     volumes:
     - name: appci-ci-operator-credentials
       secret:
-        items:
-        - key: sa.ci-operator.app.ci.config
-          path: kubeconfig
         secretName: app.ci-ci-operator-credentials
     - name: boskos
       secret:
@@ -158,7 +155,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   decorate: true
   interval: 8h
   labels:
@@ -176,7 +173,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -279,7 +276,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   decorate: true
   interval: 8h
   labels:
@@ -297,7 +294,7 @@ periodics:
         # prow doesn't allow init containers or a second container
         export PATH=$PATH:/tmp/bin
         mkdir /tmp/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
         chmod ug+x /tmp/bin/oc
 
         # if the source and destination are identical, do nothing
@@ -400,7 +397,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -438,7 +435,7 @@ periodics:
         mkdir $HOME/.docker/
         cp /usr/local/pull-secret/.dockerconfigjson $HOME/.docker/config.json
         mkdir $HOME/bin
-        curl https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
+        curl -L --fail https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /tmp/bin/ oc
         curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 2>/dev/null >/tmp/bin/jq
         chmod ug+x $HOME/bin/oc $HOME/bin/jq
 
@@ -667,199 +664,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
+  cron: 25 23 14 */12 *
   decorate: true
-  interval: 24h
-  labels:
-    job-release: "4.4"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-metal-4.4
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-metal-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-metal
-      - --template=/usr/local/e2e-metal
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.4
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: metal
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-metal
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/parallel run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-metal
-        name: job-definition
-        subPath: cluster-launch-installer-metal-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-metal-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  interval: 24h
-  labels:
-    job-release: "4.4"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: release-openshift-ocp-installer-e2e-metal-serial-4.4
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --secret-dir=/usr/local/e2e-metal-serial-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=e2e-metal-serial
-      - --template=/usr/local/e2e-metal-serial
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_LATEST
-        value: registry.ci.openshift.org/ocp/release:4.4
-      - name: BRANCH
-        value: "4.4"
-      - name: CLUSTER_TYPE
-        value: metal
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e-aws
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: aws
-      - name: JOB_NAME_SAFE
-        value: e2e-metal-serial
-      - name: TEST_COMMAND
-        value: TEST_SUITE=openshift/conformance/serial run-tests
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/e2e-metal-serial-cluster-profile
-        name: cluster-profile
-      - mountPath: /usr/local/e2e-metal-serial
-        name: job-definition
-        subPath: cluster-launch-installer-metal-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-metal
-    - configMap:
-        name: prow-job-cluster-launch-installer-metal-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build03
-  decorate: true
-  interval: 24h
   labels:
     job-release: "4.4"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -957,9 +764,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
+  cron: 9 13 8 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-release: "4.4"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1059,9 +866,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
+  cron: 28 20 4 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-env: aws
     job-release: "4.4"
@@ -1172,9 +979,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
+  cron: 55 11 8 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-env: aws
     job-release: "4.4"
@@ -1285,9 +1092,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
+  cron: 21 21 25 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-release: "4.4"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1398,9 +1205,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
+  cron: 38 15 19 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-release: "4.4"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1509,9 +1316,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
+  cron: 34 21 21 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-release: "4.4"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1609,9 +1416,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
+  cron: 5 16 6 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-release: "4.4"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1707,9 +1514,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
+  cron: 49 13 15 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-env: aws
     job-release: "4.4"
@@ -1807,9 +1614,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
+  cron: 43 8 17 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-env: gcp
     job-release: "4.4"
@@ -1919,9 +1726,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
+  cron: 25 12 2 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-release: "4.4"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -2019,9 +1826,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
+  cron: 24 21 24 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-env: aws
     job-release: "4.4"
@@ -2155,9 +1962,9 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
+  cron: 21 21 16 */12 *
   decorate: true
-  interval: 24h
   labels:
     job-env: aws
     job-release: "4.4"
@@ -2255,14 +2062,14 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
+  cron: 32 2 7 */12 *
   decorate: true
   extra_refs:
   - base_ref: release-4.4
     org: openshift
     repo: openshift-ansible
     workdir: true
-  interval: 6h
   labels:
     job-release: "4.4"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"

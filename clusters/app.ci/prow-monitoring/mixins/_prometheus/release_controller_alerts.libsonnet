@@ -33,6 +33,22 @@
           }
         ],
       },
+      {
+        name: 'release-controller-jira-errors',
+        rules: [
+          {
+            alert: 'releaseControllerJiraError',
+            expr: 'rate(release_controller_jira_errors_total[5m]) > 0',
+            labels: {
+              severity: 'critical',
+              team: 'release-controller',
+            },
+            annotations: {
+              message: 'Release-controller has reported errors in jira verification.'
+            },
+          }
+        ],
+      },
     ],
   },
 }

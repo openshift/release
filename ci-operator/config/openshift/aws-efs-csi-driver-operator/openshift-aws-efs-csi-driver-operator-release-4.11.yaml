@@ -11,10 +11,14 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: csi-livenessprobe
-  ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.17-openshift-4.11
+    tag: rhel-8-golang-1.17-openshift-4.10
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -38,16 +42,16 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: aws-efs-csi-driver-operator
 - dockerfile_path: Dockerfile.create_efs
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.17-openshift-4.11:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
@@ -70,7 +74,6 @@ operator:
   - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
     with: pipeline:aws-efs-csi-driver-operator
 promotion:
-  disabled: true
   name: "4.11"
   namespace: ocp
 releases:
@@ -116,7 +119,7 @@ tests:
       TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
     workflow: openshift-e2e-aws-csi-efs
 - as: nightly-operator-e2e
-  cron: 0 */12 * * *
+  cron: 6 14 */1 * 1-5
   steps:
     cluster_profile: aws
     dependencies:

@@ -1,12 +1,12 @@
 base_images:
   base:
-    name: "4.9"
+    name: "4.11"
     namespace: ocp
     tag: base
-  openshift_release_golang-1.17:
+  openshift_release_golang-1.18:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
 binary_build_commands: make build
 build_root:
   project_image:
@@ -15,9 +15,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: hive
 promotion:
   name: hive-v4.0
@@ -25,12 +25,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.9"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.9"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -76,10 +76,12 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
+    labels:
+      region: us-east-1
     owner: openshift-ci
     product: ocp
-    timeout: 2h0m0s
-    version: "4.9"
+    timeout: 1h0m0s
+    version: "4.11"
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -115,6 +117,7 @@ tests:
       - env: RELEASE_IMAGE
         name: release:latest
       from: src
+      grace_period: 15m0s
       resources:
         requests:
           cpu: 100m
@@ -123,10 +126,12 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
+    labels:
+      region: us-east-1
     owner: openshift-ci
     product: ocp
-    timeout: 2h30m0s
-    version: "4.9"
+    timeout: 1h0m0s
+    version: "4.11"
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -164,6 +169,7 @@ tests:
       - env: RELEASE_IMAGE
         name: release:latest
       from: src
+      grace_period: 15m0s
       resources:
         requests:
           cpu: 100m

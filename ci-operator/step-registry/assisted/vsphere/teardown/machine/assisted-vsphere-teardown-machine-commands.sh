@@ -12,9 +12,14 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+if [[ ! -r "${SHARED_DIR}/terraform.tgz" ]]; then
+    echo "No Terraform file exists - probably no VSphere machine was created - skipping teardown"
+    exit 0
+fi
+
 mkdir -p /home/assisted-test-infra/build/terraform
 cp ${SHARED_DIR}/terraform.tgz /home/assisted-test-infra/build/terraform
 cd /home/assisted-test-infra/build/terraform
 tar -xvf terraform.tgz
-terraform init
-terraform destroy -force
+terraform init -input=false
+terraform apply -destroy -input=false -auto-approve

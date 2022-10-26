@@ -24,7 +24,7 @@ spec:
   tags:
   - from:
       kind: DockerImage
-      name: image-registry.openshift-image-registry.svc:5000/ocp/4.11:tests
+      name: image-registry.openshift-image-registry.svc:5000/ocp/4.12:tests
     importPolicy:
       scheduled: true
     name: tests
@@ -159,14 +159,13 @@ spec:
         - /usr/bin/release-controller
         - --release-namespace=ocp
         - --publish-namespace=origin
-        - --cluster-group=build01,build03,build04
+        - --cluster-group=build01,build02,build03,build04,build05
         - --cluster-group=vsphere
         - --prow-config=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
         - --job-config=/etc/job-config
         - --listen=:8080
         - --prow-namespace=ci
-        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
         - --job-namespace=ci-release
         - --tools-image-stream-tag=release-controller-bootstrap:tests
         - --release-architecture=amd64
@@ -178,9 +177,12 @@ spec:
         - --bugzilla-endpoint=https://bugzilla.redhat.com
         - --bugzilla-api-key-path=/etc/bugzilla/api
         - --bugzilla-auth-method=bearer
+        - --verify-bugzilla
+        - --jira-endpoint=https://issues.redhat.com
+        - --jira-bearer-token-file=/etc/jira/api
+        - --verify-jira
         - --plugin-config=/etc/plugins/plugins.yaml
         - --supplemental-plugin-config-dir=/etc/plugins
-        - --verify-bugzilla
         - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
         - --art-suffix=-art-latest
         image: release-controller:latest
@@ -214,10 +216,13 @@ spec:
         - mountPath: /etc/bugzilla
           name: bugzilla
           readOnly: true
+        - mountPath: /etc/jira
+          name: jira
+          readOnly: true
         - mountPath: /etc/plugins
           name: plugins
           readOnly: true
-        - mountPath: /etc/kubeconfig
+        - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
       serviceAccountName: release-controller-ocp
@@ -238,6 +243,10 @@ spec:
           - configMap:
               name: job-config-master-presubmits
           - configMap:
+              name: job-config-1.x
+          - configMap:
+              name: job-config-2.x
+          - configMap:
               name: job-config-3.x
           - configMap:
               name: job-config-4.1
@@ -247,6 +256,8 @@ spec:
               name: job-config-4.11
           - configMap:
               name: job-config-4.12
+          - configMap:
+              name: job-config-4.13
           - configMap:
               name: job-config-4.2
           - configMap:
@@ -271,6 +282,10 @@ spec:
         secret:
           defaultMode: 420
           secretName: bugzilla-credentials-openshift-bugzilla-robot
+      - name: jira
+        secret:
+          defaultMode: 420
+          secretName: jira-credentials-openshift-jira-robot
       - configMap:
           defaultMode: 420
           name: plugins
@@ -278,9 +293,6 @@ spec:
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
-          items:
-          - key: sa.release-controller-ocp.app.ci.config
-            path: kubeconfig
           secretName: release-controller-kubeconfigs
 ---
 #---------------------------------------------------------------------------------
@@ -310,7 +322,6 @@ spec:
         - --release-namespace=ocp
         - --artifacts=openshift-release-artifacts.apps.ci.l2s4.p1.openshiftapps.com
         - --prow-namespace=ci
-        - --non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig
         - --job-namespace=ci-release
         - --tools-image-stream-tag=release-controller-bootstrap:tests
         - --release-architecture=amd64
@@ -336,7 +347,7 @@ spec:
           requests:
             memory: 2Gi
         volumeMounts:
-        - mountPath: /etc/kubeconfig
+        - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
       serviceAccountName: release-controller-ocp
@@ -344,9 +355,6 @@ spec:
       - name: release-controller-kubeconfigs
         secret:
           defaultMode: 420
-          items:
-          - key: sa.release-controller-ocp.app.ci.config
-            path: kubeconfig
           secretName: release-controller-kubeconfigs
 ---
 #---------------------------------------------------------------------------------
@@ -391,7 +399,7 @@ spec:
 # osd_files_cache_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
-apiVersion: v1
+apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
   name: files-cache

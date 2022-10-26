@@ -18,7 +18,7 @@ spec:
     targetPort: 8080
 
 ---
-apiVersion: policy/v1beta1
+apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: ci-search
@@ -47,6 +47,20 @@ spec:
       labels:
         app: search
     spec:
+      affinity:
+        # Encourage replicas to be scheduled on separate nodes if more
+        # than one is available.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - search
+              topologyKey: kubernetes.io/hostname
+            weight: 100
       # Force the thing onto its own snowflake node so it only harms itself and not others.
       tolerations:
       - key: ci.openshift.io/ci-search
@@ -60,6 +74,9 @@ spec:
       - name: bugzilla-token
         secret:
           secretName: bugzilla-credentials-openshift-bugzilla-robot
+      - name: jira-token
+        secret:
+          secretName: jira-credentials-openshift-jira-robot
       containers:
       - name: web
         image: ci-search:latest
@@ -70,6 +87,8 @@ spec:
         volumeMounts:
         - name: bugzilla-token
           mountPath: /etc/bugzilla/
+        - name: jira-token
+          mountPath: /etc/jira/
         - mountPath: /var/lib/ci-search/
           name: search
         command:
@@ -85,6 +104,9 @@ spec:
         - --bugzilla-url=https://bugzilla.redhat.com/rest
         - --bugzilla-token-file=/etc/bugzilla/api
         - --bugzilla-search=OPEN version:4.14,4.13,4.12,4.11,4.10,4.9,4.8,4.7,4.6,4.5,4.4,4.3,4.2 product="OpenShift Container Platform" AND delta_ts>-2w
+        - --jira-url=https://issues.redhat.com
+        - --jira-token-file=/etc/jira/api
+        - --jira-search=(project=OCPBUGS&updated>='-14d'&status!='CLOSED'&affectedVersion IN versionMatch('4\\.(14|13|12|11|10|9|8|7|6|5|4|3|2)')&level IN (null)) OR (project=TRT&updated>='-14d'&status!='CLOSED'&level IN (null))
   updateStrategy:
     rollingUpdate:
       partition: 0

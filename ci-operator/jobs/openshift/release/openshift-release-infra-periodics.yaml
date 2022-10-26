@@ -1,9 +1,10 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
+    job-architecture: amd64
     job-env: aws
     job-type: build
   name: release-openshift-origin-assemble
@@ -74,6 +75,7 @@ periodics:
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
     job-env: osd
     job-type: launch
   name: release-openshift-origin-installer-launch-osd-ephemeral
@@ -206,11 +208,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
     job-env: aws
     job-type: launch
   name: release-openshift-origin-installer-launch-aws-modern
@@ -290,6 +293,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-aws-sharednetwork
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: aws
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
           - as: launch-fips
             steps:
               cluster_profile: aws
@@ -326,6 +338,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-aws-techpreview
+          - as: launch-sdn
+            steps:
+              cluster_profile: aws
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws-sdn
           - as: upgrade
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -383,11 +403,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
     config-type: legacy
+    job-architecture: amd64
     job-env: aws
     job-type: launch
   name: release-openshift-origin-installer-launch-aws
@@ -548,11 +569,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
     job-env: azure
     job-type: launch
   name: release-openshift-origin-installer-launch-azure-modern
@@ -626,6 +648,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)-sharednetwork
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
           - as: launch-fips
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -646,6 +677,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)-techpreview
+          - as: launch-sdn
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)-sdn
           - as: upgrade
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -708,6 +747,7 @@ periodics:
   decorate: true
   labels:
     config-type: legacy
+    job-architecture: amd64
     job-env: azure
     job-type: launch
   name: release-openshift-origin-installer-launch-azure
@@ -870,11 +910,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
     job-env: gcp
     job-type: launch
   name: release-openshift-origin-installer-launch-gcp-modern
@@ -930,6 +971,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn
+          - as: launch-ovn-hybrid
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLUSTER_TYPE)-ovn-hybrid
           - as: launch-rt
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -954,6 +1003,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-single-node
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: launch-fips
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -974,12 +1032,29 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-techpreview
+          - as: launch-sdn
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-sdn
           - as: upgrade
             steps:
               cluster_profile: $(CLUSTER_TYPE)
               env:
                 TEST_SUITE: "all"
               workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-virtualization-support
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                COMPUTE_NODE_TYPE: n2-standard-4
+              test:
+              - ref: clusterbot-wait
+              workflow: ipi-$(CLUSTER_TYPE)
       - name: JOB_NAME_SAFE
         value: launch
       - name: TEST_COMMAND
@@ -1033,11 +1108,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
     config-type: legacy
+    job-architecture: amd64
     job-env: gcp
     job-type: launch
   name: release-openshift-origin-installer-launch-gcp
@@ -1198,11 +1274,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
     job-env: metal
     job-type: launch
   name: release-openshift-origin-installer-launch-metal
@@ -1301,6 +1378,23 @@ periodics:
                   commands: sleep $(CLUSTER_DURATION) & wait
                   from: cli
                   resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn-ipv4
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v4
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ipi-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ipi-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
           - as: launch-ipv6
             steps:
               cluster_profile: equinix-ocp-metal
@@ -1318,7 +1412,41 @@ periodics:
                   commands: sleep $(CLUSTER_DURATION) & wait
                   from: cli
                   resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn-ipv6
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v6
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ipi-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ipi-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
           - as: launch-dualstack
+            steps:
+              cluster_profile: equinix-ocp-metal
+              env:
+                DEVSCRIPTS_CONFIG: |
+                  IP_STACK=v4v6
+                  NETWORK_TYPE=OVNKubernetes
+              post:
+                - chain: baremetalds-ipi-post
+              pre:
+                - ref: openshift-cluster-bot-rbac
+                - chain: baremetalds-ipi-pre
+              test:
+                - as: wait
+                  commands: sleep $(CLUSTER_DURATION) & wait
+                  from: cli
+                  resources: { requests: { cpu: 100m, memory: 100Mi } }
+          - as: launch-ovn-dualstack
             steps:
               cluster_profile: equinix-ocp-metal
               env:
@@ -1386,6 +1514,7 @@ periodics:
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
     job-env: vsphere
     job-type: launch
   name: release-openshift-origin-installer-launch-vsphere-modern
@@ -1456,6 +1585,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: upi-$(CLUSTER_TYPE)-clusterbot
+          - as: launch-multi-zone
+            steps:
+              cluster_profile: vsphere-multizone
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
           - as: launch-ovn-hybrid
             steps:
               cluster_profile: $(CLUSTER_PROFILE)
@@ -1472,6 +1609,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-techpreview
+          - as: launch-sdn
+            steps:
+              cluster_profile: $(CLUSTER_PROFILE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-sdn
           - as: upgrade
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -1534,6 +1679,7 @@ periodics:
   decorate: true
   labels:
     config-type: legacy
+    job-architecture: amd64
     job-env: vsphere
     job-type: launch
   name: release-openshift-origin-installer-launch-vsphere
@@ -1701,11 +1847,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
     job-env: ovirt
     job-release: "4.5"
     job-type: launch
@@ -1799,10 +1946,11 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
+    job-architecture: amd64
     job-env: aws
     job-test: e2e
     job-type: upgrade
@@ -1900,10 +2048,11 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
+    job-architecture: amd64
     job-env: aws
     job-test: e2e
     job-type: upgrade
@@ -1928,7 +2077,7 @@ periodics:
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: BRANCH
-        value: "4.1"
+        value: "4.10"
       - name: CLUSTER_TYPE
         value: aws
       - name: UNRESOLVED_CONFIG
@@ -2000,10 +2149,113 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
+    job-architecture: amd64
+    job-env: gcp
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-installer-e2e-gcp-upgrade
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: BRANCH
+        value: "4.10"
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tag_specification:
+            name: "$(BRANCH)"
+            namespace: origin
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: build05
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
     job-env: azure
     job-test: e2e
     job-type: upgrade
@@ -2088,10 +2340,11 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
+    job-architecture: amd64
     job-env: gcp
     job-test: e2e
     job-type: upgrade
@@ -2115,7 +2368,7 @@ periodics:
       - name: RELEASE_IMAGE_LATEST
       - name: CLUSTER_VARIANT
       - name: BRANCH
-        value: "4.1"
+        value: "4.10"
       - name: CLUSTER_TYPE
         value: gcp
       - name: CONFIG_SPEC
@@ -2190,11 +2443,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
     job-env: hypershift
     job-type: launch
   name: release-openshift-origin-installer-launch-hypershift
@@ -2236,7 +2490,7 @@ periodics:
               candidate:
                 product: ocp
                 stream: ci
-                version: "4.8"
+                version: "4.12"
           resources:
             '*':
               requests:
@@ -2245,17 +2499,17 @@ periodics:
           tests:
           - as: launch
             steps:
-              cluster_profile: hypershift
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                HYPERSHIFT_HC_RELEASE_IMAGE: $(RELEASE_IMAGE_LATEST)
+                HYPERSHIFT_NODE_COUNT: 2
+                HYPERSHIFT_ZONES: "us-east-1a"
+                HYPERSHIFT_NAMESPACE: "cluster-bot"
+                HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
               test:
-              - as: publish-console-url-hack
-                commands: echo "https://cluster.example.com" > "${SHARED_DIR}/console.url"
-                from: cli
-                resources: { requests: { cpu: 100m, memory: 100Mi } }
-              - as: wait
-                commands: sleep $(CLUSTER_DURATION) & wait
-                from: cli
-                resources: { requests: { cpu: 100m, memory: 100Mi } }
-              workflow: hypershift-launch-aws
+              - ref: clusterbot-wait
+              cluster_profile: hypershift
+              workflow: hypershift-aws-cluster
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -2302,7 +2556,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -2389,11 +2643,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
     config-type: modern
+    job-architecture: amd64
     job-env: openstack
     job-release: "4.5"
     job-type: launch
@@ -2493,6 +2748,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-techpreview
+          - as: launch-upi
+            steps:
+              cluster_profile: openstack-vexxhost
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-upi
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -2538,3 +2801,116 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+- agent: kubernetes
+  cluster: build05
+  cron: '@yearly'
+  decorate: true
+  labels:
+    config-type: modern
+    job-architecture: arm64
+    job-env: aws
+    job-type: launch
+  name: release-openshift-origin-installer-launch-aws-arm64
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --namespace=$(NAMESPACE)
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/launch-cluster-profile
+      - --target=launch
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      command:
+      - ci-operator
+      env:
+      - name: RELEASE_IMAGE_INITIAL
+      - name: RELEASE_IMAGE_LATEST
+      - name: CLUSTER_VARIANT
+      - name: CLUSTER_DURATION
+        value: "9000"
+      - name: BRANCH
+        value: "4.11"
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: JOB_NAME_SAFE
+        value: launch
+      - name: NAMESPACE
+      - name: UNRESOLVED_CONFIG
+        value: |
+          resources:
+            '*':
+              limits:
+                memory: 4Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: launch
+            steps:
+              cluster_profile: aws-arm64
+              dependencies:
+                OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+              env:
+                BASE_DOMAIN: arm-ci.devcluster.openshift.com
+                COMPUTE_NODE_TYPE: m6g.xlarge
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              workflow: openshift-e2e-aws
+              test:
+              - ref: clusterbot-wait
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/launch-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/push-secret
+        name: push-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-arm64
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: push-secret
+      secret:
+        secretName: registry-push-credentials-ci-central
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator

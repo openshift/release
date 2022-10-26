@@ -12,6 +12,7 @@ function createInstallJunit() {
   if test -f "${SHARED_DIR}/install-status.txt"
   then
     EXIT_CODE=`cat ${SHARED_DIR}/install-status.txt | awk '{print $1}'`
+    cp "${SHARED_DIR}/install-status.txt" ${ARTIFACT_DIR}/
     if [ "$EXIT_CODE" ==  0  ]
     then
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
@@ -98,6 +99,19 @@ EOF
   fi
 }
 
+# camgi is a tool that creates an html document for investigating an OpenShift cluster
+# see https://github.com/elmiko/camgi.rs for more information
+function installCamgi() {
+    CAMGI_VERSION="0.8.0"
+    pushd /tmp
+
+    curl -L -o camgi.tar https://github.com/elmiko/camgi.rs/releases/download/v"$CAMGI_VERSION"/camgi-"$CAMGI_VERSION"-linux-x86_64.tar
+    tar xvf camgi.tar
+    sha256sum -c camgi.sha256
+
+    popd
+}
+
 if test ! -f "${KUBECONFIG}"
 then
 	echo "No kubeconfig, so no point in calling must-gather."
@@ -131,6 +145,9 @@ echo "Running must-gather..."
 mkdir -p ${ARTIFACT_DIR}/must-gather
 oc --insecure-skip-tls-verify adm must-gather $MUST_GATHER_IMAGE --dest-dir ${ARTIFACT_DIR}/must-gather > ${ARTIFACT_DIR}/must-gather/must-gather.log
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
+installCamgi
+/tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"
+[ -f "${ARTIFACT_DIR}/must-gather/camgi.html" ] && cp "${ARTIFACT_DIR}/must-gather/camgi.html" "${ARTIFACT_DIR}/camgi.html"
 tar -czC "${ARTIFACT_DIR}/must-gather" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
 rm -rf "${ARTIFACT_DIR}"/must-gather
 

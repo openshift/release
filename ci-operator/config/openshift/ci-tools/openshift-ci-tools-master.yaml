@@ -1,6 +1,10 @@
 base_images:
+  ci_nginx-unprivileged_stable:
+    name: nginx-unprivileged
+    namespace: ci
+    tag: stable
   cli:
-    name: "4.10"
+    name: "4.11"
     namespace: ocp
     tag: cli
   golangci-lint:
@@ -32,6 +36,30 @@ images:
       - destination_dir: .
         source_path: /go/bin/pod-scaler
   to: pod-scaler
+- context_dir: images/pr-reminder/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pr-reminder
+  to: pr-reminder
+- context_dir: images/check-gh-automation/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/check-gh-automation
+  to: check-gh-automation
+- context_dir: images/gh-pull-through-cache/
+  inputs:
+    ci_nginx-unprivileged_stable:
+      as:
+      - registry.ci.openshift.org/ci/nginx-unprivileged:stable
+  to: gh-pull-through-cache
+- context_dir: images/quayio-pull-through-cache/
+  to: quayio-pull-through-cache
 - context_dir: images/cvp-trigger/
   from: os
   inputs:
@@ -208,6 +236,8 @@ images:
         source_path: /go/bin/ci-operator-yaml-creator
       - destination_dir: .
         source_path: /go/bin/clusterimageset-updater
+      - destination_dir: .
+        source_path: /go/bin/promoted-image-governor
   to: auto-config-brancher
 - context_dir: images/prowjobdispatcher
   from: os
@@ -437,6 +467,21 @@ images:
       - destination_dir: .
         source_path: /go/bin/serviceaccount-secret-rotation-trigger
   to: serviceaccount-secret-rotation-trigger
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git diffutils && dnf clean all && rm -rf /var/cache/dnf
+    ADD sippy-config-generator /usr/bin/sippy-config-generator
+    ADD prcreator /usr/bin/prcreator
+    ENTRYPOINT ["/usr/bin/sippy-config-generator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sippy-config-generator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: auto-sippy-config-generator
 - context_dir: images/ocp-build-data-enforcer/
   from: os
   inputs:
@@ -583,6 +628,21 @@ images:
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD job-run-aggregator /usr/bin/job-run-aggregator
+    ADD prcreator /usr/bin/prcreator
+    ENTRYPOINT ["job-run-aggregator"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/job-run-aggregator
+      - destination_dir: .
+        source_path: /go/bin/prcreator
+  to: auto-aggregator-job-names
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
     ADD sync-rover-groups /usr/bin/sync-rover-groups
     ADD usr/bin/oc /usr/bin/oc
     ENTRYPOINT ["sync-rover-groups"]
@@ -620,7 +680,7 @@ resources:
 test_binary_build_commands: make race-install
 tests:
 - as: unit
-  commands: make test TESTFLAGS='-count=25'
+  commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
   container:
     from: src
 - as: codegen
@@ -743,6 +803,7 @@ tests:
   container:
     from: golangci-lint
 - as: continuouslint
+  cluster: build02
   commands: make lint
   container:
     from: golangci-lint

@@ -5,11 +5,9 @@ base_images:
     tag: upi-installer
 releases:
   initial:
-    prerelease:
-      product: ocp
-      version_bounds:
-        lower: 4.10.0-0
-        upper: 4.11.0-0
+    release:
+      channel: fast
+      version: "4.10"
   latest:
     candidate:
       product: ocp
@@ -22,7 +20,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-aws-upgrade
-  interval: 24h
+  cron: 17 4 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:
@@ -31,17 +29,17 @@ tests:
     workflow: openshift-upgrade-aws
 - as: e2e-gcp-upgrade
   cluster: build02
-  interval: 24h
+  cron: 21 18 */1 * 1-5
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-upgrade-gcp
 - as: e2e-azure-upgrade
-  interval: 24h
+  cron: 11 4 */1 * 1-5
   steps:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
-      TEST_REQUIRES_SSH: "yes"
+      TEST_REQUIRES_SSH: "true"
       TEST_TYPE: upgrade-conformance
     pre:
     - ref: ipi-install-hosted-loki
@@ -49,12 +47,12 @@ tests:
     - chain: ipi-azure-pre-stableinitial
     workflow: openshift-upgrade-azure
 - as: e2e-ovirt-upgrade
-  interval: 6h
+  cron: 10 2 */1 * 1-5
   steps:
     cluster_profile: ovirt
     workflow: openshift-upgrade-ovirt
 - as: e2e-vsphere-upgrade
-  interval: 24h
+  cron: 14 2 */1 * 1-5
   steps:
     cluster_profile: vsphere
     workflow: openshift-upgrade-vsphere
@@ -67,51 +65,32 @@ tests:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
-- as: e2e-aws-ovn-upgrade-rollback
-  interval: 24h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=99
-    workflow: openshift-upgrade-aws-ovn
-  timeout: 6h0m0s
 - as: e2e-gcp-ovn-upgrade
   cluster: build02
   interval: 48h
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
+      FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-gcp-ovn
 - as: e2e-gcp-ovn-rt-upgrade
   cluster: build02
-  interval: 6h
+  cron: 14 23 */1 * 1-5
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     env:
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-gcp-ovn-rt
 - as: e2e-azure-ovn-upgrade
-  interval: 24h
+  cron: 26 9 */1 * 1-5
   steps:
     cluster_profile: azure-2
     env:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-aws-upgrade-rollback
-  interval: 48h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      DELETE_MC: "false"
-      TEST_TYPE: upgrade
-      TEST_UPGRADE_OPTIONS: abort-at=99
-    workflow: openshift-upgrade-aws
-  timeout: 6h0m0s
 - as: e2e-aws-uwm
   interval: 48h
   steps:
@@ -124,7 +103,7 @@ tests:
     - chain: ipi-aws-pre-stableinitial
     workflow: openshift-upgrade-aws
 - as: e2e-aws-upgrade-workload
-  interval: 24h
+  cron: 56 7 */1 * 1-5
   steps:
     cluster_profile: aws-2
     env:

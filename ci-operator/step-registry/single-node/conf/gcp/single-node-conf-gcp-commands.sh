@@ -4,7 +4,7 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SINGLE_NODE_GCP_INSTANCE_TYPE="n1-standard-16"
+SINGLE_NODE_GCP_INSTANCE_TYPE="n2-standard-16"
 
 echo "Updating install-config.yaml to a single ${SINGLE_NODE_GCP_INSTANCE_TYPE} control plane node and 0 workers"
 
@@ -28,7 +28,7 @@ cfg["controlPlane"]["replicas"] = 1
 if not "networking" in cfg:
     cfg["networking"] = {}
 
-cfg["networking"]["networkType"] = "OVNKubernetes"
+cfg["networking"]["networkType"] = "'${NETWORK_TYPE}'"
 
 # Single Node Openshift requires extra memory and compute resources
 platform = cfg["controlPlane"]["platform"]

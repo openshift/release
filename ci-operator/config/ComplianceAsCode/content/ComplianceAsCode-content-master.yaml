@@ -2,19 +2,19 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: golang-1.18
 images:
 - dockerfile_path: Dockerfiles/ocp4_content
   to: ocp4-content-ds
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.11"
       namespace: ocp
 resources:
   '*':
@@ -35,7 +35,8 @@ tests:
         export PRODUCT=rhcos4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -57,7 +58,8 @@ tests:
         export PRODUCT=ocp4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -81,7 +83,8 @@ tests:
         export PRODUCT=ocp4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -105,7 +108,8 @@ tests:
         export PRODUCT=ocp4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -127,7 +131,8 @@ tests:
         export PRODUCT=ocp4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -149,7 +154,8 @@ tests:
         export PRODUCT=ocp4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -176,7 +182,58 @@ tests:
         export PRODUCT=rhcos4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ocp4-stig
+  run_if_changed: ^(controls/srg_ctr/.*|applications/openshift/.*|products/ocp4/.*|ocp-resources/.*|shared/(macros.*jinja|checks/.*|templates/.*)|Dockerfiles/ocp4_content|Dockerfiles/quay_publish)$
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=stig
+        export PRODUCT=ocp4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
+        go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
+      dependencies:
+      - env: CONTENT_IMAGE
+        name: ocp4-content-ds
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-ocp4-stig-node
+  run_if_changed: ^(controls/srg_ctr/.*|applications/openshift/.*|products/ocp4/.*|ocp-resources/.*|shared/(macros.*jinja|checks/.*|templates/.*)|Dockerfiles/ocp4_content|Dockerfiles/quay_publish)$
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export PROFILE=stig-node
+        export PRODUCT=ocp4
+        export component=ocp4-content-ds
+        export ROOT_DIR=$PWD
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -198,7 +255,8 @@ tests:
         export PRODUCT=ocp4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -220,7 +278,8 @@ tests:
         export PRODUCT=ocp4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -247,7 +306,8 @@ tests:
         export PRODUCT=rhcos4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -271,7 +331,8 @@ tests:
         export PRODUCT=ocp4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
@@ -295,7 +356,8 @@ tests:
         export PRODUCT=ocp4
         export component=ocp4-content-ds
         export ROOT_DIR=$PWD
-        go get github.com/ComplianceAsCode/ocp4e2e
+        git clone https://github.com/ComplianceAsCode/ocp4e2e.git ocp4e2e
+        pushd ocp4e2e
         go test -v -timeout 120m github.com/ComplianceAsCode/ocp4e2e -profile="$PROFILE" -product="$PRODUCT" -content-image="$CONTENT_IMAGE"
       dependencies:
       - env: CONTENT_IMAGE
