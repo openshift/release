@@ -1,0 +1,42 @@
+periodics:
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@daily'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+    workdir: true
+  labels:
+    ci.openshift.io/area: supplemental-ci-images-arm64
+    ci.openshift.io/role: infra
+  name: periodic-image-mirroring-supplemental-ci-images-arm64
+  spec:
+    containers:
+    - args:
+      - --skip-missing=true
+      - --filter-by-os=linux/arm64
+      - --skip-multiple-scopes
+      command:
+      - hack/image-mirroring/mirror-images.sh
+      env:
+      - name: ARCH
+        value: arm64
+      - name: HOME
+        value: /home/mirror
+      image: registry.ci.openshift.org/ocp/4.12:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: .dockerconfigjson
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-ci-central

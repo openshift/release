@@ -29,7 +29,11 @@ CONFIG = {
         'us-east-1': 40,
     },
     'aws-qe-quota-slice': {
+        'us-east-1': 20,
         'us-east-2': 25,
+    },
+    'aws-1-qe-quota-slice': {
+        'us-east-1': 5,
     },
     'aws-china-qe-quota-slice': {
         'cn-north-1': 1,
@@ -75,9 +79,10 @@ CONFIG = {
         'centralus': 10
     },
     'azure-arm64-qe-quota-slice': {
-        'northeurope': 10,
-        'westus2': 5,
-        'westeurope': 5
+        'centralus': 6,
+        'eastus': 6,
+        'eastus2': 4,
+        'northeurope': 4
     },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5
@@ -172,6 +177,9 @@ CONFIG = {
     },
     'ibmcloud-quota-slice': {
         'default': 7,
+    },
+    'ibmcloud-qe-quota-slice': {
+        'default': 10,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,

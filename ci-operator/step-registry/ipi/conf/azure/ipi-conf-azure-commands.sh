@@ -30,13 +30,24 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
 fi
 master_type=null
+master_type_prefix=""
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  master_type=Standard_D32s_v3
+  master_type_prefix=Standard_D32
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  master_type=Standard_D16s_v3
+  master_type_prefix=Standard_D16
 elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  master_type=Standard_D8s_v3
+  master_type_prefix=Standard_D8
 fi
+if [ -n "${master_type_prefix}" ]; then
+  if [ "${OCP_ARCH}" = "amd64" ]; then
+    master_type=${master_type_prefix}s_v3
+  elif [ "${OCP_ARCH}" = "arm64" ]; then
+    master_type=${master_type_prefix}ps_v5
+  fi
+fi
+
+echo "Using control plane instance type: ${master_type}"
+echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${BASE_DOMAIN}
@@ -44,12 +55,14 @@ platform:
   azure:
     region: ${REGION}
 controlPlane:
+  architecture: ${OCP_ARCH}
   name: master
   platform:
     azure:
       type: ${master_type}
 compute:
-- name: worker
+- architecture: ${OCP_ARCH}
+  name: worker
   replicas: ${workers}
   platform:
     azure:

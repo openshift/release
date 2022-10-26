@@ -140,7 +140,7 @@ echo "${proxy_public_url}" > "${SHARED_DIR}/proxy_public_url"
 echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
-echo "${bastion_public_ip}" >> "${SHARED_DIR}/proxyip"
+echo "${bastion_public_ip}" > "${SHARED_DIR}/proxyip"
 
 #####################################
 ####Register mirror registry DNS#####
