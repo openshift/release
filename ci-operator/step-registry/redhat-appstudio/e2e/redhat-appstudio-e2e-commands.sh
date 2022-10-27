@@ -34,10 +34,8 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
 # Puting infra-deployments repo by default. All periodic jobs are running there.
 REPO_NAME=${REPO_NAME:-"infra-deployments"}
-if [[ "$REPO_NAME" == "e2e-tests" ]]
-then
-    /bin/bash scripts/install-appstudio-kcp.sh -kc kcp-stable-root -kk "$HOME/.configs/kcp_kubeconfig" -ck $KUBECONFIG -s --e2e
-else
-    curl https://raw.githubusercontent.com/redhat-appstudio/e2e-tests/main/scripts/install-appstudio-kcp.sh -o appstudio-kcp.sh && chmod +x appstudio-kcp.sh
-    /bin/bash ./appstudio-kcp.sh -kc kcp-stable-root -kk "$HOME/.configs/kcp_kubeconfig" -ck $KUBECONFIG -s --e2e
-fi
+
+cd "$(mktemp -d)"
+git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
+make ci/prepare/e2e-branch
+/bin/bash ./scripts/install-appstudio-kcp.sh -kc kcp-stable-root -kk "$HOME/.configs/kcp_kubeconfig" -ck $KUBECONFIG -s --e2e
