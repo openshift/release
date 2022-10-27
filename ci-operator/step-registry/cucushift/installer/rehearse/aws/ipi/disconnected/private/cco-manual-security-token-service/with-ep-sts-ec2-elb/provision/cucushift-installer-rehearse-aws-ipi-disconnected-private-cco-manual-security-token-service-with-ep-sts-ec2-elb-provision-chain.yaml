@@ -1,0 +1,39 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-with-ep-sts-ec2-elb-provision
+  steps:
+    - ref: aws-provision-vpc-disconnected
+    - chain: aws-provision-bastionhost
+    - chain: mirror-images-by-oc-adm
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws-custom-vpc
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-aws-oidc-creds-provision
+    - ref: ipi-conf-aws
+    - ref: ipi-conf-aws-custom-endpoints
+    - ref: ipi-conf-mirror
+    - ref: ipi-install-monitoringpvc
+    - ref: proxy-config-generate
+    - ref: ipi-install-install-aws
+    - ref: ipi-install-times-collection
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: set-sample-operator-disconnected
+  env:
+  - name: ADD_INGRESS_RECORDS_MANUALLY
+    default: "yes"
+    documentation: "Enable manually create apps dns record."
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy."
+  - name: SERVICE_ENDPOINT_EC2
+    default: "DEFAULT_ENDPOINT"
+    documentation: "ec2 endpoint."
+  - name: SERVICE_ENDPOINT_ELB
+    default: "DEFAULT_ENDPOINT"
+    documentation: "elb endpoint."
+  - name: SERVICE_ENDPOINT_STS
+    default: "DEFAULT_ENDPOINT"
+    documentation: "sts endpoint."
+  documentation: |-
+    Create an IPI cluster on AWS for QE e2e tests.
