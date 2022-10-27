@@ -4,23 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
 function create_tests_skip_list_file {
 # List of test cases to ignore due to open bugs
 cat <<EOF >"${SKIP_TESTS_FILE}"
+
 # <feature> <test name>
 
 # this test is checking that there are no none cnf-worker nodes with rt kernel enabled.
 # when running cnf-tests in parallel we do have other nodes with rt kernel so the test is failing.
 performance "a node without performance profile applied should not have RT kernel installed"
 
-# bz### known bug
-sriov "Should be able to configure a metaplugin"
-# bz### known bug
-sriov "Webhook resource injector"
-# bz### known bug
-sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
 # need to investigate why it's failing
 sriov "Test Connectivity Connectivity between client and server Should work over a SR-IOV device"
+
 # this test needs both sriov and sctp available in the cluster.
 # since we run them in parallel we can't run this test.
 sriov "Allow access only to a specific port/protocol SCTP"
@@ -28,8 +25,61 @@ sriov "Allow access only to a specific port/protocol SCTP"
 # this test needs both sriov and sctp available in the cluster.
 # since we run them in parallel we can't run this test.
 sctp "Allow access only to a specific port/protocol SCTP"
+
 EOF
 }
+
+
+function create_tests_temp_skip_list_11 {
+# List of temporarly skipped tests for 4.11
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# Nothing to skip for 4.11
+EOF
+}
+
+
+function create_tests_temp_skip_list_12 {
+# List of temporarly skipped tests for 4.12
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### known bug
+# TESTNAME
+sriov "Should be able to configure a metaplugin"
+
+# SKIPTEST
+# bz### known bug
+# TESTNAME
+sriov "Webhook resource injector"
+
+# SKIPTEST
+# bz### known bug
+# TESTNAME
+sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
+
+# SKIPTEST
+# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
+# TESTNAME
+performance "should disable CPU load balancing for CPU\\\'s used by the pod"
+
+# SKIPTEST
+# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
+# TESTNAME
+performance "should run infra containers on reserved CPUs"
+
+# SKIPTEST
+# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
+# TESTNAME
+performance "Huge pages support for container workloads"
+
+EOF
+}
+
+function create_tests_temp_skip_list_13 {
+    create_tests_temp_skip_list_12
+}
+
 
 function create_ns {
     ns=$1
@@ -195,13 +245,26 @@ oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disab
 make setup-build-index-image
 cd -
 
+# Skiplist common for all releases
 create_tests_skip_list_file
+
+# Skiplist according to each release
+if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
+    create_tests_temp_skip_list_11
+fi
+if [[ "$CNF_BRANCH" == *"4.12"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+    create_tests_temp_skip_list_12
+fi
+if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
+    create_tests_temp_skip_list_13
+fi
+cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
 # run cnf-tests by feature in a thread on a free worker node
 for feature in ${FEATURES}; do
     log_file="${ARTIFACT_DIR}/deploy_and_test_${feature}.log"
     rm -f "${log_file}"
-    
+
     feature_nodes=""
     num_of_free_nodes=0
     num_of_required_nodes=1
