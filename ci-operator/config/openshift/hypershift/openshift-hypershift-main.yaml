@@ -1,4 +1,8 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.7
     namespace: edge-infrastructure
@@ -124,13 +128,14 @@ tests:
         MINIKUBE_RAM_MB=12000
         TEST=./src/tests/test_kube_api.py
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="setup run deploy_capi_env test"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test"
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: assisted-baremetal
 - as: e2e-ibmcloud-iks
   optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  run_if_changed: ^api/
   steps:
     env:
       BOM_VERSION: 4.10.26_openshift
@@ -140,7 +145,7 @@ tests:
     workflow: hypershift-ibmcloud-e2e
 - as: e2e-ibmcloud-roks
   optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  run_if_changed: ^api/
   steps:
     env:
       BOM_VERSION: 4.11.0_openshift

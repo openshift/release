@@ -50,7 +50,6 @@ networking:
     hostPrefix: 23
   machineNetwork:
   - cidr: 10.0.0.0/16
-  networkType: OpenShiftSDN
   serviceNetwork:
   - 172.30.0.0/16
 compute:

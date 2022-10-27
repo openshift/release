@@ -8,6 +8,45 @@
 # signer_resources.py added the following resource
 #---------------------------------------------------------------------------------
 
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: release-controller-signer
+  namespace: ocp
+rules:
+- apiGroups:
+  - ''
+  resourceNames:
+  - release-upgrade-graph
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+---
+#---------------------------------------------------------------------------------
+# signer_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-controller-signer-binding
+  namespace: ocp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-controller-signer
+subjects:
+- kind: ServiceAccount
+  name: release-controller
+  namespace: ci
+---
+#---------------------------------------------------------------------------------
+# signer_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
 # The signer watches all release tags and signs those that have the correct metadata and images are reachable (according
 # to an `oc adm release info --verify` invocation). Signatures a test that the specified release image was built within the
 # CI infrastructure or tagged in by a privileged user. Future versions of the verifier may add additional constraints.

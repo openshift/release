@@ -21,6 +21,13 @@ sriov "Webhook resource injector"
 sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
 # need to investigate why it's failing
 sriov "Test Connectivity Connectivity between client and server Should work over a SR-IOV device"
+# this test needs both sriov and sctp available in the cluster.
+# since we run them in parallel we can't run this test.
+sriov "Allow access only to a specific port/protocol SCTP"
+
+# this test needs both sriov and sctp available in the cluster.
+# since we run them in parallel we can't run this test.
+sctp "Allow access only to a specific port/protocol SCTP"
 EOF
 }
 
@@ -103,6 +110,7 @@ function deploy_and_test {
         sed -i "s/name\: performance/name\: performance-sriov/g" perf_profile_for_sriov.yaml
         sed -i "s/worker-cnf/${node_label}/g" perf_profile_for_sriov.yaml
         oc apply -f perf_profile_for_sriov.yaml
+        FEATURES_ENVIRONMENT="${features_env}" FEATURES="multinetworkpolicy" make feature-deploy
     fi
 
     if [[ "${feature}" == "xt_u32" ]] || [[ "${feature}" == "sctp" ]]; then

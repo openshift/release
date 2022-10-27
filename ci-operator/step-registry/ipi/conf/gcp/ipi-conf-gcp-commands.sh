@@ -39,6 +39,9 @@ controlPlane:
   platform:
     gcp:
       type: ${master_type}
+      osDisk:
+        diskType: pd-ssd
+        diskSizeGB: 200
   replicas: ${masters}
 compute:
 - name: worker

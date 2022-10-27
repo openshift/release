@@ -1,4 +1,8 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.7
     namespace: edge-infrastructure
@@ -58,6 +62,8 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: hypershift
 promotion:
+  additional_images:
+    hypershift-tests: test-bin
   name: 4.12-priv
   namespace: ocp-private
 releases:
@@ -123,10 +129,31 @@ tests:
         MINIKUBE_RAM_MB=12000
         TEST=./src/tests/test_kube_api.py
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="setup run deploy_capi_env test"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test"
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: assisted-baremetal
+- as: e2e-ibmcloud-iks
+  optional: true
+  run_if_changed: ^api/
+  steps:
+    env:
+      BOM_VERSION: 4.10.26_openshift
+      MANAGED_CLUSTER_TYPE: iks
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
+    workflow: hypershift-ibmcloud-e2e
+- as: e2e-ibmcloud-roks
+  optional: true
+  run_if_changed: ^api/
+  steps:
+    env:
+      BOM_VERSION: 4.11.0_openshift
+      MANAGED_CLUSTER_TYPE: openshift
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
+    workflow: hypershift-ibmcloud-e2e
 zz_generated_metadata:
   branch: main
   org: openshift-priv
