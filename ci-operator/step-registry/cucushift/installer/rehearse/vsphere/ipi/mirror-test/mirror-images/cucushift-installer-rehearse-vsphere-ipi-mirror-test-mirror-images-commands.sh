@@ -60,17 +60,17 @@ SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
 BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
 
-echo scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no /tmp/secret/new_pull_secret ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/
-scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no /tmp/secret/new_pull_secret ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/
+echo scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/
+scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/
 
 echo ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
-oc adm release -a "${new_pull_secret}" mirror --insecure=true \
+oc adm release -a /tmp/new_pull_secret mirror --insecure=true \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"
 
 ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
-oc adm release -a "${new_pull_secret}" mirror --insecure=true \
+oc adm release -a /tmp/new_pull_secret mirror --insecure=true \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"
