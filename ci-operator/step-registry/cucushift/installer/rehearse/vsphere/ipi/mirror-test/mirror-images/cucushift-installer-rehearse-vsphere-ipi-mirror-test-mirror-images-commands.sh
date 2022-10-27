@@ -63,18 +63,23 @@ BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
 echo scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no /tmp/secret/new_pull_secret ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/
 scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no /tmp/secret/new_pull_secret ${BASTION_SSH_USER}@${BASTION_IP}:/tmp/
 
-echo ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} "oc adm release -a /tmp/new_pull_secret mirror --insecure=true --from=registry.ci.openshift.org/ocp/release:4.12.0-0.nightly-2022-10-18-192348 --to=${BASTION_IP}:5000/ci-op-9yflvkc4/release --to-release-image=${BASTION_IP}:5000/ci-op-9yflvkc4/release:4.12.0-0.nightly-2022-10-18-192348"
-
-
-sleep 18000
-
-# MIRROR IMAGES
+echo ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
 oc adm release -a "${new_pull_secret}" mirror --insecure=true \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"
 
+ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
+oc adm release -a "${new_pull_secret}" mirror --insecure=true \
+ --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
+ --to=${target_release_image_repo} \
+ --to-release-image=${target_release_image} | tee "${mirror_output}"
 
+# MIRROR IMAGES
+# oc adm release -a "${new_pull_secret}" mirror --insecure=true \
+#  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
+#  --to=${target_release_image_repo} \
+#  --to-release-image=${target_release_image} | tee "${mirror_output}"
 
 grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
 grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
