@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: cli
   opm-builder:
@@ -20,16 +20,6 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 images:
-- dockerfile_path: openshift-ci/Dockerfile.deploy
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/performance-addon-operators
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/performance-profile-creator
-  to: performance-addon-operator
 - dockerfile_path: openshift-ci/Dockerfile.must-gather
   from: os-min8
   inputs:
@@ -38,24 +28,6 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build/_output/bin/gather-sysinfo
   to: performance-addon-operator-must-gather
-- dockerfile_path: openshift-ci/Dockerfile.index-gen.ci
-  from: opm-builder
-  to: performance-addon-operator-index-gen
-- dockerfile_path: openshift-ci/Dockerfile.index.ci
-  from: opm-builder
-  inputs:
-    performance-addon-operator-index-gen:
-      paths:
-      - destination_dir: .
-        source_path: /database/index.db
-  to: performance-addon-operator-index
-- dockerfile_path: openshift-ci/Dockerfile.bundle.upstream.dev
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift-kni/performance-addon-operators/build
-  to: performance-addon-operator-bundle
 - dockerfile_path: openshift-ci/Dockerfile.src.ci
   from: src
   inputs:
@@ -64,30 +36,17 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: pao-src-oc
-operator:
-  bundles:
-  - dockerfile_path: openshift-ci/Dockerfile.bundle.ci
-  - dockerfile_path: openshift-ci/Dockerfile.bundle-4.10.ci
-  substitutions:
-  - pullspec: REPLACE_IMAGE
-    with: performance-addon-operator
-promotion:
-  excluded_images:
-  - performance-addon-operator-index-gen
-  - pao-src-oc
-  name: performance-addon-operator
-  namespace: ocp-kni
 releases:
   initial:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.11"
+      version: "4.12"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.11"
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -103,51 +62,6 @@ tests:
   container:
     from: pao-src-oc
   optional: true
-- as: ci-ppc
-  commands: make perf-profile-creator-tests
-  container:
-    from: src
-  optional: true
-- as: e2e-render-cmd
-  commands: make render-command-tests
-  container:
-    from: src
-- as: e2e-gcp
-  optional: true
-  steps:
-    cluster_profile: gcp
-    env:
-      OO_CHANNEL: "4.11"
-      OO_INSTALL_NAMESPACE: openshift-performance-addon-operator
-      OO_PACKAGE: performance-addon-operator
-      OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: e2e-test
-      commands: CLUSTER=mcp-only make cluster-deploy && make functests
-      from: pao-src-oc
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-gcp
-- as: e2e-gcp-operator-upgrade
-  optional: true
-  steps:
-    cluster_profile: gcp
-    env:
-      OO_CHANNEL: "4.10"
-      OO_INSTALL_NAMESPACE: openshift-performance-addon-operator
-      OO_PACKAGE: performance-addon-operator
-      OO_TARGET_NAMESPACES: '!all'
-    test:
-    - as: e2e-test
-      commands: CLUSTER=ci-upgrade-test PERF_TEST_PROFILE=ci-upgrade-test make operator-upgrade-tests
-      from: pao-src-oc
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: master
   org: openshift-kni
