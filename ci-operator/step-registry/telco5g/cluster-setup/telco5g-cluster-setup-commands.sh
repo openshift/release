@@ -8,6 +8,8 @@ echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
 
+env
+
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
