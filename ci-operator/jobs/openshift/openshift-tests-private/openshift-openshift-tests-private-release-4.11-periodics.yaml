@@ -6942,7 +6942,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 0 0 */7 * *
+  cron: 0 4 */7 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -6956,7 +6956,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-aws-ipi
+  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-aws-ipi-ovn-p2
   spec:
     containers:
     - args:
@@ -6966,8 +6966,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-ipi-cluster-profile
-      - --target=e2e-aws-ipi
+      - --secret-dir=/usr/local/e2e-aws-ipi-ovn-p2-cluster-profile
+      - --target=e2e-aws-ipi-ovn-p2
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -6984,7 +6984,88 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-ipi-cluster-profile
+      - mountPath: /usr/local/e2e-aws-ipi-ovn-p2-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 0 0 */7 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.11
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: amd64-stable
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-aws-ipi-p2
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ipi-p2-cluster-profile
+      - --target=e2e-aws-ipi-p2
+      - --variant=amd64-stable
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ipi-p2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -7032,93 +7113,12 @@ periodics:
     org: openshift
     repo: openshift-tests-private
   labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
-    ci-operator.openshift.io/variant: amd64-stable
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-aws-ipi-ovn
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --oauth-token-path=/usr/local/github-credentials/oauth
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-ipi-ovn-cluster-profile
-      - --target=e2e-aws-ipi-ovn
-      - --variant=amd64-stable
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-ipi-ovn-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/github-credentials
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-qe
-    - name: github-credentials-openshift-ci-robot-private-git-cloner
-      secret:
-        secretName: github-credentials-openshift-ci-robot-private-git-cloner
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: 0 0 */7 * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.11
-    org: openshift
-    repo: openshift-tests-private
-  labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure-qe
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-azure-ipi
+  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-azure-ipi-ovn-p2
   spec:
     containers:
     - args:
@@ -7128,8 +7128,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-ipi-cluster-profile
-      - --target=e2e-azure-ipi
+      - --secret-dir=/usr/local/e2e-azure-ipi-ovn-p2-cluster-profile
+      - --target=e2e-azure-ipi-ovn-p2
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -7146,7 +7146,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-ipi-cluster-profile
+      - mountPath: /usr/local/e2e-azure-ipi-ovn-p2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -7185,7 +7185,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 0 4 */7 * *
+  cron: 0 0 */7 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7199,7 +7199,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-azure-ipi-ovn
+  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-azure-ipi-p2
   spec:
     containers:
     - args:
@@ -7209,8 +7209,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-ipi-ovn-cluster-profile
-      - --target=e2e-azure-ipi-ovn
+      - --secret-dir=/usr/local/e2e-azure-ipi-p2-cluster-profile
+      - --target=e2e-azure-ipi-p2
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -7227,7 +7227,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-ipi-ovn-cluster-profile
+      - mountPath: /usr/local/e2e-azure-ipi-p2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -7266,7 +7266,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
-  cron: 0 0 */7 * *
+  cron: 0 4 */7 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7280,7 +7280,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-gcp-ipi
+  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-gcp-ipi-ovn-p2
   spec:
     containers:
     - args:
@@ -7290,8 +7290,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-gcp-ipi-cluster-profile
-      - --target=e2e-gcp-ipi
+      - --secret-dir=/usr/local/e2e-gcp-ipi-ovn-p2-cluster-profile
+      - --target=e2e-gcp-ipi-ovn-p2
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -7308,7 +7308,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-gcp-ipi-cluster-profile
+      - mountPath: /usr/local/e2e-gcp-ipi-ovn-p2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -7347,7 +7347,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build04
-  cron: 0 4 */7 * *
+  cron: 0 0 */7 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7361,7 +7361,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-gcp-ipi-ovn
+  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-gcp-ipi-p2
   spec:
     containers:
     - args:
@@ -7371,8 +7371,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-gcp-ipi-ovn-cluster-profile
-      - --target=e2e-gcp-ipi-ovn
+      - --secret-dir=/usr/local/e2e-gcp-ipi-p2-cluster-profile
+      - --target=e2e-gcp-ipi-p2
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -7389,7 +7389,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-gcp-ipi-ovn-cluster-profile
+      - mountPath: /usr/local/e2e-gcp-ipi-p2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -7442,7 +7442,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-vsphere-ipi
+  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-vsphere-ipi-p2
   spec:
     containers:
     - args:
@@ -7452,8 +7452,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-vsphere-ipi-cluster-profile
-      - --target=e2e-vsphere-ipi
+      - --secret-dir=/usr/local/e2e-vsphere-ipi-p2-cluster-profile
+      - --target=e2e-vsphere-ipi-p2
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -7470,7 +7470,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-vsphere-ipi-cluster-profile
+      - mountPath: /usr/local/e2e-vsphere-ipi-p2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -7523,7 +7523,7 @@ periodics:
     ci-operator.openshift.io/variant: amd64-stable
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-vsphere-upi
+  name: periodic-ci-openshift-openshift-tests-private-release-4.11-amd64-stable-e2e-vsphere-upi-p2
   spec:
     containers:
     - args:
@@ -7533,8 +7533,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-vsphere-upi-cluster-profile
-      - --target=e2e-vsphere-upi
+      - --secret-dir=/usr/local/e2e-vsphere-upi-p2-cluster-profile
+      - --target=e2e-vsphere-upi-p2
       - --variant=amd64-stable
       command:
       - ci-operator
@@ -7551,7 +7551,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-vsphere-upi-cluster-profile
+      - mountPath: /usr/local/e2e-vsphere-upi-p2-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
