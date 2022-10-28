@@ -201,7 +201,7 @@ periodics:
   decorate: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-bugzilla-refresh
+  name: periodic-bugzilla-refresh-main
   spec:
     containers:
     - args:
@@ -209,14 +209,143 @@ periodics:
         --query=is:pr
         comments:<2500
         state:open
-        label:bugzilla/invalid-bug
-        -label:bugzilla/valid-bug
+        base:main
+        label:bugzilla/valid-bug
+        label:lgtm
+        label:approved
+        -label:needs-rebase
       - --token=/etc/oauth/oauth
       - --updated=0
       - |-
         --comment=/bugzilla refresh
 
-        The requirements for Bugzilla bugs have changed, recalculating validity.
+        The requirements for Bugzilla bugs have changed (BZs linked to PRs on main branch need to target OCP 4.12), recalculating validity.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: gcr.io/k8s-prow/commenter:v20221027-c0f9edbb5d
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-bugzilla-refresh-master
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        comments:<2500
+        state:open
+        base:master
+        label:bugzilla/valid-bug
+        label:lgtm
+        label:approved
+        -label:needs-rebase
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - |-
+        --comment=/bugzilla refresh
+
+        The requirements for Bugzilla bugs have changed (BZs linked to PRs on main branch need to target OCP 4.12), recalculating validity.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: gcr.io/k8s-prow/commenter:v20221027-c0f9edbb5d
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-jira-refresh-main
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        comments:<2500
+        state:open
+        base:main
+        label:jira/valid-bug
+        label:lgtm
+        label:approved
+        -label:needs-rebase
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - |-
+        --comment=/jira refresh
+
+        The requirements for Jira bugs have changed (Jira issues linked to PRs on main branch need to target OCP 4.12), recalculating validity.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: gcr.io/k8s-prow/commenter:v20221027-c0f9edbb5d
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-jira-refresh-master
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        comments:<2500
+        state:open
+        base:master
+        label:jira/valid-bug
+        label:lgtm
+        label:approved
+        -label:needs-rebase
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - |-
+        --comment=/jira refresh
+
+        The requirements for Jira bugs have changed (Jira issues linked to PRs on main branch need to target OCP 4.12), recalculating validity.
       - --ceiling=0
       - --confirm
       command:
