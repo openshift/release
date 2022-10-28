@@ -112,6 +112,10 @@ validate-step-registry:
 refresh-bugzilla-prs:
 	./hack/refresh-bugzilla-prs.sh
 
+python-validation:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/python-validation:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/python-validation:latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
+
 # LEGACY TARGETS
 # You should not need to add new targets here.
 
