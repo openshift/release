@@ -40,18 +40,21 @@ computeSubnetID=$(az network vnet subnet show --resource-group ${vnet_RG} --vnet
 # Start to provision rhel instances from template in existing VNET and NSG
 for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   echo "$(date -u --rfc-3339=seconds) - Provision ${infra_id}-rhel-${count} ..."
-  # az command to configure RHEL VM's
-  az vm create --resource-group "${infra_id}-rg" \
-    --name "${infra_id}-rhel-${count}" \
-    --image "${RHEL_IMAGE}" \
-    --ssh-key-values "${SSH_PUB_KEY_PATH}" \
-    --admin-user "${RHEL_USER}" \
-    --public-ip-address "" \
-    --size "${RHEL_VM_SIZE}" \
-    --os-disk-size-gb "${RHEL_VM_DISK_SIZE}" \
-    --nsg "" \
-    --subnet "${computeSubnetID}" > /tmp/tmp.json
-  
+
+  # check if the current region support AZ by checking if $az_num != 0
+  IFS=$'\t' read -r -a zone_list <<< "$(az vm list-skus -l ${AZURE_REGION} --zone --size ${RHEL_VM_SIZE} --query '[].locationInfo[0].zones' -o tsv)"
+  az_num=${#zone_list[@]}
+
+  # az command to create RHEL VM and append --zone when the region has AZ
+  cmd="az vm create --resource-group '${infra_id}-rg' --name '${infra_id}-rhel-${count}' --image '${RHEL_IMAGE}' --ssh-key-values '${SSH_PUB_KEY_PATH}' --admin-user '${RHEL_USER}' --public-ip-address '' --size '${RHEL_VM_SIZE}' --os-disk-size-gb '${RHEL_VM_DISK_SIZE}' --nsg '' --subnet '${computeSubnetID}'"
+
+  if [ "${az_num}" != "0" ]; then
+    cmd="${cmd} --zone ${count}"
+  fi
+
+  echo "Creating RHEL VM: ${cmd}"
+  eval "${cmd}" | tee /tmp/tmp.json 
+ 
   rhel_node_ip=$(cat /tmp/tmp.json | jq -r .privateIpAddress)
   echo "Ip address is ${rhel_node_ip}"
   
