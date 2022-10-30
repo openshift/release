@@ -31,6 +31,10 @@ echo "Pull spec for arm64 release image: ${pullspec_release_arm64}"
 # Call rebase script
 ./scripts/auto-rebase/rebase.sh to "${pullspec_release_amd64}" "${pullspec_release_arm64}"
 
+# debug
+git remote -v
+exit 1
+
 APP_ID=$(cat /secrets/pr-creds/app_id) \
 KEY=/secrets/pr-creds/key.pem \
 ORG=openshift \
