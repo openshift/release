@@ -450,6 +450,17 @@ EOF
       break
     fi
   done
+
+  #
+  # Clean up leftover networks
+  #
+  (
+    while read UUID
+    do
+      echo ibmcloud pi network-delete ${UUID}
+      ibmcloud pi network-delete ${UUID}
+    done
+  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("rdr-multiarch-'${POWERVS_ZONE}'")) | .networkID')
 }
 
 function dump_resources() {
