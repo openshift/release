@@ -181,7 +181,20 @@ tests:
   postsubmit: true
   steps:
     test:
-    - ref: stackrox-initial
+      as: style-checks
+      commands: .openshift-ci/dispatch.sh style-checks
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+        limits:
+          cpu: 4000m
+          memory: 8000Mi
+      from: src
 - as: policy-checks
   postsubmit: true
   steps:
@@ -207,6 +220,9 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
+        limits:
+          cpu: 4000m
+          memory: 8000Mi
     - as: check-todos
       commands: .openshift-ci/dispatch.sh check-todos
       credentials:
@@ -218,6 +234,9 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
+        limits:
+          cpu: 4000m
+          memory: 8000Mi
     - as: check-pr-fixes
       commands: .openshift-ci/dispatch.sh check-pr-fixes
       credentials:
@@ -229,16 +248,45 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
+        limits:
+          cpu: 4000m
+          memory: 8000Mi
 - as: go-unit-tests
   postsubmit: true
   steps:
     test:
-    - ref: stackrox-initial
+      as: go-unit-tests
+      commands: .openshift-ci/dispatch.sh go-unit-tests
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+        limits:
+          cpu: 4000m
+          memory: 8000Mi
+      from: src
 - as: go-unit-tests-release
   postsubmit: true
   steps:
     test:
-    - ref: stackrox-initial
+      as: go-unit-tests-release
+      commands: .openshift-ci/dispatch.sh go-unit-tests-release
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+        limits:
+          cpu: 4000m
+          memory: 8000Mi
+      from: src
 - as: go-postgres-tests
   postsubmit: true
   steps:
