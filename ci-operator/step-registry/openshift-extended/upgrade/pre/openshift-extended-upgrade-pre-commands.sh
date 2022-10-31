@@ -90,7 +90,7 @@ aws-usgov)
     export KUBE_SSH_USER=core
     export TEST_PROVIDER="none"
     ;;
-azure4)
+azure4|azure-arm64)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
     export SSH_CLOUD_PRIV_AZURE_USER="${QE_BASTION_SSH_USER:-core}"
