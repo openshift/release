@@ -7,6 +7,14 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: openstack-installer
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.10"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.8"
   upi-installer:
     name: "4.8"
     namespace: ocp
@@ -36,101 +44,75 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi
-  cron: 46 23 9,20 * *
+- as: aws-ipi-p2
+  cron: 46 23 */7 * *
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
+      BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_INTERMEDIATE_TAGS: '@4.9 and @aws-ipi and @upgrade-sanity'
       E2E_RUN_LATEST_TAGS: '@4.10 and @aws-ipi and @upgrade-sanity'
       UPGRADE_CHECK_RUN_TAGS: '@4.8 and @aws-ipi and @upgrade-check'
       UPGRADE_PRE_RUN_TAGS: '@4.8 and @aws-ipi and @upgrade-prepare'
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - ref: ipi-install-hosted-loki
-    - chain: ipi-aws-pre-stableinitial
-    - ref: idp-htpasswd
-    - ref: cucushift-pre
-    - ref: cucushift-upgrade-prepare
-    workflow: cucushift-upgrade-paused
-- as: azure-ipi
-  cron: 10 17 8,20 * *
+    test:
+    - chain: cucushift-upgrade-paused
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: azure-ipi-p2
+  cron: 10 17 */7 * *
   steps:
-    cluster_profile: azure-2
+    cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
     env:
-      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_INTERMEDIATE_TAGS: '@4.9 and @azure-ipi and @upgrade-sanity'
       E2E_RUN_LATEST_TAGS: '@4.10 and @azure-ipi and @upgrade-sanity'
       UPGRADE_CHECK_RUN_TAGS: '@4.8 and @azure-ipi and @upgrade-check'
       UPGRADE_PRE_RUN_TAGS: '@4.8 and @azure-ipi and @upgrade-prepare'
-    post:
-    - chain: ipi-azure-post
-    pre:
-    - ref: ipi-install-hosted-loki
-    - chain: ipi-azure-pre-stableinitial
-    - ref: idp-htpasswd
-    - ref: cucushift-pre
-    - ref: cucushift-upgrade-prepare
-    workflow: cucushift-upgrade-paused
-- as: azure-upi
-  cron: 5 22 5,23 * *
+    test:
+    - chain: cucushift-upgrade-paused
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-upi-p2
+  cron: 5 22 */7 * *
   steps:
-    cluster_profile: azure4
+    cluster_profile: azure-qe
     env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_INTERMEDIATE_TAGS: '@4.9 and @azure-upi and @upgrade-sanity'
       E2E_RUN_LATEST_TAGS: '@4.10 and @azure-upi and @upgrade-sanity'
       UPGRADE_CHECK_RUN_TAGS: '@4.8 and @azure-upi and @upgrade-check'
       UPGRADE_PRE_RUN_TAGS: '@4.8 and @azure-upi and @upgrade-prepare'
-    post:
-    - chain: upi-azure-post
-    pre:
-    - chain: upi-azure-pre
-    - ref: idp-htpasswd
-    - ref: cucushift-pre
-    - ref: cucushift-upgrade-prepare
-    workflow: cucushift-upgrade-paused
-- as: gcp-ipi
-  cron: 15 11 4,28 * *
+    test:
+    - chain: cucushift-upgrade-paused
+    workflow: cucushift-installer-rehearse-azure-upi
+- as: gcp-ipi-p2
+  cron: 15 11 */7 * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-qe
     env:
       E2E_RUN_INTERMEDIATE_TAGS: '@4.9 and @gcp-ipi and @upgrade-sanity'
       E2E_RUN_LATEST_TAGS: '@4.10 and @gcp-ipi and @upgrade-sanity'
       UPGRADE_CHECK_RUN_TAGS: '@4.8 and @gcp-ipi and @upgrade-check'
       UPGRADE_PRE_RUN_TAGS: '@4.8 and @gcp-ipi and @upgrade-prepare'
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: idp-htpasswd
-    - ref: cucushift-pre
-    - ref: cucushift-upgrade-prepare
-    workflow: cucushift-upgrade-paused
-- as: gcp-upi
-  cron: 49 23 10,21 * *
+    test:
+    - chain: cucushift-upgrade-paused
+    workflow: cucushift-installer-rehearse-gcp-ipi
+- as: gcp-upi-p2
+  cron: 49 23 */7 * *
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-qe
     env:
       E2E_RUN_INTERMEDIATE_TAGS: '@4.9 and @gcp-upi and @upgrade-sanity'
       E2E_RUN_LATEST_TAGS: '@4.10 and @gcp-upi and @upgrade-sanity'
       UPGRADE_CHECK_RUN_TAGS: '@4.8 and @gcp-upi and @upgrade-check'
       UPGRADE_PRE_RUN_TAGS: '@4.8 and @gcp-upi and @upgrade-prepare'
-    post:
-    - chain: upi-gcp-post
-    pre:
-    - chain: upi-gcp-pre
-    - ref: idp-htpasswd
-    - ref: cucushift-pre
-    - ref: cucushift-upgrade-prepare
-    workflow: cucushift-upgrade-paused
-- as: openstack-ipi
-  cron: 54 16 4,27 * *
+    test:
+    - chain: cucushift-upgrade-paused
+    workflow: cucushift-installer-rehearse-gcp-upi
+- as: openstack-ipi-p2
+  cron: 54 16 */7 * *
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -140,16 +122,11 @@ tests:
       E2E_RUN_LATEST_TAGS: '@4.10 and @openstack-ipi and @upgrade-sanity'
       UPGRADE_CHECK_RUN_TAGS: '@4.8 and @openstack-ipi and @upgrade-check'
       UPGRADE_PRE_RUN_TAGS: '@4.8 and @openstack-ipi and @upgrade-prepare'
-    post:
-    - chain: ipi-openstack-post
-    pre:
-    - chain: ipi-openstack-pre
-    - ref: idp-htpasswd
-    - ref: cucushift-pre
-    - ref: cucushift-upgrade-prepare
-    workflow: cucushift-upgrade-paused
-- as: vsphere-ipi
-  cron: 26 20 12,22 * *
+    test:
+    - chain: cucushift-upgrade-paused
+    workflow: ipi-openstack
+- as: vsphere-ipi-p3
+  cron: 26 20 */28 * *
   steps:
     cluster_profile: vsphere
     env:
@@ -157,16 +134,11 @@ tests:
       E2E_RUN_LATEST_TAGS: '@4.10 and @vsphere-ipi and @upgrade-sanity'
       UPGRADE_CHECK_RUN_TAGS: '@4.8 and @vsphere-ipi and @upgrade-check'
       UPGRADE_PRE_RUN_TAGS: '@4.8 and @vsphere-ipi and @upgrade-prepare'
-    post:
-    - chain: ipi-vsphere-post
-    pre:
-    - chain: ipi-vsphere-pre
-    - ref: idp-htpasswd
-    - ref: cucushift-pre
-    - ref: cucushift-upgrade-prepare
-    workflow: cucushift-upgrade-paused
-- as: vsphere-upi
-  cron: 38 1 6,17 * *
+    test:
+    - chain: cucushift-upgrade-paused
+    workflow: cucushift-installer-rehearse-vsphere-ipi
+- as: vsphere-upi-p3
+  cron: 38 1 */28 * *
   steps:
     cluster_profile: vsphere
     env:
@@ -174,14 +146,9 @@ tests:
       E2E_RUN_LATEST_TAGS: '@4.10 and @vsphere-upi and @upgrade-sanity'
       UPGRADE_CHECK_RUN_TAGS: '@4.8 and @vsphere-upi and @upgrade-check'
       UPGRADE_PRE_RUN_TAGS: '@4.8 and @vsphere-upi and @upgrade-prepare'
-    post:
-    - chain: upi-vsphere-post
-    pre:
-    - chain: upi-vsphere-pre
-    - ref: idp-htpasswd
-    - ref: cucushift-pre
-    - ref: cucushift-upgrade-prepare
-    workflow: cucushift-upgrade-paused
+    test:
+    - chain: cucushift-upgrade-paused
+    workflow: cucushift-installer-rehearse-vsphere-upi
 zz_generated_metadata:
   branch: master
   org: openshift
