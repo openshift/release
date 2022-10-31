@@ -32,6 +32,9 @@ vsphere_resource_pool="$(cat ${SECRET_DIR}/vsphere_resource_pool)"
 dns_server="$(cat ${SECRET_DIR}/dns_server)"
 vsphere_dev_network="$(cat ${SECRET_DIR}/vsphere_dev_network)"
 
+# Don't use broken vsphere_datastore 
+vsphere_datastore="$(echo ${vsphere_datastore} | sed 's;vsanDatastore;iscsi-vsanDatastore;g')"
+
 # govc command persists sessions to GOVMOMI_HOME.
 # It's possible to disable session persistence but it might be useful
 # Providing a writable directory.
