@@ -1,8 +1,23 @@
-base_images:
-  test_runner:
-    name: redhat-appstudio-e2e-test-runner
-    namespace: ci
-    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_literal: |-
+    FROM src
+    SHELL ["/bin/bash", "-c"]
+
+    ENV YQ_VERSION=v4.25.2
+
+    # Install yq and kubectl
+    RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+    RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
+  from: src
+  to: e2e-test-runner
+promotion:
+  name: redhat-appstudio
+  namespace: ci
 releases:
   latest:
     release:
