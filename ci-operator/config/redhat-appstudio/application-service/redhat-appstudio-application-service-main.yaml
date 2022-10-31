@@ -9,7 +9,7 @@ releases:
     release:
       architecture: amd64
       channel: stable
-      version: "4.9"
+      version: "4.11"
 resources:
   '*':
     limits:
@@ -18,46 +18,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: has-e2e
+- as: kcp-stable-application-service
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.9"
+    version: "4.11"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
+    dependencies:
+      COMPONENT_IMAGE: redhat-appstudio-has-image
     test:
-    - as: has-e2e
-      cli: latest
-      commands: |
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
-
-        git config --global user.name "redhat-appstudio-qe-bot"
-        git config --global user.email redhat-appstudio-qe-bot@redhat.com
-
-        mkdir -p ${HOME}/creds
-        GIT_CREDS_PATH="${HOME}/creds/file"
-        git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
-        echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
-
-        echo ${HAS_CONTROLLER_IMAGE%@*}
-        /bin/bash .ci/oci-e2e-has.sh
-      credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
-        namespace: test-credentials
-      dependencies:
-      - env: HAS_CONTROLLER_IMAGE
-        name: redhat-appstudio-has-image
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
+    - ref: redhat-appstudio-e2e
+    workflow: redhat-appstudio-claim
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio
