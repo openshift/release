@@ -154,15 +154,6 @@ function deploy_and_test {
         features_env="typical-baremetal"
     fi
 
-    if [[ "${feature}" == "sriov" ]]; then
-        rm -f perf_profile_for_sriov.yaml
-        oc kustomize feature-configs/typical-baremetal/performance > perf_profile_for_sriov.yaml
-        sed -i "s/name\: performance/name\: performance-sriov/g" perf_profile_for_sriov.yaml
-        sed -i "s/worker-cnf/${node_label}/g" perf_profile_for_sriov.yaml
-        oc apply -f perf_profile_for_sriov.yaml
-        FEATURES_ENVIRONMENT="${features_env}" FEATURES="multinetworkpolicy" make feature-deploy
-    fi
-
     if [[ "${feature}" == "xt_u32" ]] || [[ "${feature}" == "sctp" ]]; then
         sed -i "s/worker-cnf/${node_label}/g" feature-configs/deploy/"${feature}"/"${feature}"_module_mc.yaml
     else
@@ -174,11 +165,24 @@ function deploy_and_test {
 
     CNF_NODES="${nodes}" make setup-test-cluster
 
-    FEATURES_ENVIRONMENT="${features_env}" FEATURES="${feature}" make feature-deploy
-    FEATURES_ENVIRONMENT="${features_env}" FEATURES="${feature} general" make feature-wait
-
     skip_tests=$(get_skip_tests "${feature}")
-    FEATURES="\[${feature}\]" SKIP_TESTS="${skip_tests}" make functests
+
+    if [[ "${feature}" == "sriov" ]]; then
+        rm -f perf_profile_for_sriov.yaml
+        oc kustomize feature-configs/typical-baremetal/performance > perf_profile_for_sriov.yaml
+        sed -i "s/name\: performance/name\: performance-sriov/g" perf_profile_for_sriov.yaml
+        sed -i "s/worker-cnf/${node_label}/g" perf_profile_for_sriov.yaml
+        oc apply -f perf_profile_for_sriov.yaml
+        # TEMP: while working on testing dpdk and sriov in parallel we can test dpdk together with sriov.
+        # multinetworkpolicy deployment is done here for sriov testing.
+        FEATURES_ENVIRONMENT="${features_env}" FEATURES="sriov multinetworkpolicy dpdk" make feature-deploy
+        FEATURES_ENVIRONMENT="${features_env}" FEATURES="sriov dpdk general" make feature-wait
+        FEATURES="\[sriov\]|\[dpdk\]" SKIP_TESTS="${skip_tests}" make functests
+    else
+        FEATURES_ENVIRONMENT="${features_env}" FEATURES="${feature}" make feature-deploy
+        FEATURES_ENVIRONMENT="${features_env}" FEATURES="${feature} general" make feature-wait
+        FEATURES="\[${feature}\]" SKIP_TESTS="${skip_tests}" make functests
+    fi
 
     # cleanup nodes
     for node in $nodes; do
