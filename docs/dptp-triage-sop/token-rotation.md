@@ -7,13 +7,13 @@ Bound SA tokens are used for Prow components and ci-tools except the following c
 Each SA's token is created by `prowjob/periodic-ci-secret-generator` and bound to the same object `secret/token-bound-object-{0|1}` in the same namespace.
 To expire the tokens,
 
-- Bind all tokens to the other secret in [the generator's configuration file](../../core-services/ci-secret-generator/_config.yaml), e.g., bind to `secret/token-bound-object-{1}` if `secret/token-bound-object-0` currently. Create a PR and Merge it.
+- Bind all tokens to the other secret in [the generator's configuration file](../../core-services/ci-secret-generator/_config.yaml), e.g., bind to `secret/token-bound-object-1` if `secret/token-bound-object-0` currently. Create a PR and Merge it.
 
 - Trigger `prowjob/periodic-ci-secret-generator` to generator the tokens bound to the new secret.
 
 > make job JOB=periodic-ci-secret-generator
 
-- Delete the secret that the old tokens were previously bound to. It will expire the old tokens. Since the old secret's manifests is still in the release repo, it will be created with a new uid and to be prepared the next rotation.
+- Delete the secret that the old tokens were previously bound to. It will expire the old tokens. Since the old [secret's manifests](../../clusters/build-clusters/common/assets/bound-object_secrets.yaml) is still in the release repo, it will be created with a new uid and to be prepared the next rotation.
 
 ```console
 oc --context ${CLUSTER} delete secret -A -l ci.openshift.io/token-bound-object=$(TOKEN_BOUND_OBJECT_NAME_SUFFIX)  --dry-run=none --as system:admin
@@ -65,8 +65,22 @@ $ make -C ./clusters/psi apply_credentials
 
 ### Expire a Previous token
 
-After merging of the pull request, we expire the token with a previous version
+After merging of the pull request, we expire the token with a previous version on every cluster:
 
 ```console
 $ make CLUSTER=${CLUSTER} EXPIRE_TOKEN_VERSION=1 DRY_RUN=none expire-token-version
+```
+
+_Note_ that we have to always use a new name for the secrets (e.g, [config-updater-token-version-n](https://github.com/openshift/release/blob/master/clusters/build-clusters/common/prow/admin_config-updater_rbac.yaml)) that contain the non-expiring token because it would reactivate the expired token otherwise.
+That is the reason we cannot bounce between two secrets like we do for the bound SA's tokens.
+Instead, we increase the number in the secret's names each time.
+
+On any cluster, we should keep only the latest version of those secrets.
+
+```console
+$ make list-token-secrets 
+oc --context app.ci -n ci get secret -l ci.openshift.io/token-version --show-labels
+NAME                                        TYPE                                  DATA   AGE   LABELS
+config-updater-token-version-1              kubernetes.io/service-account-token   4      13d   ci.openshift.io/non-expiring-token=true,ci.openshift.io/token-version=version-1
+sync-rover-groups-updater-token-version-1   kubernetes.io/service-account-token   4      13d   ci.openshift.io/non-expiring-token=true,ci.openshift.io/token-version=version-1
 ```
