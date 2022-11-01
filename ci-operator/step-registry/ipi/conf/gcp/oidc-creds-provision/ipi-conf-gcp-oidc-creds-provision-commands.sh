@@ -11,17 +11,20 @@ export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
-# extract gcp credentials requests from the release image
+echo "> Extract gcp credentials requests from the release image"
 oc registry login
 oc adm release extract --credentials-requests --cloud=gcp --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
 
-# create required credentials infrastructure and installer manifests for workload identity
+echo "> Output gcp credentials requests to directory: /tmp/credrequests"
+ls "/tmp/credrequests"
+
+echo "> Create required credentials infrastructure and installer manifests for workload identity"
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 ccoctl gcp create-all --name="${infra_name}" --project="${PROJECT}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
 
-# copy generated service account signing from ccoctl target directory into shared directory
-cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"
+echo "> Copy generated service account signing from ccoctl target directory into shared directory"
+cp -v "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"
 
-# copy generated secret manifests from ccoctl target directory into shared directory
+echo "> Copy generated secret manifests from ccoctl target directory into shared directory"
 cd "/tmp/manifests"
-for FILE in *; do cp $FILE "${MPREFIX}_$FILE"; done
+for FILE in *; do cp -v $FILE "${MPREFIX}_$FILE"; done
