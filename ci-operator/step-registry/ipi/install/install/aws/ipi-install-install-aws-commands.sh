@@ -111,6 +111,17 @@ if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
   yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.publicZone
 fi
 
+if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
+  # replace PLACEHOLDER_INFRA_ID PLACEHOLDER_AMI_ID
+  echo "Local Zone is enabled, updating Infran ID and AMI ID ... "
+  localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
+  infra_id=$(jq -r '."*installconfig.ClusterID".InfraID' "${dir}/.openshift_install_state.json")
+  ami_id=$(grep ami "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" | tail -n1 | awk '{print$2}')
+  sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${localzone_machineset}
+  sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${localzone_machineset}
+  cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
+fi
+
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"
