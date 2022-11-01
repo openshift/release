@@ -12,9 +12,11 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+source $SHARED_DIR/vsphere_context.sh
+
 source ${SHARED_DIR}/govc.sh
 echo "Data center is ${GOVC_DATACENTER}"
-if govc object.collect /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template; then
+if govc object.collect /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/${vsphere_ci_machine_template_name}; then
     printf 'Assisted service ci template already exist - skipping \n'
     exit 0
 fi
@@ -23,7 +25,7 @@ printf 'Assisted service ci template does not exist - creating using packer\n'
 
 export vsphere_cluster=""
 export vsphere_dev_network=""
-source $SHARED_DIR/vsphere_context.sh
+
 SSH_PUBLIC_KEY="$(cat /var/run/vault/sshkeys/public_key)"
 
 mkdir -p build/packer
@@ -40,7 +42,7 @@ vsphere_datastore = "${GOVC_DATASTORE}"
 vsphere_cluster = "${vsphere_cluster}"
 vsphere_network = "${vsphere_dev_network}"
 vsphere_folder = "assisted-test-infra-ci"
-vm_name = "assisted-test-infra-machine-template"
+vm_name = "${vsphere_ci_machine_template_name}"
 ssh_public_key = "${SSH_PUBLIC_KEY}"
 ssh_private_key_file = "/var/run/vault/sshkeys/private_key"
 EOF

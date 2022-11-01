@@ -59,6 +59,7 @@ export cloud_where_run="${cloud_where_run}"
 export vsphere_dev_network="${vsphere_dev_network}"
 export vsphere_datacenter="${vsphere_datacenter}"
 export vsphere_datastore="${vsphere_datastore}"
+export vsphere_ci_machine_template_name = "assisted-test-infra-machine-template-nov01"
 EOF
 
 third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))

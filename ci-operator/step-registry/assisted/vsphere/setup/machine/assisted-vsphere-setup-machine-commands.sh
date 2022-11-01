@@ -19,7 +19,7 @@ source $SHARED_DIR/vsphere_context.sh
 source ${SHARED_DIR}/govc.sh
 mkdir -p build/govc
 export GOVMOMI_HOME=/home/assisted-test-infra/build/govc/
-govc object.collect /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template || { echo 'Assisted service ci template does not exist' ; exit 1; }
+govc object.collect /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/${vsphere_ci_machine_template_name} || { echo 'Assisted service ci template does not exist' ; exit 1; }
 
 # Cloning the template into a new CI VM.
 mkdir -p /home/assisted-test-infra/build/terraform
@@ -35,7 +35,7 @@ vsphere_datacenter = "${GOVC_DATACENTER}"
 vsphere_datastore = "${GOVC_DATASTORE}"
 vsphere_cluster = "${vsphere_cluster}"
 vsphere_network = "${LEASED_RESOURCE}"
-template_name = "assisted-test-infra-machine-template"
+template_name = "${vsphere_ci_machine_template_name}"
 build_id = "${BUILD_ID}"
 EOF
 
