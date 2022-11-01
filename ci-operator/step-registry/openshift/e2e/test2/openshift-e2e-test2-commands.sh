@@ -297,6 +297,31 @@ function suite() {
         -o "${ARTIFACT_DIR}/e2e5.log" \
         --junit-dir "${ARTIFACT_DIR}/junit5" &
 
+    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e1.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit1" &
+
+    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e2.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit2" &
+
+    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e3.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit3" &
+
+    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e4.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit4" &
+
+    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e5.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit5" &
+
     wait &&
     set +x
 }
