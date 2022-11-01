@@ -172,7 +172,7 @@ def _add_osd_rc_servicemonitor(gendoc):
 
 
 def _get_osd_rc_deployment_sidecars(context):
-    sidecars = list()
+    sidecars = []
 
     if context.private:
         sidecars.append({
