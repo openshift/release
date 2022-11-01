@@ -15,7 +15,7 @@ def _service_account(gendoc):
     ])
 
 
-def _cluster_level_rbac_resources(gendoc):
+def _cluster_scoped_rbac_resources(gendoc):
     config = gendoc.context.config
     gendoc.add_comments("""These cluster-level permissions are for the listers and watchers that are used throughout the
     release-payload-controller.  The "infrastructures" permission is required by library-go to perform part of it's
@@ -131,51 +131,60 @@ def _library_go_rbac(gendoc):
 
 
 def _controller_rbac(gendoc):
+    # OCP Resources
     config = gendoc.context.config
 
     for private in (False, True):
         for arch in config.arches:
             namespace = f'{config.rpc_release_namespace}{config.get_suffix(arch, private)}'
+            _namespaced_rbac_resources(gendoc, namespace)
 
-            gendoc.add_comments(f'These RBAC resources allow the release-payload-controller to update ReleasePayloads in the {namespace} namespace.')
-            gendoc.append_all([
+    # OKD Resources
+    _namespaced_rbac_resources(gendoc, 'origin')
+
+
+def _namespaced_rbac_resources(gendoc, namespace):
+    config = gendoc.context.config
+
+    gendoc.add_comments(f'These RBAC resources allow the release-payload-controller to update ReleasePayloads in the {namespace} namespace.')
+    gendoc.append_all([
+        {
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'Role',
+            'metadata': {
+                'name': 'release-payload-controller',
+                'namespace': namespace
+            },
+            'rules': [
                 {
-                    'apiVersion': 'rbac.authorization.k8s.io/v1',
-                    'kind': 'Role',
-                    'metadata': {
-                        'name': 'release-payload-controller',
-                        'namespace': namespace
-                    },
-                    'rules': [
-                        {
-                            'apiGroups': ['release.openshift.io'],
-                            'resources': ['releasepayloads', 'releasepayloads/status'],
-                            'verbs': ['get', 'list', 'watch', 'update']
-                        },
-                    ]
+                    'apiGroups': ['release.openshift.io'],
+                    'resources': ['releasepayloads', 'releasepayloads/status'],
+                    'verbs': ['get', 'list', 'watch', 'update']
                 },
-                {
-                    'apiVersion': 'rbac.authorization.k8s.io/v1',
-                    'kind': 'RoleBinding',
-                    'metadata': {
-                        'name': 'release-payload-controller',
-                        'namespace': namespace
-                    },
-                    'roleRef': {
-                        'apiGroup': 'rbac.authorization.k8s.io',
-                        'kind': 'Role',
-                        'name': 'release-payload-controller'
-                    },
-                    'subjects': [{
-                        'kind': 'ServiceAccount',
-                        'name': 'release-payload-controller',
-                        'namespace': config.rc_deployment_namespace
-                    }]
-                },
-            ])
+            ]
+        },
+        {
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'RoleBinding',
+            'metadata': {
+                'name': 'release-payload-controller',
+                'namespace': namespace
+            },
+            'roleRef': {
+                'apiGroup': 'rbac.authorization.k8s.io',
+                'kind': 'Role',
+                'name': 'release-payload-controller'
+            },
+            'subjects': [{
+                'kind': 'ServiceAccount',
+                'name': 'release-payload-controller',
+                'namespace': config.rc_deployment_namespace
+            }]
+        },
+    ])
 
 
-def _namespaced_rbac_resources(gendoc):
+def _namespace_scoped_rbac_resources(gendoc):
     _library_go_rbac(gendoc)
     _controller_rbac(gendoc)
 
@@ -257,8 +266,8 @@ def _deployment_resources(gendoc):
 def add_release_payload_controller_resources(config, context):
     with genlib.GenDoc(config.paths.path_rpc_resources.joinpath('admin_rbac.yaml'), context) as gendoc:
         _service_account(gendoc)
-        _cluster_level_rbac_resources(gendoc)
-        _namespaced_rbac_resources(gendoc)
+        _cluster_scoped_rbac_resources(gendoc)
+        _namespace_scoped_rbac_resources(gendoc)
 
     with genlib.GenDoc(config.paths.path_rpc_resources.joinpath('deployment.yaml'), context) as gendoc:
         _deployment_resources(gendoc)
