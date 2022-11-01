@@ -220,11 +220,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-jenkins-sync-plugin,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-jenkins-image-tests
     decorate: true
     labels:
@@ -232,6 +232,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-jenkins-release-4.12-e2e-jenkins-image-tests
     rerun_command: /test e2e-jenkins-image-tests
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -271,7 +272,7 @@ presubmits:
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build05
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -286,6 +287,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -318,7 +320,7 @@ presubmits:
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
-    cluster: build05
+    cluster: build03
     context: ci/prow/jenkins-check-plugins-supply-chain-change
     decorate: true
     labels:

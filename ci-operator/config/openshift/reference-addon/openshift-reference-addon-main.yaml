@@ -1,18 +1,18 @@
-binary_build_commands: make
+base_images:
+  base:
+    name: ubi-micro
+    namespace: ocp
+    tag: "8"
+binary_build_commands: ./mage build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  from_repository: true
 images:
-- dockerfile_path: config/docker/reference-addon-manager.Dockerfile
+- dockerfile_path: Dockerfile
+  from: base
   inputs:
     bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/reference-addon/bin/linux_amd64/reference-addon-manager
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/reference-addon/config/docker/passwd
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
   to: reference-addon-manager
 promotion:
   name: reference-addon-manager
@@ -24,15 +24,20 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: ./mage cache-ci-deps
 tests:
-- as: unit
-  commands: make test-unit
-  container:
-    from: src
 - as: lint
-  commands: make lint
+  commands: ./mage lint
   container:
-    from: src
+    from: test-bin
+- as: unit
+  commands: ./mage test-unit
+  container:
+    from: test-bin
+- as: integration
+  commands: ./mage test-integration
+  container:
+    from: test-bin
 zz_generated_metadata:
   branch: main
   org: openshift

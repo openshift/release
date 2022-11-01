@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/clustername.txt
-cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
-
 echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and alerts"
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
@@ -17,75 +14,133 @@ source "${SHARED_DIR}/vsphere_context.sh"
 function collect_diagnostic_data {
   set +e
 
-  # assuming that if the install-status doesn't exist then something is
-  # broken
-  installer_exit_code=1
-  # Check if install or bootstrap failed
-  if [[ -f "${SHARED_DIR}/install-status.txt" ]]; then
-      installer_exit_code=$(awk '{print $1}' "${SHARED_DIR}/install-status.txt")
-  fi
+  host_metrics="cpu.ready.summation
+  cpu.usage.average
+  cpu.usagemhz.average
+  cpu.coreUtilization.average
+  cpu.costop.summation
+  cpu.demand.average
+  cpu.idle.summation
+  cpu.latency.average
+  cpu.readiness.average
+  cpu.reservedCapacity.average
+  cpu.totalCapacity.average
+  cpu.utilization.average
+  datastore.datastoreIops.average
+  datastore.datastoreMaxQueueDepth.latest
+  datastore.datastoreReadIops.latest
+  datastore.datastoreReadOIO.latest
+  datastore.datastoreVMObservedLatency.latest
+  datastore.datastoreWriteIops.latest
+  datastore.datastoreWriteOIO.latest
+  datastore.numberReadAveraged.average
+  datastore.numberWriteAveraged.average
+  datastore.siocActiveTimePercentage.average
+  datastore.sizeNormalizedDatastoreLatency.average
+  datastore.totalReadLatency.average
+  datastore.totalWriteLatency.average
+  disk.deviceLatency.average
+  disk.maxQueueDepth.average
+  disk.maxTotalLatency.latest
+  disk.numberReadAveraged.average
+  disk.numberWriteAveraged.average
+  disk.usage.average
+  mem.consumed.average
+  mem.overhead.average
+  mem.swapinRate.average
+  mem.swapoutRate.average
+  mem.usage.average
+  mem.vmmemctl.average
+  net.usage.average
+  sys.uptime.latest"
 
-  echo "$(date -u --rfc-3339=seconds) - installer exit code: ${installer_exit_code}"
+  vm_metrics="cpu.ready.summation
+  cpu.usage.average
+  cpu.usagemhz.average
+  cpu.readiness.average
+  cpu.overlap.summation
+  cpu.swapwait.summation
+  cpu.system.summation
+  cpu.used.summation
+  cpu.wait.summation
+  cpu.costop.summation
+  cpu.demand.average
+  cpu.entitlement.latest
+  cpu.idle.summation
+  cpu.latency.average
+  cpu.maxlimited.summation
+  cpu.run.summation
+  datastore.read.average
+  datastore.write.average
+  datastore.maxTotalLatency.latest
+  datastore.numberReadAveraged.average
+  datastore.numberWriteAveraged.average
+  datastore.totalReadLatency.average
+  datastore.totalWriteLatency.average
+  disk.maxTotalLatency.latest
+  mem.consumed.average
+  mem.overhead.average
+  mem.swapinRate.average
+  mem.swapoutRate.average
+  mem.usage.average
+  mem.vmmemctl.average
+  net.usage.average
+  sys.uptime.latest"
 
   source "${SHARED_DIR}/govc.sh"
-  vm_path="/${GOVC_DATACENTER}/vm/${cluster_name}"
   vcenter_state="${ARTIFACT_DIR}/vcenter_state"
   mkdir "${vcenter_state}"
+  unset GOVC_DATACENTER
+  unset GOVC_DATASTORE
+  unset GOVC_RESOURCE_POOL
 
+  echo "Gathering information from hosts and virtual machines associated with segment"
 
-  govc object.collect "/${GOVC_DATACENTER}/host" triggeredAlarmState &> "${vcenter_state}/host_alarms.log"
-  clustervms=$(govc ls "${vm_path}-*")
-  for vm in $clustervms; do
-    vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)
-
-    # skip template machine
-    if [[ "$vmname" == *"rhcos"* ]]; then
+  IFS=$'\n' read -d '' -r -a all_hosts <<< "$(govc find . -type h -runtime.powerState poweredOn)"
+  IFS=$'\n' read -d '' -r -a networks <<< "$(govc find -type=n -i=true -name ${LEASED_RESOURCE})"
+  for network in "${networks[@]}"; do
+          
+      IFS=$'\n' read -d '' -r -a vms <<< "$(govc find . -type m -runtime.powerState poweredOn -network $network)"            
+      if [ -z ${vms:-} ]; then
+        govc find . -type m -runtime.powerState poweredOn -network $network
+        echo "No VMs found"
         continue
-    fi
+      fi
+      for vm in "${vms[@]}"; do        
+          datacenter=$(echo "$vm" | cut -d'/' -f 2)
+          vm_host="$(govc vm.info -dc="${datacenter}" ${vm} | grep "Host:" | awk -F "Host:         " '{print $2}')"
+          
+          if [ ! -z "${vm_host}" ]; then
+              hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
+              if [ ! -f "${vcenter_state}/${hostname}.metrics.txt" ]; then                  
+                  full_hostpath=$(for host in "${all_hosts[@]}"; do echo ${host} | grep ${vm_host}; done)                  
+                  if [ -z "${full_hostpath:-}" ]; then
+                    continue
+                  fi
+                  echo "Collecting Host metrics for ${vm_host}"
+                  hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
+                  govc metric.sample -dc="${datacenter}" -d=80 -n=60 ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.txt
+                  govc metric.sample -dc="${datacenter}" -d=80 -n=60 -t=true -json=true ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.json
+                  govc object.collect -dc="${datacenter}" "${vm_host}" triggeredAlarmState &> "${vcenter_state}/${hostname}_alarms.log"
+              fi
+          fi
+          echo "Collecting VM metrics for ${vm}"
+          vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)          
+          govc metric.sample -dc="${datacenter}" -d=80 -n=60 $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.txt
+          govc metric.sample -dc="${datacenter}" -d=80 -n=60 -t=true -json=true $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.json
 
-    echo "Collecting alarms from $vm"
-    govc object.collect "$vm" triggeredAlarmState &> "${vcenter_state}/${vmname}_alarms.log"
-    echo "Collecting metrics from $vm"
-    METRICS=$(govc metric.ls "$vm")
-    govc metric.sample -json -n 60 "$vm" "$METRICS" &> "${vcenter_state}/${vmname}_metrics.json"
+          echo "Collecting alarms from ${vm}"
+          govc object.collect -dc="${datacenter}" "${vm}" triggeredAlarmState &> "${vcenter_state}/${vmname}_alarms.log"    
 
-    # press ENTER on the console if screensaver is running
-    echo "Keystoke enter in ${vmname} console"
-    govc vm.keystrokes -vm.ipath="$vm" -c 0x28
+          # press ENTER on the console if screensaver is running
+          echo "Keystoke enter in ${vmname} console"
+          govc vm.keystrokes -dc="${datacenter}" -vm.ipath="${vm}" -c 0x28
 
-    echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
-    govc vm.console -vm.ipath="$vm" -capture "${vcenter_state}/${vmname}.png"
-
-    if [[ "$installer_exit_code" -ne 0 ]]; then
-        echo "Checking if VMware tools is running on ${vmname}"
-        output=$(govc vm.ip -wait=0h0m10s -vm.ipath="$vm")
-        if [[ -z "$output" ]]; then
-            echo "$(date -u --rfc-3339=seconds) VMware Tools is not running: ${vmname}"
-            # VMware Tools is not running this RHCOS instance
-            # didn't start up correctly in some way.
-
-            echo "$(date -u --rfc-3339=seconds) Powering off: ${vmname}"
-            # power off machine
-            govc vm.power -vm.ipath="$vm" -off -force=true
-
-            echo "$(date -u --rfc-3339=seconds) Removing network adapter: ${vmname}"
-            # remove network adapter
-            govc device.remove -vm.ipath="$vm" ethernet-0
-
-            echo "$(date -u --rfc-3339=seconds) Moving: ${vmname} to /${GOVC_DATACENTER}/vm/debug"
-            # move to the debug folder
-            govc object.mv "$vm" "/${GOVC_DATACENTER}/vm/debug"
-
-            # removing the tag from the virtual machine
-            # the installer is deleting the vm
-            echo "$(date -u --rfc-3339=seconds) Removing tags attached: ${vmname}"
-            govc tags.detach "${cluster_name}" "${vm}"
-        fi
-    fi
-
+          echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
+          govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"       
+      done
   done
-  first_vm=$(echo "${clustervms}" | cut -d" " -f1)
-  target_hw_version=$(govc vm.info -json=true "${first_vm}" | jq -r .VirtualMachines[0].Config.Version)
+  target_hw_version=$(govc vm.info -json=true "${vms[0]}" | jq -r .VirtualMachines[0].Config.Version)
   echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
 
   set -e

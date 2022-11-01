@@ -20,11 +20,11 @@ mkdir -p "${TOOLS_DIR}"
 export PATH="${TOOLS_DIR}:${PATH}"
 
 echo "## Install opm"
-curl -L https://github.com/operator-framework/operator-registry/releases/download/v1.21.0/linux-amd64-opm -o "${TOOLS_DIR}/opm" && chmod +x "${TOOLS_DIR}/opm"
+curl -L --retry 5 https://github.com/operator-framework/operator-registry/releases/download/v1.26.2/linux-amd64-opm -o "${TOOLS_DIR}/opm" && chmod +x "${TOOLS_DIR}/opm"
 echo "   opm installed"
 
 echo "## Install umoci"
-curl -L https://github.com/opencontainers/umoci/releases/download/v0.4.7/umoci.amd64 -o "${TOOLS_DIR}/umoci" && chmod +x "${TOOLS_DIR}/umoci"
+curl -L --retry 5 https://github.com/opencontainers/umoci/releases/download/v0.4.7/umoci.amd64 -o "${TOOLS_DIR}/umoci" && chmod +x "${TOOLS_DIR}/umoci"
 echo "   umoci installed"
 
 echo "## Install python dependencies"
@@ -54,6 +54,7 @@ umoci config --config.label 'operators.operatorframework.io.bundle.channel.defau
 umoci config --config.label 'operators.operatorframework.io.metrics.builder=operator-sdk-v1.10.0+git' --image bundle:latest
 umoci config --config.label 'operators.operatorframework.io.metrics.mediatype.v1=metrics+v1' --image bundle:latest
 umoci config --config.label 'operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v3' --image bundle:latest
+umoci config --config.label 'quay.expires-after=4w' --image bundle:latest # let quay expire the tag after 1 month from build time
 umoci unpack --rootless --image bundle:latest bundle
 
 # Update the manifests to points to the digest of the images it contains
@@ -65,9 +66,12 @@ cp -r "${SRC_DIR}/deploy/olm-catalog/metadata" bundle/rootfs/
 umoci repack --image bundle:latest bundle
 skopeo copy oci:bundle:latest "docker://${BUNDLE_DESTINATION}"
 
-# Get bundle digest
+# Publish the bundle tagged with its sha
+# In quay, we cannot pull by digest when no tag is associated with it
 BUNDLE_DIGEST=$(skopeo inspect oci:bundle:latest | jq -r '.Digest')
-BUNDLE_DESTINATION_DIGEST="${REGISTRY_HOST}/${REGISTRY_ORG}/${REGISTRY_BUNDLE_REPOSITORY_NAME}@${BUNDLE_DIGEST}"
+BUNDLE_DIGEST=${BUNDLE_DIGEST/*:/} # only keep the sha "sha256:ac45..." -> "ac45..."
+BUNDLE_DESTINATION_DIGEST_TAG="${REGISTRY_HOST}/${REGISTRY_ORG}/${REGISTRY_BUNDLE_REPOSITORY_NAME}:${BUNDLE_DIGEST}"
+skopeo copy oci:bundle:latest "docker://${BUNDLE_DESTINATION_DIGEST_TAG}"
 
 CATALOG_DESTINATION="${REGISTRY_HOST}/${REGISTRY_ORG}/${REGISTRY_CATALOG_REPOSITORY_NAME}:${REGISTRY_CATALOG_REPOSITORY_TAG}"
 echo "## Generate and publish catalog to ${CATALOG_DESTINATION}"
@@ -77,7 +81,7 @@ cd "${tmp}"
 
 # Create the index database from the bundle we just published
 opm index add \
-    --bundles "${BUNDLE_DESTINATION_DIGEST}" \
+    --bundles "${BUNDLE_DESTINATION_DIGEST_TAG}" \
     --out-dockerfile index.Dockerfile \
     --generate
 

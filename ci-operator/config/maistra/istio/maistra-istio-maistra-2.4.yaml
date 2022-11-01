@@ -1,0 +1,49 @@
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: "2.4"
+  use_build_cache: true
+resources:
+  '*':
+    limits:
+      memory: 16Gi
+    requests:
+      cpu: "4"
+      memory: 4Gi
+tests:
+- as: istio-unit-2-4
+  commands: |
+    make -e T=-v build racetest binaries-test \
+    BUILD_WITH_CONTAINER="0" \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache" \
+  container:
+    from: src
+  timeout: 4h0m0s
+- as: istio-lint-2-4
+  commands: |
+    make lint \
+    BUILD_WITH_CONTAINER="0" \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache" \
+  container:
+    from: src
+- as: istio-gencheck-2-4
+  commands: |
+    make gen-check \
+    BUILD_WITH_CONTAINER="0" \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache" \
+  container:
+    from: src
+zz_generated_metadata:
+  branch: maistra-2.4
+  org: maistra
+  repo: istio

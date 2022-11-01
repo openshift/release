@@ -1,0 +1,58 @@
+ref:
+  as: red-hat-data-services-ci-image-mirror
+  commands: red-hat-data-services-ci-image-mirror-commands.sh
+  credentials:
+    - mount_path: /secrets/red-hat-data-services-push-secret
+      name: red-hat-data-services-push-secret
+      namespace: test-credentials
+  dependencies:
+    - env: SOURCE_IMAGE_REF
+      name: src
+  documentation: |-
+    This workflow mirrors an image from the CI Registry to a given
+    image ref.
+  env:
+    - name: IMAGE_REPO
+      default: ""
+      documentation: |-
+        The repository name of the destination image reference.
+    - name: IMAGE_TAG
+      default: ""
+      documentation: |-
+        The tag for the destination image reference. If blank, the tag for
+        a presubmit will be <version>-PR<pull_num>-<commit_sha> and for a
+        postsubmit will be <version>-<commit_sha>.
+    - name: REGISTRY_HOST
+      default: quay.io
+      documentation: |-
+        The hostname (and port) of the destination registry.
+    - name: REGISTRY_ORG
+      default: modh
+      documentation: |-
+        The organization of the destination image reference.
+    - name: REGISTRY_SECRET
+      default: red-hat-data-services-push-secret
+      documentation: |-
+        The name of the kube secret that contains the registry token file.
+    - name: REGISTRY_SECRET_FILE
+      default: config.json
+      documentation: |-
+        The name of the file in REGISTRY_SECRET with the contents of
+        the .docker/config.json file encoded in base64.
+    - name: RELEASE_VERSION
+      default: ""
+      documentation: |-
+        The current release version for the product.
+    - name: SECRETS_PATH
+      default: /secrets
+      documentation: |-
+        The directory where credentials will be mounted.
+  from_image:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 1h0m0s

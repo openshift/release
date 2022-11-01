@@ -360,7 +360,7 @@ def add_imagestream_namespace_rbac(gendoc):
         'kind': 'ServiceAccount',
         'metadata': {
             'annotations': {} if not context.private else {
-                f'serviceaccounts.openshift.io/oauth-redirectreference.{context.rc_serviceaccount_name}': '{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{"kind":"Route","name":"%s"}}' % context.rc_route_name
+                f'serviceaccounts.openshift.io/oauth-redirectreference.{context.rc_serviceaccount_name}': f'{{"kind":"OAuthRedirectReference","apiVersion":"v1","reference":{{"kind":"Route","name":"{context.rc_route_name}"}}}}'
             },
             'name': context.rc_serviceaccount_name,
             'namespace': context.config.rc_deployment_namespace,
