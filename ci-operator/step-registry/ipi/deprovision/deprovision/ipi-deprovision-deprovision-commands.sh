@@ -39,6 +39,17 @@ fi
 echo "Copying the installation artifacts to the Installer's asset directory..."
 cp -ar "${SHARED_DIR}" /tmp/installer
 
+if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+  # C2S/SC2S regions do not support destory
+  #   replace ${AWS_REGION} with source_region(us-east-1) in metadata.json as a workaround"
+  
+  # downloading jq
+  curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
+
+  source_region=$(/tmp/jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+  sed -i "s/${LEASED_RESOURCE}/${source_region}/" "/tmp/installer/metadata.json"
+fi
+
 # TODO: remove once BZ#1926093 is done and backported
 if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
   echo "Destroy bootstrap ..."
@@ -49,9 +60,13 @@ fi
 
 # Check if proxy is set
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
-  echo "Private cluster setting proxy"
-  # shellcheck disable=SC1090
-  source "${SHARED_DIR}/proxy-conf.sh"
+  if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+    echo "proxy-conf.sh detected, but not reqquired by C2S/SC2S while destroying cluster, skip proxy setting"
+  else
+    echo "Private cluster setting proxy"
+    # shellcheck disable=SC1090
+    source "${SHARED_DIR}/proxy-conf.sh"
+  fi
 fi
 
 echo "Running the Installer's 'destroy cluster' command..."
