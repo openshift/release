@@ -39,7 +39,7 @@ fi
 echo "Copying the installation artifacts to the Installer's asset directory..."
 cp -ar "${SHARED_DIR}" /tmp/installer
 
-if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   # C2S/SC2S regions do not support destory
   #   replace ${AWS_REGION} with source_region(us-east-1) in metadata.json as a workaround"
   
@@ -60,7 +60,7 @@ fi
 
 # Check if proxy is set
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
-  if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+  if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
     echo "proxy-conf.sh detected, but not reqquired by C2S/SC2S while destroying cluster, skip proxy setting"
   else
     echo "Private cluster setting proxy"

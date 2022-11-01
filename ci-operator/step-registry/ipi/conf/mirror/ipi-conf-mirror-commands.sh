@@ -30,7 +30,7 @@ CONFIG_PATCH="${SHARED_DIR}/pull_secret_ca.yaml.patch"
 
 additional_trust_bundle="${SHARED_DIR}/additional_trust_bundle"
 cat /var/run/vault/mirror-registry/client_ca.crt > "${additional_trust_bundle}"
-if [ X"${CLUSTER_TYPE}" == X"aws-c2s" ] || [ X"${CLUSTER_TYPE}" == X"aws-sc2s" ]; then
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   echo >> "${additional_trust_bundle}"
   cat "${CLUSTER_PROFILE_DIR}/shift-ca-chain.cert.pem" >> "${additional_trust_bundle}"
 fi

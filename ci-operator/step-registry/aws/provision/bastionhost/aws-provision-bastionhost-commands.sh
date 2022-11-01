@@ -11,7 +11,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION="${LEASED_RESOURCE}"
 
 # Using source region for C2S and SC2S
-if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   REGION=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
 fi
 

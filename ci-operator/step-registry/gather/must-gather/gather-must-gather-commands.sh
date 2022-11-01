@@ -106,7 +106,7 @@ function installCamgi() {
     pushd /tmp
 
     # no internet access in C2S/SC2S env, disable proxy 
-    if [ "${CLUSTER_TYPE}" == "aws-c2s" ] || [ "${CLUSTER_TYPE}" == "aws-sc2s" ]; then
+    if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
       if [ ! -f "${SHARED_DIR}/unset-proxy.sh" ]; then
         echo "ERROR, unset-proxy.sh does not exist."
         return 1
@@ -118,7 +118,7 @@ function installCamgi() {
     tar xvf camgi.tar
     sha256sum -c camgi.sha256
 
-    if [ "${CLUSTER_TYPE}" == "aws-c2s" ] || [ "${CLUSTER_TYPE}" == "aws-sc2s" ]; then
+    if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
       if [ ! -f "${SHARED_DIR}/proxy-conf.sh" ]; then
         echo "ERROR, proxy-conf.sh does not exist."
         return 1

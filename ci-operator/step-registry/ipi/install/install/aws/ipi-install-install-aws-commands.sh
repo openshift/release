@@ -95,7 +95,7 @@ esac
 
 
 # set CA_BUNDLE for C2S and SC2S 
-if [ "${CLUSTER_TYPE}" == "aws-c2s" ] || [ "${CLUSTER_TYPE}" == "aws-sc2s" ]; then
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   export AWS_CA_BUNDLE=${SHARED_DIR}/additional_trust_bundle
 fi
 

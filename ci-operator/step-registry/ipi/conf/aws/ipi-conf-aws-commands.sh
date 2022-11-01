@@ -20,7 +20,7 @@ function join_by { local IFS="$1"; shift; echo "$*"; }
 REGION="${LEASED_RESOURCE}"
 aws_source_region="${REGION}"
 
-if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   # in C2S/SC2S use source_region (us-east-1) to communicate with AWS services
   aws_source_region=$(jq -r ".\"${REGION}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
   echo "C2S/SC2S source region: $aws_source_region"
@@ -76,7 +76,7 @@ elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
   CONTROL_PLANE_INSTANCE_SIZE="2xlarge"
 fi
 
-if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   # C2S & SC2S
 
   # Not all instance family are supported by SHIFT emulator
@@ -254,7 +254,7 @@ if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$R
   echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
 fi
 
-if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
   openshift-install version
   RHCOS_AMI=$(openshift-install coreos print-stream-json | jq -r ".architectures.x86_64.images.aws.regions.\"${aws_source_region}\".image")
