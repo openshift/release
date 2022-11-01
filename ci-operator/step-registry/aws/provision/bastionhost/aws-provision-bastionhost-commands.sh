@@ -41,10 +41,12 @@ if [[ "${BASTION_HOST_AMI}" == "" ]]; then
   aws --region $REGION s3 mb "s3://${s3_bucket_name}"
   echo "s3://${s3_bucket_name}" > "$SHARED_DIR/to_be_removed_s3_bucket_list"
   aws --region $REGION s3 cp ${bastion_ignition_file} "${ign_location}"
+  echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 else
   # use BYO bastion host
   ami_id=${BASTION_HOST_AMI}
   ign_location="NA"
+  echo "ec2-user" > "${SHARED_DIR}/bastion_ssh_user"
 fi
 
 echo -e "AMI ID: $ami_id"
@@ -269,7 +271,6 @@ BASTION_HOST_PRIVATE_DNS="$(aws --region "${REGION}" cloudformation describe-sta
 
 echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/bastion_public_address"
 echo "${BASTION_HOST_PRIVATE_DNS}" > "${SHARED_DIR}/bastion_private_address"
-echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${BASTION_HOST_PUBLIC_DNS}" > "${SHARED_DIR}/proxyip"

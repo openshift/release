@@ -8,6 +8,9 @@ set -o pipefail
 CLUSTER_NAME="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'metadata.name')"
 BASE_DOMAIN="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
 
+which openshift-install
+openshift-install version
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -19,7 +22,7 @@ function populate_artifact_dir() {
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
   case "${CLUSTER_TYPE}" in
-    aws|aws-arm64|aws-usgov)
+    aws|aws-arm64|aws-usgov|aws-c2s|aws-sc2s)
       grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log" > "${SHARED_DIR}/aws-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
   esac
@@ -86,8 +89,15 @@ fi
 
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
+aws-c2s|aws-sc2s) export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_temp_creds;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
+
+
+# set CA_BUNDLE for C2S and SC2S 
+if [ "${CLUSTER_TYPE}" == "aws-c2s" ] || [ "${CLUSTER_TYPE}" == "aws-sc2s" ]; then
+  export AWS_CA_BUNDLE=${SHARED_DIR}/additional_trust_bundle
+fi
 
 dir=/tmp/installer
 mkdir "${dir}/"

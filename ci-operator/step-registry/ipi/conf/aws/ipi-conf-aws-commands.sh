@@ -12,14 +12,18 @@ expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
-REGION="${LEASED_RESOURCE}"
 
-# m6a (AMD) are more cost effective than other x86 instance types
-# for general purpose work. Use by default, when supported in the
-# region.
-IS_M6A_REGION="no"
-if aws ec2 describe-instance-type-offerings --region "${REGION}" | grep -q m6a ; then
-  IS_M6A_REGION="yes"
+# REGION: the region that OCP will be installed
+# aws_source_region: for non-C2S/SC2S cluster, it's the same as REGION, for C2S/SC2S it's the source region that emulator runs on.
+#             e.g. for instance, if installing a cluster on a C2S (us-iso-east-1) region and its emulator runs on us-east-1:
+#                  so the REGION is us-iso-east-1, and aws_source_region is us-east-1
+REGION="${LEASED_RESOURCE}"
+aws_source_region="${REGION}"
+
+if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+  # in C2S/SC2S use source_region (us-east-1) to communicate with AWS services
+  aws_source_region=$(jq -r ".\"${REGION}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+  echo "C2S/SC2S source region: $aws_source_region"
 fi
 
 function eval_instance_capacity() {
@@ -62,24 +66,6 @@ function eval_instance_capacity() {
 
 # BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
 architecture=${OCP_ARCH:-"amd64"}
-if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
-  architecture="arm64"
-fi
-
-# Do not change auto-types unless it is coordinated with the cloud
-# financial operations team. Savings plans may be in place to
-# decrease the cost of certain instance families.
-if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
-  if [ "${architecture}" = "arm64" ]; then
-    COMPUTE_NODE_TYPE="m6g.xlarge"
-  else
-    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-      COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
-    else
-      COMPUTE_NODE_TYPE="m6i.xlarge"
-    fi
-  fi
-fi
 
 CONTROL_PLANE_INSTANCE_SIZE="xlarge"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
@@ -90,10 +76,46 @@ elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
   CONTROL_PLANE_INSTANCE_SIZE="2xlarge"
 fi
 
-if [[ x"${architecture}" == x"arm64" ]]; then
-  arch_instance_type=m6g
+if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+  # C2S & SC2S
+
+  # Not all instance family are supported by SHIFT emulator
+  #   see https://bugzilla.redhat.com/show_bug.cgi?id=2020181
+
+  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+    COMPUTE_NODE_TYPE="m5.xlarge"
+  fi
+  arch_instance_type="m5"
+  CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
+  # ARM 64
+  architecture="arm64"
+  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+    COMPUTE_NODE_TYPE="m6g.xlarge"
+  fi
+  arch_instance_type="m6g"
   CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
 else
+  # AMD 64
+  # m6a (AMD) are more cost effective than other x86 instance types
+  # for general purpose work. Use by default, when supported in the
+  # region.
+  IS_M6A_REGION="no"
+  if aws ec2 describe-instance-type-offerings --region "${REGION}" | grep -q m6a ; then
+    IS_M6A_REGION="yes"
+  fi
+
+  # Do not change auto-types unless it is coordinated with the cloud
+  # financial operations team. Savings plans may be in place to
+  # decrease the cost of certain instance families.
+  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+      COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
+    else
+      COMPUTE_NODE_TYPE="m6i.xlarge"
+    fi
+  fi
+
   if [[ "${IS_M6A_REGION}" == "yes" ]]; then
     CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
   else
@@ -110,23 +132,23 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
 fi
 
 # Generate working availability zones from the region
-mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
+mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
 # Generate availability zones with OpenShift Installer required instance types
 
 if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then ## all regions are the same
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
+  mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
 elif [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == null && "${COMPUTE_NODE_TYPE}" == null  ]]; then ## two null regions
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
+  mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
 elif [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == null || "${COMPUTE_NODE_TYPE}" == null ]]; then ## one null region
   if [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" || "${CONTROL_PLANE_INSTANCE_TYPE}" == "${COMPUTE_NODE_TYPE}" ]]; then ## "one null region and duplicates"
-    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
+    mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
   else ## "one null region and no duplicates"
-    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
+    mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
   fi
 elif [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" || "${CONTROL_PLANE_INSTANCE_TYPE}" == "${COMPUTE_NODE_TYPE}" ]]; then ## duplicates regions with no null region
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
+  mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
 elif [[ "${BOOTSTRAP_NODE_TYPE}" != "${COMPUTE_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" != "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then   # three different regions
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 3 ' | awk '{print $2}')
+  mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 3 ' | awk '{print $2}')
 fi
 # Generate availability zones based on these 2 criteria
 mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
@@ -230,6 +252,12 @@ if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$R
   curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
   RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
   echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
+fi
+
+if [[ "${CLUSTER_TYPE}" == "aws-c2s" ]] || [[ "${CLUSTER_TYPE}" == "aws-sc2s" ]]; then
+  jq --version
+  openshift-install version
+  RHCOS_AMI=$(openshift-install coreos print-stream-json | jq -r ".architectures.x86_64.images.aws.regions.\"${aws_source_region}\".image")
 fi
 
 if [ ! -z ${RHCOS_AMI} ]; then

@@ -14,6 +14,8 @@ then
 	exit 0
 fi
 
+REGION="$(jq -r .aws.region "${SHARED_DIR}/metadata.json")"
+
 # while gathering logs from a private cluster, proxy setting is required for connecting cluster
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
@@ -39,7 +41,17 @@ fi
 
 aws --version
 
-REGION="$(jq -r .aws.region "${SHARED_DIR}/metadata.json")"
+# Special setting for C2S/SC2S, running aws command in source region (us-east-1)
+if [ "${CLUSTER_TYPE}" == "aws-c2s" ] || [ "${CLUSTER_TYPE}" == "aws-sc2s" ]; then
+  source_region=$(jq -r ".\"${REGION}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+  REGION=$source_region
+  if [ ! -f "${SHARED_DIR}/unset-proxy.sh" ]; then
+    echo "ERROR, unset-proxy.sh does not exist, exit now."
+    exit 1
+  fi
+  source "${SHARED_DIR}/unset-proxy.sh"
+fi
+
 cat "${TMPDIR}/node-provider-IDs.txt" | sort | grep . | uniq | while read -r INSTANCE_ID
 do
 	echo "Gathering console logs for ${INSTANCE_ID}"
