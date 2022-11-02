@@ -42,7 +42,7 @@ fi
 aws --version
 
 # Special setting for C2S/SC2S, running aws command in source region (us-east-1)
-if [ "${CLUSTER_TYPE}" == "aws-c2s" ] || [ "${CLUSTER_TYPE}" == "aws-sc2s" ]; then
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   source_region=$(jq -r ".\"${REGION}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
   REGION=$source_region
   if [ ! -f "${SHARED_DIR}/unset-proxy.sh" ]; then
