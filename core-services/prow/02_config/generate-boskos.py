@@ -183,10 +183,10 @@ CONFIG = {
         'tok04': 1
     },
     'ibmcloud-quota-slice': {
-        'default': 7,
+        'us-east': 7,
     },
     'ibmcloud-qe-quota-slice': {
-        'default': 10,
+        'jp-tok': 10,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
