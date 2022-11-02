@@ -432,3 +432,6 @@ suite)
     exit 1
     ;;
 esac
+
+echo "Requesting risk analysis for test failures in this job run from sippy:"
+openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
