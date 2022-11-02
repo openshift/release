@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config
+.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen
 
 export CONTAINER_ENGINE ?= docker
 export SKIP_PULL ?= false
@@ -410,3 +410,11 @@ secret-config-updater:
 	--from-file=sa.config-updater.vsphere.config=$(TMPDIR)/sa.config-updater.vsphere.config \
 	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f - 
 .PHONY: secret-config-updater
+
+multi-arch-gen:
+	hack/image-mirroring/supplemental_ci_images_mirror_gen.py
+.PHONY: multi-arch-gen
+
+validate-multi-arch-gen:
+	hack/image-mirroring/validate-multi-arch-image-mirror-gen.sh .
+.PHONY: validate-multi-arch-gen

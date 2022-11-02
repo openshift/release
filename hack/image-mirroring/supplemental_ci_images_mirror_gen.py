@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import glob
 import shutil
-from ruamel.yaml import YAML
+import ruamel.yaml as yaml
 
 APPCI_REGISTRY = "registry.ci.openshift.org"
 MAPPING_FILE_PREFIX = "mapping_"
@@ -127,14 +129,12 @@ def generate_mappings():
 
 def generate_periodics():
     jobs = []
-    yaml = YAML()
     for arch, os_filter in ARCHITECTURES.items():
         jobs.append(yaml.round_trip_load(generate_job(
             arch, os_filter), preserve_quotes=True))
 
     print(f"Generate periodics in {PERIODICS_FILE}")
     with open(PERIODICS_FILE, 'w', encoding="utf-8") as file:
-        file.write("# DO NOT EDIT. This file is auto-generated.\n")
         periodics = {"periodics": jobs}
         yaml.round_trip_dump(periodics, file, indent=2,
                              default_flow_style=False, explicit_start=False)
