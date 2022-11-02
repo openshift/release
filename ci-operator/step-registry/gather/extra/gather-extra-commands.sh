@@ -551,7 +551,7 @@ queue ${ARTIFACT_DIR}/metrics/job_metrics.json oc --insecure-skip-tls-verify rsh
 wait
 
 # C2S/SC2S proxy can not access internet
-if [ "${CLUSTER_TYPE}" == "aws-c2s" ] || [ "${CLUSTER_TYPE}" == "aws-sc2s" ]; then
+if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   source "${SHARED_DIR}/unset-proxy.sh"
 fi
 # This is a temporary conversion of cluster operator status to JSON matching the upgrade - may be moved to code in the future
