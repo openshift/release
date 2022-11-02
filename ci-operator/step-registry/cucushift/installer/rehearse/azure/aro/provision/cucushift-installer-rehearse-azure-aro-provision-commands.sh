@@ -43,14 +43,16 @@ if [ -f "$PULL_SECRET_FILE"  ]; then
     CREATE_CMD="$CREATE_CMD --pull-secret @\"$PULL_SECRET_FILE\" "
 fi
 
-if [ $DISK_ENCRYPTION_SET_ENABLE = "yes" ]; then
-    DES_ID=$(cat $SHARED_DIR/desid)
-    CREATE_CMD="$CREATE_CMD --disk-encryption-set \"$DES_ID\" --master-encryption-at-host --worker-encryption-at-host "
+# if azure_des file exists assume we want to use des for our aro cluster
+if [ -f "${SHARED_DIR}/azure_des" ]; then
+    des=$(cat ${SHARED_DIR}/azure_des)
+    des_id=$(az disk-encryption-set show -n ${des} -g ${RESOURCEGROUP} --query "[id]" -o tsv)
+    CREATE_CMD="${CREATE_CMD} --disk-encryption-set ${des_id} --master-encryption-at-host --worker-encryption-at-host "
 fi
 
 echo "Running ARO create command:"
 echo "${CREATE_CMD}"
-eval "$CREATE_CMD" > ${SHARED_DIR}/clusterinfo
+eval "${CREATE_CMD}" > ${SHARED_DIR}/clusterinfo
 
 echo "Cluster created, sleeping 600 seconds";
 sleep 600
