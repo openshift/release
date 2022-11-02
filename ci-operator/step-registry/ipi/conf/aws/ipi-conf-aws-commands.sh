@@ -87,7 +87,7 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   fi
   arch_instance_type="m5"
   CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
-elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
+elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
   # ARM 64
   architecture="arm64"
   if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
