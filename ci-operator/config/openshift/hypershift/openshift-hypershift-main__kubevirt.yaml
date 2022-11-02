@@ -7,10 +7,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
+    tag: rhel-8-golang-1.19-openshift-4.12
   openshift_release_golang-1.18:
     name: release
     namespace: openshift
@@ -28,9 +28,9 @@ images:
 - dockerfile_path: Dockerfile.control-plane
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: hypershift
 releases:
   hosted-ocp-previous:
@@ -42,10 +42,6 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
-      namespace: ocp
-  v412:
-    integration:
       name: "4.12"
       namespace: ocp
 resources:
@@ -64,7 +60,11 @@ tests:
     test:
     - as: deploy-cnv
       cli: latest
-      commands: ./hack/ci/install-cnv.sh
+      commands: CNV_PRERELEASE_VERSION=4.12 ./hack/ci/install-cnv.sh
+      credentials:
+      - mount_path: /etc/cnv-nightly-pull-credentials
+        name: openshift-cnv-quay-credentials
+        namespace: test-credentials
       from: bin
       resources:
         requests:
@@ -89,7 +89,6 @@ tests:
                   --e2e.platform="KubeVirt" \
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-                  --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson
       credentials:
       - mount_path: /etc/ci-pull-credentials
@@ -99,7 +98,7 @@ tests:
       - env: HYPERSHIFT_RELEASE_LATEST
         name: hypershift-operator
       - env: OCP_IMAGE_LATEST
-        name: release:v412
+        name: release:latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
       from: bin
@@ -117,7 +116,11 @@ tests:
     test:
     - as: deploy-cnv
       cli: latest
-      commands: ./hack/ci/install-cnv.sh
+      commands: CNV_PRERELEASE_VERSION=4.12 ./hack/ci/install-cnv.sh
+      credentials:
+      - mount_path: /etc/cnv-nightly-pull-credentials
+        name: openshift-cnv-quay-credentials
+        namespace: test-credentials
       from: bin
       resources:
         requests:
@@ -151,7 +154,7 @@ tests:
       - env: HYPERSHIFT_RELEASE_LATEST
         name: hypershift-operator
       - env: OCP_IMAGE_LATEST
-        name: release:v412
+        name: release:latest
       - env: OCP_IMAGE_PREVIOUS
         name: release:hosted-ocp-previous
       from: bin
