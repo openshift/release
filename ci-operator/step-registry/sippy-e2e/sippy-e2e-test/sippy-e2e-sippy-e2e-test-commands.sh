@@ -5,8 +5,14 @@
 # will be available to start the sippy-load and sippy-server pods.
 echo "The sippy CI image: ${SIPPY_IMAGE}"
 
+# If you're using Openshift, we use oc, if you're using plain Kubernetes,
+# we use kubectl.
+#
+KUBECTL_CMD="${KUBECTL_CMD:=oc}"
+echo "The kubectl command is: ${KUBECTL_CMD}"
+
 # Launch the sippy api server pod.
-cat << END | oc apply -f -
+cat << END | ${KUBECTL_CMD} apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -63,11 +69,11 @@ END
 
 # The basic readiness probe will give us at least 10 seconds before declaring the pod as ready.
 echo "Waiting for sippy api server pod to be Ready ..."
-oc -n postgres wait --for=condition=Ready pod/sippy-server --timeout=30s
+${KUBECTL_CMD} -n postgres wait --for=condition=Ready pod/sippy-server --timeout=30s
 
 is_ready=0
 for i in `seq 1 20`; do
-  c=$(oc -n postgres logs sippy-server|tail -1|grep "Refresh complete"|wc -l)
+  c=$(${KUBECTL_CMD} -n postgres logs sippy-server|tail -1|grep "Refresh complete"|wc -l)
   if [ $c -eq 1 ]; then
     echo "sippy server is ready."
     is_ready=1
@@ -82,8 +88,8 @@ if [ $is_ready -eq 0 ]; then
   exit 1
 fi
 
-oc -n postgres get pod -o wide
-oc -n postgres logs sippy-server > ${ARTIFACT_DIR}/sippy-server.log
+${KUBECTL_CMD} -n postgres get pod -o wide
+${KUBECTL_CMD} -n postgres logs sippy-server > ${ARTIFACT_DIR}/sippy-server.log
 
 echo "Setup services and port forwarding for the sippy api server ..."
 set -x
@@ -98,13 +104,13 @@ trap cleanup EXIT
 
 # Create the Kubernetes service for the sippy-server pod
 # Setup port forward for port 18080 to get to the sippy-server pod
-oc -n postgres expose pod sippy-server
-oc -n postgres port-forward pod/sippy-server 8080:8080 &
+${KUBECTL_CMD} -n postgres expose pod sippy-server
+${KUBECTL_CMD} -n postgres port-forward pod/sippy-server 8080:8080 &
 SIPPY_API_PORT=8080
 export SIPPY_API_PORT
 
-oc -n postgres get svc,ep
+${KUBECTL_CMD} -n postgres get svc,ep
 
-oc -n postgres delete secret regcred
+${KUBECTL_CMD} -n postgres delete secret regcred
 
 go test ./test/e2e/ -v
