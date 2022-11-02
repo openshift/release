@@ -50,18 +50,14 @@ fi
 
 echo "Running ARO create command:"
 echo "${CREATE_CMD}"
+eval "$CREATE_CMD" > ${SHARED_DIR}/clusterinfo
 
-AROINFO="$(eval "$CREATE_CMD")"
-
-echo "Cluster created, sleeping 600";
-
+echo "Cluster created, sleeping 600 seconds";
 sleep 600
-
-echo "$AROINFO" > ${SHARED_DIR}/clusterinfo
 
 echo "Retrieving credentials"
 
-KUBEAPI=$(echo "$AROINFO" | jq -r '.apiserverProfile.url')
+KUBEAPI=$(cat ${SHARED_DIR}/clusterinfo | jq -r '.apiserverProfile.url')
 KUBECRED=$(az aro list-credentials --name $CLUSTER --resource-group $RESOURCEGROUP)
 KUBEUSER=$(echo "$KUBECRED" | jq -r '.kubeadminUsername')
 KUBEPASS=$(echo "$KUBECRED" | jq -r '.kubeadminPassword')
