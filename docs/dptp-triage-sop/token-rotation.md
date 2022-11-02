@@ -71,7 +71,7 @@ After merging of the pull request, we expire the token with a previous version o
 $ make CLUSTER=${CLUSTER} EXPIRE_TOKEN_VERSION=1 DRY_RUN=none expire-token-version
 ```
 
-_Note_ that we have to always use a new name for the secrets (e.g, [config-updater-token-version-n](https://github.com/openshift/release/blob/master/clusters/build-clusters/common/prow/admin_config-updater_rbac.yaml)) that contain the non-expiring token because it would reactivate the expired token otherwise.
+_Note_ that we have to always use a new name for the secrets (e.g, [config-updater-token-version-n](../../clusters/build-clusters/common/prow/admin_config-updater_rbac.yaml)) that contain the non-expiring token because it would reactivate the expired token otherwise.
 That is the reason we cannot bounce between two secrets like we do for the bound SA's tokens.
 Instead, we increase the number in the secret's names each time.
 
