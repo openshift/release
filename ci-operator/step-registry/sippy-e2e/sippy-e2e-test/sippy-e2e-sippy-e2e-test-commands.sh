@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# The SIPPY_IMAGE variable is defined in the sippy-e2e-ref.yaml file as a
+# In Prow CI, SIPPY_IMAGE variable is defined in the sippy-e2e-ref.yaml file as a
 # dependency so that the pipeline:sippy image (containing the sippy binary)
 # will be available to start the sippy-load and sippy-server pods.
+# When running locally, the user has to define SIPPY_IMAGE.
 echo "The sippy CI image: ${SIPPY_IMAGE}"
 
 # If you're using Openshift, we use oc, if you're using plain Kubernetes,
