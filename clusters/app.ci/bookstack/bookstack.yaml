@@ -2,53 +2,31 @@ kind: List
 apiVersion: v1
 items:
 - apiVersion: v1
-  kind: PersistentVolume
-  metadata:
-    name: bookstack-pv
-    namespace: ci
-  spec:
-    capacity:
-      storage: 1Gi
-    accessModes:
-    - ReadWriteOnce
-    hostPath:
-      path: "/opt/bookstack"
-- apiVersion: v1
   kind: PersistentVolumeClaim
   metadata:
     name: bookstack-pvc
     namespace: ci
+    labels:
+      app: bookstack
   spec:
     accessModes:
     - ReadWriteOnce
     resources:
       requests:
-        storage: "1Gi"
-- apiVersion: v1
-  kind: PersistentVolume
-  metadata:
-    name: bookstack-db-pv
-    namespace: ci
-    labels:
-      type: local
-  spec:
-    capacity:
-      storage: 1Gi
-    accessModes:
-    - ReadWriteOnce
-    hostPath:
-      path: "/opt/bookstack-db"
+        storage: 1Gi
 - apiVersion: v1
   kind: PersistentVolumeClaim
   metadata:
     name: bookstack-db-pvc
     namespace: ci
+    labels:
+      app: bookstack-db
   spec:
     accessModes:
     - ReadWriteOnce
     resources:
       requests:
-        storage: "1Gi"
+        storage: 1Gi
 - apiVersion: v1
   kind: Service
   metadata:
@@ -59,9 +37,11 @@ items:
   spec:
     ports:
     - port: 3306
+      targetPort: 3306
       protocol: TCP
     selector:
       app: bookstack-db
+    type: NodePort
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
@@ -71,6 +51,8 @@ items:
       app: bookstack-db
   spec:
     replicas: 1
+    strategy:
+      type: Recreate
     selector:
       matchLabels:
         app: bookstack-db
@@ -80,15 +62,16 @@ items:
           app: bookstack-db
       spec:
         containers:
-        - image: linuxserver/mariadb
-          name: bookstack
+        - image: lscr.io/linuxserver/mariadb:latest
+          name: bookstack-db
           ports:
           - containerPort: 3306
+            name: mysql
           env:
           - name: PUID
-            value: "1001"
+            value: "1000"
           - name: PGID
-            value: "986"
+            value: "1000"
           - name: MYSQL_ROOT_PASSWORD
             value: "bookstack"
           - name: MYSQL_DATABASE
@@ -101,11 +84,11 @@ items:
             value: "Europe/London"
           volumeMounts:
           - mountPath: /config
-            name: bookstack-vol
+            name: bookstack-db-vol
         volumes:
-        - name: bookstack-vol
+        - name: bookstack-db-vol
           persistentVolumeClaim:
-            claimName: bookstack-pvc
+            claimName: bookstack-db-pvc
 - apiVersion: v1
   kind: Service
   metadata:
@@ -118,6 +101,7 @@ items:
       app: bookstack
     ports:
     - port: 80
+      targetPort: 80
       protocol: TCP
     type: NodePort
 - apiVersion: apps/v1
@@ -125,8 +109,12 @@ items:
   metadata:
     name: bookstack
     namespace: ci
+    labels:
+      app: bookstack
   spec:
     replicas: 1
+    strategy:
+      type: Recreate
     selector:
       matchLabels:
         app: bookstack
@@ -137,14 +125,15 @@ items:
       spec:
         containers:
         - name: bookstack
-          image: linuxserver/bookstack
+          image: lscr.io/linuxserver/bookstack:latest
           ports:
           - containerPort: 80
+            name: http
           env:
           - name: PUID
-            value: "1001"
+            value: "1000"
           - name: PGID
-            value: "986"
+            value: "1000"
           - name: DB_HOST
             value: "bookstack-db"
           - name: DB_USER
@@ -155,8 +144,8 @@ items:
             value: "bookstack"
           volumeMounts:
           - mountPath: /config
-            name: bookstack-db-vol
+            name: bookstack-vol
         volumes:
-        - name: bookstack-db-vol
+        - name: bookstack-vol
           persistentVolumeClaim:
-            claimName: bookstack-db-pvc
+            claimName: bookstack-pvc
