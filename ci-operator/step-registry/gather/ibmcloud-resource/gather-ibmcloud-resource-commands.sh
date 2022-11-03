@@ -80,8 +80,7 @@ function install_ibmcloud_cli {
 
 # IBM Cloud CLI login
 function ibmcloud_login {
-    # TODO(cjschaef): Retrieve target region from $LEASED_RESOURCE
-    "${IBMCLOUD_CLI}" login -a https://cloud.ibm.com -r eu-gb --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+    "${IBMCLOUD_CLI}" login -a https://cloud.ibm.com -r ${LEASED_RESOURCE} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
 
 # Gather load-balancer resources
