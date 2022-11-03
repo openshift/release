@@ -8,6 +8,7 @@ source ${SHARED_DIR}/nutanix_context.sh
 
 
 echo "$(date -u --rfc-3339=seconds) - Creating CSI manifests..."
+
 cat > "${SHARED_DIR}/manifest_0000-nutanix-csi-crd-manifest.yaml" << EOF
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
@@ -61,7 +62,23 @@ metadata:
   name: ntnx-system
 EOF
 
-cat > "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml" << EOF
+cat > "${SHARED_DIR}/manifest_0002-nutanix-csi-beta-catalog-source.yaml" << EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: nutanix-csi-operator-beta
+  namespace: openshift-marketplace
+spec:
+  displayName: Nutanix Beta
+  publisher: Nutanix-dev
+  sourceType: grpc
+  image: quay.io/ntnx-csi/nutanix-csi-operator-catalog:latest
+  updateStrategy:
+    registryPoll:
+      interval: 5m
+EOF
+
+cat > "${SHARED_DIR}/manifest_0003-nutanix-csi-ntnx-secret.yaml" << EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -71,7 +88,7 @@ stringData:
   key: ${PE_HOST}:${PE_PORT}:${PE_USERNAME}:${PE_PASSWORD}
 EOF
 
-cat > "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml" << EOF
+cat > "${SHARED_DIR}/manifest_0004-nutanix-csi-operator-group.yaml" << EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
@@ -82,7 +99,7 @@ spec:
     - ntnx-system
 EOF
 
-cat > "${SHARED_DIR}/manifest_0004-nutanix-csi-subscription.yaml" << EOF
+cat > "${SHARED_DIR}/manifest_0005-nutanix-csi-subscription.yaml" << EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -92,11 +109,11 @@ spec:
   channel: stable
   name: nutanixcsioperator
   installPlanApproval: Automatic
-  source: certified-operators
+  source: nutanix-csi-operator-beta
   sourceNamespace: openshift-marketplace
 EOF
 
-cat > "${SHARED_DIR}/manifest_0005-nutanix-csi-storage.yaml" << EOF
+cat > "${SHARED_DIR}/manifest_0006-nutanix-csi-storage.yaml" << EOF
 apiVersion: crd.nutanix.com/v1alpha1
 kind: NutanixCsiStorage
 metadata:
@@ -111,7 +128,7 @@ spec:
       effect: "NoSchedule"
 EOF
 
-cat > "${SHARED_DIR}/manifest_0006-nutanix-csi-storage-class.yaml" << EOF
+cat > "${SHARED_DIR}/manifest_0007-nutanix-csi-storage-class.yaml" << EOF
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
