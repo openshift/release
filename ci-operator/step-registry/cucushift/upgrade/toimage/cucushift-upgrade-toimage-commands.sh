@@ -432,7 +432,7 @@ function check_upgrade_status() {
         if ! ( echo "oc get clusterversion" && oc get clusterversion ); then
             continue
         fi
-        out="$(oc get clusterversion --no-headers)"
+        if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then
