@@ -8,6 +8,8 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 ACCOUNT_ROLES_PREFIX=${ACCOUNT_ROLES_PREFIX:-$NAMESPACE}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
+OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
+CHANNEL_GROUP=${CHANNEL_GROUP}
 
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -33,9 +35,16 @@ else
   exit 1
 fi
 
+# Support to create the account-roles with the higher version 
+VERSION_SWITCH=""
+if [[ "$CHANNEL_GROUP" != "stable" ]] && [[ ! -z "$OPENSHIFT_VERSION" ]]; then
+  OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
+  VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
+fi
+
 # Whatever the account roles with the prefix exist or not, do creation.
 echo "Create the account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
-rosa create account-roles --prefix "${ACCOUNT_ROLES_PREFIX}" -y --mode auto
+rosa create account-roles --prefix ${ACCOUNT_ROLES_PREFIX} -y --mode auto ${VERSION_SWITCH}
 
 # Store the account-role-prefix for the post steps and the account roles deletion
 echo -n "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-prefix"
