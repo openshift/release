@@ -69,7 +69,7 @@ spec:
   volumes:
   - name: push
     secret:
-      secretName: registry-push-credentials-ci-central
+      secretName: multi-arch-mirroring-secrets
 """
 
 
