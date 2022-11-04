@@ -148,14 +148,16 @@ function rhel_upgrade(){
 # Extract oc binary which is supposed to be identical with target release
 function extract_oc(){
     echo -e "Extracting oc\n"
-    local retry=5
-    while ! (oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${OC_DIR} ${TARGET});
+    local retry=5 tmp_oc="/tmp/client-2"
+    mkdir -p ${tmp_oc}
+    while ! (oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
         if (( retry < 0 )); then return 1; fi
         sleep 60
     done
+    mv ${tmp_oc}/oc ${OC_DIR} -f
     which oc
     oc version --client
     return 0
