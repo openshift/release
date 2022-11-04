@@ -160,13 +160,10 @@ EOF
 }
 
 
-# We have 2 ofcir servers,
-# the 1st (contents of ${CLUSTER_PROFILE_DIR}/ofcir_laburl)
+# the ofcir server (contents of ${CLUSTER_PROFILE_DIR}/ofcir_laburl)
 #   manages HW in the lab, this has hosts of type cihost (for virtualized jobs)
 #   and cicluster (for baremetal jobs)
-# the 2nd (contents of ${CLUSTER_PROFILE_DIR}/ofcir)
-#   manages HW in equinix, this is for virt hosts only
-# If neither can give us a host to use then we fall back to on demaned from equinix
+# If it can't give us a host to use then we fall back to on demaned from equinix
 
 CIRTYPE=cihost
 [[ "$CLUSTERTYPE" == "baremetal" ]] && CIRTYPE=cicluster
@@ -180,10 +177,6 @@ fi
 
 # No point in continuing, only ofcir_laburl has cir's of type "cicluster"
 [[ "$CLUSTERTYPE" == "baremetal" ]] && exit_with_failure "Failed to get baremetal cluster from ofcir"
-
-if [ -e "${CLUSTER_PROFILE_DIR}/ofcir_url" ] ; then
-    getCIR "$(cat ${CLUSTER_PROFILE_DIR}/ofcir_url)" && exit_with_success
-fi
 
 # Avoid requesting a bunch of servers at the same time so they
 # don't race each other for available resources in a facility
