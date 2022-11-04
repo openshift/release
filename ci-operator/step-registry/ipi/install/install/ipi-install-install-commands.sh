@@ -300,17 +300,12 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
 
-
 # aws-outpost code - begin
 if [[ "${CLUSTER_TYPE}" == 'aws' ]] && [[ -f "${SHARED_DIR}/outpost_stack" ]]; then
-  PRV_SUBN=$(cat $SHARED_DIR/prv_subn)
-  OUTPOST_PRV_SUBN=$(cat $SHARED_DIR/outpost_prv_subn)
-  sed -i "s/$PRV_SUBN/$OUTPOST_PRV_SUBN/" $dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml
-
+  sed -i "s/$(cat $SHARED_DIR/prv_subn)/$(cat $SHARED_DIR/outpost_prv_subn)/" $dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml
   cp $SHARED_DIR/cluster-network-03-config.yml $dir/manifests/
 fi
 # aws-outpost code - end
-
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
