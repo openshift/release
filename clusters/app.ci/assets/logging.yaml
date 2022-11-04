@@ -97,6 +97,23 @@ data:
       region = "us-east-1"
       stream_name = "{{ kubernetes.pod_name }}"
       encoding.codec = "text"
+
+    # Release-payload-controller logs
+    [transforms.release_payload_controllers]
+      type = "filter"
+      inputs = ["kubernetes"]
+      condition.type = "check_fields"
+      condition."kubernetes.pod_namespace.eq" = "ci"
+      condition."kubernetes.pod_name.starts_with" = "release-payload-controller-"
+      condition."kubernetes.container_name.eq" = ["controller"]
+
+    [sinks.rpc_aws_cloudwatch_logs]
+      type = "aws_cloudwatch_logs"
+      inputs = ["release_payload_controllers"]
+      group_name = "app-ci-logs/{{ kubernetes.pod_labels.app }}"
+      region = "us-east-1"
+      stream_name = "{{ kubernetes.pod_name }}"
+      encoding.codec = "text"
 ---
 # Vector agent on each node where it collects logs from pods.
 apiVersion: apps/v1
