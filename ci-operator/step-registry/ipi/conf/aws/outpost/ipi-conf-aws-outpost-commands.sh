@@ -296,12 +296,16 @@ EOF
 yq-go m -i -x "${CONFIG}" "${PATCH}"                      # merge $PATCH with $CONFIG
 
 
-# Save subnets, and yml for later use in ipi-install-install-outpost 
-PRV_SUBN=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="PrivateSubnetIds").OutputValue')
-echo $PRV_SUBN > $SHARED_DIR/prv_subn
-OUTPOST_PRV_SUBN=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="OutpostPrivateSubnetId").OutputValue')
-echo $OUTPOST_PRV_SUBN > $SHARED_DIR/outpost_prv_subn
+# Save outpost subnets, and yml for later use in ipi-install-install 
+echo $(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="PrivateSubnetIds").OutputValue') > $SHARED_DIR/prv_subn
+echo $(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="OutpostPrivateSubnetId").OutputValue') > $SHARED_DIR/outpost_prv_subn
 
+NET='ovnKubernetesConfig:'
+MTU='1200'
+if [[ "$(yq-go r ${CONFIG} 'networking.networkType')" == "OpenShiftSDN" ]]; then
+  NET='openshiftSDNConfig:'
+  MTU='1250'
+fi
 cat << _EOF > $SHARED_DIR/cluster-network-03-config.yml
 apiVersion: operator.openshift.io/v1
 kind: Network
@@ -309,15 +313,9 @@ metadata:
   name: cluster
 spec:
   defaultNetwork:
+    $NET
+      $MTU
 _EOF
-
-if [[ "$(yq-go r ${CONFIG} 'networking.networkType')" == "OpenShiftSDN" ]]; then
-  echo '    openshiftSDNConfig:'  >> $SHARED_DIR/cluster-network-03-config.yml
-  echo '      mtu: 1250'          >> $SHARED_DIR/cluster-network-03-config.yml
-else
-  echo '    ovnKubernetesConfig:' >> $SHARED_DIR/cluster-network-03-config.yml
-  echo '      mtu: 1200'          >> $SHARED_DIR/cluster-network-03-config.yml
-fi
 
 ls -l "${SHARED_DIR}"
 cat "${CONFIG}"
