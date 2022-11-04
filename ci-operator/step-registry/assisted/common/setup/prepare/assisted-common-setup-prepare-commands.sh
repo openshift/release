@@ -89,6 +89,7 @@ export TEST_TEARDOWN=false
 export TEST_FUNC=test_install
 export ASSISTED_SERVICE_HOST={{ IP }}
 export PUBLIC_CONTAINER_REGISTRIES="{{ CI_REGISTRIES | join(',') }}"
+export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ OPENSHIFT_INSTALL_RELEASE_IMAGE }}
 
 {% if ENVIRONMENT == "production" %}
 # Testing against the production AI parameters
@@ -110,10 +111,6 @@ export HYPERSHIFT_IMAGE={{ HYPERSHIFT_IMAGE }}
 
 {% if JOB_TYPE == "presubmit" and REPO_NAME == "assisted-service" %}
 export SERVICE_BRANCH={{ PULL_PULL_SHA }}
-{% endif %}
-
-{% if JOB_TYPE != "presubmit" or REPO_NAME == "release" %}
-export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ RELEASE_IMAGE_LATEST }}
 {% endif %}
 
 source /root/platform-conf.sh
@@ -162,6 +159,7 @@ cat > run_test_playbook.yaml <<-"EOF"
     ASSISTED_CONFIG: "{{ lookup('env', 'ASSISTED_CONFIG') }}"
     ASSISTED_TEST_INFRA_IMAGE: "{{ lookup('env', 'ASSISTED_TEST_INFRA_IMAGE')}}"
     CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE')}}"
+    OPENSHIFT_INSTALL_RELEASE_IMAGE: "{{ lookup('env', 'OPENSHIFT_INSTALL_RELEASE_IMAGE')}}"
   tasks:
     - name: Fail on unsupported environment
       fail:

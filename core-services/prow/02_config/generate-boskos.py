@@ -19,6 +19,9 @@ CONFIG = {
         'us-west-1': 35,
         'us-west-2': 35,
     },
+    'aws-1-qe-quota-slice': {
+        'us-east-1': 5,
+    },
     'aws-2-quota-slice': {
         'us-east-1': 40,
         'us-east-2': 40,
@@ -28,8 +31,16 @@ CONFIG = {
     'aws-3-quota-slice': {
         'us-east-1': 40,
     },
+    'aws-cspi-qe-quota-slice': {
+        'us-east-1': 10,
+        'us-east-2': 10,
+    },
     'aws-qe-quota-slice': {
+        'us-east-1': 20,
         'us-east-2': 25,
+    },
+    'aws-outpost-quota-slice': {
+        'us-east-1': 10,
     },
     'aws-china-qe-quota-slice': {
         'cn-north-1': 1,
@@ -75,9 +86,10 @@ CONFIG = {
         'centralus': 10
     },
     'azure-arm64-qe-quota-slice': {
-        'northeurope': 10,
-        'westus2': 5,
-        'westeurope': 5
+        'centralus': 6,
+        'eastus': 6,
+        'eastus2': 4,
+        'northeurope': 4
     },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5
@@ -171,7 +183,10 @@ CONFIG = {
         'tok04': 1
     },
     'ibmcloud-quota-slice': {
-        'default': 7,
+        'us-east': 7,
+    },
+    'ibmcloud-qe-quota-slice': {
+        'jp-tok': 10,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
@@ -187,12 +202,12 @@ CONFIG = {
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
-
-for i in range(3):
+# mihawk1 system needs firmware update. We can put it in the list once the firmware is updated and then reserve one cluster back for internal debugging.
+for i in range(2):
     for j in range(4):
-        CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
+        CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i+1, j)] = 1
 # Reserve one for internal debugging use
-del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-1-3']
+# del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-1-3']
 
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1

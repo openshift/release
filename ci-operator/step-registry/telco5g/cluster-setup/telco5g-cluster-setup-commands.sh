@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 echo "************ telco cluster setup command ************"
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
+# Fix user IDs in a container
 ~/fix_uid.sh
 
 SSH_PKEY_PATH=/var/run/ci-key/cikey
@@ -15,7 +15,7 @@ chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 DSHVIP="$(cat /var/run/ds-hv-ip/dshvip)"
-COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ConnectTimeout=60 -o ServerAliveInterval=30"
+COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 KCLI_PARAM=""
 if [[ "$PROW_JOB_ID" =~ "nightly" ]]; then
@@ -54,6 +54,14 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
   hosts: bastion
   gather_facts: false
   tasks:
+  - name: Wait 300 seconds, but only start checking after 10 seconds
+    wait_for_connection:
+      timeout: 125
+      connect_timeout: 90
+    register: sshresult
+    until: sshresult is success
+    retries: 15
+    delay: 2
   - name: Discover cluster to run job
     command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -e $CL_SEARCH
     register: cluster
@@ -64,8 +72,11 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     delegate_to: localhost
 EOF
 
+# Check connectivity
+ping ${BASTION_IP} -c 10 || true
+echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
 
-ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vv
+ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
@@ -102,7 +113,7 @@ EOF
 
 fi
 echo "#############################################################################..."
-echo "========  Deploying plan $PLAN_NAME on cluster $CLUSTER_NAME with$(if ! $BASTION_ENV; then echo "out"; fi) a bastion  ========"
+echo "========  Deploying plan $PLAN_NAME on cluster $CLUSTER_NAME $(if $BASTION_ENV; then echo "with a bastion"; fi)  ========"
 echo "#############################################################################..."
 
 # Start the deployment

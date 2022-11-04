@@ -93,7 +93,7 @@ http_port 3128
 EOF
 
 ## PROXY Service
-cat > ${workdir}/squid-proxy.service << EOF
+cat > ${workdir}/squid.service << EOF
 [Unit]
 Description=OpenShift QE Squid Proxy Server
 After=network.target syslog.target
@@ -125,7 +125,7 @@ EOF
 PROXY_CREDENTIAL_ARP1=$(< /var/run/vault/proxy/proxy_creds_encrypted_apr1)
 PROXY_CREDENTIAL_CONTENT="$(echo -e ${PROXY_CREDENTIAL_ARP1} | base64 -w0)"
 PROXY_CONFIG_CONTENT=$(cat ${workdir}/squid.conf | base64 -w0)
-PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/squid-proxy.service | sed 's/\"/\\"/g')
+PROXY_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/squid.service | sed 's/\"/\\"/g')
 
 # proxy ignition
 proxy_ignition_patch=$(mktemp)
@@ -171,7 +171,7 @@ cat > "${proxy_ignition_patch}" << EOF
       {
         "contents": "${PROXY_SERVICE_CONTENT}",
         "enabled": true,
-        "name": "squid-proxy.service"
+        "name": "squid.service"
       }
     ]
   }
@@ -214,7 +214,7 @@ ExecStart=/usr/bin/podman run --name poc-registry-${port} \
 -v /opt/registry-${port}/auth:/auth \
 -v /opt/registry-${port}/certs:/certs:z \
 -v /opt/registry-${port}/config.yaml:/etc/docker/registry/config.yml \
-registry:2
+quay.io/openshifttest/registry:2
 
 ExecReload=-/usr/bin/podman stop "poc-registry-${port}"
 ExecReload=-/usr/bin/podman rm "poc-registry-${port}"
