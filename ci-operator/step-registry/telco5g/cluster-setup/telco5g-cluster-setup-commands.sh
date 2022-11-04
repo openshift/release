@@ -30,7 +30,7 @@ fi
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM  =========="
 
 # Set environment for jobs to run
-INTERNAL=true
+INTERNAL=false
 INTERNAL_ONLY=true
 # Whether to use the bastion environment
 BASTION_ENV=true
