@@ -74,7 +74,7 @@ ${KUBECTL_CMD} -n postgres wait --for=condition=Ready pod/sippy-server --timeout
 
 is_ready=0
 for i in `seq 1 20`; do
-  c=$(${KUBECTL_CMD} -n postgres logs sippy-server|tail -1|grep "Refresh complete"|wc -l)
+  c=$(${KUBECTL_CMD} -n postgres logs sippy-server|grep "Refresh complete"|wc -l)
   if [ $c -eq 1 ]; then
     echo "sippy server is ready."
     is_ready=1
