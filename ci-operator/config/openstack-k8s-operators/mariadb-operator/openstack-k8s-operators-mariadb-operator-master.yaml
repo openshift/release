@@ -14,16 +14,7 @@ binary_build_commands: |
   OS_REGISTRY=quay.io
   OS_REPO=dviroel
   IMAGE_TAG_BASE=${OS_REGISTRY}/${OS_REPO}/mariadb-operator
-  IMG=$IMAGE_TAG_BASE:${OPENSHIFT_BUILD_COMMIT}
-  make build bundle
-  # Clone and build openstack-operator
-  git clone https://github.com/openstack-k8s-operators/openstack-operator.git
-  cd openstack-operator/
-  IMAGE_TAG_BASE=${OS_REGISTRY}/${OS_REPO}/openstack-operator
-  IMG=$IMAGE_TAG_BASE:${OPENSHIFT_BUILD_COMMIT}
-  go work init . apis/
-  go work use ../ ../api/
-  make build bundle
+  IMG=$IMAGE_TAG_BASE:${OPENSHIFT_BUILD_COMMIT} make build bundle
 build_root:
   project_image:
     dockerfile_literal: |
@@ -63,14 +54,6 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openstack-k8s-operators/mariadb-operator/.
   to: mariadb-operator-bundle
-- dockerfile_path: Dockerfile
-  context_dir: ./openstack-operator
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openstack-k8s-operators/mariadb-operator/.
-  to: openstack-operator
 releases:
   latest:
     integration:
@@ -114,6 +97,16 @@ tests:
   commands: make gofmt || true
   container:
     from: src
+- as: mariadb-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    workflow: openstack-k8s-operators-mariadb-e2e
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
