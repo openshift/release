@@ -3,6 +3,10 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
@@ -24,22 +28,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: chectl-e2e-olm-installer
+- as: che-operator-update
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
       commands: |
-        oc new-project eclipse-che
-        .ci/oci_chectl_olm.sh
+        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/test-harness-secrets/github-token)
+        .ci/cico_updates_openshift.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/test-harness-secrets
+        name: test-harness-secrets
+        namespace: test-credentials
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-aws
 zz_generated_metadata:
-  branch: 7.54.x
-  org: che-incubator
-  repo: chectl
+  branch: 7.56.x
+  org: eclipse-che
+  repo: che-operator
   variant: v11
