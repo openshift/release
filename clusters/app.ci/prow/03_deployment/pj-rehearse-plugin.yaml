@@ -25,10 +25,7 @@ items:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"pj-rehearse:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"pj-rehearse-plugin\")].image"}]'
     namespace: ci
   spec:
-    # Do not scale up.
     replicas: 1
-    strategy:
-      type: Recreate
     revisionHistoryLimit: 2
     selector:
       matchLabels:
@@ -47,8 +44,8 @@ items:
           - --dry-run=false
           - --server=true
           - --log-level=debug
-          - --pre-check=false
-          - --comment-on-pr-creation=false
+          - --pre-check=true
+          - --comment-on-pr-creation=true
           - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
           - --kubeconfig-dir=/var/kubeconfigs
           - --kubeconfig-suffix=config
@@ -76,8 +73,8 @@ items:
             mountPath: /var/tmp
           resources:
             requests:
-              memory: "3Gi"
-              cpu: "750m"
+              memory: "12Gi"
+              cpu: 2
           livenessProbe:
             httpGet:
               path: /healthz
@@ -99,19 +96,4 @@ items:
           secret:
             secretName: github-credentials-openshift-ci-robot
         - name: cache
-          persistentVolumeClaim:
-            claimName: pj-rehearse-plugin
-- apiVersion: v1
-  kind: PersistentVolumeClaim
-  metadata:
-    labels:
-      app: prow
-      component: pj-rehearse-plugin
-    name: pj-rehearse-plugin
-    namespace: ci
-  spec:
-    accessModes:
-    - ReadWriteOnce
-    resources:
-      requests:
-        storage: 10Gi
+          emptyDir: {}

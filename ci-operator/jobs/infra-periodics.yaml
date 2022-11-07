@@ -201,7 +201,7 @@ periodics:
   decorate: true
   labels:
     ci.openshift.io/role: infra
-  name: periodic-bugzilla-refresh
+  name: periodic-bugzilla-refresh-main
   spec:
     containers:
     - args:
@@ -209,19 +209,148 @@ periodics:
         --query=is:pr
         comments:<2500
         state:open
-        label:bugzilla/invalid-bug
-        -label:bugzilla/valid-bug
+        base:main
+        label:bugzilla/valid-bug
+        label:lgtm
+        label:approved
+        -label:needs-rebase
       - --token=/etc/oauth/oauth
       - --updated=0
       - |-
         --comment=/bugzilla refresh
 
-        The requirements for Bugzilla bugs have changed, recalculating validity.
+        The requirements for Bugzilla bugs have changed (BZs linked to PRs on main branch need to target OCP 4.12), recalculating validity.
       - --ceiling=0
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-bugzilla-refresh-master
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        comments:<2500
+        state:open
+        base:master
+        label:bugzilla/valid-bug
+        label:lgtm
+        label:approved
+        -label:needs-rebase
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - |-
+        --comment=/bugzilla refresh
+
+        The requirements for Bugzilla bugs have changed (BZs linked to PRs on main branch need to target OCP 4.12), recalculating validity.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-jira-refresh-main
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        comments:<2500
+        state:open
+        base:main
+        label:jira/valid-bug
+        label:lgtm
+        label:approved
+        -label:needs-rebase
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - |-
+        --comment=/jira refresh
+
+        The requirements for Jira bugs have changed (Jira issues linked to PRs on main branch need to target OCP 4.12), recalculating validity.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /etc/oauth
+        name: token
+    volumes:
+    - name: token
+      secret:
+        secretName: github-credentials-openshift-bot
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/role: infra
+  name: periodic-jira-refresh-master
+  spec:
+    containers:
+    - args:
+      - |-
+        --query=is:pr
+        comments:<2500
+        state:open
+        base:master
+        label:jira/valid-bug
+        label:lgtm
+        label:approved
+        -label:needs-rebase
+      - --token=/etc/oauth/oauth
+      - --updated=0
+      - |-
+        --comment=/jira refresh
+
+        The requirements for Jira bugs have changed (Jira issues linked to PRs on main branch need to target OCP 4.12), recalculating validity.
+      - --ceiling=0
+      - --confirm
+      command:
+      - /ko-app/commenter
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -296,7 +425,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -342,7 +471,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -388,7 +517,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -438,7 +567,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -488,7 +617,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -537,7 +666,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -586,7 +715,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/commenter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -639,7 +768,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/label_sync:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/label_sync:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -942,7 +1071,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: gcr.io/k8s-prow/generic-autobumper:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/generic-autobumper:v20221104-4497ace285
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -964,7 +1093,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  - base_ref: openshift-4.11
+  - base_ref: openshift-4.13
     org: openshift
     repo: ocp-build-data
   labels:
@@ -982,8 +1111,7 @@ periodics:
       - --git-email=openshift-bot@redhat.com
       - --target-dir=.
       - --config-dir=./ci-operator/config
-      - --current-release=4.12
-      - --future-release=4.12
+      - --current-release=4.13
       - --future-release=4.13
       - --self-approve=true
       - --assign=ghost
@@ -1163,7 +1291,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: gcr.io/k8s-prow/branchprotector:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/branchprotector:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1217,7 +1345,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/branchprotector:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1274,7 +1402,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: gcr.io/k8s-prow/peribolos:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/peribolos:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1353,7 +1481,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: gcr.io/k8s-prow/config-bootstrapper:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/config-bootstrapper:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1383,7 +1511,7 @@ periodics:
     containers:
     - args:
       - --config-dir=./ci-operator/config/
-      - --current-release=4.12
+      - --current-release=4.13
       - --future-release=4.13
       - --fast-forward
       - --confirm
@@ -1465,7 +1593,7 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --dry-run=false
       - --config-dir=./ci-operator/config/
-      - --current-release=4.12
+      - --current-release=4.13
       - --future-release=4.13
       command:
       - blocking-issue-creator
@@ -1761,7 +1889,7 @@ periodics:
       - --github-graphql-endpoint=http://ghproxy/graphql
       - --ocp-build-data-repo-dir=./
       - --create-prs=true
-      - --minor=12
+      - --minor=13
       - --pr-creation-ceiling=1000
       command:
       - /usr/bin/ocp-build-data-enforcer
@@ -1931,7 +2059,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/invitations-accepter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1963,7 +2091,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/invitations-accepter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1995,7 +2123,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20221026-709aedbbfe
+      image: gcr.io/k8s-prow/invitations-accepter:v20221104-4497ace285
       imagePullPolicy: Always
       name: ""
       resources:

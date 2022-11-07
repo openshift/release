@@ -8,6 +8,9 @@ set -o pipefail
 CLUSTER_NAME="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'metadata.name')"
 BASE_DOMAIN="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
 
+which openshift-install
+openshift-install version
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -19,7 +22,7 @@ function populate_artifact_dir() {
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
   case "${CLUSTER_TYPE}" in
-    aws|aws-arm64|aws-usgov)
+    aws|aws-arm64|aws-usgov|aws-c2s|aws-sc2s)
       grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log" > "${SHARED_DIR}/aws-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
   esac
@@ -86,8 +89,15 @@ fi
 
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
+aws-c2s|aws-sc2s) export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_temp_creds;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
+
+
+# set CA_BUNDLE for C2S and SC2S 
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
+  export AWS_CA_BUNDLE=${SHARED_DIR}/additional_trust_bundle
+fi
 
 dir=/tmp/installer
 mkdir "${dir}/"
@@ -109,6 +119,17 @@ wait "$!"
 if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
   yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.privateZone
   yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.publicZone
+fi
+
+if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
+  # replace PLACEHOLDER_INFRA_ID PLACEHOLDER_AMI_ID
+  echo "Local Zone is enabled, updating Infran ID and AMI ID ... "
+  localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
+  infra_id=$(jq -r '."*installconfig.ClusterID".InfraID' "${dir}/.openshift_install_state.json")
+  ami_id=$(grep ami "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" | tail -n1 | awk '{print$2}')
+  sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${localzone_machineset}
+  sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${localzone_machineset}
+  cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
 fi
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"

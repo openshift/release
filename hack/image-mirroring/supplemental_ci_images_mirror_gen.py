@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import glob
 import shutil
-from ruamel.yaml import YAML
+import ruamel.yaml as yaml
 
 APPCI_REGISTRY = "registry.ci.openshift.org"
 MAPPING_FILE_PREFIX = "mapping_"
@@ -20,6 +22,9 @@ README = """This folder holds the mappings of the image mirroring for the multi 
 
 Note that this folder is automatically generated.
 """
+
+
+NAMESPACES_FILE = "clusters/app.ci/multi-arch/namespaces.yaml"
 
 
 def generate_job(arch, os_filter):
@@ -64,11 +69,26 @@ spec:
   volumes:
   - name: push
     secret:
-      secretName: registry-push-credentials-ci-central
+      secretName: multi-arch-mirroring-secrets
 """
 
 
+def generate_namespaces(namespaces):
+    ret = []
+    for namespace in namespaces:
+        metadata = {"name": namespace}
+        ret.append({
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": metadata
+        })
+    return {"kind": "List",
+            "apiVersion": "v1",
+            "items": ret}
+
+
 def generate_mappings():
+    namespaces = []
     print("Removing all core-services/image-mirroring-* directories")
     for path in glob.glob('core-services/image-mirroring-*', recursive=False):
         try:
@@ -117,6 +137,7 @@ def generate_mappings():
 
                         _, namespace, image_name = dest.split("/")
                         namespace = f"{namespace}-{arch}"
+                        namespaces.append(namespace)
 
                         new_dest = f"{APPCI_REGISTRY}/{namespace}/{image_name}"
 
@@ -124,17 +145,21 @@ def generate_mappings():
                         with open(to_write, 'a+', encoding="utf-8") as f:
                             f.write(f"{source} {new_dest}\n")
 
+    if not os.path.exists(os.path.dirname(NAMESPACES_FILE)):
+        os.makedirs(os.path.dirname(NAMESPACES_FILE))
+    with open(NAMESPACES_FILE, 'w', encoding="utf-8") as file:
+        yaml.round_trip_dump(generate_namespaces(list(dict.fromkeys(namespaces))), file, indent=2,
+                             default_flow_style=False, explicit_start=False)
+
 
 def generate_periodics():
     jobs = []
-    yaml = YAML()
     for arch, os_filter in ARCHITECTURES.items():
         jobs.append(yaml.round_trip_load(generate_job(
             arch, os_filter), preserve_quotes=True))
 
     print(f"Generate periodics in {PERIODICS_FILE}")
     with open(PERIODICS_FILE, 'w', encoding="utf-8") as file:
-        file.write("# DO NOT EDIT. This file is auto-generated.\n")
         periodics = {"periodics": jobs}
         yaml.round_trip_dump(periodics, file, indent=2,
                              default_flow_style=False, explicit_start=False)

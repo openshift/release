@@ -147,35 +147,17 @@ function rhel_upgrade(){
 
 # Extract oc binary which is supposed to be identical with target release
 function extract_oc(){
-    local route="openshift-release-artifacts"
-    local url
-    local target_arch=""
-    if [ "${OCP_ARCH}" != "amd64" ]; then
-      # Change the route to use for non-amd64 clusters
-      route="${route}-${OCP_ARCH}"
-      if [ "$(uname -m)" = "x86_64" ]; then
-        # Add amd64- to the download url only if we run on amd64 prow clusters
-        # For instance, on an arm64 payload:
-        # - openshift-client-linux-4.xxx.tar.gz is the arm64 client
-        # - openshift-client-linux-amd64-4.xxx.tar.gz is the amd64 client
-        target_arch="amd64-"
-      fi
-    fi
-    url="${route}.apps.ci.l2s4.p1.openshiftapps.com"
-
-    #check tools are ready for download
-    local progress; progress="."
-    while curl -kLs https://${url}/${TARGET_VERSION} | grep -q "Extracting tools"
+    echo -e "Extracting oc\n"
+    local retry=5 tmp_oc="/tmp/client-2"
+    mkdir -p ${tmp_oc}
+    while ! (oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
     do
-        echo -ne "Tools have not yet extracted at the server, please wait ${progress}\r"
-        progress+="."
-        sleep 300
+        echo >&2 "Failed to extract oc binary, retry..."
+        (( retry -= 1 ))
+        if (( retry < 0 )); then return 1; fi
+        sleep 60
     done
-
-    echo -e "downloading oc ${TARGET_VERSION} from server ${url}"
-    if ! (curl -kL\# https://${url}/${TARGET_VERSION}/openshift-client-linux-${target_arch}${TARGET_VERSION}.tar.gz | tar -C ${OC_DIR} -xvz); then
-        echo >&2 "Failed to extract oc binary" && return 1
-    fi
+    mv ${tmp_oc}/oc ${OC_DIR} -f
     which oc
     oc version --client
     return 0
@@ -452,7 +434,7 @@ function check_upgrade_status() {
         if ! ( echo "oc get clusterversion" && oc get clusterversion ); then
             continue
         fi
-        out="$(oc get clusterversion --no-headers)"
+        if ! out="$(oc get clusterversion --no-headers)"; then continue; fi
         avail="$(echo "${out}" | awk '{print $3}')"
         progress="$(echo "${out}" | awk '{print $4}')"
         if [[ ${avail} == "True" && ${progress} == "False" && ${out} == *"Cluster version is ${TARGET_VERSION}" ]]; then

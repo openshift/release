@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config
+.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen
 
 export CONTAINER_ENGINE ?= docker
 export SKIP_PULL ?= false
@@ -61,7 +61,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20221026-709aedbbfe --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20221104-4497ace285 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -111,6 +111,10 @@ validate-step-registry:
 
 refresh-bugzilla-prs:
 	./hack/refresh-bugzilla-prs.sh
+
+python-validation:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/python-validation:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/python-validation:latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
@@ -406,3 +410,11 @@ secret-config-updater:
 	--from-file=sa.config-updater.vsphere.config=$(TMPDIR)/sa.config-updater.vsphere.config \
 	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f - 
 .PHONY: secret-config-updater
+
+multi-arch-gen:
+	hack/image-mirroring/supplemental_ci_images_mirror_gen.py
+.PHONY: multi-arch-gen
+
+validate-multi-arch-gen:
+	hack/image-mirroring/validate-multi-arch-image-mirror-gen.sh .
+.PHONY: validate-multi-arch-gen

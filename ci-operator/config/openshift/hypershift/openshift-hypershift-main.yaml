@@ -24,11 +24,11 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: base
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -63,7 +63,7 @@ images:
 promotion:
   additional_images:
     hypershift-tests: test-bin
-  name: "4.12"
+  name: "4.13"
   namespace: ocp
 releases:
   hosted-ocp-previous:
@@ -75,7 +75,7 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -105,10 +105,16 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      INSTANCE_TYPE: m5.4xlarge
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-metrics
   optional: true
   steps:
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      INSTANCE_TYPE: m5.4xlarge
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-conformance
   optional: true
@@ -131,7 +137,7 @@ tests:
         MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
         MAKEFILE_TARGET="test"
       GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: minimal
+      TEST_SUITE: none
     workflow: assisted-baremetal
 - as: e2e-ibmcloud-iks
   optional: true

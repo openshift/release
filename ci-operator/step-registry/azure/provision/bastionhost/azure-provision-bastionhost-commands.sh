@@ -103,9 +103,9 @@ echo "Copy bastion vhd from public blob URI to the bastion Storage Account"
 storage_contnainer="${bastion_name}vhd"
 vhd_name=$(basename "${bastion_source_vhd_uri}")
 status="unknown"
-run_command "az storage container create --name ${storage_contnainer} --account-name ${sa_name}" &&
+run_command "az storage container create --name ${storage_contnainer} --account-name ${sa_name} --account-key ${account_key}" &&
 run_command "az storage blob copy start --account-name ${sa_name} --account-key ${account_key} --destination-blob ${vhd_name} --destination-container ${storage_contnainer} --source-uri '${bastion_source_vhd_uri}'" || exit 2
-try=0 retries=15 interval=60
+try=0 retries=30 interval=60
 while [ X"${status}" != X"success" ] && [ $try -lt $retries ]; do
     echo "check copy complete, ${try} try..."
     cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
@@ -135,14 +135,22 @@ vnet_subnet_address_parameter="--address-prefixes ${bastion_subnet_cidr}"
 run_command "az network vnet subnet create -g ${bastion_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg}" || exit 2
 
 echo "Create bastion vm"
-run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --os-disk-size-gb 199 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}'" || exit 2
+run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --os-disk-size-gb 199 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'" || exit 2
 
-# wait for a while, so that azure api return IP successfully
-sleep 60
-vm_ip_info_file=$(mktemp)
-run_command "az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | tee '${vm_ip_info_file}'" || exit 2
-bastion_private_ip=$(jq -r ".[].virtualMachine.network.privateIpAddresses[]" "${vm_ip_info_file}")
-bastion_public_ip=$(jq -r ".[].virtualMachine.network.publicIpAddresses[].ipAddress" "${vm_ip_info_file}")
+# sleep for a while to wait registry/proxy image get pulled and services boot up after vm is running
+sleep 180
+
+if [ -f "${SHARED_DIR}/${bastion_name}_output.json" ]; then
+    # directly get public IP from bastion vm creation output
+    bastion_private_ip=$(jq -r ".privateIpAddress" "${SHARED_DIR}/${bastion_name}_output.json")
+    bastion_public_ip=$(jq -r ".publicIpAddress" "${SHARED_DIR}/${bastion_name}_output.json")
+else
+    vm_ip_info_file=$(mktemp)
+    run_command "az vm list-ip-addresses --name ${bastion_name} --resource-group ${bastion_rg} | tee '${vm_ip_info_file}'" || exit 2
+    bastion_private_ip=$(jq -r ".[].virtualMachine.network.privateIpAddresses[]" "${vm_ip_info_file}")
+    bastion_public_ip=$(jq -r ".[].virtualMachine.network.publicIpAddresses[].ipAddress" "${vm_ip_info_file}")
+fi
+
 if [ X"${bastion_public_ip}" == X"" ] || [ X"${bastion_private_ip}" == X"" ] ; then
     echo "Did not found public or internal IP!"
     exit 1
