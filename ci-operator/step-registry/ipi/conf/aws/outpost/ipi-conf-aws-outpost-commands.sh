@@ -297,8 +297,10 @@ yq-go m -i -x "${CONFIG}" "${PATCH}"                      # merge $PATCH with $C
 
 
 # Save outpost subnets, and yml for later use in ipi-install-install 
-echo $(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="PrivateSubnetIds").OutputValue') > $SHARED_DIR/prv_subn
-echo $(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="OutpostPrivateSubnetId").OutputValue') > $SHARED_DIR/outpost_prv_subn
+OUTPOST_PRV=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="PrivateSubnetIds").OutputValue')
+echo "${OUTPOST_PRV}" > "$SHARED_DIR/prv_subn"
+OUTPOST_PUB=$(aws --region "${REGION}" cloudformation describe-stacks --stack-name $STACK_NAME |jq -r '.Stacks |.[].Outputs|.[] |select(.OutputKey=="OutpostPrivateSubnetId").OutputValue')
+echo "${OUTPOST_PUB}" > "$SHARED_DIR/outpost_prv_subn" 
 
 NET='ovnKubernetesConfig:'
 MTU='1200'
