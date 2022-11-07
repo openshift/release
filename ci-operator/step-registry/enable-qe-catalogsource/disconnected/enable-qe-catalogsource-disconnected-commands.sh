@@ -76,27 +76,27 @@ function disable_default_catalogsource () {
 }
 
 # Create the ICSP for optional operators dynamiclly, but we don't use it here
-function create_icsp_by_olm () {
-    mirror_auths="${SHARED_DIR}/mirror_auths"
-    # Don't mirror OLM operators images, but create the ICSP for them.
-    echo "===>>> create ICSP for OLM operators"
-    run_command "oc adm catalog mirror -a ${mirror_auths} quay.io/openshift-qe-optional-operators/ocp4-index:latest ${MIRROR_REGISTRY_HOST} --manifests-only --to-manifests=/tmp/olm_mirror"; ret=$?
-    if [[ $ret -eq 0 ]]; then
-        run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
-        run_command "oc create -f /tmp/olm_mirror/imageContentSourcePolicy.yaml"; ret=$?
-        if [[ $ret -eq 0 ]]; then
-            echo "create the ICSP resource successfully"
-        else
-            echo "!!! fail to create the ICSP resource"
-            return 1
-        fi
-    else
-        echo "!!! fail to generate the ICSP for OLM operators"
-        # cat ${mirror_auths}
-        return 1
-    fi
-    rm -rf /tmp/olm_mirror 
-}
+# function create_icsp_by_olm () {
+#     mirror_auths="${SHARED_DIR}/mirror_auths"
+#     # Don't mirror OLM operators images, but create the ICSP for them.
+#     echo "===>>> create ICSP for OLM operators"
+#     run_command "oc adm catalog mirror -a ${mirror_auths} quay.io/openshift-qe-optional-operators/ocp4-index:latest ${MIRROR_REGISTRY_HOST} --manifests-only --to-manifests=/tmp/olm_mirror"; ret=$?
+#     if [[ $ret -eq 0 ]]; then
+#         run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
+#         run_command "oc create -f /tmp/olm_mirror/imageContentSourcePolicy.yaml"; ret=$?
+#         if [[ $ret -eq 0 ]]; then
+#             echo "create the ICSP resource successfully"
+#         else
+#             echo "!!! fail to create the ICSP resource"
+#             return 1
+#         fi
+#     else
+#         echo "!!! fail to generate the ICSP for OLM operators"
+#         # cat ${mirror_auths}
+#         return 1
+#     fi
+#     rm -rf /tmp/olm_mirror 
+# }
 
 # Slove: x509: certificate signed by unknown authority
 # Config CA for each cluster node so that it can pull images successfully.
@@ -183,6 +183,10 @@ EOF
 
 function create_catalog_sources()
 {
+    # get cluster Major.Minor version
+    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+    mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+    
     echo "create QE catalogsource: qe-app-registry"
     cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -192,7 +196,7 @@ metadata:
   namespace: openshift-marketplace
 spec:
   displayName: Production Operators
-  image: ${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/ocp4-index:latest
+  image: ${mirror_index_image}
   publisher: OpenShift QE
   sourceType: grpc
   updateStrategy:
