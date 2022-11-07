@@ -46,7 +46,8 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
   echo "$(date -u --rfc-3339=seconds) - Provision ${infra_id}-rhel-${count} ..."
 
   # az command to create RHEL VM and append --zone when the region has AZ
-  cmd="az vm create --resource-group '${infra_id}-rg' --name '${infra_id}-rhel-${count}' --image '${RHEL_IMAGE}' --ssh-key-values '${SSH_PUB_KEY_PATH}' --admin-user '${RHEL_USER}' --public-ip-address '' --size '${RHEL_VM_SIZE}' --os-disk-size-gb '${RHEL_VM_DISK_SIZE}' --nsg '' --subnet '${computeSubnetID}'"
+  # add --assign-identity in the vm creation command to add cluster identity to the RHEL vm
+  cmd="az vm create --resource-group '${infra_id}-rg' --name '${infra_id}-rhel-${count}' --image '${RHEL_IMAGE}' --ssh-key-values '${SSH_PUB_KEY_PATH}' --admin-user '${RHEL_USER}' --public-ip-address '' --size '${RHEL_VM_SIZE}' --os-disk-size-gb '${RHEL_VM_DISK_SIZE}' --nsg '' --subnet '${computeSubnetID}' --assign-identity '${infra_id}-identity'"
 
   if [ "${az_num}" != "0" ]; then
     cmd="${cmd} --zone $((${count} % ${az_num} + 1))"
@@ -62,7 +63,7 @@ for count in $(seq 1 ${RHEL_WORKER_COUNT}); do
     echo "Unable to get ip of rhel instance ${infra_id}-rhel-${count}!"
     exit 1
   fi
-
+   
   echo ${rhel_node_ip} >> /tmp/rhel_nodes_ip
 done
 
