@@ -28,13 +28,7 @@ chain:
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
         --namespace local-cluster \
-        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
-        --render > /tmp/hosted-cluster-cr-render.yaml
-        
-        yq eval-all --inplace \
-          "select(.kind==\"HostedCluster\").metadata.annotations.\"cluster.open-cluster-management.io/managedcluster-name\" = \"${CLUSTER_NAME}\"" \
-          /tmp/hosted-cluster-cr-render.yaml
-        oc apply -f /tmp/hosted-cluster-cr-render.yaml
+        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
         
         echo "Waiting for cluster to become available"
         oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
