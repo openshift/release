@@ -1,0 +1,58 @@
+base_images:
+  openshift_release_golang-1.17:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/dispatcher/Dockerfile
+  to: knative-eventing-kafka-broker-dispatcher
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-controller/Dockerfile
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: knative-eventing-kafka-broker-kafka-controller
+- dockerfile_path: openshift/ci-operator/knative-images/post-install/Dockerfile
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: knative-eventing-kafka-broker-post-install
+- dockerfile_path: openshift/ci-operator/knative-images/receiver/Dockerfile
+  to: knative-eventing-kafka-broker-receiver
+- dockerfile_path: openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
+  inputs:
+    openshift_release_golang-1.17:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.17
+  to: knative-eventing-kafka-broker-webhook-kafka
+promotion:
+  additional_images:
+    eventing-kafka-broker-src: src
+  # following needs to be unique, but its value is not actually used anywhere
+  name: knative-v1.4-commit-by-tag
+  namespace: openshift
+  tag_by_commit: true
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1Gi
+zz_generated_metadata:
+  branch: release-v1.4
+  org: openshift-knative
+  repo: eventing-kafka-broker
+  variant: "411"
