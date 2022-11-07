@@ -150,9 +150,12 @@ function extract_oc(){
     echo -e "Extracting oc\n"
     local retry=5 tmp_oc="/tmp/client-2"
     mkdir -p ${tmp_oc}
-    while ! (oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
+    echo "oc adm release extract -a ${CLUSTER_PROFILE_DIR}/pull-secret --command=oc --to=${tmp_oc} ${TARGET}"
+    while [ ! -x "${tmp_oc}/oc" ];
     do
-        echo >&2 "Failed to extract oc binary, retry..."
+        echo "Target oc binary doesn't exist, extracting oc..."
+        # To work around the issue error: image did not contain usr/bin/oc, we always return 0 
+        oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET} || true
         (( retry -= 1 ))
         if (( retry < 0 )); then return 1; fi
         sleep 60
