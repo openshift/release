@@ -1,19 +1,16 @@
 base_images:
-  ocp_builder_golang-1.17:
-    name: builder
+  base:
+    name: "4.11"
     namespace: ocp
-    tag: golang-1.17
+    tag: base
   ocp_builder_rhel-8-golang-1.17-openshift-4.11:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.17-openshift-4.11
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  from_repository: true
 images:
-- from: ocp_builder_golang-1.17
+- from: base
   inputs:
     ocp_builder_rhel-8-golang-1.17-openshift-4.11:
       as:
@@ -24,12 +21,12 @@ operator:
   - as: sandboxed-containers-operator-bundle
     dockerfile_path: bundle-custom.Dockerfile
   substitutions:
-  - pullspec: controller:latest
+  - pullspec: proxy.engineering.redhat.com/rh-osbs/openshift-sandboxed-containers-operator
     with: pipeline:sandboxed-containers-operator
 releases:
   initial:
     integration:
-      name: "4.8"
+      name: "4.10"
       namespace: ocp
   latest:
     integration:
