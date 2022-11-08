@@ -16,6 +16,9 @@ runcmd:
     set -o errexit
     set -o pipefail
 
+    # workaround a bug with equinix metal that does not populate the authorized hosts
+    echo "$(cat ${CLUSTER_PROFILE_DIR}/packet-public-ssh-key)" >> /root/.ssh/authorized_keys
+
     if [ "${PACKET_PLAN}" = "c3.medium.x86" ] || [ "${PACKET_PLAN}" = "m3.small.x86" ]
     then
       # c3.medium.x86 and m3.small.x86 have 64GB of RAM which is not enough for most of assisted jobs.
