@@ -2,6 +2,9 @@
 
 set -ex
 
+# debug
+sleep 3600
+
 # Setup temp quay registry credentials
 mkdir -p "$HOME/.docker"
 REGISTRY_TOKEN_FILE="/secrets/docker/config.json"
