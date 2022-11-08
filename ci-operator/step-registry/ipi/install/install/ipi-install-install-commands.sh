@@ -301,10 +301,9 @@ openshift-install --dir="${dir}" create manifests &
 wait "$!"
 
 # aws-outpost code - begin
-ls -l "${SHARED_DIR}"
-cat "${SHARED_DIR}/install-config.yaml"
-if [[ "${CLUSTER_PROFILE}" == 'aws-outpost' ]]; then
-# if [[ "${CLUSTER_TYPE}" == 'aws' ]] && [[ -f "${SHARED_DIR}/outpost_stack" ]]; then
+if [[ "${CLUSTER_TYPE}" == 'aws' ]] && [[ -f "${SHARED_DIR}/outpost_stack" ]]; then
+  ls -l "${SHARED_DIR}"
+  cat "${SHARED_DIR}/install-config.yaml"
   sed -i "s/$(cat $SHARED_DIR/prv_subn)/$(cat $SHARED_DIR/outpost_prv_subn)/" $dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml
   cp $SHARED_DIR/cluster-network-03-config.yml $dir/manifests/
 fi

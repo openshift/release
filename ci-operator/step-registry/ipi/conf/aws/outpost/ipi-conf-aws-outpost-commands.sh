@@ -16,8 +16,6 @@ PATCH=/tmp/install-config-outpost.yaml.patch
 REGION="${REGION:-$LEASED_RESOURCE}"
 CLUSTER_NAME="$(yq-go r "${CONFIG}" 'metadata.name')"
 
-export REGION='us-east-1'
-
 OUTPOST_ID=$(aws --region "${REGION}" outposts list-outposts | jq -r .Outposts[0].OutpostId)
 OUTPOST_AZ=$(aws --region "${REGION}" outposts list-outposts | jq -r .Outposts[0].AvailabilityZone)
 OUTPOST_ARN=$(aws --region "${REGION}" outposts list-outposts | jq -r .Outposts[0].OutpostArn)
@@ -308,7 +306,7 @@ if [[ "$(yq-go r ${CONFIG} 'networking.networkType')" == "OpenShiftSDN" ]]; then
   NET='openshiftSDNConfig:'
   MTU='1250'
 fi
-cat << _EOF > $SHARED_DIR/cluster-network-03-config.yml
+cat << _EOF > "${SHARED_DIR}/cluster-network-03-config.yml"
 apiVersion: operator.openshift.io/v1
 kind: Network
 metadata:
