@@ -368,7 +368,7 @@ deploy() {
             _elapsed=$(( _elapsed + _step ))
         fi
 
-        KUBECONFIG="$_kc" QUAY_TOKEN="$QUAY_TOKEN" ./start.sh --silent -t \
+        DEBUG="$ACM_DEPLOY_DEBUG" KUBECONFIG="$_kc" QUAY_TOKEN="$QUAY_TOKEN" ./start.sh --silent -t \
             > >(tee -a "$_log") 2>&1 && {
             logf "$_log" "Deploy $_cluster: start.sh generated YAML files after ${_elapsed}s"
             break
