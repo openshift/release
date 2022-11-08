@@ -5,6 +5,7 @@ set -x
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
@@ -26,27 +27,21 @@ echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
 echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
 chmod 0600 "${HOME}"/.ssh/config
 
-# Copy pull secret to user home
-cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
-
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
+BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
+if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+gcloud dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
+while read -r line; do
+  DNSNAME=$(echo "${line}" | jq -r '.name')
+  DNSTTL=$(echo "${line}" | jq -r '.ttl')
+  DNSTYPE=$(echo "${line}" | jq -r '.type')
+  DNSDATA=$(echo "${line}" | jq -r '.rrdatas[]')
+  gcloud dns record-sets transaction remove --zone "${BASE_DOMAIN_ZONE_NAME}" --name "${DNSNAME}" --ttl "${DNSTTL}" --type "${DNSTYPE}" "${DNSDATA}"
+done < <(gcloud dns record-sets list --zone="${BASE_DOMAIN_ZONE_NAME}" --filter="name:${INSTANCE_PREFIX}.${BASE_DOMAIN}." --format=json | jq -c '.[]')
+gcloud dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${INSTANCE_PREFIX}.${BASE_DOMAIN}/kubeconfig" > /tmp/kubeconfig
-
-KUBECONFIG=/tmp/kubeconfig ${PAYLOAD_PATH}/usr/bin/oc get node
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
---quiet \
---project "${GOOGLE_PROJECT_ID}" \
---zone "${GOOGLE_COMPUTE_ZONE}" \
---recurse rhel8user@"${INSTANCE_PREFIX}":~/suite.txt "${HOME}"/suite.txt
-
-KUBECONFIG=/tmp/kubeconfig ${PAYLOAD_PATH}/usr/bin/openshift-tests run -v 2 --provider=none -f "${HOME}"/suite.txt -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
+gcloud compute firewall-rules delete "${INSTANCE_PREFIX}"-external

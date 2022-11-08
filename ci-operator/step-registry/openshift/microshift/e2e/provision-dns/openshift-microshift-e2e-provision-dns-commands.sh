@@ -5,6 +5,7 @@ set -x
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
@@ -26,27 +27,19 @@ echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
 echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
 chmod 0600 "${HOME}"/.ssh/config
 
-# Copy pull secret to user home
-cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
-
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${INSTANCE_PREFIX}.${BASE_DOMAIN}/kubeconfig" > /tmp/kubeconfig
+CLUSTER_IP=$(gcloud compute instances list --filter="name=${INSTANCE_PREFIX}" --format json | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
+if [ -f transaction.yaml ]; then rm transaction.yaml; fi
+BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
+gcloud dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
+gcloud dns record-sets transaction add "${CLUSTER_IP}" --name "${INSTANCE_PREFIX}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
+gcloud dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
 
-KUBECONFIG=/tmp/kubeconfig ${PAYLOAD_PATH}/usr/bin/oc get node
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
---quiet \
---project "${GOOGLE_PROJECT_ID}" \
---zone "${GOOGLE_COMPUTE_ZONE}" \
---recurse rhel8user@"${INSTANCE_PREFIX}":~/suite.txt "${HOME}"/suite.txt
-
-KUBECONFIG=/tmp/kubeconfig ${PAYLOAD_PATH}/usr/bin/openshift-tests run -v 2 --provider=none -f "${HOME}"/suite.txt -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
+gcloud compute firewall-rules create "${INSTANCE_PREFIX}"-external \
+  --network "${INSTANCE_PREFIX}" \
+  --allow tcp:80,tcp:443,tcp:6443
