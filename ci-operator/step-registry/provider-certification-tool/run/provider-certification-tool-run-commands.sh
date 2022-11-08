@@ -52,6 +52,8 @@ then
 fi
 
 # install newest oc
+export PATH=$PATH:/tmp/bin
+mkdir /tmp/bin
 curl -L --fail https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
 chmod ug+x /tmp/bin/oc
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
