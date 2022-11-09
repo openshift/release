@@ -20,11 +20,16 @@ items:
         name: telco-bastion:latest
     source:
       dockerfile: |
-        FROM registry.ci.openshift.org/openshift/release:golang-1.14
+        FROM registry.ci.openshift.org/openshift/release:golang-1.17
         ENV HOME /output
         RUN yum install -y ansible openconnect && \
             yum clean all && \
             rm -rf /var/cache/yum/* && \
+            wget https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/4.11.9/openshift-client-linux.tar.gz && \
+            tar -zxvf openshift-client-linux.tar.gz && \
+            mv oc /usr/local/bin/ && \
+            mv kubectl /usr/local/bin/ && \
+            rm -f openshift-client-linux.tar.gz && \
             mkdir /output && \
             chmod -R g+rwx /output && \
             chmod g+w /etc/passwd && \
