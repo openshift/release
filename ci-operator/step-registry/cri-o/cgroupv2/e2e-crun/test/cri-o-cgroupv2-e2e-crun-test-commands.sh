@@ -33,6 +33,7 @@ instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 
 timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
     REPO_DIR="/home/deadbeef/cri-o"
-    ansible-playbook i ${REPO_DIR}/contrib/test/ci/e2e-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv --tags setup,e2e --extra-vars "build_runc=False build_crun=True cgroupv2=True"
+    cd "\${REPO_DIR}/contrib/test/ci"
+    ansible-playbook i e2e-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv --tags setup,e2e --extra-vars "build_runc=False build_crun=True cgroupv2=True"
 EOF
 
