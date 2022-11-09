@@ -11,8 +11,99 @@ BASE_DOMAIN="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
 which openshift-install
 openshift-install version
 
+function run_command() {
+    local cmd="$1"
+    echo "Running Command: ${cmd}"
+    eval "${cmd}"
+}
+
+function run_ssh_cmd() {
+    local sshkey=$1
+    local user=$2
+    local host=$3
+    local remote_cmd=$4
+    local options=$5
+    options+=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
+    cmd="ssh ${options} -i \"${sshkey}\" ${user}@${host} \"${remote_cmd}\""
+    run_command "$cmd" || return 2
+    return 0
+}
+
+function run_scp_to_remote() {
+    local sshkey=$1
+    local user=$2
+    local host=$3
+    local src=$4
+    local dest=$5
+    local options=$6
+    options+=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
+    cmd="scp ${options} -i \"${sshkey}\" ${src} ${user}@${host}:${dest}"
+    run_command "$cmd" || return 2
+    return 0
+}
+
+function run_scp_from_remote() {
+    local sshkey=$1
+    local user=$2
+    local host=$3
+    local src=$4
+    local dest=$5
+    local options=$6
+    options+=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
+    cmd="scp ${options} -i \"${sshkey}\" ${user}@${host}:${src} ${dest}"
+    run_command "$cmd" || return 2
+    return 0
+}
+
 function populate_artifact_dir() {
   set +e
+  set -x
+  # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
+  # the workaround is gather log-bundle from bastion host
+  local publish_strategy
+  publish_strategy=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'publish')
+  if [[ "${publish_strategy}" == "Internal" ]]; then
+    echo "Gathering log-bundle from private cluster"
+
+    local region
+    region=${LEASED_RESOURCE}
+    if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
+      region=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+    fi
+
+    local bootstrap_private_ip
+    bootstrap_private_ip=$(aws --region $region ec2 describe-instances --filters "Name=tag:Name,Values=${CLUSTER_NAME}*bootstrap*" | jq -r '.Reservations[].Instances[].PrivateIpAddress')
+
+    if [[ "${bootstrap_private_ip}" != "" ]] && [[ "${bootstrap_private_ip}" != "null" ]]; then
+      local ssh_key
+      local bastion_dns
+      local bastion_user
+      local master_ips
+      local installer_bin
+
+      ssh_key=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+      bastion_dns=$(head -n 1 "${SHARED_DIR}/bastion_public_address")
+      bastion_user=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
+      master_ips=$(aws --region $region ec2 describe-instances --filters "Name=tag:Name,Values=${CLUSTER_NAME}*master*" | jq -r '.Reservations[].Instances[].PrivateIpAddress' | xargs)
+      installer_bin=$(which openshift-install)
+
+      run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "${installer_bin}" "/tmp/"
+      run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "${ssh_key}" "/tmp/k"
+      run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "chmod 600 /tmp/k"
+      run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/openshift-install gather bootstrap --bootstrap ${bootstrap_private_ip} --master '${master_ips}' --log-level debug --key /tmp/k 2> /tmp/gather.log"
+      run_scp_from_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/gather.log" "${ARTIFACT_DIR}"/gather.log
+      log_bundle_path=$(tail -n 1 "${ARTIFACT_DIR}"/gather.log  | awk '{print $7}' | sed 's/"//g')
+      log_bundle_name=$(basename "${log_bundle_path}")
+      run_scp_from_remote "${ssh_key}" ${bastion_user} ${bastion_dns} $log_bundle_name "${dir}"/
+
+      echo "Gathering log-bundle from private cluster - Done"
+      echo "log-bundle has been saved at \"${dir}/${log_bundle_name}\""
+    else
+      echo "Bootstrap machine has been destroyed or cann't get bootstrap ip, skip gathering log-bundle logs."
+    fi
+  fi
+  set +x
+
   echo "Copying log bundle..."
   cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
   echo "Removing REDACTED info from log..."
