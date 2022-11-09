@@ -40,9 +40,19 @@ dnf install subscription-manager -y
 subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
+
+tee /etc/yum.repos.d/rhocp-4.12-el8-beta-$(uname -i)-rpms.repo >/dev/null <<EOF2
+[rhocp-4.12-el8-beta-$(uname -i)-rpms]
+name=Beta rhocp-4.12 RPMs for RHEL8
+baseurl=https://mirror.openshift.com/pub/openshift-v4/\\\$basearch/dependencies/rpms/4.12-el8-beta/
+enabled=1
+gpgcheck=0
+skip_if_unavailable=1
+EOF2
+
 subscription-manager repos \
-  --enable rhocp-4.10-for-rhel-8-x86_64-rpms \
-  --enable fast-datapath-for-rhel-8-x86_64-rpms
+  --enable "fast-datapath-for-rhel-8-$(uname -i)-rpms"
+#  --enable "rhocp-4.12-for-rhel-8-$(uname -i)-rpms" \
 
 dnf install jq firewalld -y
 dnf install -y /packages/*.rpm
