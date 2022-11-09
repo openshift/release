@@ -330,10 +330,11 @@ ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}
 rm /tmp/pull-secret
 
 if (( ocp_minor_version >= 12 && ocp_major_version >= 4 )); then
-  cat <<EOF > ${SHARED_DIR}/manifest_cap-token-cronjob_412plus-patch.yaml
+  echo "For 4.12+, using batch API version: batch/v1"
+  cat <<EOF > /tmp/cap-token-cronjob_412plus-patch.yaml
 apiVersion: batch/v1
 EOF
-  yq-go m -x -i "${SHARED_DIR}/manifest_cap-token-cronjob.yaml" "${SHARED_DIR}/manifest_cap-token-cronjob_412plus-patch.yaml"
+  yq-go m -x -i "${SHARED_DIR}/manifest_cap-token-cronjob.yaml" "/tmp/cap-token-cronjob_412plus-patch.yaml"
 fi
 
 echo "files in dir:"
