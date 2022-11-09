@@ -322,5 +322,19 @@ spec:
 EOF
 
 
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+rm /tmp/pull-secret
+
+if (( ocp_minor_version >= 12 && ocp_major_version >= 4 )); then
+  cat <<EOF > ${SHARED_DIR}/manifest_cap-token-cronjob_412plus-patch.yaml
+apiVersion: batch/v1
+EOF
+  yq-go m -x -i "${SHARED_DIR}/manifest_cap-token-cronjob.yaml" "${SHARED_DIR}/manifest_cap-token-cronjob_412plus-patch.yaml"
+fi
+
 echo "files in dir:"
 ls ${SHARED_DIR}/
