@@ -62,5 +62,5 @@ VERSION=$(oc get clusterversion version -o=jsonpath='{.status.desired.version}')
 # upload to AWS S3
 DATE=$(date +%Y%m%d)
 
-aws s3 cp "${ARTIFACT_DIR}/certification-results/*.tar.gz s3://openshift-provider-certification/baseline-results/${VERSION}-${DATE}.tar.gz" \
+aws s3 cp "${ARTIFACT_DIR}/certification-results/*.tar.gz" "s3://openshift-provider-certification/baseline-results/${VERSION}-${DATE}.tar.gz" \
 --metadata '{"platform-type":"'"${CLUSTER_TYPE}"'"}'
