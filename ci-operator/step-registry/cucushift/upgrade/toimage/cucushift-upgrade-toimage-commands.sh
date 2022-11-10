@@ -424,6 +424,7 @@ function admin_ack() {
 
 # Upgrade the cluster to target release
 function upgrade() {
+    echo "oc adm upgrade --to-image=${TARGET} --allow-explicit-upgrade --force=${FORCE_UPDATE}" > /tmp/upgrade
     sleep 1500
     oc adm upgrade --to-image="${TARGET}" --allow-explicit-upgrade --force="${FORCE_UPDATE}"
     echo "Upgrading cluster to ${TARGET} gets started..."
