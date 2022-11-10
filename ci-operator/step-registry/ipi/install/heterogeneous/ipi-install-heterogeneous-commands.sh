@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # Make sure yq is installed
@@ -52,12 +50,6 @@ exec oc create -f ${dir}/99_openshift-cluster-api_worker-machineset-additional.y
 
 wait "$!"
 ret="$?"
-
-if test "${ret}" -eq 0 ; then
-  touch  "${SHARED_DIR}/success"
-  # Save console URL in `console.url` file so that ci-chat-bot could report success
-  echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
-fi
 
 echo "Exiting with ret=${ret}"
 exit "${ret}"
