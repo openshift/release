@@ -37,6 +37,29 @@ function prepare_next_steps() {
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
 
+  # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
+  # the workaround is gather log-bundle from bastion host
+  # copying install folder to bastion host for gathering logs
+  publish=$(grep "publish:" ${SHARED_DIR}/install-config.yaml | awk '{print $2}')
+  if [[ "${publish}" == "Internal" ]] && [[ ! $(grep "Bootstrap status: complete" "${dir}/.openshift_install.log") ]]; then
+    echo "Copying install dir to bastion host."
+    echo > "${SHARED_DIR}/REQUIRE_INSTALL_DIR_TO_BASTION"
+    if [[ -s "${SHARED_DIR}/bastion_ssh_user" ]] && [[ -s "${SHARED_DIR}/bastion_public_address" ]]; then
+      bastion_ssh_user=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
+      bastion_public_address=$(head -n 1 "${SHARED_DIR}/bastion_public_address")
+      if [[ -n "${bastion_ssh_user}" ]] && [[ -n "${bastion_public_address}" ]]; then
+        cmd="scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes  -i \"${CLUSTER_PROFILE_DIR}/ssh-privatekey\" -r ${dir} ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
+        echo "Running Command: ${cmd}"
+        eval "${cmd}"
+        echo > "${SHARED_DIR}/COPIED_INSTALL_DIR_TO_BASTION"
+      else
+        echo "ERROR: Can not get bastion user/host, skip to copy install dir."
+      fi
+    else
+      echo "ERROR: File bastion_ssh_user or bastion_public_address is empty or not exist, skip to copy install dir."
+    fi
+  fi
+
   # TODO: remove once BZ#1926093 is done and backported
   if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
     cp -t "${SHARED_DIR}" "${dir}"/terraform.*
