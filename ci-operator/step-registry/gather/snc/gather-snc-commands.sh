@@ -47,4 +47,4 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gsutil acl \
    ch -r -u AllUsers:R gs://crc-bundle/
 
 echo "Create file in artifact directory, having links to storage links"
-find /tmp/ -maxdepth 1 -name "*.crcbundle" -exec basename \"{}\" \; | awk '{print "https://storage.googleapis.com/crc-bundle/" $0 ""}' > ${ARTIFACT_DIR}/bundles.txt
+find /tmp/ -maxdepth 1 -name "*.crcbundle" -printf "https://storage.googleapis.com/crc-bundle/%f\n" > ${ARTIFACT_DIR}/bundles.txt
