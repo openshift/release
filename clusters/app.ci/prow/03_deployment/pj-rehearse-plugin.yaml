@@ -4,12 +4,12 @@ items:
 - apiVersion: v1
   kind: Service
   metadata:
-    name: pj-rehearse-plugin
+    name: pj-rehearse-plugin-alpha
     namespace: ci
   spec:
     selector:
       app: prow
-      component: pj-rehearse-plugin
+      component: pj-rehearse-plugin-alpha
     ports:
     - port: 80
       targetPort: 8888
@@ -17,29 +17,29 @@ items:
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
-    name: pj-rehearse-plugin
+    name: pj-rehearse-plugin-alpha
     labels:
       app: prow
-      component: pj-rehearse-plugin
+      component: pj-rehearse-plugin-alpha
     annotations:
       image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"pj-rehearse:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"pj-rehearse-plugin\")].image"}]'
     namespace: ci
   spec:
-    replicas: 2
+    replicas: 1
     revisionHistoryLimit: 2
     selector:
       matchLabels:
         app: prow
-        component: pj-rehearse-plugin
+        component: pj-rehearse-plugin-alpha
     template:
       metadata:
         labels:
           app: prow
-          component: pj-rehearse-plugin
+          component: pj-rehearse-plugin-alpha
       spec:
         containers:
-        - name: pj-rehearse-plugin
-          image: registry.ci.openshift.org/ci/pj-rehearse:latest
+        - name: pj-rehearse-plugin-alpha
+          image: quay.io/sgoeddel/pj-rehearse-plugin:4.0
           args:
           - --dry-run=false
           - --server=true
