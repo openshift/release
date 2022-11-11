@@ -372,6 +372,10 @@ if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   inject_promtail_service
 fi
 
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
@@ -386,9 +390,5 @@ if test "${ret}" -eq 0 ; then
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 fi
-
-echo "install-config.yaml"
-echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 exit "$ret"
