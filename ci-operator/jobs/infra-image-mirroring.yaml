@@ -1321,6 +1321,16 @@ periodics:
         set -o errexit
         failures=0
         for mapping in /etc/imagemirror/mapping_external_dns_operator*; do
+          ciimage=$(cat ${mapping} | cut -d ' ' -f1)
+          quayimage=$(cat ${mapping} | cut -d ' ' -f2)
+          digest=$(oc image info ${ciimage} | grep 'Digest:' | tr -d ' ' | cut -d ':' -f2-)
+          shorttag=$(echo ${digest} | cut -d: -f2 | grep -oP '^.{12}')
+          quayimageshort=${quayimage/:*/:${shorttag}}
+          echo "Running: oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes"
+          if ! oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes; then
+            echo "ERROR: Failed to mirror images from $mapping to ${quayimageshort}"
+            failures=$((failures+1))
+          fi
           echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
           if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
@@ -1350,6 +1360,64 @@ periodics:
     - name: push
       secret:
         secretName: registry-push-credentials-quay-io-external-dns-optr
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: aws-load-balancer-operator
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-aws-load-balancer-operator
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        failures=0
+        for mapping in /etc/imagemirror/mapping_aws_load_balancer_operator*; do
+          ciimage=$(cat ${mapping} | cut -d ' ' -f1)
+          quayimage=$(cat ${mapping} | cut -d ' ' -f2)
+          digest=$(oc image info ${ciimage} | grep 'Digest:' | tr -d ' ' | cut -d ':' -f2-)
+          shorttag=$(echo ${digest} | cut -d: -f2 | grep -oP '^.{12}')
+          quayimageshort=${quayimage/:*/:${shorttag}}
+          echo "Running: oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes"
+          if ! oc image mirror --keep-manifest-list ${ciimage}=${quayimageshort} --skip-multiple-scopes; then
+            echo "ERROR: Failed to mirror images from $mapping to ${quayimageshort}"
+            failures=$((failures+1))
+          fi
+          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+            echo "ERROR: Failed to mirror images from $mapping"
+            failures=$((failures+1))
+          fi
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      env:
+      - name: HOME
+        value: /home/mirror
+      image: registry.ci.openshift.org/ocp/4.9:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: registry-push-credentials-quay-io-albo
     - configMap:
         name: image-mirror-mappings
       name: config

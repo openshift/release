@@ -1,0 +1,93 @@
+chain:
+  as: hypershift-mce-aws-create-2.2
+  steps:
+    - as: create-hostedcluster
+      cli: latest
+      env:
+        - name: HYPERSHIFT_NODE_COUNT
+          default: "3"
+          documentation: "The number nodes to automatically create and join to the cluster."
+        - name: HYPERSHIFT_BASE_DOMAIN
+          default: "origin-ci-int-aws.dev.rhcloud.com"
+          documentation: "The cluster's FQDN will be a subdomain of the base domain."
+        - name: HYPERSHIFT_AWS_REGION
+          default: "us-east-1"
+          documentation: "The AWS region of the cluster."
+      commands: |-
+        set -exuo pipefail
+
+        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+      
+        /usr/bin/hypershift create cluster aws \
+        --name ${CLUSTER_NAME} \
+        --infra-id ${CLUSTER_NAME} \
+        --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
+        --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+        --region ${HYPERSHIFT_AWS_REGION} \
+        --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+        --aws-creds ${CLUSTER_PROFILE_DIR}/.awscred \
+        --namespace local-cluster \
+        --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+        
+        oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
+        oc apply -f - <<EOF
+        apiVersion: cluster.open-cluster-management.io/v1
+        kind: ManagedCluster
+        metadata:
+          annotations:
+            import.open-cluster-management.io/hosting-cluster-name: local-cluster
+            import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
+            open-cluster-management/created-via: other
+          labels:
+            cloud: auto-detect
+            cluster.open-cluster-management.io/clusterset: default
+            name: ${CLUSTER_NAME}
+            vendor: OpenShift
+          name: ${CLUSTER_NAME}
+        spec:
+          hubAcceptsClient: true
+          leaseDurationSeconds: 60
+        EOF
+        
+        echo "Waiting for cluster to become available"
+        oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
+        echo "Cluster became available, creating kubeconfig"
+        bin/hypershift create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+        echo "Waiting for clusteroperators to be ready"
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+        until \
+        oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
+        oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
+        oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
+        echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+        sleep 10s
+        done
+        echo "Waiting for ManagedCluster to be ready"
+        export KUBECONFIG=${SHARED_DIR}/kubeconfig
+        until \
+        oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterJoined' >/dev/null && \
+        oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterConditionAvailable' >/dev/null && \
+        oc wait managedcluster ${CLUSTER_NAME} --for='condition=HubAcceptedManagedCluster' >/dev/null;  do
+        echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
+        sleep 10s
+        done
+      from_image:
+        namespace: ocp
+        name: "4.12"
+        tag: hypershift-operator
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 30m0s
+      credentials:
+        - mount_path: /etc/ci-pull-credentials
+          name: ci-pull-credentials
+          namespace: test-credentials
+      dependencies:
+        - name: "release:latest"
+          env: RELEASE_IMAGE_LATEST
+        - name: hypershift-operator
+          env: HYPERSHIFT_RELEASE_LATEST

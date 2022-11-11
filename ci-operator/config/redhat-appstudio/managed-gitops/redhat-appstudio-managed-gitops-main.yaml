@@ -6,7 +6,7 @@ releases:
     release:
       architecture: amd64
       channel: stable
-      version: "4.9"
+      version: "4.11"
 resources:
   '*':
     limits:
@@ -22,13 +22,13 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.11"
   steps:
     test:
     - as: managed-gitops-unit-tests
       cli: latest
       commands: |
-        export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-e2e-tests-on-kcp-hive-admin-kubeconfig/kubeconfig"
+        export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-unit-tests-hive-admin-kubeconfig/kubeconfig"
         make devenv-k8s
         kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
         make test
@@ -45,13 +45,13 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.11"
   steps:
     test:
     - as: managed-gitops-e2e-tests
       cli: latest
       commands: |
-        export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-e2e-tests-on-kcp-hive-admin-kubeconfig/kubeconfig"
+        export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-e2e-tests-hive-admin-kubeconfig/kubeconfig"
         make install-argocd-openshift
         make devenv-k8s
         make download-deps
@@ -72,7 +72,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h30m0s
-    version: "4.10"
+    version: "4.11"
   steps:
     test:
     - as: managed-gitops-e2e-tests-on-kcp
@@ -81,8 +81,8 @@ tests:
         export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-e2e-tests-on-kcp-hive-admin-kubeconfig/kubeconfig"
         git clone https://github.com/openshift-pipelines/pipeline-service.git
         pushd pipeline-service/
-        git checkout edacf0348b2ae693eeb62b940dd618c05b34df62
-        kcp_version="$(yq '.images[] | select(.name == "kcp") | .newTag' "ckcp/openshift/overlays/dev/kustomization.yaml")"
+        git checkout feb7a522e7e47af3670bde9a58ddef958e9bff1e
+        kcp_version="$(yq '.images[] | select(.name == "kcp") | .newTag' "developer/ckcp/openshift/overlays/dev/kustomization.yaml")"
         echo "kcp version:" $kcp_version
         popd
         mkdir install-kcp-plugin
