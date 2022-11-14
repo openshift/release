@@ -1,0 +1,379 @@
+base_images:
+  apollo-ci:
+    name: apollo-ci
+    namespace: stackrox
+    tag: collector-0.3.44-1-gb00ffc52af
+  centos7:
+    name: centos
+    namespace: openshift
+    tag: "7"
+  centos8:
+    name: centos
+    namespace: origin
+    tag: stream8
+  cpaas-drivers-base:
+    name: stackrox-drivers
+    namespace: stackrox
+    tag: 0.1.0
+  fc36:
+    name: fedora
+    namespace: coreos
+    tag: "36"
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: |
+  export SRC_ROOT_DIR=/go/src/github.com/stackrox/collector
+  "${SRC_ROOT_DIR}/.openshift-ci/build/build-collector.sh"
+  make container-dockerfile
+build_root:
+  project_image:
+    dockerfile_path: builder/Dockerfile
+images:
+- build_args:
+  - name: ROOT_DIR
+    value: /go/src/github.com/stackrox/collector/collector/container/rhel
+  context_dir: collector
+  dockerfile_path: container/Dockerfile.gen
+  from: ubi-minimal
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/stackrox/collector/collector/container
+  to: collector-slim
+- context_dir: .openshift-ci/jobs/apollo-src/
+  dockerfile_path: Dockerfile
+  from: apollo-ci
+  inputs:
+    bin:
+      as:
+      - replaced-by-osci:bin
+  to: apollo-src
+- context_dir: .
+  dockerfile_path: .openshift-ci/build/Dockerfile.latest
+  inputs:
+    collector-slim:
+      as:
+      - replaced-by-osci:collector-slim
+    drivers:
+      as:
+      - replaced-by-osci:drivers
+  to: collector-full
+- context_dir: .
+  dockerfile_path: .openshift-ci/build/Dockerfile.cpaas
+  from: collector-slim
+  inputs:
+    apollo-ci:
+      as:
+      - quay.io/stackrox-io/apollo-ci:collector-0.3.44-1-gb00ffc52af
+  to: collector-cpaas
+- context_dir: .openshift-ci
+  dockerfile_path: jobs/integration-tests/Dockerfile
+  from: apollo-src
+  to: integration-tests
+- context_dir: .
+  dockerfile_path: .openshift-ci/drivers/scripts.Dockerfile
+  from: fc36
+  to: scripts
+- context_dir: .openshift-ci/drivers/
+  dockerfile_path: fc36-base.Dockerfile
+  from: fc36
+  inputs:
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: fc36-base
+- context_dir: .openshift-ci/drivers/
+  dockerfile_path: rhel8-base.Dockerfile
+  from: centos8
+  inputs:
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: rhel8-base
+- context_dir: .openshift-ci/drivers/
+  dockerfile_path: rhel7-base.Dockerfile
+  from: centos7
+  inputs:
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: rhel7-base
+- build_args:
+  - name: USE_KERNELS_FILE
+    value: "true"
+  dockerfile_path: .openshift-ci/drivers/pre-build.Dockerfile
+  from: apollo-src
+  inputs:
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: pre-build
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/fc36/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    fc36-base:
+      as:
+      - replaced-by-osci:builder-base
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+  to: fc36-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel8/0/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel8-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel8-0-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel8/1/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel8-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel8-1-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel8/2/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel8-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel8-2-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel8/3/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel8-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel8-3-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel7/0/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel7-0-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel7/1/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel7-1-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel7/2/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel7-2-drivers
+- build_args:
+  - name: SHARDS_DIR
+    value: /tasks/rhel7/3/shards/
+  context_dir: .
+  dockerfile_path: .openshift-ci/drivers/build.Dockerfile
+  inputs:
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-base:
+      as:
+      - replaced-by-osci:builder-base
+  to: rhel7-3-drivers
+- context_dir: .
+  dockerfile_path: .openshift-ci/drivers/drivers.Dockerfile
+  from: apollo-src
+  inputs:
+    fc36-drivers:
+      as:
+      - replaced-by-osci:fc36-drivers
+    pre-build:
+      as:
+      - replaced-by-osci:pre-build
+    rhel7-0-drivers:
+      as:
+      - replaced-by-osci:rhel7-0-drivers
+    rhel7-1-drivers:
+      as:
+      - replaced-by-osci:rhel7-1-drivers
+    rhel7-2-drivers:
+      as:
+      - replaced-by-osci:rhel7-2-drivers
+    rhel7-3-drivers:
+      as:
+      - replaced-by-osci:rhel7-3-drivers
+    rhel8-0-drivers:
+      as:
+      - replaced-by-osci:rhel8-0-drivers
+    rhel8-1-drivers:
+      as:
+      - replaced-by-osci:rhel8-1-drivers
+    rhel8-2-drivers:
+      as:
+      - replaced-by-osci:rhel8-2-drivers
+    rhel8-3-drivers:
+      as:
+      - replaced-by-osci:rhel8-3-drivers
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: drivers
+- context_dir: .
+  dockerfile_path: .openshift-ci/drivers/cpaas.Dockerfile
+  from: apollo-src
+  inputs:
+    cpaas-drivers-base:
+      as:
+      - replaced-by-osci:cpaas-drivers-base
+    scripts:
+      as:
+      - replaced-by-osci:scripts
+  to: cpaas-drivers
+resources:
+  '*':
+    limits:
+      memory: 20Gi
+    requests:
+      cpu: "2"
+      memory: 2Gi
+tests:
+- as: flatcar-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: flatcar
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: merge-rhel-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: rhel
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: merge-cos-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: cos
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: merge-rhel-sap-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: rhel-sap
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: merge-sles-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: sles
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: merge-ubuntu-os-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: ubuntu-os
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: merge-ubuntu-os-pro-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: ubuntu-os-pro
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: merge-garden-linux-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: garden-linux
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: merge-fedora-coreos-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: fedora-coreos
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: merge-flatcar-integration-tests
+  postsubmit: true
+  steps:
+    env:
+      VM_TYPE: flatcar
+    workflow: stackrox-collector-release-3.12-integration-tests
+- as: drivers-tests-post
+  postsubmit: true
+  steps:
+    test:
+    - as: drivers-build-failures
+      commands: |
+        FAILURES_DIR=/FAILURES/ /scripts/drivers-build-failures.sh
+      from: drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
+- as: push-drivers-post
+  postsubmit: true
+  steps:
+    test:
+    - as: push-drivers
+      commands: |
+        /scripts/push-drivers.sh gs://collector-modules-osci
+      credentials:
+      - mount_path: /tmp/secret/stackrox-collector-driver-push
+        name: stackrox-collector-driver-push
+        namespace: test-credentials
+      from: drivers
+      resources:
+        requests:
+          cpu: 100m
+          memory: 2000Mi
+zz_generated_metadata:
+  branch: release-3.12
+  org: stackrox
+  repo: collector
