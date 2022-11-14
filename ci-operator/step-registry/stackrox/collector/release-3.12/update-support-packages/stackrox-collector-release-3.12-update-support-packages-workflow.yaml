@@ -1,0 +1,28 @@
+workflow:
+  as: stackrox-collector-release-3.12-update-support-packages
+  steps:
+    pre:
+      - ref: stackrox-collector-release-3.12-update-support-packages-setup
+    test:
+      - as: stackrox-collector-release-3.12-update-support-packages
+        from: apollo-src
+        commands: .openshift-ci/jobs/update-support-packages/run.sh
+        credentials:
+          - mount_path: /tmp/secret/stackrox-collector-e2e-tests
+            name: stackrox-collector-e2e-tests
+            namespace: test-credentials
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 500Mi
+        timeout: 4h0m0s
+        grace_period: 5m0s
+        env:
+        - name: VM_TYPE
+          default: ubuntu-os
+        - name: IMAGE_FAMILY
+          default: ubuntu-2204-lts
+    post:
+      - ref: stackrox-collector-release-3.12-update-support-packages-teardown
+  documentation: |-
+    Runs the stackrox/collector update support pakages
