@@ -299,24 +299,7 @@ tests:
 - as: push-images
   steps:
     test:
-    - as: push-collector-images
-      commands: .openshift-ci/jobs/push-images/push-images.sh
-      credentials:
-      - mount_path: /tmp/secret/stackrox-stackrox-push
-        name: stackrox-stackrox-push
-        namespace: test-credentials
-      dependencies:
-      - env: COLLECTOR_SLIM
-        name: collector-slim
-      - env: COLLECTOR_FULL
-        name: collector-full
-      - env: COLLECTOR_BUILDER
-        name: root
-      from: apollo-src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
+    - ref: stackrox-collector-push-images
 - as: unit-tests
   commands: |
     /go/src/github.com/stackrox/collector/cmake-build/collector/runUnitTests
@@ -514,6 +497,11 @@ tests:
         requests:
           cpu: 100m
           memory: 2000Mi
+- as: merge-push-images
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-collector-push-images
 zz_generated_metadata:
   branch: master
   org: stackrox
