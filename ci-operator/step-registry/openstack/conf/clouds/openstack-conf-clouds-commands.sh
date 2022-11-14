@@ -5,12 +5,18 @@ set -o errexit
 set -o pipefail
 
 CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
-export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
-cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml" "$OS_CLIENT_CONFIG_FILE"
+clouds_yaml="$(mktemp)"
+cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml" "$clouds_yaml"
+if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/osp-ca.crt" ]; then
+	cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/osp-ca.crt" "${SHARED_DIR}/osp-ca.crt"
+	sed -i "s|cacert: .*|cacert: ${SHARED_DIR}/osp-ca.crt|" "$clouds_yaml"
+fi
 
-if [[ ! -z $APPLICATION_CREDENTIALS ]]; then
-	declare appcred_json clouds_yaml
+new_clouds_yaml() {
+	declare OS_CLIENT_CONFIG_FILE appcred_json
+	OS_CLIENT_CONFIG_FILE="$1"
+	export OS_CLIENT_CONFIG_FILE
 
 	appcred_json="$(
 		openstack application credential create \
@@ -20,27 +26,31 @@ if [[ ! -z $APPLICATION_CREDENTIALS ]]; then
 			"prow-$(date +'%s%N')"
 	)"
 
-	clouds_yaml="$(
-		yq --yml-output ".
-			| del(.clouds.\"${OS_CLOUD}\".auth.username)
-			| del(.clouds.\"${OS_CLOUD}\".auth.password)
-			| del(.clouds.\"${OS_CLOUD}\".auth.user_domain_name)
-			| del(.clouds.\"${OS_CLOUD}\".auth.project_id)
-			| del(.clouds.\"${OS_CLOUD}\".auth.project_name)
-			| del(.clouds.\"${OS_CLOUD}\".auth.project_domain_name)
-			| .clouds.\"${OS_CLOUD}\".auth_type=\"v3applicationcredential\"
-			| .clouds.\"${OS_CLOUD}\".auth.application_credential_id=\"$(jq -r '.id' <<< $appcred_json)\"
-			| .clouds.\"${OS_CLOUD}\".auth.application_credential_secret=\"$(jq -r '.secret' <<< $appcred_json)\"
-			" "$OS_CLIENT_CONFIG_FILE"
-	)"
+	yq --yml-output ".
+		| del(.clouds.\"${OS_CLOUD}\".auth.username)
+		| del(.clouds.\"${OS_CLOUD}\".auth.password)
+		| del(.clouds.\"${OS_CLOUD}\".auth.user_domain_name)
+		| del(.clouds.\"${OS_CLOUD}\".auth.project_id)
+		| del(.clouds.\"${OS_CLOUD}\".auth.project_name)
+		| del(.clouds.\"${OS_CLOUD}\".auth.project_domain_name)
+		| .clouds.\"${OS_CLOUD}\".auth_type=\"v3applicationcredential\"
+		| .clouds.\"${OS_CLOUD}\".auth.application_credential_id=\"$(jq -r '.id' <<< "$appcred_json")\"
+		| .clouds.\"${OS_CLOUD}\".auth.application_credential_secret=\"$(jq -r '.secret' <<< "$appcred_json")\"
+		" "$OS_CLIENT_CONFIG_FILE"
+}
 
-	cat > "$OS_CLIENT_CONFIG_FILE" <<< $clouds_yaml
-fi
+if [[ -n $APPLICATION_CREDENTIALS ]]; then
+	echo 'Generating ephemeral application credentials'
+	new_clouds_yaml "$clouds_yaml" > "${SHARED_DIR}/clouds.yaml"
+else
+	echo 'The environment variable APPLICATION_CREDENTIALS is unset or empty.'
+	if [[ "$(yq -r ".clouds.\"${OS_CLOUD}\".auth_type" "$clouds_yaml")" == 'v3applicationcredential' ]]; then
+		echo 'Using application credentials as found in the original clouds.yaml'
+	else
+		echo 'Using password authentication as found in the original clouds.yaml'
+	fi
 
-
-if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/osp-ca.crt" ]; then
-	cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/osp-ca.crt" "${SHARED_DIR}/osp-ca.crt"
-	sed -i "s+cacert: .*+cacert: ${SHARED_DIR}/osp-ca.crt+" "${SHARED_DIR}/clouds.yaml"
+	cp "$clouds_yaml" "${SHARED_DIR}/clouds.yaml"
 fi
 
 if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/squid-credentials.txt" ]; then
