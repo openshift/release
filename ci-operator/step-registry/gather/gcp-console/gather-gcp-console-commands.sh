@@ -17,6 +17,15 @@ fi
 
 gcloud config set project "$(jq -r .gcp.projectID "${SHARED_DIR}/metadata.json")"
 
+# while gathering logs from a private cluster, proxy setting is required for connecting cluster
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	echo "Going to enable client proxy by 'source ${SHARED_DIR}/proxy-conf.sh'"
+	source "${SHARED_DIR}/proxy-conf.sh"
+else
+	echo "No '${SHARED_DIR}/proxy-conf.sh' found, skip enabling cient proxy."
+fi
+
 if test -f "${KUBECONFIG}"
 then
 	oc --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' > "${TMPDIR}/node-provider-IDs.txt" &
