@@ -1,0 +1,33 @@
+chain:
+  as: cucushift-installer-rehearse-gcp-ipi-xpn-techpreview-provision
+  steps: 
+    - chain: ipi-conf-gcp
+    - ref: ipi-conf-credentials-mode
+    - ref: ipi-conf-feature-set
+    - ref: ipi-conf-gcp-xpn-network
+    - ref: ipi-conf-gcp-create-firewall-rules
+    - ref: ipi-conf-gcp-public-dns-zone
+    - chain: ipi-install
+    - ref: gcp-provision-public-dns-zone-ingress-records
+    - ref: enable-qe-catalogsource
+  env:
+  - name: CREDENTIALS_MODE
+    default: "Passthrough"
+    documentation: CCO mode.
+  - name: BASE_DOMAIN
+    documentation: The base domain.
+  - name: BASE_DOMAIN_ZONE_NAME
+    documentation: The public DNS zone name.
+  - name: BASE_DOMAIN_ZONE_PROJECT
+    documentation: The GCP project name, which the public DNS zone belongs to.
+  - name: CREATE_FIREWALL_RULES
+    default: "Disabled"
+    documentation: Create firewall-rules in the shared VPC or not.
+  - name: COMPUTE_NODES_TAGS
+    default: "preserved-ipi-xpn-compute"
+    documentation: Additional network tags applied to compute nodes, comma separated strings, e.g. "ocp-tag01,ocp-tag02".
+  - name: CONTROL_PLANE_NODES_TAGS
+    default: "preserved-ipi-xpn-control-plane"
+    documentation: Additional network tags applied to control-plane nodes, comma separated strings, e.g. "ocp-tag01,ocp-tag02".
+  documentation: |-
+    This chain contains all of the steps to provision an OpenShift cluster into a shared VPC on GCP.
