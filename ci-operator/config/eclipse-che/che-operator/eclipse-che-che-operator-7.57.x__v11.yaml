@@ -1,0 +1,53 @@
+base_images:
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+  cli-jq:
+    name: cli-jq
+    namespace: ocp
+    tag: latest
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: che-operator-update
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/test-harness-secrets/github-token)
+        build/scripts/oc-tests/oc-test-upgrade-from-stable-to-stable.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/test-harness-secrets
+        name: test-harness-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: 7.57.x
+  org: eclipse-che
+  repo: che-operator
+  variant: v11

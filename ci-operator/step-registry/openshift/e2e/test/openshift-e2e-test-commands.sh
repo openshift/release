@@ -40,6 +40,14 @@ fi
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+function cleanup() {
+    echo "Requesting risk analysis for test failures in this job run from sippy:"
+    openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true
+
+    echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"
+}
+trap cleanup EXIT
+
 mkdir -p "${HOME}"
 
 # Override the upstream docker.io registry due to issues with rate limiting
@@ -280,7 +288,6 @@ function suite() {
 }
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_START"
-trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-api-removals-in-4.9":"true"}}' --type=merge || echo 'failed to ack the 4.9 Kube v1beta1 removals; possibly API-server issue, or a pre-4.8 release image'
 
@@ -432,6 +439,3 @@ suite)
     exit 1
     ;;
 esac
-
-echo "Requesting risk analysis for test failures in this job run from sippy:"
-openshift-tests risk-analysis --junit-dir "${ARTIFACT_DIR}/junit" || true

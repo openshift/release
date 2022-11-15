@@ -36,8 +36,7 @@ CONFIG = {
         'us-east-2': 10,
     },
     'aws-qe-quota-slice': {
-        'us-east-1': 20,
-        'us-east-2': 25,
+        'us-east-1': 45,
     },
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
@@ -47,8 +46,8 @@ CONFIG = {
         'cn-northwest-1': 1,
     },
     'aws-usgov-qe-quota-slice': {
-        'us-gov-west-1': 5,
-        'us-gov-east-1': 5,
+        'us-gov-west-1': 10,
+        'us-gov-east-1': 10,
     },
     'aws-c2s-qe-quota-slice': {
         'us-iso-east-1': 8,
@@ -82,8 +81,8 @@ CONFIG = {
     },
     'azure-qe-quota-slice': {
         'northcentralus': 10,
-        'westus3': 10,
-        'centralus': 10
+        'southcentralus': 20,
+        'centralus': 30
     },
     'azure-arm64-qe-quota-slice': {
         'centralus': 6,

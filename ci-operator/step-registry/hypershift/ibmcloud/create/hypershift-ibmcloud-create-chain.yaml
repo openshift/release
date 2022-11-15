@@ -9,10 +9,16 @@ chain:
     - mount_path: /etc/ibmcloud/secrets
       name: hypershift-ibm-managed-ci-creds
       namespace: test-credentials
+    dependencies:
+    - env: HYPERSHIFT_RELEASE_LATEST
+      name: hypershift-operator
+    - env: OCP_IMAGE_LATEST
+      name: release:latest
     env:
     - name: BOM_VERSION
     - name: MANAGED_CLUSTER_TYPE
     - name: MANAGEMENT_CLUSTER_KUBECONFIG
+    - name: TEST_TYPE
     from_image:
       name: ibm-hypershift-testing
       namespace: ci
@@ -24,27 +30,3 @@ chain:
         cpu: 100m
         memory: 100Mi
     timeout: 120m0s
-  - as: verify-guest-cluster
-    commands: |-
-      export CLUSTER_ID="${BUILD_ID}"
-      ./cluster-verify.sh
-    credentials:
-    - mount_path: /etc/ibmcloud/secrets
-      name: hypershift-ibm-managed-ci-creds
-      namespace: test-credentials
-    env:
-    - name: BOM_VERSION
-    - name: MANAGED_CLUSTER_TYPE
-    - name: MANAGEMENT_CLUSTER_KUBECONFIG
-    - name: VERIFY_COMPLIANCE_OPERATOR_SCAN
-    from_image:
-      name: ibm-hypershift-testing
-      namespace: ci
-      tag: latest
-    grace_period: 10m0s
-    no_kubeconfig: true
-    resources:
-      requests:
-        cpu: 100m
-        memory: 100Mi
-    timeout: 30m0s

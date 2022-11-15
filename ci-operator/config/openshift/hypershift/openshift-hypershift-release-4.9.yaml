@@ -15,10 +15,16 @@ images:
     openshift_release_golang-1.17:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.17
-  to: hypershift
+  to: hypershift-operator
 promotion:
   namespace: hypershift
   tag: "4.9"
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.9"
+      namespace: ocp
 resources:
   '*':
     limits:
@@ -35,6 +41,26 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e-ibmcloud-iks
+  optional: true
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    env:
+      BOM_VERSION: 4.9.0_openshift
+      MANAGED_CLUSTER_TYPE: iks
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks-release.kubeconfig
+      TEST_TYPE: release
+    workflow: hypershift-ibmcloud-e2e-release
+- as: e2e-ibmcloud-roks
+  optional: true
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    env:
+      BOM_VERSION: 4.9.0_openshift
+      MANAGED_CLUSTER_TYPE: openshift
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks-release.kubeconfig
+      TEST_TYPE: release
+    workflow: hypershift-ibmcloud-e2e-release
 zz_generated_metadata:
   branch: release-4.9
   org: openshift

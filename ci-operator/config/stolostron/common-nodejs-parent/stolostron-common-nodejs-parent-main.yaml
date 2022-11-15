@@ -8,6 +8,8 @@ images:
   to: nodejs-14
 - dockerfile_path: Dockerfile.nodejs-16
   to: nodejs-16
+- dockerfile_path: Dockerfile.nodejs-18
+  to: nodejs-18
 promotion:
   name: common-nodejs-parent
   namespace: stolostron
@@ -37,6 +39,18 @@ tests:
     env:
       IMAGE_REPO: common-nodejs-parent
       IMAGE_TAG: nodejs-16
+      REGISTRY_HOST: registry.ci.openshift.org
+      REGISTRY_ORG: stolostron
+      REGISTRY_SECRET: acm-cicd-osci-push
+    workflow: ocm-ci-image-mirror-periodic
+- as: periodic-build-nodejs-18
+  cron: 0 6 * * *
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: nodejs-18
+    env:
+      IMAGE_REPO: common-nodejs-parent
+      IMAGE_TAG: nodejs-18
       REGISTRY_HOST: registry.ci.openshift.org
       REGISTRY_ORG: stolostron
       REGISTRY_SECRET: acm-cicd-osci-push
