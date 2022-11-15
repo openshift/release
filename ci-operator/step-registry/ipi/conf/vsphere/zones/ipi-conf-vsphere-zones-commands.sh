@@ -27,7 +27,6 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 cat >> "${CONFIG}" << EOF
 baseDomain: $base_domain
-featureSet: TechPreviewNoUpgrade
 controlPlane:
   name: "master"
   replicas: 3
