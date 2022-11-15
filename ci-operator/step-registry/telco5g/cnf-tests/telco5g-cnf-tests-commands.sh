@@ -33,7 +33,12 @@ EOF
 function create_tests_temp_skip_list_11 {
 # List of temporarly skipped tests for 4.11
 cat <<EOF >>"${SKIP_TESTS_FILE}"
-# Nothing to skip for 4.11
+# <feature> <test name>
+
+# SKIPTEST
+# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
+# TESTNAME
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
 EOF
 }
 
@@ -72,6 +77,11 @@ performance "should run infra containers on reserved CPUs"
 # PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
 # TESTNAME
 performance "Huge pages support for container workloads"
+
+# SKIPTEST
+# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
+# TESTNAME
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
 
 EOF
 }
