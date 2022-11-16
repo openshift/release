@@ -348,4 +348,30 @@ echo -e "${err_msg}\n"
 if [ -f "summary.txt" ]; then
     cat summary.txt
 fi
+
+# Create a HTML report
+for feature in ${FEATURES}; do
+    xml_f="${ARTIFACT_DIR}/${feature}/cnftests-junit.xml"
+    if [[ -f $xml_f ]]; then
+        cp $xml_f ${ARTIFACT_DIR}/cnftests-junit_${feature}.xml
+    fi
+    xml_v="${ARTIFACT_DIR}/${feature}/validation_junit.xml"
+    if [[ -f $xml_v ]]; then
+        cp $xml_v ${ARTIFACT_DIR}/validation_junit_${feature}.xml
+    fi
+    xml_s="${ARTIFACT_DIR}/${feature}/setup_junit.xml"
+    if [[ -f $xml_s ]]; then
+        cp $xml_s ${ARTIFACT_DIR}/setup_junit_${feature}.xml
+    fi
+done
+
+python3 -m venv ${SHARED_DIR}/myenv
+source ${SHARED_DIR}/myenv/bin/activate
+git clone https://github.com/sshnaidm/html4junit.git ${SHARED_DIR}/html4junit
+pip install -r ${SHARED_DIR}/html4junit/requirements.txt
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.html
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.html
+rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
+
 exit ${exit_code}
