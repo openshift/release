@@ -1,0 +1,541 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_4.10_cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
+  origin_4.12_cli:
+    name: "4.14"
+    namespace: origin
+    tag: cli
+  rhel-7:
+    name: builder
+    namespace: ocp
+    tag: rhel-7-golang-1.16-openshift-4.10
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: installer
+- dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  from: installer
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: installer-artifacts
+- dockerfile_path: images/libvirt/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: libvirt-installer
+- dockerfile_path: images/installer/Dockerfile.upi.ci
+  from: rhel-7
+  inputs:
+    ocp_4.10_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.10:cli
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: upi-installer
+- dockerfile_path: images/openstack/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    origin_4.12_cli:
+      as:
+      - registry.ci.openshift.org/origin/4.12:cli
+  to: openstack-installer
+- dockerfile_path: images/baremetal/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: baremetal-installer
+- dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: ovirt-installer
+promotion:
+  name: "4.14"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  aro-unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  baremetal-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  govet:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer-artifacts:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  libvirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  openstack-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  ovirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: aro-unit
+  commands: go test ./pkg/... -tags=aro
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: gofmt
+  commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: govet
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: golint
+  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
+    .ImportPath }}' ./...)
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: verify-codegen
+  commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
+  container:
+    from: src
+- as: e2e-aws-ovn
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-proxy
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-proxy
+- as: e2e-aws-upi-proxy
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-upi-proxy
+- as: e2e-aws-ovn-shared-vpc
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-sharednetwork
+- as: e2e-aws-ovn-imdsv2
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    env:
+      AWS_METADATA_SERVICE_AUTH: Required
+    workflow: openshift-e2e-aws
+- as: e2e-gcp-ovn
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-alibaba
+  optional: true
+  run_if_changed: (alibabacloud|aliyun|alicloud)
+  steps:
+    cluster_profile: alibabacloud
+    env:
+      TEST_SKIPS: \[StatefulSetBasic\] should not deadlock when a pod.s predecessor
+        fails\|\[StatefulSetBasic\] should perform rolling updates and roll backs
+        of template modifications with PVCs\|\[StatefulSetBasic\] should provide basic
+        identity\|\[StatefulSetBasic\] should adopt matching orphans and release non-matching
+        pods\|PVC Protection
+    workflow: openshift-e2e-alibabacloud
+- as: e2e-gcp-ovn-shared-vpc
+  optional: true
+  run_if_changed: gcp
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-sharednetwork
+- as: e2e-azure-ovn
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-azure-ovn-shared-vpc
+  optional: true
+  run_if_changed: azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-sharednetwork
+- as: e2e-azure-ovn-resourcegroup
+  optional: true
+  run_if_changed: azure
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-resourcegroup
+- as: e2e-aws-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws-latestinstaller
+- as: e2e-aws-ovn-upi
+  run_if_changed: ^(upi/aws/.*)|^(images/installer/Dockerfile\.upi.*)
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-upi
+- as: e2e-gcp-ovn-upi
+  run_if_changed: ^(upi/gcp/.*)|^(images/installer/Dockerfile\.upi.*)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-upi
+- as: e2e-gcp-upi-xpn
+  optional: true
+  run_if_changed: ^(upi/gcp/.*)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-upi-xpn
+- as: e2e-azure-ovn-upi
+  run_if_changed: ^(upi/(azure|azurestack)/.*)|^(images/installer/Dockerfile\.upi.*)
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-upi
+- as: e2e-aws-ovn-workers-rhel8
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      PLATFORM_VERSION: "8.4"
+    workflow: openshift-e2e-aws-workers-rhel
+- as: e2e-aws-ovn-disruptive
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-gcp-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp-latestinstaller
+- as: e2e-metal-ipi-sdn
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-sdn-swapped-hosts
+  cluster: build05
+  optional: true
+  run_if_changed: (baremetal|metal3-io)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+        HOSTS_SWAP_DEFINITION=true
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  run_if_changed: (baremetal|metal3-io)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
+  optional: true
+  run_if_changed: (baremetal|metal3-io)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-sdn-virtualmedia
+  cluster: build05
+  optional: true
+  run_if_changed: (baremetal|metal3-io)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-virtualmedia
+- as: e2e-openstack
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-upi
+  optional: true
+  run_if_changed: (^images/openstack/)|(^docs/user/openstack/install_upi\.md$)|(^upi/openstack/)
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      OPENSTACK_TEST_SKIPS: The OpenStack platform creates Worker nodes in a server
+        group\|The OpenStack platform creates Control plane nodes in a server group
+      TEST_SUITE: experimental/reliability/minimal
+    workflow: openshift-e2e-openstack-upi
+- as: e2e-openstack-sdn-parallel
+  optional: true
+  run_if_changed: openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-proxy
+  optional: true
+  run_if_changed: openstack
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-proxy
+- as: openstack-manifests
+  run_if_changed: openstack
+  steps:
+    cluster_profile: openstack-vexxhost
+    workflow: openshift-manifests-openstack
+- as: e2e-vsphere-ovn
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs)/)
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-upi
+  run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-upi
+- as: e2e-vsphere-zones
+  optional: true
+  steps:
+    cluster_profile: vsphere-multizone
+    workflow: openshift-e2e-vsphere-zones
+- as: e2e-crc
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-crc
+- as: e2e-libvirt
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-libvirt
+- as: e2e-metal-assisted
+  optional: true
+  skip_if_only_changed: (^(docs|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-baremetal
+- as: e2e-ovirt-sdn
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere)/)
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-minimal
+- as: e2e-aws-ovn-single-node
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-metal-single-node-live-iso
+  optional: true
+  run_if_changed: (baremetal|metal3-io)
+  steps:
+    cluster_profile: packet-sno
+    workflow: baremetalds-sno
+- as: e2e-aws-ovn-fips
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: openshift/conformance/parallel
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
+- as: e2e-openstack-kuryr
+  optional: true
+  run_if_changed: (openstack|gophercloud)
+  steps:
+    cluster_profile: openstack-kuryr
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      NETWORK_TYPE: Kuryr
+    test:
+    - ref: openstack-noop
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-azurestack
+  optional: true
+  run_if_changed: (azure|azurestack)
+  steps:
+    cluster_profile: azurestack
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
+    workflow: openshift-e2e-azurestack
+- as: e2e-azurestack-upi
+  optional: true
+  run_if_changed: ^(upi/(azure|azurestack)/.*)
+  steps:
+    cluster_profile: azurestack
+    env:
+      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
+    workflow: openshift-e2e-azurestack-upi
+- as: e2e-ibmcloud-ovn
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud
+- as: e2e-sdn-nutanix
+  cluster: build01
+  optional: true
+  run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
+- as: e2e-agent-compact
+  cluster: build05
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-mce
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        AGENT_DEPLOY_MCE=true
+    workflow: agent-e2e-generic
+- as: e2e-agent-sno
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4_DHCP
+    workflow: agent-e2e-generic
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: installer
