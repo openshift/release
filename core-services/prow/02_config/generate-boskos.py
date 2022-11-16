@@ -81,8 +81,8 @@ CONFIG = {
     },
     'azure-qe-quota-slice': {
         'northcentralus': 10,
-        'westus3': 10,
-        'centralus': 10
+        'southcentralus': 20,
+        'centralus': 30
     },
     'azure-arm64-qe-quota-slice': {
         'centralus': 6,

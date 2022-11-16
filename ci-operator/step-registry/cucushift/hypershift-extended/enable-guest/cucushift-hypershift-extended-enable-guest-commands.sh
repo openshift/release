@@ -7,10 +7,9 @@ if [ ! -f "${SHARED_DIR}/nested_kubeconfig" ]; then
 fi
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-NAMESPACE="clusters"
-CLUSTER_NAME=$(oc get hostedclusters -n clusters -o=jsonpath='{.items[0].metadata.name}')
+CLUSTER_NAME=$(oc get hostedclusters -n "$HYPERSHIFT_NAMESPACE" -o=jsonpath='{.items[0].metadata.name}')
 
-kubeadmin_password=$(oc get secret -n "$NAMESPACE-$CLUSTER_NAME" kubeadmin-password --template='{{.data.password | base64decode}}')
+kubeadmin_password=$(oc get secret -n "$HYPERSHIFT_NAMESPACE-$CLUSTER_NAME" kubeadmin-password --template='{{.data.password | base64decode}}')
 echo $kubeadmin_password > "$SHARED_DIR/hostedcluster_kubeadmin_password"
 echo "https://$(oc --kubeconfig="$SHARED_DIR"/nested_kubeconfig -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "$SHARED_DIR/hostedcluster_console.url"
 echo "hostedcluster_console.url path:$SHARED_DIR/hostedcluster_console.url"

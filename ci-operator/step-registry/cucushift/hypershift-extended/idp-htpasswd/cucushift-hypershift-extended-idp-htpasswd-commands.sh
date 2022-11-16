@@ -6,14 +6,14 @@ set -o errexit
 set -o pipefail
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-count=$(oc get hostedclusters --no-headers --ignore-not-found -n clusters | wc -l)
+count=$(oc get hostedclusters --no-headers --ignore-not-found -n "$HYPERSHIFT_NAMESPACE" | wc -l)
 echo "hostedcluster count: $count"
 if [ "$count" -lt 1 ]  ; then
     echo "namespace clusters don't have hostedcluster"
     exit 1
 fi
 #Limitation: we always & only select the first hostedcluster to add idp-htpasswd. "
-cluster_name=$(oc get hostedclusters -n clusters -o jsonpath='{.items[0].metadata.name}')
+cluster_name=$(oc get hostedclusters -n "$HYPERSHIFT_NAMESPACE" -o jsonpath='{.items[0].metadata.name}')
 
 # prepare users
 users=""
@@ -32,8 +32,8 @@ do
 done
 
 ## add users to cluster
-oc create secret generic "$cluster_name" --from-file=htpasswd="$htpass_file" -n clusters
-oc patch hostedclusters $cluster_name -n clusters --type=merge -p '{"spec":{"configuration":{"oauth":{"identityProviders":[{"htpasswd":{"fileData":{"name":"'$cluster_name'"}},"mappingMethod":"claim","name":"htpasswd","type":"HTPasswd"}]}}}}'
+oc create secret generic "$cluster_name" --from-file=htpasswd="$htpass_file" -n "$HYPERSHIFT_NAMESPACE"
+oc patch hostedclusters $cluster_name -n "$HYPERSHIFT_NAMESPACE" --type=merge -p '{"spec":{"configuration":{"oauth":{"identityProviders":[{"htpasswd":{"fileData":{"name":"'$cluster_name'"}},"mappingMethod":"claim","name":"htpasswd","type":"HTPasswd"}]}}}}'
 
 # store users in a shared file
 if [ -f "${SHARED_DIR}/runtime_env" ] ; then
