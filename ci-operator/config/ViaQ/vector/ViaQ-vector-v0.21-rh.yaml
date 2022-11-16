@@ -1,8 +1,56 @@
 base_images:
+  cluster-logging-operator-5-6:
+    name: "5.6"
+    namespace: logging
+    tag: cluster-logging-operator
+  cluster-logging-operator-e2e-5-6:
+    name: "5.6"
+    namespace: logging
+    tag: cluster-logging-operator-e2e
+  cluster-logging-operator-registry-5-6:
+    name: "5.6"
+    namespace: logging
+    tag: cluster-logging-operator-registry
+  elasticsearch-operator-5-6:
+    name: "5.6"
+    namespace: logging
+    tag: elasticsearch-operator
+  elasticsearch-operator-registry-5-6:
+    name: "5.6"
+    namespace: logging
+    tag: elasticsearch-operator-registry
+  elasticsearch-proxy:
+    name: 5.y
+    namespace: logging
+    tag: elasticsearch-proxy
+  log-file-metric-exporter:
+    name: 5.y
+    namespace: logging
+    tag: log-file-metric-exporter
+  logging-elasticsearch6:
+    name: 5.y
+    namespace: logging
+    tag: logging-elasticsearch6
+  logging-eventrouter:
+    name: 5.y
+    namespace: logging
+    tag: logging-eventrouter
+  logging-fluentd:
+    name: v1.14.x
+    namespace: logging
+    tag: logging-fluentd
+  logging-kibana6:
+    name: 5.y
+    namespace: logging
+    tag: logging-kibana6
+  oauth-proxy:
+    name: "4.9"
+    namespace: ocp
+    tag: oauth-proxy
   ubi8:
     name: builder
     namespace: ocp
-    tag: rhel-8-base-openshift-4.10
+    tag: rhel-8-base-openshift-4.11
 build_root:
   image_stream_tag:
     name: release
@@ -11,10 +59,10 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   from: ubi8
-  to: vector
+  to: logging-vector
 - dockerfile_path: Dockerfile.unit
   from: ubi8
-  to: vector-test-unit
+  to: logging-vector-test-unit
 promotion:
   name: v0.21-rh
   namespace: logging
@@ -35,16 +83,93 @@ tests:
 - as: unit
   commands: make test
   container:
-    from: vector-test-unit
+    from: logging-vector-test-unit
 - as: cargo-deny-check-bans
   commands: cargo deny --no-default-features --features ocp-logging --offline check
     bans
   container:
-    from: vector-test-unit
+    from: logging-vector-test-unit
 - as: ldd-openssl
   commands: ldd /usr/bin/vector | egrep 'libcrypto|libssl'
   container:
-    from: vector
+    from: logging-vector
+- as: cluster-logging-operator-e2e-5-6
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: export GINKGO_OPTS="-ginkgo.skip fluentd"; FAKE_HOME_DIR=/tmp/home
+        LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry-5-6
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator-5-6
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry-5-6
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-6
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e-5-6
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-gcp
+  timeout: 5h0m0s
+- as: clo-functional-5-6
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-functional-vector
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry-5-6
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator-5-6
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator-5-6
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e-5-6
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: v0.21-rh
   org: ViaQ
