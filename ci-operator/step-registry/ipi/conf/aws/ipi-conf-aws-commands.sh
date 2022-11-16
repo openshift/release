@@ -85,18 +85,25 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
     COMPUTE_NODE_TYPE="m5.xlarge"
   fi
-  arch_instance_type="m5"
-  CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+
+  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+    arch_instance_type="m5"
+    CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+  fi
 elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
   # ARM 64
   architecture="arm64"
   if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
     COMPUTE_NODE_TYPE="m6g.xlarge"
   fi
-  arch_instance_type="m6g"
-  CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+
+  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+    arch_instance_type="m6g"
+    CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+  fi
 else
   # AMD 64
+
   # m6a (AMD) are more cost effective than other x86 instance types
   # for general purpose work. Use by default, when supported in the
   # region.
@@ -108,6 +115,14 @@ else
   # Do not change auto-types unless it is coordinated with the cloud
   # financial operations team. Savings plans may be in place to
   # decrease the cost of certain instance families.
+  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+      CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
+    else
+      CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+    fi
+  fi
+
   if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
     if [[ "${IS_M6A_REGION}" == "yes" ]]; then
       COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
@@ -116,11 +131,6 @@ else
     fi
   fi
 
-  if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-    CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
-  else
-    CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
-  fi
   arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
 fi
 
