@@ -301,10 +301,10 @@ OUTPOST_PUB=$(aws --region "${REGION}" cloudformation describe-stacks --stack-na
 echo "${OUTPOST_PUB}" > "$SHARED_DIR/outpost_prv_subn" 
 
 NET='ovnKubernetesConfig:'
-MTU='1200'
+MTU='mtu: 1200'
 if [[ "$(yq-go r ${CONFIG} 'networking.networkType')" == "OpenShiftSDN" ]]; then
   NET='openshiftSDNConfig:'
-  MTU='1250'
+  MTU='mtu: 1250'
 fi
 cat << _EOF > "${SHARED_DIR}/cluster-network-03-config.yml"
 apiVersion: operator.openshift.io/v1
