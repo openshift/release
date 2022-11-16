@@ -23,8 +23,8 @@ function run_ssh_cmd() {
     local user=$2
     local host=$3
     local remote_cmd=$4
-    local options=$5
-    options+=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
+
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
     cmd="ssh ${options} -i \"${sshkey}\" ${user}@${host} \"${remote_cmd}\""
     run_command "$cmd" || return 2
     return 0
@@ -36,8 +36,8 @@ function run_scp_to_remote() {
     local host=$3
     local src=$4
     local dest=$5
-    local options=$6
-    options+=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
+
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
     cmd="scp ${options} -i \"${sshkey}\" ${src} ${user}@${host}:${dest}"
     run_command "$cmd" || return 2
     return 0
@@ -49,8 +49,8 @@ function run_scp_from_remote() {
     local host=$3
     local src=$4
     local dest=$5
-    local options=$6
-    options+=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
+
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
     cmd="scp ${options} -i \"${sshkey}\" ${user}@${host}:${src} ${dest}"
     run_command "$cmd" || return 2
     return 0
