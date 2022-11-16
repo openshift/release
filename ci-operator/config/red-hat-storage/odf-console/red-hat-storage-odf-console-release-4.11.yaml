@@ -1,0 +1,74 @@
+base_images:
+  base:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
+images:
+- dockerfile_path: Dockerfile.ci
+  inputs:
+    base:
+      as:
+      - node:15
+  to: odf-console
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  steps:
+    test:
+    - as: lint
+      commands: yarn install && yarn run lint
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: odf-console-e2e-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      ODF_CONSOLE_FULL_IMG_NAME: odf-console
+    env:
+      COMPUTE_NODE_TYPE: m4.2xlarge
+      ZONES_COUNT: "1"
+    test:
+    - as: tests
+      cli: latest
+      commands: ./test-prow-e2e.sh ${ODF_CONSOLE_FULL_IMG_NAME};
+      credentials:
+      - mount_path: /var/run/operator-secret
+        name: operator-secret
+        namespace: test-credentials
+      dependencies:
+      - env: ODF_CONSOLE_FULL_IMG_NAME
+        name: odf-console-img
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.11
+  org: red-hat-storage
+  repo: odf-console

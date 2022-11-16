@@ -34,6 +34,7 @@ $CONTAINER_ENGINE run --rm -v "${BASE_DIR}/core-services/ci-secret-bootstrap/_co
   --vault-prefix=kv \
   --config=/_config.yaml \
   --kubeconfig-dir=/tmp/build-farm-credentials \
+  --kubeconfig-suffix=config
   --dry-run=${dry_run} \
   --force=${force} \
   --cluster=${cluster} \

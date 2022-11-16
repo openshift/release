@@ -158,9 +158,9 @@ CLUSTER_ID_FILE="${SHARED_DIR}/cluster-id"
 CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"
 CLUSTER_INSTALL_LOG="${ARTIFACT_DIR}/.install.log"
 
-rosa create cluster --sts \
+# The default cluster mode is sts now
+rosa create cluster -y \
                     --mode auto \
-                    -y \
                     --cluster-name "${CLUSTER_NAME}" \
                     --role-arn "${Account_Installer_Role_ARN}" \
                     --controlplane-iam-role "${Account_ControlPlane_Role_ARN}" \

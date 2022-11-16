@@ -1,5 +1,43 @@
 
 def generate_signer_resources(gendoc):
+    resources = gendoc
+    context = gendoc.context
+
+    resources.append({
+        'apiVersion': 'authorization.openshift.io/v1',
+        'kind': 'Role',
+        'metadata': {
+            'name': 'release-controller-signer',
+            'namespace': 'ocp'
+        },
+        'rules': [
+            {
+                'apiGroups': [''],
+                'resourceNames': ['release-upgrade-graph'],
+                'resources': ['secrets'],
+                'verbs': ['get', 'list', 'watch']
+            }
+        ]
+    })
+
+    resources.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'release-controller-signer-binding',
+            'namespace': 'ocp',
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Role',
+            'name': 'release-controller-signer'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'release-controller',
+            'namespace': context.config.rc_deployment_namespace
+        }]
+    })
 
     gendoc.add_comments("""
 The signer watches all release tags and signs those that have the correct metadata and images are reachable (according
@@ -42,10 +80,6 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                         'name': 'release-controller-kubeconfigs',
                         'secret': {
                             'secretName': 'release-controller-kubeconfigs',
-                            'items': [{
-                                'key': 'sa.release-controller-ocp.app.ci.config',
-                                'path': 'kubeconfig'
-                            }]
                         }
                     }, {
                         'name': 'signer',
@@ -62,7 +96,7 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                             'readOnly': True
                         }, {
                             'name': 'release-controller-kubeconfigs',
-                            'mountPath': '/etc/kubeconfig',
+                            'mountPath': '/etc/kubeconfigs',
                             'readOnly': True
                         }, {
                             'name': 'signer',
@@ -74,7 +108,6 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                             '--release-namespace=ocp',
                             '--release-namespace=origin',
                             '--job-namespace=ci-release',
-                            '--non-prow-job-kubeconfig=/etc/kubeconfig/kubeconfig',
                             '--tools-image-stream-tag=4.6:tests',
                             '--audit=gs://openshift-ci-release/releases',
                             '--sign=/etc/release-controller/signer/openshift-ci.gpg',

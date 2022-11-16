@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -euo pipefail
+set -x
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -36,8 +37,16 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 
 cat  > "${HOME}"/run-test.sh <<'EOF'
+#!/bin/bash
+set -euo pipefail
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-openshift-tests run -v 2 --provider=none -f suite.txt
+set +e
+openshift-tests run -v 2 --provider=none -f suite.txt -o /home/rhel8user/e2e.log --junit-dir /home/rhel8user/junit
+res=$?
+set -e
+chown rhel8user:rhel8user /home/rhel8user/e2e.log
+chown -R rhel8user:rhel8user /home/rhel8user/junit
+exit $res
 EOF
 chmod +x "${HOME}"/run-test.sh
 
@@ -48,7 +57,24 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/run-test.sh rhel8user@"${INSTANCE_PREFIX}":~/run-test.sh
 
+set +e
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo ~/run-test.sh'
+res=$?
+set -e
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse rhel8user@"${INSTANCE_PREFIX}":~/e2e.log "${ARTIFACT_DIR}/e2e.log"
+
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse rhel8user@"${INSTANCE_PREFIX}":~/junit "${ARTIFACT_DIR}/junit"
+
+exit $res

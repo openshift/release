@@ -7,10 +7,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.8
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -21,10 +17,6 @@ canonical_go_repository: github.com/openshift/cluster-api-provider-baremetal
 images:
 - dockerfile_path: Dockerfile.rhel
   from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: baremetal-machine-controllers
 promotion:
   name: 4.8-priv
@@ -49,15 +41,24 @@ tests:
   commands: ./hack/ci-test.sh
   container:
     from: src
+  skip_if_only_changed: (^(docs|config)/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
 - as: e2e-metal-ipi
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-upgrade
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -69,10 +70,16 @@ tests:
       TEST_TYPE: upgrade
     workflow: baremetalds-e2e-upgrade
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-virtualmedia
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
@@ -80,14 +87,17 @@ tests:
   commands: make fmt
   container:
     from: src
+  skip_if_only_changed: (^(docs|config)/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
 - as: govet
   commands: make vet
   container:
     from: src
+  skip_if_only_changed: (^(docs|config)/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
 - as: generate-check
   commands: make generate-check
   container:
     from: src
+  skip_if_only_changed: (^docs\/)|(^.*\.md$)|((^|/)(DCO|LICENSE|OWNERS|PROJECT)$)
 zz_generated_metadata:
   branch: release-4.8
   org: openshift-priv

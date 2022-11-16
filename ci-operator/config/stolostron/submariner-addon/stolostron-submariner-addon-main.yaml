@@ -6,7 +6,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.43.0
+    tag: v1.46.0
   stolostron_builder_go1.18-linux:
     name: builder
     namespace: stolostron
@@ -26,8 +26,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.18-linux
   to: submariner-addon
 promotion:
-  disabled: true
-  name: "2.6"
+  name: "2.7"
   namespace: stolostron
 releases:
   initial:
@@ -56,12 +55,6 @@ tests:
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
-  container:
-    from: bin
-- as: verify-deps
-  commands: |
-    make update-deps-overrides
-    make verify-deps -k --warn-undefined-variables
   container:
     from: bin
 - as: integration
@@ -98,6 +91,12 @@ tests:
       IMAGE_TAG: latest
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.7
+    workflow: ocm-ci-fastforward
 - as: golangci-lint
   commands: |
     export GOCACHE=/tmp/

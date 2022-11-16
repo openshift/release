@@ -46,6 +46,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
   to: hello-openshift
 promotion:
+  disabled: true
   name: 4.13-priv
   namespace: ocp-private
 releases:
@@ -76,6 +77,12 @@ resources:
       cpu: "3"
       memory: 8Gi
 tests:
+- as: unit
+  commands: GOTEST_FLAGS='-p 8' hack/test-go.sh
+  container:
+    from: src
+    memory_backed_volume:
+      size: 4Gi
 - as: verify
   commands: |
     make verify -k --warn-undefined-variables
@@ -128,7 +135,7 @@ tests:
     env:
       TEST_SUITE: openshift/test-cmd
     workflow: openshift-e2e-azure
-- as: e2e-gcp-builds
+- as: e2e-gcp-ovn-builds
   run_if_changed: ^(pkg/oc/cli/startbuild/startbuild.go)|^(pkg/build)|^(staging/src/.*/pkg/.*build)|^(pkg/cmd/infra/builder)|^(test/extended/builds)|^(test/extended/testdata/builds)|^(test/extended/util)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -162,12 +169,12 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_SUITE: openshift/jenkins-e2e
     workflow: openshift-e2e-aws-jenkins
-- as: e2e-gcp-image-ecosystem
+- as: e2e-gcp-ovn-image-ecosystem
   run_if_changed: ^(test/extended/image_ecosystem)|^(examples/db-templates)|^(examples/quickstarts)|^(examples/image-streams)|^(examples/jenkins)|^(vendor/github.com/openshift/source-to-image)|^(vendor/github.com/openshift/imagebuilder)
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-image-ecosystem
-- as: e2e-aws-image-registry
+- as: e2e-aws-ovn-image-registry
   run_if_changed: ^(pkg/image)|^(test/extended/registry)|^(test/extended/images)|^(test/extended/imageapis)|^(vendor/github.com/docker/distribution)
   steps:
     cluster_profile: aws-2
@@ -189,7 +196,7 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-csi
-- as: e2e-aws-upgrade
+- as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws-2
@@ -243,32 +250,38 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-sdn-multi
-- as: e2e-metal-ipi
+- as: e2e-metal-ipi-sdn
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-dualstack
 - as: e2e-metal-ipi-virtualmedia
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
 - as: e2e-metal-ipi-serial
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
 - as: e2e-metal-ipi-serial-ovn-ipv6
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -296,7 +309,7 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-single-node
-- as: e2e-openstack
+- as: e2e-openstack-ovn
   optional: true
   steps:
     cluster_profile: openstack-vexxhost
@@ -304,6 +317,21 @@ tests:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-kuryr
+  optional: true
+  steps:
+    cluster_profile: openstack-kuryr
+    env:
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: minimal
+      NETWORK_TYPE: Kuryr
+      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
+        the type from ExternalName to ClusterIP \| Pods should delete a collection
+        of pods \| Kubectl client Guestbook application should create and stop a working
+        application \| Services should serve multiport endpoints from pods \| Services
+        should serve a basic endpoint from pods
+      TEST_SUITE: kubernetes/conformance
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-serial
   optional: true

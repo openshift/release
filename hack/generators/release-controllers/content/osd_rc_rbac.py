@@ -20,6 +20,11 @@ def add_osd_rc_service_account_resources(gendoc):
                 'apiGroups': ['prow.k8s.io'],
                 'resources': ['prowjobs'],
                 'verbs': ['*']
+            }, {
+                'apiGroups': [''],
+                'resourceNames': ['release-upgrade-graph'],
+                'resources': ['secrets'],
+                'verbs': ['get']
             }]
         },
         {

@@ -1,0 +1,23 @@
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: ci-chat-bot
+  namespace: ci
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+    haproxy.router.openshift.io/timeout: 2m
+spec:
+  tls:
+    - hosts:
+        - clusterbot.ci.openshift.org
+      secretName: clusterbot-tls
+  rules:
+    - host: clusterbot.ci.openshift.org
+      http:
+        paths:
+          - backend:
+              service:
+                name: ci-chat-bot
+                port:
+                  number: 8080
+            pathType: ImplementationSpecific

@@ -12,14 +12,18 @@ expiration_date=$(date -d '8 hours' --iso=minutes --utc)
 
 function join_by { local IFS="$1"; shift; echo "$*"; }
 
-REGION="${LEASED_RESOURCE}"
 
-# m6a (AMD) are more cost effective than other x86 instance types
-# for general purpose work. Use by default, when supported in the
-# region.
-IS_M6A_REGION="no"
-if aws ec2 describe-instance-type-offerings --region "${REGION}" | grep -q m6a ; then
-  IS_M6A_REGION="yes"
+# REGION: the region that OCP will be installed
+# aws_source_region: for non-C2S/SC2S cluster, it's the same as REGION, for C2S/SC2S it's the source region that emulator runs on.
+#             e.g. for instance, if installing a cluster on a C2S (us-iso-east-1) region and its emulator runs on us-east-1:
+#                  so the REGION is us-iso-east-1, and aws_source_region is us-east-1
+REGION="${LEASED_RESOURCE}"
+aws_source_region="${REGION}"
+
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
+  # in C2S/SC2S use source_region (us-east-1) to communicate with AWS services
+  aws_source_region=$(jq -r ".\"${REGION}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
+  echo "C2S/SC2S source region: $aws_source_region"
 fi
 
 function eval_instance_capacity() {
@@ -59,16 +63,9 @@ function eval_instance_capacity() {
   set -o errexit
 }
 
-# Do not change auto-types unless it is coordinated with the cloud
-# financial operations team. Savings plans may be in place to
-# decrease the cost of certain instance families.
-if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
-  if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-    COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
-  else
-    COMPUTE_NODE_TYPE="m6i.xlarge"
-  fi
-fi
+
+# BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
+architecture=${OCP_ARCH:-"amd64"}
 
 CONTROL_PLANE_INSTANCE_SIZE="xlarge"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
@@ -79,22 +76,61 @@ elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
   CONTROL_PLANE_INSTANCE_SIZE="2xlarge"
 fi
 
-# BootstrapInstanceType gets its value from pkg/types/aws/defaults/platform.go
-architecture=${OCP_ARCH:-"amd64"}
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
+  # C2S & SC2S
 
-if [[ "${CLUSTER_TYPE}" == "aws-arm64" ]]; then
-  architecture="arm64"
-fi
+  # Not all instance family are supported by SHIFT emulator
+  #   see https://bugzilla.redhat.com/show_bug.cgi?id=2020181
 
-if [[ x"${architecture}" == x"arm64" ]]; then
-  arch_instance_type=m6g
-  CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
-else
-  if [[ "${IS_M6A_REGION}" == "yes" ]]; then
-    CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
-  else
-    CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+    COMPUTE_NODE_TYPE="m5.xlarge"
   fi
+
+  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+    arch_instance_type="m5"
+    CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+  fi
+elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
+  # ARM 64
+  architecture="arm64"
+  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+    COMPUTE_NODE_TYPE="m6g.xlarge"
+  fi
+
+  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+    arch_instance_type="m6g"
+    CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+  fi
+else
+  # AMD 64
+
+  # m6a (AMD) are more cost effective than other x86 instance types
+  # for general purpose work. Use by default, when supported in the
+  # region.
+  IS_M6A_REGION="no"
+  if aws ec2 describe-instance-type-offerings --region "${REGION}" | grep -q m6a ; then
+    IS_M6A_REGION="yes"
+  fi
+
+  # Do not change auto-types unless it is coordinated with the cloud
+  # financial operations team. Savings plans may be in place to
+  # decrease the cost of certain instance families.
+  if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
+    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+      CONTROL_PLANE_INSTANCE_TYPE=$(eval_instance_capacity "m6a.${CONTROL_PLANE_INSTANCE_SIZE}" "m6i.${CONTROL_PLANE_INSTANCE_SIZE}")
+    else
+      CONTROL_PLANE_INSTANCE_TYPE="m6i.${CONTROL_PLANE_INSTANCE_SIZE}"
+    fi
+  fi
+
+  if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+    if [[ "${IS_M6A_REGION}" == "yes" ]]; then
+      COMPUTE_NODE_TYPE=$(eval_instance_capacity "m6a.xlarge" "m6i.xlarge")
+    else
+      COMPUTE_NODE_TYPE="m6i.xlarge"
+    fi
+  fi
+
   arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
 fi
 
@@ -106,23 +142,23 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
 fi
 
 # Generate working availability zones from the region
-mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
+mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
 # Generate availability zones with OpenShift Installer required instance types
 
 if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then ## all regions are the same
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
+  mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
 elif [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == null && "${COMPUTE_NODE_TYPE}" == null  ]]; then ## two null regions
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
+  mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
 elif [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == null || "${COMPUTE_NODE_TYPE}" == null ]]; then ## one null region
   if [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" || "${CONTROL_PLANE_INSTANCE_TYPE}" == "${COMPUTE_NODE_TYPE}" ]]; then ## "one null region and duplicates"
-    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
+    mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 1 ' | awk '{print $2}')
   else ## "one null region and no duplicates"
-    mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
+    mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
   fi
 elif [[ "${BOOTSTRAP_NODE_TYPE}" == "${COMPUTE_NODE_TYPE}" || "${BOOTSTRAP_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" || "${CONTROL_PLANE_INSTANCE_TYPE}" == "${COMPUTE_NODE_TYPE}" ]]; then ## duplicates regions with no null region
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
+  mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 2 ' | awk '{print $2}')
 elif [[ "${BOOTSTRAP_NODE_TYPE}" != "${COMPUTE_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" != "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then   # three different regions
-  mapfile -t INSTANCE_ZONES < <(aws --region "${REGION}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 3 ' | awk '{print $2}')
+  mapfile -t INSTANCE_ZONES < <(aws --region "${aws_source_region}" ec2 describe-instance-type-offerings --location-type availability-zone --filters Name=instance-type,Values="${BOOTSTRAP_NODE_TYPE}","${CONTROL_PLANE_INSTANCE_TYPE}","${COMPUTE_NODE_TYPE}" | jq -r '.InstanceTypeOfferings[].Location' | sort | uniq -c | grep ' 3 ' | awk '{print $2}')
 fi
 # Generate availability zones based on these 2 criteria
 mapfile -t ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
@@ -182,16 +218,56 @@ EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+rm /tmp/pull-secret
+
+# excluding older releases because of the bug fixed in 4.10, see: https://bugzilla.redhat.com/show_bug.cgi?id=1960378
+if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
+  MIRROR_REGION="us-east-1"
+  if [ "$REGION" == "us-west-1" ] || [ "$REGION" == "us-east-2" ] || [ "$REGION" == "us-west-2" ] ; then
+    MIRROR_REGION="${REGION}"
+  fi
+
+  PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
+  cat > "${PATCH}" << EOF
+imageContentSources:
+- mirrors:
+  - quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com
+  source: quay.io
+EOF
+
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+
+  pull_secret=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
+  mirror_auth=$(echo ${pull_secret} | jq '.auths["quay.io"].auth' -r)
+  pull_secret_aws=$(jq --arg auth ${mirror_auth} --arg repo "quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com" '.["auths"] += {($repo): {$auth}}' <<<  $pull_secret)
+
+  PATCH="/tmp/install-config-pull-secret-aws.yaml.patch"
+  cat > "${PATCH}" << EOF
+pullSecret: >
+  $(echo "${pull_secret_aws}" | jq -c .)
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  rm "${PATCH}"
+fi
+
 # custom rhcos ami for non-public regions
 RHCOS_AMI=
 if [ "$REGION" == "us-gov-west-1" ] || [ "$REGION" == "us-gov-east-1" ] || [ "$REGION" == "cn-north-1" ] || [ "$REGION" == "cn-northwest-1" ]; then
   # TODO: move repo to a more appropriate location
   curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-non-public-regions/images.json -o /tmp/ami.json
-  oc registry login
-  # ocp_version=4.9 4.10 etc.
-  ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
   RHCOS_AMI=$(jq -r .architectures.x86_64.images.aws.regions.\"${REGION}\".\"${ocp_version}\".image /tmp/ami.json)
   echo "RHCOS_AMI: $RHCOS_AMI, ocp_version: $ocp_version"
+fi
+
+if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
+  jq --version
+  openshift-install version
+  RHCOS_AMI=$(openshift-install coreos print-stream-json | jq -r ".architectures.x86_64.images.aws.regions.\"${aws_source_region}\".image")
 fi
 
 if [ ! -z ${RHCOS_AMI} ]; then

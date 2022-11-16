@@ -3,6 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+  stolostron_builder_go1.19-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -10,9 +14,9 @@ images:
 - dockerfile_path: build/Dockerfile
   from: base
   inputs:
-    root:
+    stolostron_builder_go1.19-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
   to: governance-policy-propagator
 promotion:
   disabled: true
@@ -32,23 +36,6 @@ tests:
       IMAGE_REPO: governance-policy-propagator
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: test-unit
-  commands: |
-    export HOME="/tmp"
-    make test
-  container:
-    from: src
-- as: sonarcloud
-  commands: |
-    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/test\/e2e/ {printf $0" "}')"
-    export SELF="make -f Makefile.prow"
-    export HOME="/tmp"
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
 - as: latest-image-mirror
   postsubmit: true
   steps:

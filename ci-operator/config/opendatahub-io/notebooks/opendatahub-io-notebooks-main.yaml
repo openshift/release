@@ -2,14 +2,48 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: rhel-8-release-golang-1.17-openshift-4.10
 images:
 - context_dir: base/ubi8-python-3.8
   dockerfile_path: Dockerfile
   to: base-ubi8-python-3.8
+- context_dir: jupyter/minimal/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: base-ubi8-python-3.8
+  to: jupyter-minimal-ubi8-python-3.8
+- context_dir: jupyter/datascience/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: jupyter-minimal-ubi8-python-3.8
+  to: jupyter-datascience-ubi8-python-3.8
+- context_dir: cuda/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: base-ubi8-python-3.8
+  to: cuda-ubi8-python-3.8
+- context_dir: jupyter/minimal/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: cuda-ubi8-python-3.8
+  to: cuda-jupyter-minimal-ubi8-python-3.8
+- context_dir: jupyter/datascience/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: cuda-jupyter-minimal-ubi8-python-3.8
+  to: cuda-jupyter-datascience-ubi8-python-3.8
+- context_dir: jupyter/pytorch/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: cuda-jupyter-datascience-ubi8-python-3.8
+  to: cuda-jupyter-pytorch-ubi8-python-3.8
+- context_dir: jupyter/tensorflow/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: cuda-jupyter-datascience-ubi8-python-3.8
+  to: cuda-jupyter-tensorflow-ubi8-python-3.8
 promotion:
   namespace: opendatahub-io
   tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.10"
 resources:
   '*':
     requests:
@@ -18,7 +52,6 @@ resources:
 tests:
 - as: notebook-base-ubi8-python-3-8-image-mirror
   postsubmit: true
-  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: base-ubi8-python-3.8
@@ -35,6 +68,240 @@ tests:
       IMAGE_REPO: notebooks
       RELEASE_VERSION: base-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-minimal-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-minimal-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-minimal-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-minimal-ubi8-python-3-8-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-minimal-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-minimal-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-datascience-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-datascience-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-datascience-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-datascience-ubi8-python-3-8-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-datascience-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-datascience-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-ubi8-python-3-8-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-minimal-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-minimal-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-minimal-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-minimal-ubi8-python-3-8-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-minimal-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-minimal-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-ds-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-datascience-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-datascience-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-ds-ubi8-python-3-8-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-datascience-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-datascience-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-pytorch-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-pytorch-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-pytorch-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-pytorch-ubi8-python-3-8-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-pytorch-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-pytorch-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-tf-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-tensorflow-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-tensorflow-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-tf-ubi8-python-3-8-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-tensorflow-ubi8-python-3.8
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-tensorflow-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebooks-e2e-tests
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: jupyter-minimal-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-minimal-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
+        make deploy-jupyter-minimal-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-minimal-ubi8-python-3.8
+        make undeploy-jupyter-minimal-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_MINIMAL_IMAGE
+        name: jupyter-minimal-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-datascience-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-datascience-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
+        make deploy-jupyter-datascience-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-datascience-ubi8-python-3.8
+        make undeploy-jupyter-datascience-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_DATA_SCIENCE_IMAGE
+        name: jupyter-datascience-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-minimal-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project cuda-jupyter-minimal-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
+        make deploy-cuda-jupyter-minimal-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-cuda-jupyter-minimal-ubi8-python-3.8
+        make undeploy-cuda-jupyter-minimal-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_MINIMAL_IMAGE
+        name: cuda-jupyter-minimal-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-datascience-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project cuda-jupyter-datascience-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
+        make deploy-cuda-jupyter-datascience-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-cuda-jupyter-datascience-ubi8-python-3.8
+        make undeploy-cuda-jupyter-datascience-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_DATA_SCIENCE_IMAGE
+        name: cuda-jupyter-datascience-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-pytorch-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project cuda-jupyter-pytorch-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_PYTORCH_IMAGE}"
+        make deploy-cuda-jupyter-pytorch-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-cuda-jupyter-pytorch-ubi8-python-3.8
+        make undeploy-cuda-jupyter-pytorch-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_PYTORCH_IMAGE
+        name: cuda-jupyter-pytorch-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-tensorflow-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project cuda-jupyter-tensorflow-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TENSORFLOW_IMAGE}"
+        make deploy-cuda-jupyter-tensorflow-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-cuda-jupyter-tensorflow-ubi8-python-3.8
+        make undeploy-cuda-jupyter-tensorflow-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_TENSORFLOW_IMAGE
+        name: cuda-jupyter-tensorflow-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

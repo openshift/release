@@ -47,12 +47,18 @@ do
   SECRET_NAME=$(yq -r .spec.secretRef.name "/tmp/credentials-request/${f}")
   SECRET_NAMESPACE=$(yq -r .spec.secretRef.namespace "/tmp/credentials-request/${f}")
   FEATURE_GATE=$(yq -r '.metadata.annotations."release.openshift.io/feature-gate"' "/tmp/credentials-request/${f}")
+  FEATURE_SET=$(yq -r '.metadata.annotations."release.openshift.io/feature-set"' "/tmp/credentials-request/${f}")
 
 # 4.10 includes techpreview of CAPI which without the namespace: openshift-cluster-api
 # fails to bootstrap. Below checks if TechPreviewNoUpgrade is annotated and if so skips
-# creating that secret.
+# creating that secret. In 4.12 the annotation was changed from feature-gate -> feature-set.
+# So check for both.
 
   if [[ $FEATURE_GATE == *"TechPreviewNoUpgrade"* ]]; then
+      continue
+  fi
+
+  if [[ $FEATURE_SET == *"TechPreviewNoUpgrade"* ]]; then
       continue
   fi
 

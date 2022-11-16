@@ -60,7 +60,7 @@ data="{
 subnet_name="${LEASED_RESOURCE}"
 slice_number=${LEASED_RESOURCE: -1}
 
-if [[ ! -z "${one_net_mode_network_name}" ]]; then
+if [[ ! -z "${one_net_mode_network_name:-}" ]]; then
   subnet_name="${one_net_mode_network_name}"
 fi
 
@@ -113,5 +113,5 @@ export PE_STORAGE_CONTAINER='${prism_element_storage_container}'
 export SUBNET_UUID='${subnet_uuid}'
 export API_VIP='${API_VIP}'
 export INGRESS_VIP='${INGRESS_VIP}'
-export OVERRIDE_RHCOS_IMAGE='${override_rhcos_image}'
+export OVERRIDE_RHCOS_IMAGE='${override_rhcos_image:-}'
 EOF

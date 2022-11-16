@@ -102,12 +102,29 @@ EOF
 # camgi is a tool that creates an html document for investigating an OpenShift cluster
 # see https://github.com/elmiko/camgi.rs for more information
 function installCamgi() {
-    CAMGI_VERSION="0.7.2"
+    CAMGI_VERSION="0.8.1"
     pushd /tmp
+
+    # no internet access in C2S/SC2S env, disable proxy
+    if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+      if [ ! -f "${SHARED_DIR}/unset-proxy.sh" ]; then
+        echo "ERROR, unset-proxy.sh does not exist."
+        return 1
+      fi
+      source "${SHARED_DIR}/unset-proxy.sh"
+    fi
 
     curl -L -o camgi.tar https://github.com/elmiko/camgi.rs/releases/download/v"$CAMGI_VERSION"/camgi-"$CAMGI_VERSION"-linux-x86_64.tar
     tar xvf camgi.tar
     sha256sum -c camgi.sha256
+
+    if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
+      if [ ! -f "${SHARED_DIR}/proxy-conf.sh" ]; then
+        echo "ERROR, proxy-conf.sh does not exist."
+        return 1
+      fi
+      source "${SHARED_DIR}/proxy-conf.sh"
+    fi
 
     popd
 }

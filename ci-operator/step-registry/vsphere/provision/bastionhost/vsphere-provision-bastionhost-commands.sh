@@ -14,6 +14,11 @@ if [[ ! -f "${bastion_ignition_file}" ]]; then
 fi
 bastion_ignition_base64=$(base64 -w0 < "${bastion_ignition_file}")
 
+if [[ -z "${BASTION_HOST_SUBNET}" ]]; then
+  echo "Not define env BASTION_HOST_SUBNET, bastion host will be provisioned in network defined as LEASED_RESOURCE..."
+  BASTION_HOST_SUBNET=${LEASED_RESOURCE}
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
@@ -131,6 +136,9 @@ echo "core" > "${SHARED_DIR}/bastion_ssh_user"
 proxy_credential=$(cat /var/run/vault/proxy/proxy_creds)
 proxy_private_url="http://${proxy_credential}@${bastion_ip}:3128"
 echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
+
+# echo proxy IP to ${SHARED_DIR}/proxyip
+echo "${bastion_ip}" > "${SHARED_DIR}/proxyip"
 
 echo "Sleeping 5 mins, make sure that the bastion host is fully started."
 sleep 300

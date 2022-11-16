@@ -547,3 +547,43 @@ subjects:
 - kind: ServiceAccount
   name: release-payload-controller
   namespace: ci
+---
+#---------------------------------------------------------------------------------
+# release_payload_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+# These RBAC resources allow the release-payload-controller to update ReleasePayloads in the origin namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: release-payload-controller
+  namespace: origin
+rules:
+- apiGroups:
+  - release.openshift.io
+  resources:
+  - releasepayloads
+  - releasepayloads/status
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+---
+#---------------------------------------------------------------------------------
+# release_payload_controller_resources.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: release-payload-controller
+  namespace: origin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: release-payload-controller
+subjects:
+- kind: ServiceAccount
+  name: release-payload-controller
+  namespace: ci

@@ -1,0 +1,36 @@
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: "2.3"
+  use_build_cache: true
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: api-unit-2-3
+  commands: |
+    make test \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
+  container:
+    from: src
+- as: api-gencheck-2-3
+  commands: |
+    make gen-check \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
+  container:
+    from: src
+zz_generated_metadata:
+  branch: maistra-2.3
+  org: maistra
+  repo: api

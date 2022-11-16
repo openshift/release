@@ -4,8 +4,13 @@ set -o nounset
 set -o pipefail
 
 # Every cluster that can should have a PV for prometheus data so that data is preserved
-# across reschedules of pods. This may need to be conditionally disabled in the future
-# if certain instance types are used that cannot access persistent volumes.
+# across reschedules of pods.
+
+if test false = "${PERSISTENT_MONITORING}"
+then
+	echo "Nothing to do with PERSISTENT_MONITORING='${PERSISTENT_MONITORING}'"
+	exit
+fi
 
 # Use yq to create cluster monitoring config, as other steps may adjust it
 YQ_URI=https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64

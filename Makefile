@@ -1,6 +1,6 @@
 SHELL=/usr/bin/env bash -o errexit
 
-.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config
+.PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen
 
 export CONTAINER_ENGINE ?= docker
 export SKIP_PULL ?= false
@@ -61,13 +61,11 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20220920-d6a4487207 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20221115-a6c6c84e3d --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/go/src/github.com/openshift/release:z" -e GOPATH=/go registry.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/sanitize-prow-jobs:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs:z" registry.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml
+	$(MAKE) ci-operator-prowgen
+	$(MAKE) sanitize-prow-jobs
 
 ci-operator-checkconfig:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-checkconfig:latest
@@ -77,6 +75,14 @@ ci-operator-checkconfig:
 ci-operator-config:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/determinize-ci-operator:latest
 	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
+
+ci-operator-prowgen:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/go/src/github.com/openshift/release:z" -e GOPATH=/go registry.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo $(WHAT)
+
+sanitize-prow-jobs:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/sanitize-prow-jobs:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs:z" registry.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml $(WHAT)
 
 registry-metadata:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/generate-registry-metadata:latest
@@ -105,6 +111,10 @@ validate-step-registry:
 
 refresh-bugzilla-prs:
 	./hack/refresh-bugzilla-prs.sh
+
+python-validation:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/python-validation:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/python-validation:latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
@@ -332,9 +342,11 @@ download_crt_crd:
 .PHONY: download_crt_crd
 
 sed_cmd := sed
+timeout_cmd := timeout
 uname_out := $(shell uname -s)
 ifeq ($(uname_out),Darwin)
 sed_cmd := gsed
+timeout_cmd := gtimeout
 endif
 
 crds = 'clusters/build-clusters/common/testimagestreamtagimport.yaml' 'clusters/app.ci/prow/01_crd/pullrequestpayloadqualificationruns.yaml' 'clusters/app.ci/release-controller/admin_01_releasepayload_crd.yaml'
@@ -349,3 +361,60 @@ update_crt_crd: download_crt_crd $(crds)
 check-repo:
 	./hack/check-repo.sh "$(REPO)"
 .PHONY: check-repo
+
+token_version ?= $(shell yq -r '.nonExpiringToken.currentVersion' ./hack/_token.yaml)
+pre_token_version ?= $(shell expr $(token_version) - 1 )
+next_token_version ?= $(shell expr $(token_version) + 1 )
+
+increase-token-version:
+	yq -y '.nonExpiringToken.currentVersion = $(next_token_version)' ./hack/_token.yaml > $(TMPDIR)/_token.yaml
+	mv $(TMPDIR)/_token.yaml ./hack/_token.yaml 
+.PHONY: increase-token-version
+
+refresh-token-version:
+	grep -r -l "ci.openshift.io/token-version: version-$(pre_token_version)" ./clusters | while read file; do $(sed_cmd) -i "s/version-$(pre_token_version)/version-$(token_version)/g" $${file}; done
+.PHONY: refresh-token-version
+
+DRY_RUN ?= server
+CLUSTER ?= app.ci
+API_SERVER_URL ?= "https://api.ci.l2s4.p1.openshiftapps.com:6443"
+TMPDIR ?= /tmp
+
+expire-token-version:
+ifndef EXPIRE_TOKEN_VERSION
+	echo "EXPIRE_TOKEN_VERSION is not defined, existing"
+	false
+endif
+	oc --context ${CLUSTER} -n ci delete secret -l ci.openshift.io/token-version=version-$(EXPIRE_TOKEN_VERSION)  --dry-run=$(DRY_RUN) --as system:admin
+.PHONY: increase-token-version
+
+list-token-secrets:
+	oc --context ${CLUSTER} -n ci get secret -l ci.openshift.io/token-version --show-labels
+.PHONY: list-token-secrets
+
+config-updater-kubeconfig:
+	$(timeout_cmd) 60 ./clusters/psi/create_kubeconfig.sh "$(TMPDIR)/sa.config-updater.${CLUSTER}.config" ${CLUSTER} $@ ci ${API_SERVER_URL} config-updater-token-version-$(token_version)
+	cat "$(TMPDIR)/sa.config-updater.${CLUSTER}.config"
+.PHONY: config-updater-kubeconfig
+
+secret-config-updater:
+	oc --context app.ci -n ci create secret generic config-updater \
+	--from-file=sa.config-updater.app.ci.config=$(TMPDIR)/sa.config-updater.app.ci.config \
+	--from-file=sa.config-updater.arm01.config=$(TMPDIR)/sa.config-updater.arm01.config \
+	--from-file=sa.config-updater.build01.config=$(TMPDIR)/sa.config-updater.build01.config \
+	--from-file=sa.config-updater.build02.config=$(TMPDIR)/sa.config-updater.build02.config \
+	--from-file=sa.config-updater.build03.config=$(TMPDIR)/sa.config-updater.build03.config \
+	--from-file=sa.config-updater.build04.config=$(TMPDIR)/sa.config-updater.build04.config \
+	--from-file=sa.config-updater.build05.config=$(TMPDIR)/sa.config-updater.build05.config \
+	--from-file=sa.config-updater.hive.config=$(TMPDIR)/sa.config-updater.hive.config \
+	--from-file=sa.config-updater.vsphere.config=$(TMPDIR)/sa.config-updater.vsphere.config \
+	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f - 
+.PHONY: secret-config-updater
+
+multi-arch-gen:
+	hack/image-mirroring/supplemental_ci_images_mirror_gen.py
+.PHONY: multi-arch-gen
+
+validate-multi-arch-gen:
+	hack/image-mirroring/validate-multi-arch-image-mirror-gen.sh .
+.PHONY: validate-multi-arch-gen

@@ -61,7 +61,7 @@ oc wait clusteroperator.config.openshift.io \
     --for=condition=Available=True \
     --for=condition=Progressing=False \
     --for=condition=Degraded=False \
-    --timeout=10m \
+    --timeout=20m \
     --all
 
 echo "$(date -u --rfc-3339=seconds) - RHEL worker scaleup complete"

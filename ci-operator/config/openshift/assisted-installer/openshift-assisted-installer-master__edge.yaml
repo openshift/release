@@ -11,6 +11,14 @@ base_images:
     name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service
+  assisted-service-index:
+    name: assisted-service-index
+    namespace: edge-infrastructure
+    tag: latest
+  assisted-service-scripts:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   assisted-test-infra:
     name: ocm-2.7
     namespace: edge-infrastructure
@@ -50,9 +58,10 @@ promotion:
   namespace: edge-infrastructure
 releases:
   latest:
-    integration:
-      name: "4.11"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -169,6 +178,18 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
+        OPENSHIFT_VERSION=4.11
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-lvm
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=lvm
+        MASTERS_COUNT=1
+        MASTER_MEMORY=18000
+        MASTER_CPU=9
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
   optional: true
@@ -177,6 +198,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.11
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
@@ -189,6 +211,15 @@ tests:
         OPENSHIFT_VERSION=4.8
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
+- as: e2e-ai-operator-ztp
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      INDEX_IMAGE: assisted-service-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    workflow: assisted-baremetal-operator-ztp
 zz_generated_metadata:
   branch: master
   org: openshift

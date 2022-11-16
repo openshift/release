@@ -1,0 +1,36 @@
+base_images:
+  test_runner:
+    name: redhat-appstudio-e2e-test-runner
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: redhat-appstudio-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    test:
+    - ref: redhat-appstudio-e2e-pre-kcp
+    workflow: redhat-appstudio-claim
+zz_generated_metadata:
+  branch: pre-kcp
+  org: redhat-appstudio
+  repo: e2e-tests

@@ -24,7 +24,7 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -46,17 +46,23 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: machine-config-operator
 promotion:
-  name: "4.12"
+  name: "4.13"
   namespace: ocp
 releases:
+  hosted-ocp-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.12"
   initial:
     integration:
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -161,16 +167,19 @@ tests:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi
 - as: e2e-metal-ipi
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ipv4
 - as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6
 - as: e2e-metal-ipi-ovn-dualstack
+  cluster: build05
   optional: true
   steps:
     cluster_profile: equinix-ocp-metal
@@ -267,6 +276,10 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-hypershift
+  optional: true
+  steps:
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -23,8 +23,14 @@ function populate_artifact_dir() {
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
   case "${CLUSTER_TYPE}" in
     powervs)
+      # We don't want debugging in this section
+      unset TF_LOG_PROVIDER
+      unset TF_LOG
+      unset TF_LOG_PATH
+      unset IBMCLOUD_TRACE
+
       echo "8<--------8<--------8<--------8<-------- Instance names, ids, and MAC addresses 8<--------8<--------8<--------8<--------"
-      ibmcloud pi instances --json | jq -r '.Payload.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
+      ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | [.serverName, .pvmInstanceID, .addresses[].ip, .addresses[].macAddress]'
       echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
       ;;
     *)
@@ -217,7 +223,7 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.10.0/IBM_Cloud_CLI_2.10.0_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.12.0/IBM_Cloud_CLI_2.12.0_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
@@ -367,7 +373,7 @@ function check_resources() {
   #
   # Quota check for image imports
   #
-  JOBS=$(ibmcloud pi jobs --operation-action imageImport --json | jq -r '.Payload.jobs[] | select (.status.state|test("running")) | .id')
+  JOBS=$(ibmcloud pi jobs --operation-action imageImport --json | jq -r '.jobs[] | select (.status.state|test("running")) | .id')
   if [ -n "${JOBS}" ]
   then
     echo "JOBS=${JOBS}"
@@ -444,10 +450,39 @@ EOF
       break
     fi
   done
+
+  #
+  # Clean up leftover networks
+  #
+  (
+    while read UUID
+    do
+      echo ibmcloud pi network-delete ${UUID}
+      ibmcloud pi network-delete ${UUID}
+    done
+  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("rdr-multiarch-'${POWERVS_ZONE}'")) | .networkID')
 }
 
 function dump_resources() {
   init_ibmcloud
+
+  # We don't want debugging in this section
+  if declare -p TF_LOG_PROVIDER &>/dev/null; then
+    SAVE_TF_LOG_PROVIDER=${TF_LOG_PROVIDER}
+    unset TF_LOG_PROVIDER
+  fi
+  if declare -p TF_LOG &>/dev/null; then
+    SAVE_TF_LOG=${TF_LOG}
+    unset TF_LOG
+  fi
+  if declare -p TF_LOG_PATH &>/dev/null; then
+    SAVE_TF_LOG_PATH=${TF_LOG_PATH}
+    unset TF_LOG_PATH
+  fi
+  if declare -p IBMCLOUD_TRACE &>/dev/null; then
+    SAVE_IBMCLOUD_TRACE=${IBMCLOUD_TRACE}
+    unset IBMCLOUD_TRACE
+  fi
 
   INFRA_ID=$(jq -r '.infraID' ${dir}/metadata.json)
   echo "INFRA_ID=${INFRA_ID}"
@@ -455,7 +490,7 @@ function dump_resources() {
 
   echo "8<--------8<--------8<--------8<-------- Cloud Connection 8<--------8<--------8<--------8<--------"
 
-  CLOUD_UUID=$(ibmcloud pi connections --json | jq -r '.Payload.cloudConnections[] | select (.name|test("'${INFRA_ID}'")) | .cloudConnectionID')
+  CLOUD_UUID=$(ibmcloud pi connections --json | jq -r '.cloudConnections[] | select (.name|test("'${INFRA_ID}'")) | .cloudConnectionID')
 
   if [ -z "${CLOUD_UUID}" ]
   then
@@ -598,9 +633,31 @@ function dump_resources() {
     jq -r 'select (.type|test("Available"))' ${F_FILE}
 )
 
+  echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
+  ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
+
+  echo "8<--------8<--------8<--------8<-------- Running jobs 8<--------8<--------8<--------8<--------"
+  ibmcloud pi jobs --json | jq -r '.jobs[] | select (.status.state|test("running"))'
+
   echo "8<--------8<--------8<--------8<-------- DONE! 8<--------8<--------8<--------8<--------"
 
-  egrep '(Creation complete|level=error|: [0-9ms]*")' ${dir}/.openshift_install.log > ${SHARED_DIR}/installation_stats.log
+  # Restore any debugging if saved
+  if declare -p SAVE_TF_LOG_PROVIDER &>/dev/null; then
+    export TF_LOG_PROVIDER=${SAVE_TF_LOG_PROVIDER}
+    unset SAVE_TF_LOG_PROVIDER
+  fi
+  if declare -p SAVE_TF_LOG &>/dev/null; then
+    export TF_LOG=${SAVE_TF_LOG}
+    unset SAVE_TF_LOG
+  fi
+  if declare -p SAVE_TF_LOG_PATH &>/dev/null; then
+    export TF_LOG_PATH=${SAVE_TF_LOG_PATH}
+    unset SAVE_TF_LOG_PATH
+  fi
+  if declare -p SAVE_IBMCLOUD_TRACE &>/dev/null; then
+    export IBMCLOUD_TRACE=${SAVE_IBMCLOUD_TRACE}
+    unset SAVE_IBMCLOUD_TRACE
+  fi
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -671,7 +728,11 @@ date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
-echo
+
+# @BEGIN TEMPORARY-FIX
+export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="rhcos-powervs-images-${VPCREGION}/rhcos-412-86-202208090152-0-ppc64le-powervs.ova.gz"
+echo "OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE=${OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE}"
+# @END TEMPORARY-FIX
 
 openshift-install version
 
@@ -772,10 +833,10 @@ date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 
 export TF_LOG=debug
 # Uncomment for even more debugging!
-export TF_LOG_PROVIDER=TRACE
-export TF_LOG=TRACE
-export TF_LOG_PATH=/tmp/tf.log
-export IBMCLOUD_TRACE=true
+#export TF_LOG_PROVIDER=TRACE
+#export TF_LOG=TRACE
+#export TF_LOG_PATH=/tmp/tf.log
+#export IBMCLOUD_TRACE=true
 
 echo "8<--------8<--------8<--------8<-------- BEGIN: create cluster 8<--------8<--------8<--------8<--------"
 echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
@@ -797,6 +858,8 @@ date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
 dump_resources
+
+egrep '(Creation complete|level=error|: [0-9ms]*")' ${dir}/.openshift_install.log > ${SHARED_DIR}/installation_stats.log
 
 if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"

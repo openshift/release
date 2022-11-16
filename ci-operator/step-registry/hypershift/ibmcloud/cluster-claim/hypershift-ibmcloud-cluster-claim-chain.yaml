@@ -1,0 +1,24 @@
+chain:
+  as: hypershift-ibmcloud-cluster-claim
+  steps:
+  - as: cluster-claim-check
+    commands: |-
+      oc --kubeconfig="${MANAGEMENT_CLUSTER_KUBECONFIG}" get deploy -n hypershift operator || exit 0
+      exit 1
+    credentials:
+    - mount_path: /etc/ibmcloud/secrets
+      name: hypershift-ibm-managed-ci-creds
+      namespace: test-credentials
+    env:
+    - name: MANAGEMENT_CLUSTER_KUBECONFIG
+    from_image:
+      name: ibm-hypershift-testing
+      namespace: ci
+      tag: latest
+    grace_period: 1m0s
+    no_kubeconfig: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 5m0s

@@ -1,0 +1,50 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- context_dir: tests/
+  dockerfile_path: Dockerfile
+  to: data-science-pipelines-tests
+promotion:
+  namespace: opendatahub-io
+  tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.10"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 400Mi
+tests:
+- as: unit
+  commands: |
+    go mod tidy
+    go mod vendor
+    make run-go-unittests
+    rm -rf vendor
+  container:
+    from: src
+- as: data-science-pipelines-e2e
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      commands: $HOME/peak/installandtest.sh
+      from: data-science-pipelines-tests
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: master
+  org: opendatahub-io
+  repo: data-science-pipelines

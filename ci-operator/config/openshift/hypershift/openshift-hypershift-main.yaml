@@ -1,4 +1,8 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.7
     namespace: edge-infrastructure
@@ -20,11 +24,11 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: base
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: cli
   dev-scripts:
@@ -57,7 +61,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: hypershift
 promotion:
-  name: "4.12"
+  additional_images:
+    hypershift-tests: test-bin
+  name: "4.13"
   namespace: ocp
 releases:
   hosted-ocp-previous:
@@ -69,7 +75,7 @@ releases:
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -78,6 +84,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+  unit:
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 4000m
+      memory: 2.5Gi
 test_binary_build_commands: make build e2e
 tests:
 - as: verify
@@ -93,10 +105,16 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      INSTANCE_TYPE: m5.4xlarge
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-metrics
   optional: true
   steps:
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      INSTANCE_TYPE: m5.4xlarge
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-conformance
   optional: true
@@ -116,10 +134,33 @@ tests:
         MINIKUBE_RAM_MB=12000
         TEST=./src/tests/test_kube_api.py
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="setup run deploy_capi_env test"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test"
       GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: minimal
+      TEST_SUITE: none
     workflow: assisted-baremetal
+- as: e2e-ibmcloud-iks
+  optional: true
+  run_if_changed: ^api/
+  steps:
+    env:
+      BOM_VERSION: 4.10.26_openshift
+      MANAGED_CLUSTER_TYPE: iks
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
+      TEST_TYPE: main
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
+    workflow: hypershift-ibmcloud-e2e
+- as: e2e-ibmcloud-roks
+  optional: true
+  run_if_changed: ^api/
+  steps:
+    env:
+      BOM_VERSION: 4.11.0_openshift
+      MANAGED_CLUSTER_TYPE: openshift
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
+      TEST_TYPE: main
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
+    workflow: hypershift-ibmcloud-e2e
 zz_generated_metadata:
   branch: main
   org: openshift

@@ -7,12 +7,13 @@ set -o verbose
 
 echo "************ baremetalds e2e assisted conf command ************"
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
 case "${CLUSTER_TYPE}" in
     vsphere)
         export TEST_PROVIDER=vsphere
         ;;
 
-    packet-edge)
+    packet-edge|nutanix)
         export TEST_PROVIDER=baremetal
         ;;
 
@@ -33,7 +34,7 @@ EOF
         ;;
 
     conformance)
-        INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run)
+        INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run --provider '{"type":"${TEST_PROVIDER}"}')
         ;;
 
     full)

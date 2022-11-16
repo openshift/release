@@ -38,8 +38,10 @@ cat > "${HOME}"/reboot-test.sh <<'EOF'
 set -xeuo pipefail
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-
-kubectl create deployment nginx --image=nginx
+# TODO: Remove the labels again once https://issues.redhat.com/browse/OCPBUGS-1969 has been fixed upstream
+oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"-version=v1.24"
+oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"=privileged"
+oc create deployment -n default nginx --image=nginx
 
 set +ex
 echo "waiting for deployment response" >&2

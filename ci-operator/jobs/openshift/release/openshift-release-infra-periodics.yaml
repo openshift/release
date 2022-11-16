@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -293,6 +293,16 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-aws-sharednetwork
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: aws
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+                PERSISTENT_MONITORING: "false"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-aws
           - as: launch-fips
             steps:
               cluster_profile: aws
@@ -394,370 +404,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build05
-  cron: '@yearly'
-  decorate: true
-  labels:
-    config-type: modern
-    job-architecture: amd64
-    job-env: aws-2
-    job-type: launch
-  name: release-openshift-origin-installer-launch-aws-2-modern
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=launch
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_INITIAL
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: CLUSTER_DURATION
-        value: "9000"
-      - name: BRANCH
-        value: "4.9"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: launch
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              test:
-              - ref: clusterbot-wait
-              workflow: ipi-aws
-          - as: launch-proxy
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-aws-proxy
-          - as: launch-ovn
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-aws-ovn
-          - as: launch-ovn-hybrid
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              test:
-              - ref: clusterbot-wait
-              workflow: ipi-aws-ovn-hybrid
-          - as: launch-shared-vpc
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-aws-sharednetwork
-          - as: launch-fips
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                FIPS_ENABLED: "true"
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              pre:
-              - chain: ipi-aws-pre
-              - ref: fips-check
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-aws
-          - as: launch-single-node
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-aws-single-node
-          - as: launch-cgroupsv2
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-aws-cgroupsv2
-          - as: launch-techpreview
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-aws-techpreview
-          - as: launch-sdn
-            steps:
-              cluster_profile: aws-2
-              env:
-                CLUSTER_DURATION: $(CLUSTER_DURATION)
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              test:
-              - ref: clusterbot-wait
-              workflow: openshift-e2e-aws-sdn
-          - as: upgrade
-            steps:
-              cluster_profile: $(CLUSTER_TYPE)-2
-              env:
-                TEST_SUITE: "all"
-                BASE_DOMAIN: aws-2.ci.openshift.org
-              workflow: openshift-upgrade-$(CLUSTER_TYPE)
-      - name: JOB_NAME_SAFE
-        value: launch
-      - name: TEST_COMMAND
-        value: sleep $(CLUSTER_DURATION) & wait
-      - name: NAMESPACE
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/launch-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/push-secret
-        name: push-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws-2
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: push-secret
-      secret:
-        secretName: registry-push-credentials-ci-central
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build05
-  cron: '@yearly'
-  decorate: true
-  labels:
-    config-type: legacy
-    job-architecture: amd64
-    job-env: aws
-    job-type: launch
-  name: release-openshift-origin-installer-launch-aws
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=launch
-      - --template=/usr/local/launch
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_INITIAL
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: CLUSTER_DURATION
-        value: "9000"
-      - name: BRANCH
-        value: "4.1"
-      - name: CLUSTER_TYPE
-        value: aws
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-builds
-            commands: TEST_SUITE=openshift/build run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-disruptive
-            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-disruptive-all
-            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-all
-            commands: TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-image-ecosystem
-            commands: TEST_SUITE=openshift/image-ecosystem run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-image-registry
-            commands: TEST_SUITE=openshift/image-registry run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-network-stress
-            commands: TEST_SUITE=openshift/network/stress run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-all
-            commands: TEST_SUITE=all run-upgrade-tests; TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-partial
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-rollback
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=100 run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: launch
-            commands: sleep $(CLUSTER_DURATION) & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: launch
-      - name: TEST_COMMAND
-        value: sleep $(CLUSTER_DURATION) & wait
-      - name: NAMESPACE
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/launch-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/launch
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/push-secret
-        name: push-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-aws
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: push-secret
-      secret:
-        secretName: registry-push-credentials-ci-central
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -836,6 +483,16 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLOUD_TYPE)-sharednetwork
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+                PERSISTENT_MONITORING: "false"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
           - as: launch-fips
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -911,174 +568,6 @@ periodics:
         sources:
         - secret:
             name: cluster-secrets-azure4
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: push-secret
-      secret:
-        secretName: registry-push-credentials-ci-central
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build01
-  cron: '@yearly'
-  decorate: true
-  labels:
-    config-type: legacy
-    job-architecture: amd64
-    job-env: azure
-    job-type: launch
-  name: release-openshift-origin-installer-launch-azure
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=launch
-      - --template=/usr/local/launch
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_INITIAL
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: CLUSTER_DURATION
-        value: "9000"
-      - name: BRANCH
-        value: "4.2"
-      - name: CLOUD_TYPE
-        value: azure
-      - name: CLUSTER_TYPE
-        value: azure4
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-builds
-            commands: TEST_SUITE=openshift/build run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-disruptive
-            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-disruptive-all
-            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-all
-            commands: TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-image-ecosystem
-            commands: TEST_SUITE=openshift/image-ecosystem run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-image-registry
-            commands: TEST_SUITE=openshift/image-registry run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-network-stress
-            commands: TEST_SUITE=openshift/network/stress run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-all
-            commands: TEST_SUITE=all run-upgrade-tests; TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-partial
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-rollback
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=100 run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: launch
-            commands: sleep $(CLUSTER_DURATION) & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: launch
-      - name: TEST_COMMAND
-        value: sleep $(CLUSTER_DURATION) & wait
-      - name: NAMESPACE
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/launch-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/launch
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/push-secret
-        name: push-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-azure4
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1182,6 +671,16 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-single-node
+          - as: launch-no-capabilities
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                BASELINE_CAPABILITY_SET: None
+                PERSISTENT_MONITORING: "false"
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)
           - as: launch-fips
             steps:
               cluster_profile: $(CLUSTER_TYPE)
@@ -1278,173 +777,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build02
-  cron: '@yearly'
-  decorate: true
-  labels:
-    config-type: legacy
-    job-architecture: amd64
-    job-env: gcp
-    job-type: launch
-  name: release-openshift-origin-installer-launch-gcp
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=launch
-      - --template=/usr/local/launch
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_INITIAL
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: CLUSTER_DURATION
-        value: "9000"
-      - name: BRANCH
-        value: "4.2"
-      - name: CLUSTER_TYPE
-        value: gcp
-      - name: CONFIG_SPEC
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-builds
-            commands: TEST_SUITE=openshift/build run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-disruptive
-            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-disruptive-all
-            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-all
-            commands: TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-image-ecosystem
-            commands: TEST_SUITE=openshift/image-ecosystem run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-image-registry
-            commands: TEST_SUITE=openshift/image-registry run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-network-stress
-            commands: TEST_SUITE=openshift/network/stress run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-all
-            commands: TEST_SUITE=all run-upgrade-tests; TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-partial
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-rollback
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=100 run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: launch
-            commands: sleep $(CLUSTER_DURATION) & wait
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-      - name: JOB_NAME_SAFE
-        value: launch
-      - name: TEST_COMMAND
-        value: sleep $(CLUSTER_DURATION) & wait
-      - name: NAMESPACE
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/launch-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/launch
-        name: job-definition
-        subPath: cluster-launch-installer-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/push-secret
-        name: push-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-gcp
-    - configMap:
-        name: prow-job-cluster-launch-installer-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: push-secret
-      secret:
-        secretName: registry-push-credentials-ci-central
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -1755,6 +1088,14 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: upi-$(CLUSTER_TYPE)-clusterbot
+          - as: launch-multi-zone
+            steps:
+              cluster_profile: vsphere-multizone
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
           - as: launch-ovn-hybrid
             steps:
               cluster_profile: $(CLUSTER_PROFILE)
@@ -1836,180 +1177,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: vsphere
-  cron: '@yearly'
-  decorate: true
-  labels:
-    config-type: legacy
-    job-architecture: amd64
-    job-env: vsphere
-    job-type: launch
-  name: release-openshift-origin-installer-launch-vsphere
-  spec:
-    containers:
-    - args:
-      - --give-pr-author-access-to-namespace=true
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --namespace=$(NAMESPACE)
-      - --secret-dir=/usr/local/launch-cluster-profile
-      - --secret-dir=/usr/local/pull-secret
-      - --target=launch
-      - --template=/usr/local/launch
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      command:
-      - ci-operator
-      env:
-      - name: RELEASE_IMAGE_INITIAL
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: CLUSTER_DURATION
-        value: "9000"
-      - name: BRANCH
-        value: "4.2"
-      - name: CLUSTER_TYPE
-        value: vsphere
-      - name: UNRESOLVED_CONFIG
-        value: |
-          resources:
-            '*':
-              limits:
-                memory: 6Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: ocp
-          tests:
-          - as: e2e
-            commands: TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-builds
-            commands: TEST_SUITE=openshift/build run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-disruptive
-            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-disruptive-all
-            commands: setup_ssh_bastion; TEST_SUITE=openshift/disruptive run-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-image-ecosystem
-            commands: TEST_SUITE=openshift/image-ecosystem run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-image-registry
-            commands: TEST_SUITE=openshift/image-registry run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-network-stress
-            commands: TEST_SUITE=openshift/network/stress run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-serial
-            commands: TEST_SUITE=openshift/conformance/serial run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-          - as: e2e-upgrade
-            commands: TEST_SUITE=all run-upgrade-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-all
-            commands: TEST_SUITE=all run-upgrade-tests; TEST_SUITE=openshift/conformance run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-partial
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=random run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: e2e-upgrade-rollback
-            commands: TEST_SUITE=all TEST_UPGRADE_OPTIONS=abort-at=100 run-upgrade-tests; TEST_SUITE=openshift/conformance/parallel run-tests
-            openshift_installer:
-              cluster_profile: "$(CLUSTER_TYPE)"
-              upgrade: true
-          - as: launch
-            steps:
-              cluster_profile: $(CLUSTER_TYPE)
-              test:
-              - as: e2e-test
-                commands: sleep $(CLUSTER_DURATION) & wait
-                from_image:
-                  namespace: origin
-                  name: centos
-                  tag: '8'
-                resources:
-                  requests:
-                    cpu: 100m
-                    memory: 200Mi
-              workflow: openshift-e2e-$(CLUSTER_TYPE)
-      - name: JOB_NAME_SAFE
-        value: launch
-      - name: TEST_COMMAND
-        value: sleep $(CLUSTER_DURATION) & wait
-      - name: NAMESPACE
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /usr/local/launch-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /usr/local/launch
-        name: job-definition
-        subPath: cluster-launch-installer-upi-e2e.yaml
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/push-secret
-        name: push-secret
-        readOnly: true
-      - mountPath: /usr/local/pull-secret
-        name: release-pull-secret
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-vsphere
-    - configMap:
-        name: prow-job-cluster-launch-installer-upi-e2e
-      name: job-definition
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: push-secret
-      secret:
-        secretName: registry-push-credentials-ci-central
-    - name: release-pull-secret
-      secret:
-        secretName: ci-pull-credentials
-- agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2413,7 +1581,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2605,7 +1773,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:
@@ -2663,9 +1831,11 @@ periodics:
             steps:
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
+                HYPERSHIFT_HC_RELEASE_IMAGE: $(RELEASE_IMAGE_LATEST)
                 HYPERSHIFT_NODE_COUNT: 2
                 HYPERSHIFT_ZONES: "us-east-1a"
                 HYPERSHIFT_NAMESPACE: "cluster-bot"
+                HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT: "true"
               test:
               - ref: clusterbot-wait
               cluster_profile: hypershift
@@ -2716,7 +1886,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -2803,7 +1973,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   cron: '@yearly'
   decorate: true
   labels:

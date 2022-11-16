@@ -52,9 +52,7 @@ cat << VARS >> /root/config
 export DISCONNECTED="${DISCONNECTED:-}"
 export ALLOW_CONVERGED_FLOW="${ALLOW_CONVERGED_FLOW:-}"
 
-# TODO: remove this and support mirroring an index referenced by digest value
-# https://issues.redhat.com/browse/MGMT-6858
-export INDEX_IMAGE="\$(dirname ${INDEX_IMAGE})/pipeline:ci-index"
+export INDEX_IMAGE="${INDEX_IMAGE}"
 
 export PUBLIC_CONTAINER_REGISTRIES="\$(for image in \${images}; do echo \${image} | cut -d'/' -f1; done | sort -u | paste -sd ',' -)"
 export ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="${ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE}"

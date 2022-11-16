@@ -41,10 +41,6 @@ tests:
       BASE_DOMAIN: ci2.azure.devcluster.openshift.com
       TEST_REQUIRES_SSH: "true"
       TEST_TYPE: upgrade-conformance
-    pre:
-    - ref: ipi-install-hosted-loki
-    - ref: tcpdump-service
-    - chain: ipi-azure-pre-stableinitial
     workflow: openshift-upgrade-azure
 - as: e2e-ovirt-upgrade
   cron: 10 2 */1 * 1-5
@@ -65,16 +61,6 @@ tests:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws-ovn
-- as: e2e-aws-ovn-upgrade-rollback
-  cron: 8 5 */1 * 1-5
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      TEST_TYPE: upgrade-conformance
-      TEST_UPGRADE_OPTIONS: abort-at=99
-    workflow: openshift-upgrade-aws-ovn
-  timeout: 6h0m0s
 - as: e2e-gcp-ovn-upgrade
   cluster: build02
   interval: 48h
@@ -101,17 +87,6 @@ tests:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-azure-ovn
-- as: e2e-aws-upgrade-rollback
-  interval: 48h
-  steps:
-    cluster_profile: aws-2
-    env:
-      BASE_DOMAIN: aws-2.ci.openshift.org
-      DELETE_MC: "false"
-      TEST_TYPE: upgrade
-      TEST_UPGRADE_OPTIONS: abort-at=99
-    workflow: openshift-upgrade-aws
-  timeout: 6h0m0s
 - as: e2e-aws-uwm
   interval: 48h
   steps:

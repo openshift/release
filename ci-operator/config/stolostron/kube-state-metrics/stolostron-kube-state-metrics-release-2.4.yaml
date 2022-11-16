@@ -38,6 +38,17 @@ tests:
     make -f Makefile test-unit
   container:
     from: src
+- as: ocm-ci-rbac
+  steps:
+    workflow: ocm-ci-rbac
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kube-state-metrics
+    env:
+      IMAGE_REPO: kube-state-metrics
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: sonar-pre-submit
   commands: |
     export SELF="make -f /opt/build-harness/Makefile.prow"

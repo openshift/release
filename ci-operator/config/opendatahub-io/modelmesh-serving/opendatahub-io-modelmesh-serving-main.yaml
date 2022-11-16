@@ -1,0 +1,44 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- context_dir: tests/
+  dockerfile_path: Dockerfile
+  to: modelmesh-serving-tests
+promotion:
+  namespace: opendatahub-io
+  tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: modelmesh-serving-e2e
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      commands: $HOME/peak/installandtest.sh
+      from: modelmesh-serving-tests
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: modelmesh-serving

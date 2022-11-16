@@ -75,18 +75,31 @@ tests:
   commands: make unit/api
   container:
     from: ci-image
-- as: e2e-aws-olm
+- as: e2e-gcp-olm
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm
+      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm SKIP='\[FLAKE\]'
       from: ci-image
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: ipi-gcp
+- as: e2e-gcp-olm-flaky
+  optional: true
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm TEST='\[FLAKE\]'
+      from: ci-image
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: e2e-aws-console-olm
   steps:
     cluster_profile: aws

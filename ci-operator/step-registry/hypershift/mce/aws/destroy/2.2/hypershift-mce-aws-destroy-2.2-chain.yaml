@@ -1,0 +1,44 @@
+chain:
+  as: hypershift-mce-aws-destroy-2.2
+  steps:
+    - as: destroy
+      cli: latest
+      env:
+        - name: HYPERSHIFT_BASE_DOMAIN
+          default: "origin-ci-int-aws.dev.rhcloud.com"
+          documentation: "The cluster's FQDN will be a subdomain of the base domain."
+        - name: HYPERSHIFT_AWS_REGION
+          default: "us-east-1"
+          documentation: "The AWS region of the cluster."
+      commands: |-
+        set -exuo pipefail
+
+        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        
+        bin/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
+          --dump-guest-cluster=true \
+          --namespace local-cluster \
+          --name="${CLUSTER_NAME}"
+      
+        echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+        bin/hypershift destroy cluster aws \
+          --aws-creds=${CLUSTER_PROFILE_DIR}/.awscred  \
+          --name ${CLUSTER_NAME} \
+          --region ${HYPERSHIFT_AWS_REGION} \
+          --base-domain ${HYPERSHIFT_BASE_DOMAIN} \
+          --namespace local-cluster \
+          --cluster-grace-period 40m
+        echo "$(date) Finished deleting cluster"
+        
+        oc delete managedcluster ${CLUSTER_NAME}
+        echo "$(date) Finished destroying hypershift managed cluster"
+      from_image:
+        namespace: ocp
+        name: "4.12"
+        tag: hypershift-operator
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 30m0s

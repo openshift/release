@@ -94,14 +94,13 @@ do
     govc vm.power -on=true "${vm_name}"
 
     # wait for VM to power-on and get an IP address
+    echo "$(date -u --rfc-3339=seconds) - waiting for IP address for VM ${vm_name}"
     sleep 60
-    vm_ip=
-    while [ -z $vm_ip ]; do
-        echo "$(date -u --rfc-3339=seconds) - waiting IP address for VM ${vm_name}"
-        vm_ip=$(govc vm.info -waitip=true -json=true "${vm_name}" | jq -r .VirtualMachines[0].Guest.IpAddress)
-        # wait 30s for next call
-        sleep 30
-    done
+    vm_ip=$(govc vm.ip -a -v4 -wait=20m "${vm_name}")
+    if [ -z $vm_ip ]; then
+      echo "$(date -u --rfc-3339=seconds) - timeout waiting for IP address for VM ${vm_name}"
+      exit 1
+    fi
     echo "$(date -u --rfc-3339=seconds) - VM ${vm_name} provisioned with IP address ${vm_ip}"
 
     createWindowsInstanceFile "${vm_ip}" "${vm_template_username}" || {

@@ -73,7 +73,7 @@ def display(log_dir):
     while True:
         sys.stdout.write(CLEAR)
         for log in sorted(glob.glob(logs)):
-            with open(log) as f:
+            with open(log, encoding='utf-8') as f:
                 if sys.stdout.write(f.read()):
                     sys.stdout.write('\n')
         time.sleep(5)
@@ -83,23 +83,23 @@ def highlight(log_dir, dc):
     warn = '"level":"warning"'
     error = '"level":"error"'
     fatal = '"level":"fatal"'
-    log = '{}/{}.log'.format(log_dir, dc)
+    log = f'{log_dir}/{dc}.log'
     while True:
-        debug("deployment/{}: gathering info".format(dc))
+        debug(f'deployment/{dc}: gathering info')
         header = renderHeader(dc)
         lines = []
         log_lines = []
         for pod in run_oc(['get', 'pods', '--selector', dc, '--output', 'jsonpath={.items[*].metadata.name}']).split():
-            debug("deployment/{}: pod/{}: gathering info".format(dc, pod))
+            debug(f'deployment/{dc}: pod/{pod}: gathering info')
             lines.extend(renderFlavor(pod, dc))
-            cmd = ['logs', '--since', '20m', 'pod/{}'.format(pod)]
+            cmd = ['logs', '--since', '20m', f'pod/{pod}']
             if "deck-internal" in dc:
                 cmd += ['--container', 'deck']
             if "component=boskos" in dc and not "-" in dc:
                 cmd += ['--container', 'boskos']
             if "release-controller" in dc and "priv" in dc:
                 cmd += ['--container', 'controller']
-            debug("deployment/{}: pod/{}: getting logs".format(dc, pod))
+            debug(f'deployment/{dc}: pod/{pod}: getting logs')
             try:
                 for l in run_oc(cmd).splitlines():
                     if any(word in l for word in BLACKLIST):
@@ -117,17 +117,17 @@ def highlight(log_dir, dc):
                     elif error in l or fatal in l:
                         log_lines.append(RED + l + RESET)
             except subprocess.CalledProcessError:
-                debug("deployment/{}: pod/{}: getting logs failed".format(dc, pod))
+                debug(f'deployment/{dc}: pod/{pod}: getting logs failed')
 
         if not log_lines and not lines:
-            header = "{} {}{}{}".format(header, GREEN, "OK", RESET)
-        with open(log, 'w') as f:
+            header = f'{header} {GREEN}OK{RESET}'
+        with open(log, 'w', encoding='utf-8') as f:
             f.write('\n'.join([header, *lines, *log_lines[-5:]]))
         time.sleep(60)
 
 
 def renderHeader(dc):
-    debug("deployment/{}: rendering header".format(dc))
+    debug(f'deployment/{dc}: rendering header')
     name = run_oc(["get", "deployment", "-l", dc, "-o", "name"]).strip()
     if name == "":
         # Surprise: Deployments may not match their .spec.labelSelector
@@ -155,7 +155,7 @@ def renderHeader(dc):
         container_name = containers[0].get("name", "")
     else:
         container_name = dc
-    debug("deployment/{}: got container name {}".format(dc, container_name))
+    debug(f'deployment/{dc}: got container name {container_name}')
     for container in containers:
         if container.get("name") == container_name:
             image = container.get("image", "")
@@ -164,20 +164,20 @@ def renderHeader(dc):
     if desired != current:
         headerColor = RED
 
-    message = '{} at {} [{}/{}]'.format(dc, version, current, desired)
+    message = f'{dc} at {version} [{current}/{desired}]'
     if updated != desired:
-        message += ' ({} stale replicas)'.format(desired - updated)
+        message += f' ({desired - updated} stale replicas)'
     if available != desired:
-        message += ' ({} unavailable replicas)'.format(desired - available)
-    header = '{}{}{}:{}'.format(BOLD, headerColor, message, RESET)
-    debug("deployment/{}: got header {}".format(dc, header))
+        message += f' ({desired - available} unavailable replicas)'
+    header = f'{BOLD}{headerColor}{message}:{RESET}'
+    debug(f'deployment/{dc}: got header {header}')
     return header
 
 
 def renderFlavor(pod, dc):
-    debug("deployment/{}: pod/{}: rendering flavor".format(dc, pod))
+    debug(f'deployment/{dc}: pod/{pod}: rendering flavor')
     lines = []
-    raw = json.loads(run_oc(['get', 'pod/{}'.format(pod), '--output', 'json']))
+    raw = json.loads(run_oc(['get', f'pod/{pod}', '--output', 'json']))
     status = raw.get("status", {})
     phase = status.get("phase", "")
     if phase != "Running":
@@ -186,27 +186,27 @@ def renderFlavor(pod, dc):
         color = YELLOW
         if phase in ["Failed", "Unknown", "CrashLoopBackOff"]:
             color = RED
-        lines.append(color + "pod {} is {}: {}, {}".format(pod, phase, reason, message))
+        lines.append(color + f'pod {pod} is {phase}: {reason}, {message}')
 
     for container in status.get("containerStatuses", []):
-        debug("pod/{}: handling status for container {}".format(pod, container.get("name", "")))
+        debug(f'pod/{pod}: handling status for container {container.get("name", "")}')
         if container.get("name") == dc:
             state = container.get("state", {})
             if "running" not in state:
                 if "waiting" in state:
                     reason = state["waiting"].get("reason")
                     message = state["waiting"].get("message")
-                    lines.append(YELLOW + "pod {} is waiting: {}".format(pod, reason) + RESET)
-                    lines.append(YELLOW + "\t{}".format(message) + RESET)
+                    lines.append(YELLOW + f'pod {pod} is waiting: {reason}' + RESET)
+                    lines.append(YELLOW + f'\t{message}' + RESET)
                 if "terminated" in state:
                     reason = state["terminated"].get("reason")
                     message = state["terminated"].get("message")
-                    lines.append(RED + "pod {} is terminated: {}".format(pod, reason) + RESET)
-                    lines.append(RED + "\t{}".format(message) + RESET)
+                    lines.append(RED + f'pod {pod} is terminated: {reason}' + RESET)
+                    lines.append(RED + f'\t{message}' + RESET)
             restartCount = container.get("restartCount", 0)
             if restartCount != 0:
-                lines.append(RED + "pod {} has restarted {} times".format(pod, restartCount) + RESET)
-    debug("deployment/{}: pod/{}: got flavor {}".format(dc, pod, lines))
+                lines.append(RED + f'pod {pod} has restarted {restartCount} times' + RESET)
+    debug(f'deployment/{dc}: pod/{pod}: got flavor {lines}')
     return lines
 
 

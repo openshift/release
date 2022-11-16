@@ -50,7 +50,7 @@ echo "VpcId: ${VpcId}"
 # all subnets
 # ['subnet-pub1', 'subnet-pub2', 'subnet-priv1', 'subnet-priv2']
 AllSubnetsIds="$(jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g")"
-echo "$AllSubnetsIds" > "${SHARED_DIR}/all_subnet_ids"
+echo "$AllSubnetsIds" > "${SHARED_DIR}/subnet_ids"
 
 # save public subnets ids
 # ['subnet-pub1', 'subnet-pub2']
@@ -77,6 +77,6 @@ echo "AvailabilityZones: ${AvailabilityZones}"
 
 cp "${SHARED_DIR}/vpc_stack_name" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/vpc_id" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/all_subnet_ids" "${ARTIFACT_DIR}/"
+cp "${SHARED_DIR}/subnet_ids" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/public_subnet_ids" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/private_subnet_ids" "${ARTIFACT_DIR}/"
