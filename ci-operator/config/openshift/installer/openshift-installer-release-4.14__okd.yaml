@@ -1,0 +1,205 @@
+base_images:
+  base:
+    name: "4.14"
+    namespace: origin
+    tag: base
+  ocp_4.10_cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
+  origin_4.12_cli:
+    name: "4.14"
+    namespace: origin
+    tag: cli
+  rhel-7:
+    name: builder
+    namespace: ocp
+    tag: rhel-7-golang-1.16-openshift-4.10
+build_root:
+  from_repository: true
+images:
+- build_args:
+  - name: TAGS
+    value: okd
+  dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: installer
+- build_args:
+  - name: TAGS
+    value: okd
+  dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  from: installer
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: installer-artifacts
+- build_args:
+  - name: TAGS
+    value: libvirt okd
+  dockerfile_path: images/libvirt/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: libvirt-installer
+- build_args:
+  - name: TAGS
+    value: okd
+  dockerfile_path: images/installer/Dockerfile.upi.ci
+  from: rhel-7
+  inputs:
+    ocp_4.10_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.10:cli
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: upi-installer
+- build_args:
+  - name: TAGS
+    value: okd
+  dockerfile_path: images/openstack/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    origin_4.12_cli:
+      as:
+      - registry.ci.openshift.org/origin/4.12:cli
+  to: openstack-installer
+- build_args:
+  - name: TAGS
+    value: baremetal libvirt okd
+  dockerfile_path: images/baremetal/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: baremetal-installer
+- build_args:
+  - name: TAGS
+    value: okd
+  dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: ovirt-installer
+promotion:
+  name: "4.14"
+  namespace: origin
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: origin
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  baremetal-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  govet:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer-artifacts:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  libvirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  openstack-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  ovirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: verify-codegen
+  commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
+  container:
+    from: src
+- as: e2e-aws-ovn
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-gcp
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-ovn-upgrade
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-gcp-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- as: e2e-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere
+- as: e2e-aws-ovn-testing-stream
+  cron: 30 0 * * *
+  steps:
+    cluster_profile: aws
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-fcos-ami
+    - chain: ipi-install
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: installer
+  variant: okd
