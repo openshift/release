@@ -87,8 +87,7 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   fi
 
   if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
-    arch_instance_type="m5"
-    CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+    CONTROL_PLANE_INSTANCE_TYPE="m5.${CONTROL_PLANE_INSTANCE_SIZE}"
   fi
 elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; then
   # ARM 64
@@ -98,8 +97,7 @@ elif [[ "${CLUSTER_TYPE}" == "aws-arm64" ]] || [[ "${OCP_ARCH}" == "arm64" ]]; t
   fi
 
   if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" == "" ]]; then
-    arch_instance_type="m6g"
-    CONTROL_PLANE_INSTANCE_TYPE="${arch_instance_type}.${CONTROL_PLANE_INSTANCE_SIZE}"
+    CONTROL_PLANE_INSTANCE_TYPE="m6g.${CONTROL_PLANE_INSTANCE_SIZE}"
   fi
 else
   # AMD 64
@@ -131,9 +129,9 @@ else
     fi
   fi
 
-  arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
 fi
 
+arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
 BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 
 workers=3
