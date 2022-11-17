@@ -156,8 +156,8 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 # check if the cluster is ready
 oc version --client
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+oc wait nodes --all --for=condition=Ready=true --timeout=15m
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 oc get clusterversion version -o yaml || true
 
 # execute the cases
