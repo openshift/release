@@ -1,41 +1,43 @@
 base_images:
   base:
-    name: 4.7-priv
+    name: 4.12-priv
     namespace: ocp-private
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
-    tag: latest
-  ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    tag: stage
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.7
+    tag: rhel-8-golang-1.19-openshift-4.12
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.14
+  from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.7:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.7
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: insights-operator
 promotion:
-  name: 4.7-priv
+  disabled: true
+  name: 4.12-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.7-priv
+      name: 4.12-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.7-priv
+      name: 4.12-priv
       namespace: ocp-private
 resources:
   '*':
@@ -43,8 +45,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: lint
+  commands: |
+    GOLANGCI_LINT_CACHE=/tmp/golangci-cache make lint
+  container:
+    from: src
 - as: unit
-  commands: make test-unit
+  commands: make test
   container:
     from: src
 - as: e2e
@@ -64,13 +71,22 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: make test-e2e
-      from: src
+      commands: pytest.sh -m "not ui"
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      from: insights-operator-tests
       resources:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
 zz_generated_metadata:
-  branch: release-4.7
+  branch: stage
   org: openshift-priv
   repo: insights-operator
