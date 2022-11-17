@@ -25,6 +25,9 @@ chain:
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
       documentation: "Release image used for the HostedCluster. Empty by default it will use release:latest"
+    - name: HYPERSHIFT_CP_AVAILABILITY_POLICY
+      default: "SingleReplica"
+      documentation: "Availability policy for hosted cluster components. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
     commands: |-
       set -exuo pipefail
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -50,6 +53,7 @@ chain:
         --instance-type=m5.xlarge \
         --base-domain ${DOMAIN} \
         --region ${HYPERSHIFT_AWS_REGION} \
+        --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
         --release-image ${RELEASE_IMAGE} \
