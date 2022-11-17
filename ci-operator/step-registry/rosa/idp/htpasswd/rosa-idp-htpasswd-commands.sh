@@ -39,7 +39,7 @@ fi
 # is over 10 minutes, so we give a loop to wait for the configuration to be active before timeout. 
 echo "Config htpasswd idp ..."
 IDP_USER="rosa-admin"
-IDP_PASSWD=$(openssl rand -base64 15)
+IDP_PASSWD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 15)
 rosa create idp -c ${CLUSTER_ID} \
                 -y \
                 --type htpasswd \
