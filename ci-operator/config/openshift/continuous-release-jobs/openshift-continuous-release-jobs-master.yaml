@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: base
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: cli
   openshift_release_golang-1.18:
@@ -26,16 +26,19 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: dpcr-bugzilla-updater
-- dockerfile_path: images/impacts/Dockerfile
-  from: os
-  to: impacts
 - dockerfile_path: images/base/Dockerfile
   from: os
   inputs:
     cli:
       as:
-      - registry.ci.openshift.org/ocp/4.12:cli
+      - registry.ci.openshift.org/ocp/4.13:cli
   to: continuous-release-jobs
+- dockerfile_path: images/cluster-apply/Dockerfile
+  from: continuous-release-jobs
+  to: cluster-apply
+- dockerfile_path: images/impacts/Dockerfile
+  from: continuous-release-jobs
+  to: impacts
 promotion:
   namespace: continuous-release-jobs
   tag: latest
