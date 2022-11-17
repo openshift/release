@@ -92,7 +92,7 @@ aws)
     export KUBE_SSH_USER=core
     export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
     ;;
-aws-usgov)
+aws-usgov|aws-c2s|aws-sc2s)
     mkdir -p ~/.ssh
     export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
     export KUBE_SSH_USER=core
