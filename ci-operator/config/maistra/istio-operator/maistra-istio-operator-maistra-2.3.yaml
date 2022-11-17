@@ -59,20 +59,20 @@ tests:
     - as: create-builder-pod
       cli: latest
       commands: "oc -n openshift-config  get secret/pull-secret -o yaml | sed 's/openshift-config/default/'
-        | sed 's/\\.dockerconfigjson/auth.json/' | grep -v type: | oc apply -f -\noc
-        -n default apply -f - <<EOF\napiVersion: v1\nkind: Pod\nmetadata:\n  name:
-        maistra-istio-operator-integ\nspec:\n  containers:\n  - name: builder\n    image:
-        registry.ci.openshift.org/ci/maistra-builder:2.3\n    command:\n    - docker
-        version\n    securityContext:\n      privileged: true\n    volumeMounts:\n
-        \   - name: pull-secret\n      mountPath: \"/run/user/0/containers/\"\n      readOnly:
-        true\n    - name: modules\n      mountPath: /lib/modules\n      readOnly:
-        true\n    - name: cgroup\n      mountPath: /sys/fs/cgroup\n      readOnly:
-        true\n    - name: varlibdocker\n      mountPath: /var/lib/docker\n      readOnly:
-        false\n  volumes:\n  - name: pull-secret\n    secret:\n      secretName: pull-secret\n
-        \ - name: modules \n    hostPath:\n      path: /lib/modules\n      type: Directory\n
-        \ - name: cgroup\n    hostPath:\n      path: /sys/fs/cgroup\n      type: Directory\n
-        \ - name: varlibdocker\n    emptyDir: {}\nEOF\noc -n default wait pod/maistra-istio-operator-integ
-        --for=condition=Ready --timeout=180s\noc -n default describe pod/maistra-istio-operator-integ\n"
+        | sed 's/\\.dockerconfigjson/auth.json/' | grep -v type: | oc apply -f - \noc
+        -n default apply -f - <<EOF \napiVersion: v1 \nkind: Pod \nmetadata:\n  name:
+        maistra-builder\nspec:\n  containers:\n  - name: builder\n    image: registry.ci.openshift.org/ci/maistra-builder:2.3\n
+        \   command:\n    - entrypoint tail -f /dev/null\n    securityContext:\n      privileged:
+        true\n    volumeMounts:\n    - name: pull-secret\n      mountPath: \"/run/user/0/containers/\"\n
+        \     readOnly: true\n    - name: modules\n      mountPath: /lib/modules\n
+        \   - name: cgroup\n      mountPath: /sys/fs/cgroup\n    - name: varlibdocker\n
+        \     mountPath: /var/lib/docker\n  volumes:\n  - name: pull-secret\n    secret:\n
+        \     secretName: pull-secret\n  - name: modules\n    hostPath:\n      path:
+        /lib/modules\n      type: Directory\n  - name: cgroup\n    hostPath:\n      path:
+        /sys/fs/cgroup\n      type: Directory\n  - name: varlibdocker\n    emptyDir:
+        {}\nEOF \noc -n default wait pod/maistra-builder --for=condition=Ready --timeout=180s
+        || true \noc -n default describe pod/maistra-builder \noc -n default logs
+        pod/maistra-builder -c builder\n"
       from: src
       resources:
         requests:
