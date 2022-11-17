@@ -6,6 +6,49 @@ postsubmits:
     - ^master$
     cluster: build04
     decorate: true
+    max_concurrency: 1
+    name: branch-ci-openshift-continuous-release-jobs-dptools-cluster-apply
+    spec:
+      containers:
+      - command:
+        - /continuous-release-jobs/config/hack/cluster-apply.sh
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: AWS_ACCESS_KEY_ID
+              name: dptools-aws-read-only-bot
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: AWS_SECRET_KEY
+              name: dptools-aws-read-only-bot
+        - name: OPENSHIFT_CLIENT_PYTHON_DEFAULT_CONFIG_PATH
+          value: /etc/dptools-kubeconfig/kubeconfig
+        image: registry.ci.openshift.org/continuous-release-jobs/cluster-apply:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /etc/dptools-kubeconfig
+          name: dptools-kubeconfig
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: dptools-kubeconfig
+        secret:
+          items:
+          - key: kubeconfig
+            path: kubeconfig
+          secretName: dptools-jenkins-service-account-kubeconfig
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    cluster: build04
+    decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
