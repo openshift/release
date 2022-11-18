@@ -85,7 +85,13 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm SKIP='\[FLAKE\]'
+      commands: |
+        export JUNIT_DIRECTORY=${ARTIFACT_DIR}
+        # Skip the flake tests, which are ran in a separate job
+        export SKIP='\[FLAKE\]'
+        # Skip an upstream test that requires OLM to be built with an e2e-only go build tag
+        export SKIP="$SKIP|an InstallPlan step contains a deprecated resource version"
+        make e2e/olm
       from: ci-image
       resources:
         requests:
