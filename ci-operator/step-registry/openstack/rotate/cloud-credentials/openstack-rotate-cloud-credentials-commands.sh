@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ -z "$ROTATE_CLOUD_CREDENTIALS" ]; then
+	echo 'Environment variable ROTATE_CLOUD_CREDENTIALS unset or empty. Exiting.'
+	exit 0
+fi
+
 info() {
 	printf '%s: %s\n' "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" "$*"
 }
