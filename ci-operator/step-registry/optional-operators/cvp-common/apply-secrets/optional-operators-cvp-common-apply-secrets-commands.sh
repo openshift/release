@@ -94,9 +94,16 @@ LIST_OF_KUBEOBJECTS=$(find "${CUSTOM_KUBEOBJECTS_PATH}"* -type f -name kube_obje
 if [ -n "${LIST_OF_KUBEOBJECTS[0]}" ] ; then
     for i in "${LIST_OF_KUBEOBJECTS[@]}"
     do
-        echo "The following custom kubeobject has been found ! $i"
-        echo "Applying kube_objects on to the Namespace $OO_INSTALL_NAMESPACE"
-        oc apply -f "$i" -n "$OO_INSTALL_NAMESPACE"
+	echo "The following custom kubeobject has been found ! $i"
+	echo "Check if the namespace is mentioned inside the kubeobjects"
+        if oc apply -f "$i" --dry-run=client | grep  "^namespace/"
+        then
+            echo "Namespace found in kubeobjects. Applying directly"
+	    oc apply -f "$i"
+        else
+            echo "Applying kube_objects on to the Namespace $OO_INSTALL_NAMESPACE"
+            oc apply -f "$i" -n "$OO_INSTALL_NAMESPACE"
+        fi	
     done
 else
     echo "Could not find any kubeobjects please check the vault"
