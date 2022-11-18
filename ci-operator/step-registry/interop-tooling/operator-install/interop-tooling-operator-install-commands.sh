@@ -93,34 +93,17 @@ done
 
 if [[ $(oc get csv -n "${SUB_INSTALL_NAMESPACE}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
   echo "Error: Failed to deploy ${SUB_PACKAGE}"
-  #echo "CSV ${CSV} YAML"
-  #oc get CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}" -o yaml
-  #echo "CSV ${CSV} Describe"
-  #oc describe CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}"
 
-  echo "SUBSCRIPTION"
+  echo "SUBSCRIPTION YAML"
   oc get subscription -n "${SUB_INSTALL_NAMESPACE}" "${SUB_PACKAGE}" -o yaml
 
-  echo "CSV"
+  echo "CSV ${CSV} YAML"
   oc get CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}" -o yaml
+
+  echo "CSV ${CSV} Describe"
+  oc describe CSV "${CSV}" -n "${SUB_INSTALL_NAMESPACE}"
 
   exit 1
 fi
 
-echo "successfully installed ${SUB_PACKAGE}"
-
-
-# Deploy windup
-oc apply -f - <<EOF
-apiVersion: windup.jboss.org/v1
-metadata:
-    name: mta
-    namespace: mta
-spec:
-    mta_Volume_Cpacity: "5Gi"
-    volumeCapacity: "5Gi"
-EOF
-
-# TODO: Execute tests
-echo "MTA installed."
-
+echo "Successfully installed ${SUB_PACKAGE}"
