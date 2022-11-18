@@ -100,7 +100,7 @@ images:
 promotion:
   disabled: true
   name: openshift-serverless-v1.26.0
-  namespace: openshift
+  namespace: knative
 releases:
   latest:
     release:
@@ -115,9 +115,15 @@ resources:
       memory: 200Mi
 tests:
 - as: operator-e2e-aws-ocp-48
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws
     test:
     - as: operator-e2e
       commands: make test-e2e-with-kafka
@@ -135,11 +141,18 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
+    workflow: generic-claim
 - as: upstream-e2e-aws-ocp-48
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  optional: true
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws
     test:
     - as: serverless-e2e
       commands: make test-upstream-e2e-no-upgrade
@@ -157,11 +170,18 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws
+    workflow: generic-claim
 - as: upgrade-tests-aws-ocp-48
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.8"
+  optional: true
   steps:
     allow_skip_on_success: true
-    cluster_profile: aws
     test:
     - as: serverless-e2e
       commands: make test-upgrade
@@ -179,7 +199,7 @@ tests:
         requests:
           cpu: "2"
           memory: 4Gi
-    workflow: openshift-e2e-aws
+    workflow: generic-claim
 - as: upstream-e2e-mesh-aws-ocp-48
   cluster_claim:
     architecture: amd64
