@@ -3,32 +3,28 @@ base_images:
     name: stream8
     namespace: coreos
     tag: "8"
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.ocp
+- dockerfile_path: Dockerfile.okd
   from: centos
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    centos:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: ironic-machine-os-downloader
+      - registry.svc.ci.openshift.org/ocp/builder:rhel-8-base-openshift
+  to: ironic-ipa-downloader
 promotion:
-  name: "4.13"
+  name: scos-4.13
   namespace: origin
 releases:
   initial:
     integration:
-      name: "4.13"
+      name: scos-4.13
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
+      name: scos-4.13
       namespace: origin
 resources:
   '*':
@@ -38,5 +34,5 @@ resources:
 zz_generated_metadata:
   branch: master
   org: openshift
-  repo: ironic-rhcos-downloader
-  variant: okd
+  repo: ironic-ipa-downloader
+  variant: okd-scos
