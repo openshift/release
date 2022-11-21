@@ -1,8 +1,6 @@
 build_root:
-  image_stream_tag:
-    name: redhat-appstudio
-    namespace: ci
-    tag: e2e-test-runner
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
 releases:
   latest:
     release:
@@ -17,7 +15,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: appstudio-e2e-kcp-stable
+- as: appstudio-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -25,12 +23,69 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.11"
-  optional: true
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
-    - ref: redhat-appstudio-e2e
+    - as: appstudio-e2e-tests
+      cli: latest
+      commands: |
+        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
+        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
+        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
+        export QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-user)
+        export QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token)
+        export QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-source)
+        export QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
+
+        git config --global user.name "redhat-appstudio-qe-bot"
+        git config --global user.email redhat-appstudio-qe-bot@redhat.com
+
+        mkdir -p ${HOME}/creds
+        GIT_CREDS_PATH="${HOME}/creds/file"
+        git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
+        echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
+
+        /bin/bash .ci/oci-e2e-deployment.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
+        name: ci-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: redhat-appstudio-claim
-- as: appstudio-e2e-kcp-stable-periodic
+- as: appstudio-e2e-tests-periodic
+  cron: 0 */24 * * *
+  steps:
+    test:
+    - as: appstudio-e2e-tests-periodic
+      cli: latest
+      commands: |
+        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
+        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
+        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
+        export QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-user)
+        export QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token)
+
+        git config --global user.name "redhat-appstudio-qe-bot"
+        git config --global user.email redhat-appstudio-qe-bot@redhat.com
+        mkdir -p ${HOME}/creds
+        GIT_CREDS_PATH="${HOME}/creds/file"
+
+        git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
+        echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
+        /bin/bash .ci/oci-e2e-deployment.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
+        name: ci-secrets
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: redhat-appstudio-claim
+- as: hacbs-e2e-periodic
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -38,7 +93,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.11"
-  cron: 0 */24 * * *
+  cron: 0 2 * * *
   steps:
     test:
     - ref: redhat-appstudio-e2e
