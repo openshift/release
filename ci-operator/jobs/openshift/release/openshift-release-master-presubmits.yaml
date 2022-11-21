@@ -1515,6 +1515,46 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: app.ci
+    context: ci/prow/pr-reminder-config
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-pr-reminder-config
+    rerun_command: /test pr-reminder-config
+    run_if_changed: ^core-services/pr-reminder/_config.yaml
+    spec:
+      containers:
+      - args:
+        - SUCCESS
+        command:
+        - echo
+        image: centos:7
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/github-mapping
+          name: github-mapping
+          readOnly: true
+        - mountPath: /etc/slack
+          name: slack
+          readOnly: true
+      volumes:
+      - configMap:
+          name: sync-rover-groups
+        name: github-mapping
+      - name: slack
+        secret:
+          secretName: slack-credentials-dptp-bot
+    trigger: (?m)^/test( | .* )pr-reminder-config,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: build04
     context: ci/prow/pylint
     decorate: true
