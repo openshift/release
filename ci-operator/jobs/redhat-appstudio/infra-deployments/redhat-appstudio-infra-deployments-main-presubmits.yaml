@@ -1,21 +1,21 @@
 presubmits:
   redhat-appstudio/infra-deployments:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/appstudio-e2e-kcp-stable
+    context: ci/prow/appstudio-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-appstudio-infra-deployments-main-appstudio-e2e-kcp-stable
-    optional: true
-    rerun_command: /test appstudio-e2e-kcp-stable
+    name: pull-ci-redhat-appstudio-infra-deployments-main-appstudio-e2e-tests
+    rerun_command: /test appstudio-e2e-tests
+    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -24,7 +24,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=appstudio-e2e-kcp-stable
+        - --target=appstudio-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -63,4 +63,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )appstudio-e2e-kcp-stable,?($|\s.*)
+    trigger: (?m)^/test( | .* )appstudio-e2e-tests,?($|\s.*)
