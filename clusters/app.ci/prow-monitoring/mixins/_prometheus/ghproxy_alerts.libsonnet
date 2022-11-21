@@ -7,7 +7,7 @@
           {
             alert: 'ghproxy-too-many-pending-alerts',
             expr: |||
-                sum_over_time(pending_outbound_requests{container="ghproxy"}[5m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[5m]) > 100
+                sum_over_time(pending_outbound_requests{container="ghproxy"}[5m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[5m]) > 150
             |||,
             labels: {
               severity: 'critical',
