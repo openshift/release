@@ -570,7 +570,17 @@ tests:
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-capi
   optional: true
-  run_if_changed: ^(deploy/operator/.*)$
+  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: cluster-api-provider-agent
+    workflow: assisted-baremetal-operator-capi
+- as: e2e-ai-operator-ztp-capi-periodic
+  cron: 25 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -932,26 +942,6 @@ tests:
         export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-capi
-  optional: true
-  run_if_changed: ^(api/.*|internal/controller/controllers/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: hypershift-operator
-      PROVIDER_IMAGE: cluster-api-provider-agent
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=12000
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: none
     workflow: assisted-baremetal
 - as: e2e-vsphere-assisted
   optional: true
