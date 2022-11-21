@@ -55,6 +55,9 @@ CONFIG = {
     'aws-sc2s-qe-quota-slice': {
         'us-isob-east-1': 5,
     },
+    'aws-interop-qe-quota-slice': {
+        'us-east-2': 5,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
