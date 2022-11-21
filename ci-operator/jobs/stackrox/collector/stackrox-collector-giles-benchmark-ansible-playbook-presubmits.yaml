@@ -3,9 +3,58 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
+    context: ci/prow/benchmarks
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-benchmarks
+    rerun_command: /test benchmarks
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=benchmarks
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )benchmarks,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/cos-integration-tests
     decorate: true
     decoration_config:
@@ -13,7 +62,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-cos-integration-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-cos-integration-tests
     rerun_command: /test cos-integration-tests
     spec:
       containers:
@@ -52,9 +101,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/drivers-tests
     decorate: true
     decoration_config:
@@ -62,7 +111,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-drivers-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-drivers-tests
     optional: true
     rerun_command: /test drivers-tests
     spec:
@@ -102,9 +151,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/fedora-coreos-integration-tests
     decorate: true
     decoration_config:
@@ -112,7 +161,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-fedora-coreos-integration-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-fedora-coreos-integration-tests
     rerun_command: /test fedora-coreos-integration-tests
     spec:
       containers:
@@ -151,9 +200,58 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
+    context: ci/prow/flatcar-integration-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-flatcar-integration-tests
+    rerun_command: /test flatcar-integration-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=flatcar-integration-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )flatcar-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/garden-linux-integration-tests
     decorate: true
     decoration_config:
@@ -161,7 +259,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-garden-linux-integration-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-garden-linux-integration-tests
     rerun_command: /test garden-linux-integration-tests
     spec:
       containers:
@@ -200,9 +298,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -210,7 +308,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-images
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-images
     rerun_command: /test images
     spec:
       containers:
@@ -249,9 +347,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -259,7 +357,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-lint
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-lint
     rerun_command: /test lint
     spec:
       containers:
@@ -298,9 +396,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/push-drivers
     decorate: true
     decoration_config:
@@ -308,7 +406,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-push-drivers
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-push-drivers
     optional: true
     rerun_command: /test push-drivers
     spec:
@@ -348,9 +446,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/push-images
     decorate: true
     decoration_config:
@@ -358,7 +456,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-push-images
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-push-images
     rerun_command: /test push-images
     spec:
       containers:
@@ -397,9 +495,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/rhel-integration-tests
     decorate: true
     decoration_config:
@@ -407,7 +505,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-rhel-integration-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-rhel-integration-tests
     rerun_command: /test rhel-integration-tests
     spec:
       containers:
@@ -446,9 +544,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/rhel-sap-integration-tests
     decorate: true
     decoration_config:
@@ -456,7 +554,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-rhel-sap-integration-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-rhel-sap-integration-tests
     rerun_command: /test rhel-sap-integration-tests
     spec:
       containers:
@@ -495,9 +593,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/sles-integration-tests
     decorate: true
     decoration_config:
@@ -505,7 +603,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-sles-integration-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-sles-integration-tests
     rerun_command: /test sles-integration-tests
     spec:
       containers:
@@ -544,9 +642,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/ubuntu-os-integration-tests
     decorate: true
     decoration_config:
@@ -554,7 +652,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-ubuntu-os-integration-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-ubuntu-os-integration-tests
     rerun_command: /test ubuntu-os-integration-tests
     spec:
       containers:
@@ -593,9 +691,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/ubuntu-os-pro-integration-tests
     decorate: true
     decoration_config:
@@ -603,7 +701,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-ubuntu-os-pro-integration-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-ubuntu-os-pro-integration-tests
     rerun_command: /test ubuntu-os-pro-integration-tests
     spec:
       containers:
@@ -642,9 +740,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/unit-tests
     decorate: true
     decoration_config:
@@ -652,7 +750,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-unit-tests
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-unit-tests
     rerun_command: /test unit-tests
     spec:
       containers:
@@ -691,9 +789,9 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    - ^master-
-    cluster: build02
+    - ^giles-benchmark-ansible-playbook$
+    - ^giles-benchmark-ansible-playbook-
+    cluster: build01
     context: ci/prow/update-support-packages-from-registry
     decorate: true
     decoration_config:
@@ -701,7 +799,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-master-update-support-packages-from-registry
+    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-update-support-packages-from-registry
     rerun_command: /test update-support-packages-from-registry
     spec:
       containers:
