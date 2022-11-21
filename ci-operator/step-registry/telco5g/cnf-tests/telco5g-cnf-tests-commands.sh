@@ -369,9 +369,15 @@ python3 -m venv ${SHARED_DIR}/myenv
 source ${SHARED_DIR}/myenv/bin/activate
 git clone https://github.com/sshnaidm/html4junit.git ${SHARED_DIR}/html4junit
 pip install -r ${SHARED_DIR}/html4junit/requirements.txt
+# Create HTML reports for humans/aliens
 python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.html
 python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
 python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.html
+# Create JSON reports for robots
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.json
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.json
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.json
+
 rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
 
 exit ${exit_code}
