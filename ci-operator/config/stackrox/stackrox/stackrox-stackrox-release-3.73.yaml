@@ -165,6 +165,14 @@ tests:
         requests:
           cpu: 2000m
           memory: 4000Mi
+- as: style-checks
+  commands: .openshift-ci/dispatch.sh style-checks
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
 - as: merge-style-checks
   postsubmit: true
   steps:
@@ -222,6 +230,14 @@ tests:
   steps:
     test:
     - ref: stackrox-initial
+- as: go-unit-tests-release
+  commands: .openshift-ci/dispatch.sh go-unit-tests-release
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
 - as: merge-go-unit-tests-release
   postsubmit: true
   steps:
@@ -239,6 +255,10 @@ tests:
     - ref: stackrox-initial
 - as: merge-shell-unit-tests
   postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: ui-unit-tests
   steps:
     test:
     - ref: stackrox-initial
