@@ -63,6 +63,7 @@ images:
 promotion:
   additional_images:
     hypershift-tests: test-bin
+  disabled: true
   name: "4.13"
   namespace: ocp
 releases:
@@ -105,10 +106,16 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      INSTANCE_TYPE: m5.4xlarge
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-metrics
   optional: true
   steps:
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      INSTANCE_TYPE: m5.4xlarge
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-conformance
   optional: true
@@ -131,26 +138,28 @@ tests:
         MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
         MAKEFILE_TARGET="test"
       GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: minimal
+      TEST_SUITE: none
     workflow: assisted-baremetal
 - as: e2e-ibmcloud-iks
   optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  run_if_changed: ^api/
   steps:
     env:
       BOM_VERSION: 4.10.26_openshift
       MANAGED_CLUSTER_TYPE: iks
       MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
+      TEST_TYPE: main
       VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
     workflow: hypershift-ibmcloud-e2e
 - as: e2e-ibmcloud-roks
   optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  run_if_changed: ^api/
   steps:
     env:
       BOM_VERSION: 4.11.0_openshift
       MANAGED_CLUSTER_TYPE: openshift
       MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
+      TEST_TYPE: main
       VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
     workflow: hypershift-ibmcloud-e2e
 zz_generated_metadata:

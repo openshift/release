@@ -54,9 +54,10 @@ promotion:
   namespace: edge-infrastructure
 releases:
   latest:
-    integration:
-      name: "4.12"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -217,6 +218,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
+        OPENSHIFT_VERSION=4.11
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-periodic
   cron: 15 02 */1 * 0-5
@@ -225,6 +227,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
+        OPENSHIFT_VERSION=4.11
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
@@ -257,6 +260,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.11
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-periodic
@@ -266,6 +270,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.11
       PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
@@ -540,7 +545,6 @@ tests:
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
       PLATFORM: vsphere
-      TEST_SUITE: conformance
     workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-periodic
   cron: 45 02 */1 * 0-5
@@ -548,8 +552,10 @@ tests:
     cluster_profile: vsphere
     env:
       ASSISTED_CONFIG: |
-        NUM_WORKERS=0
+        NUM_WORKERS=3
         MAKEFILE_TARGET=test
+        WORKER_VCPU=4
+        WORKER_MEMORY=16384
       PLATFORM: vsphere
       TEST_SUITE: conformance
     workflow: assisted-vsphere
@@ -652,6 +658,8 @@ tests:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-periodic
@@ -664,6 +672,7 @@ tests:
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
       PLATFORM: nutanix
     workflow: assisted-nutanix
 zz_generated_metadata:

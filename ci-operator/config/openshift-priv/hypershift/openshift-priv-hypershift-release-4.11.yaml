@@ -1,4 +1,8 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-image-service
   assisted-installer:
     name: ocm-2.7
     namespace: edge-infrastructure
@@ -118,7 +122,8 @@ tests:
         MINIKUBE_RAM_MB=10240
         TEST=./src/tests/test_kube_api.py
         TEST_FUNC=test_capi_provider
-        MAKEFILE_TARGET="setup run deploy_capi_env test"
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test"
       GATHER_CAPI_LOGS: "true"
       TEST_SUITE: minimal
     workflow: assisted-baremetal
@@ -388,6 +393,26 @@ tests:
         requests:
           cpu: 100m
       timeout: 1h0m0s
+- as: e2e-ibmcloud-iks
+  optional: true
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    env:
+      BOM_VERSION: 4.11.0_openshift
+      MANAGED_CLUSTER_TYPE: iks
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks-release.kubeconfig
+      TEST_TYPE: release
+    workflow: hypershift-ibmcloud-e2e-release
+- as: e2e-ibmcloud-roks
+  optional: true
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    env:
+      BOM_VERSION: 4.11.0_openshift
+      MANAGED_CLUSTER_TYPE: openshift
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks-release.kubeconfig
+      TEST_TYPE: release
+    workflow: hypershift-ibmcloud-e2e-release
 zz_generated_metadata:
   branch: release-4.11
   org: openshift-priv

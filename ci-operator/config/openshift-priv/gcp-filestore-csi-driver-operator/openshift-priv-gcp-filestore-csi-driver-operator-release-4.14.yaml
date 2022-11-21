@@ -1,0 +1,133 @@
+base_images:
+  attacher-operand:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: csi-external-attacher
+  base:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: base
+  driver-operand:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: gcp-filestore-csi-driver
+  livenessprobe-operand:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: csi-livenessprobe
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
+  provisioner-operand:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: csi-external-provisioner
+  proxy-operand:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: kube-rbac-proxy
+  registrar-operand:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: csi-node-driver-registrar
+  resizer-operand:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: csi-external-resizer
+  snapshotter-operand:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: csi-external-snapshotter
+binary_build_commands: make
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/gcp-filestore-csi-driver-operator
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+  to: gcp-filestore-csi-driver-operator
+operator:
+  bundles:
+  - as: gcp-filestore-csi-driver-operator-bundle
+    base_index: operator-index
+    context_dir: config
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/openshift/origin-gcp-filestore-csi-driver-operator:latest
+    with: pipeline:gcp-filestore-csi-driver-operator
+  - pullspec: quay.io/openshift/origin-gcp-filestore-csi-driver:latest
+    with: pipeline:driver-operand
+  - pullspec: quay.io/openshift/origin-csi-external-provisioner:latest
+    with: pipeline:provisioner-operand
+  - pullspec: quay.io/openshift/origin-csi-external-provisioner:latest
+    with: pipeline:attacher-operand
+  - pullspec: quay.io/openshift/origin-csi-external-snapshotter:latest
+    with: pipeline:snapshotter-operand
+  - pullspec: quay.io/openshift/origin-csi-external-resizer:latest
+    with: pipeline:resizer-operand
+  - pullspec: quay.io/openshift/origin-csi-node-driver-registrar:latest
+    with: pipeline:registrar-operand
+  - pullspec: quay.io/openshift/origin-csi-livenessprobe:latest
+    with: pipeline:livenessprobe-operand
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:latest
+    with: pipeline:proxy-operand
+promotion:
+  name: 4.14-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.14-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.14-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make test
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: operator-e2e
+  optional: true
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
+    env:
+      CLUSTERCSIDRIVER: filestore.csi.storage.gke.io
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
+      OO_PACKAGE: gcp-filestore-csi-driver-operator
+      OO_TARGET_NAMESPACES: '!all'
+      TEST_CSI_DRIVER_MANIFEST: manifest-gcp-filestore.yaml
+      TEST_SUITE: openshift/csi
+      TRUECONDITIONS: GCPFilestoreDriverControllerServiceControllerAvailable GCPFilestoreDriverNodeServiceControllerAvailable
+    workflow: openshift-e2e-gcp-csi-filestore
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-priv
+  repo: gcp-filestore-csi-driver-operator

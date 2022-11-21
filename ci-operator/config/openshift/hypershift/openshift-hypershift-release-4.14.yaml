@@ -1,0 +1,167 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- from: base
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: hypershift-operator
+- dockerfile_path: Dockerfile.control-plane
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: hypershift
+promotion:
+  additional_images:
+    hypershift-tests: test-bin
+  name: "4.14"
+  namespace: ocp
+releases:
+  hosted-ocp-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.12"
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  unit:
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 4000m
+      memory: 2.5Gi
+test_binary_build_commands: make build e2e
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+- as: unit
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+- as: e2e-aws
+  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      INSTANCE_TYPE: m5.4xlarge
+    workflow: hypershift-aws-e2e-nested
+- as: e2e-aws-metrics
+  optional: true
+  steps:
+    env:
+      HYPERSHIFT_NODE_COUNT: "1"
+      INSTANCE_TYPE: m5.4xlarge
+    workflow: hypershift-aws-e2e-metrics
+- as: e2e-conformance
+  optional: true
+  steps:
+    workflow: hypershift-aws-conformance
+- as: capi-provider-agent-sanity
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      HYPERSHIFT_IMAGE: pipeline:hypershift-operator
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=yes
+        ENABLE_KUBE_API=true
+        MINIKUBE_DISK_SIZE=70g
+        MINIKUBE_RAM_MB=12000
+        TEST=./src/tests/test_kube_api.py
+        TEST_FUNC=test_capi_provider
+        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
+        MAKEFILE_TARGET="test"
+      GATHER_CAPI_LOGS: "true"
+      TEST_SUITE: none
+    workflow: assisted-baremetal
+- as: e2e-ibmcloud-iks
+  optional: true
+  run_if_changed: ^api/
+  steps:
+    env:
+      BOM_VERSION: 4.10.26_openshift
+      MANAGED_CLUSTER_TYPE: iks
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/iks.kubeconfig
+      TEST_TYPE: main
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "false"
+    workflow: hypershift-ibmcloud-e2e
+- as: e2e-ibmcloud-roks
+  optional: true
+  run_if_changed: ^api/
+  steps:
+    env:
+      BOM_VERSION: 4.11.0_openshift
+      MANAGED_CLUSTER_TYPE: openshift
+      MANAGEMENT_CLUSTER_KUBECONFIG: /etc/ibmcloud/secrets/roks.kubeconfig
+      TEST_TYPE: main
+      VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
+    workflow: hypershift-ibmcloud-e2e
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: hypershift

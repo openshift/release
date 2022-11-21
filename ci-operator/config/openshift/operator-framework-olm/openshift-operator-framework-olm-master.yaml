@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: base
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
@@ -30,17 +30,17 @@ images:
 promotion:
   excluded_images:
   - ci-image
-  name: "4.12"
+  name: "4.13"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -84,7 +84,13 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm SKIP='\[FLAKE\]'
+      commands: |
+        export JUNIT_DIRECTORY=${ARTIFACT_DIR}
+        # Skip the flake tests, which are ran in a separate job
+        export SKIP='\[FLAKE\]'
+        # Skip an upstream test that requires OLM to be built with an e2e-only go build tag
+        export SKIP="$SKIP|an InstallPlan step contains a deprecated resource version"
+        make e2e/olm
       from: ci-image
       resources:
         requests:

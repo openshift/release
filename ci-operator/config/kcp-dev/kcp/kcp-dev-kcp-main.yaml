@@ -157,7 +157,7 @@ tests:
   steps:
     test:
     - as: e2e
-      commands: USE_GOTESTSUM=1 E2E_PARALLELISM=3 make test-e2e
+      commands: USE_GOTESTSUM=1 E2E_PARALLELISM=3 make test-e2e SUITES=control-plane,transparent-multi-cluster
       from: bin
       resources:
         requests:
@@ -168,7 +168,7 @@ tests:
   steps:
     test:
     - as: e2e
-      commands: USE_GOTESTSUM=1 E2E_PARALLELISM=3 make test-e2e
+      commands: USE_GOTESTSUM=1 E2E_PARALLELISM=3 make test-e2e SUITES=control-plane,transparent-multi-cluster
       from: bin
       resources:
         requests:
@@ -179,7 +179,7 @@ tests:
   steps:
     test:
     - as: e2e-multiple-runs
-      commands: USE_GOTESTSUM=1 COUNT=3 E2E_PARALLELISM=3 make test-e2e
+      commands: USE_GOTESTSUM=1 COUNT=3 E2E_PARALLELISM=3 make test-e2e SUITES=control-plane,transparent-multi-cluster
       from: bin
       resources:
         requests:
@@ -190,7 +190,51 @@ tests:
   steps:
     test:
     - as: e2e-multiple-runs
-      commands: USE_GOTESTSUM=1 COUNT=3 E2E_PARALLELISM=3 make test-e2e
+      commands: USE_GOTESTSUM=1 COUNT=3 E2E_PARALLELISM=3 make test-e2e SUITES=control-plane,transparent-multi-cluster
+      from: bin
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+- as: e2e-shared
+  skip_if_only_changed: ^docs\/|^\.github\/|^\.goreleaser\.yaml|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    test:
+    - as: e2e-shared
+      commands: USE_GOTESTSUM=1 make test-e2e-shared-minimal SUITES=control-plane,transparent-multi-cluster
+      from: bin
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4G
+- as: e2e-shared-periodic
+  cron: 0 */2 * * *
+  steps:
+    test:
+    - as: e2e-shared
+      commands: USE_GOTESTSUM=1 make test-e2e-shared-minimal SUITES=control-plane,transparent-multi-cluster
+      from: bin
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+- as: e2e-sharded
+  skip_if_only_changed: ^docs\/|^\.github\/|^\.goreleaser\.yaml|\.md$|^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    test:
+    - as: e2e-sharded
+      commands: USE_GOTESTSUM=1 make test-e2e-sharded-minimal SUITES=control-plane,transparent-multi-cluster
+      from: bin
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4G
+- as: e2e-sharded-periodic
+  cron: 0 */2 * * *
+  steps:
+    test:
+    - as: e2e-shared
+      commands: USE_GOTESTSUM=1 make test-e2e-sharded-minimal SUITES=control-plane,transparent-multi-cluster
       from: bin
       resources:
         requests:

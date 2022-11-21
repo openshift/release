@@ -92,13 +92,13 @@ aws)
     export KUBE_SSH_USER=core
     export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
     ;;
-aws-usgov)
+aws-usgov|aws-c2s|aws-sc2s)
     mkdir -p ~/.ssh
     export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
     export KUBE_SSH_USER=core
     export TEST_PROVIDER="none"
     ;;
-azure4)
+azure4|azure-arm64)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
     export SSH_CLOUD_PRIV_AZURE_USER="${QE_BASTION_SSH_USER:-core}"
@@ -156,8 +156,8 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 # check if the cluster is ready
 oc version --client
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+oc wait nodes --all --for=condition=Ready=true --timeout=15m
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 oc get clusterversion version -o yaml || true
 
 # execute the cases

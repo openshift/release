@@ -19,7 +19,7 @@ def raise_on_duplicates(ordered_pairs):
     d = {}
     for k, v in ordered_pairs:
         if k in d:
-            raise ValueError("Duplicate key: %r for value: %r" % (k, v))
+            raise ValueError(f'Duplicate key: {k} for value: {v}')
         d[k] = v
     return d
 
@@ -30,7 +30,7 @@ def read_release_definitions(path):
         for entry in entries:
             if entry.is_file():
                 if entry.name.endswith('.json'):
-                    with open(entry, 'r') as release:
+                    with open(entry, 'r', encoding='utf-8') as release:
                         definitions.update({entry.name: json.load(release, object_pairs_hook=raise_on_duplicates)})
     return definitions
 
@@ -41,7 +41,7 @@ def read_job_definitions(path):
         for entry in entries:
             if entry.is_file():
                 if entry.name.endswith('.yaml'):
-                    with open(entry, 'r') as release:
+                    with open(entry, 'r', encoding='utf-8') as release:
                         definitions.update({entry.name: yaml.load(release, Loader=yaml.SafeLoader)})
     return definitions
 

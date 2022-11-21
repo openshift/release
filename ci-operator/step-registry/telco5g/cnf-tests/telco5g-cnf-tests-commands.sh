@@ -4,23 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
 function create_tests_skip_list_file {
 # List of test cases to ignore due to open bugs
 cat <<EOF >"${SKIP_TESTS_FILE}"
+
 # <feature> <test name>
 
 # this test is checking that there are no none cnf-worker nodes with rt kernel enabled.
 # when running cnf-tests in parallel we do have other nodes with rt kernel so the test is failing.
 performance "a node without performance profile applied should not have RT kernel installed"
 
-# bz### known bug
-sriov "Should be able to configure a metaplugin"
-# bz### known bug
-sriov "Webhook resource injector"
-# bz### known bug
-sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
 # need to investigate why it's failing
 sriov "Test Connectivity Connectivity between client and server Should work over a SR-IOV device"
+
 # this test needs both sriov and sctp available in the cluster.
 # since we run them in parallel we can't run this test.
 sriov "Allow access only to a specific port/protocol SCTP"
@@ -28,8 +25,71 @@ sriov "Allow access only to a specific port/protocol SCTP"
 # this test needs both sriov and sctp available in the cluster.
 # since we run them in parallel we can't run this test.
 sctp "Allow access only to a specific port/protocol SCTP"
+
 EOF
 }
+
+
+function create_tests_temp_skip_list_11 {
+# List of temporarly skipped tests for 4.11
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
+# TESTNAME
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
+EOF
+}
+
+
+function create_tests_temp_skip_list_12 {
+# List of temporarly skipped tests for 4.12
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### known bug
+# TESTNAME
+sriov "Should be able to configure a metaplugin"
+
+# SKIPTEST
+# bz### known bug
+# TESTNAME
+sriov "Webhook resource injector"
+
+# SKIPTEST
+# bz### known bug
+# TESTNAME
+sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
+
+# SKIPTEST
+# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
+# TESTNAME
+performance "should disable CPU load balancing for CPU\\\'s used by the pod"
+
+# SKIPTEST
+# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
+# TESTNAME
+performance "should run infra containers on reserved CPUs"
+
+# SKIPTEST
+# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
+# TESTNAME
+performance "Huge pages support for container workloads"
+
+# SKIPTEST
+# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
+# TESTNAME
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
+
+EOF
+}
+
+function create_tests_temp_skip_list_13 {
+    create_tests_temp_skip_list_12
+}
+
 
 function create_ns {
     ns=$1
@@ -137,7 +197,7 @@ function deploy_and_test {
     done
 }
 
-export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn}" # next: ovs_qos metallb
+export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb}" # next: ovs_qos
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
@@ -195,13 +255,26 @@ oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disab
 make setup-build-index-image
 cd -
 
+# Skiplist common for all releases
 create_tests_skip_list_file
+
+# Skiplist according to each release
+if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
+    create_tests_temp_skip_list_11
+fi
+if [[ "$CNF_BRANCH" == *"4.12"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+    create_tests_temp_skip_list_12
+fi
+if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
+    create_tests_temp_skip_list_13
+fi
+cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
 # run cnf-tests by feature in a thread on a free worker node
 for feature in ${FEATURES}; do
     log_file="${ARTIFACT_DIR}/deploy_and_test_${feature}.log"
     rm -f "${log_file}"
-    
+
     feature_nodes=""
     num_of_free_nodes=0
     num_of_required_nodes=1
@@ -275,4 +348,36 @@ echo -e "${err_msg}\n"
 if [ -f "summary.txt" ]; then
     cat summary.txt
 fi
+
+# Create a HTML report
+for feature in ${FEATURES}; do
+    xml_f="${ARTIFACT_DIR}/${feature}/cnftests-junit.xml"
+    if [[ -f $xml_f ]]; then
+        cp $xml_f ${ARTIFACT_DIR}/cnftests-junit_${feature}.xml
+    fi
+    xml_v="${ARTIFACT_DIR}/${feature}/validation_junit.xml"
+    if [[ -f $xml_v ]]; then
+        cp $xml_v ${ARTIFACT_DIR}/validation_junit_${feature}.xml
+    fi
+    xml_s="${ARTIFACT_DIR}/${feature}/setup_junit.xml"
+    if [[ -f $xml_s ]]; then
+        cp $xml_s ${ARTIFACT_DIR}/setup_junit_${feature}.xml
+    fi
+done
+
+python3 -m venv ${SHARED_DIR}/myenv
+source ${SHARED_DIR}/myenv/bin/activate
+git clone https://github.com/sshnaidm/html4junit.git ${SHARED_DIR}/html4junit
+pip install -r ${SHARED_DIR}/html4junit/requirements.txt
+# Create HTML reports for humans/aliens
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.html
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.html
+# Create JSON reports for robots
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.json
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.json
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.json
+
+rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
+
 exit ${exit_code}

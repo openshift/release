@@ -223,7 +223,7 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.11.1/IBM_Cloud_CLI_2.11.1_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.12.0/IBM_Cloud_CLI_2.12.0_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
@@ -450,6 +450,17 @@ EOF
       break
     fi
   done
+
+  #
+  # Clean up leftover networks
+  #
+  (
+    while read UUID
+    do
+      echo ibmcloud pi network-delete ${UUID}
+      ibmcloud pi network-delete ${UUID}
+    done
+  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("rdr-multiarch-'${POWERVS_ZONE}'")) | .networkID')
 }
 
 function dump_resources() {
