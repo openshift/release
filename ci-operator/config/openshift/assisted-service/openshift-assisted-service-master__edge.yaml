@@ -43,10 +43,6 @@ base_images:
     name: edge-infrastructure-swagger-codegen-cli
     namespace: ci
     tag: 2.4.18
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.37.1
   goswagger_swagger:
     name: goswagger-swagger
     namespace: ci
@@ -55,10 +51,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: hypershift-operator
-  openshift_release_golang-1.17:
+  openshift_release_golang-1.18:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
   postgresql-12-centos7:
     name: postgresql-12-centos7
     namespace: edge-infrastructure
@@ -71,19 +67,15 @@ images:
     coreos_centos_stream9:
       as:
       - quay.io/centos/centos:stream9
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-service-base
 - dockerfile_path: ci-images/Dockerfile.unit-tests
   from: assisted-service-base
   to: assisted-service-unit-test
 - dockerfile_path: ci-images/Dockerfile.lint
   from: assisted-service-base
-  inputs:
-    golangci-lint:
-      as:
-      - quay.io/app-sre/golangci-lint:v1.37.1
   to: assisted-service-lint
 - dockerfile_path: ci-images/Dockerfile.subsystem
   from: assisted-service-base
@@ -107,9 +99,9 @@ images:
     goswagger_swagger:
       as:
       - quay.io/goswagger/swagger:v0.28.0
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-service-build-base
 - dockerfile_literal: |
     FROM base-build
@@ -125,9 +117,9 @@ images:
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-service
 - dockerfile_literal: |
     FROM coreos/centos
@@ -578,7 +570,17 @@ tests:
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-capi
   optional: true
-  run_if_changed: ^(deploy/operator/.*)$
+  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: cluster-api-provider-agent
+    workflow: assisted-baremetal-operator-capi
+- as: e2e-ai-operator-ztp-capi-periodic
+  cron: 25 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -855,6 +857,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
+        OPENSHIFT_VERSION=4.11
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -874,6 +877,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.11
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
@@ -938,26 +942,6 @@ tests:
         export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-capi
-  optional: true
-  run_if_changed: ^(api/.*|internal/controller/controllers/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: hypershift-operator
-      PROVIDER_IMAGE: cluster-api-provider-agent
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=12000
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: none
     workflow: assisted-baremetal
 - as: e2e-vsphere-assisted
   optional: true

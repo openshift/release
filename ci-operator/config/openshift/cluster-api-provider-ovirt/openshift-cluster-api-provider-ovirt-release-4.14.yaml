@@ -1,0 +1,75 @@
+base_images:
+  ansible-runner-ovirt:
+    name: ansible-runner-ovirt
+    namespace: openshift
+    tag: latest
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
+  ovirt-prfinder:
+    name: ovirt-prfinder
+    namespace: openshift
+    tag: latest
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+  to: ovirt-machine-controllers
+promotion:
+  name: "4.14"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: go test -tags=unit ./... -v
+  container:
+    from: src
+- as: functional
+  commands: source ./hack/run-functional-test.sh
+  container:
+    from: src
+- as: e2e-ovirt
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-minimal
+- as: e2e-ovirt-cleanup
+  interval: 4h
+  steps:
+    cluster_profile: ovirt
+    test:
+    - ref: openshift-e2e-ovirt-cleanup-test
+- as: e2e-ovirt-prfinder
+  interval: 5m
+  steps:
+    cluster_profile: ovirt
+    test:
+    - ref: openshift-e2e-ovirt-prfinder-test
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: cluster-api-provider-ovirt

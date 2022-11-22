@@ -1,0 +1,56 @@
+base_images:
+  ocp_4.10_jenkins:
+    name: "4.10"
+    namespace: ocp
+    tag: jenkins
+  ocp_4.10_jenkins-agent-maven:
+    name: "4.10"
+    namespace: ocp
+    tag: jenkins-agent-maven
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_4.10_jenkins:
+      as:
+      - registry.ci.openshift.org/ocp/4.10:jenkins
+    ocp_4.10_jenkins-agent-maven:
+      as:
+      - registry.ci.openshift.org/ocp/4.10:jenkins-agent-maven
+  to: jenkins
+promotion:
+  excluded_images:
+  - jenkins
+  name: "4.14"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-aws-jenkins-sync-plugin
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - ref: jenkins-sync-plugin-e2e
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift
+  repo: jenkins-openshift-login-plugin

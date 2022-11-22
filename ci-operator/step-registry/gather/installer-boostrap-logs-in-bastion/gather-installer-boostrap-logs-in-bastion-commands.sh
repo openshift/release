@@ -6,6 +6,17 @@ set -o pipefail
 
 set -x
 
+# Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+# to be able to SSH.
+if ! whoami &> /dev/null; then
+    if [[ -w /etc/passwd ]]; then
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    else
+        echo "/etc/passwd is not writeable, and user matching this uid is not found."
+        exit 1
+    fi
+fi
+
 installer_bin=$(which openshift-install)
 echo "openshift-install binary path: $installer_bin"
 
@@ -24,7 +35,7 @@ function run_ssh_cmd() {
     local host=$3
     local remote_cmd=$4
 
-    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
     cmd="ssh ${options} -i \"${sshkey}\" ${user}@${host} \"${remote_cmd}\""
     run_command "$cmd" || return 2
     return 0
@@ -37,7 +48,7 @@ function run_scp_to_remote() {
     local src=$4
     local dest=$5
 
-    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
     cmd="scp ${options} -i \"${sshkey}\" ${src} ${user}@${host}:${dest}"
     run_command "$cmd" || return 2
     return 0
@@ -50,7 +61,7 @@ function run_scp_from_remote() {
     local src=$4
     local dest=$5
 
-    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes "
+    options=" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null "
     cmd="scp ${options} -i \"${sshkey}\" ${user}@${host}:${src} ${dest}"
     run_command "$cmd" || return 2
     return 0

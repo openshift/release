@@ -5,7 +5,47 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
+    context: ci/prow/config
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-continuous-release-jobs-master-config
+    optional: true
+    rerun_command: /test config
+    spec:
+      containers:
+      - command:
+        - /continuous-release-jobs/hack/verify-config.sh
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: AWS_ACCESS_KEY_ID
+              name: dptools-aws-read-only-bot
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: AWS_SECRET_KEY
+              name: dptools-aws-read-only-bot
+        image: registry.ci.openshift.org/continuous-release-jobs/continuous-release-jobs:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )config,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -55,3 +95,43 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/impacts
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-continuous-release-jobs-master-impacts
+    optional: true
+    rerun_command: /test impacts
+    spec:
+      containers:
+      - command:
+        - /continuous-release-jobs/hack/verify-impacts.sh
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: AWS_ACCESS_KEY_ID
+              name: dptools-aws-read-only-bot
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: AWS_SECRET_KEY
+              name: dptools-aws-read-only-bot
+        image: registry.ci.openshift.org/continuous-release-jobs/continuous-release-jobs:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )impacts,?($|\s.*)

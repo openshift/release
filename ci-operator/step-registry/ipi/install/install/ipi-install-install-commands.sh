@@ -48,7 +48,19 @@ function prepare_next_steps() {
       bastion_ssh_user=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
       bastion_public_address=$(head -n 1 "${SHARED_DIR}/bastion_public_address")
       if [[ -n "${bastion_ssh_user}" ]] && [[ -n "${bastion_public_address}" ]]; then
-        cmd="scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=yes  -i \"${CLUSTER_PROFILE_DIR}/ssh-privatekey\" -r ${dir} ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
+
+        # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+        # to be able to SSH.
+        if ! whoami &> /dev/null; then
+          if [[ -w /etc/passwd ]]; then
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+          else
+            echo "/etc/passwd is not writeable, and user matching this uid is not found."
+            exit 1
+          fi
+        fi
+
+        cmd="scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i \"${CLUSTER_PROFILE_DIR}/ssh-privatekey\" -r ${dir} ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
         echo "Running Command: ${cmd}"
         eval "${cmd}"
         echo > "${SHARED_DIR}/COPIED_INSTALL_DIR_TO_BASTION"
