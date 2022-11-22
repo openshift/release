@@ -11,6 +11,11 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+if [ -z "${AUX_HOST}" ]; then
+    echo "AUX_HOST is not filled. Failing."
+    exit 1
+fi
+
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
