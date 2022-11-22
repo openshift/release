@@ -5,17 +5,16 @@ set -o errexit
 set -o pipefail
 
 # Deploy windup
-# oc apply -f - <<EOF
-# apiVersion: windup.jboss.org/v1
-# kind: Windup
-# metadata:
-#     name: mta
-#     namespace: mta
-# spec:
-#     mta_Volume_Cpacity: "5Gi"
-#     volumeCapacity: "5Gi"
-# EOF
-
+oc apply -f - <<EOF
+apiVersion: windup.jboss.org/v1
+kind: Windup
+metadata:
+    name: mta
+    namespace: mta
+spec:
+    mta_Volume_Cpacity: "5Gi"
+    volumeCapacity: "5Gi"
+EOF
 
 echo "MTA operator installed and Windup deployed."
 
