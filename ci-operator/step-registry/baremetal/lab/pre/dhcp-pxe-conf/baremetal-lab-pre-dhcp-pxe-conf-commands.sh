@@ -59,6 +59,7 @@ DHCP_CONF="${DHCP_CONF}
 echo "Setting the DHCP/PXE config in the auxiliary host..."
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "'${DHCP_CONF}'" <<'EOF'
   echo -e "${1}" >> /opt/dhcpd/root/etc/dnsmasq.conf
+  docker restart dhcpd
 EOF
 
 if [ "${IPI}" = "true" ]; then
