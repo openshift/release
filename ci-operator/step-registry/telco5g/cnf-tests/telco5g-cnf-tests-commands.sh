@@ -188,7 +188,13 @@ function deploy_and_test {
     FEATURES_ENVIRONMENT="${features_env}" FEATURES="${feature} general" make feature-wait
 
     skip_tests=$(get_skip_tests "${feature}")
-    FEATURES="\[${feature}\]" SKIP_TESTS="${skip_tests}" make functests
+
+    # TODO: Until we merge https://github.com/openshift-kni/cnf-features-deploy/pull/1317
+    if [[ "$CNF_BRANCH" == *"4.11"* ]] ; then
+        FEATURES="\[${feature}\]" SKIP_TESTS="${skip_tests}" make functests
+    else
+        FEATURES="${feature}" SKIP_TESTS="${skip_tests}" make functests
+    fi
 
     # cleanup nodes
     for node in $nodes; do
