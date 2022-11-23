@@ -29,10 +29,51 @@ if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
         if [[ ! -z "${var}" ]]; then
             if [[ "${var}" == *"CNF_BRANCH"* ]]; then
                 CNF_BRANCH="$(echo "${var}" | cut -d'=' -f2)"
+            elif [[ "${var}" == *"FEATURES"* ]]; then
+                FEATURES="$(echo "${var}" | cut -d'=' -f2 | tr -d '"')"
             fi
         fi
     done
 fi
+
+###############################################################################
+# Copy all artifacts from the previous step
+ls -lash ${SHARED_DIR}
+ls -lash ${SHARED_DIR}/cnf-tests-artifacts/
+
+cp -r ${SHARED_DIR}/cnf-tests-artifacts/* ${ARTIFACT_DIR}/
+
+# Create reports from CNF tests if exist
+for feature in ${FEATURES}; do
+    xml_f="${ARTIFACT_DIR}/${feature}/cnftests-junit.xml"
+    if [[ -f $xml_f ]]; then
+        cp $xml_f ${ARTIFACT_DIR}/cnftests-junit_${feature}.xml
+    fi
+    xml_v="${ARTIFACT_DIR}/${feature}/validation_junit.xml"
+    if [[ -f $xml_v ]]; then
+        cp $xml_v ${ARTIFACT_DIR}/validation_junit_${feature}.xml
+    fi
+    xml_s="${ARTIFACT_DIR}/${feature}/setup_junit.xml"
+    if [[ -f $xml_s ]]; then
+        cp $xml_s ${ARTIFACT_DIR}/setup_junit_${feature}.xml
+    fi
+done
+python3 -m venv ${SHARED_DIR}/myenv
+source ${SHARED_DIR}/myenv/bin/activate
+git clone https://github.com/sshnaidm/html4junit.git ${SHARED_DIR}/html4junit
+pip install -r ${SHARED_DIR}/html4junit/requirements.txt
+# Create HTML reports for humans/aliens
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.html || true
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html || true
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.html || true
+# Create JSON reports for robots
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.json || true
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.json || true
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.json || true
+
+rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
+###############################################################################
+
 
 echo "Running for CNF_BRANCH=${CNF_BRANCH}"
 if [[ "$CNF_BRANCH" == *"4.11"* ]]; then

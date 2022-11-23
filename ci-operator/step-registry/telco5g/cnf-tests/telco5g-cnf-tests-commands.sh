@@ -190,7 +190,7 @@ function deploy_and_test {
     fi
 
     export ROLE_WORKER_CNF="${node_label}"
-    export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/${feature}"
+    export TESTS_REPORTS_PATH="${TMP_ARTIFACT_DIR}/${feature}"
 
     CNF_NODES="${nodes}" make setup-test-cluster
 
@@ -217,6 +217,13 @@ export CNF_BRANCH="${CNF_BRANCH:-master}"
 
 echo "************ telco5g cnf-tests commands ************"
 
+echo "DEBUG_MSG: Creating tmp artifacts directory TMP_ARTIFACT_DIR=${SHARED_DIR}/cnf-tests-artifacts"
+export TMP_ARTIFACT_DIR="${SHARED_DIR}/cnf-tests-artifacts"
+mkdir -p $TMP_ARTIFACT_DIR
+echo "DEBUG_MSG: Listing it - ls $TMP_ARTIFACT_DIR"
+ls -lashd $TMP_ARTIFACT_DIR
+
+echo "DEBUG_MSG: Reading variables"
 if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
     readarray -t config <<< "${E2E_TESTS_CONFIG}"
     for var in "${config[@]}"; do
@@ -230,12 +237,16 @@ if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
     done
 fi
 
+echo "DEBUG_MSG: CNF_BRANCH=$CNF_BRANCH"
+echo "DEBUG_MSG: FEATURES=$FEATURES"
+
 worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
 --selector='!node-role.kubernetes.io/master' -o name)
 if [ -z "${worker_nodes}" ]; then
     echo "[ERROR]: No worker nodes found in cluster"
     exit 1
 fi
+echo "DEBUG_MSG: worker_nodes=$worker_nodes"
 
 # get BM workers for testing
 test_nodes=""
@@ -249,6 +260,7 @@ if [ -z "${test_nodes}" ]; then
     echo "[ERROR]: No BM worker nodes found in cluster"
     exit 1
 fi
+echo "DEBUG_MSG: test_nodes=$test_nodes"
 
 cnf_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$cnf_dir" || exit 1
@@ -258,31 +270,40 @@ for node in ${test_nodes}; do
     touch "${node}_ready.txt"
 done
 
-echo "running on branch ${CNF_BRANCH}"
+echo "DEBUG_MSG: running on branch ${CNF_BRANCH}"
 git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
+echo "DEBUG_MSG: Running oc patch OperatorHub cluster --type ..."
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+echo "DEBUG_MSG: Running make setup-build-index-image"
 make setup-build-index-image
 cd -
 
 # Skiplist common for all releases
+echo "DEBUG_MSG: Create a skiplist for all releases"
 create_tests_skip_list_file
 
 # Skiplist according to each release
 if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
+    echo "DEBUG_MSG: Create a skiplist for release 4.11"
     create_tests_temp_skip_list_11
 fi
 if [[ "$CNF_BRANCH" == *"4.12"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+    echo "DEBUG_MSG: Create a skiplist for release 4.12"
     create_tests_temp_skip_list_12
 fi
 if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
+    echo "DEBUG_MSG: Create a skiplist for release 4.13"
     create_tests_temp_skip_list_13
 fi
-cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
+echo "DEBUG_MSG: Copy $SKIP_TESTS_FILE to ${TMP_ARTIFACT_DIR}/"
+cp "$SKIP_TESTS_FILE" "${TMP_ARTIFACT_DIR}/"
+
 
 # run cnf-tests by feature in a thread on a free worker node
 for feature in ${FEATURES}; do
-    log_file="${ARTIFACT_DIR}/deploy_and_test_${feature}.log"
+    echo "DEBUG_MSG: Log file for feature ${feature} is ${TMP_ARTIFACT_DIR}/deploy_and_test_${feature}.log"
+    log_file="${TMP_ARTIFACT_DIR}/deploy_and_test_${feature}.log"
     rm -f "${log_file}"
 
     feature_nodes=""
@@ -291,6 +312,7 @@ for feature in ${FEATURES}; do
     if [[ "${feature}" == "ovs_qos" ]]; then
         num_of_required_nodes=2
     fi
+    echo "DEBUG_MSG: num_of_required_nodes=$num_of_required_nodes"
     while [ ${num_of_free_nodes} -lt ${num_of_required_nodes} ]; do
         for node in ${test_nodes}; do
             node_ready_file="${node}_ready.txt"
@@ -300,6 +322,7 @@ for feature in ${FEATURES}; do
                 num_of_free_nodes=$((num_of_free_nodes+1))
             fi
             if [ ${num_of_free_nodes} -eq ${num_of_required_nodes} ]; then
+                echo "DEBUG_MSG: Running deploy_and_test for ${feature} on nodes ${feature_nodes} with log to ${log_file}"
                 (deploy_and_test "${feature}" "${feature_nodes}" || true) 2>&1 | tee "${log_file}" &
                 break
             fi
@@ -309,6 +332,7 @@ for feature in ${FEATURES}; do
 done
 wait
 
+echo "DEBUG_MSG: Start cleanup"
 # cleanup
 for node in ${test_nodes}; do
     rm -f "${node}_ready.txt"
@@ -318,11 +342,12 @@ rm -rf node/
 cd -
 
 # check tests results
+echo "DEBUG_MSG: Start checking tests results"
 exit_code=0
 err_msg=""
 rm -f summary.txt
 for feature in ${FEATURES}; do
-    log_file="${ARTIFACT_DIR}/deploy_and_test_${feature}.log"
+    log_file="${TMP_ARTIFACT_DIR}/deploy_and_test_${feature}.log"
     if [ ! -f "${log_file}" ]; then
         err_msg="${err_msg}\n[ERROR]: Failed to test ${feature}"
         exit_code=1
@@ -359,35 +384,12 @@ if [ -f "summary.txt" ]; then
     cat summary.txt
 fi
 
-# Create a HTML report
-for feature in ${FEATURES}; do
-    xml_f="${ARTIFACT_DIR}/${feature}/cnftests-junit.xml"
-    if [[ -f $xml_f ]]; then
-        cp $xml_f ${ARTIFACT_DIR}/cnftests-junit_${feature}.xml
-    fi
-    xml_v="${ARTIFACT_DIR}/${feature}/validation_junit.xml"
-    if [[ -f $xml_v ]]; then
-        cp $xml_v ${ARTIFACT_DIR}/validation_junit_${feature}.xml
-    fi
-    xml_s="${ARTIFACT_DIR}/${feature}/setup_junit.xml"
-    if [[ -f $xml_s ]]; then
-        cp $xml_s ${ARTIFACT_DIR}/setup_junit_${feature}.xml
-    fi
-done
+set -x
+ls -l ${SHARED_DIR}
+echo "DEBUG_MSG: and tmp artifacts:"
+ls -l $TMP_ARTIFACT_DIR
+echo "DEBUG_MSG: and artifacts:"
+ls -l $ARTIFACT_DIR/
 
-python3 -m venv ${SHARED_DIR}/myenv
-source ${SHARED_DIR}/myenv/bin/activate
-git clone https://github.com/sshnaidm/html4junit.git ${SHARED_DIR}/html4junit
-pip install -r ${SHARED_DIR}/html4junit/requirements.txt
-# Create HTML reports for humans/aliens
-python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.html
-python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
-python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.html
-# Create JSON reports for robots
-python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.json
-python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.json
-python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.json
-
-rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
-
+cp -r ${TMP_ARTIFACT_DIR}/* $ARTIFACT_DIR/
 exit ${exit_code}
