@@ -124,6 +124,8 @@ openstack*)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal)
     export TEST_PROVIDER='{"type":"skeleton"}';;
+nutanix|nutanix-qe)
+    export TEST_PROVIDER='{"type":"nutanix"}';;
 *)
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
