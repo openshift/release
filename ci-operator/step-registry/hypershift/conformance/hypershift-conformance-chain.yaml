@@ -44,6 +44,7 @@ chain:
           fi
           ;;
       ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
+      none) export TEST_PROVIDER='{"type":"baremetal"}';;
       ibmcloud)
           export TEST_PROVIDER='{"type":"ibmcloud"}'
           IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
@@ -64,6 +65,8 @@ chain:
           echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
       fi
+
+      INCL=$(openshift-tests run "openshift/conformance/parallel" --dry-run --provider '{"type":"${TEST_PROVIDER}"}')
 
       openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
