@@ -1,0 +1,25 @@
+chain:
+  as: hypershift-agent-destroy
+  steps:
+  - as: destroy
+    cli: latest
+    env:
+    commands: |-
+      set -exuo pipefail
+
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
+      bin/hypershift destroy cluster agent \
+        --name ${CLUSTER_NAME} \
+        --cluster-grace-period 40m
+      echo "$(date) Finished deleting cluster"
+    from_image:
+      namespace: ocp
+      name: "4.12"
+      tag: hypershift-operator
+    grace_period: 5m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 45m0s
