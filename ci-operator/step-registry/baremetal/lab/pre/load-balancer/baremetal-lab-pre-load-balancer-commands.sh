@@ -22,8 +22,10 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 BUILD_USER=ci-op
 BUILD_ID="${NAMESPACE}"
 
+CONF_DIR=$(mktemp -d)
+
 # Generate haproxy.cfg
-cat > haproxy.cfg << EOF
+cat > "${CONF_DIR}/haproxy.cfg" << EOF
 global
 log         127.0.0.1 local2
 pidfile     /var/run/haproxy.pid
@@ -61,7 +63,7 @@ listen api-server-6443
     mode tcp
 $(
 if [ "${IPI}" != "true" ]; then
-  for bmhost in $(yq e -o=j -I=0 '.[]' hosts.yaml); do
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     # shellcheck disable=SC2154
@@ -117,7 +119,7 @@ $(
 EOF
 
 # Generate dhclient.conf
-cat > dhclient.conf << EOF
+cat > "${CONF_DIR}/dhclient.conf" << EOF
 # Configuration file for /sbin/dhclient.
 #
 # This is a sample configuration file for dhclient. See dhclient.conf's
@@ -196,5 +198,5 @@ mkdir -m 755 -p "/var/builds/$BUILD_ID/haproxy"
 EOF
 
 echo "Uploading the haproxy.cfg file to the auxiliary host..."
-scp "${SSHOPTS[@]}" haproxy.cfg "root@${AUX_HOST}:/var/builds/$NAMESPACE/haproxy"
-scp "${SSHOPTS[@]}" dhclient.conf "root@${AUX_HOST}:/var/builds/$NAMESPACE/haproxy"
+scp "${SSHOPTS[@]}" "${CONF_DIR}/haproxy.cfg" "root@${AUX_HOST}:/var/builds/$NAMESPACE/haproxy"
+scp "${SSHOPTS[@]}" "${CONF_DIR}/dhclient.conf" "root@${AUX_HOST}:/var/builds/$NAMESPACE/haproxy"
