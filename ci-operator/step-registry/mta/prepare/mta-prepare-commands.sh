@@ -4,21 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# Deploy windup
-oc apply -f - <<EOF
-apiVersion: windup.jboss.org/v1
-kind: Windup
-metadata:
-    name: mta
-    namespace: mta
-spec:
-    mta_Volume_Cpacity: "5Gi"
-    volumeCapacity: "5Gi"
-EOF
+# Get the apps URL
+URL=$(oc get route -n openshift-console console -o jsonpath='{.spec.host}')
+APPS_URL=${URL#"console-openshift-console."}
 
-echo "MTA operator installed and Windup deployed."
+echo "export APPS_URL=${APPS_URL}" >> ${SHARED_DIR}/env.sh
 
-echo "DEBUGGING..."
+chmod +x ${SHARED_DIR}/env.sh
+
+
 
 # console_route=$(oc get route -n openshift-console console -o yaml)
 # echo "CONSOLE ROUTE"
