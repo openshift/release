@@ -23,8 +23,8 @@ chain:
       default: ""
       documentation: "The cluster's FQDN will be a subdomain of the base domain."
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
-      default: "quay.io/openshift-release-dev/ocp-release:4.11.14-x86_64"
-      documentation: "Release image used for the HostedCluster. Empty by default so it will use the based code defaulting"
+      default: "registry.ci.openshift.org/ocp/release:4.13.0-0.nightly-2022-11-23-062622"
+      documentation: "Release image used for the HostedCluster. TODO: Set to a stable release when resource overrides are included in a stable OCP release."
     commands: |-
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
@@ -51,7 +51,8 @@ chain:
         --service-cidr=172.29.0.0/16 \
         --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
         --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
-        --namespace=${HYPERSHIFT_NAMESPACE}
+        --namespace=${HYPERSHIFT_NAMESPACE} \
+        --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m
       echo "Waiting for cluster to become available"
       oc wait --timeout=10m --for=condition=Available --namespace=${HYPERSHIFT_NAMESPACE} hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
