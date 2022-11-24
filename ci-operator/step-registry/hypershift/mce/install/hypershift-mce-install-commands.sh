@@ -93,8 +93,8 @@ for ((i=1; i<=10; i++)); do
   echo "Waiting for CSV to be ready"
 done
 
+# install MCE
 if [ $_apiReady -eq 1 ]; then
-  # Enable Hypershift Preview
   oc apply -f - <<EOF
 apiVersion: multicluster.openshift.io/v1
 kind: MultiClusterEngine
@@ -112,7 +112,30 @@ else
   exit 1
 fi
 
-oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hypershift-preview","enabled": true}]}}}'
+# create s3 secret, should be done before add-on is enabled
+echo "Creating s3 secret..."
+oc create secret generic hypershift-operator-oidc-provider-s3-credentials --from-file=credentials=/etc/hypershift-pool-aws-credentials/credentials --from-literal=bucket=hypershift-ci-oidc --from-literal=region=us-east-1 -n local-cluster
+oc label secret hypershift-operator-oidc-provider-s3-credentials -n local-cluster cluster.open-cluster-management.io/backup=true
+
+# wait for Configuring the hosting service cluster
+echo "Configuring the hosting service cluster..."
+_configReady=0
+set +e
+for ((i=1; i<=10; i++)); do
+  oc get configmap -n kube-public oidc-storage-provider-s3-config
+  if [ $? -eq 0 ]; then
+    _configReady=1
+    break
+  fi
+  echo "Waiting on Configuring the hosting service cluster"
+  sleep 30
+done
+set -e
+if [ $_configReady -eq 0 ]; then
+  echo "Configuring error"
+  exit 1
+fi
+echo "Configuring the hosting service cluster Succeeded!"
 
 # It takes some time for this api to become available.
 # So we try multiple times until it succeeds
@@ -136,7 +159,15 @@ if [ $_localClusterReady -eq 0 ]; then
 fi
 echo "MCE local-cluster is ready!"
 
-oc apply -f - <<EOF
+# enable the hypershift feature, this will automatically enable the hypershift addon
+oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"components":[{"name":"hypershift-preview","enabled": true}]}}}'
+
+
+# install hypershift addon if it's not already there
+oc get managedclusteraddon hypershift-addon -n local-cluster
+if [ $? -ne 0 ]; then
+  echo "hypershift-addon is not installed on the hub, try to install it"
+  oc apply -f - <<EOF
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ManagedClusterAddOn
 metadata:
@@ -145,6 +176,7 @@ metadata:
 spec:
   installNamespace: open-cluster-management-agent-addon
 EOF
+fi
 
 # wait for hypershift operator to come online
 _hypershiftReady=0
@@ -165,25 +197,3 @@ if [ $_hypershiftReady -eq 0 ]; then
   exit 1
 fi
 echo "hypershift is online!"
-
-echo "Configuring the hosting service cluster"
-oc create secret generic hypershift-operator-oidc-provider-s3-credentials --from-file=credentials=/etc/hypershift-pool-aws-credentials/credentials --from-literal=bucket=hypershift-ci-oidc --from-literal=region=us-east-1 -n local-cluster
-oc label secret hypershift-operator-oidc-provider-s3-credentials -n local-cluster cluster.open-cluster-management.io/backup=true
-# wait for Configuring the hosting service cluster
-_configReady=0
-set +e
-for ((i=1; i<=10; i++)); do
-  oc get configmap -n kube-public oidc-storage-provider-s3-config
-  if [ $? -eq 0 ]; then
-    _configReady=1
-    break
-  fi
-  echo "Waiting on Configuring the hosting service cluster"
-  sleep 30
-done
-set -e
-if [ $_configReady -eq 0 ]; then
-  echo "Configuring error"
-  exit 1
-fi
-echo "Configuring the hosting service cluster Succeeded!"
