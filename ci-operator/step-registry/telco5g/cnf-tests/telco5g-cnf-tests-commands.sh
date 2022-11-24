@@ -83,6 +83,16 @@ performance "Huge pages support for container workloads"
 # TESTNAME
 sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/CNF-6862
+# TESTNAME
+performance "Checking IRQBalance settings Verify irqbalance configuration handling Should not overwrite the banned CPU set on tuned restart"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/CNF-6862
+# TESTNAME
+performance "Checking IRQBalance settings Verify irqbalance configuration handling Should store empty cpu mask in the backup"
+
 EOF
 }
 
