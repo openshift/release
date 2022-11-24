@@ -2,20 +2,17 @@ base_images:
   base:
     name: centos
     namespace: openshift
-    tag: "7"
-  openshift_release_golang-1.18:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    tag: stream9
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.45.2
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.16
+  from_repository: true
 images:
 - from: base
   inputs:
-    openshift_release_golang-1.18:
+    root:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: ci-chat-bot
@@ -27,6 +24,19 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: lint
+  commands: HOME=/tmp golangci-lint run
+  container:
+    from: golangci-lint
+- as: vendor
+  commands: make validate-vendor
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
 zz_generated_metadata:
   branch: master
   org: openshift

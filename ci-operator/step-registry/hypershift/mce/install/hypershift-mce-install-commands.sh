@@ -116,39 +116,26 @@ oc patch mce multiclusterengine-sample --type=merge -p '{"spec":{"overrides":{"c
 
 # It takes some time for this api to become available.
 # So we try multiple times until it succeeds
-_localClusterCreated=0
+# wait for hypershift operator to come online
+_localClusterReady=0
 set +e
 for ((i=1; i<=10; i++)); do
-  oc apply -f - <<EOF
-apiVersion: cluster.open-cluster-management.io/v1
-kind: ManagedCluster
-metadata:
-  labels:
-    local-cluster: "true"
-  name: local-cluster
-spec:
-  hubAcceptsClient: true
-  leaseDurationSeconds: 60
-EOF
+  oc get managedcluster local-cluster -o 'jsonpath={.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status}' >> /dev/null
   if [ $? -eq 0 ]; then
-    _localClusterCreated=1
+    _localClusterReady=1
     break
   fi
-  sleep 10
+  echo "Waiting for MCE local-cluster to be ready..."
+  sleep 15
 done
 set -e
 
-if [ $_localClusterCreated -eq 0 ]; then
-  echo "local cluster not created in the allotted time."
+if [ $_localClusterReady -eq 0 ]; then
+  echo "FATAL: MCE local-cluster failed to be ready. Check operator on hub for more details."
   exit 1
 fi
+echo "MCE local-cluster is ready!"
 
-oc apply -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: local-cluster
-EOF
 oc apply -f - <<EOF
 apiVersion: addon.open-cluster-management.io/v1alpha1
 kind: ManagedClusterAddOn

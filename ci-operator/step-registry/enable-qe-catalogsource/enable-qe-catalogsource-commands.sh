@@ -95,6 +95,10 @@ EOF
 
 function create_catalog_sources()
 {
+    # get cluster Major.Minor version
+    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+    index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+
     echo "create QE catalogsource: qe-app-registry"
     cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -104,7 +108,7 @@ metadata:
   namespace: openshift-marketplace
 spec:
   displayName: Production Operators
-  image: quay.io/openshift-qe-optional-operators/ocp4-index:latest
+  image: ${index_image}
   publisher: OpenShift QE
   sourceType: grpc
   updateStrategy:

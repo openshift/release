@@ -23,7 +23,7 @@ chain:
       default: ""
       documentation: "The cluster's FQDN will be a subdomain of the base domain."
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
-      default: ""
+      default: "quay.io/openshift-release-dev/ocp-release:4.11.14-x86_64"
       documentation: "Release image used for the HostedCluster. Empty by default so it will use the based code defaulting"
     commands: |-
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
@@ -67,10 +67,9 @@ chain:
       echo "Waiting for clusteroperators to be ready"
       export KUBECONFIG=${SHARED_DIR}/management_cluster_kubeconfig
       until \
-        oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
-        oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
-        oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
+        oc wait clusterversion/version --for='condition=Available=True' > /dev/null; do
           echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+          oc get clusterversion 2>/dev/null || true
           sleep 1s
       done
       # Data for cluster bot.

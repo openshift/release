@@ -36,7 +36,7 @@ CONFIG = {
         'us-east-2': 10,
     },
     'aws-qe-quota-slice': {
-        'us-east-1': 45,
+        'us-east-1': 30,
     },
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
@@ -54,6 +54,9 @@ CONFIG = {
     },
     'aws-sc2s-qe-quota-slice': {
         'us-isob-east-1': 5,
+    },
+    'aws-interop-qe-quota-slice': {
+        'us-east-2': 5,
     },
     'azure4-quota-slice': {
         'centralus': 33,
@@ -81,7 +84,7 @@ CONFIG = {
     },
     'azure-qe-quota-slice': {
         'northcentralus': 10,
-        'westus3': 10,
+        'southcentralus': 10,
         'centralus': 10
     },
     'azure-arm64-qe-quota-slice': {
@@ -91,7 +94,7 @@ CONFIG = {
         'northeurope': 4
     },
     'azuremag-qe-quota-slice': {
-        'usgovvirginia': 5
+        'usgovvirginia': 10
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 40,
@@ -100,7 +103,7 @@ CONFIG = {
         'default': 40,
     },
     'gcp-qe-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 30,
     },
     'gcp-quota-slice': {
         'us-central1': 70,

@@ -1,0 +1,80 @@
+base_images:
+  base:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+canonical_go_repository: github.com/openshift/platform-operators
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+  to: cluster-platform-operators-manager
+promotion:
+  name: 4.14-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.14-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.14-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: src
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: e2e-aws-techpreview-operator
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws-techpreview
+- as: e2e-aws-techpreview
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-techpreview
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-priv
+  repo: platform-operators

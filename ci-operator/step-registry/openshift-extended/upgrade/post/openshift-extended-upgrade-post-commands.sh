@@ -84,7 +84,7 @@ aws)
     export KUBE_SSH_USER=core
     export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
     ;;
-aws-usgov)
+aws-usgov|aws-c2s|aws-sc2s)
     mkdir -p ~/.ssh
     export SSH_CLOUD_PRIV_AWS_USER="${QE_BASTION_SSH_USER:-core}"
     export KUBE_SSH_USER=core
@@ -116,6 +116,8 @@ openstack*)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal)
     export TEST_PROVIDER='{"type":"skeleton"}';;
+nutanix|nutanix-qe)
+    export TEST_PROVIDER='{"type":"nutanix"}';;
 *)
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
@@ -148,8 +150,8 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 # check if the cluster is ready
 oc version --client
-oc wait nodes --all --for=condition=Ready=true --timeout=10m
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+oc wait nodes --all --for=condition=Ready=true --timeout=15m
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 
 # execute the cases
 function run {
