@@ -11,12 +11,14 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.ocp
-  from: ocp_builder_rhel-9-base-openshift-4.13
-  to: ironic-static-ip-manager
-promotion:
-  disabled: true
-  name: "4.13"
-  namespace: ocp
+  from: base
+  to: ironic-agent
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      curl http://base-4-13-rhel-9-ironic-prevalidation.ocp.svc > /etc/yum.repos.d/base-4-13-rhel-9-ironic-prevalidation.repo
+    from: ocp_builder_rhel-9-base-openshift-4.13
+    to: base
 releases:
   initial:
     integration:
@@ -33,53 +35,41 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-metal-ipi-bm
+- as: e2e-metal-ipi-bm-prevalidation
   cluster: build05
-  skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS)$
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     env:
       CLUSTERTYPE: baremetal
     workflow: baremetalds-e2e-ipv4
-- as: e2e-metal-ipi-serial-ipv4
+- as: e2e-metal-ipi-serial-ipv4-prevalidation
   cluster: build05
-  optional: true
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-serial-ipv4
-- as: e2e-metal-ipi-upgrade
+- as: e2e-metal-ipi-virtualmedia-prevalidation
   cluster: build05
-  optional: true
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
-        NETWORK_TYPE=OpenShiftSDN
-        MASTER_DISK=50
-      RUN_UPGRADE_TEST: "true"
-      TEST_SUITE: ""
-      TEST_TYPE: upgrade
-    workflow: baremetalds-e2e-upgrade
-- as: e2e-metal-ipi-ovn-ipv6
-  cluster: build05
-  skip_if_only_changed: (^[A-Z]+\.md$)|((^|/)OWNERS$)
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ovn-ipv6
-- as: e2e-metal-ipi-ovn-dualstack
-  cluster: build05
-  optional: true
-  steps:
-    cluster_profile: equinix-ocp-metal
-    workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-virtualmedia
-  cluster: build05
-  optional: true
+  run_if_changed: .*packages-list.*
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
+- as: e2e-metal-ipi-ovn-ipv6-prevalidation
+  cluster: build05
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-ipv6
+- as: e2e-metal-ipi-ovn-dualstack-prevalidation
+  cluster: build05
+  optional: true
+  run_if_changed: .*packages-list.*
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-ovn-dualstack
 zz_generated_metadata:
   branch: release-4.13
   org: openshift
-  repo: ironic-static-ip-manager
+  repo: ironic-agent-image
+  variant: prevalidation
