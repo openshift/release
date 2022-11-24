@@ -49,6 +49,7 @@ rosa create idp -c ${CLUSTER_ID} \
 
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-verify=true" > "${SHARED_DIR}/api.login"
+cat "${SHARED_DIR}/api.login" > "${ARTIFACT_DIR}/api.login"
 
 # Grant cluster-admin access to the cluster
 rosa grant user cluster-admin --user=${IDP_USER} --cluster=${CLUSTER_ID}
