@@ -1,27 +1,24 @@
-presubmits:
+postsubmits:
   stackrox/collector:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/benchmarks
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-benchmarks
-    rerun_command: /test benchmarks
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-benchmarks-post
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=benchmarks
+        - --target=benchmarks-post
         command:
         - ci-operator
         image: ci-operator:latest
@@ -48,29 +45,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )benchmarks,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/cos-integration-tests
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-cos-integration-tests
-    rerun_command: /test cos-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-drivers-tests-post
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=cos-integration-tests
+        - --target=drivers-tests-post
         command:
         - ci-operator
         image: ci-operator:latest
@@ -97,224 +90,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )cos-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/drivers-tests
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-drivers-tests
-    optional: true
-    rerun_command: /test drivers-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=drivers-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )drivers-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/fedora-coreos-integration-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-fedora-coreos-integration-tests
-    rerun_command: /test fedora-coreos-integration-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=fedora-coreos-integration-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )fedora-coreos-integration-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/flatcar-integration-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-flatcar-integration-tests
-    rerun_command: /test flatcar-integration-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=flatcar-integration-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )flatcar-integration-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/garden-linux-integration-tests
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-garden-linux-integration-tests
-    rerun_command: /test garden-linux-integration-tests
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=garden-linux-integration-tests
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )garden-linux-integration-tests,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -332,6 +127,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -340,32 +138,31 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/lint
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-lint
-    rerun_command: /test lint
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-cos-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=lint
+        - --target=merge-cos-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -392,30 +189,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/push-drivers
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-push-drivers
-    optional: true
-    rerun_command: /test push-drivers
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-fedora-coreos-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=push-drivers
+        - --target=merge-fedora-coreos-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -442,29 +234,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )push-drivers,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/push-images
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-push-images
-    rerun_command: /test push-images
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-flatcar-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=push-images
+        - --target=merge-flatcar-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -491,29 +279,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )push-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/rhel-integration-tests
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-rhel-integration-tests
-    rerun_command: /test rhel-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-garden-linux-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhel-integration-tests
+        - --target=merge-garden-linux-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -540,29 +324,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/rhel-sap-integration-tests
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-rhel-sap-integration-tests
-    rerun_command: /test rhel-sap-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-push-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhel-sap-integration-tests
+        - --target=merge-push-images
         command:
         - ci-operator
         image: ci-operator:latest
@@ -589,29 +369,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-sap-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/sles-integration-tests
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-sles-integration-tests
-    rerun_command: /test sles-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-rhel-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=sles-integration-tests
+        - --target=merge-rhel-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -638,29 +414,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )sles-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/ubuntu-os-integration-tests
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-ubuntu-os-integration-tests
-    rerun_command: /test ubuntu-os-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-rhel-sap-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ubuntu-os-integration-tests
+        - --target=merge-rhel-sap-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -687,29 +459,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ubuntu-os-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/ubuntu-os-pro-integration-tests
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-ubuntu-os-pro-integration-tests
-    rerun_command: /test ubuntu-os-pro-integration-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-sles-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ubuntu-os-pro-integration-tests
+        - --target=merge-sles-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -736,29 +504,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ubuntu-os-pro-integration-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/unit-tests
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-unit-tests
-    rerun_command: /test unit-tests
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-ubuntu-os-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit-tests
+        - --target=merge-ubuntu-os-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -785,29 +549,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit-tests,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^giles-benchmark-ansible-playbook$
-    - ^giles-benchmark-ansible-playbook-
-    cluster: build01
-    context: ci/prow/update-support-packages-from-registry
+    - ^master$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stackrox-collector-giles-benchmark-ansible-playbook-update-support-packages-from-registry
-    rerun_command: /test update-support-packages-from-registry
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-merge-ubuntu-os-pro-integration-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=update-support-packages-from-registry
+        - --target=merge-ubuntu-os-pro-integration-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -834,4 +594,93 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )update-support-packages-from-registry,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-push-drivers-post
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=push-drivers-post
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    cluster: build02
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stackrox-collector-master-update-support-packages-from-registry-post
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=update-support-packages-from-registry-post
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
