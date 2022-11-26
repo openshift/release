@@ -37,7 +37,7 @@ BASTION_ENV=true
 # Environment - US lab, DS lab or any
 CL_SEARCH="upstreambil"
 
-if $INTERNAL_ONLY; then
+if $INTERNAL_ONLY && $INTERNAL; then
     CL_SEARCH="internalbos"
 elif $INTERNAL; then
     CL_SEARCH="any"

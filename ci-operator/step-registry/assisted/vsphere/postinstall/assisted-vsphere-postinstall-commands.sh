@@ -54,6 +54,8 @@ data:
     datacenters = "${VSPHERE_DATACENTER}"
 EOF
 
+oc patch clusterversion version --type json -p '[{"op": "remove", "path": "/spec/channel"}]}]'
+
 until \
   oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
   oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \

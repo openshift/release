@@ -135,9 +135,8 @@ else
 fi
 
 echo -e "
-rosa create cluster --sts \
+rosa create cluster -y \
 --mode auto \
--y \
 --cluster-name ${CLUSTER_NAME} \
 --role-arn ${Account_Installer_Role_ARN} \
 --controlplane-iam-role ${Account_ControlPlane_Role_ARN} \
@@ -201,6 +200,7 @@ while true; do
     exit 1
   fi
 done
+rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
 
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
