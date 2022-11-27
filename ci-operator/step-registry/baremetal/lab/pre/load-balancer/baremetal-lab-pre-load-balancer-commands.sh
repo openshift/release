@@ -20,11 +20,28 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 BUILD_USER=ci-op
 BUILD_ID="${NAMESPACE}"
-
 CONF_DIR=$(mktemp -d)
 
+scp "${SSHOPTS[@]}" "${SHARED_DIR}/hosts.yaml" "root@${AUX_HOST}:~/hosts.yaml"
+
+timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+  "${BUILD_ID}" "${IPI}" "${BUILD_USER}"  << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+set -o allexport
+
+BUILD_ID="${1}"
+IPI="${2}"
+BUILD_USER=${3}"
+
+set +o allexport
+
+# shellcheck disable=SC2174
+mkdir -m 755 -p "/var/builds/$BUILD_ID/haproxy"
+
 # Generate haproxy.cfg
-cat > "${CONF_DIR}/haproxy.cfg" << EOF
+cat > "/var/builds/$BUILD_ID/haproxy/haproxy.cfg" << EOF1
 global
 log         127.0.0.1 local2
 pidfile     /var/run/haproxy.pid
@@ -62,7 +79,7 @@ listen api-server-6443
     mode tcp
 $(
 if [ "${IPI}" != "true" ]; then
-for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' "${SHARED_DIR}/hosts.yaml"); do
+for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' hosts.yaml); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   # shellcheck disable=SC2154
@@ -76,7 +93,7 @@ listen machine-config-server-22623
     bind *:22623
     mode tcp
 $(
-for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' "${SHARED_DIR}/hosts.yaml"); do
+for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' hosts.yaml); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   # shellcheck disable=SC2154
@@ -88,7 +105,7 @@ listen ingress-router-80
     mode tcp
     balance source
 $(
-for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' "${SHARED_DIR}/hosts.yaml"); do
+for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' hosts.yaml); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   # shellcheck disable=SC2154
@@ -100,17 +117,17 @@ listen ingress-router-443
     mode tcp
     balance source
 $(
-for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' "${SHARED_DIR}/hosts.yaml"); do
+for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' hosts.yaml); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   # shellcheck disable=SC2154
   echo "    server $name $ip:6443 check inter 1s"
 done
 )
-EOF
+EOF1
 
 # Generate dhclient.conf
-cat > "${CONF_DIR}/dhclient.conf" << EOF
+cat > "var/builds/$BUILD_ID/haproxy/dhclient.conf" << EOF2
 # Configuration file for /sbin/dhclient.
 #
 # This is a sample configuration file for dhclient. See dhclient.conf's
@@ -169,25 +186,22 @@ interface "eth1" {
 #  rebind 2 2000/1/12 00:00:01;
 #  expire 2 2000/1/12 00:00:01;
 #}
+EOF2
+
+
+# Create and start HAProxy container
+docker run --name "haproxy-$BUILD_ID" --restart=on-failure \
+  -v "/var/builds/$BUILD_ID/haproxy/haproxy.cfg:/etc/haproxy.cfg" \
+  -v "/var/builds/$BUILD_ID/haproxy/dhclient.conf:/etc/dhcp/dhclient.conf" \
+  quay.io/openshifttest/haproxy:armbm
+
+# for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
+# eth2 will only get local routes configuration
+set -x
+# Unmount resolv.conf to let custom network conf able to modify it
+nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-{{ BUILD_ID }}) \
+/bin/umount /etc/resolv.conf
+
+docker restart "haproxy-$BUILD_ID"
 
 EOF
-
-timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${NAMESPACE}" "${IPI}" << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-set -o allexport
-
-BUILD_USER=ci-op
-BUILD_ID="${1}"
-IPI="${2}"
-set +o allexport
-
-# shellcheck disable=SC2174
-mkdir -m 755 -p "/var/builds/$BUILD_ID/haproxy"
-EOF
-
-echo "Uploading the haproxy.cfg file to the auxiliary host..."
-scp "${SSHOPTS[@]}" "${CONF_DIR}/haproxy.cfg" "root@${AUX_HOST}:/var/builds/$NAMESPACE/haproxy"
-scp "${SSHOPTS[@]}" "${CONF_DIR}/dhclient.conf" "root@${AUX_HOST}:/var/builds/$NAMESPACE/haproxy"
