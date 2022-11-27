@@ -4,8 +4,7 @@ if [ -n "${LOCAL_TEST}" ]; then
   # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
   # shellcheck disable=SC2155
   export NAMESPACE=test-ci-op AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com \
-      SHARED_DIR=${SHARED_DIR:-$(mktemp -d)} CLUSTER_PROFILE_DIR=~/.ssh IPI=false SELF_MANAGED_NETWORK=true \
-      INTERNAL_NET_IP=192.168.90.1
+      SHARED_DIR=${SHARED_DIR:-$(mktemp -d)} CLUSTER_PROFILE_DIR=~/.ssh IPI=false
 fi
 
 set -o nounset
@@ -63,14 +62,12 @@ listen api-server-6443
     mode tcp
 $(
 if [ "${IPI}" != "true" ]; then
-  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
-    # shellcheck disable=SC1090
-    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    # shellcheck disable=SC2154
-    if [[ $name == *master* ]]; then
-    echo "    server $name $ip:6443 check inter 1s"
-    fi
-  done
+for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  echo "    server $name $ip:6443 check inter 1s"
+done
 else
    echo "    server API_VIP 1.1.1.1:6443 check inter 1s"
 fi
@@ -79,42 +76,36 @@ listen machine-config-server-22623
     bind *:22623
     mode tcp
 $(
-  for bmhost in $(yq e -o=j -I=0 '.[]' hosts.yaml); do
-    # shellcheck disable=SC1090
-    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    # shellcheck disable=SC2154
-    if [[ $name == *master* ]]; then
-    echo "    server $name $ip:22623 check inter 1s"
-    fi
-  done
+for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  echo "    server $name $ip:6443 check inter 1s"
+done
 )
 listen ingress-router-80
     bind *:80
     mode tcp
     balance source
 $(
-  for bmhost in $(yq e -o=j -I=0 '.[]' hosts.yaml); do
-    # shellcheck disable=SC1090
-    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    # shellcheck disable=SC2154
-    if [[ $name == *worker* ]]; then
-    echo "    server $name $ip:80 check inter 1s"
-    fi
-  done
+for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  echo "    server $name $ip:6443 check inter 1s"
+done
 )
 listen ingress-router-443
     bind *:443
     mode tcp
     balance source
 $(
-  for bmhost in $(yq e -o=j -I=0 '.[]' hosts.yaml); do
-    # shellcheck disable=SC1090
-    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    # shellcheck disable=SC2154
-    if [[ $name == *worker* ]]; then
-    echo "    server $name $ip:443 check inter 1s"
-    fi
-  done
+for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  echo "    server $name $ip:6443 check inter 1s"
+done
 )
 EOF
 
