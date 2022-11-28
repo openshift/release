@@ -11,6 +11,15 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: .
+  dockerfile_path: interop_tests/dockerfiles/Dockerfile
+  to: product-install
 releases:
   initial:
     candidate:
@@ -35,15 +44,11 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: aws.interop.ccitredhat.com
-      SUB_CHANNEL: stable
-      SUB_INSTALL_NAMESPACE: open-cluster-management
-      SUB_PACKAGE: advanced-cluster-management
-      SUB_TARGET_NAMESPACES: '!install'
     test:
-    - ref: operatorhub-subscribe
+    - chain: acm-interop-scenario
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
-  branch: master
-  org: rhpit
+  branch: main
+  org: ascerra
   repo: interop-tests
   variant: acm-install-rehearse-4.12
