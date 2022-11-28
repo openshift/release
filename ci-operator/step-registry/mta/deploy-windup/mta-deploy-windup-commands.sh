@@ -276,4 +276,8 @@ spec:
     volumeCapacity: "5Gi"
 EOF
 
+# Wait 5 minutes for Windup to fully deploy
+echo "Waiting 5 minutes for Windup to finish deploying"
+sleep 300
+
 echo "MTA operator installed and Windup deployed."
