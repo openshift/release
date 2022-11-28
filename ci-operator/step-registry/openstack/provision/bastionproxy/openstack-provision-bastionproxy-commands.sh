@@ -181,6 +181,7 @@ EOF"
 
 sudo bash -c "cat << EOF > /etc/squid/squid.conf
 acl localnet src all
+acl Safe_ports port 22
 acl Safe_ports port 80
 acl Safe_ports port 443
 acl Safe_ports port 1025-65535
