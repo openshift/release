@@ -5,8 +5,13 @@ set -o errexit
 set -o pipefail
 
 if [[ -z "${SUB_INSTALL_NAMESPACE}" ]]; then
-  echo "ERROR: INSTALL_NAMESPACE is not defined"
-  exit 1
+  echo "SUB_INSTALL_NAMESPACE is not defined, using ${NAMESPACE}"
+  SUB_INSTALL_NAMESPACE=${NAMESPACE}
+fi
+
+if [[ -z "${SUB_TARGET_NAMESPACES}" ]]; then
+  echo "SUB_TARGET_NAMESPACES is not defined, using ${NAMESPACE}"
+  SUB_TARGET_NAMESPACES=${NAMESPACE}
 fi
 
 if [[ -z "${SUB_PACKAGE}" ]]; then
