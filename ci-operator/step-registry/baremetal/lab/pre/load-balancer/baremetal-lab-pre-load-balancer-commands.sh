@@ -142,21 +142,21 @@ interface 'eth1' {
 #reboot 10;
 #select-timeout 5;
 #initial-interval 2;
-#script "/sbin/dhclient-script";
-#media "-link0 -link1 -link2", "link0 link1";
+#script '/sbin/dhclient-script';
+#media '-link0 -link1 -link2', 'link0 link1';
 #reject 192.33.137.209;
 
 #alias {
-#  interface "eth0";
+#  interface 'eth0';
 #  fixed-address 192.5.5.213;
 #  option subnet-mask 255.255.255.255;
 #}
 
 #lease {
-#  interface "eth0";
+#  interface 'eth0';
 #  fixed-address 192.33.137.200;
-#  medium "link0 link1";
-#  option host-name "andare.swiftmedia.com";
+#  medium 'link0 link1';
+#  option host-name 'andare.swiftmedia.com';
 #  option subnet-mask 255.255.255.0;
 #  option broadcast-address 192.33.137.255;
 #  option routers 192.33.137.250;
