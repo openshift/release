@@ -4,6 +4,21 @@ build_root:
     namespace: openshift
     tag: golang-1.18
 canonical_go_repository: github.com/openshift/ofcir
+images:
+- dockerfile_literal: |
+    FROM docker.io/library/docker:dind
+    RUN wget -O /usr/local/bin/minikube "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64"
+    RUN chmod +x /usr/local/bin/minikube
+    RUN wget -O /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl"
+    RUN chmod +x /usr/local/bin/kubectl
+    RUN apk update
+    RUN apk add make
+    RUN apk add bash
+    RUN apk add go
+    RUN apk add libc-dev gcc
+    RUN apk add libvirt-dev
+    USER root
+  to: dind-image
 resources:
   '*':
     limits:
@@ -20,6 +35,11 @@ tests:
     make unit-tests
   container:
     from: src
+- as: te2e
+  commands: |
+    sleep inf
+  container:
+    from: dind-image
 zz_generated_metadata:
   branch: main
   org: openshift-eng
