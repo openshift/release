@@ -20,28 +20,40 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 BUILD_USER=ci-op
 BUILD_ID="${NAMESPACE}"
-CONF_DIR=$(mktemp -d)
 
-scp "${SSHOPTS[@]}" "${SHARED_DIR}/hosts.yaml" "root@${AUX_HOST}:~/hosts.yaml"
+MC=`if [ "${IPI}" != "true" ]; then 
+  for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' hosts.yaml); do
+    # shellcheck disable=SC1090
+    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+    # shellcheck disable=SC2154
+    echo "    server $name $ip:6443 check inter 1s"
+  done
+else
+   echo "    server API_VIP 1.1.1.1:6443 check inter 1s"
+fi`
 
-timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${BUILD_ID}" "${IPI}" "${BUILD_USER}"  << 'EOF'
-set -o nounset
-set -o errexit
-set -o pipefail
-set -o allexport
+APISRV=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' hosts.yaml); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  echo "    server $name $ip:22623 check inter 1s"
+done`
 
-BUILD_ID="${1}"
-IPI="${2}"
-BUILD_USER=${3}"
+INGRESS80=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' hosts.yaml); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  echo "    server $name $ip:80 check inter 1s"
+done`
 
-set +o allexport
+INGRESS443=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' hosts.yaml); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  echo "    server $name $ip:443 check inter 1s jad"
+done`
 
-# shellcheck disable=SC2174
-mkdir -m 755 -p "/var/builds/$BUILD_ID/haproxy"
-
-# Generate haproxy.cfg
-cat > "/var/builds/$BUILD_ID/haproxy/haproxy.cfg" << EOF1
+HAPROXY="
 global
 log         127.0.0.1 local2
 pidfile     /var/run/haproxy.pid
@@ -77,57 +89,24 @@ stats uri /stats
 listen api-server-6443
     bind *:6443
     mode tcp
-$(
-if [ "${IPI}" != "true" ]; then
-for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' hosts.yaml); do
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  # shellcheck disable=SC2154
-  echo "    server $name $ip:6443 check inter 1s"
-done
-else
-   echo "    server API_VIP 1.1.1.1:6443 check inter 1s"
-fi
-)
+$MC
 listen machine-config-server-22623
     bind *:22623
     mode tcp
-$(
-for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' hosts.yaml); do
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  # shellcheck disable=SC2154
-  echo "    server $name $ip:6443 check inter 1s"
-done
-)
+$APISRV
 listen ingress-router-80
     bind *:80
     mode tcp
     balance source
-$(
-for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' hosts.yaml); do
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  # shellcheck disable=SC2154
-  echo "    server $name $ip:6443 check inter 1s"
-done
-)
+$INGRESS80
 listen ingress-router-443
     bind *:443
     mode tcp
     balance source
-$(
-for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' hosts.yaml); do
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  # shellcheck disable=SC2154
-  echo "    server $name $ip:6443 check inter 1s"
-done
-)
-EOF1
+$INGRESS443
+"
 
-# Generate dhclient.conf
-cat > "var/builds/$BUILD_ID/haproxy/dhclient.conf" << EOF2
+DHCLIENT="
 # Configuration file for /sbin/dhclient.
 #
 # This is a sample configuration file for dhclient. See dhclient.conf's
@@ -148,7 +127,7 @@ request subnet-mask, broadcast-address, time-offset, host-name,
         rfc3442-classless-static-routes, ntp-servers;
 
 # Assuming eth1 will be the interface with the default gateway route
-interface "eth1" {
+interface 'eth1' {
     also request routers, domain-name, domain-name-servers, domain-search,
         dhcp6.name-servers, dhcp6.domain-search, dhcp6.fqdn, dhcp6.sntp-servers;
 }
@@ -186,8 +165,24 @@ interface "eth1" {
 #  rebind 2 2000/1/12 00:00:01;
 #  expire 2 2000/1/12 00:00:01;
 #}
-EOF2
+"
 
+timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+  "${BUILD_ID}" "${IPI}" "${BUILD_USER}" "${HAPROXY}"  "${DHCLIENT}"  << 'EOF'
+set -o nounset
+set -o errexit
+set -o pipefail
+set -o allexport
+
+BUILD_ID="${1}"
+IPI="${2}"
+BUILD_USER=${3}"
+
+# shellcheck disable=SC2174
+mkdir -m 755 -p "/var/builds/$BUILD_ID/haproxy"
+
+echo -e "${4}" >> var/builds/$BUILD_ID/haproxy/haproxy.cfg
+echo -e "${5}" >> var/builds/$BUILD_ID/haproxy/dhclient.conf
 
 # Create and start HAProxy container
 docker run --name "haproxy-$BUILD_ID" --restart=on-failure \
