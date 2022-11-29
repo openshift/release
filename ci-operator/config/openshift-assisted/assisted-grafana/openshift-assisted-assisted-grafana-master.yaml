@@ -1,8 +1,21 @@
+base_images:
+  coreos_centos_stream9:
+    name: stream9
+    namespace: coreos
+    tag: "9"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/origin/centos:stream9
+      RUN dnf install git -y
+images:
+- dockerfile_path: Dockerfile.build
+  from: src
+  inputs:
+    coreos_centos_stream9:
+      as:
+      - quay.io/centos/centos:stream9
+  to: build
 resources:
   '*':
     limits:
@@ -14,7 +27,7 @@ tests:
 - as: validate
   commands: make validate
   container:
-    from: src
+    from: build
 zz_generated_metadata:
   branch: master
   org: openshift-assisted
