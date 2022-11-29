@@ -18,7 +18,7 @@ fi
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
 # since ci-operator gives steps KUBECONFIG pointing to cluster under test under some circumstances,
-# unset KUBECONFIG and proxy setting to ensure this step always interact with the build farm.
+# unset KUBECONFIG to ensure this step always interact with the build farm.
 unset KUBECONFIG
 
 # Create qe test image list
