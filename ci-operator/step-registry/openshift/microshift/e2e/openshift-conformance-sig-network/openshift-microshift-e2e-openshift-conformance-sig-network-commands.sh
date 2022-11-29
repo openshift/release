@@ -84,6 +84,7 @@ cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-network] Services should serve a basic endpoint from pods  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-network] Services should serve multiport endpoints from pods  [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-network] Services should test the lifecycle of an Endpoint [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
+"[sig-network][Feature:Router] The HAProxy router should serve routes that were created from an ingress [apigroup:route.openshift.io] [Skipped:Disconnected] [Suite:openshift/conformance/parallel]"
 EOF
 chmod +r "${HOME}"/suite.txt
 
