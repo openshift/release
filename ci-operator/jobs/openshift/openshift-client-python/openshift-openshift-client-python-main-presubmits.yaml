@@ -9,43 +9,23 @@ presubmits:
     context: ci/prow/ansible-module
     decorate: true
     labels:
-      ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-openshift-client-python-main-ansible-module
     rerun_command: /test ansible-module
     spec:
       containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ansible-module
-        command:
-        - ci-operator
-        image: ci-operator:latest
+      - command:
+        - ./hack/verify-ansible-module.sh
+        env:
+        - name: RUNTIME_ENV
+          value: container
+        image: registry.ci.openshift.org/dpcr/openshift-client-python:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
+            cpu: 500m
       serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
     trigger: (?m)^/test( | .* )ansible-module,?($|\s.*)
   - agent: kubernetes
     always_run: true
