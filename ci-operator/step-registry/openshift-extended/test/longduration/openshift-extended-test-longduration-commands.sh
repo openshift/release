@@ -165,10 +165,12 @@ oc get clusterversion version -o yaml || true
 # execute the cases
 function run {
     test_scenarios=""
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
-    echo "TEST_FILTERS: \"~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}\""
+    echo "TEST_FILTERS: \"${hardcoded_filters};${TEST_FILTERS:-}\""
+    echo "FILTERS_ADDITIONAL: \"${FILTERS_ADDITIONAL:-}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     if [[ -n "${TEST_SCENARIOS:-}" ]]; then
         readarray -t scenarios <<< "${TEST_SCENARIOS}"
@@ -208,7 +210,13 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    handle_filters "~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;${TEST_FILTERS}"
+    test_filters="${hardcoded_filters};${TEST_FILTERS}"
+    if [[ -n "${FILTERS_ADDITIONAL:-}" ]]; then
+        echo "add FILTERS_ADDITIONAL into test_filters"
+        test_filters="${hardcoded_filters};${TEST_FILTERS};${FILTERS_ADDITIONAL}"
+    fi
+    echo "${test_filters}"
+    handle_filters "${test_filters}"
     echo "------------------the case selected------------------"
     selected_case_num=$(cat ./case_selected|wc -l)
     if [ "W${selected_case_num}W" == "W0W" ]; then
