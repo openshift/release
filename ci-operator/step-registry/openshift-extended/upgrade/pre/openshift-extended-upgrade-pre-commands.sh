@@ -156,8 +156,12 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 # execute the cases
 function run {
     test_scenarios=""
+    hardcoded_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&"
     echo "TEST_SCENARIOS_PREUPG: \"${TEST_SCENARIOS_PREUPG:-}\""
     echo "TEST_ADDITIONAL_PREUPG: \"${TEST_ADDITIONAL_PREUPG:-}\""
+    echo "TEST_FILTERS: \"${TEST_FILTERS:-}\""
+    echo "FILTERS_ADDITIONAL: \"${FILTERS_ADDITIONAL:-}\""
+    echo "TEST_FILTERS_PREUPG: \"${TEST_FILTERS_PREUPG:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     if [[ -n "${TEST_SCENARIOS_PREUPG:-}" ]]; then
@@ -198,13 +202,14 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    test_filters=""
+    test_filters="${hardcoded_filters};${TEST_FILTERS}"
+    if [[ -n "${FILTERS_ADDITIONAL:-}" ]]; then
+        echo "add filter FILTERS_ADDITIONAL"
+        test_filters="${test_filters};${FILTERS_ADDITIONAL:-}"
+    fi
     if [[ -n "${TEST_FILTERS_PREUPG:-}" ]]; then
-        # shellcheck disable=SC2153
-        test_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS};${TEST_FILTERS_PREUPG}"
-    else
-        # shellcheck disable=SC2153
-        test_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PreChkUpgrade&;${TEST_FILTERS}"
+        echo "add filter TEST_FILTERS_PREUPG"
+        test_filters="${test_filters};${TEST_FILTERS_PREUPG:-}"
     fi
     echo "final test_filters: \"${test_filters}\""
 
