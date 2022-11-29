@@ -23,6 +23,12 @@ images:
 - dockerfile_path: Dockerfile
   from: ubi_minimal
   to: assisted-events-scrape
+- dockerfile_literal: |
+    FROM docker.io/kindest/node:v1.25.0
+    COPY --from=quay.io/openshift/origin-cli:4.12 /usr/bin/oc /usr/local/bin/
+    RUN apt-get update && apt-get install -y \
+      make
+  to: kind
 promotion:
   name: ocm-2.5
   namespace: edge-infrastructure
@@ -44,29 +50,11 @@ tests:
     from: assisted-events-scrape-build
   skip_if_only_changed: ^openshift/|^docs/|^dashboards/|^README.md$|^(AUTHORS|LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: integration-test
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 30m0s
-    version: "4.10"
+  commands: make ci-integration-test
+  container:
+    clone: true
+    from: kind
   skip_if_only_changed: ^openshift/|^docs/|^dashboards/|^README.md$|^(AUTHORS|LICENSE|OWNERS|OWNERS_ALIASES)$
-  steps:
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        make ci-integration-test
-      dependencies:
-      - env: ASSISTED_EVENTS_SCRAPE_IMAGE
-        name: assisted-events-scrape
-      from: assisted-events-scrape-build
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift-assisted
