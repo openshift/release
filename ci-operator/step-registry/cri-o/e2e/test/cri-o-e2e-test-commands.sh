@@ -3,42 +3,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/env"
-
-#####################################
-###############Log In################
-#####################################
-
-GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
-export GCP_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/gce.json"
-sa_email=$(jq -r .client_email ${GCP_SHARED_CREDENTIALS_FILE})
-if ! gcloud auth list | grep -E "\*\s+${sa_email}"
-then
-  gcloud auth activate-service-account --key-file="${GCP_SHARED_CREDENTIALS_FILE}"
-  gcloud config set project "${GOOGLE_PROJECT_ID}"
-fi
-
-mkdir -p "${HOME}"/.ssh
-chmod 0700 "${HOME}"/.ssh
-
-cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
-cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
-
-latest=$(wget -q -O- https://api.github.com/repos/coreos/etcd/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
-if gcloud alpha storage ls gs://crio-ci | grep -q ${latest} ; then 
-    echo "etcd is up to date"
-else 
-    echo "caching etcd" 
-    curl https://github.com/coreos/etcd/releases/download/${latest}/etcd-${latest}-linux-amd64.tar.gz -L | gsutil cp - gs://crio-ci/etcd-${latest}.tar.gz
-fi 
+USE_CONMONRS=${USE_CONMONRS:-false}
 
 #####################################
 #####################################
 
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
-USE_CONMONRS=${USE_CONMONRS:-false}
 
 tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > \${HOME}/cri-o.tar.gz"
 timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
