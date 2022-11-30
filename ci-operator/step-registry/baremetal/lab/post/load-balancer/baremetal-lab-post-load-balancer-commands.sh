@@ -44,3 +44,5 @@ docker restart "haproxy-$BUILD_ID"
 
 # shellcheck disable=SC2174
 rm -rf "/var/builds/$BUILD_ID/haproxy"
+
+EOF
