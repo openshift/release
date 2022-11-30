@@ -6,6 +6,7 @@ set -o pipefail
 
 # use it as a bool
 marketplace=0
+mirror=0
 
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
@@ -15,6 +16,16 @@ function set_proxy () {
         source "${SHARED_DIR}/proxy-conf.sh"
     else
         echo "no proxy setting."
+    fi
+}
+
+function unset_proxy () {
+    if test -s "${SHARED_DIR}/unset-proxy.sh" ; then
+        echo "unset the proxy"
+        echo "source ${SHARED_DIR}/unset-proxy.sh"
+        source "${SHARED_DIR}/unset-proxy.sh"
+    else
+        echo "no proxy setting found."
     fi
 }
 
@@ -97,6 +108,19 @@ function disable_default_catalogsource () {
 #     fi
 #     rm -rf /tmp/olm_mirror 
 # }
+
+# this func only used when the cluster not set the Proxy registy, such as C2S, SC2S clusters
+function mirror_optional_images () {
+    mirror_auths="${SHARED_DIR}/mirror_auths"
+    run_command "oc adm catalog mirror -a ${mirror_auths} ${mirror_index_image} ${MIRROR_REGISTRY_HOST} --continue-on-error --to-manifests=/tmp/olm_mirror"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        echo "mirror optional operators' images successfully"
+    else
+        run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
+        run_command "cat /tmp/olm_mirror/mapping.txt"
+        return 1
+    fi
+}
 
 # Slove: x509: certificate signed by unknown authority
 # Config CA for each cluster node so that it can pull images successfully.
@@ -182,11 +206,7 @@ EOF
 }
 
 function create_catalog_sources()
-{
-    # get cluster Major.Minor version
-    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
-    mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
-    
+{    
     echo "create QE catalogsource: qe-app-registry"
     cat <<EOF | oc create -f -
 apiVersion: operators.coreos.com/v1alpha1
@@ -203,7 +223,6 @@ spec:
     registryPoll:
       interval: 15m
 EOF
-    set +e 
     COUNTER=0
     while [ $COUNTER -lt 600 ]
     do
@@ -227,7 +246,6 @@ EOF
 
         return 1
     fi
-    set -e 
 }
 
 function check_default_catalog () {
@@ -290,25 +308,49 @@ run_command "oc version -o yaml"
 # private mirror registry host
 # <public_dns>:<port>
 MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
-echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
 # the proxy registry port 6001 for quay.io
 MIRROR_PROXY_REGISTRY_QUAY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6001/g' `
-echo "MIRROR_PROXY_REGISTRY_QUAY: ${MIRROR_PROXY_REGISTRY_QUAY}"
 # the proxy registry port 6002 for redhat.io
 MIRROR_PROXY_REGISTRY=`echo "${MIRROR_REGISTRY_HOST}" | sed 's/5000/6002/g' `
+
+# we don't set the proxy registy for the C2S and SC2S clusters, so use the default mirror registry port: 5000
+platform=`oc get infrastructure cluster -o=jsonpath="{.status.platform}"`
+echo "The platform is ${platform}"
+if [[ $platform == "AWS" ]]; then
+    region=`oc get infrastructure cluster -o=jsonpath="{.status.platformStatus.aws.region}"`
+    echo "The region is ${region}"
+    if [[ $region =~ ^us-iso(b)?-.* ]]; then
+        echo "This cluster is a C2S or SC2S cluster(region us-iso-* represent C2S, us-isob-* represent SC2S), so don't use the proxy registry."
+        # change it back to the default port 5000
+        MIRROR_PROXY_REGISTRY_QUAY=${MIRROR_REGISTRY_HOST}
+        MIRROR_PROXY_REGISTRY=${MIRROR_REGISTRY_HOST}
+        mirror=1
+    fi
+fi
+
+echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
+echo "MIRROR_PROXY_REGISTRY_QUAY: ${MIRROR_PROXY_REGISTRY_QUAY}"
 echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 set_cluster_auth
 set_CA_for_nodes
+# get cluster Major.Minor version
+ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+if [ $mirror -eq 1 ]; then
+    unset_proxy
+    mirror_optional_images
+    set_proxy
+fi 
+
 create_settled_icsp
 check_marketplace
+# No need to disable the default OperatorHub when marketplace disabled as default.
+if [ $marketplace -eq 0 ]; then
+    disable_default_catalogsource
+fi
 create_catalog_sources
 # For now(2022-07-19), the Proxy registry can only proxy the `brew.registry.redhat.io` image, 
 # but the default CatalogSource use `registry.redhat.io` image, such as registry.redhat.io/redhat/redhat-operator-index:v4.11
 # And, there is no brew.registry.redhat.io/redhat/redhat-operator-index:v4.11 , so disable the default CatalogSources.
 # TODO: the Proxy registry support the `registry.redhat.io` images
 # check_default_catalog
-
-# No need to disable the default OperatorHub when marketplace disabled as default.
-if [ $marketplace -eq 0 ]; then
-    disable_default_catalogsource
-fi
