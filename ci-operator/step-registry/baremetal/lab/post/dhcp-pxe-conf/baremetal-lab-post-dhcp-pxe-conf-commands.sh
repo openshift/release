@@ -7,8 +7,6 @@ if [ -n "${LOCAL_TEST}" ]; then
       SHARED_DIR=${SHARED_DIR:-$(mktemp -d)} CLUSTER_PROFILE_DIR=~/.ssh SELF_MANAGED_NETWORK=true
 fi
 
-set -o errexit
-set -o pipefail
 set -o nounset
 
 if [ -z "${AUX_HOST}" ]; then
@@ -39,8 +37,6 @@ done
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${NAMESPACE}" "${MAC_ARRAY[@]}" << 'EOF'
   set -o nounset
-  set -o errexit
-  set -o pipefail
   NAMESPACE="${1}"; shift
   MAC_ARRAY=("$@")
   echo "Removing the DHCP/PXE config..."
