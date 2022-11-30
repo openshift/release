@@ -103,6 +103,8 @@ echo "extracting CR from image $RELEASE_IMAGE_LATEST"
 oc version --client
 REPO=$(oc -n ${NAMESPACE} get is release -o json | jq -r '.status.publicDockerImageRepository')
 cmd="oc adm release extract ${REPO}:latest --credentials-requests --cloud=aws --to '$cr_yaml_d'"
+oc image info ${RELEASE_IMAGE_LATEST}  || true
+oc image info ${REPO}:latest || true
 run_command "${cmd}" || exit 1
 
 annotation="TechPreviewNoUpgrade"
