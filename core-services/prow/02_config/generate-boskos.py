@@ -232,7 +232,7 @@ for i in range(1, 7):
 for i in range(83,93):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(94,106):
+for i in range(94,109):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):
