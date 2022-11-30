@@ -197,6 +197,21 @@ set -x
 nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-{{ BUILD_ID }}) \
 /bin/umount /etc/resolv.conf
 
+devices=(eth1.br-ext eth2.br-int eth1.br-int)
+for dev in ${devices[@]}; do
+  interface=$(echo $dev | cut -f1 -d.)
+  bridge=$(echo $dev | cut -f2 -d.)
+  # for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
+  # eth2 will only get local routes configuration
+  set -x
+  /usr/local/bin/ovs-docker add-port $bridge $interface haproxy-$BUILD_ID
+  nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-$BUILD_ID) \
+  /sbin/dhclient -v \
+  -pf /var/run/dhclient.$interface.pid \
+  -lf /var/lib/dhcp/dhclient.$interface.lease \
+  {$interface
+done
+
 docker restart "haproxy-$BUILD_ID"
 
 EOF
