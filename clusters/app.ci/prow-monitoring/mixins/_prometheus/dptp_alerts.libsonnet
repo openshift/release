@@ -200,7 +200,7 @@
               severity: 'warning',
             },
             annotations: {
-              message: '{{ Pod-scaler admission determined that workload $labels.workload_name ($labels.workload_type) used 10x more than configured amount of memory (actual: $labels.determined_memory, configured: $labels.configured_memory}}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',
+              message: 'Workload {{ $labels.workload_name }} ({{ $labels.workload_type }}) used 10x more than configured amount of memory (actual: {{ $labels.determined_memory }}, configured: {{ $labels.configured_memory }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',
             },
           }
         ],
