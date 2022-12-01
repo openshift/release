@@ -15,4 +15,6 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     REPO_DIR="/home/deadbeef/cri-o"
     cd "\${REPO_DIR}/contrib/test/ci"
     ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow USE_CONMONRS=$USE_CONMONRS" --connection=local -vvv --tags setup,e2e
+    sleep 900
 EOF
+sleep 900
