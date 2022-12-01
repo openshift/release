@@ -1,8 +1,12 @@
 #!/bin/bash
 
-set -o nounset
 set -o errexit
 set -o pipefail
+
+if [[ "${BASELINE_CAPABILITY_SET}" == "" ]]; then
+  echo "This step is not required when BASELINE_CAPABILITY_SET is not set"
+  exit 0
+fi
 
 function remove_secrets()
 {
@@ -28,60 +32,75 @@ function remove_secrets()
 
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
-ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-# ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
-# ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+
+# shellcheck disable=SC2153
+REPO=$(oc -n ${NAMESPACE} get is release -o json | jq -r '.status.publicDockerImageRepository')
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${REPO}:latest --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 rm /tmp/pull-secret
 
 echo "OCP Version: $ocp_version"
 
+if (( ocp_minor_version <=10 && ocp_major_version == 4 )) || (( ocp_major_version < 4 )); then
+  echo "This step is not required for ${ocp_version}, exit now"
+  exit 0
+fi
+
 v411="baremetal marketplace openshift-samples"
-v412="baremetal marketplace openshift-samples Console Insights Storage CSISnapshot"
-vCurrent=""
+# shellcheck disable=SC2034
+v412=" ${v411} Console Insights Storage CSISnapshot"
+latest_defined="v412"
+always_default="${!latest_defined}"
 
-case ${ocp_version} in
-"4.11")
-  vCurrent="${v411}"
-  ;;
-"4.12")
-  vCurrent="${v412}"
-  ;;
-*)
-  ;;
-esac
+# Determine vCurrent
 
+declare "v${ocp_major_version}${ocp_minor_version}"
+v_current_version="v${ocp_major_version}${ocp_minor_version}"
+
+if [[ ${!v_current_version} == "" ]]; then
+  echo "vCurrent: No default value for ${v_current_version}, use default value from ${latest_defined}: ${!latest_defined}"
+  vCurrent=${always_default}
+else
+  echo "vCurrent: Use exsting value from ${v_current_version}: ${!v_current_version}"
+  vCurrent=${!v_current_version}
+fi
 echo "vCurrent set: $vCurrent"
 
-# Base Capability
-base_operators=""
+# Determine BASELINE_CAPABILITY_SET
+
+enabled_operators=""
 case ${BASELINE_CAPABILITY_SET} in
 "None")
   ;;
 "v4.11")
-  base_operators="${v411}"
+  enabled_operators="${v411}"
   ;;
 "v4.12")
-  base_operators="${v412}"
+  enabled_operators="${v412}"
   ;;
 "vCurrent")
-  base_operators="${vCurrent}"
+  enabled_operators="${vCurrent}"
   ;;
 *)
-  base_operators="${vCurrent}" # include all operators by default
+  enabled_operators="${always_default}"
   ;;
 esac
 
-echo "Baseline Capability Set: $base_operators"
 
 # Base Capability + Additional Capability
-all_caps=$(echo "$base_operators $ADDITIONAL_ENABLED_CAPABILITY_SET" | xargs -n1 | sort -u | xargs)
-echo "Enabled Capability Set: $all_caps"
 
-if [[ "${ocp_version}" == "4.12" ]]; then
-    if [[ ! "${all_caps}" =~ "Storage" ]]; then
-        namespace="openshift-cluster-csi-drivers"
-        remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
-    fi
+echo "Baseline Capability Set: $enabled_operators"
+echo "Additional Capability Set: $ADDITIONAL_ENABLED_CAPABILITY_SET"
+enabled_operators=$(echo "$enabled_operators $ADDITIONAL_ENABLED_CAPABILITY_SET" | xargs -n1 | sort -u | xargs)
+echo "Enabled Capability Set: $enabled_operators"
+
+# Remove openshift-cluster-csi-drivers, >= 4.12
+if (( ocp_minor_version >=12 && ocp_major_version == 4 )); then
+  if [[ ! "${enabled_operators}" =~ "Storage" ]]; then
+      namespace="openshift-cluster-csi-drivers"
+      remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
+  fi
 fi
 
 exit 0
