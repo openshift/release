@@ -11,6 +11,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+cp "${SHARED_DIR}"/vips.yaml "${SHARED_DIR}"/external_vips.yaml
+
+if [ -z "${AUX_HOST}" ]; then
+    echo "AUX_HOST is not filled. Failing."
+    exit 1
+fi
+
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
   -o 'UserKnownHostsFile=/dev/null'
@@ -22,7 +29,7 @@ BUILD_USER=ci-op
 BUILD_ID="${NAMESPACE}"
 
 MC=`if [ "${IPI}" != "true" ]; then 
-  for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' hosts.yaml); do
+  for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     # shellcheck disable=SC2154
@@ -32,21 +39,21 @@ else
    echo "    server API_VIP 1.1.1.1:6443 check inter 1s"
 fi`
 
-APISRV=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' hosts.yaml); do
+APISRV=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   # shellcheck disable=SC2154
   echo "    server $name $ip:22623 check inter 1s"
 done`
 
-INGRESS80=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' hosts.yaml); do
+INGRESS80=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   # shellcheck disable=SC2154
   echo "    server $name $ip:80 check inter 1s"
 done`
 
-INGRESS443=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' hosts.yaml); do
+INGRESS443=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   # shellcheck disable=SC2154
@@ -197,20 +204,35 @@ set -x
 nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-{{ BUILD_ID }}) \
 /bin/umount /etc/resolv.conf
 
-devices=(eth1.br-ext eth2.br-int eth1.br-int)
-for dev in ${devices[@]}; do
-  interface=$(echo $dev | cut -f1 -d.)
-  bridge=$(echo $dev | cut -f2 -d.)
-  # for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
-  # eth2 will only get local routes configuration
+devices=(eth1.br-ext eth2.br-int)
+if [ x"${DISCONNECTED}" != x"true" ]; then
+  for dev in ${devices[@]}; do
+    interface=$(echo $dev | cut -f1 -d.)
+    bridge=$(echo $dev | cut -f2 -d.)
+    # for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
+    # eth2 will only get local routes configuration
+    set -x
+    /usr/local/bin/ovs-docker add-port $bridge $interface haproxy-$BUILD_ID
+    nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-$BUILD_ID) \
+    /sbin/dhclient -v \
+    -pf /var/run/dhclient.$interface.pid \
+    -lf /var/lib/dhcp/dhclient.$interface.lease $interface
+  done
+else
   set -x
-  /usr/local/bin/ovs-docker add-port $bridge $interface haproxy-$BUILD_ID
-  nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-$BUILD_ID) \
-  /sbin/dhclient -v \
-  -pf /var/run/dhclient.$interface.pid \
-  -lf /var/lib/dhcp/dhclient.$interface.lease \
-  {$interface
-done
+    /usr/local/bin/ovs-docker add-port br-int eth1 haproxy-$BUILD_ID
+    nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-$BUILD_ID) \
+    /sbin/dhclient -v \
+    -pf /var/run/dhclient.eth1.pid \
+    -lf /var/lib/dhcp/dhclient.eth1.lease eth1
+
+fi
+
+# Gather the IP Address for the new interface
+api_ip=nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-{{ BUILD_ID }}) -n  \
+/sbin/ip -o -4 a list eth1 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/'
+
+ingress_ip=$api_ip
 
 docker restart "haproxy-$BUILD_ID"
 

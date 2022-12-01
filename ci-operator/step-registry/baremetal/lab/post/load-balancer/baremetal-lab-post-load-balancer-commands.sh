@@ -8,8 +8,11 @@ if [ -n "${LOCAL_TEST}" ]; then
 fi
 
 set -o nounset
-set -o errexit
-set -o pipefail
+
+if [ -z "${AUX_HOST}" ]; then
+    echo "AUX_HOST is not filled. Failing."
+    exit 1
+fi
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -24,10 +27,6 @@ BUILD_ID="${NAMESPACE}"
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${BUILD_ID}" "${BUILD_USER}" << 'EOF'
 set -o nounset
-set -o errexit
-set -o pipefail
-set -o allexport
-
 BUILD_ID="${1}"
 BUILD_USER=${2}"
 
@@ -40,7 +39,7 @@ for dev in ${devices[@]}; do
 done
 
 # Remove HAProxy container
-docker restart "haproxy-$BUILD_ID"
+docker rm --force "haproxy-$BUILD_ID"
 
 # shellcheck disable=SC2174
 rm -rf "/var/builds/$BUILD_ID/haproxy"
