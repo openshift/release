@@ -1,0 +1,255 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-test-infra:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  assisted-test-infra-internal:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: assisted-test-infra-internal
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+  cluster-api-provider-agent:
+    name: ocm-2.7
+    namespace: edge-infrastructure
+    tag: cluster-api-provider-agent
+  coreos_centos_stream9:
+    name: stream9
+    namespace: coreos
+    tag: "9"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  edge_infrastructure_swagger_codegen_cli:
+    name: edge-infrastructure-swagger-codegen-cli
+    namespace: ci
+    tag: 2.4.18
+  goswagger_swagger:
+    name: goswagger-swagger
+    namespace: ci
+    tag: v0.28.0
+  hypershift-operator:
+    name: "4.12"
+    namespace: ocp
+    tag: hypershift-operator
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+  postgresql-12-centos7:
+    name: postgresql-12-centos7
+    namespace: edge-infrastructure
+    tag: latest
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: ci-images/Dockerfile.base
+  inputs:
+    coreos_centos_stream9:
+      as:
+      - quay.io/centos/centos:stream9
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: assisted-service-base
+- dockerfile_path: ci-images/Dockerfile.unit-tests
+  from: assisted-service-base
+  to: assisted-service-unit-test
+- dockerfile_path: ci-images/Dockerfile.lint
+  from: assisted-service-base
+  to: assisted-service-lint
+- dockerfile_path: ci-images/Dockerfile.subsystem
+  from: assisted-service-base
+  inputs:
+    cli:
+      as:
+      - quay.io/openshift/origin-cli:latest
+  to: assisted-service-subsystem
+- dockerfile_path: ci-images/Dockerfile.code-generation
+  from: assisted-service-base
+  inputs:
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
+  to: assisted-service-generate
+- dockerfile_path: Dockerfile.assisted-service-build
+  inputs:
+    edge_infrastructure_swagger_codegen_cli:
+      as:
+      - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
+    goswagger_swagger:
+      as:
+      - quay.io/goswagger/swagger:v0.28.0
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: assisted-service-build-base
+- dockerfile_literal: |
+    FROM base-build
+    COPY . .
+  inputs:
+    assisted-service-build-base:
+      as:
+      - base-build
+    src:
+      paths:
+      - destination_dir: ./
+        source_path: /go/src/github.com/openshift/assisted-service/.
+  to: assisted-service-build
+- dockerfile_literal: |
+    # Generate python client
+    FROM quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18 as swagger_py
+    COPY swagger.yaml .
+    COPY tools/generate_python_client.sh .
+    RUN chmod +x ./generate_python_client.sh && SWAGGER_FILE=swagger.yaml OUTPUT=/build ./generate_python_client.sh
+
+    # TODO: Find a pure Python3 base image, rather than relying on the golang one
+    FROM quay.io/odepaz/golang:1.18.8 as pybuilder
+    COPY . /assisted-service
+    COPY --from=swagger_py /build /assisted-service/build
+    RUN python3 -m pip install -I pip && pip3 install -I -r /assisted-service/dev-requirements.txt
+    RUN cd /assisted-service/build && python3 ../tools/client_package_initializer.py ./ https://github.com/openshift/assisted-service
+
+    # TODO: Currently, the Python package is included in the service image for testing purposes. It conveniently allows matching a service version to a specific Python client version. In the future, once the Python package is published on pip, it should (probably) be removed from the Assisted Service image (this dockerfile).
+
+    # Build binaries
+    FROM quay.io/centos/centos:stream8 as builder
+
+    RUN dnf install -y gcc git && dnf clean all
+    COPY --from=quay.io/odepaz/golang:1.18.8 /usr/local/go /usr/local/go
+
+    ENV GOROOT=/usr/local/go
+    ENV PATH=$PATH:$GOROOT/bin
+
+    WORKDIR /assisted-service/
+
+    # Bring in the go dependencies before anything else so we can take
+    # advantage of caching these layers in future builds.
+    COPY api/go.mod api/go.sum /assisted-service/api/
+    COPY models/go.mod models/go.sum /assisted-service/models/
+    COPY go.mod go.sum /assisted-service/
+    RUN go mod download
+
+    COPY . /assisted-service/
+
+    RUN cd cmd && CGO_ENABLED=1 GOFLAGS="" GO111MODULE=on go build -o /build/assisted-service
+    RUN cd ./cmd/operator && CGO_ENABLED=0 GOFLAGS="" GO111MODULE=on go build -o /build/assisted-service-operator
+    RUN cd ./cmd/webadmission && CGO_ENABLED=0 GOFLAGS="" GO111MODULE=on go build -o /build/assisted-service-admission
+    RUN cd ./cmd/agentbasedinstaller/client && CGO_ENABLED=0 GOFLAGS="" GO111MODULE=on go build -o /build/agent-installer-client
+
+    # Create final image
+    FROM quay.io/centos/centos:stream8
+
+    # multiarch images need it till WRKLDS-222 and https://bugzilla.redhat.com/show_bug.cgi?id=2111537 are fixed
+    RUN dnf install -y --setopt=install_weak_deps=False skopeo
+    # openshift-install requires this
+    RUN dnf install -y libvirt-libs nmstate &&\
+        dnf clean all
+
+    ARG WORK_DIR=/data
+
+    RUN mkdir $WORK_DIR && chmod 775 $WORK_DIR
+
+    # downstream this can be installed as an RPM
+    COPY --from=quay.io/openshift/origin-cli:4.12 /usr/bin/oc /usr/local/bin/
+
+    COPY --from=builder /build/assisted-service /assisted-service
+    COPY --from=builder /build/assisted-service-operator /assisted-service-operator
+    COPY --from=builder /build/assisted-service-admission /assisted-service-admission
+    COPY --from=builder /build/agent-installer-client /usr/local/bin/agent-installer-client
+    RUN ln -s /usr/local/bin/agent-installer-client /agent-based-installer-register-cluster-and-infraenv
+    COPY --from=pybuilder /assisted-service/build/dist/* /clients/
+    ENV GODEBUG=madvdontneed=1
+    ENV GOGC=50
+    CMD ["/assisted-service"]
+  to: assisted-service
+- dockerfile_literal: |
+    FROM coreos/centos
+    COPY . .
+  from: src
+  to: assisted-service-scripts
+- dockerfile_literal: |
+    FROM coreos/centos
+    RUN yum install -y skopeo
+  from: src
+  to: assisted-service-publish-index
+releases:
+  candidate-4-11:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  candidate-4-11-multi:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  stable-4-10:
+    integration:
+      name: "4.10"
+      namespace: ocp
+  stable-4-11:
+    integration:
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    make lint
+  container:
+    from: assisted-service-lint
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+- as: verify-generated-code
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  steps:
+    test:
+    - ref: assisted-verify-generated-code
+- as: unit-test
+  commands: |
+    export REPORTS=/tmp/reports
+    export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
+    export GINKGO_REPORTFILE=${ARTIFACT_DIR}/junit_unit_test.xml
+    make ci-unit-test
+  container:
+    from: assisted-service-unit-test
+  secret:
+    mount_path: /tmp/secret
+    name: assisted-service-codecov-token
+  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+zz_generated_metadata:
+  branch: use_bmo_code_for_ironic_ip
+  org: openshift
+  repo: assisted-service
