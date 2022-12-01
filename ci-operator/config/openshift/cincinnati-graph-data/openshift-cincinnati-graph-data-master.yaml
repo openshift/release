@@ -21,6 +21,28 @@ images:
   to: stable
 - dockerfile_path: graph-data.rs/Dockerfile
   to: graphdata-unittests
+- dockerfile_literal: |-
+    FROM scratch
+    COPY blocked-edges /blocked-edges
+    COPY channels /channels
+    COPY raw /raw
+    USER 1000:1000
+    ENV PATH /
+    ENV HOME /
+    WORKDIR /
+    ENTRYPOINT ["/this-image-is-not-executable"]
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/cincinnati-graph-data/.
+  to: graph-data
+promotion:
+  excluded_images:
+  - stable
+  - graphdata-unittests
+  name: cincinnati-graph-data
+  namespace: cincinnati-ci-public
 raw_steps:
 - pipeline_image_cache_step:
     commands: |
