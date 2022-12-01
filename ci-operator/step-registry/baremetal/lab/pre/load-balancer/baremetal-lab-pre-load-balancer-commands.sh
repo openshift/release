@@ -11,8 +11,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cp "${SHARED_DIR}"/vips.yaml "${SHARED_DIR}"/external_vips.yaml
-
 if [ -z "${AUX_HOST}" ]; then
     echo "AUX_HOST is not filled. Failing."
     exit 1
@@ -185,6 +183,8 @@ BUILD_ID="${1}"
 IPI="${2}"
 BUILD_USER=${3}"
 
+cp /var/builds/$BUILD_ID/vips.yaml /var/builds/$BUILD_ID/external_vips.yaml
+
 # shellcheck disable=SC2174
 mkdir -m 755 -p "/var/builds/$BUILD_ID/haproxy"
 
@@ -232,8 +232,14 @@ fi
 api_ip=nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-{{ BUILD_ID }}) -n  \
 /sbin/ip -o -4 a list eth1 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/'
 
-ingress_ip=$api_ip
+vips="
+ingress_vip: $api_ip
+api_vip: $api_ip
+"
+echo $vips > external_vips.yaml
 
 docker restart "haproxy-$BUILD_ID"
 
 EOF
+
+scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/external_vips.yaml" "${SHARED_DIR}/"
