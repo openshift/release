@@ -61,16 +61,9 @@ echo $TENANT_ID >> ${SHARED_DIR}/TENANT_ID
 echo $AAD_CLIENT_SECRET >> ${SHARED_DIR}/AAD_CLIENT_SECRET
 echo $APP_ID >> ${SHARED_DIR}/APP_ID
 
-AZURESTACK_ENDPOINT=$(cat ${SHARED_DIR}/AZURESTACK_ENDPOINT)
-SUFFIX_ENDPOINT=$(cat ${SHARED_DIR}/SUFFIX_ENDPOINT)
-
-az cloud register \
-    -n PPE \
-    --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
-    --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
-az cloud set -n PPE
-az cloud update --profile 2019-03-01-hybrid
-az login --service-principal -u $APP_ID -p $AAD_CLIENT_SECRET --tenant $TENANT_ID > /dev/null
+# Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
+chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
+${SHARED_DIR}/azurestack-login-script.sh
 
 # shellcheck disable=SC2034
 SUBSCRIPTION_ID=$(az account show | jq -r .id)

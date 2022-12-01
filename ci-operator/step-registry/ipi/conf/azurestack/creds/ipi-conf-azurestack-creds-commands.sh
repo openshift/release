@@ -26,25 +26,9 @@ AZURE_REGION=$(yq -r .platform.azure.region "${SHARED_DIR}/install-config.yaml")
 # shellcheck disable=SC2016
 yq --arg name "${RESOURCE_GROUP}" -i -y '.platform.azure.resourceGroupName=$name' "${SHARED_DIR}/install-config.yaml"
 
-if [[ -f "${CLUSTER_PROFILE_DIR}/cloud_name" ]]; then
-  cloud_name=$(< "${CLUSTER_PROFILE_DIR}/cloud_name")
-else
-  cloud_name="PPE"
-fi
-
-if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
-  cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
-  cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
-  export REQUESTS_CA_BUNDLE=/tmp/ca.pem
-fi
-
-az cloud register \
-    -n ${cloud_name} \
-    --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
-    --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
-az cloud set -n ${cloud_name}
-az cloud update --profile 2019-03-01-hybrid
-az login --service-principal -u "$APP_ID" -p "$AAD_CLIENT_SECRET" --tenant "$TENANT_ID" > /dev/null
+# Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
+chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
+${SHARED_DIR}/azurestack-login-script.sh
 
 az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
 
