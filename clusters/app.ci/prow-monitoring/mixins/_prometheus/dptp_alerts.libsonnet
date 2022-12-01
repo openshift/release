@@ -188,6 +188,24 @@
         ],
       },
       {
+        name: 'pod-scaler-admission-memory-warning',
+        rules: [
+          {
+            alert: 'pod-scaler-admission-memory-warning',
+            expr: |||
+             sum by (workload_name, workload_type, determined_memory, configured_memory) (increase(pod_scaler_admission_high_determined_memory{workload_type!="undefined"}[5m])) > 0
+            |||,
+            'for': '1m',
+            labels: {
+              severity: 'warning',
+            },
+            annotations: {
+              message: 'Workload {{ $labels.workload_name }} ({{ $labels.workload_type }}) used 10x more than configured amount of memory (actual: {{ $labels.determined_memory }}, configured: {{ $labels.configured_memory }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',
+            },
+          }
+        ],
+      },
+      {
         name: 'openshift-mirroring-failures',
         rules: [
           {
