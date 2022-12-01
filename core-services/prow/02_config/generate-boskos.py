@@ -180,7 +180,6 @@ CONFIG = {
     },
     'powervs-quota-slice': {
         'syd04': 1,
-        'syd05': 1,
         'tor01': 1,
         'tok04': 1
     },
