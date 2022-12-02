@@ -22,13 +22,10 @@ images:
 - dockerfile_path: graph-data.rs/Dockerfile
   to: graphdata-unittests
 - dockerfile_literal: |-
-    FROM source AS build
-    COPY . /src
-    
     FROM scratch
-    COPY --from=build /src/blocked-edges /blocked-edges
-    COPY --from=build /src/channels /channels
-    COPY --from=build /src/raw /raw
+    COPY /src/blocked-edges /blocked-edges
+    COPY /src/channels /channels
+    COPY /src/raw /raw
     USER 1000:1000
     ENV PATH /
     ENV HOME /
@@ -36,8 +33,9 @@ images:
     ENTRYPOINT ["/this-image-is-not-executable"]
   inputs:
     src:
-      as:
-        - source
+      paths:
+        - destination_dir: '/src'
+          source_path: '/go/src/github.com/openshift/cincinnati-graph-data'
   to: graph-data
 promotion:
   excluded_images:
