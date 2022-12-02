@@ -111,8 +111,10 @@ function disable_default_catalogsource () {
 
 # this func only used when the cluster not set the Proxy registy, such as C2S, SC2S clusters
 function mirror_optional_images () {
-    mirror_auths="${SHARED_DIR}/mirror_auths"
-    run_command "oc adm catalog mirror -a ${mirror_auths} ${mirror_index_image} ${MIRROR_REGISTRY_HOST} --continue-on-error --to-manifests=/tmp/olm_mirror"; ret=$?
+    registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
+    jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > /tmp/new-dockerconfigjson
+    ret=0
+    run_command "oc adm catalog mirror -a \"/tmp/new-dockerconfigjson\" ${mirror_index_image} ${MIRROR_REGISTRY_HOST} --continue-on-error --to-manifests=/tmp/olm_mirror" || ret=$?
     if [[ $ret -eq 0 ]]; then
         echo "mirror optional operators' images successfully"
     else
@@ -331,15 +333,19 @@ fi
 echo "MIRROR_REGISTRY_HOST: ${MIRROR_REGISTRY_HOST}"
 echo "MIRROR_PROXY_REGISTRY_QUAY: ${MIRROR_PROXY_REGISTRY_QUAY}"
 echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
-set_cluster_auth
+
 set_CA_for_nodes
 # get cluster Major.Minor version
 ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+
 if [ $mirror -eq 1 ]; then
     unset_proxy
     mirror_optional_images
     set_proxy
+else
+    # no need to set auth for the MIRROR_REGISTRY_HOST
+    set_cluster_auth
 fi 
 
 create_settled_icsp
