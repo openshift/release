@@ -33,6 +33,8 @@ images:
     FROM src
     RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
         curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        sh -c 'echo -e "[rhel8.6-baseos]\nname=rhel8.6-baseos\nbaseurl=http://download-node-02.eng.bos.redhat.com/rhel-8/rel-eng/RHEL-8/latest-RHEL-8.6/compose/BaseOS/x86_64/os\nenabled=1\ngpgcheck=1" >/etc/yum.repos.d/rhel8.6-baseos.repo' && \
+        sh -c 'echo -e "[rhel8.6-appstream]\nname=rhel8.6-appstream\nbaseurl=https://download-node-02.eng.bos.redhat.com/rhel-8/rel-eng/RHEL-8/latest-RHEL-8.6/compose/AppStream/x86_64/os\nenabled=1\ngpgcheck=1" >/etc/yum.repos.d/rhel8.6-appstream.repo' && \
         PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && \
         yum clean all && rm -rf /var/cache/yum/*
@@ -48,6 +50,8 @@ images:
 - dockerfile_literal: |
     FROM bin
     RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
+        sh -c 'echo -e "[rhel-8-baseos]\nid=rhel-8-baseos\nname=rhel-8-baseos\nbaseurl=http://base-4-12-rhel8.ocp.svc/rhel-8-baseos\nenabled=1\ngpgcheck=0" >/etc/yum.repos.d/rhel-8-baseos.repo' && \
+        sh -c 'echo -e "[rhel-8-appstream]\nid=rhel-8-appstream\nrhel-8-appstream\nbaseurl=http://base-4-12-rhel8.ocp.svc/rhel-8-appstream\nenabled=1\ngpgcheck=0" >/etc/yum.repos.d/rhel-8-appstream.repo' && \
         PACKAGES="azure-cli openssh-clients httpd-tools skopeo" && \
         yum update -y && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && yum clean all && rm -rf /var/cache/yum/* && \
