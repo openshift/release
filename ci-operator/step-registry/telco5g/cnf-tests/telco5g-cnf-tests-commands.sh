@@ -26,6 +26,26 @@ sriov "Allow access only to a specific port/protocol SCTP"
 # since we run them in parallel we can't run this test.
 sctp "Allow access only to a specific port/protocol SCTP"
 
+# SKIPTEST
+# bz### this tests takes too long - between 10 to 15 minutes
+# TESTNAME
+sriov "should work when vfs are used by pods"
+
+# SKIPTEST
+# bz### this tests takes too long - between 7 to 10 minutes
+# TESTNAME
+sriov "Should inject downward api volume with no labels present"
+
+# SKIPTEST
+# bz### this tests takes too long - between 8 to 16 minutes
+# TESTNAME
+sriov "on bond over sriov interfaces should start"
+
+# SKIPTEST
+# bz### this tests takes too long - between 7 to 9 minutes
+# TESTNAME
+sriov "Should support jumbo frames"
+
 EOF
 }
 
