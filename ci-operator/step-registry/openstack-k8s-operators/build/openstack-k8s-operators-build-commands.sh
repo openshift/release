@@ -42,7 +42,7 @@ REGISTRY_SECRET=push-quay-secret
 oc create secret generic ${REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/docker/config.json --type=kubernetes.io/dockerconfigjson
 
 # Build operator
-IMAGE_TAG_BASE=${OS_REGISTRY}/${OS_NAMESPACE}/${BASE}
+IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${BASE}
 export VERSION=0.0.1
 export IMG=$IMAGE_TAG_BASE:${PR_SHA}
 
