@@ -1,0 +1,84 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hypershift-workload-sa
+  namespace: clusters
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hypershift-admin
+  namespace: clusters
+rules:
+- apiGroups:
+  - hypershift.openshift.io
+  resources:
+  - hostedclusters
+  - nodepools
+  verbs:
+  - get
+  - create
+  - delete
+  - list
+  - update
+  - patch
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - create
+  - delete
+  - list
+  - update
+  - patch
+  - deletecollection
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hypershift-workload-rolebinding
+  namespace: clusters
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: hypershift-admin
+subjects:
+  - kind: ServiceAccount
+    namespace: clusters
+    name: hypershift-workload-sa
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: hypershift-oidc-discovery
+  namespace: kube-public
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: hypershift-workload-rolebinding-oidc
+  namespace: kube-public
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: hypershift-oidc-discovery
+subjects:
+  - kind: ServiceAccount
+    namespace: clusters
+    name: hypershift-workload-sa
