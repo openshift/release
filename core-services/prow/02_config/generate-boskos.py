@@ -79,6 +79,9 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
+   'azurestack-qe-quota-slice': {
+        'mtcazs': 2
+    },
     'azuremag-quota-slice': {
         'usgovvirginia': 5
     },
