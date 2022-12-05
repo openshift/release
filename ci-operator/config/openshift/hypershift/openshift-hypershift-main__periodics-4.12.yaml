@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.10"
+    name: "4.12"
     namespace: ocp
     tag: base
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
@@ -46,10 +46,6 @@ releases:
       product: ocp
       stream: nightly
       version: "4.12"
-  previous:
-    release:
-      channel: stable
-      version: "4.11"
 resources:
   '*':
     limits:
@@ -62,9 +58,6 @@ tests:
 - as: e2e-aws-periodic
   cron: 0 */6 * * *
   steps:
-    env:
-      HYPERSHIFT_NODE_COUNT: "1"
-      INSTANCE_TYPE: m5.4xlarge
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-ovn-periodic-conformance-serial
   cron: 0 1 * * *
@@ -76,23 +69,11 @@ tests:
   cron: 0 2 * * *
   steps:
     workflow: hypershift-aws-conformance
-- as: conformance-azure-ovn
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: azure4
-    workflow: hypershift-azure-conformance
 - as: conformance-aws-ovn-proxy
   cron: 0 3 * * *
   steps:
     cluster_profile: aws
     workflow: hypershift-aws-conformance-proxy
-- as: e2e-conformance-kubevirt
-  cron: 0 4 * * *
-  steps:
-    cluster_profile: azure4
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:previous
-    workflow: hypershift-kubevirt-conformance
 - as: e2e-powervs-periodic
   cron: 0 4 * * *
   steps:
