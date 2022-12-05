@@ -6,8 +6,12 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+prefix="ci-rosa-s"
+if [[ "$HOSTED_CP" == "true" ]]; then
+  prefix="ci-rosa-h"
+fi
 subfix=$(openssl rand -hex 2)
-CLUSTER_NAME=${CLUSTER_NAME:-"ci-rosa-s-$subfix"}
+CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
 COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP}
@@ -15,6 +19,7 @@ MULTI_AZ=${MULTI_AZ:-false}
 ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
 ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
+HOSTED_CP=${HOSTED_CP:-false}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 
 ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
@@ -99,11 +104,11 @@ if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
 fi
 
-COMPUTER_NODES_SWITCH=""
+COMPUTE_NODES_SWITCH=""
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
-  COMPUTER_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
 else
-  COMPUTER_NODES_SWITCH="--compute-nodes ${COMPUTE_NODES}"
+  COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
 fi
 
 ETCD_ENCRYPTION_SWITCH=""
@@ -116,8 +121,20 @@ if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]]; then
   DISABLE_WORKLOAD_MONITORING_SWITCH="--disable-workload-monitoring"
 fi
 
+HYPERSHIFT_SWITCH=""
+if [[ "$HOSTED_CP" == "true" ]]; then
+  PUBLIC_SUBNET_ID=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
+  PRIVATE_SUBNET_ID=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  if [[ -z "${PUBLIC_SUBNET_ID}" ]] || [[ -z "${PRIVATE_SUBNET_ID}" ]]; then
+    echo -e "The public_subnet_id and the the privated_subnet_id are mandatory."
+    exit 1
+  fi
+  HYPERSHIFT_SWITCH="--hosted-cp --subnet-ids ${PUBLIC_SUBNET_ID},${PRIVATE_SUBNET_ID}"
+fi
+
 echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
+echo "  Enable hypershift: ${HOSTED_CP}"
 echo "  Account roles prefix: ${ACCOUNT_ROLES_PREFIX}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
@@ -131,7 +148,7 @@ if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Min replicas: ${MIN_REPLICAS}"
   echo "  Min replicas: ${MAX_REPLICAS}"  
 else
-  echo "  Cluster nodes: ${COMPUTE_NODES}"
+  echo "  Replicas: ${REPLICAS}"
 fi
 
 echo -e "
@@ -147,9 +164,10 @@ rosa create cluster -y \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
 ${MULTI_AZ_SWITCH} \
-${COMPUTER_NODES_SWITCH} \
+${COMPUTE_NODES_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
-${DISABLE_WORKLOAD_MONITORING_SWITCH}
+${DISABLE_WORKLOAD_MONITORING_SWITCH} \
+${HYPERSHIFT_SWITCH}
 "
 
 mkdir -p "${SHARED_DIR}"
@@ -170,9 +188,10 @@ rosa create cluster -y \
                     --channel-group ${CHANNEL_GROUP} \
                     --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
                     ${MULTI_AZ_SWITCH} \
-                    ${COMPUTER_NODES_SWITCH} \
+                    ${COMPUTE_NODES_SWITCH} \
                     ${ETCD_ENCRYPTION_SWITCH} \
                     ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
+                    ${HYPERSHIFT_SWITCH} \
                     > "${CLUSTER_INFO}"
 
 # Store the cluster ID for the post steps and the cluster deprovision
