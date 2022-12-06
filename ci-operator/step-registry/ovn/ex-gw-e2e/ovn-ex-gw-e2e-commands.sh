@@ -9,6 +9,7 @@ echo "************ ovn external gateways e2e commands ************"
 unsupported_versions=("4.8" "4.9" "4.10" "4.11") # ipv4-metal-ipi was added since 4.8, exgw e2e support 4.12+
 version="master"
 PULL_BASE_REF=${PULL_BASE_REF:-"master"}
+echo "### PULL_BASE_REF is ${PULL_BASE_REF}"
 if [ ${PULL_BASE_REF} != "master" ]
 then
         version=${PULL_BASE_REF##release-}
@@ -30,7 +31,7 @@ if [ -d "${OVNK_SRC_DIR}" ]; then
 fi
 
 echo "### Creating script"
-cat <<'EOF' >>ovnk-ex-gw-e2e.sh
+cat <<'EOF' >>/tmp/ovnk-ex-gw-e2e.sh
 #!/usr/bin/bash
 
 source common.sh
@@ -90,10 +91,10 @@ export OVN_TEST_EX_GW_NETWORK=host
 make control-plane WHAT="e2e non-vxlan external gateway through a gateway pod"
 EOF
 
-chmod +x ovnk-ex-gw-e2e.sh
+chmod +x /tmp/ovnk-ex-gw-e2e.sh
 
 echo "### Copying E2E script to dev-scripts"
-scp "${SSHOPTS[@]}" -r "ovnk-ex-gw-e2e.sh" "root@${IP}:/root/dev-scripts/"
+scp "${SSHOPTS[@]}" -r "/tmp/ovnk-ex-gw-e2e.sh" "root@${IP}:/root/dev-scripts/"
 
 echo "### Running external gateways E2E on remote host"
 ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/ && ./ovnk-ex-gw-e2e.sh"
