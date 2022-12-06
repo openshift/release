@@ -1,0 +1,123 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.15-openshift-4.8
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.13
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+  tools:
+    name: "4.13"
+    namespace: ocp
+    tag: tools
+build_root:
+  from_repository: true
+images:
+- dockerfile_literal: |-
+    FROM src
+    RUN git clone \
+        --branch master \
+        https://github.com/openshift/origin.git \
+        /go/src/github.com/openshift/origin
+    WORKDIR /go/src/github.com/openshift/origin
+    RUN git show-ref refs/remotes/origin/HEAD && \
+        rm -rf vendor/github.com/openshift/library-go && \
+        cp -rf /go/src/github.com/openshift/library-go vendor/github.com/openshift
+  from: src
+  to: origin-src
+- dockerfile_literal: |-
+    FROM origin
+    RUN make build
+  from: origin-src
+  to: origin-bin
+- dockerfile_path: origin/images/tests/Dockerfile.rhel
+  from: tools
+  inputs:
+    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    origin-src:
+      paths:
+      - destination_dir: /go/src/github.com/openshift/origin
+        source_path: /go/src/github.com/openshift/origin
+  to: tests
+- dockerfile_literal: |-
+    FROM src
+    RUN git clone \
+        --branch master \
+        https://github.com/openshift/cluster-kube-apiserver-operator.git \
+        /go/src/github.com/openshift/cluster-kube-apiserver-operator
+    WORKDIR /go/src/github.com/openshift/cluster-kube-apiserver-operator
+    RUN git show-ref refs/remotes/cluster-kube-apiserver-operator/HEAD && \
+        rm -rf vendor/github.com/openshift/library-go && \
+        cp -rf /go/src/github.com/openshift/library-go vendor/github.com/openshift
+  from: src
+  to: cluster-kube-apiserver-operator-src
+- dockerfile_literal: |-
+    FROM origin
+    RUN make build --warn-undefined-variables
+  from: cluster-kube-apiserver-operator-src
+  to: cluster-kube-apiserver-operator-bin
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    cluster-kube-apiserver-operator-src:
+      paths:
+      - destination_dir: /go/src/github.com/openshift/origin
+        source_path: /go/src/github.com/openshift/origin
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+  to: cluster-kube-apiserver-operator
+releases:
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 8Gi
+tests:
+- as: origin-unit
+  commands: GOTEST_FLAGS='-p 8' hack/test-go.sh
+  container:
+    from: origin-src
+    memory_backed_volume:
+      size: 4Gi
+- as: origin-verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: origin-bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: origin-src
+- as: e2e-aws-ovn
+  optional: true
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-ovn
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: library-go
+  variant: bump
