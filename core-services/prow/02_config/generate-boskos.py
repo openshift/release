@@ -204,6 +204,9 @@ CONFIG = {
     'alibabacloud-cn-qe-quota-slice': {
         'us-east-1': 10,
     },
+    'hypershift-hive-quota-slice': {
+        'default': 80
+    }
 }
 
 for i in range(3):
