@@ -15,21 +15,20 @@ build_root:
     tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
 - dockerfile_literal: |
-    FROM registry.access.redhat.com/ubi9
+    FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.18-openshift-4.12
     USER root
-    RUN yum install -y gcc git jq make && \
-        yum clean all && rm -rf /var/cache/dnf/*
-    RUN mkdir -p $GOCACHE /.cache
-    RUN chmod -R 777 /go /.cache
-    ENV GOPATH=/go GOCACHE=/go/src/.cache GO111MODULE=on
-    RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
-    RUN cp ./kustomize /usr/local/bin
-    RUN curl -s -L "https://github.com/operator-framework/operator-registry/releases/latest/download/linux-amd64-opm" -o opm
-    RUN chmod +x ./opm
-    RUN cp ./opm /usr/local/bin
+    RUN yum install -y gcc git jq make python39 python39-pip && \
+    yum clean all && rm -rf /var/cache/dnf/*
+    RUN alternatives --set python3 /usr/bin/python3.9
+    RUN pip3 install python-openstackclient
     RUN curl -s -L "https://github.com/operator-framework/operator-sdk/releases/latest/download/operator-sdk_linux_amd64" -o operator-sdk
     RUN chmod +x ./operator-sdk
-    RUN cp ./operator-sdk /usr/local/bin
+    RUN mv ./operator-sdk /usr/local/bin
+    RUN curl -s -L "https://github.com/operator-framework/operator-registry/releases/latest/download/linux-amd64-opm" -o opm
+    RUN chmod +x ./opm
+    RUN mv ./opm /usr/local/bin
+    RUN curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
+    RUN mv ./kustomize /usr/local/bin
     RUN curl -s -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /usr/local/bin oc
     RUN chmod +x /usr/local/bin/oc
   from: src
