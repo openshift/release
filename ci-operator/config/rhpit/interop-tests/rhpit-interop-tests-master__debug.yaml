@@ -1,0 +1,55 @@
+base_images:
+  ansible:
+    name: "4.12"
+    namespace: ocp
+    tag: ansible
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: openstack-installer
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.12"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: interop-debug-git-clone
+  interval: 960h
+  steps:
+    cluster_profile: aws-cspi-qe
+    test:
+    - as: test
+      commands: |
+        set -x
+        cat /etc/os-release
+        sudo yum install git -y
+        git clone https://gitlab.cee.redhat.com/migrationqe/oadp-qe-automation.git
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+zz_generated_metadata:
+  branch: master
+  org: rhpit
+  repo: interop-tests
+  variant: debug
