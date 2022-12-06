@@ -58,6 +58,7 @@ spec:
       min_perf_pct=100
 
       [service]
+      service.chronyd=stop,disable
       $stalld_service
 
       [vm]
