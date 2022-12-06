@@ -4678,7 +4678,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 0,3,6,9,12,15,18,21 * * *
+  cron: 0 0,6,12,18 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -5123,6 +5123,82 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 1,7,13,19 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  labels:
+    ci-operator.openshift.io/cloud: powervs
+    ci-operator.openshift.io/cloud-cluster-profile: powervs
+    ci-operator.openshift.io/cluster: build01
+    ci-operator.openshift.io/variant: nightly-4.12
+    ci.openshift.io/generator: prowgen
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.12-ocp-e2e-serial-ovn-ppc64le-powervs
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/ocp-e2e-serial-ovn-ppc64le-powervs-cluster-profile
+      - --target=ocp-e2e-serial-ovn-ppc64le-powervs
+      - --variant=nightly-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/ocp-e2e-serial-ovn-ppc64le-powervs-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-powervs
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -7318,7 +7394,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 0,3,6,9,12,15,18,21 * * *
+  cron: 0 2,8,14,20 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7771,7 +7847,83 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 43 4 26 * *
+  cron: 0 3,9,15,21 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: multiarch
+  labels:
+    ci-operator.openshift.io/cloud: powervs
+    ci-operator.openshift.io/cloud-cluster-profile: powervs
+    ci-operator.openshift.io/cluster: build01
+    ci-operator.openshift.io/variant: nightly-4.13
+    ci.openshift.io/generator: prowgen
+    job-release: "4.13"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-multiarch-master-nightly-4.13-ocp-e2e-serial-ovn-ppc64le-powervs
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/ocp-e2e-serial-ovn-ppc64le-powervs-cluster-profile
+      - --target=ocp-e2e-serial-ovn-ppc64le-powervs
+      - --variant=nightly-4.13
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/ocp-e2e-serial-ovn-ppc64le-powervs-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-powervs
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 30 13 10 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -8225,7 +8377,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 15 15 29 * *
+  cron: 10 14 15 * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -8527,7 +8679,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 19 18 24 * *
+  cron: 20 20 17 * *
   decorate: true
   decoration_config:
     skip_cloning: true
