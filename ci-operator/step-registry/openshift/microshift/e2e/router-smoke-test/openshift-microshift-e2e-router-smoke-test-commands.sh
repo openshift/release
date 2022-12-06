@@ -99,18 +99,25 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
 
 
 IP=$(LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances describe "${INSTANCE_PREFIX}" --format='value(networkInterfaces.accessConfigs[0].natIP)')
-set +x
+set +e
 RESPONSE=$(curl -vk http://hello-microshift.cluster.local --resolve "hello-microshift.cluster.local:80:${IP}" 2>&1)
 RESULT=$?
 echo "${RESPONSE}"
 
 if [ $RESULT -ne 0 ] || ! echo "${RESPONSE}" | grep -q -E "HTTP.*200 OK"; then
+  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+    --quiet \
+    --project "${GOOGLE_PROJECT_ID}" \
+    --zone "${GOOGLE_COMPUTE_ZONE}" \
+    --recurse /tmp/validate-microshift "rhel8user@${INSTANCE_PREFIX}:~/validate-microshift"
+
   LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
     --project "${GOOGLE_PROJECT_ID}" \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     "rhel8user@${INSTANCE_PREFIX}" \
-    --command "oc describe pod hello-microshift; echo; oc logs hello-microshift; echo; oc get events -A"
-    exit 1
+    --command "bash ~/validate-microshift/cluster-debug-info.sh"
+
+  exit 1
 fi
 
 exit 0
