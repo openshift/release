@@ -116,7 +116,7 @@ function mirror_optional_images () {
     ret=0
     # Running Command: oc adm catalog mirror -a "/tmp/new-dockerconfigjson" ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12 ec2-3-90-59-26.compute-1.amazonaws.com:5000 --continue-on-error --to-manifests=/tmp/olm_mirror
     # error: unable to read image ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12: Get "https://ec2-3-90-59-26.compute-1.amazonaws.com:5000/v2/": x509: certificate signed by unknown authority
-    run_command "oc adm catalog mirror  --insecure=true  --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${mirror_index_image} ${MIRROR_REGISTRY_HOST} --continue-on-error --to-manifests=/tmp/olm_mirror" || ret=$?
+    run_command "oc adm catalog mirror  --insecure=true  --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${origin_index_image} ${MIRROR_REGISTRY_HOST} --continue-on-error --to-manifests=/tmp/olm_mirror" || ret=$?
     if [[ $ret -eq 0 ]]; then
         echo "mirror optional operators' images successfully"
     else
@@ -340,6 +340,7 @@ echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 set_CA_for_nodes
 # get cluster Major.Minor version
 ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
 mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
 
 if [ $mirror -eq 1 ]; then
