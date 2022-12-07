@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -o nounset
 set -o errexit
 set -o pipefail
 
@@ -58,7 +59,7 @@ always_default="${!latest_defined}"
 declare "v${ocp_major_version}${ocp_minor_version}"
 v_current_version="v${ocp_major_version}${ocp_minor_version}"
 
-if [[ ${!v_current_version} == "" ]]; then
+if [[ ${!v_current_version:-} == "" ]]; then
   echo "vCurrent: No default value for ${v_current_version}, use default value from ${latest_defined}: ${!latest_defined}"
   vCurrent=${always_default}
 else
