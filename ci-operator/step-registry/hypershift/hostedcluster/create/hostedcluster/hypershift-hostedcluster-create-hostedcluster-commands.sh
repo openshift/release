@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
-DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
-
 echo Generating pull secret to current build farm
 oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
 echo "Set KUBECONFIG to Hive cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
-if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then
-  AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
-  DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
+AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ ! -f "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" ]]; then
+  echo "AWS credentials file ${AWS_GUEST_INFRA_CREDENTIALS_FILE} not found"
+  exit 1
 fi
-DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
+DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-""}
+if [[ -z "${DOMAIN}" ]]; then
+  echo "HYPERSHIFT_BASE_DOMAIN must be set"
+  exit 1
+fi
+
 RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 
 # We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
