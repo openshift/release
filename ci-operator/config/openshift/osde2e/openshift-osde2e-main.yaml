@@ -53,6 +53,28 @@ tests:
   - mount_path: /usr/local/sd-cicd-aws-prod
     name: sd-cicd-aws-prod
   skip_if_only_changed: ^(?:docs|\.github)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+- as: rosa-stage-mcvw
+  run_if_changed: pkg/e2e/webhooks
+  commands: |
+    export GOFLAGS=""
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="hypershift"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage,/usr/local/osde2e-hypershift-byovpc"
+
+    make build
+
+    out/osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS} --focus-tests "Managed Cluster Validating Webhooks"
+  container:
+    from: src
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-rosa-stage
+    name: osde2e-rosa-stage
+  - mount_path: /usr/local/osde2e-hypershift-byovpc
+    name: osde2e-hypershift-byovpc
 - as: aro-ovn-e2e-default
   cron: 0 0 9 * * *
   steps:
