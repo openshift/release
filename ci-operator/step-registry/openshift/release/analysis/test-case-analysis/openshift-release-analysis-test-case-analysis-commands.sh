@@ -176,3 +176,19 @@ job-run-aggregator analyze-test-case \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP}
 set -e
+
+echo
+echo "********** Starting testcase analysis for aws proxy jobs"
+echo
+set +e
+job-run-aggregator analyze-test-case \
+	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
+	--payload-tag=${PAYLOAD_TAG} \
+	--platform=aws \
+	--include-job-names=proxy \
+	--minimum-successful-count=1 \
+	--job-start-time=${JOB_START_TIME} \
+	--working-dir=${ARTIFACT_DIR}/aws-proxy \
+	--timeout=4h30m \
+	--test-group=${TEST_GROUP}
+set -e
