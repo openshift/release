@@ -19,6 +19,11 @@ fi
 if [[ "$CONFIG_TYPE" == "proxy" ]]; then
     BASTION_FIP=$(<"${SHARED_DIR}/BASTION_FIP")
     BASTION_USER=$(<"${SHARED_DIR}/BASTION_USER")
+else
+    if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        echo "This job uses a proxy but without a bastion, gathering is not supported yet, see CORS-2367"
+        exit 0
+    fi
 fi
 
 collect_bootstrap_logs() {
