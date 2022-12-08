@@ -18,6 +18,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
+if [ -z "${AUX_HOST}" ]; then
+    echo "AUX_HOST is not filled. Failing."
+    exit 1
+fi
+
 # The hostname of nodes and the cluster names have limited length for BM.
 # Other profiles add to the cluster_name the suffix "-${JOB_NAME_HASH}".
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"

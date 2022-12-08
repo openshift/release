@@ -108,6 +108,14 @@ releases:
       product: ocp
       stream: nightly
       version: "4.12"
+  oldest-supported-credentials-request:
+    release:
+      channel: candidate
+      version: 4.12.0-rc.0
+  oldest-supported-z-rollback:
+    release:
+      channel: candidate
+      version: 4.12.0-rc.0
 resources:
   '*':
     requests:
@@ -267,6 +275,7 @@ tests:
     env:
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v6
+        MASTER_MEMORY=24576
         NUM_WORKERS=0
     workflow: baremetalds-e2e
 - as: e2e-aws-ovn-proxy
@@ -460,6 +469,25 @@ tests:
       COMPUTE_NODE_TYPE: n2-standard-8
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp-realtime
+- as: e2e-aws-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
+- as: credentials-request-freeze
+  interval: 48h
+  steps:
+    dependencies:
+      OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
+      OPENSHIFT_LATEST_RELEASE_IMAGE: release:latest
+    workflow: openshift-credentials-request-freeze
 - as: e2e-aws-sdn-upgrade
   interval: 24h
   steps:
@@ -643,7 +671,7 @@ tests:
     workflow: ipi-aws
 - as: e2e-telco5g
   cluster: build05
-  cron: 21 3 */1 * 1-5
+  cron: 02 6 */1 * 1-5
   steps:
     env:
       E2E_TESTS_CONFIG: |
@@ -694,6 +722,32 @@ tests:
   steps:
     cluster_profile: azurestack
     workflow: openshift-e2e-azurestack-upi
+- as: e2e-nutanix
+  cluster: build01
+  interval: 24h
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
+- as: e2e-aws-ovn-etcd-scaling
+  interval: 24h
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-etcd-scaling
+- as: e2e-gcp-ovn-etcd-scaling
+  interval: 24h
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-etcd-scaling
+- as: e2e-azure-ovn-etcd-scaling
+  interval: 24h
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-etcd-scaling
+- as: e2e-vsphere-ovn-etcd-scaling
+  interval: 24h
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-etcd-scaling
 zz_generated_metadata:
   branch: master
   org: openshift

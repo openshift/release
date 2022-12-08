@@ -65,44 +65,6 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: managed-gitops-e2e-tests-on-kcp
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h30m0s
-    version: "4.11"
-  steps:
-    test:
-    - as: managed-gitops-e2e-tests-on-kcp
-      cli: latest
-      commands: |
-        export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-e2e-tests-on-kcp-hive-admin-kubeconfig/kubeconfig"
-        git clone https://github.com/openshift-pipelines/pipeline-service.git
-        pushd pipeline-service/
-        git checkout feb7a522e7e47af3670bde9a58ddef958e9bff1e
-        kcp_version="$(yq '.images[] | select(.name == "kcp") | .newTag' "developer/ckcp/openshift/overlays/dev/kustomization.yaml")"
-        echo "kcp version:" $kcp_version
-        popd
-        mkdir install-kcp-plugin
-        pushd install-kcp-plugin
-        git clone https://github.com/kcp-dev/kcp.git -b $kcp_version
-        pushd kcp/ && go mod vendor && make install
-        kubectl-kcp --version
-        popd
-        popd
-        export ADMIN_KUBECONFIG="/secrets/managed-gitops-e2e-tests-on-kcp-hive-admin-kubeconfig/kubeconfig"
-        echo "\n\nStart ckcp setup ..."
-        make download-deps
-        make kcp-test-local-e2e
-        killall kubectl
-        killall goreman
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio

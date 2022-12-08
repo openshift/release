@@ -6,15 +6,15 @@ base_images:
   cert-manager-cainjector:
     name: cert-manager-cainjector
     namespace: ci
-    tag: v1.8.0
+    tag: v1.9.1
   cert-manager-controller:
     name: cert-manager-controller
     namespace: ci
-    tag: v1.8.0
+    tag: v1.9.1
   cert-manager-webhook:
     name: cert-manager-webhook
     namespace: ci
-    tag: v1.8.0
+    tag: v1.9.1
   ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
@@ -37,13 +37,13 @@ operator:
     context_dir: bundle/
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: registry-proxy.engineering.redhat.com/rh-osbs/cert-manager-cert-manager-operator-rhel8:latest
+  - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller:v1.8.0
+  - pullspec: quay.io/jetstack/cert-manager-controller:v1.9.1
     with: cert-manager-controller
-  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.8.0
+  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.9.1
     with: cert-manager-webhook
-  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.8.0
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.9.1
     with: cert-manager-cainjector
 promotion:
   disabled: true
@@ -77,7 +77,7 @@ tests:
     from: src
 - as: unit
   commands: |
-    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+    make test --warn-undefined-variables
   container:
     from: src
 - as: e2e-operator
@@ -87,9 +87,9 @@ tests:
       OO_INDEX: ci-index-cert-manager-operator-bundle
     env:
       OO_CHANNEL: tech-preview
-      OO_INSTALL_NAMESPACE: openshift-cert-manager-operator
+      OO_INSTALL_NAMESPACE: cert-manager-operator
       OO_PACKAGE: cert-manager-operator
-      OO_TARGET_NAMESPACES: '!all'
+      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: test
       cli: latest

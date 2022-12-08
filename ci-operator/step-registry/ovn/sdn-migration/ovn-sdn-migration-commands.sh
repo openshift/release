@@ -53,8 +53,13 @@ oc wait co network --for='condition=PROGRESSING=True' --timeout=30s
 timeout 300s oc rollout status ds/multus -n openshift-multus
 
 # Reboot all the nodes
+readarray -t POD_NODES <<< "$(oc get pod -n openshift-machine-config-operator -o wide| grep daemon|awk '{print $1" "$7}')"
 
-oc get pod -n openshift-machine-config-operator | grep daemon|awk '{print $1}'|xargs -i oc rsh -n openshift-machine-config-operator {} chroot /rootfs shutdown -r +1
+for i in "${POD_NODES[@]}"
+do
+    read -r POD NODE <<< "$i"
+    until oc rsh -n openshift-machine-config-operator "$POD" chroot /rootfs shutdown -r +1; do echo "cannot reboot node $NODE, retry"&&sleep 3; done
+done 
 
 # Wait until all nodes reboot and the api-server is unreachable.
 sleep 65

@@ -33,7 +33,12 @@ EOF
 function create_tests_temp_skip_list_11 {
 # List of temporarly skipped tests for 4.11
 cat <<EOF >>"${SKIP_TESTS_FILE}"
-# Nothing to skip for 4.11
+# <feature> <test name>
+
+# SKIPTEST
+# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
+# TESTNAME
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
 EOF
 }
 
@@ -72,6 +77,21 @@ performance "should run infra containers on reserved CPUs"
 # PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
 # TESTNAME
 performance "Huge pages support for container workloads"
+
+# SKIPTEST
+# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
+# TESTNAME
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/CNF-6862
+# TESTNAME
+performance "Checking IRQBalance settings Verify irqbalance configuration handling Should not overwrite the banned CPU set on tuned restart"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/CNF-6862
+# TESTNAME
+performance "Checking IRQBalance settings Verify irqbalance configuration handling Should store empty cpu mask in the backup"
 
 EOF
 }
@@ -338,4 +358,36 @@ echo -e "${err_msg}\n"
 if [ -f "summary.txt" ]; then
     cat summary.txt
 fi
+
+# Create a HTML report
+for feature in ${FEATURES}; do
+    xml_f="${ARTIFACT_DIR}/${feature}/cnftests-junit.xml"
+    if [[ -f $xml_f ]]; then
+        cp $xml_f ${ARTIFACT_DIR}/cnftests-junit_${feature}.xml
+    fi
+    xml_v="${ARTIFACT_DIR}/${feature}/validation_junit.xml"
+    if [[ -f $xml_v ]]; then
+        cp $xml_v ${ARTIFACT_DIR}/validation_junit_${feature}.xml
+    fi
+    xml_s="${ARTIFACT_DIR}/${feature}/setup_junit.xml"
+    if [[ -f $xml_s ]]; then
+        cp $xml_s ${ARTIFACT_DIR}/setup_junit_${feature}.xml
+    fi
+done
+
+python3 -m venv ${SHARED_DIR}/myenv
+source ${SHARED_DIR}/myenv/bin/activate
+git clone https://github.com/sshnaidm/html4junit.git ${SHARED_DIR}/html4junit
+pip install -r ${SHARED_DIR}/html4junit/requirements.txt
+# Create HTML reports for humans/aliens
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.html
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
+python ${SHARED_DIR}/html4junit/j2html.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.html
+# Create JSON reports for robots
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.json
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.json
+python ${SHARED_DIR}/html4junit/junit2json.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.json
+
+rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
+
 exit ${exit_code}
