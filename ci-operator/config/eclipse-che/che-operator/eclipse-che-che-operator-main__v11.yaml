@@ -1,9 +1,6 @@
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
-images:
-- dockerfile_path: Dockerfile
-  to: che-operator-image
 releases:
   initial:
     integration:
@@ -31,9 +28,6 @@ tests:
     - as: operator-test
       cli: latest
       commands: /bin/bash build/scripts/oc-tests/oc-test-operator.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
       env:
       - name: TEST_SKIPS
       from: src
@@ -51,9 +45,6 @@ tests:
     - as: upgrade-stable-to-next
       cli: latest
       commands: /bin/bash build/scripts/oc-tests/oc-test-upgrade-from-stable-to-next.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
       env:
       - name: TEST_SKIPS
       from: src
@@ -73,9 +64,6 @@ tests:
       commands: |
         /bin/bash build/scripts/olm/testCatalogFromSources.sh -o ${CI_CHE_OPERATOR_IMAGE} --verbose
         /bin/bash build/scripts/oc-tests/oc-test-happy-path.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
       env:
       - name: TEST_SKIPS
       from: src
@@ -93,9 +81,6 @@ tests:
     - as: che-behind-proxy
       cli: latest
       commands: /bin/bash build/scripts/oc-tests/oc-test-operator.sh
-      dependencies:
-      - env: CI_CHE_OPERATOR_IMAGE
-        name: che-operator-image
       env:
       - name: TEST_SKIPS
       from: src
@@ -106,7 +91,7 @@ tests:
     workflow: openshift-e2e-aws-proxy
 - as: che-disconnected
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     env:
       TEST_SKIPS: ""
     test:
@@ -123,7 +108,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
 zz_generated_metadata:
   branch: main
   org: eclipse-che
