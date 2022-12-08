@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ci-grafana
+---
+apiVersion: integreatly.org/v1alpha1
+kind: Grafana
+metadata:
+  name: ci
+  namespace: ci-grafana
+spec:
+  client:
+    preferService: true
+  ingress:
+    enabled: true
+    pathType: Prefix
+    path: "/"
+  config:
+    log:
+      mode: "console"
+      level: "error"
+    log.frontend:
+      enabled: true
+    auth:
+      disable_login_form: true
+      disable_signout_menu: true
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+  service:
+    name: "grafana"
+    labels:
+      app: "grafana"
+  dashboardLabelSelector:
+  - matchExpressions:
+    - key: app
+      operator: In
+      values:
+        - grafana
+  resources:
+    limits:
+      cpu: 200m
+      memory: 200Mi
+    requests:
+      cpu: 100m
+      memory: 100Mi
