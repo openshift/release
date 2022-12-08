@@ -67,7 +67,28 @@ then
   . network.sh
   . utils.sh
 
-  ssh -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' core@\$BOOTSTRAP_PROVISIONING_IP TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap &&
+  # Pass master IPs to installer-gather script to collect info from nodes which didn't join the cluster
+  NODE_IPS=()
+  for (( n=0; n<\$NUM_MASTERS; n++ ))
+  do
+     node_name=\$(printf \$MASTER_HOSTNAME_FORMAT \$n)
+     node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//ip/dhcp[*]/host[@name='\${node_name}']/@ip)" -)
+     NODE_IPS+=("\$node_ip")
+  done
+  for (( n=0; n<\$NUM_WORKERS; n++ ))
+  do
+     node_name=\$(printf \$WORKER_HOSTNAME_FORMAT \$n)
+     node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//dns[*]/host/hostname[. = '\$node_name']/../@ip)" -)
+     NODE_IPS+=("\$node_ip")
+  done
+  for (( n=0; n<\$NUM_EXTRA_WORKERS; n++ ))
+  do
+     node_name="extraworker-%d"
+     node_ip=\$(sudo virsh net-dumpxml \$BAREMETAL_NETWORK_NAME | xmllint --xpath "string(//dns[*]/host/hostname[. = '\$node_name']/../@ip)" -)
+     NODE_IPS+=("\$node_ip")
+  done
+
+  ssh -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' core@\$BOOTSTRAP_PROVISIONING_IP TAR_FILE=/tmp/log-bundle-bootstrap.tar.gz sudo -E /usr/local/bin/installer-gather.sh --id bootstrap \${NODE_IPS[@]} &&
   scp -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' core@\$(wrap_if_ipv6 \$BOOTSTRAP_PROVISIONING_IP):/tmp/log-bundle-bootstrap.tar.gz /tmp/artifacts/log-bundle-bootstrap.tar.gz || true
 fi
 
