@@ -13,7 +13,7 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE="${SHARED_DIR}/alibabacreds.ini"
 oc registry login
 # extract alibabacloud credentials requests from the release image
 # shellcheck disable=SC2153
-REPO=$(oc -n ${NAMESPACE} get is release -o json | jq -r '.status.publicDockerImageRepository')
+REPO=$(oc -n ${NAMESPACE} get is release -o=jsonpath="{.status.publicDockerImageRepository}")
 oc --loglevel 10 adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --credentials-requests --cloud=alibabacloud --to="${CR_PATH}" "${REPO}:latest"
 
 # create required credentials infrastructure and installer manifests for workload identity
