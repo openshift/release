@@ -13,5 +13,5 @@ echo "### Gathering logs..."
 timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF
 cd dev-scripts
 make agent_gather
-scp agent-gather.tar.xz "${ARTIFACT_DIR}"
+cp agent-gather*.tar.xz "${ARTIFACT_DIR}"
 EOF
