@@ -14,15 +14,6 @@
       'configresolver.json': '703f0ccf02cc4339a374b52eb10f653b',
       'clusterpool.json': '22491886c1e19dde8d2984bca82154c1',
     },
-    buildCopSuccessRateTargets: {
-      'branch-.*-images': 100,
-      'release-.*-4.1': 80,
-      'release-.*-4.2': 80,
-      'release-.*-4.3': 80,
-      'release-.*-upgrade.*': 80,
-      'release-.*4.1.*4.2.*': 80,
-      'release-.*4.2.*4.3.*': 80,
-    },
     alertManagerReceivers: {
     },
   },
