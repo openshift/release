@@ -24,7 +24,9 @@ aws --region $REGION ec2 describe-images --owners aws-marketplace \
 
 # Get readable version from image, e.g. 4.8.49, 4.12.0-0.nightly-2022-09-05-090751
 oc registry login
-version=$(oc adm release info ${RELEASE_IMAGE_LATEST} -ojson | jq -r '.metadata.version')
+# shellcheck disable=SC2153
+REPO=$(oc -n ${NAMESPACE} get is release -o json | jq -r '.status.publicDockerImageRepository')
+version=$(oc adm release info ${REPO}:latest -ojson | jq -r '.metadata.version')
 image_name_prefix="rhcos-`echo ${version} | awk -F '.' '{print $1$2}'`" # e.g. rhcos-48, rhcos-412
 
 jq --arg v "$image_name_prefix" '.Images[] | select(.Name | startswith($v))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.Name) | last' > $selected_image

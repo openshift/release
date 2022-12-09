@@ -13,7 +13,9 @@ PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
 echo "> Extract gcp credentials requests from the release image"
 oc registry login
-oc adm release extract --credentials-requests --cloud=gcp --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
+# shellcheck disable=SC2153
+REPO=$(oc -n ${NAMESPACE} get is release -o json | jq -r '.status.publicDockerImageRepository')
+oc adm release extract --credentials-requests --cloud=gcp --to="/tmp/credrequests" "${REPO}:latest"
 
 echo "> Output gcp credentials requests to directory: /tmp/credrequests"
 ls "/tmp/credrequests"
