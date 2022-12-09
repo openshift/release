@@ -30,6 +30,7 @@ fi
 
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
+credentialsMode: Passthrough
 platform:
   gcp:
     projectID: ${GCP_PROJECT}
