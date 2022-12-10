@@ -2,7 +2,7 @@
 
 if [ "${LOCAL_TEST:=false}" != "false" ]; then
   # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
-  export N_MASTERS=1 N_WORKERS=1 IPI=true AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com
+  export masters=1 workers=1 IPI=true AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com
   # shellcheck disable=SC2155
   export NAMESPACE=test-ci-op SHARED_DIR=$(mktemp -d) CLUSTER_PROFILE_DIR=~/.ssh
 fi
@@ -28,7 +28,7 @@ fi
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
 
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${NAMESPACE}" "${N_MASTERS}" "${N_WORKERS}" "${IPI}" << 'EOF'
+  "${NAMESPACE}" "${masters}" "${workers}" "${IPI}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
