@@ -238,7 +238,7 @@ api_vip: $api_ip
 "
 echo $vips > external_vips.yaml
 
-docker restart "haproxy-$BUILD_ID"
+docker kill --signal HUP "haproxy-$BUILD_ID"
 
 EOF
 
