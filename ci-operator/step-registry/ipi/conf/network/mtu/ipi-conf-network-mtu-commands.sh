@@ -16,7 +16,9 @@ if [[ "${network_type}" == "" ]]; then
   # default
   cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
   oc registry login --to /tmp/pull-secret
-  ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+  # shellcheck disable=SC2153
+  REPO=$(oc -n ${NAMESPACE} get is release -o json | jq -r '.status.publicDockerImageRepository')
+  ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${REPO}:latest --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
   ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
   ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
   rm /tmp/pull-secret

@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: ci-alerts
+  namespace: ci
+spec:
+  groups:
+  - name: ci-absent
+    rules:
+    - alert: retesterDown
+      annotations:
+        message: The service retester has been down for 5 minutes.
+      expr: |
+        absent(up{job="retester"} == 1)
+      for: 5m
+      labels:
+        severity: critical
