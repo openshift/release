@@ -10,6 +10,11 @@
           text: '{{ .CommonAnnotations.message }}',
         },
       ],
+      pagerduty_configs: [
+        {
+          service_key: '${PAGERDUTY_INTEGRATION_KEY}',
+        },
+      ],
     },
     {
       name: 'slack-warnings',

@@ -11,6 +11,11 @@
         "required": true
       },
       {
+        "name": "PAGERDUTY_INTEGRATION_KEY",
+        "description": "The PagerDuty integration key",
+        "required": true
+      },
+      {
         "description": "monitoring namespace",
         "name": "MONITORING_NAMESPACE",
         "value": "openshift-user-workload-monitoring"
