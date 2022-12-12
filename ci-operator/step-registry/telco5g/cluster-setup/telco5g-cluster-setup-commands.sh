@@ -123,21 +123,26 @@ cat << EOF > ~/ocp-install.yml
   hosts: hypervisor
   gather_facts: false
   tasks:
+
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
       delay: 10
       timeout: 300
+
   - name: Remove last run
     shell: kcli delete plan --yes ${PLAN_NAME}
     ignore_errors: yes
+
   - name: Remove lock file
     file:
       path: /home/kni/us_${CLUSTER_NAME}_ready.txt
       state: absent
+
   - name: Run deployment
     shell: kcli create plan --force --paramfile /home/kni/params_${CLUSTER_NAME}.yaml ${PLAN_NAME} $KCLI_PARAM
     args:
       chdir: ~/kcli-openshift4-baremetal
+
   - name: Try to grab file to see install finished
     shell: >-
       kcli scp root@${CLUSTER_NAME}-installer:/root/cluster_ready.txt /home/kni/us_${CLUSTER_NAME}_ready.txt &&
@@ -146,9 +151,35 @@ cat << EOF > ~/ocp-install.yml
     until: result is success
     retries: 150
     delay: 60
+
   - name: Check if successful
     stat: path=/home/kni/us_${CLUSTER_NAME}_ready.txt
     register: ready
+
+  - name: Grab the kcli log from installer
+    shell: >-
+      kcli scp root@${CLUSTER_NAME}-installer:/var/log/cloud-init-output.log /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+    ignore_errors: true
+
+  - name: Grab the log from HV to artifacts
+    fetch:
+      src: /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+      dest: ${ARTIFACT_DIR}/cloud-init-output.log
+      flat: yes
+    ignore_errors: true
+
+  - name: Show last logs from cloud init if failed
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer 'tail -100 /var/log/cloud-init-output.log'
+    when: ready.stat.exists == False
+    ignore_errors: true
+
+  - name: Show bmh objects when failed to install
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer 'oc get bmh -A'
+    when: ready.stat.exists == False
+    ignore_errors: true
+
   - name: Fail if file was not there
     fail:
       msg: Installation not finished yet
@@ -161,18 +192,22 @@ cat << EOF > ~/fetch-kubeconfig.yml
   hosts: hypervisor
   gather_facts: false
   tasks:
+
   - name: Copy kubeconfig from installer vm
     shell: kcli scp root@${CLUSTER_NAME}-installer:/root/ocp/auth/kubeconfig /home/kni/.kube/config_${CLUSTER_NAME}
+
   - name: Add skip-tls-verify to kubeconfig
     lineinfile:
       path: /home/kni/.kube/config_${CLUSTER_NAME}
       regexp: '    certificate-authority-data:'
       line: '    insecure-skip-tls-verify: true'
+
   - name: Grab the kubeconfig
     fetch:
       src: /home/kni/.kube/config_${CLUSTER_NAME}
       dest: $SHARED_DIR/kubeconfig
       flat: yes
+
   - name: Modify local copy of kubeconfig
     lineinfile:
       path: $SHARED_DIR/kubeconfig
@@ -181,5 +216,23 @@ cat << EOF > ~/fetch-kubeconfig.yml
     delegate_to: localhost
 EOF
 
-ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv
+cat << EOF > ~/fetch-information.yml
+---
+- name: Fetch information about cluster
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Get cluster version
+    shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get clusterversion'
+
+  - name: Get bmh objects
+    shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get bmh -A'
+
+  - name: Get nodes
+    shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
+EOF
+
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv
