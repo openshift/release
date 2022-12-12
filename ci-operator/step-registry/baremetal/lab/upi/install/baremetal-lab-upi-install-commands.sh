@@ -238,9 +238,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
   reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}"
 done
-# Enabling the future deprovisioning disks wipe step
-touch "${SHARED_DIR}/wipe.disks"
 
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
 sleep 900
 echo "Launching 'wait-for bootstrap-complete' installation step....."

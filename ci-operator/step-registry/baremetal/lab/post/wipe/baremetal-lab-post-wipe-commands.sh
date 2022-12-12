@@ -1,12 +1,5 @@
 #!/bin/bash
 
-if [ "${LOCAL_TEST:-false}" != "false" ]; then
-  # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
-  # shellcheck disable=SC2155
-  export NAMESPACE=test-ci-op AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com \
-      SHARED_DIR=${SHARED_DIR:-$(mktemp -d)} CLUSTER_PROFILE_DIR=~/.ssh SELF_MANAGED_NETWORK=true
-fi
-
 set -o nounset
 
 if [ -z "${AUX_HOST}" ]; then
@@ -19,7 +12,7 @@ if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
   exit 0
 fi
 
-if [ -f "${SHARED_DIR}/wipe.disks" ]; then
+if [ ! -f "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME" ]; then
   echo "Skipping the wipe step as not needed"
   exit 0
 fi

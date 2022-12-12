@@ -1,25 +1,10 @@
 #!/bin/bash
 
-# This script modifies the following files in the auxiliary host:
-# - /opt/dhcpd/root/etc/dnsmasq.conf
-# - /opt/tftpboot/grub.cfg-01-{hosts_mac}
-
-if [ "${LOCAL_TEST:=false}" != "false" ]; then
-  # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
-  # shellcheck disable=SC2155
-  export NAMESPACE=test-ci-op AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com \
-      SHARED_DIR=${SHARED_DIR:-$(mktemp -d)} CLUSTER_PROFILE_DIR=~/.ssh IPI=false SELF_MANAGED_NETWORK=true \
-      INTERNAL_NET_IP=192.168.90.1
-fi
-
 set -o errexit
 set -o pipefail
 set -o nounset
 
-if [ -z "${AUX_HOST}" ]; then
-    echo "AUX_HOST is not filled. Failing."
-    exit 1
-fi
+[ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing."; exit 1; }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
