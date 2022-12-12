@@ -40,6 +40,30 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
+- as: odh-notebook-controller-e2e
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      commands: |
+        pushd components/odh-notebook-controller
+        make image -e IMG=quay.io/opendatahub/odh-notebook-controller -e TAG=e2e
+        oc new-project odh-notebook-controller-system
+        make deploy -e K8S_NAMESPACE=odh-notebook-controller-system -e IMG=quay.io/opendatahub/odh-notebook-controller -e TAG=e2e
+        mkdir -p ~/.kube
+        cp /tmp/kubeconfig ~/.kube/config 2> /dev/null || cp /var/run/secrets/ci.openshift.io/multi-stage/kubeconfig ~/.kube/config
+        chmod 644 ~/.kube/config
+        export KUBECONFIG=~/.kube/config
+        make e2e-test -e K8S_NAMESPACE=odh-notebook-controller-system
+        make undeploy -e K8S_NAMESPACE=odh-notebook-controller-system
+        oc delete project odh-notebook-controller-system
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: kf-notebook-controller-unit
   run_if_changed: ^(components/common/.*|components/notebook-controller/.*)
   steps:
