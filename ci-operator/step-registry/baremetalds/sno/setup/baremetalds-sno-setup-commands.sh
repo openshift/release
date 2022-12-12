@@ -47,8 +47,8 @@ fi
 # repo.
 export SINGLE_NODE_IP_ADDRESS="192.168.127.10"
 export CLUSTER_NAME="test-infra-cluster"
-export CLUSTER_API_DOMAIN="api.${CLUSTER_NAME}.redhat.com"
-export CLUSTER_INGRESS_SUB_DOMAIN="apps.${CLUSTER_NAME}.redhat.com"
+export CLUSTER_API_DOMAIN="api.${CLUSTER_NAME}.metalkube.org"
+export CLUSTER_INGRESS_SUB_DOMAIN="apps.${CLUSTER_NAME}.metalkube.org"
 export INGRESS_APPS=(oauth-openshift console-openshift-console canary-openshift-ingress-canary thanos-querier-openshift-monitoring)
 
 timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
