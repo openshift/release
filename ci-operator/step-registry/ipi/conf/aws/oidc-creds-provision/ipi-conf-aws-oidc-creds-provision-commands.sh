@@ -12,9 +12,7 @@ REGION="${LEASED_RESOURCE}"
 
 # extract aws credentials requests from the release image
 oc registry login
-# shellcheck disable=SC2153
-REPO=$(oc -n ${NAMESPACE} get is release -o=jsonpath="{.status.publicDockerImageRepository}")
-oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "${REPO}:latest"
+oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
 
 # create required credentials infrastructure and installer manifests
 ccoctl aws create-all --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"

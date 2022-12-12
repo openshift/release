@@ -15,9 +15,7 @@ PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 # for deprovision.
 # https://docs.ci.openshift.org/docs/architecture/step-registry/#sharing-data-between-steps
 echo "> Extract gcp credentials requests from the release image"
-# shellcheck disable=SC2153
-REPO=$(oc -n ${NAMESPACE} get is release -o=jsonpath="{.status.publicDockerImageRepository}")
-oc adm release extract --credentials-requests --cloud=gcp --to="/tmp/credrequests" "${REPO}:latest"
+oc adm release extract --credentials-requests --cloud=gcp --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
 
 echo "> Output gcp credentials requests to directory: /tmp/credrequests"
 ls "/tmp/credrequests"
