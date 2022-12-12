@@ -57,7 +57,7 @@ do
       continue
   fi
 
-  filename=manifest_${SECRET_NAMESPACE}_${SECRET_NAME}_secret.yml
+  filename=manifest_${SECRET_NAMESPACE}_secret.yml
   cat >> "${SHARED_DIR}/${filename}" << EOF
 apiVersion: v1
 kind: Secret
