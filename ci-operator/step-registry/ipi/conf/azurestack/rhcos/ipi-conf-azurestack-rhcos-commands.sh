@@ -6,10 +6,6 @@ set -o pipefail
 # Set PATH to include YQ, installed via pip in the image
 export PATH="$PATH:/usr/local/bin"
 
-tenant_id=$(jq -r .tenantId "${SHARED_DIR}/osServicePrincipal.json")
-aad_client_secret=$(jq -r .clientSecret "${SHARED_DIR}/osServicePrincipal.json")
-app_id=$(jq -r .clientId "${SHARED_DIR}/osServicePrincipal.json")
-
 suffix_endpoint=$(cat "${SHARED_DIR}/SUFFIX_ENDPOINT")
 
 # Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh

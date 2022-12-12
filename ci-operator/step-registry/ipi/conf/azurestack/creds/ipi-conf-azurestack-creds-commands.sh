@@ -19,8 +19,6 @@ APP_ID=$(jq -r .clientId "${AZURE_AUTH_LOCATION}")
 TENANT_ID=$(jq -r .tenantId "${AZURE_AUTH_LOCATION}")
 AAD_CLIENT_SECRET=$(jq -r .clientSecret "${AZURE_AUTH_LOCATION}")
 SUBSCRIPTION_ID=$(jq -r .subscriptionId "${AZURE_AUTH_LOCATION}")
-AZURESTACK_ENDPOINT=$(cat "${SHARED_DIR}"/AZURESTACK_ENDPOINT)
-SUFFIX_ENDPOINT=$(cat "${SHARED_DIR}"/SUFFIX_ENDPOINT)
 AZURE_REGION=$(yq -r .platform.azure.region "${SHARED_DIR}/install-config.yaml")
 
 # shellcheck disable=SC2016

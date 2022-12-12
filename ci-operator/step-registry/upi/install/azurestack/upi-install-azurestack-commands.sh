@@ -40,7 +40,6 @@ python3 -c "import yaml" || pip3 install --user pyyaml
 sed -i "s|ppe.azurestack.devcluster.openshift.com|ppe.upi.azurestack.devcluster.openshift.com|g" install-config.yaml
 
 CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
-AAD_CLIENT_ID=$(jq -r .clientId ${SHARED_DIR}/osServicePrincipal.json)
 AZURE_REGION=ppe3
 SSH_KEY=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["sshKey"])')
 BASE_DOMAIN=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
@@ -49,7 +48,6 @@ AAD_CLIENT_SECRET=$(jq -r .clientSecret ${SHARED_DIR}/osServicePrincipal.json)
 APP_ID=$(jq -r .clientId ${SHARED_DIR}/osServicePrincipal.json)
 
 export CLUSTER_NAME
-export AAD_CLIENT_ID
 export AZURE_REGION
 export SSH_KEY
 export TENANT_ID
@@ -65,9 +63,6 @@ echo $APP_ID >> ${SHARED_DIR}/APP_ID
 chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
 ${SHARED_DIR}/azurestack-login-script.sh
 
-# shellcheck disable=SC2034
-SUBSCRIPTION_ID=$(az account show | jq -r .id)
-export SUBSCRIPTION_ID
 export AZURE_AUTH_LOCATION="${SHARED_DIR}/osServicePrincipal.json"
 
 # remove workers from the install config so the mco won't try to create them
