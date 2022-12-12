@@ -201,3 +201,13 @@
     - build02
     service_account:
     - sprint-automation
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      -n openshift-user-workload-monitoring get secrets -o json | jq -r '.items[]
+      | select(.type=="kubernetes.io/service-account-token") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="prometheus-user-workload")|.data.token'
+      | base64 -d
+    name: sa.prometheus-user-workload.$(cluster).token.txt
+  item_name: app-ci-openshift-user-workload-monitoring-credentials
+  params:
+    cluster:
+    - app.ci
