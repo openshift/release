@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ -n "${LOCAL_TEST}" ]; then
+if [ "${LOCAL_TEST:=false}" != "false" ]; then
   # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
   # Also needs SHARED_DIR to be set appropriately (e.g., to the same dir used by the pre-reserve-nodes step tested earlier)
   export AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com

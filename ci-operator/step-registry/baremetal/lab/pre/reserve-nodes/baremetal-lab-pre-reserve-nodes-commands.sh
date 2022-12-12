@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ -n "${LOCAL_TEST}" ]; then
+if [ "${LOCAL_TEST:=false}" != "false" ]; then
   # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
   export N_MASTERS=1 N_WORKERS=1 IPI=true AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com
   # shellcheck disable=SC2155

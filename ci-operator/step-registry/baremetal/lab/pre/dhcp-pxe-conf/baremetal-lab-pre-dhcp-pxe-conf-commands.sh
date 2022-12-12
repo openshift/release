@@ -4,7 +4,7 @@
 # - /opt/dhcpd/root/etc/dnsmasq.conf
 # - /opt/tftpboot/grub.cfg-01-{hosts_mac}
 
-if [ -n "${LOCAL_TEST}" ]; then
+if [ "${LOCAL_TEST:=false}" != "false" ]; then
   # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
   # shellcheck disable=SC2155
   export NAMESPACE=test-ci-op AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com \
