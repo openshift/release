@@ -147,7 +147,7 @@ def _add_osd_rc_servicemonitor(gendoc):
         'kind': 'ServiceMonitor',
         'metadata': {
             'name': context.rc_api_service_name,
-            'namespace': 'prow-monitoring',
+            'namespace': 'ci',
             'annotations': annotations,
         },
         'spec': {
