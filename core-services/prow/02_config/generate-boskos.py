@@ -189,7 +189,8 @@ CONFIG = {
         'osa21': 1,
         'syd04': 1,
         'syd05': 1,
-        'tok04': 1
+        'tok04': 1,
+        'tor01': 1
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
