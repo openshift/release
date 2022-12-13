@@ -15,6 +15,45 @@
       'clusterpool.json': '22491886c1e19dde8d2984bca82154c1',
     },
     alertManagerReceivers: {
+      'build-cop': {
+        team: 'build-cop',
+        channel: '#build-cop-alerts',
+        notify: 'build-cop',
+      },
+      'patch-manager': {
+        team: 'patch-manager',
+        channel: '#notifications-ci',
+        notify: 'patch-manager',
+      },
+      'endurance-cluster': {
+        team: 'build-cop',
+        channel: '#build-cop-alerts',
+        notify: 'bparees',
+      },
+      'kni-cnf': {
+        team: 'cnf-cop',
+        channel: '#cnf-alerts',
+        notify: 'cnf-cop',
+      },
+      'openshift-logging': {
+        team: 'logging',
+        channel: '#forum-logging',
+        notify: 'aoslogging',
+      },
+      'OLM-rh-operators': {
+        team: 'OLM',
+        channel: '#operator-test',
+        notify: 'olmcop',
+      },
+      'openshift-virtualization': {
+        team: 'openshift-virtualization',
+        channel: '#kubevirt-ci-monitoring',
+        notify: 'build-officer',
+      },
+      'release-controller': {
+        team: 'release-controller',
+        channel: '#ops-crt',
+      },
     },
   },
 }
