@@ -62,26 +62,20 @@ items:
           app: bookstack-db
       spec:
         containers:
-        - image: lscr.io/linuxserver/mariadb:latest
+        - image: mysql:8.0
           name: bookstack-db
           ports:
           - containerPort: 3306
             name: mysql
           env:
-          - name: PUID
-            value: "1000"
-          - name: PGID
-            value: "1000"
-          - name: MYSQL_ROOT_PASSWORD
-            value: "bookstack"
           - name: MYSQL_DATABASE
-            value: "bookstack"
-          - name: MYSQL_USER
             value: "bookstack"
           - name: MYSQL_PASSWORD
             value: "bookstackpswd"
-          - name: TZ
-            value: "Europe/London"
+          - name: MYSQL_ROOT_PASSWORD
+            value: "bookstack"
+          - name: MYSQL_USER
+            value: "bookstack"
           volumeMounts:
           - mountPath: /config
             name: bookstack-db-vol
@@ -103,7 +97,7 @@ items:
     - port: 80
       targetPort: 80
       protocol: TCP
-    type: NodePort
+    type: LoadBalancer
 - apiVersion: apps/v1
   kind: Deployment
   metadata:
@@ -125,22 +119,18 @@ items:
       spec:
         containers:
         - name: bookstack
-          image: lscr.io/linuxserver/bookstack:latest
+          image: solidnerd/bookstack:latest
           ports:
           - containerPort: 80
             name: http
           env:
-          - name: PUID
-            value: "1000"
-          - name: PGID
-            value: "1000"
+          - name: DB_DATABASE
+            value: "bookstack"
           - name: DB_HOST
             value: "bookstack-db"
-          - name: DB_USER
+          - name: DB_PASSWORD
             value: "bookstack"
-          - name: DB_PASS
-            value: "bookstack"
-          - name: DB_DATABASE
+          - name: DB_USERNAME
             value: "bookstack"
           volumeMounts:
           - mountPath: /config
