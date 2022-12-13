@@ -53,6 +53,82 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: check-commits-count
+  commands: ci/prow/check-commits-count
+  container:
+    from: src
+- as: check-api-changes
+  commands: |
+    unset GOFLAGS
+    ci/prow/check-api-changes
+  container:
+    from: src
+- as: e2e-incluster-build-kernel-module
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 40m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        oc project default
+        ci/prow/e2e-incluster-build
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: generic-claim
+- as: e2e-prebuilt-kernel-module
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 40m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        oc project default
+        ci/prow/e2e-prebuilt-kernel-module
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: generic-claim
+- as: e2e-crd-variable
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 40m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        oc project default
+        ci/prow/e2e-crd-variable
+      from: src
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
