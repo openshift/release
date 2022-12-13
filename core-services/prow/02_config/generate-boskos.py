@@ -38,6 +38,9 @@ CONFIG = {
     'aws-qe-quota-slice': {
         'us-east-1': 30,
     },
+    'aws-sd-qe-quota-slice': {
+        'us-west-2': 3,
+    },
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
     },
@@ -78,6 +81,9 @@ CONFIG = {
     },
     'azurestack-quota-slice': {
         'ppe3': 2
+    },
+   'azurestack-qe-quota-slice': {
+        'mtcazs': 2
     },
     'azuremag-quota-slice': {
         'usgovvirginia': 5
@@ -179,10 +185,12 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
+        'mon01': 1,
+        'osa21': 1,
         'syd04': 1,
         'syd05': 1,
-        'tor01': 1,
-        'tok04': 1
+        'tok04': 1,
+        'tor01': 1
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
@@ -199,6 +207,9 @@ CONFIG = {
     'alibabacloud-cn-qe-quota-slice': {
         'us-east-1': 10,
     },
+    'hypershift-hive-quota-slice': {
+        'default': 80
+    }
 }
 
 for i in range(3):

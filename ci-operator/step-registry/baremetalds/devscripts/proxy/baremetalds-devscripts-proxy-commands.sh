@@ -15,6 +15,12 @@ source "${SHARED_DIR}/packet-conf.sh"
 ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 sudo dnf install -y podman firewalld
 
+# The default "10:30:100" results in connections being rejected
+# Password auth is disabled so we can bump this up a bit and make it
+# less likely we hit "ssh_exchange_identification: Connection closed by remote host"
+sudo sed -i -e 's/.*MaxStartups.*/MaxStartups 20:10:100/g' /etc/ssh/sshd_config
+sudo systemctl restart sshd
+
 # Setup squid proxy for accessing cluster
 cat <<SQUID>\$HOME/squid.conf
 acl cluster dstdomain .metalkube.org .ocpci.eng.rdu2.redhat.com

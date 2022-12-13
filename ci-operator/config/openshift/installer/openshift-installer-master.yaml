@@ -43,6 +43,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
   origin_4.12_cli:
     name: "4.13"
     namespace: origin
@@ -60,6 +64,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
@@ -67,6 +74,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -101,6 +111,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -108,6 +121,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: ovirt-installer
 promotion:
   name: "4.13"
@@ -510,13 +526,20 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
-- as: e2e-sdn-nutanix
+- as: e2e-nutanix-ovn
   cluster: build01
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
   steps:
     cluster_profile: nutanix
-    workflow: openshift-e2e-nutanix
+    workflow: openshift-e2e-nutanix-ovn
+- as: e2e-nutanix-sdn
+  cluster: build01
+  optional: true
+  run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix-sdn
 - as: e2e-agent-compact-ipv4
   cluster: build05
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)

@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/aro-unit
     decorate: true
     labels:
@@ -54,7 +54,7 @@ presubmits:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build05
-    context: ci/prow/e2e-agent-compact
+    context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -62,8 +62,8 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.13-e2e-agent-compact
-    rerun_command: /test e2e-agent-compact
+    name: pull-ci-openshift-installer-release-4.13-e2e-agent-compact-ipv4
+    rerun_command: /test e2e-agent-compact-ipv4
     skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
       containers:
@@ -73,8 +73,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agent-compact-cluster-profile
-        - --target=e2e-agent-compact
+        - --secret-dir=/usr/local/e2e-agent-compact-ipv4-cluster-profile
+        - --target=e2e-agent-compact-ipv4
         command:
         - ci-operator
         image: ci-operator:latest
@@ -90,7 +90,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agent-compact-cluster-profile
+        - mountPath: /usr/local/e2e-agent-compact-ipv4-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -121,7 +121,82 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agent-compact,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agent-compact-ipv4,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build05
+    context: ci/prow/e2e-agent-ha-dualstack
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: equinix-ocp-metal
+      ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.13-e2e-agent-ha-dualstack
+    optional: true
+    rerun_command: /test e2e-agent-ha-dualstack
+    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-agent-ha-dualstack-cluster-profile
+        - --target=e2e-agent-ha-dualstack
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-agent-ha-dualstack-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-equinix-ocp-metal
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-agent-ha-dualstack,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -202,7 +277,7 @@ presubmits:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build05
-    context: ci/prow/e2e-agent-sno
+    context: ci/prow/e2e-agent-sno-ipv6
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -210,9 +285,9 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.13-e2e-agent-sno
+    name: pull-ci-openshift-installer-release-4.13-e2e-agent-sno-ipv6
     optional: true
-    rerun_command: /test e2e-agent-sno
+    rerun_command: /test e2e-agent-sno-ipv6
     skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
       containers:
@@ -222,8 +297,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agent-sno-cluster-profile
-        - --target=e2e-agent-sno
+        - --secret-dir=/usr/local/e2e-agent-sno-ipv6-cluster-profile
+        - --target=e2e-agent-sno-ipv6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -239,7 +314,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agent-sno-cluster-profile
+        - mountPath: /usr/local/e2e-agent-sno-ipv6-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -270,13 +345,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agent-sno,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agent-sno-ipv6,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-alibaba
     decorate: true
     labels:
@@ -1158,7 +1233,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-azure-ovn
     decorate: true
     labels:
@@ -1231,7 +1306,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-resourcegroup
     decorate: true
     labels:
@@ -1305,7 +1380,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-shared-vpc
     decorate: true
     labels:
@@ -1379,7 +1454,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-upi
     decorate: true
     labels:
@@ -1452,7 +1527,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-azurestack
     decorate: true
     labels:
@@ -1526,7 +1601,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-azurestack-upi
     decorate: true
     labels:
@@ -2064,7 +2139,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-ibmcloud-ovn
     decorate: true
     labels:
@@ -2216,7 +2291,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-metal
     decorate: true
     labels:
@@ -2280,7 +2355,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-metal-assisted
     decorate: true
     labels:
@@ -2728,7 +2803,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     labels:
@@ -2802,7 +2877,157 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build01
+    context: ci/prow/e2e-nutanix-ovn
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: nutanix
+      ci-operator.openshift.io/cloud-cluster-profile: nutanix
+      ci-operator.openshift.io/cluster: build01
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.13-e2e-nutanix-ovn
+    optional: true
+    rerun_command: /test e2e-nutanix-ovn
+    run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-nutanix-ovn-cluster-profile
+        - --target=e2e-nutanix-ovn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-nutanix-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-nutanix
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-nutanix-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build01
+    context: ci/prow/e2e-nutanix-sdn
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: nutanix
+      ci-operator.openshift.io/cloud-cluster-profile: nutanix
+      ci-operator.openshift.io/cluster: build01
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.13-e2e-nutanix-sdn
+    optional: true
+    rerun_command: /test e2e-nutanix-sdn
+    run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-nutanix-sdn-cluster-profile
+        - --target=e2e-nutanix-sdn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-nutanix-sdn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-nutanix
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-nutanix-sdn,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build03
     context: ci/prow/e2e-openstack
     decorate: true
     labels:
@@ -2876,7 +3101,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-openstack-kuryr
     decorate: true
     labels:
@@ -2950,7 +3175,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-openstack-proxy
     decorate: true
     labels:
@@ -3024,7 +3249,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-openstack-sdn-parallel
     decorate: true
     labels:
@@ -3098,7 +3323,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-openstack-upi
     decorate: true
     labels:
@@ -3172,7 +3397,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-ovirt-sdn
     decorate: true
     labels:
@@ -3245,81 +3470,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ovirt-sdn,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build01
-    context: ci/prow/e2e-sdn-nutanix
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: nutanix
-      ci-operator.openshift.io/cloud-cluster-profile: nutanix
-      ci-operator.openshift.io/cluster: build01
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.13-e2e-sdn-nutanix
-    optional: true
-    rerun_command: /test e2e-sdn-nutanix
-    run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-sdn-nutanix-cluster-profile
-        - --target=e2e-sdn-nutanix
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-sdn-nutanix-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-nutanix
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-sdn-nutanix,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -3544,7 +3694,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/gofmt
     decorate: true
     labels:
@@ -3592,7 +3742,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/golint
     decorate: true
     labels:
@@ -3640,7 +3790,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/govet
     decorate: true
     labels:
@@ -3688,7 +3838,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -4121,7 +4271,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/okd-images
     decorate: true
     labels:
@@ -4555,7 +4705,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/okd-scos-images
     decorate: true
     labels:
@@ -4604,7 +4754,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/okd-scos-unit
     decorate: true
     labels:
@@ -4655,7 +4805,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/okd-scos-verify-codegen
     decorate: true
     labels:
@@ -4705,7 +4855,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/okd-unit
     decorate: true
     labels:
@@ -4755,7 +4905,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/okd-verify-codegen
     decorate: true
     labels:
@@ -4804,7 +4954,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/openstack-manifests
     decorate: true
     labels:
@@ -4877,7 +5027,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -4906,7 +5056,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -4936,7 +5086,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -4965,7 +5115,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -5013,7 +5163,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/verify-codegen
     decorate: true
     labels:
@@ -5060,7 +5210,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/verify-vendor
     decorate: true
     labels:
@@ -5108,7 +5258,7 @@ presubmits:
     branches:
     - ^release-4.13$
     - ^release-4.13-
-    cluster: build02
+    cluster: build03
     context: ci/prow/yaml-lint
     decorate: true
     labels:

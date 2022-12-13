@@ -16,3 +16,7 @@ jb --version
 mixins_dir="${base_dir}/clusters/app.ci/prow-monitoring/mixins"
 
 make -C "${mixins_dir}" validate
+
+mixins_dir="${base_dir}/clusters/app.ci/openshift-user-workload-monitoring/mixins"
+
+make -C "${mixins_dir}" validate

@@ -4,6 +4,9 @@ build_root:
     namespace: openshift
     tag: golang-1.18
 canonical_go_repository: github.com/openshift/ofcir
+images:
+- dockerfile_path: Dockerfile
+  to: ofcir
 resources:
   '*':
     limits:
@@ -11,6 +14,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: |
+  wget -O /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl"
+  chmod +x /usr/local/bin/kubectl
 tests:
 - as: unit
   commands: |
@@ -20,6 +26,42 @@ tests:
     make unit-tests
   container:
     from: src
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        # aws clusters have container security context valid user 1000650000 - 1000659999
+        # this is dynamic based on the project creation order
+        sed -i 's#runAsUser: 1001#runAsUser: 1000650001#' config/manager/manager.yaml
+        # make deploy IMG= does not work (kustomize edit && kustomize build config/default)
+        sed -i "s#ofcir.io/ofcir:latest#${OFCIR_IMAGE}#" config/manager/manager.yaml
+        GOFLAGS="-mod=readonly" make deploy
+        # expose the service throught a route
+        /cli/oc -n ofcir-system expose svc ofcir-service
+        # hack the go tests to point to correct host and port
+        OFCIR_ROUTE="$(kubectl -n ofcir-system get route | tail -n 1 | awk '{print $2}')"
+        sed -i "/return &OfcirClient/i \\\thost = \"$OFCIR_ROUTE\"\n\tport = 80" tests/e2e/client_internal_test.go
+        # wait for containers to be ready
+        sleep 120
+        GOFLAGS="-mod=readonly" make e2e-tests
+      dependencies:
+      - env: OFCIR_IMAGE
+        name: ofcir
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift-eng

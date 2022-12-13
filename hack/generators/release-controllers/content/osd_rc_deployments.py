@@ -126,7 +126,7 @@ def _add_osd_rc_servicemonitor(gendoc):
         'kind': 'ServiceMonitor',
         'metadata': {
             'name': context.rc_service_name,
-            'namespace': 'prow-monitoring',
+            'namespace': 'ci',
             'annotations': annotations,
         },
         'spec': {
@@ -135,9 +135,6 @@ def _add_osd_rc_servicemonitor(gendoc):
                 'port': 'main',
                 'scheme': 'http',
             }],
-            'namespaceSelector': {
-                'matchNames': ['ci'],
-            },
             'selector': {
                 'matchLabels': {
                     'app': context.rc_service_name,

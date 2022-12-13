@@ -114,6 +114,11 @@ presubmits:
             secretKeyRef:
               key: integration_key
               name: pagerduty
+        - name: PROMETHEUS_USER_WORKLOAD_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: sa.prometheus-user-workload.app.ci.token.txt
+              name: app-ci-openshift-user-workload-monitoring-credentials
         - name: SLACK_API_URL
           valueFrom:
             secretKeyRef:
@@ -210,7 +215,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20221128-1457a21
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20221208-ecb4ed8
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -690,7 +695,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20221201-5f3a3ac62d
+        image: gcr.io/k8s-prow/checkconfig:v20221208-8898931a7f
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -842,7 +847,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-generated-dashboards
     rerun_command: /test generated-dashboards
-    run_if_changed: ^clusters/app.ci/prow-monitoring/.*
+    run_if_changed: ^(clusters/app.ci/prow-monitoring/.*)|^(clusters/app.ci/openshift-user-workload-monitoring/.*)
     spec:
       containers:
       - args:

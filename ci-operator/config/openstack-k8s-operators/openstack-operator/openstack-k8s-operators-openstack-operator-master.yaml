@@ -8,7 +8,11 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+- dockerfile_path: containers/ci/Dockerfile
+  from: src
+  to: openstack-operator-ci-tooling
 resources:
   '*':
     limits:
@@ -42,6 +46,16 @@ tests:
   commands: make gofmt || true
   container:
     from: src
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export GOFLAGS=
+    export PRE_COMMIT_HOME=/tmp
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    pre-commit run --all-files --show-diff-on-failure
+  container:
+    from: openstack-operator-ci-tooling
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators

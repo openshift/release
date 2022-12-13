@@ -81,6 +81,7 @@ cat > ovirt_remove_old_resources.yaml <<-EOF
       max_hours: 5
       vms_to_exclude:
         - proxy-vm
+        - proxy-vm-45
       templates_to_exclude:
         - Blank
         - centos-7
