@@ -1158,14 +1158,13 @@ periodics:
       - --config-path=./core-services/sanitize-prow-jobs/_config.yaml
       - --prow-jobs-dir=./ci-operator/jobs
       - --self-approve=true
-      - --prometheus-username=ci
-      - --prometheus-password-path=/etc/prometheus/password
+      - --prometheus-bearer-token-path=/etc/prometheus/token
       - --create-pr=true
       command:
       - /usr/bin/prow-job-dispatcher
       image: registry.ci.openshift.org/ci/prow-job-dispatcher:latest
       imagePullPolicy: Always
-      name: auto-config-brancher
+      name: auto-prow-job-dispatcher
       resources:
         requests:
           cpu: 500m
@@ -1180,9 +1179,9 @@ periodics:
     - name: prometheus
       secret:
         items:
-        - key: password
-          path: password
-        secretName: prometheus-auth-credentials
+        - key: sa.prometheus-user-workload.app.ci.token.txt
+          path: token
+        secretName: app-ci-openshift-user-workload-monitoring-credentials
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
