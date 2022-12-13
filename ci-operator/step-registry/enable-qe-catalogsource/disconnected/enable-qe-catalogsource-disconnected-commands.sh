@@ -116,7 +116,7 @@ function mirror_optional_images () {
     optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
     qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
     
-    jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\", \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > /tmp/new-dockerconfigjson
+    jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > /tmp/new-dockerconfigjson
     ret=0
     # Running Command: oc adm catalog mirror -a "/tmp/new-dockerconfigjson" ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12 ec2-3-90-59-26.compute-1.amazonaws.com:5000 --continue-on-error --to-manifests=/tmp/olm_mirror
     # error: unable to read image ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12: Get "https://ec2-3-90-59-26.compute-1.amazonaws.com:5000/v2/": x509: certificate signed by unknown authority
