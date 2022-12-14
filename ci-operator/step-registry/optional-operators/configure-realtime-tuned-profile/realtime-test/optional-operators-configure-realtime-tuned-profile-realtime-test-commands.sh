@@ -1,9 +1,11 @@
 #!/bin/bash
 
-namespace="openshift-debug"
-podname="oslat"
+#!/bin/bash
 
-echo "Setting up cluster configuration for test"
+namespace="openshift-debug"
+jobname="oslat"
+
+echo "setting up cluster and job configuration for the test"
 oc apply -f - <<EOF
 kind: Project
 apiVersion: project.openshift.io/v1
@@ -41,36 +43,44 @@ subjects:
     namespace: ${namespace}
 
 ---
-apiVersion: v1
-kind: Pod
+apiVersion: batch/v1
+kind: Job
 metadata:
   labels:
     app: oslat
-  name: ${podname}
+  name: ${jobname}
   namespace: ${namespace}
 spec:
-  containers:
-    - image: quay.io/ocp-edge-qe/oslat
-      imagePullPolicy: Always
-      name: container-00
-      command: ["sh"]
-      args:
-        - "-c"
-        - "sleep 5000"
+  parallelism: 1
+  completions: 1
+  activeDeadlineSeconds: 360
+  backoffLimit: 5
+  template:
+    metadata:
+      name: ${jobname}
+    spec:
+      containers:
+      - image: quay.io/ocp-edge-qe/oslat
+        imagePullPolicy: Always
+        name: container-00
+        command: ["oslat", "-D 5m"]
+        securityContext:
+          privileged: true
+      restartPolicy: OnFailure
       resources: {}
-      securityContext:
-        privileged: true
-  dnsPolicy: ClusterFirst
-  serviceAccount: debug
-  serviceAccountName: debug
-  terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      serviceAccount: debug
+      serviceAccountName: debug
+      terminationGracePeriodSeconds: 30
 EOF
 
-echo "waiting for pod/${podname} to be ready"
-oc wait --for=condition=Ready pod/$podname --timeout=30s -n $namespace
+echo "waiting for job/${jobname} to complete"
+oc wait --for=condition=complete job/$jobname --timeout=60m -n $namespace
 
-echo "executing the os latency test"
-oc exec $podname -n $namespace -- oslat -D 5m
+echo "getting job output"
+jlog=$(oc logs job/${jobname})
 
-echo "cleaning up the pod"
-oc delete pod $podname
+echo "${jlog}"
+
+# Cleanup
+oc delete job $jobname
