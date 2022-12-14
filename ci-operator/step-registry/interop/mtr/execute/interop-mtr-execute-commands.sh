@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 # Set variables used to update the config file
+SECRETS_DIR="/tmp/secrets"
 APPS_URL=$(cat ${SHARED_DIR}/apps_url)
 FTP_USERNAME=$(cat ${SECRETS_DIR}/ftp-username)
 FTP_PASSWORD=$(cat ${SECRETS_DIR}/ftp-password)
@@ -28,6 +29,6 @@ sed -i "s#REPLACE_EXECUTOR#${SELENIUM_EXECUTOR}#" $CONFIG_FILE
 echo "Installing integration tests"
 pip install -e /tmp/integration_tests
 
-echo "Executing PyTest..."
 # Execute tests
+echo "Executing PyTest..."
 pytest /tmp/integration_tests/mta/tests/operator/test_operator_test_cases.py -vv --reruns 4 --reruns-delay 10 --junitxml=${SHARED_DIR}/xunit_output.xml
