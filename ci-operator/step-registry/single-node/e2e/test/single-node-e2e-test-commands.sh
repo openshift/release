@@ -288,7 +288,7 @@ oc -n openshift-config patch cm admin-acks --patch '{"data":{"ack-4.8-kube-1.22-
 # wait for ClusterVersion to level, until https://bugzilla.redhat.com/show_bug.cgi?id=2009845 makes it back to all 4.9 releases being installed in CI
 oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
-# wait up to 10m for the number of nodes to match the number of machines
+# wait up to 20m for the number of nodes to match the number of machines
 i=0
 while true
 do
@@ -307,7 +307,7 @@ EOF
     echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
     sleep 30
     i=$((i+1))
-    if [ $i -gt 20 ]; then
+    if [ $i -gt 40 ]; then
       MACHINELIST="$(kubectl get machines -A)"
       NODELIST="$(kubectl get nodes)"
       cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF

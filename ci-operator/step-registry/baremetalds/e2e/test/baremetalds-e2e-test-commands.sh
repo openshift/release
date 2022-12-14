@@ -168,7 +168,7 @@ oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
 check_clusteroperators_status
 
-# wait up to 10m for the number of nodes to match the number of machines
+# wait up to 20m for the number of nodes to match the number of machines
 i=0
 while true
 do
@@ -187,7 +187,7 @@ EOF
   echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
   sleep 30
   i=$((i+1))
-  if [ $i -gt 20 ]; then
+  if [ $i -gt 40 ]; then
     MACHINELIST="$(kubectl get machines -A)"
     NODELIST="$(kubectl get nodes)"
     cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
