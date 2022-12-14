@@ -193,7 +193,7 @@
           {
             alert: 'pod-scaler-admission-memory-warning',
             expr: |||
-             sum by (workload_name, workload_type, determined_memory, configured_memory) (increase(pod_scaler_admission_high_determined_memory{workload_type!="undefined"}[5m])) > 0
+             sum by (workload_name, workload_type, determined_memory, configured_memory) (increase(pod_scaler_admission_high_determined_memory{workload_type!~"undefined|build"}[5m])) > 0
             |||,
             'for': '1m',
             labels: {
