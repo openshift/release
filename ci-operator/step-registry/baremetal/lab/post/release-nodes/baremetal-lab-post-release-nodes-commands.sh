@@ -1,21 +1,10 @@
 #!/bin/bash
 
-if [ -n "${LOCAL_TEST}" ]; then
-  # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
-  # Also needs SHARED_DIR to be set appropriately (e.g., to the same dir used by the pre-reserve-nodes step tested earlier)
-  export AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com
-  # shellcheck disable=SC2155
-  export NAMESPACE=test-ci-op CLUSTER_PROFILE_DIR=~/.ssh
-fi
-
 set -o nounset
 set -o errexit
 set -o pipefail
 
-if [ -z "${AUX_HOST}" ]; then
-    echo "AUX_HOST is not filled. Failing."
-    exit 1
-fi
+[ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing."; exit 1; }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -53,5 +42,6 @@ sed -i "/,${BUILD_ID},${BUILD_USER},/d" /etc/vips_reserved
 
 echo "Releasing lock $LOCK_FD ($LOCK)"
 flock -u $LOCK_FD
-
+# TODO normalize and sanitize paths
+rm -rf /{var/builds,opt/html,opt/tftpboot}/${BUILD_ID}
 EOF
