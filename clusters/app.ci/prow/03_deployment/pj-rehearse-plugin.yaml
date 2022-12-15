@@ -55,12 +55,16 @@ items:
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-token-path=/etc/github/oauth
+          - --config-path=/etc/config/config.yaml
           ports:
             - name: http
               containerPort: 8888
           volumeMounts:
           - mountPath: /var/kubeconfigs
             name: prowjob-kubeconfig
+          - name: prow-config
+            mountPath: /etc/config
+            readOnly: true
           - name: hmac
             mountPath: /etc/webhook
             readOnly: true
@@ -87,6 +91,9 @@ items:
         - name: prowjob-kubeconfig
           secret:
             secretName: pj-rehearse
+        - name: prow-config
+          configMap:
+            name: config
         - name: hmac
           secret:
             secretName: github-webhook-credentials
