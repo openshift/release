@@ -1,6 +1,6 @@
 # Metrics and Alerts
 
-This fold contains the manifests for user-workload-monitoring (UWM) based on [monitoring user-defined project on OSD cluster](https://docs.openshift.com/dedicated/osd_cluster_admin/osd_monitoring/osd-understanding-the-monitoring-stack.html) and managed by cluster-monitoring-operator (CMO).
+This folder contains the manifests for user-workload-monitoring (UWM) based on [monitoring user-defined project on OSD cluster](https://docs.openshift.com/dedicated/osd_cluster_admin/osd_monitoring/osd-understanding-the-monitoring-stack.html) and managed by cluster-monitoring-operator (CMO).
 
 The ServiceMonitors and the PodMonitors defines the scraping targets for Prometheus. The cluster console has the UI to run queries against the metrics from those targets.
 
