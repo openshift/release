@@ -10,7 +10,7 @@ The dashboards for Grafana are generated from [mixins](../openshift-user-workloa
 > make -C clusters/app.ci/openshift-user-workload-monitoring/mixins all
 
 The generated dashboards are stored in [mixins/grafana_dashboards_out](../openshift-user-workload-monitoring/mixins/grafana_dashboards_out).
-The `jsonnot` objects are there because it is easy for validation in CI if all the mixins generated manifests stays together.
+The `jsonnet` objects are there because it is easy for validation in CI if all the mixins generated manifests stay together.
 
 ## Staging
 
