@@ -29,6 +29,15 @@ sed -i "s#REPLACE_EXECUTOR#${SELENIUM_EXECUTOR}#" $CONFIG_FILE
 echo "Installing integration tests"
 pip install -e /tmp/integration_tests
 
+# Start FTP Server
+echo "Starting the local FTP Server"
+nohup python /tmp/ftp_server.py &
+# Save the PID of the FTP server process
+FTP_SERVER_PID=$(echo $!)
+
 # Execute tests
 echo "Executing PyTest..."
 pytest /tmp/integration_tests/mta/tests/operator/test_operator_test_cases.py -vv --reruns 4 --reruns-delay 10 --junitxml=${SHARED_DIR}/xunit_output.xml
+
+# Kill the FTP Server pid
+kill -9 ${FTP_SERVER_PID}

@@ -80,9 +80,6 @@ Below is a list of steps and sub-steps executed within this chain. Each step is 
     - This is taken care of in the [interop-mtr-orchestrate](orchestrate/README.md) -> [interop-tooling-operator-install](../tooling/operator-install/README.md) step
 - A Selenium container running in the test cluster that allows for ingress
   - This is taken care of in the [interop-mtr-orchestrate](orchestrate/README.md) -> [interop-tooling-deploy-selenium](../tooling/deploy-selenium/README.md) step
-- A public FTP server that hosts files required for the Interop MTR tests. 
-  - This server is Product QE's responsibility.
-
 
 ### Credentials
 
