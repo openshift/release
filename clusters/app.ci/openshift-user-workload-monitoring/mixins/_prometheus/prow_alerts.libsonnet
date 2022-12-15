@@ -23,7 +23,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'The backlog for {{ $labels.name }} is not getting drained. Check <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=workqueue_depth%7Bname%3D~%22{{ $labels.name }}%22%7D%20%3E%20100&g0.tab=0|Prometheus>'
+              message: 'The backlog for {{ $labels.name }} is not getting drained. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=prow-job-backlog-growing|Prometheus>'
             },
           },
           {
