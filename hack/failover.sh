@@ -24,7 +24,7 @@ CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
 PROMPASS=$(mktemp)
 trap 'rm -f "${PROMPASS}"' EXIT
 
-oc --context app.ci --namespace ci get secret prometheus-auth-credentials -o jsonpath='{.data.password}' | base64 -d > "${PROMPASS}"
+oc --context app.ci -n ci extract secret/app-ci-openshift-user-workload-monitoring-credentials --to=- --keys=sa.prometheus-user-workload.app.ci.token.txt > "${PROMPASS}"
 
 ${CONTAINER_ENGINE} pull registry.ci.openshift.org/ci/prow-job-dispatcher:latest
 ${CONTAINER_ENGINE} run --rm -v "$PWD:/release:z" -v "${PROMPASS}:/prompass:z" registry.ci.openshift.org/ci/prow-job-dispatcher:latest "$@" \
