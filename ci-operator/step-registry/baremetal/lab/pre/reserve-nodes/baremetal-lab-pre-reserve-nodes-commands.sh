@@ -1,12 +1,5 @@
 #!/bin/bash
 
-if [ -n "${LOCAL_TEST}" ]; then
-  # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
-  export N_MASTERS=1 N_WORKERS=1 IPI=true AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com
-  # shellcheck disable=SC2155
-  export NAMESPACE=test-ci-op SHARED_DIR=$(mktemp -d) CLUSTER_PROFILE_DIR=~/.ssh
-fi
-
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -18,17 +11,17 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-if [ -z "${AUX_HOST}" ]; then
-    echo "AUX_HOST is not filled. Failing."
-    exit 1
-fi
+[ -z "${AUX_HOST}" ] && {  echo "\$AUX_HOST is not filled. Failing."; exit 1; }
+[ -z "${masters}" ] && {  echo "\$AUX_HOST is not filled. Failing."; exit 1; }
+[ -z "${workers}" ] && {  echo "\$AUX_HOST is not filled. Failing."; exit 1; }
+[ -z "${IPI}" ] && {  echo "\$AUX_HOST is not filled. Failing."; exit 1; }
 
 # The hostname of nodes and the cluster names have limited length for BM.
 # Other profiles add to the cluster_name the suffix "-${JOB_NAME_HASH}".
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
-
+echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$IPI" != true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${NAMESPACE}" "${N_MASTERS}" "${N_WORKERS}" "${IPI}" << 'EOF'
+  "${NAMESPACE}" "${masters}" "${workers}" "${IPI}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -50,6 +43,6 @@ bash /usr/local/bin/reserve_hosts.sh
 bash /usr/local/bin/reserve_vips.sh
 EOF
 
+echo "Node reservation concluded successfully."
 scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/*.yaml" "${SHARED_DIR}/"
-
-more "${SHARED_DIR}"/* |& sed 's/pass.*$/pass ** HIDDEN **/g'
+more "${SHARED_DIR}"/*.yaml |& sed 's/pass.*$/pass ** HIDDEN **/g'

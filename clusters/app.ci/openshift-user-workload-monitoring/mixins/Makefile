@@ -1,7 +1,7 @@
 #
 SHELL=/usr/bin/env bash -o pipefail
 
-dashboards = cluster-pool
+dashboards = build-cop boskos boskos-acquire boskos-http canary configresolver deck e2e-template-jobs dptp ghproxy hook jenkins-operator osde2e plank prow sinker tide cluster-pool
 
 all: $(dashboards) ci-alerts_prometheusrule.yaml alertmanager-user-workload-secret_template.yaml
 
@@ -10,7 +10,7 @@ $(dashboards):
 	mkdir -p tmp
 	jsonnet -J vendor/ _grafana_dashboards/$@.jsonnet > tmp/$@.json
 	./create_dashboard.sh $@ $@ tmp/$@_grafanadashboard.jsonnet
-	jsonnet tmp/$@_grafanadashboard.jsonnet | gojsontoyaml > grafana_dashboards_out/cluster-pool_grafanadashboard.yaml
+	jsonnet tmp/$@_grafanadashboard.jsonnet | gojsontoyaml > grafana_dashboards_out/$@_grafanadashboard.yaml
 
 ci-alerts_prometheusrule.yaml:
 	@echo "Generating ci-alerts_prometheusrule.yaml ..."

@@ -106,6 +106,7 @@ bastion_fip="$(openstack floating ip create -f value -c floating_ip_address \
 >&2 openstack server add floating ip "$server_id" "$bastion_fip"
 echo ${bastion_fip} >> ${SHARED_DIR}/DELETE_FIPS
 echo ${bastion_fip} > ${SHARED_DIR}/BASTION_FIP
+echo ${BASTION_USER} > ${SHARED_DIR}/BASTION_USER
 cp ${SHARED_DIR}/DELETE_FIPS ${ARTIFACT_DIR}
 
 # configure the local container environment to have the correct SSH configuration
@@ -202,7 +203,6 @@ $SCP_CMD $WORK_DIR/deploy_squid.sh $BASTION_USER@$bastion_fip:/tmp
 $SSH_CMD chmod +x /tmp/deploy_squid.sh
 $SSH_CMD bash -c /tmp/deploy_squid.sh
 $SCP_CMD $BASTION_USER@$bastion_fip:/etc/squid/certs/domain.crt ${SHARED_DIR}/
-echo ${BASTION_USER}>${SHARED_DIR}/BASTION_USER
 
 if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
   printf "\n" >> "${SHARED_DIR}/osp-ca.crt"

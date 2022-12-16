@@ -93,9 +93,9 @@ if [[ -z "$OPENSHIFT_VERSION" ]]; then
   exit 1
 fi
 
-if [[ "$CHANNEL_GROUP" != "stable" ]]; then
-  OPENSHIFT_VERSION="${OPENSHIFT_VERSION}-${CHANNEL_GROUP}"
-fi
+# if [[ "$CHANNEL_GROUP" != "stable" ]]; then
+#   OPENSHIFT_VERSION="${OPENSHIFT_VERSION}-${CHANNEL_GROUP}"
+# fi
 echo "Choosing openshift version ${OPENSHIFT_VERSION}"
 
 # Switches

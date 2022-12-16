@@ -61,7 +61,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20221208-8898931a7f --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20221216-06fc803e5c --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -267,7 +267,6 @@ verify-app-ci:
 
 mixins:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/dashboards-validation:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/prow-monitoring/mixins install all
 	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/openshift-user-workload-monitoring/mixins install all
 .PHONY: mixins
 

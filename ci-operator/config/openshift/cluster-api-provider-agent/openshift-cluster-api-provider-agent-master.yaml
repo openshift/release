@@ -15,10 +15,6 @@ base_images:
     name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
-  assisted-service:
-    name: ocm-2.8
-    namespace: edge-infrastructure
-    tag: assisted-service
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
@@ -27,10 +23,6 @@ base_images:
     name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-service-scripts
-  assisted-test-infra:
-    name: ocm-2.8
-    namespace: edge-infrastructure
-    tag: assisted-test-infra
   base:
     name: "4.12"
     namespace: ocp
@@ -98,44 +90,7 @@ tests:
   container:
     from: src
   skip_if_only_changed: (^(docs|config)/)|(\.md$)|((^|/)OWNERS$)
-- as: e2e-metal-assisted-capi
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: hypershift-operator
-      PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=12000
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
-        MAKEFILE_TARGET="deploy_capi_env test_kube_api_parallel"
-      GATHER_CAPI_LOGS: "true"
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-capi-periodic
-  cron: 00 00 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: hypershift-operator
-      PROVIDER_IMAGE: pipeline:cluster-api-provider-agent
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=12000
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: full
-    workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp-capi
-  optional: true
   steps:
     cluster_profile: packet-assisted
     dependencies:

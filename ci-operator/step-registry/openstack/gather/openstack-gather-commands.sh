@@ -10,13 +10,20 @@ CLUSTER_NAME=$(<"${SHARED_DIR}/CLUSTER_NAME")
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 CREATE_FIPS=1
 
-if test -f "${SHARED_DIR}/proxy-conf.sh"
-then
+if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/proxy-conf.sh"
     CREATE_FIPS=0
+fi
+
+if [[ "$CONFIG_TYPE" == "proxy" ]]; then
     BASTION_FIP=$(<"${SHARED_DIR}/BASTION_FIP")
     BASTION_USER=$(<"${SHARED_DIR}/BASTION_USER")
+else
+    if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+        echo "This job uses a proxy but without a bastion, gathering is not supported yet, see CORS-2367"
+        exit 0
+    fi
 fi
 
 collect_bootstrap_logs() {
@@ -24,7 +31,7 @@ collect_bootstrap_logs() {
 		declare -a GATHER_BOOTSTRAP_ARGS
 		declare -a FIPS
 		IP=
-		
+
 		BOOTSTRAP_NODE=$(openstack server list --format value -c Name | awk "/${CLUSTER_NAME}-.{5}-bootstrap/ {print}")
 		if [ "$BOOTSTRAP_NODE" != "" ]; then
 			echo "Collecting bootstrap logs..."
@@ -42,7 +49,7 @@ collect_bootstrap_logs() {
 				IP=$(echo "${ADDRESSES}" | jq -r 'if .addresses|type == "object" then .addresses[][0] else .addresses|split("=")[1]|split(",")[0] end')
 			fi
 			GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${IP}")
-			
+
 			for idx in 0 1 2; do
 				if openstack server show ${CLUSTER_ID}-master-${idx} &> /dev/null; then
 					if [[ $CREATE_FIPS == 1 ]]; then
@@ -58,8 +65,7 @@ collect_bootstrap_logs() {
 			done
 			# Ideally this would be removed once the openshift-install gather bootstrap starts supporting proxy https://issues.redhat.com/browse/CORS-2367
 			SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-			if test -f "${SHARED_DIR}/proxy-conf.sh"
-			then
+                        if [[ "$CONFIG_TYPE" == "proxy" ]]; then
 				# configure the local container environment to have the correct SSH configuration
 				if ! whoami &> /dev/null; then
 					if [[ -w /etc/passwd ]]; then
