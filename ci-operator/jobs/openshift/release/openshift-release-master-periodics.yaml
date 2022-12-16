@@ -7138,6 +7138,82 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
+  interval: 48h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: ci-4.12
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.12-e2e-aws-ovn-network-migration
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ovn-network-migration-cluster-profile
+      - --target=e2e-aws-ovn-network-migration
+      - --variant=ci-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-network-migration-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
   interval: 8h
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -9472,82 +9548,6 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.12-e2e-network-migration
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-network-migration-cluster-profile
-      - --target=e2e-network-migration
-      - --variant=ci-4.12
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-network-migration-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-2
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  interval: 48h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-2
-    ci-operator.openshift.io/variant: ci-4.12
-    ci.openshift.io/generator: prowgen
-    ci.openshift.io/no-builds: "true"
-    job-release: "4.12"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-release-master-ci-4.12-e2e-network-migration-rollback
   spec:
     containers:
@@ -10898,6 +10898,82 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-aws-ovn-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: ci-4.13
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.13"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.13-e2e-aws-ovn-network-migration
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ovn-network-migration-cluster-profile
+      - --target=e2e-aws-ovn-network-migration
+      - --variant=ci-4.13
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-network-migration-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -13237,82 +13313,6 @@ periodics:
             name: cluster-secrets-gcp-openshift-gce-devel-ci-2
         - configMap:
             name: cluster-profile-gcp-openshift-gce-devel-ci-2
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build01
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: master
-    org: openshift
-    repo: release
-  interval: 168h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-2
-    ci-operator.openshift.io/variant: ci-4.13
-    ci.openshift.io/generator: prowgen
-    ci.openshift.io/no-builds: "true"
-    job-release: "4.13"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-ci-4.13-e2e-network-migration
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-network-migration-cluster-profile
-      - --target=e2e-network-migration
-      - --variant=ci-4.13
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-network-migration-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-2
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -40717,7 +40717,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.12-e2e-nutanix
+  name: periodic-ci-openshift-release-master-nightly-4.12-e2e-nutanix-ovn
   spec:
     containers:
     - args:
@@ -40726,8 +40726,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-nutanix-cluster-profile
-      - --target=e2e-nutanix
+      - --secret-dir=/usr/local/e2e-nutanix-ovn-cluster-profile
+      - --target=e2e-nutanix-ovn
       - --variant=nightly-4.12
       command:
       - ci-operator
@@ -40744,7 +40744,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-nutanix-cluster-profile
+      - mountPath: /usr/local/e2e-nutanix-ovn-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -46735,7 +46735,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-nightly-4.13-e2e-nutanix
+  name: periodic-ci-openshift-release-master-nightly-4.13-e2e-nutanix-ovn
   spec:
     containers:
     - args:
@@ -46744,8 +46744,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-nutanix-cluster-profile
-      - --target=e2e-nutanix
+      - --secret-dir=/usr/local/e2e-nutanix-ovn-cluster-profile
+      - --target=e2e-nutanix-ovn
       - --variant=nightly-4.13
       command:
       - ci-operator
@@ -46762,7 +46762,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-nutanix-cluster-profile
+      - mountPath: /usr/local/e2e-nutanix-ovn-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -65077,7 +65077,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-okd-4.12-upgrade-from-okd-4.11-e2e-upgrade-aws
+  name: periodic-ci-openshift-release-master-okd-4.12-upgrade-from-okd-4.11-e2e-aws-ovn-upgrade
   spec:
     containers:
     - args:
@@ -65086,8 +65086,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-upgrade-aws-cluster-profile
-      - --target=e2e-upgrade-aws
+      - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
+      - --target=e2e-aws-ovn-upgrade
       - --variant=okd-4.12-upgrade-from-okd-4.11
       command:
       - ci-operator
@@ -65104,7 +65104,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-upgrade-aws-cluster-profile
+      - mountPath: /usr/local/e2e-aws-ovn-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -65153,7 +65153,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-okd-4.12-upgrade-from-okd-4.11-e2e-upgrade-gcp
+  name: periodic-ci-openshift-release-master-okd-4.12-upgrade-from-okd-4.11-e2e-gcp-ovn-upgrade
   spec:
     containers:
     - args:
@@ -65162,8 +65162,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-upgrade-gcp-cluster-profile
-      - --target=e2e-upgrade-gcp
+      - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-cluster-profile
+      - --target=e2e-gcp-ovn-upgrade
       - --variant=okd-4.12-upgrade-from-okd-4.11
       command:
       - ci-operator
@@ -65180,7 +65180,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-upgrade-gcp-cluster-profile
+      - mountPath: /usr/local/e2e-gcp-ovn-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -65461,7 +65461,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-okd-4.13-upgrade-from-okd-4.12-e2e-upgrade-aws-ovn
+  name: periodic-ci-openshift-release-master-okd-4.13-upgrade-from-okd-4.12-e2e-aws-ovn-upgrade
   spec:
     containers:
     - args:
@@ -65470,8 +65470,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-upgrade-aws-ovn-cluster-profile
-      - --target=e2e-upgrade-aws-ovn
+      - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
+      - --target=e2e-aws-ovn-upgrade
       - --variant=okd-4.13-upgrade-from-okd-4.12
       command:
       - ci-operator
@@ -65488,7 +65488,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-upgrade-aws-ovn-cluster-profile
+      - mountPath: /usr/local/e2e-aws-ovn-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -65537,7 +65537,7 @@ periodics:
     ci.openshift.io/no-builds: "true"
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-release-master-okd-4.13-upgrade-from-okd-4.12-e2e-upgrade-gcp-ovn
+  name: periodic-ci-openshift-release-master-okd-4.13-upgrade-from-okd-4.12-e2e-gcp-ovn-upgrade
   spec:
     containers:
     - args:
@@ -65546,8 +65546,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-upgrade-gcp-ovn-cluster-profile
-      - --target=e2e-upgrade-gcp-ovn
+      - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-cluster-profile
+      - --target=e2e-gcp-ovn-upgrade
       - --variant=okd-4.13-upgrade-from-okd-4.12
       command:
       - ci-operator
@@ -65564,7 +65564,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-upgrade-gcp-ovn-cluster-profile
+      - mountPath: /usr/local/e2e-gcp-ovn-upgrade-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
