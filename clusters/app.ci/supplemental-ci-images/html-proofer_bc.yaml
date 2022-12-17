@@ -1,0 +1,41 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: hongkliu-test
+  name: html-proofer
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: html-proofer:5.0.3
+  source:
+    # https://raw.githubusercontent.com/hugoguru/docker-html-proofer/main/Dockerfile
+    dockerfile: |
+      FROM docker.io/ruby:3.1.3-alpine3.17 AS main
+
+      ARG VERSION
+
+      RUN apk add --no-cache libcurl xz-libs \
+      && apk add --no-cache --virtual tmp build-base libxml2-dev libxslt-dev \
+      && gem install html-proofer --version "= $VERSION" --no-document \
+      && apk del tmp
+
+      WORKDIR /src
+
+      ENTRYPOINT [ "htmlproofer" ]
+
+
+      FROM main AS ci
+
+      ENTRYPOINT [ "" ]
+      CMD [ "htmlproofer" ]
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      buildArgs:
+      - name: "VERSION"
+        value: "5.0.3"
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
