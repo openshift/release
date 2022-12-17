@@ -11,21 +11,24 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+  ocp_builder_rhel-8-golang-1.17-openshift-4.10:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.17-openshift-4.10
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
 images:
 - from: base
   inputs:
     ocp_4.10_cli:
       as:
       - registry.ci.openshift.org/ocp/4.10:cli
-    ocp_builder_rhel-8-golang-1.16-openshift-4.10:
+    ocp_builder_rhel-8-golang-1.17-openshift-4.10:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.10
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.17-openshift-4.10
   to: ovn-kubernetes
 promotion:
   name: "4.10"
@@ -154,6 +157,27 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-serial
+- as: unit
+  commands: |
+    cd go-controller
+    PKGS=$(go list -mod vendor -f '{{if len .TestGoFiles}} {{.ImportPath}} {{end}}' ${PKGS:-./cmd/... ./pkg/... ./hybrid-overlay/...} | xargs)
+    # this package needs running as a container for TestNewClientset
+    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"/ }
+    PKGS=$PKGS make test NOROOT=TRUE
+  container:
+    from: src
+- as: lint
+  commands: |
+    cd go-controller
+    make lint
+  container:
+    from: src
+- as: gofmt
+  commands: |
+    cd go-controller
+    make gofmt
+  container:
+    from: src
 zz_generated_metadata:
   branch: release-4.10
   org: openshift
