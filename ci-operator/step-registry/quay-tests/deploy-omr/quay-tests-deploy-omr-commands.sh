@@ -153,5 +153,5 @@ cp /var/run/quay-qe-omr-secret/ssl.cert .
 cp /var/run/quay-qe-omr-secret/ssl.key .
 chmod 600 ./ssh.key
 
-echo "OMR Host Name is ${OMR_CI_NAME}"
+echo "OMR Host Name is ${OMR_HOST_NAME}"
 ./mirror-registry install --sslKey ./ssl.key --sslCert ./ssl.cert --quayHostname "${OMR_HOST_NAME}" --initPassword password --initUser quay --targetHostname "${OMR_HOST_NAME}" --targetUsername ec2-user --ssh-key ./ssh.key -v
