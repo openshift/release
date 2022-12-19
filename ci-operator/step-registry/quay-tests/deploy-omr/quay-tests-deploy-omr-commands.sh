@@ -32,7 +32,6 @@ EOF
 
 cat >> create_aws_ec2.tf << EOF
 provider "aws" {
-  profile = "default"
   region = "us-east-2"
   access_key = "${OMR_AWS_ACCESS_KEY}"
   secret_key = "${OMR_AWS_SECRET_KEY}"
@@ -47,17 +46,17 @@ resource "aws_vpc" "quaybuilder" {
 }
 
 resource "aws_internet_gateway" "igw" {
-  vpc_id = "${aws_vpc.quaybuilder.id}"
+  vpc_id = aws_vpc.quaybuilder.id
 }
 
 resource "aws_route" "route-public" {
-  route_table_id         = "${aws_vpc.quaybuilder.main_route_table_id}"
+  route_table_id         = aws_vpc.quaybuilder.main_route_table_id
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = "${aws_internet_gateway.igw.id}"
+  gateway_id             = aws_internet_gateway.igw.id
 }
 
 resource "aws_subnet" "quaybuilder" {
-  vpc_id            = "${aws_vpc.quaybuilder.id}"
+  vpc_id            = aws_vpc.quaybuilder.id
   cidr_block        = "10.0.1.0/24"
   availability_zone = "us-east-2c"
 }
@@ -70,7 +69,7 @@ resource "aws_key_pair" "quaybuilder0710" {
 resource "aws_security_group" "quaybuilder" {
   name        = var.quay_build_worker_security_group
   description = "Allow all inbound traffic"
-  vpc_id      = "${aws_vpc.quaybuilder.id}"
+  vpc_id      = aws_vpc.quaybuilder.id
 
   ingress {
     description = "traffic into quaybuilder VPC"
@@ -90,13 +89,13 @@ resource "aws_security_group" "quaybuilder" {
 }
 
 resource "aws_instance" "quaybuilder" {
-  key_name      = "${aws_key_pair.quaybuilder0710.key_name}"
+  key_name      = aws_key_pair.quaybuilder0710.key_name
   ami           = "ami-0b2e47f3b2e23d235"
   instance_type = "m4.xlarge"
 
   associate_public_ip_address = true
-  vpc_security_group_ids = ["${aws_security_group.quaybuilder.id}"]
-  subnet_id = "${aws_subnet.quaybuilder.id}"
+  vpc_security_group_ids = [aws_security_group.quaybuilder.id]
+  subnet_id = aws_subnet.quaybuilder.id
   
   ebs_block_device {
     device_name = "/dev/sda1"
