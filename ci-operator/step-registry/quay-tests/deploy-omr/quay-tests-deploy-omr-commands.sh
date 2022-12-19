@@ -5,8 +5,9 @@ set -o errexit
 set -o pipefail
 
 
-#Check podman version
+#Check podman and skopeo version
 podman -v
+skopeo -v
 pwd
 
 #Create new AWS EC2 Instatnce to deploy Quay OMR
@@ -106,6 +107,10 @@ resource "aws_instance" "quaybuilder" {
   provisioner "remote-exec" {
     inline = [
       "sudo yum install podman openssl -y",
+      "curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz",
+      "tar -xzvf mirror-registry.tar.gz",
+      "sudo ./mirror-registry install --quayHostname ${OMR_HOST_NAME} --initPassword password --initUser quay -v"
+
     ]
   }
 
@@ -141,17 +146,6 @@ export TF_VAR_quay_build_worker_security_group="${OMR_CI_NAME}"
 terraform init
 terraform apply -auto-approve
 
-
-#Download the latest OMR
-cd .. && mkdir omr_deployment && cd omr_deployment
-curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz
-tar -xzvf mirror-registry.tar.gz
-
-#Install OMR via remote mode
-cp /var/run/quay-qe-omr-secret/ssh.key .
-cp /var/run/quay-qe-omr-secret/ssl.cert .
-cp /var/run/quay-qe-omr-secret/ssl.key .
-chmod 600 ./ssh.key
-
-echo "OMR Host Name is ${OMR_HOST_NAME}"
-./mirror-registry install --sslKey ./ssl.key --sslCert ./ssl.cert --quayHostname "${OMR_HOST_NAME}" --initPassword password --initUser quay --targetHostname "${OMR_HOST_NAME}" --targetUsername ec2-user --ssh-key ./ssh.key -v
+#Test OMR by push image
+skopeo copy docker://docker.io/fedora@sha256:895cdfba5eb6a009a26576cb2a8bc199823ca7158519e36e4d9effcc8b951b47 \
+--dest-tls-verify=false --dest-creds quay:password docker://${OMR_HOST_NAME}:8443/quaytest/test:latest
