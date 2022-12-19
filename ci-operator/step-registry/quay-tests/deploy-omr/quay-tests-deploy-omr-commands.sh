@@ -13,6 +13,7 @@ pwd
 OMR_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/access_key)
 OMR_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
 OMR_CI_NAME="omrprowci$RANDOM"
+OMR_HOST_NAME="quayomrcitest$RANDOM.qe.devcluster.openshift.com"
 
 mkdir -p terraform_omr && cd terraform_omr
 
@@ -120,7 +121,7 @@ resource "aws_instance" "quaybuilder" {
 }
 resource "aws_route53_record" "quayomr" {
   zone_id = "Z3B3KOVA3TRCWP"
-  name    = "quayomrcitest.qe.devcluster.openshift.com"
+  name    = "${OMR_HOST_NAME}"
   type    = "A"
   ttl     = 300
   records = [aws_instance.quaybuilder.public_ip]
@@ -152,4 +153,5 @@ cp /var/run/quay-qe-omr-secret/ssl.cert .
 cp /var/run/quay-qe-omr-secret/ssl.key .
 chmod 600 ./ssh.key
 
-./mirror-registry install --sslKey ./ssl.key --sslCert ./ssl.cert --quayHostname quayomrcitest.qe.devcluster.openshift.com --initPassword password --initUser quay --targetHostname quayomrcitest.qe.devcluster.openshift.com --targetUsername ec2-user --ssh-key ./ssh.key -v
+echo "OMR Host Name is ${OMR_CI_NAME}"
+./mirror-registry install --sslKey ./ssl.key --sslCert ./ssl.cert --quayHostname "${OMR_HOST_NAME}" --initPassword password --initUser quay --targetHostname "${OMR_HOST_NAME}" --targetUsername ec2-user --ssh-key ./ssh.key -v
