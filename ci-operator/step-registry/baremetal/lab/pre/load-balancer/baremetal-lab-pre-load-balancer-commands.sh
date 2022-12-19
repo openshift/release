@@ -1,20 +1,10 @@
 #!/bin/bash
 
-if [ -n "${LOCAL_TEST}" ]; then
-  # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
-  # shellcheck disable=SC2155
-  export NAMESPACE=test-ci-op AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com \
-      SHARED_DIR=${SHARED_DIR:-$(mktemp -d)} CLUSTER_PROFILE_DIR=~/.ssh IPI=false
-fi
-
 set -o nounset
 set -o errexit
 set -o pipefail
 
-if [ -z "${AUX_HOST}" ]; then
-    echo "AUX_HOST is not filled. Failing."
-    exit 1
-fi
+[ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing."; exit 1; }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -26,38 +16,38 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 BUILD_USER=ci-op
 BUILD_ID="${NAMESPACE}"
 
-MC=`if [ "${IPI}" != "true" ]; then 
-  for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' "${SHARED_DIR}/hosts.yaml"); do
+MC=""
+APISRV=""
+INGRESS80=""
+INGRESS443=""
+echo "Filling the load balancer targets..."
+if [ "${IPI}" == "true" ]; then
+  API_VIP="$(yq .api_vip "$SHARED_DIR/vips.yaml")"
+  MC="server api_vip $API_VIP:22623 check inter 1s"
+  APISRV="server api_vip $API_VIP:6443 check inter 1s"
+  INGRESS80="server api_vip $API_VIP:80 check inter 1s"
+  INGRESS443="server api_vip $API_VIP:443 check inter 1s"
+else
+  num_workers="$(yq e '[.[] | select(.name|test("worker"))]|length' "$SHARED_DIR/hosts.yaml")"
+  # shellcheck disable=SC2154
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    # shellcheck disable=SC2154
-    echo "    server $name $ip:6443 check inter 1s"
+    if [[ "$name" =~ bootstrap* ]] || [[ "$name" =~ master* ]]; then
+      MC="$MC
+        server $name $ip:22623 check inter 1s"
+      APISRV="$APISRV
+        server $name $ip:6443 check inter 1s"
+    fi
+    if [ "$num_workers" -eq 0 ] || [[ "$name" =~ worker* ]]; then
+      INGRESS80="
+        server $name $ip:80 check inter 1s"
+      INGRESS443="
+        server $name $ip:443 check inter 1s"
+    fi
   done
-else
-   echo "    server API_VIP 1.1.1.1:6443 check inter 1s"
-fi`
-
-APISRV=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "master*")' "${SHARED_DIR}/hosts.yaml"); do
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  # shellcheck disable=SC2154
-  echo "    server $name $ip:22623 check inter 1s"
-done`
-
-INGRESS80=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' "${SHARED_DIR}/hosts.yaml"); do
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  # shellcheck disable=SC2154
-  echo "    server $name $ip:80 check inter 1s"
-done`
-
-INGRESS443=`for bmhost in $(yq e -o=j -I=0 '.[] | select(.name == "worker*")' "${SHARED_DIR}/hosts.yaml"); do
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  # shellcheck disable=SC2154
-  echo "    server $name $ip:443 check inter 1s jad"
-done`
-
+fi
+echo "Generating the template..."
 HAPROXY="
 global
 log         127.0.0.1 local2
@@ -94,11 +84,11 @@ stats uri /stats
 listen api-server-6443
     bind *:6443
     mode tcp
-$MC
+$APISRV
 listen machine-config-server-22623
     bind *:22623
     mode tcp
-$APISRV
+$MC
 listen ingress-router-80
     bind *:80
     mode tcp
@@ -111,19 +101,10 @@ listen ingress-router-443
 $INGRESS443
 "
 
-DHCLIENT="
-# Configuration file for /sbin/dhclient.
-#
-# This is a sample configuration file for dhclient. See dhclient.conf's
-#       man page for more information about the syntax of this file
-#       and a more comprehensive list of the parameters understood by
-#       dhclient.
-#
-# Normally, if the DHCP server provides reasonable information and does
-#       not leave anything out (like the domain name, for example), then
-#       few changes must be made to this file, if any.
-#
+echo "Templating for HAProxy done..."
 
+echo "Generating the dhclient configuration"
+DHCLIENT='
 option rfc3442-classless-static-routes code 121 = array of unsigned integer 8;
 
 send host-name = gethostname();
@@ -132,114 +113,83 @@ request subnet-mask, broadcast-address, time-offset, host-name,
         rfc3442-classless-static-routes, ntp-servers;
 
 # Assuming eth1 will be the interface with the default gateway route
-interface 'eth1' {
+interface "eth1" {
     also request routers, domain-name, domain-name-servers, domain-search,
         dhcp6.name-servers, dhcp6.domain-search, dhcp6.fqdn, dhcp6.sntp-servers;
 }
+'
 
-#send dhcp-client-identifier 1:0:a0:24:ab:fb:9c;
-#send dhcp-lease-time 3600;
-#supersede domain-name "fugue.com home.vix.com";
-#prepend domain-name-servers 127.0.0.1;
-#require subnet-mask, domain-name-servers;
-#timeout 60;
-#retry 60;
-#reboot 10;
-#select-timeout 5;
-#initial-interval 2;
-#script '/sbin/dhclient-script';
-#media '-link0 -link1 -link2', 'link0 link1';
-#reject 192.33.137.209;
+echo "Pushing the configuration and starting the load balancer in the auxiliary host..."
 
-#alias {
-#  interface 'eth0';
-#  fixed-address 192.5.5.213;
-#  option subnet-mask 255.255.255.255;
-#}
-
-#lease {
-#  interface 'eth0';
-#  fixed-address 192.33.137.200;
-#  medium 'link0 link1';
-#  option host-name 'andare.swiftmedia.com';
-#  option subnet-mask 255.255.255.0;
-#  option broadcast-address 192.33.137.255;
-#  option routers 192.33.137.250;
-#  option domain-name-servers 127.0.0.1;
-#  renew 2 2000/1/12 00:00:01;
-#  rebind 2 2000/1/12 00:00:01;
-#  expire 2 2000/1/12 00:00:01;
-#}
-"
-
-timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${BUILD_ID}" "${IPI}" "${BUILD_USER}" "${HAPROXY}"  "${DHCLIENT}"  << 'EOF'
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+  "${BUILD_ID}" "${IPI}" "${DISCONNECTED}" "'${HAPROXY}'"  "'${DHCLIENT}'"  << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o allexport
 
 BUILD_ID="${1}"
+BUILD_USER=ci-op
 IPI="${2}"
-BUILD_USER=${3}"
+DISCONNECTED="${3}"
+HAPROXY="${4}"
+DHCLIENT="${5}"
+BUILD_DIR="/var/builds/${BUILD_ID}"
+HAPROXY_DIR="$BUILD_DIR/haproxy"
 
-cp /var/builds/$BUILD_ID/vips.yaml /var/builds/$BUILD_ID/external_vips.yaml
+mkdir -p "$HAPROXY_DIR"
+echo -e "${HAPROXY}" >> "$HAPROXY_DIR/haproxy.cfg"
+echo -e "${DHCLIENT}" >> "$HAPROXY_DIR/dhclient.conf"
 
-# shellcheck disable=SC2174
-mkdir -m 755 -p "/var/builds/$BUILD_ID/haproxy"
-
-echo -e "${4}" >> var/builds/$BUILD_ID/haproxy/haproxy.cfg
-echo -e "${5}" >> var/builds/$BUILD_ID/haproxy/dhclient.conf
-
-# Create and start HAProxy container
-docker run --name "haproxy-$BUILD_ID" --restart=on-failure \
-  -v "/var/builds/$BUILD_ID/haproxy/haproxy.cfg:/etc/haproxy.cfg" \
-  -v "/var/builds/$BUILD_ID/haproxy/dhclient.conf:/etc/dhcp/dhclient.conf" \
+echo "Create and start HAProxy container..."
+docker run --name "haproxy-$BUILD_ID" -d --restart=on-failure \
+  -v "$HAPROXY_DIR/haproxy.cfg:/etc/haproxy.cfg" \
+  -v "$HAPROXY_DIR/dhclient.conf:/etc/dhcp/dhclient.conf" \
+  --network none \
   quay.io/openshifttest/haproxy:armbm
 
-# for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
+echo "Setting the network interfaces in the HAProxy container"
+
+# Unmount resolv.conf to let the custom network configuration able to modify it
+nsenter -m -u -n -i -p -t "$(docker inspect -f '{{.State.Pid}}' "haproxy-${BUILD_ID}")" \
+  /bin/umount /etc/resolv.conf
+
+# For the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interfaces.
 # eth2 will only get local routes configuration
-set -x
-# Unmount resolv.conf to let custom network conf able to modify it
-nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-{{ BUILD_ID }}) \
-/bin/umount /etc/resolv.conf
-
-devices=(eth1.br-ext eth2.br-int)
 if [ x"${DISCONNECTED}" != x"true" ]; then
-  for dev in ${devices[@]}; do
-    interface=$(echo $dev | cut -f1 -d.)
-    bridge=$(echo $dev | cut -f2 -d.)
-    # for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
-    # eth2 will only get local routes configuration
-    set -x
-    /usr/local/bin/ovs-docker add-port $bridge $interface haproxy-$BUILD_ID
-    nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-$BUILD_ID) \
-    /sbin/dhclient -v \
-    -pf /var/run/dhclient.$interface.pid \
-    -lf /var/lib/dhcp/dhclient.$interface.lease $interface
-  done
+  devices=( eth1.br-ext eth2.br-int )
 else
-  set -x
-    /usr/local/bin/ovs-docker add-port br-int eth1 haproxy-$BUILD_ID
-    nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-$BUILD_ID) \
-    /sbin/dhclient -v \
-    -pf /var/run/dhclient.eth1.pid \
-    -lf /var/lib/dhcp/dhclient.eth1.lease eth1
-
+  devices=( eth1.br-int )
 fi
-
-# Gather the IP Address for the new interface
-api_ip=nsenter -m -u -n -i -p -t $(docker inspect -f '{{ '{{' }}.State.Pid {{ '}}' }}' haproxy-{{ BUILD_ID }}) -n  \
-/sbin/ip -o -4 a list eth1 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/'
-
-vips="
-ingress_vip: $api_ip
-api_vip: $api_ip
-"
-echo $vips > external_vips.yaml
-
+echo "${devices[@]}"
+for dev in "${devices[@]}"; do
+  interface=${dev%%.*}
+  bridge=${dev##*.}
+  # for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
+  # eth2 will only get local routes configuration
+  /usr/local/bin/ovs-docker add-port "$bridge" "$interface" "haproxy-$BUILD_ID"
+  nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-$BUILD_ID")" \
+    /sbin/dhclient -v \
+    -pf "/var/run/dhclient.$interface.pid" \
+    -lf "/var/lib/dhcp/dhclient.$interface.lease" "$interface"
+done
+echo "Sending HUP to HAProxy to trigger the configuration reload..."
 docker kill --signal HUP "haproxy-$BUILD_ID"
+
+echo "Gather the IP Address for the new interface"
+# IPI connected only
+[ ${IPI} == "true" ] && cp "$BUILD_DIR/vips.yaml" "$BUILD_DIR/external_vips.yaml"
+# IPI disconnected and UPI
+if [ "${IPI}" != "true" ] || [ "${DISCONNECTED}" == "true" ]; then
+  api_ip=$(nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-${BUILD_ID}")" -n  \
+    /sbin/ip -o -4 a list eth1 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
+  if [ "${#api_ip}" -eq 0 ]; then
+    echo "No IP Address has been set for the external API VIP, failing"
+    exit 1
+  fi
+  printf "ingress_vip: %s\napi_vip: %s" "$api_ip" "$api_ip" > "$BUILD_DIR/external_vips.yaml"
+fi
 
 EOF
 
+echo "Syncing back the external_vips.yaml file"
 scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/external_vips.yaml" "${SHARED_DIR}/"

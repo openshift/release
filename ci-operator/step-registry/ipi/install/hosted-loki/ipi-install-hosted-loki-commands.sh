@@ -4,6 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "$LOKI_ENABLED" != "true" ]];
+then
+  exit 0
+fi
+
+# Some kinds of jobs need to skip installing loki by default
+if [[ ! "$JOB_NAME" =~ .*ipv6.* ]]
+then
+  echo "IPv6 clusters are disconnected and won't be able to reach Loki."
+  exit 0
+fi
+
+
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
 export LOKI_ENDPOINT=https://observatorium-mst.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1

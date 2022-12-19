@@ -37,7 +37,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/%s/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).' % $._config.grafanaDashboardIDs['dptp.json'],
+              message: 'Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://grafana-route-ci-grafana.appss.ci.l2s4.p1.openshiftapps.com/d/%s/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).' % $._config.grafanaDashboardIDs['dptp.json'],
             },
           },
           {
@@ -193,7 +193,7 @@
           {
             alert: 'pod-scaler-admission-memory-warning',
             expr: |||
-             sum by (workload_name, workload_type, determined_memory, configured_memory) (increase(pod_scaler_admission_high_determined_memory{workload_type!="undefined"}[5m])) > 0
+             sum by (workload_name, workload_type, determined_memory, configured_memory) (increase(pod_scaler_admission_high_determined_memory{workload_type!~"undefined|build"}[5m])) > 0
             |||,
             'for': '1m',
             labels: {

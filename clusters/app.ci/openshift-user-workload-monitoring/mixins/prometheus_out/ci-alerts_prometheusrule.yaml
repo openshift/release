@@ -169,7 +169,7 @@ spec:
         severity: critical
     - alert: infrastructure-job-failures
       annotations:
-        message: Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).
+        message: Infrastructure CI job {{ $labels.job_name }} is failing. Investigate the symptoms, assess the urgency and take appropriate action (<https://grafana-route-ci-grafana.appss.ci.l2s4.p1.openshiftapps.com/d/8ce131e226b7fd2901c2fce45d4e21c1/dptp-dashboard?orgId=1&fullscreen&viewPanel=4|Grafana Dashboard> | <https://prow.ci.openshift.org/?job={{ $labels.job_name }}|Deck> | <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>).
       expr: |
         sum by (job_name) (
           rate(
@@ -274,7 +274,7 @@ spec:
       annotations:
         message: 'Workload {{ $labels.workload_name }} ({{ $labels.workload_type }}) used 10x more than configured amount of memory (actual: {{ $labels.determined_memory }}, configured: {{ $labels.configured_memory }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.'
       expr: |
-        sum by (workload_name, workload_type, determined_memory, configured_memory) (increase(pod_scaler_admission_high_determined_memory{workload_type!="undefined"}[5m])) > 0
+        sum by (workload_name, workload_type, determined_memory, configured_memory) (increase(pod_scaler_admission_high_determined_memory{workload_type!~"undefined|build"}[5m])) > 0
       for: 1m
       labels:
         severity: warning
@@ -292,28 +292,28 @@ spec:
     rules:
     - alert: ghproxy-too-many-pending-alerts
       annotations:
-        message: The average size of the pending GH API request queue in ghproxy is {{ $value | humanize }} over the last 5 minutes, which can indicate insufficient proxy throughput. Inspect <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.end_input=2022-03-23%2016%3A22&g0.expr=sum_over_time(pending_outbound_requests%7Bcontainer%3D%22ghproxy%22%7D%5B5m%5D)%20%2F%20count_over_time(pending_outbound_requests%7Bcontainer%3D%22ghproxy%22%7D%5B5m%5D)%20%3E%20100&g0.tab=0|Prometheus> and if the metric is ramping up, consider whether changing ghproxy throttling parameters may be necessary
+        message: The average size of the pending GH API request queue in ghproxy is {{ $value | humanize }} over the last 5 minutes, which can indicate insufficient proxy throughput. Inspect <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=ghproxy-too-many-pending-alerts|Prometheus> and if the metric is ramping up, consider whether changing ghproxy throttling parameters may be necessary
       expr: |
         sum_over_time(pending_outbound_requests{container="ghproxy"}[5m]) / count_over_time(pending_outbound_requests{container="ghproxy"}[5m]) > 150
       labels:
         severity: critical
     - alert: ghproxy-specific-status-code-abnormal
       annotations:
-        message: '{{ $value | humanize }}% of all requests for {{ $labels.path }} through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&refresh=1m&fullscreen&viewPanel=9|grafana>'
+        message: '{{ $value | humanize }}% of all requests for {{ $labels.path }} through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-route-ci-grafana.appss.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&refresh=1m&fullscreen&viewPanel=9|grafana>'
       expr: |
         sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) * 100 > 10
       labels:
         severity: warning
     - alert: ghproxy-global-status-code-abnormal
       annotations:
-        message: '{{ $value | humanize }}% of all API requests through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&viewPanel=8|grafana>'
+        message: '{{ $value | humanize }}% of all API requests through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-route-ci-grafana.appss.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&viewPanel=8|grafana>'
       expr: |
         sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) * 100 > 3
       labels:
         severity: warning
     - alert: ghproxy-running-out-github-tokens-in-a-hour
       annotations:
-        message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
+        message: '{{ $labels.login }} may run out of API quota before the next reset. Check the <https://grafana-route-ci-grafana.appss.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
         github_token_usage{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) + deriv(github_token_usage{ratelimit_resource="core"}[20m]) * github_token_reset{ratelimit_resource="core"} * on(token_hash) group_left(login) max(github_user_info{login=~"openshift-.*"}) by (token_hash, login) / 1e9 < 100
       for: 5m
@@ -321,7 +321,7 @@ spec:
         severity: critical
     - alert: ghproxy-running-out-github-tokens-in-a-hour
       annotations:
-        message: '{{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
+        message: '{{ $labels.token_hash }} may run out of API quota before the next reset. Check the <https://grafana-route-ci-grafana.appss.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1|dashboard>'
       expr: |
         github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"} + deriv(github_token_usage{ratelimit_resource="core",token_hash=~"openshift-ci - .*"}[20m]) * github_token_reset{ratelimit_resource="core"}  / 1e9 < 100
       for: 5m
@@ -330,7 +330,7 @@ spec:
     - alert: ghproxy-90-inode-percent
       annotations:
         message: |+
-          {{ $labels.token_hash }} uses 90% of the available inode (<https://grafana-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?viewPanel=5&orgId=1|dashboard>)
+          {{ $labels.token_hash }} uses 90% of the available inode (<https://grafana-route-ci-grafana.appss.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?viewPanel=5&orgId=1|dashboard>)
 
           Resolve by pruning the cache inside the ghproxy pod:
 
@@ -435,7 +435,7 @@ spec:
         severity: critical
     - alert: Controller backlog is not being drained
       annotations:
-        message: The backlog for {{ $labels.name }} is not getting drained. Check <https://prometheus-prow-monitoring.apps.ci.l2s4.p1.openshiftapps.com/graph?g0.range_input=1h&g0.expr=workqueue_depth%7Bname%3D~%22{{ $labels.name }}%22%7D%20%3E%20100&g0.tab=0|Prometheus>
+        message: The backlog for {{ $labels.name }} is not getting drained. Check <https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/alertrules?alerting-rule-name=prow-job-backlog-growing|Prometheus>
       expr: workqueue_depth{name=~"crier.*|plank"} > 100
       for: 20m
       labels:

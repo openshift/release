@@ -158,9 +158,11 @@ az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name $AC
 ACCOUNT_KEY=$(az storage account keys list -g $RESOURCE_GROUP --account-name $ACCOUNT_NAME --query "[0].value" -o tsv)
 
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos.json; then
-  VHD_URL="$(jq -r '.architectures.x86_64."rhel-coreos-extensions"."azure-disk".url' /tmp/coreos.json)"
+  VHD_URL="$(jq -r --arg arch "$OCP_ARCH" '.architectures[$arch]."rhel-coreos-extensions"."azure-disk".url' /tmp/coreos.json)"
+  RELEASE_VERSION="$(jq -r --arg arch "$OCP_ARCH" '.architectures[$arch]."rhel-coreos-extensions"."azure-disk".release' /tmp/coreos.json)"
 else
   VHD_URL="$(jq -r .azure.url /var/lib/openshift-install/rhcos.json)"
+  RELEASE_VERSION="$(jq -r .azure.release /var/lib/openshift-install/rhcos.json)"
 fi
 
 echo "Copying VHD image from ${VHD_URL}"
@@ -218,10 +220,23 @@ az network private-dns link vnet create -g $RESOURCE_GROUP -z ${CLUSTER_NAME}.${
 
 echo "Deploying 02_storage"
 VHD_BLOB_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c vhd -n "rhcos.vhd" -o tsv)
-az deployment group create -g $RESOURCE_GROUP \
-  --template-file "02_storage.json" \
-  --parameters vhdBlobURL="${VHD_BLOB_URL}" \
-  --parameters baseName="$INFRA_ID"
+
+# Check if it's the new template using Image Galleries instead of Managed Images
+if grep -qs "Microsoft.Compute/galleries" 02_storage.json; then
+  AZ_ARCH=$(echo $OCP_ARCH | sed 's/x86_64/x64/;s/aarch64/Arm64/')
+  az deployment group create -g $RESOURCE_GROUP \
+    --template-file "02_storage.json" \
+    --parameters vhdBlobURL="${VHD_BLOB_URL}" \
+    --parameters baseName="$INFRA_ID" \
+    --parameters storageAccount="$ACCOUNT_NAME" \
+    --parameters imageRelease="${RELEASE_VERSION::15}" \
+    --parameters architecture="$AZ_ARCH"
+else
+  az deployment group create -g $RESOURCE_GROUP \
+    --template-file "02_storage.json" \
+    --parameters vhdBlobURL="${VHD_BLOB_URL}" \
+    --parameters baseName="$INFRA_ID"
+fi
 
 echo "Deploying 03_infra"
 az deployment group create -g $RESOURCE_GROUP \

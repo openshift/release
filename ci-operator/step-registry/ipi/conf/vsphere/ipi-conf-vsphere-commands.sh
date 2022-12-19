@@ -57,7 +57,7 @@ compute:
       memoryMB: 16384
       osDisk:
         diskSizeGB: 120"
-    fi    
+    fi
 fi
 
 cat >> "${CONFIG}" << EOF

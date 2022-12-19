@@ -13,5 +13,7 @@ echo "### Gathering logs..."
 timeout -s 9 5m ssh "${SSHOPTS[@]}" "root@${IP}" bash - <<EOF
 cd dev-scripts
 make agent_gather
-cp agent-gather*.tar.xz "${ARTIFACT_DIR}"
+for ag in \$(ls agent-gather*.tar.xz); do
+    cp "\${ag}" "${ARTIFACT_DIR}"
+done
 EOF

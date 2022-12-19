@@ -83,17 +83,10 @@ promotion:
   namespace: logging
 releases:
   latest:
-    release:
-      channel: stable
-      version: "4.11"
-  next:
-    release:
-      channel: candidate
-      version: "4.12"
-  previous:
-    release:
-      channel: stable
-      version: "4.10"
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
 resources:
   '*':
     requests:
@@ -109,7 +102,7 @@ tests:
   container:
     from: src
   timeout: 15m0s
-- as: e2e
+- as: e2e-target
   steps:
     cluster_profile: gcp
     test:
@@ -151,7 +144,56 @@ tests:
       timeout: 3h0m0s
     workflow: openshift-e2e-gcp
   timeout: 5h0m0s
-- as: e2e-claim-aws
+- as: e2e-ocp-target-minus-one
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  optional: true
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-e2e-olm
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_ELASTICSEARCH_OPERATOR
+        name: pipeline:elasticsearch-operator
+      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
+        name: pipeline:elasticsearch-operator-registry
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: generic-claim
+  timeout: 5h0m0s
+- as: e2e-ocp-target-minus-two
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -200,106 +242,14 @@ tests:
       timeout: 3h0m0s
     workflow: generic-claim
   timeout: 5h0m0s
-- as: e2e-ocp-next
-  optional: true
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
-      RELEASE_IMAGE_LATEST: release:next
-    test:
-    - as: test
-      cli: next
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e-olm
-      dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator
-      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
-        name: pipeline:elasticsearch-operator-registry
-      - env: IMAGE_OAUTH_PROXY
-        name: pipeline:oauth-proxy
-      - env: IMAGE_LOGGING_CURATOR5
-        name: pipeline:logging-curator5
-      - env: IMAGE_LOGGING_FLUENTD
-        name: pipeline:logging-fluentd
-      - env: IMAGE_LOGGING_VECTOR
-        name: pipeline:logging-vector
-      - env: IMAGE_ELASTICSEARCH_PROXY
-        name: pipeline:elasticsearch-proxy
-      - env: IMAGE_ELASTICSEARCH6
-        name: pipeline:logging-elasticsearch6
-      - env: IMAGE_LOGGING_KIBANA6
-        name: pipeline:logging-kibana6
-      - env: IMAGE_LOGGING_EVENTROUTER
-        name: pipeline:logging-eventrouter
-      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
-        name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: openshift-e2e-aws
-  timeout: 5h0m0s
-- as: e2e-ocp-previous
-  optional: true
-  steps:
-    cluster_profile: gcp
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:previous
-      RELEASE_IMAGE_LATEST: release:previous
-    test:
-    - as: test
-      cli: latest
-      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-e2e-olm
-      dependencies:
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
-        name: pipeline:cluster-logging-operator-registry
-      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
-        name: pipeline:cluster-logging-operator
-      - env: IMAGE_ELASTICSEARCH_OPERATOR
-        name: pipeline:elasticsearch-operator
-      - env: IMAGE_ELASTICSEARCH_OPERATOR_REGISTRY
-        name: pipeline:elasticsearch-operator-registry
-      - env: IMAGE_OAUTH_PROXY
-        name: pipeline:oauth-proxy
-      - env: IMAGE_LOGGING_CURATOR5
-        name: pipeline:logging-curator5
-      - env: IMAGE_LOGGING_FLUENTD
-        name: pipeline:logging-fluentd
-      - env: IMAGE_LOGGING_VECTOR
-        name: pipeline:logging-vector
-      - env: IMAGE_ELASTICSEARCH_PROXY
-        name: pipeline:elasticsearch-proxy
-      - env: IMAGE_ELASTICSEARCH6
-        name: pipeline:logging-elasticsearch6
-      - env: IMAGE_LOGGING_KIBANA6
-        name: pipeline:logging-kibana6
-      - env: IMAGE_LOGGING_EVENTROUTER
-        name: pipeline:logging-eventrouter
-      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
-        name: pipeline:log-file-metric-exporter
-      from: pipeline:cluster-logging-operator-e2e
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: openshift-e2e-gcp
-  timeout: 5h0m0s
 - as: functional
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: openshift-ci
+    owner: cvp
     product: ocp
     timeout: 1h0m0s
-    version: "4.11"
+    version: "4.12"
   steps:
     test:
     - as: test
