@@ -14,11 +14,13 @@ if [[ -z "${SUB_TARGET_NAMESPACES}" ]]; then
   SUB_TARGET_NAMESPACES=${NAMESPACE}
 fi
 
+# Exit if SUB_PACKAGE is not defined
 if [[ -z "${SUB_PACKAGE}" ]]; then
   echo "ERROR: PACKAGE is not defined"
   exit 1
 fi
 
+# Use the default channel if one isn't defined
 if [[ -z "${SUB_CHANNEL}" ]]; then
   echo "INFO: CHANNEL is not defined, using default channel"
   SUB_CHANNEL=$(oc get packagemanifest "${SUB_PACKAGE}" -o jsonpath='{.status.defaultChannel}')
@@ -31,13 +33,14 @@ if [[ -z "${SUB_CHANNEL}" ]]; then
   fi
 fi
 
+# Set SUB_TARGET_NAMESPACES to the SUB_INSTALL_NAMESPACE value if it isn't set to "!install"
 if [[ "${SUB_TARGET_NAMESPACES}" == "!install" ]]; then
   SUB_TARGET_NAMESPACES="${SUB_INSTALL_NAMESPACE}"
 fi
 
 echo "Installing ${SUB_PACKAGE} from ${SUB_CHANNEL} into ${SUB_INSTALL_NAMESPACE}, targeting ${SUB_TARGET_NAMESPACES}"
 
-# create the install namespace
+# Create the install namespace
 oc apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
@@ -45,7 +48,7 @@ metadata:
   name: "${SUB_INSTALL_NAMESPACE}"
 EOF
 
-# deploy new operator group
+# Deploy new operator group
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -57,8 +60,8 @@ spec:
   - $(echo \"${SUB_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
 EOF
 
-# subscribe to the operator
-cat <<EOF | oc apply -f -
+# Subscribe to the operator
+oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -72,7 +75,7 @@ spec:
   sourceNamespace: openshift-marketplace
 EOF
 
-# can't wait before the resource exists. Need to sleep a bit before start watching
+# Can't wait before the resource exists. Need to sleep a bit before start watching
 sleep 60
 
 RETRIES=30

@@ -65,12 +65,11 @@ pip install -e /tmp/integration_tests
 
 ### Start the local FTP Server
 
-Because these tests require an FTP server and the one used previously is behind our firewall, this image contains a script that will start a local FTP server that holds the `.war` needed to execute the tests. The following command will start the server and save the PID of the FTP server process to the `/tmp/ftp_pid` file. This file will be used to stop the FTP server later.
+Because these tests require an FTP server and the one used previously is behind our firewall, this image contains a script that will start a local FTP server that holds the `.war` needed to execute the tests. The following command will start the server in the background.
 
 ```bash
 echo "Starting the local FTP Server"
-nohup python /tmp/ftp_server.py &
-echo $! > /tmp/ftp_pid
+python /tmp/ftp_server.py &
 ```
 
 ### Execute Tests
@@ -87,7 +86,7 @@ pytest /tmp/integration_tests/mta/tests/operator/test_operator_test_cases.py -vv
 The following line of code will stop the local FTP server that was started earlier in the script. If the process is left running, the execute pod will not complete and OpenShift CI will stop the pod after 2 hours, failing the execution.
 
 ```bash
-kill -9 `cat /tmp/ftp_pid`
+pkill -f ftp_server.py
 ```
 
 ## Container Used
