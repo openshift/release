@@ -147,5 +147,5 @@ terraform init
 terraform apply -auto-approve
 
 #Test OMR by push image
-skopeo copy docker://docker.io/fedora@sha256:895cdfba5eb6a009a26576cb2a8bc199823ca7158519e36e4d9effcc8b951b47 \
---dest-tls-verify=false --dest-creds quay:password docker://${OMR_HOST_NAME}:8443/quaytest/test:latest
+sleep 60
+skopeo copy docker://docker.io/fedora@sha256:895cdfba5eb6a009a26576cb2a8bc199823ca7158519e36e4d9effcc8b951b47 --dest-tls-verify=false --dest-creds quay:password docker://${OMR_HOST_NAME}:8443/quaytest/test:latest
