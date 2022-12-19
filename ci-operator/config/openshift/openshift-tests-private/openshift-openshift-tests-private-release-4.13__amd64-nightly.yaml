@@ -407,12 +407,39 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and @hypershift-hosted and
+        not @fips'
+      TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;HyperShiftGUEST&
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
       TEST_TIMEOUT: "30"
     test:
     - ref: cucushift-helper-service-build-info
+    - ref: cucushift-pre
     - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-extended-web-tests
+    - ref: cucushift-e2e-report
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-ovn-hypershift-guest-p2-f21-destructive
+  cron: 15 19 16 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and @hypershift-hosted and
+        not @fips and @destructive'
+      TAG_VERSION: '@4.13'
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: cucushift-helper-service-build-info
+    - ref: cucushift-pre
+    - ref: openshift-extended-test-disruptive
+    - ref: cucushift-e2e-destructive
+    - ref: openshift-extended-web-tests
+    - ref: cucushift-e2e-report
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-install-p2-f21
   cron: 14 17 4 * *
@@ -1102,6 +1129,31 @@ tests:
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-ovn
+- as: azure-ipi-ovn-hypershift-mgmt-p3-f21
+  cron: 21 21 2 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - ref: cucushift-helper-service-build-info
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-hypershift
+- as: azure-ipi-ovn-hypershift-p3-f21
+  cron: 21 17 29 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@azure-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.13'
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-hypershift
 - as: azure-ipi-ovn-ipsec-p1-f4
   cron: 34 0 15,20,24,28,1,5,9 * *
   steps:
