@@ -8,7 +8,7 @@ set -o pipefail
 #Check podman and skopeo version
 podman -v
 skopeo -v
-pwd
+HOME_PATH=$(PWD) && echo $HOME_PATH
 
 #Create new AWS EC2 Instatnce to deploy Quay OMR
 OMR_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/access_key)
@@ -145,6 +145,15 @@ export TF_VAR_quay_build_worker_key="${OMR_CI_NAME}"
 export TF_VAR_quay_build_worker_security_group="${OMR_CI_NAME}"
 terraform init
 terraform apply -auto-approve
+
+#Share the OMR HOSTNAME, Terraform Var and Terraform Directory
+tar -cvzf terraform.tgz --exclude=".terraform" $HOME_PATH/terraform_omr
+cp terraform.tgz ${SHARED_DIR}
+echo "${OMR_HOST_NAME}" > ${SHARED_DIR}/OMR_HOST_NAME
+echo "${OMR_CI_NAME}" > ${SHARED_DIR}/OMR_CI_NAME
+
+#Share the CA Cert of Quay OMR
+scp -i quaybuilder -o StrictHostKeyChecking=no ec2-user@"${OMR_HOST_NAME}":/etc/quay-install/quay-rootCA/rootCA.pem ${SHARED_DIR}
 
 #Test OMR by push image
 skopeo copy docker://docker.io/fedora@sha256:895cdfba5eb6a009a26576cb2a8bc199823ca7158519e36e4d9effcc8b951b47 docker://"${OMR_HOST_NAME}":8443/quaytest/test:latest --dest-tls-verify=false --dest-creds quay:password
