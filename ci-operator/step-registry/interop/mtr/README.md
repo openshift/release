@@ -13,7 +13,7 @@
 
 To prepare an environment and execute interop testing for the MTR (previously MTA) operator on the most recent version of OpenShift. The tests are maintained in the [windup/windup_integration_test](https://github.com/windup/windup_integration_test.git) repository by MTR product QE.
 
-This chain is to be used by the [windup-windup_integration_test-main](../../../config/calebevans/windup_integration_test/README.md) configuration
+This chain is to be used by the [windup-windup_integration_test-main](../../../config/windup/windup_integration_test/README.md) configuration
 
 ## Process
 

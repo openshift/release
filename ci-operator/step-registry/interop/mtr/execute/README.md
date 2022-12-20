@@ -44,7 +44,7 @@ SELENIUM_EXECUTOR=$(cat ${SHARED_DIR}/selenium-executor)
 
 ### Create MTR Test Configuration File
 
-The following code snippet is used to create the MTR test configuration file needed to execute the tests properly against the test cluster. The file is created by replacing values in a [pre-defined yaml file within the container](https://github.com/calebevans/windup_integration_test/blob/mtr/dockerfiles/interop/env.yaml) using the `sed` command along with [variables](#define-required-variables) defined earlier in the script.
+The following code snippet is used to create the MTR test configuration file needed to execute the tests properly against the test cluster. The file is created by replacing values in a [pre-defined yaml file within the container](https://github.com/windup/windup_integration_test/blob/mtr/dockerfiles/interop/env.yaml) using the `sed` command along with [variables](#define-required-variables) defined earlier in the script.
 
 ```bash
 echo "Replacing values in config file"
@@ -97,7 +97,7 @@ pkill -f ftp_server.py
 
 ## Container Used
 
-The container used in this step is named `mtr-runner` in the [configuration file](../../../../config/calebevans/calebevans-windup_integration_test-mtr.yaml). This container created from a custom image located in the [windup/windup_integration_test](https://github.com/windup/windup_integration_test.git) repository within in the `dockerfiles/interop` directory. The code snippet below is the Dockerfile found in that repository.
+The container used in this step is named `mtr-runner` in the [configuration file](../../../../windup/windup-windup_integration_test-mtr.yaml). This container created from a custom image located in the [windup/windup_integration_test](https://github.com/windup/windup_integration_test.git) repository within in the `dockerfiles/interop` directory. The code snippet below is the Dockerfile found in that repository.
 
 ```Dockerfile
 FROM python:3.8
