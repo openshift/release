@@ -22,14 +22,50 @@ cd ${HOME}/install_yamls
 # Create/enable openstack namespace
 make namespace
 # Creates storage
-make crc_storage
+# Sometimes it fails to find container-00 inside debug pod
+# TODO: fix issue in install_yamls
+n=0
+retries=3
+while true; do
+  make crc_storage && break
+  n=$((n+1))
+  if (( n >= retries )); then
+    echo "Failed to run 'make crc_storage' target. Aborting"
+    exit 1
+  fi
+  sleep 10
+done
+
+
 # Deploy openstack operator
 make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX}
-sleep 240
-# Deploy openstack service
+# Wait before start checking all deployment status
+# Not expecting to fail here, only in next deployment checks
+n=0
+retries=30
+until [ "$n" -ge "$retries" ]; do
+  oc get deployment openstack-operator-controller-manager && break
+    n=$((n+1))
+    sleep 10
+done
+
+# Check if all deployments are available
+INSTALLED_CSV=$(oc get subscription openstack-operator -o jsonpath='{.status.installedCSV}')
+oc get csv ${INSTALLED_CSV} -o jsonpath='{.spec.install.spec.deployments[*].name}' | \
+timeout ${TIMEOUT_OPERATORS_AVAILABLE} xargs -I {} -d ' ' \
+sh -c 'oc wait --for=condition=Available deployment {} --timeout=-1s'
+
+# Deploy openstack services
 make openstack_deploy
-sleep 600
-# Get all resources
+sleep 60
+# Debug
+oc get OpenStackControlPlane openstack -o json
+# Waiting for all services to be ready
+oc get OpenStackControlPlane openstack -o jsonpath='{.status.conditions[*].type}' | \
+timeout ${TIMEOUT_SERVICES_READY} xargs -I {} -d ' ' \
+sh -c 'echo testing condition={}; oc wait openstackcontrolplane.core.openstack.org/openstack --for=condition={} --timeout=-1s'
+
+# DEBUG - Getting resources information
 oc get all
 
 # Create clouds.yaml file to be used in further tests.
