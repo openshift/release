@@ -28,24 +28,7 @@ The execution of this configuration can be thought of as a 3 step process (with 
 2. Orchestrate, Execute, and Report
 3. Deprovision the test cluster
 
-These steps use a combination of workflows, chains, and refs to complete the interop testing of the MTR operator. This documentation will reference the `tests:` stanza of the configuration file quite a bit, so here is the stanza for convenience:
-
-```yaml
-tests:
-- as: mtr-scenario
-  steps:
-    cluster_profile: aws-cspi-qe
-    env:
-      BASE_DOMAIN: aws.interop.ccitredhat.com
-      SELENIUM_NAMESPACE: mtr
-      SUB_INSTALL_NAMESPACE: mtr
-      SUB_PACKAGE: mtr-operator
-      SUB_SOURCE: redhat-operators
-      SUB_TARGET_NAMESPACES: mtr
-    test:
-    - chain: interop-mtr
-    workflow: cucushift-installer-rehearse-aws-ipi
-```
+These steps use a combination of workflows, chains, and refs to complete the interop testing of the MTR operator.
 
 ### Cluster Provisioning and Deprovisioning: `cucushift-installer-rehearse-aws-ipi`
 
@@ -61,10 +44,4 @@ All of the orchestration, test execution, and reporting for the interop MTR scen
 
 The `mtr-runner` image is a Python base image with all required packages for test execution installed along with the [windup/windup_integration_test](https://github.com/windup/windup_integration_test.git) repository copied into the `/tmp/integration_tests` directory. The image is used to execute the MTR interop tests.
 
-This configuration only utilizes one custom image. The Dockerfile for this image can be found in the `dockerfiles/interop` directory of the [windup/windup_integration_test](https://github.com/windup/windup_integration_test.git) repository or you can see it in the [`interop-mtr-execute-ref` README file.](../../../step-registry/interop/mtr/execute/README.md). The image is defined in the following stanza of the configuration:
-
-```yaml
-- context_dir: .
-  dockerfile_path: dockerfiles/interop/Dockerfile
-  to: mtr-runner
-```
+This configuration only utilizes one custom image. The Dockerfile for this image can be found in the [windup/windup_integration_test repository](https://github.com/windup/windup_integration_test/blob/mtr/dockerfiles/interop/Dockerfile).

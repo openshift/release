@@ -4,15 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Retrieve the console URL. Used later in the script to build the URL to request the status of the pod.
 URL=$(oc get route -n openshift-console console -o jsonpath='{.spec.host}')
 APPS_URL=${URL#"console-openshift-console."}
 
+# Verify that the `SELENIUM_NAMESPACE` environment variable is defined. 
+# If it is not defined, the default namespace of `selenium` will be used.
 if [[ -z "${SELENIUM_NAMESPACE}" ]]; then
   echo "SELENIUM_NAMESPACE is not defined, using \"selenium\""
   SELENIUM_NAMESPACE="selenium"
 fi
 
-# Create the namespace
+# Create the Namespace defined in the `SELENIUM_NAMESPACE` variable. 
+# This command is idempotent, if the Namespace already exists, it will move on.
 echo "Creating namespace ${SELENIUM_NAMESPACE}"
 oc apply -f - <<EOF
 apiVersion: v1
@@ -21,7 +25,8 @@ metadata:
   name: "${SELENIUM_NAMESPACE}"
 EOF
 
-# Deploy the Selenium pod and it's infrascructure
+# Deploys the Selenium pod with the resources required to run this pod. 
+# It should pull a new image from Quay every time it is deployed, so the image will stay up to date.
 echo "Deploying the Selenium pod..."
 oc apply -f - <<EOF
 kind: Pod
@@ -58,7 +63,7 @@ spec:
         sizeLimit: 2Gi
 EOF
 
-# Create a new service for selenium
+# Create the Selenium service that will route traffic from the Ingress (port 80) to the Selenium pod (port 4444). 
 echo "Creating selenium service..."
 oc apply -f - <<EOF
 apiVersion: v1
@@ -78,7 +83,7 @@ spec:
       targetPort: 4444
 EOF
 
-# Create ingress route to service
+# Creates an Ingress on the target test cluster to allow for traffic from outside of the cluster to reach the Selenium pod.
 echo "Creating selenium ingress"
 oc apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
@@ -102,7 +107,7 @@ spec:
                   number: 4444
 EOF
 
-# Create an ingress rule
+# Creates the Network Policy that allows Ingress to our Selenium pod from outside of the network.
 echo "Adding network policy for selenium ingress..."
 oc apply -f - <<EOF
 apiVersion: networking.k8s.io/v1
@@ -120,6 +125,9 @@ spec:
     - {}
 EOF
 
+# Waits about 2.5 minutes for the pod to finish starting, then checks the status of the pod and the network. 
+#It will print the output of this check, then write the address needed to use the pod as a remote executor to a file 
+# named `selenium-executor` in the `SHARED_DIR` for use in later stages of testing.
 echo "Waiting for Selenium contianer to start..."
 sleep 150
 

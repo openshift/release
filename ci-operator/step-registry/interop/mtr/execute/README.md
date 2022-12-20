@@ -26,115 +26,32 @@ This script can be separated into 5 sections - Define required variables, create
 
 ### Define Required Variables
 
-The following code snippet is used to define the variables needed to [create the MTR test configuration file](#create-mtr-test-configuration-file). The variables defined in this step come from files in the `SHARED_DIR` and [credentials](#credentials) from Vault.
-
-```bash
-SECRETS_DIR="/tmp/secrets"
-APPS_URL=$(cat ${SHARED_DIR}/apps_url)
-MTR_USERNAME=$(cat ${SECRETS_DIR}/mtr/mtr-username)
-MTR_PASSWORD=$(cat ${SECRETS_DIR}/mtr/mtr-password)
-FTP_USERNAME=$(cat ${SECRETS_DIR}/ftp/ftp-username)
-FTP_PASSWORD=$(cat ${SECRETS_DIR}/ftp/ftp-password)
-FTP_HOST=$(cat ${SECRETS_DIR}/ftp/ftp-host)
-APP_HOSTNAME="http://${APPS_URL}"
-OCP_HOSTNAME="http://mtr-mtr.${APPS_URL}/"
-OCP_SECURE_HOSTNAME="https://secure-mtr-mtr.${APPS_URL}/"
-SELENIUM_EXECUTOR=$(cat ${SHARED_DIR}/selenium-executor)
-```
+Used to define the variables needed to [create the MTR test configuration file](#create-mtr-test-configuration-file). The variables defined in this step come from files in the `SHARED_DIR` and [credentials](#credentials) from Vault.
 
 ### Create MTR Test Configuration File
 
-The following code snippet is used to create the MTR test configuration file needed to execute the tests properly against the test cluster. The file is created by replacing values in a [pre-defined yaml file within the container](https://github.com/windup/windup_integration_test/blob/mtr/dockerfiles/interop/env.yaml) using the `sed` command along with [variables](#define-required-variables) defined earlier in the script.
-
-```bash
-echo "Replacing values in config file"
-sed -i "s#REPLACE_HOSTNAME#${APP_HOSTNAME}#" $CONFIG_FILE
-sed -i "s#REPLACE_OCP_HOSTNAME#${OCP_HOSTNAME}#" $CONFIG_FILE
-sed -i "s#REPLACE_OCP_SECURE_HOSTNAME#${OCP_SECURE_HOSTNAME}#" $CONFIG_FILE
-sed -i "s#REPLACE_FTP_HOST#${FTP_HOST}#" $CONFIG_FILE
-sed -i "s#REPLACE_FTP_USERNAME#${FTP_USERNAME}#" $CONFIG_FILE
-sed -i "s#REPLACE_FTP_PASSWORD#${FTP_PASSWORD}#" $CONFIG_FILE
-sed -i "s#REPLACE_EXECUTOR#${SELENIUM_EXECUTOR}#" $CONFIG_FILE
-sed -i "s#REPLACE_MTR_PASSWORD#${MTR_PASSWORD}#" $CONFIG_FILE
-sed -i "s#REPLACE_MTR_USER#${MTR_USERNAME}#" $CONFIG_FILE
-sed -i "s#REPLACE_MTR_VERSION#${MTR_VERSION}#" $CONFIG_FILE
-```
+Used to create the MTR test configuration file needed to execute the tests properly against the test cluster. The file is created by replacing values in a [pre-defined yaml file within the container](https://github.com/windup/windup_integration_test/blob/mtr/dockerfiles/interop/env.yaml) using the `sed` command along with [variables](#define-required-variables) defined earlier in the script.
 
 ### Install MTR Tests
 
-The following code snippet uses `pip` to install the MTR tests from the `/tmp/integration_tests` directory within the container. These tests come from the the [windup/windup_integration_test](https://github.com/windup/windup_integration_test.git) repository maintained by MTR product QE. These tests must be installed in this script rather than when the container image is built because OpenShift runs these containers using a user that ends up not having access to [modify the configuration file](#create-mtr-test-configuration-file) needed to execute these tests. Because that configuration file changes with every run, we have to modify it *then* install the tests.
-
-```bash
-echo "Installing integration tests"
-pip install -e /tmp/integration_tests
-```
+Uses `pip` to install the MTR tests from the `/tmp/integration_tests` directory within the container. These tests come from the the [windup/windup_integration_test](https://github.com/windup/windup_integration_test.git) repository maintained by MTR product QE. These tests must be installed in this script rather than when the container image is built because OpenShift runs these containers using a user that ends up not having access to [modify the configuration file](#create-mtr-test-configuration-file) needed to execute these tests. Because that configuration file changes with every run, we have to modify it *then* install the tests.
 
 ### Start the local FTP Server
 
-Because these tests require an FTP server and the one used previously is behind our firewall, this image contains a script that will start a local FTP server that holds the `.war` needed to execute the tests. The following command will start the server in the background.
-
-```bash
-echo "Starting the local FTP Server"
-python /tmp/ftp_server.py &
-```
+Because these tests require an FTP server and the one used previously is behind our firewall, this image contains a script that will start a local FTP server that holds the `.war` needed to execute the tests.
 
 ### Execute Tests
 
-The following code snippet uses `pytest` to execute the Interop MTR tests. The XUnit/JUnit results are then published to the `${SHARED_DIR}/xunit_output.xml` file. This file is to be used in the [interop-mtr-report](../report/README.md) step of this scenario.
+Uses `pytest` to execute the Interop MTR tests. The XUnit/JUnit results are then published to the `${SHARED_DIR}/xunit_output.xml` file. This file is to be used in the [interop-mtr-report](../report/README.md) step of this scenario.
 
-```bash
-echo "Executing PyTest..."
-pytest /tmp/integration_tests/mta/tests/operator/test_operator_test_cases.py -vv --reruns 4 --reruns-delay 10 --junitxml=${SHARED_DIR}/xunit_output.xml
-```
 
 ### Stop the local FTP Server
 
-The following line of code will stop the local FTP server that was started earlier in the script. If the process is left running, the execute pod will not complete and OpenShift CI will stop the pod after 2 hours, failing the execution.
-
-```bash
-pkill -f ftp_server.py
-```
+Stop the local FTP server that was started earlier in the script. If the process is left running, the execute pod will not complete and OpenShift CI will stop the pod after 2 hours, failing the execution.
 
 ## Container Used
 
-The container used in this step is named `mtr-runner` in the [configuration file](../../../../windup/windup-windup_integration_test-mtr.yaml). This container created from a custom image located in the [windup/windup_integration_test](https://github.com/windup/windup_integration_test.git) repository within in the `dockerfiles/interop` directory. The code snippet below is the Dockerfile found in that repository.
-
-```Dockerfile
-FROM python:3.8
-
-# Update and install FTP
-RUN apt -y update && apt -y install ftp
-
-# Upgrade pip and install required packages
-RUN pip install --upgrade pip
-RUN pip install pytest importscan pyftpdlib
-
-# Copy the windup_integration_test repo into /tmp/integration_tests
-RUN mkdir /tmp/integration_tests
-WORKDIR /tmp/integration_tests
-COPY . .
-
-# Add interop env file to mta/conf/env.yaml
-COPY dockerfiles/interop/src/env.yaml mta/conf/env.yaml
-
-# Create the /ftpuser directory
-RUN mkdir -p /home/ftpuser/mtr/applications
-
-# Add WAR file for testing
-COPY dockerfiles/interop/src/acmeair-webapp-1.0-SNAPSHOT.war /home/ftpuser/mtr/applications/acmeair-webapp-1.0-SNAPSHOT.war
-
-# Add ftp_server.py script
-COPY dockerfiles/interop/src/ftp_server.py /tmp/ftp_server.py
-
-# Set required permissions for OpenShift usage
-RUN chgrp -R 0 /tmp && \
-    chmod -R g=u /tmp
-
-RUN chgrp -R 0 /home && \
-    chmod -R g=u /home
-
-CMD ["/bin/bash"]
-```
+The container used in this step is named `mtr-runner` in the [configuration file](../../../../windup/windup-windup_integration_test-mtr.yaml). This container created from a custom image located in the [windup/windup_integration_test repository](https://github.com/windup/windup_integration_test/blob/mtr/dockerfiles/interop/Dockerfile).
 
 ## Requirements
 

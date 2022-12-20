@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Verify the arguments provided in the .environment variables. 
+#If any of the variables are not set and are able to be set using automation, this snippet takes care of assigning values to the unset variables.
 if [[ -z "${SUB_INSTALL_NAMESPACE}" ]]; then
   echo "SUB_INSTALL_NAMESPACE is not defined, using ${NAMESPACE}"
   SUB_INSTALL_NAMESPACE=${NAMESPACE}
@@ -40,7 +42,8 @@ fi
 
 echo "Installing ${SUB_PACKAGE} from ${SUB_CHANNEL} into ${SUB_INSTALL_NAMESPACE}, targeting ${SUB_TARGET_NAMESPACES}"
 
-# Create the install namespace
+# Create the Namespace that the operator will be installed on. 
+# This command is idempotent, so if the Namespace already exists, it will just continue with the rest of the script.
 oc apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
@@ -48,7 +51,7 @@ metadata:
   name: "${SUB_INSTALL_NAMESPACE}"
 EOF
 
-# Deploy new operator group
+# Deploy a new OperatorGroup in the Namespace that was just created.
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
@@ -60,7 +63,7 @@ spec:
   - $(echo \"${SUB_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
 EOF
 
-# Subscribe to the operator
+# Create the subscription for the operator and finish the install portion of this script.
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
@@ -78,6 +81,9 @@ EOF
 # Can't wait before the resource exists. Need to sleep a bit before start watching
 sleep 60
 
+# Verify that the operator is installed successfully. 
+# It will check the status of the installation every 30 seconds until it has reached 30 retries. 
+# If the operator is not installed successfully, it will retrieve information about the subscription and print that information for debugging.
 RETRIES=30
 CSV=
 for i in $(seq "${RETRIES}"); do
