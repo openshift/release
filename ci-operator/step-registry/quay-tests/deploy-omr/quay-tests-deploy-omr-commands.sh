@@ -147,7 +147,7 @@ terraform init
 terraform apply -auto-approve
 
 #Share the OMR HOSTNAME, Terraform Var and Terraform Directory
-tar -cvzf terraform.tgz --exclude=".terraform" $HOME_PATH/terraform_omr
+tar -cvzf terraform.tgz --exclude=".terraform" *
 cp terraform.tgz ${SHARED_DIR}
 echo "${OMR_HOST_NAME}" > ${SHARED_DIR}/OMR_HOST_NAME
 echo "${OMR_CI_NAME}" > ${SHARED_DIR}/OMR_CI_NAME
