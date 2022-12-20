@@ -14,16 +14,46 @@
       'configresolver.json': '703f0ccf02cc4339a374b52eb10f653b',
       'clusterpool.json': '22491886c1e19dde8d2984bca82154c1',
     },
-    buildCopSuccessRateTargets: {
-      'branch-.*-images': 100,
-      'release-.*-4.1': 80,
-      'release-.*-4.2': 80,
-      'release-.*-4.3': 80,
-      'release-.*-upgrade.*': 80,
-      'release-.*4.1.*4.2.*': 80,
-      'release-.*4.2.*4.3.*': 80,
-    },
     alertManagerReceivers: {
+      'build-cop': {
+        team: 'build-cop',
+        channel: '#build-cop-alerts',
+        notify: 'build-cop',
+      },
+      'patch-manager': {
+        team: 'patch-manager',
+        channel: '#notifications-ci',
+        notify: 'patch-manager',
+      },
+      'endurance-cluster': {
+        team: 'build-cop',
+        channel: '#build-cop-alerts',
+        notify: 'bparees',
+      },
+      'kni-cnf': {
+        team: 'cnf-cop',
+        channel: '#cnf-alerts',
+        notify: 'cnf-cop',
+      },
+      'openshift-logging': {
+        team: 'logging',
+        channel: '#forum-logging',
+        notify: 'aoslogging',
+      },
+      'OLM-rh-operators': {
+        team: 'OLM',
+        channel: '#operator-test',
+        notify: 'olmcop',
+      },
+      'openshift-virtualization': {
+        team: 'openshift-virtualization',
+        channel: '#kubevirt-ci-monitoring',
+        notify: 'build-officer',
+      },
+      'release-controller': {
+        team: 'release-controller',
+        channel: '#ops-crt',
+      },
     },
   },
 }

@@ -1,25 +1,10 @@
 #!/bin/bash
 
-# This script modifies the following files in the auxiliary host:
-# - /opt/dhcpd/root/etc/dnsmasq.conf
-# - /opt/tftpboot/grub.cfg-01-{hosts_mac}
-
-if [ -n "${LOCAL_TEST}" ]; then
-  # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
-  # shellcheck disable=SC2155
-  export NAMESPACE=test-ci-op AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com \
-      SHARED_DIR=${SHARED_DIR:-$(mktemp -d)} CLUSTER_PROFILE_DIR=~/.ssh IPI=false SELF_MANAGED_NETWORK=true \
-      INTERNAL_NET_IP=192.168.90.1
-fi
-
 set -o errexit
 set -o pipefail
 set -o nounset
 
-if [ -z "${AUX_HOST}" ]; then
-    echo "AUX_HOST is not filled. Failing."
-    exit 1
-fi
+[ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing."; exit 1; }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -75,13 +60,30 @@ fi
 echo "Generating the GRUB2 config..."
 GRUB_DIR=$(mktemp -d)
 
+function join_by_semicolon() {
+  local array_string="${1}"
+  local prefix="${2}"
+  local postfix="${3}"
+  while [[ "${array_string}" = *\;* ]]; do
+    # print initial part of string; then, remove it
+    echo -n "${prefix}${array_string%%;*}${postfix} "
+    array_string="${array_string#*;}"
+  done
+  # either the last or only one element is printed at the end
+  if [ "${#array_string}" -gt 0 ]; then
+    echo -n "${prefix}${array_string}${postfix} "
+  fi
+}
+
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   flavor=${name%%-[0-9]*}
-
-  cat > "${GRUB_DIR}/grub.cfg-01-$(echo "$mac" | tr ':' '-')" <<EOF
+  mac_postfix=${mac//:/-}
+  kargs="$(join_by_semicolon "$ipi_disabled_ifaces" "ip=" ":off")"
+  kargs="$kargs$(join_by_semicolon "$console_kargs" "console=" "")"
+  cat > "${GRUB_DIR}/grub.cfg-01-${mac_postfix}" <<EOF
 set timeout=5
 set default=0
 insmod efi_gop
@@ -90,7 +92,7 @@ load_video
 menuentry 'Install ($flavor)' {
     set gfx_payload=keep
     insmod gzio
-    linux  /${NAMESPACE}/vmlinuz debug nosplash console=tty0 console=ttyS0,115200 ip=${baremetal_iface}:dhcp $(echo "$ipi_disabled_ifaces" | sed 's/;/:off ip=/g;s/^/ip=/;') coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${NAMESPACE}/rootfs.img ignition.config.url=http://${INTERNAL_NET_IP}/${NAMESPACE}/${flavor}-console-hook.ign ignition.firstboot ignition.platform.id=metal
+    linux  /${NAMESPACE}/vmlinuz debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${NAMESPACE}/rootfs.img ignition.config.url=http://${INTERNAL_NET_IP}/${NAMESPACE}/$mac_postfix-console-hook.ign ignition.firstboot ignition.platform.id=metal
     initrd /${NAMESPACE}/initramfs.img
 }
 EOF

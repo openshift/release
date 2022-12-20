@@ -1,18 +1,8 @@
 #!/bin/bash
 
-if [ -n "${LOCAL_TEST}" ]; then
-  # Setting LOCAL_TEST to any value will allow testing this script with default values against the ARM64 bastion @ RDU2
-  # shellcheck disable=SC2155
-  export NAMESPACE=test-ci-op AUX_HOST=openshift-qe-bastion.arm.eng.rdu2.redhat.com \
-      SHARED_DIR=${SHARED_DIR:-$(mktemp -d)} CLUSTER_PROFILE_DIR=~/.ssh SELF_MANAGED_NETWORK=true
-fi
-
 set -o nounset
 
-if [ -z "${AUX_HOST}" ]; then
-    echo "AUX_HOST is not filled. Failing."
-    exit 1
-fi
+[ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing.";  exit 1; }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'StrictHostKeyChecking=no'
@@ -31,10 +21,14 @@ declare -a MAC_ARRAY
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  # shellcheck disable=SC2154
+  if [ "${#mac}" -eq 0 ]; then
+    echo "Unable to parse an entry in the hosts.yaml file"
+  fi
   MAC_ARRAY+=( "$mac" )
 done
 
-timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${NAMESPACE}" "${MAC_ARRAY[@]}" << 'EOF'
   set -o nounset
   NAMESPACE="${1}"; shift

@@ -14,6 +14,12 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+  sed -i '
+    s/password: .*/password: REDACTED/;
+    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+    s/UserData:.*,/UserData: REDACTED,/;
+    ' "${dir}/terraform.txt" 
+  tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt" 
   case "${CLUSTER_TYPE}" in
     aws|aws-arm64)
       grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log" > "${SHARED_DIR}/aws-instance-ids.txt";;
@@ -312,7 +318,10 @@ ibmcloud)
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
-vsphere) export VSPHERE_PERSIST_SESSION=true;;
+vsphere)
+    export VSPHERE_PERSIST_SESSION=true
+    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
@@ -372,8 +381,15 @@ if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   inject_promtail_service
 fi
 
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+TF_LOG_PATH="${dir}/terraform.txt"
+export TF_LOG_PATH
+
+openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
 wait "$!"
 ret="$?"
@@ -433,9 +449,5 @@ with open("'${ARTIFACT_DIR}/cluster-data.json'", "w") as outfile:
   set -o pipefail
   echo "Done collecting cluster data for analysis!"
 fi
-
-echo "install-config.yaml"
-echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 exit "$ret"

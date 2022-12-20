@@ -43,7 +43,7 @@ then
     wait "$!"
 fi
 
-hw_versions=(13 15 17 19)
+hw_versions=(15 17 19)
 for hw_version in "${hw_versions[@]}"; do
     if [[ "$(govc vm.info "${vm_template}-hw${hw_version}" | wc -c)" -eq 0 ]]
     then
