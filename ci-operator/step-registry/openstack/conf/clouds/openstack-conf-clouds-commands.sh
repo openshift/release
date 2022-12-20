@@ -44,6 +44,10 @@ new_clouds_yaml() {
 if [[ -n $APPLICATION_CREDENTIALS ]]; then
 	echo 'Generating ephemeral application credentials'
 	new_clouds_yaml "$clouds_yaml" > "${SHARED_DIR}/clouds.yaml"
+
+	declare appcreds_id
+	appcreds_id="$(yq -r ".clouds.\"${OS_CLOUD}\".auth.application_credential_id" "${SHARED_DIR}/clouds.yaml")"
+	echo "Generated application credentials with ID ${appcreds_id}"
 else
 	echo 'The environment variable APPLICATION_CREDENTIALS is unset or empty.'
 	if [[ "$(yq -r ".clouds.\"${OS_CLOUD}\".auth_type" "$clouds_yaml")" == 'v3applicationcredential' ]]; then
@@ -59,6 +63,10 @@ if [[ -n "$ROTATE_CLOUD_CREDENTIALS" ]]; then
 	echo 'Environment variable ROTATE_CLOUD_CREDENTIALS detected. Generating a set of application credentials for the rotation.'
 	new_clouds_yaml "$clouds_yaml" > "${SHARED_DIR}/clouds2.yaml"
 	new_clouds_yaml "$clouds_yaml" --unrestricted > "${SHARED_DIR}/clouds-unrestricted.yaml"
+
+	declare appcreds_id
+	appcreds_id="$(yq -r ".clouds.\"${OS_CLOUD}\".auth.application_credential_id" "${SHARED_DIR}/clouds2.yaml")"
+	echo "Generated additional application credentials with ID ${appcreds_id}"
 fi
 
 if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/squid-credentials.txt" ]; then
