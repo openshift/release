@@ -22,11 +22,8 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 
 CLUSTER_IP=$(gcloud compute instances list --filter="name=${INSTANCE_PREFIX}" --format json | jq -r '.[].networkInterfaces[0].accessConfigs[0].natIP')
-if [ -f transaction.yaml ]; then rm transaction.yaml; fi
 BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
-gcloud dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
-gcloud dns record-sets transaction add "${CLUSTER_IP}" --name "${INSTANCE_PREFIX}.${BASE_DOMAIN}." --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
-gcloud dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+gcloud dns record-sets create "${INSTANCE_PREFIX}.${BASE_DOMAIN}." --rrdatas "${CLUSTER_IP}"  --ttl 60 --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
 
 gcloud compute firewall-rules create "${INSTANCE_PREFIX}"-external \
   --network "${INSTANCE_PREFIX}" \

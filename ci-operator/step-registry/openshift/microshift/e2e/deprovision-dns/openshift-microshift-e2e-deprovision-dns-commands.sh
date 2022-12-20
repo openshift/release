@@ -21,15 +21,6 @@ gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
-if [ -f transaction.yaml ]; then rm transaction.yaml; fi
-gcloud dns record-sets transaction start --zone "${BASE_DOMAIN_ZONE_NAME}"
-while read -r line; do
-  DNSNAME=$(echo "${line}" | jq -r '.name')
-  DNSTTL=$(echo "${line}" | jq -r '.ttl')
-  DNSTYPE=$(echo "${line}" | jq -r '.type')
-  DNSDATA=$(echo "${line}" | jq -r '.rrdatas[]')
-  gcloud dns record-sets transaction remove --zone "${BASE_DOMAIN_ZONE_NAME}" --name "${DNSNAME}" --ttl "${DNSTTL}" --type "${DNSTYPE}" "${DNSDATA}"
-done < <(gcloud dns record-sets list --zone="${BASE_DOMAIN_ZONE_NAME}" --filter="name:${INSTANCE_PREFIX}.${BASE_DOMAIN}." --format=json | jq -c '.[]')
-gcloud dns record-sets transaction execute --zone "${BASE_DOMAIN_ZONE_NAME}"
+gcloud dns record-sets delete "${INSTANCE_PREFIX}.${BASE_DOMAIN}." --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
 
-gcloud compute firewall-rules delete "${INSTANCE_PREFIX}"-external
+gcloud compute firewall-rules delete "${INSTANCE_PREFIX}"-external || true
