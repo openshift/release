@@ -195,7 +195,7 @@ which is implemented by [cert-manager/pull/2975](https://github.com/cert-manager
 We do not need the additional arg `--dns01-recursive-nameservers="8.8.8.8:53"` in the deployment of cert-manager.
 
 
-* The selector in ClusterIssuer seem not working as mentioned in [cert-manager/issues/2968](https://github.com/jetstack/cert-manager/issues/2968):
+* The selector in ClusterIssuer seems to not work as mentioned in [cert-manager/issues/2968](https://github.com/jetstack/cert-manager/issues/2968):
 
 ```
 apiVersion: cert-manager.io/v1
