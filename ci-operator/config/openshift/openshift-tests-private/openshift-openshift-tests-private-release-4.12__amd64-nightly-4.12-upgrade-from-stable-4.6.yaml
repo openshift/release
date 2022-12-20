@@ -15,6 +15,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: tools
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
 releases:
   intermediate47:
     release:
@@ -58,14 +62,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: gcp-ipi-p1-f30
-  cron: 34 0 11 * *
+- as: gcp-ipi-proxy-private-p2-f30
+  cron: 35 5 5 * *
   steps:
     cluster_profile: gcp-qe
     post:
-    - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
+    - chain: cucushift-installer-rehearse-gcp-ipi-proxy-private-deprovision
     pre:
+    - ref: gcp-provision-vpc
+    - ref: ignition-bastionhost
+    - ref: gcp-provision-bastionhost
+    - ref: proxy-config-generate
     - chain: ipi-conf-gcp
+    - ref: ipi-conf-proxy
     - chain: ipi-install
     test:
     - as: set-upgrade-releases
