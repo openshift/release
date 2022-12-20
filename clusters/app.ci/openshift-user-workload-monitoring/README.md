@@ -1,5 +1,7 @@
 # Metrics and Alerts
 
+## User workload monitoring
+
 This folder contains the manifests for user-workload-monitoring (UWM) based on [monitoring user-defined project on OSD cluster](https://docs.openshift.com/dedicated/osd_cluster_admin/osd_monitoring/osd-understanding-the-monitoring-stack.html) and managed by cluster-monitoring-operator (CMO).
 
 The ServiceMonitors and the PodMonitors defines the scraping targets for Prometheus. The cluster console has the [UI](https://console-openshift-console.apps.ci.l2s4.p1.openshiftapps.com/monitoring/query-browser) to run queries against the metrics from those targets.
@@ -12,6 +14,11 @@ The generated manifests are stored in [mixins/prometheus_out](mixins/prometheus_
 
 [Here](../supplemental-ci-images/validation-images/dashboards/dashboards-validation.yaml) is the list of the required tools.
 
-# Add an alert on Prow jobs
+## Add an alert on Prow jobs
 
 The metrics and the alerts defined here are for the TP team. CI users has [a more convenient way](https://docs.ci.openshift.org/docs/how-tos/notification/) if slack notifications are desired, e.g, on Prow job failures.
+
+## Dashboards
+
+Currently there is [no dashboard support in UWM](https://coreos.slack.com/archives/C0VMT03S5/p1670228152637209?thread_ts=1670008515.321099&cid=C0VMT03S5).
+Dashboards for ci-monitoring based on those metrics are deployed in [ci-grafana](../ci-grafana).
