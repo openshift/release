@@ -442,6 +442,15 @@ spec:
         severity: critical
     - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)
       record: github:identity_names
+  - name: release-controller-down
+    rules:
+    - alert: releaseControllerDown
+      annotations:
+        message: '{{ $labels.deployment }} has been down for 5 minutes.'
+      expr: kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"release-controller.*"} >= 1
+      for: 5m
+      labels:
+        severity: critical
   - name: release-controller-bugzilla-errors
     rules:
     - alert: releaseControllerBugzillaError
