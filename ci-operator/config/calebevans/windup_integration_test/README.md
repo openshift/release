@@ -5,8 +5,6 @@
 - [Purpose](#purpose)
 - [Process](#process)
   - [Cluster Provisioning and Deprovisioning: `cucushift-installer-rehearse-aws-ipi`](#cluster-provisioning-and-deprovisioning-cucushift-installer-rehearse-aws-ipi)
-    - [Provisioning](#provisioning)
-    - [Deprovisioning](#deprovisioning)
   - [Orchestrate, Execute, and Report - `mtr-scenario`](#orchestrate-execute-and-report---mtr-scenario)
 - [Custom Images](#custom-images)
   - [`mtr-runner`](#mtr-runner)
@@ -50,26 +48,7 @@ tests:
 
 ### Cluster Provisioning and Deprovisioning: `cucushift-installer-rehearse-aws-ipi`
 
-The [`cucushift-installer-rehearse-aws-ipi`](../../../step-registry/cucushift/installer/rehearse/aws/ipi/cucushift-installer-rehearse-aws-ipi-workflow.yaml) workflow specifies a `pre` and `post` step. These steps are run before and after the `mtr-scenario` is executed:
-
-- The `pre` step is executed immediately **before** the `mtr-scneario` test is executed
-- The `post` step is executed immediately **after** the `mtr-scenario` test has executed
-
-```yaml
-steps: 
-pre:
-- chain: cucushift-installer-rehearse-aws-ipi-provision
-post:
-- chain: cucushift-installer-rehearse-aws-ipi-deprovision
-```
-
-#### Provisioning
-
-Before any orchestration or test execution, an OpenShift cluster must be provisioned on AWS first. This configuration makes uses of the `pre` step in the `cucushift-installer-rehearse-aws-ipi` workflow to do this. The workflow utilizes the `cluster_profile` and `BASE_DOMAIN` (environment variable) to provision the cluster in the interop AWS instance.
-
-#### Deprovisioning
-
-Immediately after the `mtr-scenario` test is executed, the provisioned OpenShift cluster is deprovisioned using the `post` step specified in the `cucushift-installer-rehearse-aws-ipi` workflow.
+Please see the [`cucushift-installer-rehearse-aws-ipi`](https://steps.ci.openshift.org/workflow/cucushift-installer-rehearse-aws-ipi) documentation for more information on this workflow. This workflow is not maintained by the Interop QE team.
 
 ### Orchestrate, Execute, and Report - `mtr-scenario`
 
