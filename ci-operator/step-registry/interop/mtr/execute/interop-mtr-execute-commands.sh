@@ -7,9 +7,11 @@ set -o pipefail
 # Set variables used to update the config file
 SECRETS_DIR="/tmp/secrets"
 APPS_URL=$(cat ${SHARED_DIR}/apps_url)
-FTP_USERNAME=$(cat ${SECRETS_DIR}/ftp-username)
-FTP_PASSWORD=$(cat ${SECRETS_DIR}/ftp-password)
-FTP_HOST=$(cat ${SECRETS_DIR}/ftp-host)
+MTR_USERNAME=$(cat ${SECRETS_DIR}/mtr/mtr-username)
+MTR_PASSWORD=$(cat ${SECRETS_DIR}/mtr/mtr-password)
+FTP_USERNAME=$(cat ${SECRETS_DIR}/ftp/ftp-username)
+FTP_PASSWORD=$(cat ${SECRETS_DIR}/ftp/ftp-password)
+FTP_HOST=$(cat ${SECRETS_DIR}/ftp/ftp-host)
 APP_HOSTNAME="http://${APPS_URL}"
 OCP_HOSTNAME="http://mtr-mtr.${APPS_URL}/"
 OCP_SECURE_HOSTNAME="https://secure-mtr-mtr.${APPS_URL}/"
@@ -24,6 +26,9 @@ sed -i "s#REPLACE_FTP_HOST#${FTP_HOST}#" $CONFIG_FILE
 sed -i "s#REPLACE_FTP_USERNAME#${FTP_USERNAME}#" $CONFIG_FILE
 sed -i "s#REPLACE_FTP_PASSWORD#${FTP_PASSWORD}#" $CONFIG_FILE
 sed -i "s#REPLACE_EXECUTOR#${SELENIUM_EXECUTOR}#" $CONFIG_FILE
+sed -i "s#REPLACE_MTR_PASSWORD#${MTR_PASSWORD}#" $CONFIG_FILE
+sed -i "s#REPLACE_MTR_USER#${MTR_USERNAME}#" $CONFIG_FILE
+sed -i "s#REPLACE_MTR_VERSION#${MTR_VERSION}#" $CONFIG_FILE
 
 # Install tests
 echo "Installing integration tests"

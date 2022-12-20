@@ -70,6 +70,9 @@ Below is a list of steps and sub-steps executed within this chain. Each step is 
   - `CONFIG_FILE`
     - **Definition**: The path to the config file required for MTR test execution.
     - **If left empty**: The default value for this path is `/tmp/integration_tests/mta/conf/env.yaml` and **generally should not change**. This variable is here just in case it needs to be overridden in the future.
+  - `MTR_VERSION`
+    - **Definition**: The version of the MTR operator you are testing. This variable is currently used in the MTR test configuration file.
+    - **If left empty**: The test will fail. 
 - [interop-mtr-report](report/README.md)
 
 ### Infrastructure
@@ -87,3 +90,8 @@ Below is a list of steps and sub-steps executed within this chain. Each step is 
   - `mtr-ftp-credentials`
     - **Collection**: [mtr-qe](https://vault.ci.openshift.org/ui/vault/secrets/kv/ddlist/selfservice/mtr-qe/)
     - **Usage**: Used to retrieve required files from the FTP server during test execution
+    - **Mount Path**: `/tmp/secrets/ftp` 
+  - `mtr-mtr-credentials`
+    - **Collection**: [mtr-qe](https://vault.ci.openshift.org/ui/vault/secrets/kv/ddlist/selfservice/mtr-qe/)
+    - **Usage**: Used in the MTR test config file to access the MTR operator.
+    - **Mount Path**: `/tmp/secrets/mtr` 

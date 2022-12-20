@@ -29,10 +29,13 @@ This script can be separated into 5 sections - Define required variables, create
 The following code snippet is used to define the variables needed to [create the MTR test configuration file](#create-mtr-test-configuration-file). The variables defined in this step come from files in the `SHARED_DIR` and [credentials](#credentials) from Vault.
 
 ```bash
+SECRETS_DIR="/tmp/secrets"
 APPS_URL=$(cat ${SHARED_DIR}/apps_url)
-FTP_USERNAME=$(cat ${SECRETS_DIR}/ftp-username)
-FTP_PASSWORD=$(cat ${SECRETS_DIR}/ftp-password)
-FTP_HOST=$(cat ${SECRETS_DIR}/ftp-host)
+MTR_USERNAME=$(cat ${SECRETS_DIR}/mtr/mtr-username)
+MTR_PASSWORD=$(cat ${SECRETS_DIR}/mtr/mtr-password)
+FTP_USERNAME=$(cat ${SECRETS_DIR}/ftp/ftp-username)
+FTP_PASSWORD=$(cat ${SECRETS_DIR}/ftp/ftp-password)
+FTP_HOST=$(cat ${SECRETS_DIR}/ftp/ftp-host)
 APP_HOSTNAME="http://${APPS_URL}"
 OCP_HOSTNAME="http://mtr-mtr.${APPS_URL}/"
 OCP_SECURE_HOSTNAME="https://secure-mtr-mtr.${APPS_URL}/"
@@ -52,6 +55,9 @@ sed -i "s#REPLACE_FTP_HOST#${FTP_HOST}#" $CONFIG_FILE
 sed -i "s#REPLACE_FTP_USERNAME#${FTP_USERNAME}#" $CONFIG_FILE
 sed -i "s#REPLACE_FTP_PASSWORD#${FTP_PASSWORD}#" $CONFIG_FILE
 sed -i "s#REPLACE_EXECUTOR#${SELENIUM_EXECUTOR}#" $CONFIG_FILE
+sed -i "s#REPLACE_MTR_PASSWORD#${MTR_PASSWORD}#" $CONFIG_FILE
+sed -i "s#REPLACE_MTR_USER#${MTR_USERNAME}#" $CONFIG_FILE
+sed -i "s#REPLACE_MTR_VERSION#${MTR_VERSION}#" $CONFIG_FILE
 ```
 
 ### Install MTR Tests
@@ -137,7 +143,9 @@ CMD ["/bin/bash"]
 - `CONFIG_FILE`
   - **Definition**: The path to the config file required for MTR test execution.
   - **If left empty**: The default value for this path is `/tmp/integration_tests/mta/conf/env.yaml` and **generally should not change**. This variable is here just in case it needs to be overridden in the future.
-
+- `MTR_VERSION`
+  - **Definition**: The version of the MTR operator you are testing. This variable is currently used in the MTR test configuration file.
+  - **If left empty**: The test will fail.
 ### Infrastructure
 
 - A provisioned test cluster to target.
@@ -149,3 +157,8 @@ CMD ["/bin/bash"]
 - `mtr-ftp-credentials`
   - **Collection**: [mtr-qe](https://vault.ci.openshift.org/ui/vault/secrets/kv/ddlist/selfservice/mtr-qe/)
   - **Usage**: Used to retrieve required files from the FTP server during test execution
+  - **Mount Path**: `/tmp/secrets/ftp`
+- `mtr-mtr-credentials`
+  - **Collection**: [mtr-qe](https://vault.ci.openshift.org/ui/vault/secrets/kv/ddlist/selfservice/mtr-qe/)
+  - **Usage**: Used in the MTR test config file to access the MTR operator.
+  - **Mount Path**: `/tmp/secrets/mtr`
