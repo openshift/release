@@ -15,6 +15,7 @@
 - **Repository**: [windup/windup_integration_test](https://github.com/windup/windup_integration_test.git)
 - **Operator Tested**: [MTR (Migration Toolkit for Runtimes)](https://developers.redhat.com/products/mtr/overview)
 - **Maintainers**: Interop QE
+- **Miro Board**: Please see [the diagram for how this scenario is run on Miro](https://miro.com/app/board/uXjVP90t854=/?share_link_id=23365731328). If access is needed reach out to the Interop QE team.
 
 ## Purpose
 

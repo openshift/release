@@ -43,4 +43,5 @@ echo "Executing PyTest..."
 pytest /tmp/integration_tests/mta/tests/operator/test_operator_test_cases.py -vv --reruns 4 --reruns-delay 10 --junitxml=${SHARED_DIR}/xunit_output.xml
 
 # Kill the FTP Server pid
+echo "Shutting down the FTP server"
 pkill -f ftp_server.py
