@@ -22,7 +22,10 @@ function populate_artifact_dir() {
   tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt" 
   case "${CLUSTER_TYPE}" in
     aws|aws-arm64)
-      grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log" > "${SHARED_DIR}/aws-instance-ids.txt";;
+      (
+        oc --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' ||
+        grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log"
+      ) | sed 's|.*/||' > "${SHARED_DIR}/aws-instance-ids.txt";;
     alibabacloud)
       awk -F'id=' '/alicloud_instance.*Creation complete/ && /master/{ print $2 }' "${dir}/.openshift_install.log" | tr -d ']"' > "${SHARED_DIR}/alibaba-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"

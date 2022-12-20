@@ -23,7 +23,10 @@ function populate_artifact_dir() {
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
   case "${CLUSTER_TYPE}" in
     aws|aws-arm64|aws-usgov|aws-c2s|aws-sc2s)
-      grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log" > "${SHARED_DIR}/aws-instance-ids.txt";;
+      (
+        oc --request-timeout=5s -n openshift-machine-api get machines -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' ||
+        grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log"
+      ) | sed 's|.*/||' > "${SHARED_DIR}/aws-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
   esac
 }
