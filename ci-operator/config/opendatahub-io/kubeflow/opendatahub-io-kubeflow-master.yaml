@@ -48,10 +48,13 @@ tests:
     test:
     - as: e2e
       commands: |
+        IN=$ODH_NOTEBOOK_CONTROLLER_IMAGE
+        arrIN=(${IN//:/ })
+        export IMG=${arrIN[1]}  
+        export TAG=${arrIN[2]}
         pushd components/odh-notebook-controller
-        make image -e IMG=quay.io/opendatahub/odh-notebook-controller -e TAG=e2e
         oc new-project odh-notebook-controller-system
-        make deploy -e K8S_NAMESPACE=odh-notebook-controller-system -e IMG=quay.io/opendatahub/odh-notebook-controller -e TAG=e2e
+        make deploy -e K8S_NAMESPACE=odh-notebook-controller-system
         mkdir -p ~/.kube
         cp /tmp/kubeconfig ~/.kube/config 2> /dev/null || cp /var/run/secrets/ci.openshift.io/multi-stage/kubeconfig ~/.kube/config
         chmod 644 ~/.kube/config
@@ -59,6 +62,11 @@ tests:
         make e2e-test -e K8S_NAMESPACE=odh-notebook-controller-system
         make undeploy -e K8S_NAMESPACE=odh-notebook-controller-system
         oc delete project odh-notebook-controller-system
+      dependencies:
+      - env: KF_NOTEBOOK_CONTROLLER_IMAGE
+        name: kf-notebook-controller
+      - env: ODH_NOTEBOOK_CONTROLLER_IMAGE
+        name: odh-notebook-controller
       from: src
       resources:
         requests:
