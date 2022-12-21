@@ -5,6 +5,12 @@ set -o errexit
 set -o pipefail
 
 
+function get_cnf_tests_pr {
+    pr_num=$1
+    git fetch origin pull/${pr_num}/head
+    git checkout FETCH_HEAD
+}
+
 function create_tests_skip_list_file {
 # List of test cases to ignore due to open bugs
 cat <<EOF >"${SKIP_TESTS_FILE}"
@@ -35,10 +41,6 @@ function create_tests_temp_skip_list_11 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
-# SKIPTEST
-# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
-# TESTNAME
-sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
 EOF
 }
 
@@ -47,56 +49,6 @@ function create_tests_temp_skip_list_12 {
 # List of temporarly skipped tests for 4.12
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "Should be able to configure a metaplugin"
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "Webhook resource injector"
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
-
-# SKIPTEST
-# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
-# TESTNAME
-performance "should disable CPU load balancing for CPU\\\'s used by the pod"
-
-# SKIPTEST
-# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
-# TESTNAME
-performance "should run infra containers on reserved CPUs"
-
-# SKIPTEST
-# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
-# TESTNAME
-performance "Huge pages support for container workloads"
-
-# SKIPTEST
-# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
-# TESTNAME
-sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/CNF-6862
-# TESTNAME
-performance "Checking IRQBalance settings Verify irqbalance configuration handling Should not overwrite the banned CPU set on tuned restart"
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/CNF-6862
-# TESTNAME
-performance "Checking IRQBalance settings Verify irqbalance configuration handling Should store empty cpu mask in the backup"
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-4194
-# TESTNAME
-performance "Should have the correct RPS configuration"
 
 EOF
 }
@@ -266,6 +218,9 @@ done
 echo "running on branch ${CNF_BRANCH}"
 git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
+
+get_cnf_tests_pr 1359
+
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 make setup-build-index-image
 cd -
