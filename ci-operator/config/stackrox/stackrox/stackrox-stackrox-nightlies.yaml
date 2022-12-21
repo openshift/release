@@ -1,4 +1,8 @@
 base_images:
+  aro:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aro-0.3.8
   eks:
     name: automation-flavors
     namespace: stackrox
@@ -7,14 +11,6 @@ base_images:
     name: automation-flavors
     namespace: stackrox
     tag: osd-0.3.6
-  rosa:
-    name: automation-flavors
-    namespace: stackrox
-    tag: rosa-0.3.8
-  ubi:
-    name: ubi
-    namespace: ocp
-    tag: "8"
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -65,20 +61,13 @@ images:
   - name: ROX_PRODUCT_BRANDING
     value: RHACS_BRANDING
   dockerfile_path: Dockerfile.gen
-  from: ubi
+  from: ubi-minimal
   inputs:
     central-db-bundle:
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/stackrox/stackrox/image/postgres/.
   to: central-db
-- dockerfile_path: Dockerfile
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/docs/.
-  to: docs
 - dockerfile_path: operator/build/Dockerfile.gen
   inputs:
     operator-artifacts:
@@ -151,8 +140,6 @@ tests:
         name: roxctl
       - env: CENTRAL_DB_IMAGE
         name: central-db
-      - env: PIPELINE_DOCS_IMAGE
-        name: docs
       - env: MAIN_RCD_IMAGE
         name: main-rcd
       - env: OPERATOR_IMAGE
@@ -274,7 +261,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 5h0m0s
-    version: "4.6"
+    version: "4.8"
   postsubmit: true
   steps:
     env:
@@ -329,6 +316,11 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
+- as: gke-postgres-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
 - as: gke-kernel-qa-e2e-tests
   postsubmit: true
   steps:
@@ -374,7 +366,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 5h0m0s
-    version: "4.6"
+    version: "4.8"
   postsubmit: true
   steps:
     test:
@@ -425,11 +417,6 @@ tests:
   postsubmit: true
   steps:
     workflow: stackrox-automation-flavors-aro-e2e
-  timeout: 5h0m0s
-- as: rosa-qa-e2e-tests
-  postsubmit: true
-  steps:
-    workflow: stackrox-automation-flavors-rosa-e2e
   timeout: 5h0m0s
 - as: nightly-tag
   cron: 0 5 * * *

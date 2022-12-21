@@ -54,7 +54,7 @@ tests:
 - as: e2e-kind
   steps:
     env:
-      AWS_CREDENTIALS_SECRET: ocm-obs-china-aws-kind
+      AWS_CREDENTIALS_SECRET: ocm-obs-usa-aws-kind
       AWS_INSTANCE_TYPE: t3.small
     post:
     - ref: ocm-e2e-kind-destroy
@@ -72,6 +72,7 @@ tests:
     workflow: ocm-e2e-kind
 - as: sonar-pre-submit
   commands: |
+    export THANOS_TEST_OBJSTORE_SKIP=GCS,S3,AZURE,SWIFT,COS,ALIYUNOSS,BOS,OCI
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
@@ -81,6 +82,7 @@ tests:
     name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
+    export THANOS_TEST_OBJSTORE_SKIP=GCS,S3,AZURE,SWIFT,COS,ALIYUNOSS,BOS,OCI
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:

@@ -25,6 +25,10 @@ cluster_groups:
   - build01
   - build02
   - vsphere
+  osd_global_pull_secret:
+  - build03
+  - build04
+  - build05
 secret_configs:
 - from:
     ops-mirror.pem:
@@ -862,6 +866,10 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-aws-1-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-sd-qe
     namespace: ci
 - from:
     pull-secret:
@@ -1899,6 +1907,10 @@ secret_configs:
     - non_app_ci
     name: cluster-secrets-azure-arm64-qe
     namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-azurestack-qe
+    namespace: ci
 - from:
     osServicePrincipal.json:
       field: osServicePrincipal.json
@@ -2088,6 +2100,18 @@ secret_configs:
     name: hive-hive-credentials
     namespace: test-credentials
 - from:
+    kubeconfig:
+      field: sa.hypershift-workload.hive.config
+      item: build_farm
+    sa.hypershift-workload.hive.token.txt:
+      field: sa.hypershift-workload.hive.token.txt
+      item: build_farm
+  to:
+  - cluster_groups:
+    - build_farm
+    name: hypershift-workload-credentials
+    namespace: test-credentials
+- from:
     ci.htpasswd:
       field: ci.htpasswd
       item: boskos-oauth-proxy
@@ -2099,6 +2123,17 @@ secret_configs:
     - build_farm
     name: boskos-credentials
     namespace: ci
+- from:
+    AWS_ACCESS_KEY_ID:
+      field: AWS_ACCESS_KEY_ID
+      item: aws_ci_infra_ci-app-ci-audit-logs-uploader
+    AWS_SECRET_ACCESS_KEY:
+      field: AWS_SECRET_ACCESS_KEY
+      item: aws_ci_infra_ci-app-ci-audit-logs-uploader
+  to:
+  - cluster: app.ci
+    name: aws-ci-infra-ci-app-ci-audit-logs-uploader-credentials
+    namespace: api-audit-log
 - from:
     AWS_ACCESS_KEY_ID:
       field: AWS_ACCESS_KEY_ID
@@ -2827,20 +2862,12 @@ secret_configs:
     name: github-ldap-user-group-creator
     namespace: ci
 - from:
-    prometheus-k8s-basic-auth-password:
-      field: prometheus-k8s-basic-auth-password
-      item: app-ci-openshift-monitoring-credentials
+    sa.prometheus-user-workload.app.ci.token.txt:
+      field: sa.prometheus-user-workload.app.ci.token.txt
+      item: app-ci-openshift-user-workload-monitoring-credentials
   to:
   - cluster: app.ci
-    name: app-ci-openshift-monitoring-credentials
-    namespace: ci
-- from:
-    hive-openshift-monitoring-ci-token:
-      field: hive-openshift-monitoring-ci-token
-      item: hive-openshift-monitoring-credentials
-  to:
-  - cluster: app.ci
-    name: hive-openshift-monitoring-credentials
+    name: app-ci-openshift-user-workload-monitoring-credentials
     namespace: ci
 - from:
     token:
@@ -2908,28 +2935,6 @@ secret_configs:
   - cluster: build01
     name: cert-issuer
     namespace: cert-manager
-- from:
-    ci.htpasswd:
-      field: ci.htpasswd
-      item: prow-monitoring
-  to:
-  - cluster: app.ci
-    name: prometheus-auth-htpasswd
-    namespace: prow-monitoring
-- from:
-    password:
-      field: prometheus-prow-basic-auth-password
-      item: prow-monitoring
-    username:
-      field: prometheus-prow-basic-auth-username
-      item: prow-monitoring
-  to:
-  - cluster: app.ci
-    name: prometheus-auth-credentials
-    namespace: prow-monitoring
-  - cluster: app.ci
-    name: prometheus-auth-credentials
-    namespace: ci
 - from:
     service-account.json:
       field: service-account.json
@@ -3374,6 +3379,20 @@ secret_configs:
   - cluster: app.ci
     name: openshift-prow-github-app
     namespace: ci
+- from:
+    appid:
+      field: appid
+      item: openshift-ci-staging-prow-app
+    cert:
+      field: cert
+      item: openshift-ci-staging-prow-app
+    hmac:
+      field: hmac
+      item: openshift-ci-staging-prow-app
+  to:
+  - cluster: app.ci
+    name: openshift-prow-github-app
+    namespace: ci-staging
 - from:
     client-id:
       field: rh-internal-sso-client-id
@@ -4219,6 +4238,54 @@ secret_configs:
   - cluster: app.ci
     name: gcs-sa-quayio-pull-through-cache
     namespace: ci
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: brew.registry.redhat.io-pull-secret
+        registry_url: brew.registry.redhat.io
+      - auth_field: auth
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+  to:
+  - cluster: app.ci
+    name: multi-arch-mirroring-secrets
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+  to:
+  - cluster_groups:
+    - osd_global_pull_secret
+    name: pull-secret
+    namespace: openshift-config
+- from:
+    OPENSHIFT_MONITORING_CI_TOKEN:
+      field: sa.ci-monitoring.app.ci.token.txt
+      item: openshift-monitoring-credentials
+    OPENSHIFT_MONITORING_CI_TOKEN_ON_HIVE:
+      field: sa.ci-monitoring.hive.token.txt
+      item: openshift-monitoring-credentials
+    PROMETHEUS_USER_WORKLOAD_TOKEN:
+      field: sa.prometheus-user-workload.app.ci.token.txt
+      item: app-ci-openshift-user-workload-monitoring-credentials
+  to:
+  - cluster: app.ci
+    name: external-credentials
+    namespace: ci-grafana
 user_secrets_target_clusters:
 - app.ci
 - arm01

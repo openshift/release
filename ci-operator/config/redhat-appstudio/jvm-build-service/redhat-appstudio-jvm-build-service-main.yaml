@@ -1,6 +1,8 @@
 build_root:
-  project_image:
-    dockerfile_path: .ci/openshift-ci/Dockerfile
+  image_stream_tag:
+    name: redhat-appstudio-e2e-test-runner
+    namespace: ci
+    tag: latest
 images:
 - dockerfile_path: Dockerfile
   to: redhat-appstudio-jvm-build-service-image
@@ -13,7 +15,7 @@ releases:
     release:
       architecture: amd64
       channel: stable
-      version: "4.10"
+      version: "4.11"
 resources:
   '*':
     limits:
@@ -22,53 +24,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: jvm-build-service-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  optional: true
-  run_if_changed: ^(tmp/build)
-  steps:
-    test:
-    - as: jvm-build-service-e2e
-      cli: latest
-      commands: |
-        export GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
-        export QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
-        git config --global user.name "redhat-appstudio-qe-bot"
-        git config --global user.email redhat-appstudio-qe-bot@redhat.com
-        mkdir -p ${HOME}/creds
-        GIT_CREDS_PATH="${HOME}/creds/file"
-        git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
-        echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > ${GIT_CREDS_PATH}
-        echo "jvm build service golang operator image:"
-        echo ${JVM_BUILD_SERVICE_IMAGE}
-        echo "jvm build service jvm cache image:"
-        echo ${JVM_BUILD_SERVICE_CACHE_IMAGE}
-        echo "jvm build service jvm reqprocessor image:"
-        echo ${JVM_BUILD_SERVICE_REQPROCESSOR_IMAGE}
-        /bin/bash .ci/oci-e2e-jvm-build-service.sh
-      credentials:
-      - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
-        name: ci-secrets
-        namespace: test-credentials
-      dependencies:
-      - env: JVM_BUILD_SERVICE_IMAGE
-        name: redhat-appstudio-jvm-build-service-image
-      - env: JVM_BUILD_SERVICE_CACHE_IMAGE
-        name: redhat-appstudio-jvm-build-service-cache-image
-      - env: JVM_BUILD_SERVICE_REQPROCESSOR_IMAGE
-        name: redhat-appstudio-jvm-build-service-reqprocessor-image
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
 - as: jvm-build-service-in-repo-e2e
   cluster_claim:
     architecture: amd64
@@ -76,7 +31,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.11"
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -101,7 +56,7 @@ tests:
         /bin/bash deploy/openshift-ci.sh
         # we turn on pr pruning of successful pipelineruns to cover this path
         export JVM_DELETE_TASKRUN_PODS="1"
-        make appstudio-installed-on-openshift-e2e
+        make openshift-e2e
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
         name: ci-secrets
@@ -147,7 +102,7 @@ tests:
         # we turn off pr pruning to facilitate debug of service registry, and to cover path vs. regular in-repo e2e
         export JVM_DELETE_TASKRUN_PODS="0"
         /bin/bash deploy/openshift-ci.sh
-        make appstudio-installed-on-openshift-periodic
+        make openshift-e2e-periodic
       credentials:
       - mount_path: /usr/local/ci-secrets/redhat-appstudio-qe
         name: ci-secrets

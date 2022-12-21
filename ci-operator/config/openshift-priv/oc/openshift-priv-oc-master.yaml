@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.12-priv
+    name: 4.13-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
@@ -8,15 +8,19 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   must-gather-base:
-    name: 4.12-priv
+    name: 4.13-priv
     namespace: ocp-private
     tag: must-gather
   ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.13
   tests-base:
-    name: 4.12-priv
+    name: 4.13-priv
     namespace: ocp-private
     tag: tests
 binary_build_commands: make build --warn-undefined-variables
@@ -30,6 +34,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: cli
 - context_dir: images/tools
   from: cli
@@ -40,6 +47,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: tests
 - dockerfile_path: images/cli/Dockerfile.rhel
   from: must-gather-base
@@ -47,6 +57,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: must-gather
 - context_dir: images/deployer
   dockerfile_path: Dockerfile.rhel
@@ -70,7 +83,7 @@ promotion:
   - tests
   - must-gather
   - oc-base-with-rpms
-  name: 4.12-priv
+  name: 4.13-priv
   namespace: ocp-private
 raw_steps:
 - rpm_image_injection_step:
@@ -79,12 +92,12 @@ raw_steps:
 releases:
   initial:
     integration:
-      name: 4.12-priv
+      name: 4.13-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
+      name: 4.13-priv
       namespace: ocp-private
 resources:
   '*':
@@ -134,21 +147,21 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-serial
+- as: e2e-aws-ovn-serial
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
-- as: e2e-agnostic-cmd
+- as: e2e-agnostic-ovn-cmd
   steps:
     cluster_profile: azure4
     env:
       TEST_SUITE: openshift/test-cmd
     workflow: openshift-e2e-azure
-- as: e2e-aws-upgrade
+- as: e2e-aws-ovn-upgrade
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
-- as: e2e-aws-builds
+- as: e2e-aws-ovn-builds
   run_if_changed: ^(pkg/.*build.*)|^(pkg/.*newapp.*)
   steps:
     cluster_profile: aws

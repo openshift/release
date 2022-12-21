@@ -36,8 +36,10 @@ CONFIG = {
         'us-east-2': 10,
     },
     'aws-qe-quota-slice': {
-        'us-east-1': 20,
-        'us-east-2': 25,
+        'us-east-1': 30,
+    },
+    'aws-sd-qe-quota-slice': {
+        'us-west-2': 3,
     },
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
@@ -47,14 +49,17 @@ CONFIG = {
         'cn-northwest-1': 1,
     },
     'aws-usgov-qe-quota-slice': {
-        'us-gov-west-1': 5,
-        'us-gov-east-1': 5,
+        'us-gov-west-1': 10,
+        'us-gov-east-1': 10,
     },
     'aws-c2s-qe-quota-slice': {
         'us-iso-east-1': 8,
     },
     'aws-sc2s-qe-quota-slice': {
         'us-isob-east-1': 5,
+    },
+    'aws-interop-qe-quota-slice': {
+        'us-east-2': 5,
     },
     'azure4-quota-slice': {
         'centralus': 33,
@@ -77,12 +82,15 @@ CONFIG = {
     'azurestack-quota-slice': {
         'ppe3': 2
     },
+   'azurestack-qe-quota-slice': {
+        'mtcazs': 2
+    },
     'azuremag-quota-slice': {
         'usgovvirginia': 5
     },
     'azure-qe-quota-slice': {
         'northcentralus': 10,
-        'westus3': 10,
+        'southcentralus': 10,
         'centralus': 10
     },
     'azure-arm64-qe-quota-slice': {
@@ -92,7 +100,7 @@ CONFIG = {
         'northeurope': 4
     },
     'azuremag-qe-quota-slice': {
-        'usgovvirginia': 5
+        'usgovvirginia': 10
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 40,
@@ -101,7 +109,7 @@ CONFIG = {
         'default': 40,
     },
     'gcp-qe-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 30,
     },
     'gcp-quota-slice': {
         'us-central1': 70,
@@ -177,16 +185,18 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
+        'mon01': 1,
+        'osa21': 1,
         'syd04': 1,
         'syd05': 1,
-        'tor01': 1,
-        'tok04': 1
+        'tok04': 1,
+        'tor01': 1
     },
     'ibmcloud-quota-slice': {
-        'default': 7,
+        'us-east': 7,
     },
     'ibmcloud-qe-quota-slice': {
-        'default': 10,
+        'jp-tok': 10,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
@@ -197,17 +207,20 @@ CONFIG = {
     'alibabacloud-cn-qe-quota-slice': {
         'us-east-1': 10,
     },
+    'hypershift-hive-quota-slice': {
+        'default': 80
+    }
 }
 
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
-
-for i in range(3):
+# mihawk1 system needs firmware update. We can put it in the list once the firmware is updated and then reserve one cluster back for internal debugging.
+for i in range(2):
     for j in range(4):
-        CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
+        CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i+1, j)] = 1
 # Reserve one for internal debugging use
-del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-1-3']
+# del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-1-3']
 
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
@@ -230,7 +243,7 @@ for i in range(1, 7):
 for i in range(83,93):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(94,106):
+for i in range(94,109):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):

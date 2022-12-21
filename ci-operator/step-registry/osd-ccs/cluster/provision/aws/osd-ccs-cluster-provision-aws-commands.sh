@@ -151,7 +151,7 @@ while true; do
 done
 ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.cluster_install.log"
 
-# Print console.url and api.url
+# Print console.url
 CONSOLE_URL=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.console.url')
 echo "Console URL: ${CONSOLE_URL}"
 echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"

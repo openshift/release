@@ -25,7 +25,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.12:tests'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.13:tests'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -126,7 +126,7 @@ def _add_osd_rc_servicemonitor(gendoc):
         'kind': 'ServiceMonitor',
         'metadata': {
             'name': context.rc_service_name,
-            'namespace': 'prow-monitoring',
+            'namespace': 'ci',
             'annotations': annotations,
         },
         'spec': {
@@ -135,9 +135,6 @@ def _add_osd_rc_servicemonitor(gendoc):
                 'port': 'main',
                 'scheme': 'http',
             }],
-            'namespaceSelector': {
-                'matchNames': ['ci'],
-            },
             'selector': {
                 'matchLabels': {
                     'app': context.rc_service_name,
@@ -150,7 +147,7 @@ def _add_osd_rc_servicemonitor(gendoc):
         'kind': 'ServiceMonitor',
         'metadata': {
             'name': context.rc_api_service_name,
-            'namespace': 'prow-monitoring',
+            'namespace': 'ci',
             'annotations': annotations,
         },
         'spec': {
@@ -172,7 +169,7 @@ def _add_osd_rc_servicemonitor(gendoc):
 
 
 def _get_osd_rc_deployment_sidecars(context):
-    sidecars = list()
+    sidecars = []
 
     if context.private:
         sidecars.append({

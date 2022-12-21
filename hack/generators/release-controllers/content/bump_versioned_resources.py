@@ -31,10 +31,10 @@ def _get_next_version(version):
 
 
 def _read_update_write_file(original_file, new_file, original_str, new_str):
-    with open(original_file, "r") as f:
+    with open(original_file, "r", encoding='utf-8') as f:
         data = f.read()
 
-    with open(new_file, "w+") as f:
+    with open(new_file, "w+", encoding='utf-8') as f:
         f.write(data.replace(original_str, new_str))
 
 
@@ -78,7 +78,7 @@ def _bump_ci_operator_job_files(current_version, new_version, job_files_path, do
 
         for i in range(1, 4):
             ver = float(current_version) - (i/10)
-            versions.append(('{:.2}'.format(ver), '{:.2}'.format((ver + .1))))
+            versions.append((f'{ver:.2}', '{(ver+.1):.2}'))
 
         for current, new in versions:
             _read_update_write_file(new_file, new_file, current, new)

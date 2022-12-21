@@ -1,14 +1,14 @@
 base_images:
   base:
-    name: 4.12-priv
+    name: 4.13-priv
     namespace: ocp-private
     tag: base
   cli:
-    name: 4.12-priv
+    name: 4.13-priv
     namespace: ocp-private
     tag: cli
   hypershift-operator-4.11:
-    name: 4.12-priv
+    name: 4.13-priv
     namespace: ocp-private
     tag: hypershift-operator
   openshift_release_golang-1.18:
@@ -116,7 +116,7 @@ promotion:
   excluded_images:
   - capk-oc-bin-image
   - hypershift-cli-e2e
-  name: 4.12-priv
+  name: 4.13-priv
   namespace: ocp-private
 releases:
   hosted-ocp-previous:
@@ -127,12 +127,12 @@ releases:
       version: "4.11"
   initial:
     integration:
-      name: 4.12-priv
+      name: 4.13-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
+      name: 4.13-priv
       namespace: ocp-private
 resources:
   '*':
@@ -195,7 +195,7 @@ tests:
         sleep 60
 
         # Validate capk manager was created successfully
-        oc wait pod --for=condition=Ready -l cluster.x-k8s.io/provider=infrastructure-kubevirt -n capk-system --timeout=120s
+        oc wait pod --for=condition=Ready -l cluster.x-k8s.io/provider=kubevirt -n capk-system --timeout=120s
       dependencies:
       - env: CAPK_IMAGE
         name: kubevirt-cluster-api-controllers
@@ -256,8 +256,8 @@ tests:
         # verify the image in the manager pod
         for i in $(seq 20); do
           sleep 60
-          # wait until the old pod is deleted
-          if [[ $(oc get pods -n hypershift -l "app=operator,hypershift.openshift.io/operator-component=operator,name=operator" --no-headers | wc -l) != 1 ]]; then
+          # wait until the old pods is deleted; eventually we need only 2 pods to run
+          if [[ $(oc get pods -n hypershift -l "app=operator,hypershift.openshift.io/operator-component=operator,name=operator" --no-headers | wc -l) != 2 ]]; then
             continue
           fi
           # check if the pod contains the required env var

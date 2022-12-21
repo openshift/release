@@ -12,6 +12,7 @@ canonical_go_repository: github.com/openshift/cluster-api-actuator-pkg
 promotion:
   additional_images:
     cluster-api-actuator-pkg: src
+  disabled: true
   name: 4.13-priv
   namespace: ocp-private
 releases:
@@ -34,15 +35,12 @@ tests:
   commands: IS_CONTAINER=TRUE make goimports
   container:
     from: src
-- as: govet
-  commands: IS_CONTAINER=TRUE make vet
-  container:
-    from: src
-- as: golint
-  commands: IS_CONTAINER=TRUE make lint
+- as: check
+  commands: IS_CONTAINER=TRUE make check
   container:
     from: src
 - as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
@@ -54,20 +52,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-operator-tech-preview
-  optional: true
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-tech-preview
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 - as: e2e-vsphere-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: vsphere
     test:
@@ -80,6 +66,7 @@ tests:
           cpu: 100m
     workflow: openshift-e2e-vsphere
 - as: e2e-azure-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
     test:
@@ -93,6 +80,7 @@ tests:
     workflow: ipi-azure
 - as: e2e-gcp-operator
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     test:

@@ -1,0 +1,61 @@
+base_images:
+  base:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: base
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+binary_build_commands: go build .
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+canonical_go_repository: github.com/nutanix-cloud-native/cloud-provider-nutanix
+images:
+- dockerfile_path: openshift/Dockerfile.openshift
+  from: base
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: nutanix-cloud-controller-manager
+promotion:
+  name: 4.14-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.14-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.14-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-nutanix
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix
+- as: unit
+  commands: make unit-test
+  container:
+    from: src
+- as: fmt
+  commands: test -z $(gofmt -l $(find . -type f -name '*.go'| grep -v "/vendor/"))
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-priv
+  repo: cloud-provider-nutanix

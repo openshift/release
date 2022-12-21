@@ -14,9 +14,13 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+  sed -i '
+    s/password: .*/password: REDACTED/;
+    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+    s/UserData:.*,/UserData: REDACTED,/;
+    ' "${dir}/terraform.txt" 
+  tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt" 
   case "${CLUSTER_TYPE}" in
-    aws|aws-arm64)
-      grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log" > "${SHARED_DIR}/aws-instance-ids.txt";;
     alibabacloud)
       awk -F'id=' '/alicloud_instance.*Creation complete/ && /master/{ print $2 }' "${dir}/.openshift_install.log" | tr -d ']"' > "${SHARED_DIR}/alibaba-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
@@ -36,6 +40,41 @@ function prepare_next_steps() {
       "${dir}/auth/kubeconfig" \
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
+
+  # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
+  # the workaround is gather log-bundle from bastion host
+  # copying install folder to bastion host for gathering logs
+  publish=$(grep "publish:" ${SHARED_DIR}/install-config.yaml | awk '{print $2}')
+  if [[ "${publish}" == "Internal" ]] && [[ ! $(grep "Bootstrap status: complete" "${dir}/.openshift_install.log") ]]; then
+    echo "Copying install dir to bastion host."
+    echo > "${SHARED_DIR}/REQUIRE_INSTALL_DIR_TO_BASTION"
+    if [[ -s "${SHARED_DIR}/bastion_ssh_user" ]] && [[ -s "${SHARED_DIR}/bastion_public_address" ]]; then
+      bastion_ssh_user=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
+      bastion_public_address=$(head -n 1 "${SHARED_DIR}/bastion_public_address")
+      if [[ -n "${bastion_ssh_user}" ]] && [[ -n "${bastion_public_address}" ]]; then
+
+        # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
+        # to be able to SSH.
+        if ! whoami &> /dev/null; then
+          if [[ -w /etc/passwd ]]; then
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+          else
+            echo "/etc/passwd is not writeable, and user matching this uid is not found."
+            exit 1
+          fi
+        fi
+
+        cmd="scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i \"${CLUSTER_PROFILE_DIR}/ssh-privatekey\" -r ${dir} ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
+        echo "Running Command: ${cmd}"
+        eval "${cmd}"
+        echo > "${SHARED_DIR}/COPIED_INSTALL_DIR_TO_BASTION"
+      else
+        echo "ERROR: Can not get bastion user/host, skip to copy install dir."
+      fi
+    else
+      echo "ERROR: File bastion_ssh_user or bastion_public_address is empty or not exist, skip to copy install dir."
+    fi
+  fi
 
   # TODO: remove once BZ#1926093 is done and backported
   if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
@@ -277,7 +316,10 @@ ibmcloud)
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
-vsphere) export VSPHERE_PERSIST_SESSION=true;;
+vsphere)
+    export VSPHERE_PERSIST_SESSION=true
+    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
@@ -337,8 +379,15 @@ if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   inject_promtail_service
 fi
 
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+TF_LOG_PATH="${dir}/terraform.txt"
+export TF_LOG_PATH
+
+openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
 wait "$!"
 ret="$?"
@@ -350,10 +399,53 @@ if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
-fi
 
-echo "install-config.yaml"
-echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+  echo "Collecting cluster data for analysis..."
+  set +o errexit
+  set +o pipefail
+  if [ ! -f /tmp/jq ]; then
+    curl -L https://stedolan.github.io/jq/download/linux64/jq -o /tmp/jq && chmod +x /tmp/jq
+  fi
+  if ! pip -V; then
+    echo "pip is not installed: installing"
+    if python -c "import sys; assert(sys.version_info >= (3,0))"; then
+      python -m ensurepip --user || easy_install --user 'pip'
+    else
+      echo "python < 3, installing pip<21"
+      python -m ensurepip --user || easy_install --user 'pip<21'
+    fi
+  fi
+  echo "Installing python modules: json"
+  python3 -c "import json" || pip3 install --user pyjson
+  PLATFORM="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get infrastructure/cluster -o json|/tmp/jq '.status.platform')"
+  TOPOLOGY="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get infrastructure/cluster -o json|/tmp/jq '.status.infrastructureTopology')"
+  NETWORKTYPE="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get network.operator cluster -o json|/tmp/jq '.spec.defaultNetwork.type')"
+  if [[ "$(env KUBECONFIG=${dir}/auth/kubeconfig oc get network.operator cluster -o json|/tmp/jq '.spec.clusterNetwork[0].cidr')" =~ .*":".*  ]]; then
+    NETWORKSTACK="IPv6"
+  else
+    NETWORKSTACK="IPv4"
+  fi
+  CLOUDREGION="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get node -o json|/tmp/jq '.items[]|.metadata.labels'|grep topology.kubernetes.io/region|cut -d : -f 2| head -1| sed 's/,//g')"
+  CLOUDZONE="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get node -o json|/tmp/jq '.items[]|.metadata.labels'|grep topology.kubernetes.io/zone|cut -d : -f 2| sort -u)"
+  CLUSTERVERSIONHISTORY="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get clusterversion -o json|/tmp/jq '.items[]|.status.history'|grep version|cut -d : -f 2)"
+  CLOUDZONE="$(echo $CLOUDZONE | tr -d \")"
+  CLUSTERVERSIONHISTORY="$(echo $CLUSTERVERSIONHISTORY | tr -d \")"
+  python3 -c '
+import json;
+dictionary = {
+    "Platform": '$PLATFORM',
+    "Topology": '$TOPOLOGY',
+    "NetworkType": '$NETWORKTYPE',
+    "NetworkStack": "'$NETWORKSTACK'",
+    "CloudRegion": '"$CLOUDREGION"',
+    "CloudZone": "'"$CLOUDZONE"'".split(),
+    "ClusterVersionHistory": "'"$CLUSTERVERSIONHISTORY"'".split()
+}
+with open("'${ARTIFACT_DIR}/cluster-data.json'", "w") as outfile:
+    json.dump(dictionary, outfile)'
+  set -o errexit
+  set -o pipefail
+  echo "Done collecting cluster data for analysis!"
+fi
 
 exit "$ret"

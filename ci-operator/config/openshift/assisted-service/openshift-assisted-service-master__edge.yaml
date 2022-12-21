@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   cli:
@@ -28,7 +28,7 @@ base_images:
     namespace: ocp
     tag: cli
   cluster-api-provider-agent:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: cluster-api-provider-agent
   coreos_centos_stream9:
@@ -43,22 +43,14 @@ base_images:
     name: edge-infrastructure-swagger-codegen-cli
     namespace: ci
     tag: 2.4.18
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.37.1
-  goswagger_swagger:
-    name: goswagger-swagger
-    namespace: ci
-    tag: v0.28.0
   hypershift-operator:
-    name: "4.11"
+    name: "4.12"
     namespace: ocp
     tag: hypershift-operator
-  openshift_release_golang-1.17:
+  openshift_release_golang-1.18:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
   postgresql-12-centos7:
     name: postgresql-12-centos7
     namespace: edge-infrastructure
@@ -71,19 +63,15 @@ images:
     coreos_centos_stream9:
       as:
       - quay.io/centos/centos:stream9
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-service-base
 - dockerfile_path: ci-images/Dockerfile.unit-tests
   from: assisted-service-base
   to: assisted-service-unit-test
 - dockerfile_path: ci-images/Dockerfile.lint
   from: assisted-service-base
-  inputs:
-    golangci-lint:
-      as:
-      - quay.io/app-sre/golangci-lint:v1.37.1
   to: assisted-service-lint
 - dockerfile_path: ci-images/Dockerfile.subsystem
   from: assisted-service-base
@@ -94,22 +82,15 @@ images:
   to: assisted-service-subsystem
 - dockerfile_path: ci-images/Dockerfile.code-generation
   from: assisted-service-base
-  inputs:
-    goswagger_swagger:
-      as:
-      - quay.io/goswagger/swagger:v0.28.0
   to: assisted-service-generate
 - dockerfile_path: Dockerfile.assisted-service-build
   inputs:
     edge_infrastructure_swagger_codegen_cli:
       as:
       - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
-    goswagger_swagger:
+    openshift_release_golang-1.18:
       as:
-      - quay.io/goswagger/swagger:v0.28.0
-    openshift_release_golang-1.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-service-build-base
 - dockerfile_literal: |
     FROM base-build
@@ -125,9 +106,9 @@ images:
   to: assisted-service-build
 - dockerfile_path: Dockerfile.assisted-service
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-service
 - dockerfile_literal: |
     FROM coreos/centos
@@ -156,7 +137,7 @@ operator:
   - pullspec: quay.io/centos7/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
-  name: ocm-2.7
+  name: ocm-2.8
   namespace: edge-infrastructure
 releases:
   candidate-4-11:
@@ -171,10 +152,10 @@ releases:
       stream: nightly
       version: "4.11"
   latest:
-    integration:
-      include_built_images: true
-      name: "4.12"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
   stable-4-10:
     integration:
       name: "4.10"
@@ -578,7 +559,17 @@ tests:
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-capi
   optional: true
-  run_if_changed: ^(deploy/operator/.*)$
+  run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      PROVIDER_IMAGE: cluster-api-provider-agent
+    workflow: assisted-baremetal-operator-capi
+- as: e2e-ai-operator-ztp-capi-periodic
+  cron: 25 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -667,6 +658,7 @@ tests:
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_DUAL_STACK_VIPS=True
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
@@ -680,28 +672,9 @@ tests:
     env:
       ASSISTED_ZTP_CONFIG: |
         SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_DUAL_STACK_VIPS=True
       IP_STACK: v4v6
       NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-converged
-  run_if_changed: ^(deploy/operator/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11
-    env:
-      ALLOW_CONVERGED_FLOW: "True"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-converged-periodic
-  cron: 05 02 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:candidate-4-11
-    env:
-      ALLOW_CONVERGED_FLOW: "True"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-multiarch-3masters-ocp-411
   optional: true
@@ -728,6 +701,35 @@ tests:
         ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.11.0-rc.6-multi"
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-hypershift-zero-nodes
+  optional: true
+  run_if_changed: ^(deploy/operator/hypershift/.*|api/.*|internal/controller/controllers/.*agentserviceconfig.*)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    workflow: assisted-baremetal-operator-hypershift
+- as: e2e-ai-operator-ztp-hypershift-zero-nodes-periodic
+  cron: 00 02 */1 * 1-4
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      HYPERSHIFT_IMAGE: hypershift-operator
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    workflow: assisted-baremetal-operator-hypershift
+- as: e2e-ai-operator-ztp-converged
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ALLOW_CONVERGED_FLOW: "True"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-tpmv2
   optional: true
@@ -827,6 +829,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.8
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-9
   steps:
@@ -834,6 +837,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.9
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-10
   steps:
@@ -841,6 +845,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.10
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-11
   steps:
@@ -848,6 +853,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.11
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-12
   steps:
@@ -855,6 +861,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.12
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -863,6 +870,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
+        OPENSHIFT_VERSION=4.11
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -882,6 +890,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.11
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
@@ -947,25 +956,14 @@ tests:
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-capi
+- as: e2e-metal-assisted-upgrade-agent
   optional: true
-  run_if_changed: ^(api/.*|internal/controller/controllers/.*)$
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: hypershift-operator
-      PROVIDER_IMAGE: cluster-api-provider-agent
     env:
       ASSISTED_CONFIG: |
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=12000
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      GATHER_CAPI_LOGS: "true"
-      TEST_SUITE: full
+        TEST=./src/tests/test_upgrade_agent.py
+        TEST_FUNC=test_upgrade_agent
     workflow: assisted-baremetal
 - as: e2e-vsphere-assisted
   optional: true
@@ -998,6 +996,20 @@ tests:
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-2workers
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=2
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
       PLATFORM: nutanix
     workflow: assisted-nutanix
 zz_generated_metadata:

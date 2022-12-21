@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -31,6 +31,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
   ocp_4.10_cli:
     name: "4.13"
     namespace: ocp
@@ -39,6 +43,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
   origin_4.12_cli:
     name: "4.13"
     namespace: origin
@@ -56,6 +64,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
@@ -63,6 +74,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -97,6 +111,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -104,6 +121,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: ovirt-installer
 promotion:
   name: "4.13"
@@ -185,10 +205,14 @@ tests:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: golint
-  commands: IS_CONTAINER=TRUE ./hack/go-lint.sh -min_confidence 0.3 $(go list -f '{{
-    .ImportPath }}' ./...)
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --print-resources-usage --new-from-rev=75173a17cf
   container:
-    from: src
+    clone: true
+    from: golangci-lint
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
@@ -269,7 +293,7 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-resourcegroup
-- as: e2e-aws-upgrade
+- as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws
@@ -295,14 +319,14 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-upi
-- as: e2e-aws-workers-rhel8
+- as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
     cluster_profile: aws
     env:
       PLATFORM_VERSION: "8.4"
     workflow: openshift-e2e-aws-workers-rhel
-- as: e2e-aws-disruptive
+- as: e2e-aws-ovn-disruptive
   optional: true
   steps:
     cluster_profile: aws
@@ -502,20 +526,38 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
-- as: e2e-sdn-nutanix
+- as: e2e-nutanix-ovn
   cluster: build01
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
   steps:
     cluster_profile: nutanix
-    workflow: openshift-e2e-nutanix
-- as: e2e-agent-compact
+    workflow: openshift-e2e-nutanix-ovn
+- as: e2e-nutanix-sdn
+  cluster: build01
+  optional: true
+  run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix-sdn
+- as: e2e-agent-compact-ipv4
   cluster: build05
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: /agent/
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
-- as: e2e-agent-mce
+- as: e2e-agent-sno-ipv6
+  cluster: build05
+  optional: true
+  run_if_changed: /agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV6
+        AGENT_USE_ZTP_MANIFESTS=true
+    workflow: agent-e2e-generic
+- as: e2e-agent-ha-dualstack
   cluster: build05
   optional: true
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
@@ -523,8 +565,8 @@ tests:
     cluster_profile: equinix-ocp-metal
     env:
       DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        AGENT_DEPLOY_MCE=true
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
+        MIRROR_IMAGES=true
     workflow: agent-e2e-generic
 zz_generated_metadata:
   branch: master

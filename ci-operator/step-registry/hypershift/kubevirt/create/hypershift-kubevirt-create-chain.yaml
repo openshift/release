@@ -115,11 +115,9 @@ chain:
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 
       until \
-        oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
-        oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
-        oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
+        oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
           echo "$(date --rfc-3339=seconds) Cluster Operators not yet ready"
-          oc get clusteroperators
+          oc get clusteroperators 2>/dev/null || true
           sleep 1s
       done
     from_image:

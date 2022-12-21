@@ -5,16 +5,18 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-agent-compact
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
+      ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-e2e-agent-compact
     rerun_command: /test e2e-agent-compact
+    skip_if_only_changed: ^openshift/|^docs/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
     spec:
       containers:
       - args:
@@ -83,6 +85,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-assisted-operator-catalog-publish-verify
     rerun_command: /test edge-assisted-operator-catalog-publish-verify
@@ -140,6 +143,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-ci-index
     rerun_command: /test edge-ci-index
@@ -191,6 +195,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp
     rerun_command: /test edge-e2e-ai-operator-ztp
@@ -266,6 +271,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-3masters
     optional: true
@@ -342,11 +348,12 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-capi
     optional: true
     rerun_command: /test edge-e2e-ai-operator-ztp-capi
-    run_if_changed: ^(deploy/operator/.*)$
+    run_if_changed: ^(deploy/operator/.*|api/.*|internal/controller/controllers/.*)$
     spec:
       containers:
       - args:
@@ -418,6 +425,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-compact-day2-masters
     optional: true
@@ -493,6 +501,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-compact-day2-workers
     optional: true
@@ -568,10 +577,11 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-converged
+    optional: true
     rerun_command: /test edge-e2e-ai-operator-ztp-converged
-    run_if_changed: ^(deploy/operator/.*)$
     spec:
       containers:
       - args:
@@ -643,6 +653,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-disconnected
     optional: true
@@ -712,6 +723,83 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build04
+    context: ci/prow/edge-e2e-ai-operator-ztp-hypershift-zero-nodes
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-hypershift-zero-nodes
+    optional: true
+    rerun_command: /test edge-e2e-ai-operator-ztp-hypershift-zero-nodes
+    run_if_changed: ^(deploy/operator/hypershift/.*|api/.*|internal/controller/controllers/.*agentserviceconfig.*)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-ai-operator-ztp-hypershift-zero-nodes-cluster-profile
+        - --target=e2e-ai-operator-ztp-hypershift-zero-nodes
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-ai-operator-ztp-hypershift-zero-nodes-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-packet-assisted
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )edge-e2e-ai-operator-ztp-hypershift-zero-nodes,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build04
     context: ci/prow/edge-e2e-ai-operator-ztp-ipv4v6-3masters
     decorate: true
     labels:
@@ -719,6 +807,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-ipv4v6-3masters
     optional: true
@@ -795,6 +884,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-ipv4v6-3masters-ocp-411
     optional: true
@@ -871,6 +961,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-ipv4v6-sno
     optional: true
@@ -947,6 +1038,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-ipv4v6-sno-ocp-411
     optional: true
@@ -1023,6 +1115,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-multiarch-3masters-ocp-411
     optional: true
@@ -1098,6 +1191,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-multiarch-sno-ocp-411
     optional: true
@@ -1173,6 +1267,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-masters
     optional: true
@@ -1248,6 +1343,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers
     rerun_command: /test edge-e2e-ai-operator-ztp-sno-day2-workers
@@ -1322,6 +1418,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers-ignitionoverride
     optional: true
@@ -1397,6 +1494,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-ai-operator-ztp-sno-day2-workers-late-binding
     rerun_command: /test edge-e2e-ai-operator-ztp-sno-day2-workers-late-binding
@@ -1471,6 +1569,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted
     rerun_command: /test edge-e2e-metal-assisted
@@ -1546,6 +1645,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-10
     rerun_command: /test edge-e2e-metal-assisted-4-10
@@ -1620,6 +1720,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-11
     rerun_command: /test edge-e2e-metal-assisted-4-11
@@ -1694,6 +1795,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-12
     rerun_command: /test edge-e2e-metal-assisted-4-12
@@ -1768,6 +1870,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-8
     rerun_command: /test edge-e2e-metal-assisted-4-8
@@ -1842,6 +1945,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-4-9
     rerun_command: /test edge-e2e-metal-assisted-4-9
@@ -1909,82 +2013,6 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build04
-    context: ci/prow/edge-e2e-metal-assisted-capi
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/variant: edge
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-capi
-    optional: true
-    rerun_command: /test edge-e2e-metal-assisted-capi
-    run_if_changed: ^(api/.*|internal/controller/controllers/.*)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-capi-cluster-profile
-        - --target=e2e-metal-assisted-capi
-        - --variant=edge
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-capi-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-capi,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build04
     context: ci/prow/edge-e2e-metal-assisted-cnv
     decorate: true
     labels:
@@ -1992,6 +2020,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-cnv
     rerun_command: /test edge-e2e-metal-assisted-cnv
@@ -2067,6 +2096,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-day2
     optional: true
@@ -2143,6 +2173,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-day2-single-node
     optional: true
@@ -2219,6 +2250,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-ipv4v6
     optional: true
@@ -2295,6 +2327,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-ipv6
     optional: true
@@ -2370,6 +2403,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-kube-api-late-binding-single-node
     optional: true
@@ -2445,6 +2479,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
     optional: true
@@ -2520,6 +2555,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-kube-api-net-suite
     optional: true
@@ -2595,6 +2631,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-lvm
     rerun_command: /test edge-e2e-metal-assisted-lvm
@@ -2670,6 +2707,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-none
     optional: true
@@ -2745,6 +2783,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-ocs
     rerun_command: /test edge-e2e-metal-assisted-ocs
@@ -2820,6 +2859,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-odf
     rerun_command: /test edge-e2e-metal-assisted-odf
@@ -2895,6 +2935,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-onprem
     optional: true
@@ -2970,6 +3011,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-single-node
     optional: true
@@ -3046,6 +3088,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-static-ip-suite
     optional: true
@@ -3122,6 +3165,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-tang
     optional: true
@@ -3197,6 +3241,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-tpmv2
     optional: true
@@ -3264,6 +3309,82 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build04
+    context: ci/prow/edge-e2e-metal-assisted-upgrade-agent
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-metal-assisted-upgrade-agent
+    optional: true
+    rerun_command: /test edge-e2e-metal-assisted-upgrade-agent
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-assisted-upgrade-agent-cluster-profile
+        - --target=e2e-metal-assisted-upgrade-agent
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-assisted-upgrade-agent-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-packet-assisted
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-upgrade-agent,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: build01
     context: ci/prow/edge-e2e-nutanix-assisted
     decorate: true
@@ -3273,6 +3394,7 @@ presubmits:
       ci-operator.openshift.io/cluster: build01
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-nutanix-assisted
     optional: true
@@ -3340,6 +3462,83 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build01
+    context: ci/prow/edge-e2e-nutanix-assisted-2workers
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: nutanix
+      ci-operator.openshift.io/cloud-cluster-profile: nutanix
+      ci-operator.openshift.io/cluster: build01
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-master-edge-e2e-nutanix-assisted-2workers
+    optional: true
+    rerun_command: /test edge-e2e-nutanix-assisted-2workers
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-nutanix-assisted-2workers-cluster-profile
+        - --target=e2e-nutanix-assisted-2workers
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-nutanix-assisted-2workers-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-nutanix
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )edge-e2e-nutanix-assisted-2workers,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: vsphere
     context: ci/prow/edge-e2e-vsphere-assisted
     decorate: true
@@ -3348,6 +3547,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-vsphere-assisted
     optional: true
@@ -3423,6 +3623,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: vsphere
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-e2e-vsphere-assisted-umn
     optional: true
@@ -3496,6 +3697,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-images
     rerun_command: /test edge-images
@@ -3545,6 +3747,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-lint
     rerun_command: /test edge-lint
@@ -3595,6 +3798,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-push-pr-image
     optional: true
@@ -3652,6 +3856,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-subsystem-aws
     rerun_command: /test edge-subsystem-aws
@@ -3716,6 +3921,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-subsystem-kubeapi-aws
     rerun_command: /test edge-subsystem-kubeapi-aws
@@ -3780,6 +3986,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-unit-test
     rerun_command: /test edge-unit-test
@@ -3837,6 +4044,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
+      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-master-edge-verify-generated-code
     rerun_command: /test edge-verify-generated-code

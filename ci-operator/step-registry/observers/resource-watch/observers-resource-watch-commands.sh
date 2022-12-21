@@ -42,4 +42,5 @@ then
 fi
 
 openshift-tests run-resourcewatch --kubeconfig $KUBECONFIG --namespace default &
-wait $!
+openshift-tests run-monitor --artifact-dir $STORE_PATH &
+wait

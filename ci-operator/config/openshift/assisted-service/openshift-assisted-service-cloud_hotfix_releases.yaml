@@ -35,18 +35,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.37.1
   goswagger_swagger:
     name: goswagger-swagger
     namespace: ci
     tag: v0.28.0
-  openshift_release_golang-1.17:
+  openshift_release_golang-1.18:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.18
 build_root:
   image_stream_tag:
     name: release
@@ -58,19 +54,15 @@ images:
     coreos_centos_stream9:
       as:
       - quay.io/centos/centos:stream9
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-service-base
 - dockerfile_path: ci-images/Dockerfile.unit-tests
   from: assisted-service-base
   to: assisted-service-unit-test
 - dockerfile_path: ci-images/Dockerfile.lint
   from: assisted-service-base
-  inputs:
-    golangci-lint:
-      as:
-      - quay.io/app-sre/golangci-lint:v1.37.1
   to: assisted-service-lint
 - dockerfile_path: ci-images/Dockerfile.subsystem
   from: assisted-service-base
@@ -82,9 +74,9 @@ images:
 - dockerfile_path: Dockerfile.assisted-service
   from: coreos_centos_stream8
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-service
 - dockerfile_path: ci-images/Dockerfile.code-generation
   from: assisted-service-base
@@ -231,13 +223,15 @@ tests:
         SERVICE_BASE_REF=cloud_hotfix_releases
         OPENSHIFT_VERSION=4.11
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-networking
+- as: e2e-metal-assisted-static-ip-suite
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
+        STATIC_IPS=true
         TEST_FUNC=test_networking
+      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -247,6 +241,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         OLM_OPERATORS=cnv
+        OPENSHIFT_VERSION=4.11
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -267,6 +262,7 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=cloud_hotfix_releases
         OLM_OPERATORS=odf
+        OPENSHIFT_VERSION=4.11
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs

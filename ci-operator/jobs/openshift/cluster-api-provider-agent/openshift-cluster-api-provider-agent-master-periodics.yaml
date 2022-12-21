@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 00 00 */1 * 0-5
   decorate: true
   decoration_config:
@@ -14,16 +14,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-api-provider-agent-master-e2e-metal-assisted-capi-periodic
-  reporter_config:
-    slack:
-      channel: '#agent-capi-provider'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
+  name: periodic-ci-openshift-cluster-api-provider-agent-master-e2e-ai-operator-ztp-capi-periodic
   spec:
     containers:
     - args:
@@ -32,8 +23,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-metal-assisted-capi-periodic-cluster-profile
-      - --target=e2e-metal-assisted-capi-periodic
+      - --secret-dir=/usr/local/e2e-ai-operator-ztp-capi-periodic-cluster-profile
+      - --target=e2e-ai-operator-ztp-capi-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -49,7 +40,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-metal-assisted-capi-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-ai-operator-ztp-capi-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -81,7 +72,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   cron: 45 1 * * *
   decorate: true
   decoration_config:
@@ -94,15 +85,6 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-cluster-api-provider-agent-master-mirror-nightly-image
-  reporter_config:
-    slack:
-      channel: '#assisted-deployment-ci'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
-        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:

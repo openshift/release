@@ -30,7 +30,7 @@ def _add_redirect_resources(gendoc):
     gendoc.append({
         'apiVersion': 'v1',
         'data': {
-            'default.conf': 'server {\n  listen 8080;\n  return 302 https://%s$request_uri;\n}\n' % context.rc_app_url
+            'default.conf': f'server {{\n  listen 8080;\n  return 302 https://{context.rc_app_url}$request_uri;\n}}\n'
         },
         'kind': 'ConfigMap',
         'metadata': {
@@ -156,7 +156,7 @@ def _add_files_cache_redirect_resources(gendoc):
     gendoc.append({
         'apiVersion': 'v1',
         'data': {
-            'default.conf': 'server {\n  listen 8080;\n  return 302 https://%s$request_uri;\n}\n' % context.fc_app_url
+            'default.conf': f'server {{\n  listen 8080;\n  return 302 https://{context.fc_app_url}$request_uri;\n}}\n'
         },
         'kind': 'ConfigMap',
         'metadata': {
