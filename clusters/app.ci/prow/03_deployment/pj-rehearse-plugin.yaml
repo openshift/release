@@ -43,7 +43,6 @@ items:
           args:
           - --dry-run=false
           - --log-level=debug
-          - --pre-check=true
           - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
           - --kubeconfig-dir=/var/kubeconfigs
           - --kubeconfig-suffix=config
@@ -60,6 +59,9 @@ items:
             - name: http
               containerPort: 8888
           volumeMounts:
+          - mountPath: /etc/gcs
+            name: gcs-credentials
+            readOnly: true
           - mountPath: /var/kubeconfigs
             name: prowjob-kubeconfig
           - name: prow-config
@@ -88,6 +90,9 @@ items:
               path: /healthz/ready
               port: 8081
         volumes:
+        - name: gcs-credentials
+          secret:
+            secretName: gce-sa-credentials-gcs-publisher
         - name: prowjob-kubeconfig
           secret:
             secretName: pj-rehearse
