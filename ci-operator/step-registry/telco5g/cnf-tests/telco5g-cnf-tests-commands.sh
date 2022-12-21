@@ -93,6 +93,11 @@ performance "Checking IRQBalance settings Verify irqbalance configuration handli
 # TESTNAME
 performance "Checking IRQBalance settings Verify irqbalance configuration handling Should store empty cpu mask in the backup"
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-4194
+# TESTNAME
+performance "Should have the correct RPS configuration"
+
 EOF
 }
 
