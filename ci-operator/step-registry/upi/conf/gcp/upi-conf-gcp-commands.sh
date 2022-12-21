@@ -80,7 +80,7 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 ### Create manifests
 echo "Creating manifests..."
 openshift-install --dir="${dir}" create manifests &
-
+rm -f ${dir}/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 set +e
 wait "$!"
 ret="$?"

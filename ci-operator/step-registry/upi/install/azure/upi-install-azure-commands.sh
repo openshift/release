@@ -93,6 +93,7 @@ echo "Editing manifests"
 sed -i '/^  channel:/d' manifests/cvo-overrides.yaml
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluster-scheduler-02-config.yml
 sed -i "/publicZone/,+1d" manifests/cluster-dns-02-config.yml
 sed -i "/privateZone/,+1d" manifests/cluster-dns-02-config.yml
