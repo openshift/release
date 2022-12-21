@@ -44,8 +44,9 @@ echo "Starting the local FTP Server"
 python /tmp/ftp_server.py &
 
 # Execute the Interop MTR tests. The XUnit/JUnit results are then published to the `${SHARED_DIR}/xunit_output.xml` file. This file is to be used in the interop-mtr-report step of this scenario.
+# If execution fails, the FTP server will be stopped.
 echo "Executing PyTest..."
-pytest /tmp/integration_tests/mta/tests/operator/test_operator_test_cases.py -vv --reruns 4 --reruns-delay 10 --junitxml=${SHARED_DIR}/xunit_output.xml
+pytest /tmp/integration_tests/mta/tests/operator/test_operator_test_cases.py -vv --reruns 4 --reruns-delay 10 --junitxml=${SHARED_DIR}/xunit_output.xml || pkill -f ftp_server.py
 
 # Stop the local FTP server that was started earlier in the script. If the process is left running, the execute pod will not complete and OpenShift CI will stop the pod after 2 hours, failing the execution.
 echo "Shutting down the FTP server"
