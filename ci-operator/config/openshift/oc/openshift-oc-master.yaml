@@ -137,6 +137,13 @@ tests:
     make verify-deps -k --warn-undefined-variables
   container:
     from: src
+- as: verify-commands
+  commands: |
+    set -x -e -o pipefail
+    make oc
+    ./oc adm release extract --file=image-references quay.io/openshift-release-dev/ocp-release:4.12.0-rc.0-x86_64 | jq .
+  container:
+    from: src
 - as: unit
   commands: |
     make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
