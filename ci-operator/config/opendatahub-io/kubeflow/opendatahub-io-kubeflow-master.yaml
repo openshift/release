@@ -47,21 +47,13 @@ tests:
       COMPUTE_NODE_TYPE: n2-standard-8
     test:
     - as: e2e
-      commands: |
-        IN=$ODH_NOTEBOOK_CONTROLLER_IMAGE
-        arrIN=(${IN//:/ })
-        export IMG=${arrIN[1]}  
-        export TAG=${arrIN[2]}
-        pushd components/odh-notebook-controller
-        oc new-project odh-notebook-controller-system
-        make deploy -e K8S_NAMESPACE=odh-notebook-controller-system
-        mkdir -p ~/.kube
-        cp /tmp/kubeconfig ~/.kube/config 2> /dev/null || cp /var/run/secrets/ci.openshift.io/multi-stage/kubeconfig ~/.kube/config
-        chmod 644 ~/.kube/config
-        export KUBECONFIG=~/.kube/config
-        make e2e-test -e K8S_NAMESPACE=odh-notebook-controller-system
-        make undeploy -e K8S_NAMESPACE=odh-notebook-controller-system
-        oc delete project odh-notebook-controller-system
+      commands: "IN=$ODH_NOTEBOOK_CONTROLLER_IMAGE\narrIN=(${IN//:/ })\nexport IMG=${arrIN[1]}
+        \ \nexport TAG=${arrIN[2]}\npushd components/odh-notebook-controller\noc new-project
+        odh-notebook-controller-system\nmake deploy -e K8S_NAMESPACE=odh-notebook-controller-system\nmkdir
+        -p ~/.kube\ncp /tmp/kubeconfig ~/.kube/config 2> /dev/null || cp /var/run/secrets/ci.openshift.io/multi-stage/kubeconfig
+        ~/.kube/config\nchmod 644 ~/.kube/config\nexport KUBECONFIG=~/.kube/config\nmake
+        e2e-test -e K8S_NAMESPACE=odh-notebook-controller-system\nmake undeploy -e
+        K8S_NAMESPACE=odh-notebook-controller-system\noc delete project odh-notebook-controller-system\n"
       dependencies:
       - env: KF_NOTEBOOK_CONTROLLER_IMAGE
         name: kf-notebook-controller
