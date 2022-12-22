@@ -11,10 +11,6 @@ oc scale --replicas=1 deployment.apps/downloads -n openshift-console
 oc scale --replicas=1 deployment.apps/oauth-openshift -n openshift-authentication
 oc scale --replicas=1 deployment.apps/packageserver -n openshift-operator-lifecycle-manager
 
-oc scale --replicas=0 deployment.apps/prometheus-{operator,adapter} -n openshift-monitoring
-oc scale --replicas=0 deployment.apps/thanos-querier -n openshift-monitoring
-oc scale --replicas=0 deployment.apps/telemeter-client -n openshift-monitoring
+# Scale down CMO to avoid recreation of resources, before deleting openshift-monitoring project
 oc scale --replicas=0 deployment.apps/cluster-monitoring-operator -n openshift-monitoring
-oc scale --replicas=0 deployment.apps/{grafana,openshift-state-metrics,kube-state-metrics} -n openshift-monitoring
-
 oc delete project openshift-monitoring
