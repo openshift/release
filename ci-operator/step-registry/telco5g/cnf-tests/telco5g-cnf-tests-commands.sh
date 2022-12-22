@@ -49,21 +49,6 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
 # SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "Should be able to configure a metaplugin"
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "Webhook resource injector"
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
-
-# SKIPTEST
 # PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
 # TESTNAME
 performance "should disable CPU load balancing for CPU\\\'s used by the pod"
