@@ -85,6 +85,33 @@ tests:
   container:
     from: src
   run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+- as: e2e-openshift-conformance-serial
+  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SKIPS: The HAProxy router pods \[apigroup:route.openshift.io\] should be scheduled on different nodes\|
+        should rollback without unnecessary restarts
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-openshift-conformance
+- as: e2e-openshift-conformance-parallel
+  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SKIPS: The HAProxy router pods \[apigroup:route.openshift.io\] should be scheduled on different nodes\|
+        ReplicationController light Should scale from 1 pod to 2 pods\|
+        should not deadlock when\|
+        should support OIDC discovery of service account issuer\|
+        should allow ingress access on one named port\|
+        should propagate mounts within defined scopes\|
+        service account token should be auto-generated\|
+        should allow egress access on one named port\|
+        should perform rolling updates and roll backs of template modifications with PVCs\|
+        should enforce policy to allow traffic only from a pod\|
+        should provide basic identity\|\[StatefulSetBasic\] should adopt matching orphans\|should support sysctls with slashes
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-microshift-e2e-openshift-conformance
 - as: e2e-rpm-install
   run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
