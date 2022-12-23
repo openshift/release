@@ -13,6 +13,10 @@ if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/osp-ca.crt" ]; then
 	sed -i "s|cacert: .*|cacert: ${SHARED_DIR}/osp-ca.crt|" "$clouds_yaml"
 fi
 
+# new_clouds_yaml creates a new application credential and adds it to a new
+# clouds.yaml file. All the credentials created here have an expiration;
+# expired application credentials are pruned by the periodic cleanup job
+# running on all OpenStack clouds.
 new_clouds_yaml() {
 	declare OS_CLIENT_CONFIG_FILE appcred_json
 	OS_CLIENT_CONFIG_FILE="$1"
