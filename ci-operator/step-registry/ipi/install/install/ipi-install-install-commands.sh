@@ -308,7 +308,12 @@ fi
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
 azure4|azuremag|azure-arm64) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
-azurestack) export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json;;
+azurestack)
+    export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+    if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+        export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+    fi
+    ;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
