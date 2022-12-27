@@ -97,6 +97,7 @@ aliyun_ecs_endpoint=$(${ALIYUN_BIN} ecs DescribeRegions | jq -c ".Regions.Region
 aliyun_vpc_endpoint=$(${ALIYUN_BIN} vpc DescribeRegions | jq -c ".Regions.Region[] | select(.RegionId | contains(\"${REGION}\"))" | jq -r .RegionEndpoint)
 
 avail_zone=$(${ALIYUN_BIN} ecs DescribeAvailableResource --DestinationResource 'InstanceType' --RegionId "${REGION}" --IoOptimized 'optimized' --InstanceType "${instance_type}" --endpoint "${aliyun_ecs_endpoint}" | jq -r .AvailableZones.AvailableZone[0].ZoneId)
+echo "$(date -u --rfc-3339=seconds) - CreateVSwitch"
 ${ALIYUN_BIN} vpc CreateVSwitch \
   --VpcId "${VPC_ID}" \
   --RegionId "${REGION}" \
@@ -106,6 +107,7 @@ ${ALIYUN_BIN} vpc CreateVSwitch \
   --VSwitchName "${CLUSTER_NAME}-${bastion_name_suffix}" > out.json
 vswitch_id=$(jq -r .VSwitchId out.json)
 
+echo "$(date -u --rfc-3339=seconds) - CreateSecurityGroup and then AuthorizeSecurityGroup"
 ${ALIYUN_BIN} ecs CreateSecurityGroup \
   --RegionId "${REGION}" \
   --VpcId "${VPC_ID}" \
@@ -158,7 +160,8 @@ ${ALIYUN_BIN} ecs RunInstances \
   --endpoint "${aliyun_ecs_endpoint}" > out.json
 instance_id=$(jq -r .InstanceIdSets.InstanceIdSet[0] out.json)
 
-sleep 30s
+sleep 60s
+echo "$(date -u --rfc-3339=seconds) - DescribeInstances"
 ${ALIYUN_BIN} ecs DescribeInstances \
   --RegionId "${REGION}" \
   --InstanceName "${CLUSTER_NAME}-${bastion_name_suffix}" \
@@ -178,6 +181,7 @@ echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
 # echo proxy IP to ${SHARED_DIR}/proxyip
 echo "${bastion_public_ip}" >> "${SHARED_DIR}/proxyip"
 
+echo "$(date -u --rfc-3339=seconds) - ssh to the bastion host and then reboot it"
 # Workaround of bug https://github.com/coreos/bugs/issues/1291
 ssh_private_key="${SHARED_DIR}/ssh-privatekey"
 chmod 600 "${ssh_private_key}"
