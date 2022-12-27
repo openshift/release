@@ -64,7 +64,7 @@ function prepare_next_steps() {
           fi
         fi
 
-        cmd="scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i \"${CLUSTER_PROFILE_DIR}/ssh-privatekey\" -r ${dir} ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
+        cmd="rsync -rtv -e \"ssh -i ${CLUSTER_PROFILE_DIR}/ssh-privatekey\" ${dir}/ ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
         echo "Running Command: ${cmd}"
         eval "${cmd}"
         echo > "${SHARED_DIR}/COPIED_INSTALL_DIR_TO_BASTION"
