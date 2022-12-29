@@ -115,11 +115,28 @@ function mirror_optional_images () {
     optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
     optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
     qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
-    
-    jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > /tmp/new-dockerconfigjson
+    run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
+    if [[ $ret -eq 0 ]]; then 
+        jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+        # will remove those cat info once it works well
+        run_command "ls -l /etc/pki/ca-trust/source/anchors/"
+        run_command "cat /tmp/.dockerconfigjson"
+        run_command "cat /tmp/new-dockerconfigjson"
+        # I guess the mirror registry auth already in the pull-secret, still add it here just in case.
+        run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson"; ret=$?
+        if [[ $ret -eq 0 ]]; then
+            echo "set the mirror registry auth successfully."
+        else
+            echo "!!! fail to set the mirror registry auth"
+            return 1
+        fi
+    else
+        echo "!!! fail to extract the auth of the cluster"
+        return 1
+    fi
+
+    unset_proxy    
     ret=0
-    run_command "ls -l /etc/pki/ca-trust/source/anchors/"
-    run_command "cat /tmp/new-dockerconfigjson"
     # Running Command: oc adm catalog mirror -a "/tmp/new-dockerconfigjson" ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12 ec2-3-90-59-26.compute-1.amazonaws.com:5000 --continue-on-error --to-manifests=/tmp/olm_mirror
     # error: unable to read image ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12: Get "https://ec2-3-90-59-26.compute-1.amazonaws.com:5000/v2/": x509: certificate signed by unknown authority
     run_command "oc adm catalog mirror  --insecure=true  --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${origin_index_image} ${MIRROR_REGISTRY_HOST} --to-manifests=/tmp/olm_mirror" || ret=$?
@@ -130,6 +147,7 @@ function mirror_optional_images () {
         run_command "cat /tmp/olm_mirror/mapping.txt"
         return 1
     fi
+    set_proxy
 }
 
 # Slove: x509: certificate signed by unknown authority
@@ -349,9 +367,7 @@ origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_v
 mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
 
 if [ $mirror -eq 1 ]; then
-    unset_proxy
     mirror_optional_images
-    set_proxy
 else
     # no need to set auth for the MIRROR_REGISTRY_HOST
     set_cluster_auth
