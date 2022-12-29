@@ -115,25 +115,13 @@ function mirror_optional_images () {
     optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
     optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
     qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
-    run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
-    if [[ $ret -eq 0 ]]; then 
-        jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
-        # will remove those cat info once it works well
-        run_command "ls -l /etc/pki/ca-trust/source/anchors/"
-        run_command "cat /tmp/.dockerconfigjson"
-        run_command "cat /tmp/new-dockerconfigjson"
-        # I guess the mirror registry auth already in the pull-secret, still add it here just in case.
-        run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson"; ret=$?
-        if [[ $ret -eq 0 ]]; then
-            echo "set the mirror registry auth successfully."
-        else
-            echo "!!! fail to set the mirror registry auth"
-            return 1
-        fi
-    else
-        echo "!!! fail to extract the auth of the cluster"
-        return 1
-    fi
+
+    run_command "cat ${CLUSTER_PROFILE_DIR}/pull-secret"
+    jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > /tmp/new-dockerconfigjson
+    
+    # run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"
+    # Running Command: cat /tmp/.dockerconfigjson
+    # {"auths":{"ec2-3-92-162-185.compute-1.amazonaws.com:5000":{"auth":"XXXXXXXXXXXXXXXX"}}}
 
     unset_proxy    
     ret=0
