@@ -49,7 +49,7 @@ if [ ! -z ${VERSION} ]; then
         diskSizeGB: 120
 compute:
 - name: worker
-  replicas: 3
+  replicas: ${WORKER_NUMBERS}
   platform:
     vsphere:
       cpus: 4
