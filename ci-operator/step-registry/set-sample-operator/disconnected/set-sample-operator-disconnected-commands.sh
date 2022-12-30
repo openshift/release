@@ -112,7 +112,7 @@ registry.redhat.io/rhel8/httpd-24:latest=MIRROR_REGISTRY_PLACEHOLDER/rhel8/httpd
 
     sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_PROXY_REGISTRY}/g" "/tmp/tag_images_list"
     run_command "cat /tmp/tag_images_list"
-    # run_command "cat ${CLUSTER_PROFILE_DIR}/pull-secret"
+    run_command "cat ${CLUSTER_PROFILE_DIR}/pull-secret"
     # # quay.io/openshift-qe-optional-operators
     # optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
     # optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')

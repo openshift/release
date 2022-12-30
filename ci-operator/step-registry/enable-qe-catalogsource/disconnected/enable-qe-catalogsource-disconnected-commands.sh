@@ -125,7 +125,7 @@ function mirror_optional_images () {
     redhat_auth_password=$(cat "/var/run/vault/mirror-registry/registry_redhat.json" | jq -r '.password')
     redhat_registry_auth=`echo -n "${redhat_auth_user}:${redhat_auth_password}" | base64 -w 0`
 
-    # run_command "cat ${CLUSTER_PROFILE_DIR}/pull-secret"
+    run_command "cat ${CLUSTER_PROFILE_DIR}/pull-secret"
     # Running Command: cat /tmp/.dockerconfigjson
     # {"auths":{"ec2-3-92-162-185.compute-1.amazonaws.com:5000":{"auth":"XXXXXXXXXXXXXXXX"}}}
     run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
@@ -135,7 +135,7 @@ function mirror_optional_images () {
         echo "!!! fail to extract the auth of the cluster"
         return 1
     fi
-    
+
     unset_proxy
     ret=0
     # Running Command: oc adm catalog mirror -a "/tmp/new-dockerconfigjson" ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12 ec2-3-90-59-26.compute-1.amazonaws.com:5000 --continue-on-error --to-manifests=/tmp/olm_mirror
