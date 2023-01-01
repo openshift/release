@@ -209,6 +209,21 @@ CONFIG = {
     },
     'hypershift-hive-quota-slice': {
         'default': 80
+    },
+    'aws-virtualization-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+        'us-west-1': 5,
+        'us-west-2': 5,
+    },
+    'azure-virtualization-quota-slice': {
+        'centralus': 5,
+        'eastus': 5,
+        'eastus2': 5,
+        'westus': 5
+    },
+    'gcp-virtualization-quota-slice': {
+        'us-central1': 10,
     }
 }
 
