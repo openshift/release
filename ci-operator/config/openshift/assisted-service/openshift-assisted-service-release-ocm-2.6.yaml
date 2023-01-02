@@ -74,6 +74,12 @@ images:
     RUN dnf install -y 'dnf-command(config-manager)' && \
         dnf config-manager --set-enabled crb && \
         dnf install -y git unzip make gcc which nmstate-devel
+
+    # Git checks if the user that owns the files on the filesystem match the
+    # current user.  We need to disable this check because tests in Prow are
+    # running with a random user.
+    RUN git config --system --add safe.directory '*'
+
     COPY --from=registry.ci.openshift.org/openshift/release:golang-1.17 /usr/local/go /usr/local/go
     ENV GOPATH=/go
     ENV GOROOT=/usr/local/go

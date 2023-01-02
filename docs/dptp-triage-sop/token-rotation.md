@@ -39,6 +39,9 @@ Then, populate the new version in other places:
 
 Then create a pull request based on the changes and merge it.
 
+To keep the maintenance simple, we should use non-expiring tokens as the last resort, i.e., only use it when bound tokens do not work for the case.
+If we have to use it for a new service account, an additional required step is to [ignore the SA](../../clusters/app.ci/assets/dptp-controller-manager.yaml)in the `service account refresher` controller of `dptp-controller-manager` to void deleting the secret holding its non-expiring token.
+
 ### Generate New Tokens
 
 #### Config-Updater

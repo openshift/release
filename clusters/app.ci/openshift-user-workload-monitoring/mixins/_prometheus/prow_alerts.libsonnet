@@ -5,6 +5,17 @@
         name: 'prow',
         rules: [
           {
+            alert: 'prow-pod-crashlooping',
+            expr: 'increase(kube_pod_container_status_restarts_total{namespace="ci",job="kube-state-metrics"}[5m]) > 0',
+            'for': '10m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}}) is restarting {{ printf "%.2f" $value }} times over the last 5 minutes.'
+            },
+          },
+          {
             alert: 'prow-job-backlog-growing',
             expr: 'sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m])) > 0',
             'for': '60m',
