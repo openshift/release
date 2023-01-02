@@ -27,11 +27,17 @@ if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
     readarray -t config <<< "${E2E_TESTS_CONFIG}"
     for var in "${config[@]}"; do
         if [[ ! -z "${var}" ]]; then
-            if [[ "${var}" == *"CNF_BRANCH"* ]]; then
-                CNF_BRANCH="$(echo "${var}" | cut -d'=' -f2)"
+            if [[ "${var}" == *"T5CI_VERSION"* ]]; then
+                T5CI_VERSION="$(echo "${var}" | cut -d'=' -f2)"
             fi
         fi
     done
+fi
+
+if [[ "$T5CI_VERSION" == "4.13" ]]; then
+    export CNF_BRANCH="master"
+else
+    export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
 
 echo "Running for CNF_BRANCH=${CNF_BRANCH}"
