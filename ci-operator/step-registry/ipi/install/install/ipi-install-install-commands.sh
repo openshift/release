@@ -397,6 +397,9 @@ openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v '
 wait "$!"
 ret="$?"
 
+echo "(jiwei debug) Copying '${dir}/auth/kubeconfig' to '${ARTIFACT_DIR}'..."
+cp "${dir}/auth/kubeconfig" "${ARTIFACT_DIR}/kubeconfig"
+
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
