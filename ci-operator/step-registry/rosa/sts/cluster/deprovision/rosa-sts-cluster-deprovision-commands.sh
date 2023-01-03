@@ -6,6 +6,13 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+# Before deprovison, run must-gather to validate the cluster healthy and stable after testing
+# To avoid the kubeconfig is changed by the testing steps, always login with the orign cluster-admin user
+echo "Do must-gather ..."
+OC_LOGIN=$(cat "${SHARED_DIR}/api.login")
+eval "${OC_LOGIN}"
+oc adm must-gather
+
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 
 # Configure aws
