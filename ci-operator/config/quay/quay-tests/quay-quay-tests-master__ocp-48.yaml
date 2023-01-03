@@ -3,11 +3,15 @@ base_images:
     name: "4.8"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.8"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
+    tag: golang-1.18
 releases:
   latest:
     candidate:
@@ -23,17 +27,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests
+- as: quay-e2e-tests-quay38-ocp48
   cron: 0 12 * * 4
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       ODF_OPERATOR_CHANNEL: stable-4.8
       ODF_SUBSCRIPTION_NAME: ocs-operator
     test:
     - chain: quay-tests-quay-e2e-test
-    workflow: ipi-aws
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay
