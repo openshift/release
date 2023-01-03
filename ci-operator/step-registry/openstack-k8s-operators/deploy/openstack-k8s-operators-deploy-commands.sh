@@ -58,15 +58,11 @@ sh -c 'oc wait --for=condition=Available deployment {} --timeout=-1s'
 # Deploy openstack services
 make openstack_deploy
 sleep 60
-# Debug
-oc get OpenStackControlPlane openstack -o json
+
 # Waiting for all services to be ready
 oc get OpenStackControlPlane openstack -o jsonpath='{.status.conditions[*].type}' | \
 timeout ${TIMEOUT_SERVICES_READY} xargs -I {} -d ' ' \
 sh -c 'echo testing condition={}; oc wait openstackcontrolplane.core.openstack.org/openstack --for=condition={} --timeout=-1s'
-
-# DEBUG - Getting resources information
-oc get all
 
 # Create clouds.yaml file to be used in further tests.
 mkdir -p ~/.config/openstack
