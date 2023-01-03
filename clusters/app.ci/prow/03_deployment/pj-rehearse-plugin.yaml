@@ -6,13 +6,21 @@ items:
   metadata:
     name: pj-rehearse-plugin
     namespace: ci
+    labels:
+      app: prow
+      component: pj-rehearse-plugin
   spec:
     selector:
       app: prow
       component: pj-rehearse-plugin
     ports:
-    - port: 80
+    - name: main
+      port: 80
       targetPort: 8888
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -59,6 +67,8 @@ items:
           ports:
             - name: http
               containerPort: 8888
+            - name: metrics
+              containerPort: 9090
           volumeMounts:
           - mountPath: /var/kubeconfigs
             name: prowjob-kubeconfig
