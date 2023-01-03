@@ -35,4 +35,4 @@ done
 
 echo "successfully installed MCH"
 
-sleep 600
+sleep 5000
