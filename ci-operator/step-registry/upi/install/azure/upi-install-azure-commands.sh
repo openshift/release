@@ -159,10 +159,8 @@ ACCOUNT_KEY=$(az storage account keys list -g $RESOURCE_GROUP --account-name $AC
 
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos.json; then
   VHD_URL="$(jq -r --arg arch "$OCP_ARCH" '.architectures[$arch]."rhel-coreos-extensions"."azure-disk".url' /tmp/coreos.json)"
-  RELEASE_VERSION="$(jq -r --arg arch "$OCP_ARCH" '.architectures[$arch]."rhel-coreos-extensions"."azure-disk".release' /tmp/coreos.json)"
 else
   VHD_URL="$(jq -r .azure.url /var/lib/openshift-install/rhcos.json)"
-  RELEASE_VERSION="$(jq -r .azure.release /var/lib/openshift-install/rhcos.json)"
 fi
 
 echo "Copying VHD image from ${VHD_URL}"
@@ -229,7 +227,6 @@ if grep -qs "Microsoft.Compute/galleries" 02_storage.json; then
     --parameters vhdBlobURL="${VHD_BLOB_URL}" \
     --parameters baseName="$INFRA_ID" \
     --parameters storageAccount="$ACCOUNT_NAME" \
-    --parameters imageRelease="${RELEASE_VERSION::15}" \
     --parameters architecture="$AZ_ARCH"
 else
   az deployment group create -g $RESOURCE_GROUP \
