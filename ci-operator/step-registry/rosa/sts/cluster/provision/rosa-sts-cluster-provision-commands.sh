@@ -222,6 +222,7 @@ while true; do
   fi
 done
 rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
+rosa describe cluster -c ${CLUSTER_ID} -o json
 
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
@@ -230,3 +231,6 @@ echo "API URL: ${API_URL}"
 echo "Console URL: ${CONSOLE_URL}"
 echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
 echo "${API_URL}" > "${SHARED_DIR}/api.url"
+
+PRODUCT_ID=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.product.id')
+echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
