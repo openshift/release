@@ -11,19 +11,23 @@ periodics:
     repo: quay-tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: ocp-410
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
+    ci-operator.openshift.io/variant: ocp-410-quay38
     ci.openshift.io/generator: prowgen
     job-release: "4.10"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-410-quay-e2e-tests
+  name: periodic-ci-quay-quay-tests-master-ocp-410-quay38-quay-e2e-tests-quay38-ocp410
   reporter_config:
     slack:
       channel: '#quay-qe'
       job_states_to_report:
+      - success
       - failure
       - error
-      report_template: Job {{.Spec.Job}} failed.
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -33,9 +37,9 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/quay-e2e-tests-cluster-profile
-      - --target=quay-e2e-tests
-      - --variant=ocp-410
+      - --secret-dir=/usr/local/quay-e2e-tests-quay38-ocp410-cluster-profile
+      - --target=quay-e2e-tests-quay38-ocp410
+      - --variant=ocp-410-quay38
       command:
       - ci-operator
       image: ci-operator:latest
@@ -51,7 +55,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/quay-e2e-tests-cluster-profile
+      - mountPath: /usr/local/quay-e2e-tests-quay38-ocp410-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -78,7 +82,7 @@ periodics:
         secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
-        secretName: cluster-secrets-aws
+        secretName: cluster-secrets-aws-qe
     - name: github-credentials-openshift-ci-robot-private-git-cloner
       secret:
         secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -90,7 +94,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 0 12 * * 6
+  cron: 0 12 * * 2
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -100,12 +104,23 @@ periodics:
     repo: quay-tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
     ci-operator.openshift.io/variant: ocp-411-quay38
     ci.openshift.io/generator: prowgen
     job-release: "4.11"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-411-quay38-quay-e2e-tests
+  name: periodic-ci-quay-quay-tests-master-ocp-411-quay38-quay-e2e-tests-quay38-ocp411
+  reporter_config:
+    slack:
+      channel: '#quay-qe'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -115,8 +130,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/quay-e2e-tests-cluster-profile
-      - --target=quay-e2e-tests
+      - --secret-dir=/usr/local/quay-e2e-tests-quay38-ocp411-cluster-profile
+      - --target=quay-e2e-tests-quay38-ocp411
       - --variant=ocp-411-quay38
       command:
       - ci-operator
@@ -133,7 +148,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/quay-e2e-tests-cluster-profile
+      - mountPath: /usr/local/quay-e2e-tests-quay38-ocp411-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -160,7 +175,7 @@ periodics:
         secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
-        secretName: cluster-secrets-aws
+        secretName: cluster-secrets-aws-qe
     - name: github-credentials-openshift-ci-robot-private-git-cloner
       secret:
         secretName: github-credentials-openshift-ci-robot-private-git-cloner
