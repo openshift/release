@@ -37,7 +37,7 @@ function mirror_image(){
 
 function update_icsp(){
     local source_release_image_repo
-    source_release_image_repo="${RELEASE_IMAGE_LATEST%:*}"
+    source_release_image_repo="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"
     source_release_image_repo="${source_release_image_repo%@sha256*}"
     if [[ "${source_release_image_repo}" != "${MIRROR_RELEASE_IMAGE_REPO}" ]] && ! oc get ImageContentSourcePolicy example -oyaml; then
         echo "Target image has different repo with source image and icsp example is not present, creating icsp"
@@ -61,10 +61,10 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-# Get the target upgrades release, by default, RELEASE_IMAGE_TARGET is the target release
-# If it's serial upgrades then override-upgrade file will store the release and overrides RELEASE_IMAGE_TARGET
+# Get the target upgrades release, by default, OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is the target release
+# If it's serial upgrades then override-upgrade file will store the release and overrides OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
 # upgrade-edge file expects a comma separated releases list like target_release1,target_release2,...
-export TARGET_RELEASES=("${RELEASE_IMAGE_TARGET}")
+export TARGET_RELEASES=("${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}")
 if [[ -f "${SHARED_DIR}/upgrade-edge" ]]; then
     release_string="$(< "${SHARED_DIR}/upgrade-edge")"
     # shellcheck disable=SC2207
