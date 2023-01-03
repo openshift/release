@@ -47,6 +47,7 @@ new_clouds_yaml() {
 
 if [[ -n $APPLICATION_CREDENTIALS ]]; then
 	echo 'Generating ephemeral application credentials'
+	echo 'Dummy change'
 	new_clouds_yaml "$clouds_yaml" > "${SHARED_DIR}/clouds.yaml"
 
 	declare appcreds_id
