@@ -10,7 +10,7 @@ then
 fi
 
 # Some kinds of jobs need to skip installing loki by default
-if [[ ! "$JOB_NAME" =~ .*ipv6.* ]]
+if [[ "$JOB_NAME" =~ .*ipv6.* ]]
 then
   echo "IPv6 clusters are disconnected and won't be able to reach Loki."
   exit 0
