@@ -1,0 +1,25 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: hive-alerts
+  namespace: hive
+spec:
+  groups:
+  - name: hive-absent
+    rules:
+    - alert: hive-controllers-down
+      annotations:
+        message: The service hive-controllers has been down for 5 minutes.
+      expr: |
+        absent(up{job="hive-controllers"} == 1)
+      for: 5m
+      labels:
+        severity: critical
+    - alert: hive-clustersync-down
+      annotations:
+        message: The service hive-clustersync has been down for 5 minutes.
+      expr: |
+        absent(up{job="hive-clustersync"} == 1)
+      for: 5m
+      labels:
+        severity: critical
