@@ -16,6 +16,8 @@ openshift-install version
 
 echo "${OPENSHIFT_INSTALL_RELEASE_IMAGE}" || true
 
+cat "${CLUSTER_PROFILE_DIR}/pull-secret"
+
 OMR_HOST_NAME=$(cat ${SHARED_DIR}/OMR_HOST_NAME)
 OMR_CRED="cXVheTpwYXNzd29yZA=="
 echo "Start to mirror OCP Images to OMR $OMR_HOST_NAME ..."
