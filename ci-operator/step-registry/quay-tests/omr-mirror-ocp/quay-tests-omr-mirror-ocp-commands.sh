@@ -17,6 +17,7 @@ openshift-install version
 echo "${OPENSHIFT_INSTALL_RELEASE_IMAGE}" || true
 
 OMR_HOST_NAME=$(cat ${SHARED_DIR}/OMR_HOST_NAME)
+OMR_CRED="cXVheTpwYXNzd29yZA=="
 echo "Start to mirror OCP Images to OMR $OMR_HOST_NAME ..."
 
 cp /var/run/quay-qe-omr-secret/quaybuilder ${SHARED_DIR}/quaybuilder && cp /var/run/quay-qe-omr-secret/quaybuilder.pub  ${SHARED_DIR}/quaybuilder.pub || true
@@ -31,16 +32,9 @@ target_release_image="${target_release_image_repo}:4.12-x86_64"
 echo "${target_release_image_repo}" || true
 echo "${target_release_image}" || true
 
-cat >> "${new_pull_secret}" << EOF
-{
-  "auths": {
-    "${OMR_HOST_NAME}:8443": {
-      "auth": "cXVheTpwYXNzd29yZA==",
-      "email": "quay-qe@redhat.com"
-    }
-  }
-}
-EOF
+jq --argjson a "{\"${OMR_HOST_NAME}\": {\"auth\": \"$OMR_CRED\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+
+cat "${new_pull_secret}"
 
 # MIRROR IMAGES
 oc adm release -a "${new_pull_secret}" mirror --insecure=true \
@@ -49,4 +43,4 @@ oc adm release -a "${new_pull_secret}" mirror --insecure=true \
  --to-release-image=${target_release_image} | tee "${mirror_output}" || true
 
 #debug
-sleep 500
+sleep 600
