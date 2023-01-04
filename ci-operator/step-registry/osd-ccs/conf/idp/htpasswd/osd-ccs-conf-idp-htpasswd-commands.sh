@@ -18,7 +18,7 @@ ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 echo "Config htpasswd idp ..."
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 IDP_USER="osd-admin"
-IDP_PASSWD=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 15)
+IDP_PASSWD="HTPasswd_$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10)"
 ocm create idp -c ${CLUSTER_ID} \
                 --type htpasswd \
                 --name osd-htpasswd \

@@ -93,6 +93,11 @@ performance "Checking IRQBalance settings Verify irqbalance configuration handli
 # TESTNAME
 performance "Checking IRQBalance settings Verify irqbalance configuration handling Should store empty cpu mask in the backup"
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-4194
+# TESTNAME
+performance "Should have the correct RPS configuration"
+
 EOF
 }
 
@@ -221,13 +226,17 @@ if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
     readarray -t config <<< "${E2E_TESTS_CONFIG}"
     for var in "${config[@]}"; do
         if [[ ! -z "${var}" ]]; then
-            if [[ "${var}" == *"CNF_BRANCH"* ]]; then
-                CNF_BRANCH="$(echo "${var}" | cut -d'=' -f2)"
-            elif [[ "${var}" == *"FEATURES"* ]]; then
-                FEATURES="$(echo "${var}" | cut -d'=' -f2 | tr -d '"')"
+            if [[ "${var}" == *"T5CI_VERSION"* ]]; then
+                T5CI_VERSION="$(echo "${var}" | cut -d'=' -f2)"
             fi
         fi
     done
+fi
+
+if [[ "$T5CI_VERSION" == "4.13" ]]; then
+    export CNF_BRANCH="master"
+else
+    export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
 
 worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \

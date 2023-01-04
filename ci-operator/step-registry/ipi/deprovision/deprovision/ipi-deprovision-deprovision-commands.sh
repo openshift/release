@@ -34,6 +34,9 @@ echo ${SHARED_DIR}/metadata.json
 
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
   export AZURE_AUTH_LOCATION=$SHARED_DIR/osServicePrincipal.json
+  if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+  fi
 fi
 
 echo "Copying the installation artifacts to the Installer's asset directory..."

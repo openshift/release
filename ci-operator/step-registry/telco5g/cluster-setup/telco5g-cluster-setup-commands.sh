@@ -151,6 +151,7 @@ cat << EOF > ~/ocp-install.yml
     until: result is success
     retries: 150
     delay: 60
+    ignore_errors: true
 
   - name: Check if successful
     stat: path=/home/kni/us_${CLUSTER_NAME}_ready.txt

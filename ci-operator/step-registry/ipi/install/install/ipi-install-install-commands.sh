@@ -64,7 +64,7 @@ function prepare_next_steps() {
           fi
         fi
 
-        cmd="scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i \"${CLUSTER_PROFILE_DIR}/ssh-privatekey\" -r ${dir} ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
+        cmd="rsync -rtv -e \"ssh -i ${CLUSTER_PROFILE_DIR}/ssh-privatekey\" ${dir}/ ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
         echo "Running Command: ${cmd}"
         eval "${cmd}"
         echo > "${SHARED_DIR}/COPIED_INSTALL_DIR_TO_BASTION"
@@ -308,7 +308,12 @@ fi
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
 azure4|azuremag|azure-arm64) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
-azurestack) export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json;;
+azurestack)
+    export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+    if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+        export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+    fi
+    ;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"

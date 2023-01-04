@@ -6,13 +6,13 @@
         rules: [
           {
             alert: 'prow-pod-crashlooping',
-            expr: 'rate(kube_pod_container_status_restarts_total{namespace="ci",job="kube-state-metrics"}[15m]) * 60 * 5 > 0',
-            'for': '1m',
+            expr: 'increase(kube_pod_container_status_restarts_total{namespace="ci",job="kube-state-metrics"}[5m]) > 0',
+            'for': '10m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}}) is restarting {{ printf "%.2f" $value }} times / 5 minutes.'
+              message: 'Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}}) is restarting {{ printf "%.2f" $value }} times over the last 5 minutes.'
             },
           },
           {
