@@ -33,7 +33,7 @@ cat > prep.yaml <<-'EOF'
 - name: Prep Playbook
   hosts: new_workers
   any_errors_fatal: true
-  gather_facts: false
+  gather_facts: true
 
   vars:
     kubeconfig_path: "{{ lookup('env', 'KUBECONFIG') }}"
@@ -71,6 +71,13 @@ cat > prep.yaml <<-'EOF'
     template:
       src: "rhel-{{ major_platform_version }}-server-rpms.repo.j2"
       dest: "/etc/yum.repos.d/rhel-{{ major_platform_version }}-server-rpms.repo"
+
+  - name: List current enabled repos and also make repo metadata cache in advance
+    command: "{{ ansible_pkg_mgr }} repolist"
+    retries: 3
+    delay: 10
+    register: repolist_result
+    until: repolist_result.rc == 0
 
 EOF
 
