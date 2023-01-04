@@ -3,6 +3,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: cli
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: release
@@ -24,15 +28,16 @@ resources:
       memory: 200Mi
 tests:
 - as: quay-e2e-tests-quay36-ocp412
-  cron: 0 12 * * 5
+  cron: 0 12 * * 2
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-qe
     env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m5.2xlarge
       QUAY_OPERATOR_CHANNEL: stable-3.6
     test:
     - chain: quay-tests-quay-e2e-test
-    workflow: ipi-aws
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: master
   org: quay

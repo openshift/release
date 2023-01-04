@@ -187,7 +187,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 0 12 * * 5
+  cron: 0 12 * * 2
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -197,12 +197,23 @@ periodics:
     repo: quay-tests
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-qe
     ci-operator.openshift.io/variant: ocp-412-quay36
     ci.openshift.io/generator: prowgen
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-quay-quay-tests-master-ocp-412-quay36-quay-e2e-tests-quay36-ocp412
+  reporter_config:
+    slack:
+      channel: '#quay-qe'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -257,7 +268,7 @@ periodics:
         secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
-        secretName: cluster-secrets-aws
+        secretName: cluster-secrets-aws-qe
     - name: github-credentials-openshift-ci-robot-private-git-cloner
       secret:
         secretName: github-credentials-openshift-ci-robot-private-git-cloner
@@ -284,7 +295,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-quay-quay-tests-master-ocp-412-quay37-quay-e2e-tests-aws-ipi-ocp412
+  name: periodic-ci-quay-quay-tests-master-ocp-412-quay37-quay-e2e-tests-quay37-ocp412
+  reporter_config:
+    slack:
+      channel: '#quay-qe'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -294,8 +316,8 @@ periodics:
       - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/quay-e2e-tests-aws-ipi-ocp412-cluster-profile
-      - --target=quay-e2e-tests-aws-ipi-ocp412
+      - --secret-dir=/usr/local/quay-e2e-tests-quay37-ocp412-cluster-profile
+      - --target=quay-e2e-tests-quay37-ocp412
       - --variant=ocp-412-quay37
       command:
       - ci-operator
@@ -312,7 +334,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/quay-e2e-tests-aws-ipi-ocp412-cluster-profile
+      - mountPath: /usr/local/quay-e2e-tests-quay37-ocp412-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
