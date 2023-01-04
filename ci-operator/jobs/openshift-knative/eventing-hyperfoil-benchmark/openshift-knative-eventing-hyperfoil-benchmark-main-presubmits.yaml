@@ -6,16 +6,68 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build05
-    context: ci/prow/410-kafka-broker-upstream-nightly-aws-ocp-410
+    context: ci/prow/411-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "410"
+      ci-operator.openshift.io/variant: "411"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-eventing-hyperfoil-benchmark-main-410-kafka-broker-upstream-nightly-aws-ocp-410
-    rerun_command: /test 410-kafka-broker-upstream-nightly-aws-ocp-410
+    name: pull-ci-openshift-knative-eventing-hyperfoil-benchmark-main-411-images
+    rerun_command: /test 411-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=src
+        - --variant=411
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )411-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/411-test-kafka--7465737-aws-ocp-411
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "411"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-eventing-hyperfoil-benchmark-main-411-test-kafka--7465737-aws-ocp-411
+    rerun_command: /test 411-test-kafka--7465737-aws-ocp-411
     spec:
       containers:
       - args:
@@ -24,8 +76,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=kafka-broker-upstream-nightly-aws-ocp-410
-        - --variant=410
+        - --target=test-kafka--7465737-aws-ocp-411
+        - --variant=411
         command:
         - ci-operator
         image: ci-operator:latest
@@ -64,4 +116,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )410-kafka-broker-upstream-nightly-aws-ocp-410,?($|\s.*)
+    trigger: (?m)^/test( | .* )411-test-kafka--7465737-aws-ocp-411,?($|\s.*)
