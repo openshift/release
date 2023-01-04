@@ -20,11 +20,18 @@ cat > scaleup-pre-hook-gcp.yaml <<- 'EOF'
 - name: Configure RHEL machine on GCP
   hosts: new_workers
   any_errors_fatal: true
-  gather_facts: false
+  gather_facts: true
 
   tasks:
   - name: install checkpolicy
     yum: name=checkpolicy state=present
+
+  - name: List current enabled repos and also make repo metadata cache in advance
+    command: "{{ ansible_pkg_mgr }} repolist"
+    retries: 3
+    delay: 10
+    register: repolist_result
+    until: repolist_result.rc == 0
 EOF
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
