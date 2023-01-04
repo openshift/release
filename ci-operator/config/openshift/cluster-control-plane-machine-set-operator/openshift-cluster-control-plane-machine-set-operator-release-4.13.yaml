@@ -22,6 +22,12 @@ promotion:
   name: "4.13"
   namespace: ocp
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.13"
   initial:
     integration:
       name: "4.13"
@@ -96,6 +102,23 @@ tests:
   run_if_changed: .*periodic.*
   steps:
     cluster_profile: aws
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-arm-periodic
+  interval: 72h
+  steps:
+    cluster_profile: aws-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
     test:
     - as: test
       commands: |
