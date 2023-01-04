@@ -1,0 +1,21 @@
+chain:
+  as: hypershift-kubevirt-deploy-cnv
+  steps:
+  - as: deploy-cnv
+    cli: latest
+    env:
+    - name: CNV_PRERELEASE_VERSION
+      default: ""
+      documentation: "The prerelease version of cnv to install"
+    commands: ./hack/ci/install-cnv.sh
+    from: test-bin
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+    grace_period: 5m0s
+    timeout: 15m0s
+    credentials:
+    - mount_path: /etc/cnv-nightly-pull-credentials
+      name: openshift-cnv-quay-credentials
+      namespace: test-credentials

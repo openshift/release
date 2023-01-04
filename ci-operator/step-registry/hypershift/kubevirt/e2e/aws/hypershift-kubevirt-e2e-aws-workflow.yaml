@@ -1,0 +1,19 @@
+workflow:
+  as: hypershift-kubevirt-e2e-aws
+  documentation: |-
+    Executes hypershift e2e test suite on an aws mgmt cluster
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
+    pre:
+    - chain: ipi-aws-ovn-pre
+    - chain: ipi-install
+    - chain: hypershift-install
+    - chain: hypershift-kubevirt-deploy-cnv
+    test:
+    - chain: hypershift-kubevirt-run-e2e
+    post:
+    - chain: ipi-aws-post
