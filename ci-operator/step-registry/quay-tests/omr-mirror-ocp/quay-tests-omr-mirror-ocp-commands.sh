@@ -26,7 +26,7 @@ cp /var/run/quay-qe-omr-secret/quaybuilder ${SHARED_DIR}/quaybuilder && cp /var/
 chmod 600 ${SHARED_DIR}/quaybuilder && chmod 600 ${SHARED_DIR}/quaybuilder.pub || true
 
 #Share the CA Cert of Quay OMR
-scp -i quaybuilder -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null  ec2-user@"${OMR_HOST_NAME}":/etc/quay-install/quay-rootCA/rootCA.pem ${SHARED_DIR} || true
+scp -i ${SHARED_DIR}/quaybuilder -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null  ec2-user@"${OMR_HOST_NAME}":/etc/quay-install/quay-rootCA/rootCA.pem ${SHARED_DIR} || true
 
 target_release_image_repo="${OMR_HOST_NAME}:8443/openshift-release-dev/ocp-release"
 target_release_image="${target_release_image_repo}:4.12-x86_64"
@@ -34,9 +34,13 @@ target_release_image="${target_release_image_repo}:4.12-x86_64"
 echo "${target_release_image_repo}" || true
 echo "${target_release_image}" || true
 
+# unset KUBECONFIG to ensure this step always interact with the build farm.
+unset KUBECONFIG
+oc registry login
+
 jq --argjson a "{\"${OMR_HOST_NAME}\": {\"auth\": \"$OMR_CRED\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
-cat "${new_pull_secret}"
+cat "${new_pull_secret}" | jq || true
 
 # MIRROR IMAGES
 oc adm release -a "${new_pull_secret}" mirror --insecure=true \
