@@ -20,8 +20,9 @@ vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
 
 VCENTER_AUTH_PATH=/var/run/vault/vsphere/secrets.sh
 
-# For leases >= than 88, run on the IBM Cloud
-if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then
+LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
+# For leases >= than 88, run on the IBM Cloud 
+if [ ${LEASE_NUMBER} -ge 88 ] && [ ${LEASE_NUMBER} -lt 200 ]; then
   echo Scheduling job on IBM Cloud instance
   VCENTER_AUTH_PATH=/var/run/vault/ibmcloud/secrets.sh
   vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
@@ -30,6 +31,19 @@ if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then
   dns_server="10.38.76.172"
   vsphere_resource_pool="/IBMCloud/host/vcs-ci-workload/Resources"
   vsphere_cluster="vcs-ci-workload"
+  vsphere_datastore="vsanDatastore"
+fi
+
+# For leases >= 200, run on the IBM Cloud vSphere 8 env
+if [ ${LEASE_NUMBER} -ge 200 ]; then
+  echo Scheduling job on IBM Cloud instance
+  VCENTER_AUTH_PATH=/var/run/vsphere8-secrets/secrets.sh
+  vsphere_url="vcenter.ibmc.devcluster.openshift.com"
+  vsphere_datacenter="IBMCdatacenter"
+  cloud_where_run="IBM8"
+  dns_server="10.177.56.78"
+  vsphere_resource_pool="/IBMCdatacenter/host/IBMCcluster/Resources/ipi-ci-clusters"
+  vsphere_cluster="IBMCcluster"
   vsphere_datastore="vsanDatastore"
 fi
 
