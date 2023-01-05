@@ -15,36 +15,39 @@ CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 API_IP=$(<"${SHARED_DIR}"/API_IP)
 INGRESS_IP=$(<"${SHARED_DIR}"/INGRESS_IP)
 
-echo "Creating DNS record for api.$CLUSTER_NAME.$BASE_DOMAIN. -> $API_IP"
-cat > "${SHARED_DIR}/api-record.json" <<EOF
+echo "Creating DNS records for $CLUSTER_NAME.$BASE_DOMAIN"
+cat > "${SHARED_DIR}/dns_up.json" <<EOF
 {
-"Comment": "Create the public OpenShift API record",
-"Changes": [{
+  "Comment": "Upsert records for ${CLUSTER_NAME}.${BASE_DOMAIN}",
+  "Changes": [
+    {
       "Action": "UPSERT",
       "ResourceRecordSet": {
         "Name": "api.${CLUSTER_NAME}.${BASE_DOMAIN}.",
         "Type": "A",
         "TTL": 300,
-        "ResourceRecords": [{"Value": "${API_IP}"}]
+        "ResourceRecords": [
+          {
+            "Value": "${API_IP}"
+          }
+        ]
       }
-}]}
-EOF
-cp "${SHARED_DIR}/api-record.json" "${ARTIFACT_DIR}/api-record.json"
-aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "file://${SHARED_DIR}/api-record.json"
-
-echo "Creating DNS record for *.apps.$CLUSTER_NAME.$BASE_DOMAIN. -> $INGRESS_IP"
-cat > "${SHARED_DIR}/ingress-record.json" <<EOF
-{
-"Comment": "Create the public OpenShift Ingress record",
-"Changes": [{
-  "Action": "UPSERT",
-  "ResourceRecordSet": {
-    "Name": "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}.",
-    "Type": "A",
-    "TTL": 300,
-    "ResourceRecords": [{"Value": "${INGRESS_IP}"}]
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "*.apps.${CLUSTER_NAME}.${BASE_DOMAIN}.",
+        "Type": "A",
+        "TTL": 300,
+        "ResourceRecords": [
+          {
+            "Value": "${INGRESS_IP}"
+          }
+        ]
+      }
     }
-}]}
+  ]
+}
 EOF
-cp "${SHARED_DIR}/ingress-record.json" "${ARTIFACT_DIR}/ingress-record.json"
-aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "file://${SHARED_DIR}/ingress-record.json"
+cp "${SHARED_DIR}/dns_up.json" "${ARTIFACT_DIR}/"
+aws route53 change-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" --change-batch "file://${SHARED_DIR}/dns_up.json"

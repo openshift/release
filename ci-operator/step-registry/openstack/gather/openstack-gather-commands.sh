@@ -11,7 +11,7 @@ OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPEN
 CREATE_FIPS=1
 
 if test -f "${SHARED_DIR}/proxy-conf.sh"; then
-    # shellcheck disable=SC1090
+    # shellcheck source=/dev/null
     source "${SHARED_DIR}/proxy-conf.sh"
     CREATE_FIPS=0
 fi
@@ -36,14 +36,14 @@ collect_bootstrap_logs() {
 		if [ "$BOOTSTRAP_NODE" != "" ]; then
 			echo "Collecting bootstrap logs..."
 			CLUSTER_ID=${BOOTSTRAP_NODE%-bootstrap}
-			openstack security group rule create ${CLUSTER_ID}-master --protocol tcp --dst-port 22:22 --remote-ip 0.0.0.0/0
+			openstack security group rule create "${CLUSTER_ID}-master" --protocol tcp --dst-port 22:22 --remote-ip 0.0.0.0/0
 			if [[ $CREATE_FIPS == 1 ]]; then
-				IP=$(openstack floating ip list --port ${CLUSTER_ID}-bootstrap-port -c "Floating IP Address" -f value)
+				IP=$(openstack floating ip list --port "${CLUSTER_ID}-bootstrap-port" -c "Floating IP Address" -f value)
 				if [[ ${IP} == "" ]]; then
 					IP=$(openstack floating ip create "$OPENSTACK_EXTERNAL_NETWORK" --description "${CLUSTER_ID}-bootstrap" --format value --column floating_ip_address)
 				fi
 				FIPS+=("${IP}")
-				openstack server add floating ip ${CLUSTER_ID}-bootstrap ${IP}
+				openstack server add floating ip "${CLUSTER_ID}-bootstrap" "${IP}"
 			else
 				ADDRESSES=$(openstack server show "${BOOTSTRAP_NODE}" --column addresses --format json)
 				IP=$(echo "${ADDRESSES}" | jq -r 'if .addresses|type == "object" then .addresses[][0] else .addresses|split("=")[1]|split(",")[0] end')
@@ -51,11 +51,11 @@ collect_bootstrap_logs() {
 			GATHER_BOOTSTRAP_ARGS+=('--bootstrap' "${IP}")
 
 			for idx in 0 1 2; do
-				if openstack server show ${CLUSTER_ID}-master-${idx} &> /dev/null; then
+				if openstack server show "${CLUSTER_ID}-master-${idx}" &> /dev/null; then
 					if [[ $CREATE_FIPS == 1 ]]; then
 						IP=$(openstack floating ip create "$OPENSTACK_EXTERNAL_NETWORK" --description "${CLUSTER_ID}-master-${idx}" --format value --column floating_ip_address)
 						FIPS+=("${IP}")
-						openstack server add floating ip ${CLUSTER_ID}-master-${idx} ${IP}
+						openstack server add floating ip "${CLUSTER_ID}-master-${idx}" "${IP}"
 					else
 						ADDRESSES=$(openstack server show "${CLUSTER_ID}-master-${idx}" --column addresses --format json)
 						IP=$(echo "${ADDRESSES}" | jq -r 'if .addresses|type == "object" then .addresses[][0] else .addresses|split("=")[1]|split(",")[0] end')
@@ -80,13 +80,13 @@ collect_bootstrap_logs() {
 					exit 1
 				fi
 				echo "Moving credentials and openshift binary to Bastion Proxy"
-				$SCP_CMD $SSH_PRIV_KEY_PATH /bin/openshift-install $BASTION_USER@$BASTION_FIP:/tmp
+				$SCP_CMD "$SSH_PRIV_KEY_PATH" /bin/openshift-install "${BASTION_USER}@${BASTION_FIP}:/tmp"
 				echo "Gathering bootstrap logs from Bastion Proxy"
 				$SSH_CMD bash - << EOF
 /tmp/openshift-install gather bootstrap --key /tmp/ssh-privatekey ${GATHER_BOOTSTRAP_ARGS[@]}
 EOF
 				echo "Copying logs"
-				$SCP_CMD $BASTION_USER@$BASTION_FIP:/home/$BASTION_USER/log-bundle-*.tar.gz "${SHARED_DIR}"/
+				$SCP_CMD "${BASTION_USER}@${BASTION_FIP}:/home/${BASTION_USER}/log-bundle-*.tar.gz" "${SHARED_DIR}/"
 			else
 				openshift-install gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
 				cp log-bundle-*.tar.gz "${ARTIFACT_DIR}"
@@ -95,6 +95,31 @@ EOF
 		fi
 	fi
 }
+
+export ARTIFACT_DIR_JSON="${ARTIFACT_DIR}/json"
+mkdir -p "$ARTIFACT_DIR_JSON"
+
+openstack server list --name "${CLUSTER_NAME}" -f json > "${ARTIFACT_DIR_JSON}/openstack_server_list.json"
+
+for server in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_server_list.json"); do
+	openstack server show "$server" -f json
+done | jq --slurp > "${ARTIFACT_DIR_JSON}/openstack_server_show.json"
+
+openstack port list -f json \
+        | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
+        > "${ARTIFACT_DIR_JSON}/openstack_port_list.json"
+
+for port in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_port_list.json"); do
+	openstack port show "$port" -f json
+done | jq --slurp > "${ARTIFACT_DIR_JSON}/openstack_port_show.json"
+
+openstack subnet list -f json \
+        | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
+        > "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json"
+
+for port in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json"); do
+        openstack subnet show "$port" -f json
+done | jq --slurp > "${ARTIFACT_DIR_JSON}/openstack_subnet_show.json"
 
 mkdir -p "${ARTIFACT_DIR}/nodes"
 
