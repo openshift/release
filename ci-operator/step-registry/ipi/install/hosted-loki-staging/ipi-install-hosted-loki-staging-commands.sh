@@ -231,6 +231,8 @@ spec:
         app.kubernetes.io/part-of: loki
         app.kubernetes.io/version: ${PROMTAIL_VERSION}
     spec:
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
       - args:
         - --oidc.client-id=\$(CLIENT_ID)
