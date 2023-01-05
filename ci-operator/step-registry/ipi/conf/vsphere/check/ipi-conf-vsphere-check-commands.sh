@@ -28,7 +28,7 @@ if [ ${LEASE_NUMBER} -ge 88 ] && [ ${LEASE_NUMBER} -lt 200 ]; then
   vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
   vsphere_datacenter="IBMCloud"
   cloud_where_run="IBM"
-  dns_server="10.38.76.172"
+  dns_server="192.168.133.73"
   vsphere_resource_pool="/IBMCloud/host/vcs-ci-workload/Resources"
   vsphere_cluster="vcs-ci-workload"
   vsphere_datastore="vsanDatastore"
