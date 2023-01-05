@@ -32,7 +32,7 @@ oc registry login
 
 jq --argjson a "{\"${OMR_HOST}\": {\"auth\": \"$OMR_CRED\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
-# MIRROR IMAGES
+# MIRROR IMAGES to OMR
 oc adm release -a "${new_pull_secret}" mirror --insecure=true \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE} \
  --to=${target_release_image_repo} \
