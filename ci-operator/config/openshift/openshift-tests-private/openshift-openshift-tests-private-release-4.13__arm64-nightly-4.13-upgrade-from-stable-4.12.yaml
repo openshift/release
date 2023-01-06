@@ -113,6 +113,27 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+- as: aws-ipi-disconnected-cco-manual-sts-ep-p2-f14
+  cron: 58 17 6,21 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.12 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.12 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-with-ep-sts-ec2-elb
 - as: aws-ipi-disconnected-private-p1-f14
   cron: 38 11 10,25 * *
   steps:
