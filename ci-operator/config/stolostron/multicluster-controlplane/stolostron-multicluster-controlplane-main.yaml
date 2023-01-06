@@ -1,0 +1,94 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.19-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.19-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
+  to: multicluster-controlplane
+promotion:
+  disabled: true
+  name: "2.7"
+  namespace: stolostron
+releases:
+  initial:
+    integration:
+      name: "4.8"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.8"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: "true"
+tests:
+- as: test-unit
+  commands: |
+    export SELF="make"
+    export HOME="/tmp"
+    make test-unit
+  container:
+    from: src
+- as: test-e2e
+  skip_if_only_changed: ^doc/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO|release-notes/*)$
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-hub-of-hubs-aws-kind
+      AWS_INSTANCE_TYPE: m5ad.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: test
+      commands: |
+        echo "IMAGE_NAME=$IMAGE_NAME"
+        echo "OPENSHIFT_CI=$OPENSHIFT_CI"
+        export SELF="make"
+        set -o pipefail
+        make setup-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e-prow-tests.log
+        make test-e2e 2>&1 | tee ${ARTIFACT_DIR}/e2e-prow-tests.log
+        set +o pipefail
+      dependencies:
+      - env: IMAGE_NAME
+        name: multicluster-controlplane
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicluster-controlplane
+    env:
+      IMAGE_REPO: multicluster-controlplane
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: multicluster-controlplane
