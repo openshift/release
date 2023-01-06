@@ -23,6 +23,9 @@ if [[ "${CLUSTER_TYPE}" == "ibmcloud" ]]; then
   IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
   export IC_API_KEY
 fi
+if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+fi
 
 echo "Deprovisioning cluster ..."
 if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
@@ -45,7 +48,7 @@ cp -ar "${SHARED_DIR}" /tmp/installer
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   # C2S/SC2S regions do not support destory
   #   replace ${AWS_REGION} with source_region(us-east-1) in metadata.json as a workaround"
-  
+
   # downloading jq
   curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
 
