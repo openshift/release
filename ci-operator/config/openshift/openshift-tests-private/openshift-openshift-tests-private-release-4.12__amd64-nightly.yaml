@@ -928,6 +928,26 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: rosa-aws-sts
+- as: aws-rosa-sts-hypershift-p2-f7
+  cron: 26 1 4,12,19,26 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@aws-ipi and @rosa and @network-ovnkubernetes and @hypershift-hosted
+        and not @fips'
+      OPENSHIFT_VERSION: "4.12"
+      TAG_VERSION: '@4.12'
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - ref: cucushift-helper-service-build-info
+    - ref: cucushift-pre
+    - ref: openshift-extended-test
+    - ref: cucushift-e2e
+    - ref: openshift-extended-web-tests
+    - ref: cucushift-e2e-report
+    workflow: rosa-aws-sts-hypershift
 - as: aws-sc2s-ipi-disconnected-private-p2-f7
   cron: 24 23 13,21,28,4 * *
   steps:
