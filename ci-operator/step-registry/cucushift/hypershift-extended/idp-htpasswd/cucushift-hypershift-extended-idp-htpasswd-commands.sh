@@ -5,7 +5,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+MC_KUBECONFIG_FILE="${SHARED_DIR}/hs-mc.kubeconfig"
+if [ -f "${MC_KUBECONFIG_FILE}" ]; then
+  export KUBECONFIG="${SHARED_DIR}/hs-mc.kubeconfig"
+  _jsonpath="{.items[?(@.metadata.name==\"$(cat ${SHARED_DIR}/cluster-name)\")].metadata.namespace}"
+  HYPERSHIFT_NAMESPACE=$(oc get hostedclusters -A -ojsonpath="$_jsonpath")
+else
+  export KUBECONFIG="${SHARED_DIR}/kubeconfig"
+fi
+
 count=$(oc get hostedclusters --no-headers --ignore-not-found -n "$HYPERSHIFT_NAMESPACE" | wc -l)
 echo "hostedcluster count: $count"
 if [ "$count" -lt 1 ]  ; then
