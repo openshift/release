@@ -79,6 +79,8 @@ $(cat "${SHARED_DIR}/rootCA.pem" | awk '{print "    "$0}')
 $(cat "${SHARED_DIR}/local_registry_icsp_file.yaml")
 EOF
 
+cat "${SHARED_DIR}/install-config.yaml"
+
 cp "${SHARED_DIR}/install-config.yaml" /tmp
 openshift-install --dir=/tmp create cluster --log-level=debug || true
 ls /tmp
