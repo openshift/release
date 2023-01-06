@@ -10,8 +10,9 @@ openshift-install version || true
 which openshift-install || true
 
 #Check AWS CLI
-export AWS_DEFAULT_REGION=us-west-2
-export AWS_SHARED_CREDENTIALS_FILE=/var/run/vault/opct/.awscred
+AWS_ACCESS_KEY_ID=$(cat /var/run/quay-qe-omr-secret/access_key) && export AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key) && export AWS_SECRET_ACCESS_KEY
+AWS_DEFAULT_REGION="us-west-2" && export AWS_DEFAULT_REGION
 aws s3 ls
 
 cat "${SHARED_DIR}/new_pull_secret" | jq
