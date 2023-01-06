@@ -10,22 +10,20 @@ openshift-install version || true
 which openshift-install || true
 
 #Check AWS CLI
-export AWS_ACCESS_KEY_ID=$(cat /var/run/quay-qe-omr-secret/access_key)
-export AWS_SECRET_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
-export AWS_DEFAULT_REGION=us-west-2
+export AWS_ACCESS_KEY_ID="$(cat /var/run/quay-qe-omr-secret/access_key)"
+export AWS_SECRET_ACCESS_KEY="$(cat /var/run/quay-qe-omr-secret/secret_key)"
+export AWS_DEFAULT_REGION="us-west-2"
 aws s3 ls
 
-new_pull_secret="${SHARED_DIR}/new_pull_secret"
-cat new_pull_secret="${SHARED_DIR}/new_pull_secret" | jq
+cat "${SHARED_DIR}/new_pull_secret" | jq
 icsp_file="${SHARED_DIR}/local_registry_icsp_file.yaml"
 cat ${icsp_file}
-omr_ca_cert="${SHARED_DIR}/rootCA.pem"
 OMR_HOST_NAME=$(cat ${SHARED_DIR}/OMR_HOST_NAME)
 OCP_NAME="omrocpprowci$RANDOM"
 
 echo ${OMR_HOST_NAME}
 echo ${OCP_NAME}
-scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i /var/run/quay-qe-omr-secret/quaybuilder ec2-user@${OMR_HOST_NAME}:/etc/quay-install/quay-rootCA/rootCA.pem ${omr_ca_cer}
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i /var/run/quay-qe-omr-secret/quaybuilder ec2-user@${OMR_HOST_NAME}:/etc/quay-install/quay-rootCA/rootCA.pem "${SHARED_DIR}/rootCA.pem"
 
 cat >> ${SHARED_DIR}/install-config.yaml << EOF
 apiVersion: v1
