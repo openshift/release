@@ -40,6 +40,7 @@ oc adm release -a "${new_pull_secret}" mirror --insecure=true \
 
 grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
 grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
+head -7 "${install_config_icsp_patch}" > "${SHARED_DIR}/install-config-mirrors"
 
 cat "${icsp_file}"
 cat "${install_config_icsp_patch}"
