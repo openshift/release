@@ -38,6 +38,7 @@ set +o allexport
 
 # shellcheck disable=SC2174
 mkdir -m 755 -p {/var/builds,/opt/tftpboot,/opt/html}/${BUILD_ID}
+mkdir -m 777 -p /opt/nfs/${BUILD_ID}
 touch /etc/{hosts_pool_reserved,vips_reserved}
 # The current implementation of the following scripts is different based on the auxiliary host. Keeping the script in
 # the remote aux servers temporarily.
