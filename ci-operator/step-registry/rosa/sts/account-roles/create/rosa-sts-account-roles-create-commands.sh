@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 3600s
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 ACCOUNT_ROLES_PREFIX=${ACCOUNT_ROLES_PREFIX:-$NAMESPACE}
