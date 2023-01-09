@@ -17,13 +17,25 @@ ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 # is over 10 minutes, so we give a loop to wait for the configuration to be active before timeout. 
 echo "Config htpasswd idp ..."
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+IDP_NAME="osd-htpasswd"
 IDP_USER="osd-admin"
-IDP_PASSWD="HTPasswd_$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 10)"
-ocm create idp -c ${CLUSTER_ID} \
-                --type htpasswd \
-                --name osd-htpasswd \
-                --username ${IDP_USER} \
-                --password ${IDP_PASSWD}
+IDP_PASSWD="HTPasswd_$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 6)"
+IDP_PAYLOAD=$(echo -e '{
+  "kind": "IdentityProvider",
+  "htpasswd": {
+    "users": {
+      "items": [
+        {
+          "username": "'${IDP_USER}'",
+          "password": "'${IDP_PASSWD}'"
+        }
+      ]
+    }
+  },
+  "name": "'${IDP_NAME}'",
+  "type": "HTPasswdIdentityProvider"  
+}')
+echo "${IDP_PAYLOAD}" | jq -c | ocm post "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/identity_providers"  > "${SHARED_DIR}/htpasswd.txt"
 
 API_URL=$(ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}" | jq -r ".api.url")
 echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-verify=true" > "${SHARED_DIR}/api.login"
