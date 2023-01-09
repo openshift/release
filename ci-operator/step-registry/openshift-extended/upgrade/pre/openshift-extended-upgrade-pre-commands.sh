@@ -61,6 +61,13 @@ cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
 chmod 0644 ~/.ssh/ssh-publickey || true
 eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
 
+#set env for rosa which are required by hypershift qe team
+if test -f "${CLUSTER_PROFILE_DIR}/ocm-token"
+then
+    TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
+    export TEST_ROSA_TOKEN
+fi
+
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
