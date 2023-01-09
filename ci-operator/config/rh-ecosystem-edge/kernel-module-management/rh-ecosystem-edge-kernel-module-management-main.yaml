@@ -91,6 +91,28 @@ tests:
     ci/prow/check-api-changes
   container:
     from: test-bin
+- as: e2e-in-cluster-build
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        oc project default
+        ./ci/prow/e2e-incluster-build
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
