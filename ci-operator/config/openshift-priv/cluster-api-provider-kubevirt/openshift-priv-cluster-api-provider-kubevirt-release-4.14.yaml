@@ -7,7 +7,7 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: cli
-  hypershift-operator-4.11:
+  hypershift-operator-4.13:
     name: 4.14-priv
     namespace: ocp-private
     tag: hypershift-operator
@@ -96,7 +96,8 @@ images:
         git clone https://github.com/openshift/hypershift.git && \
         cd hypershift/ && \
         go mod tidy && go mod vendor && \
-        make e2e
+        make e2e && \
+        sed -i 's|global-pull-secret.json|/tmp/global-pull-secret.json|g' ./hack/ci/install-cnv.sh
     WORKDIR /go/src/github.com/openshift/hypershift
   from: src
   inputs:
@@ -104,7 +105,7 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    hypershift-operator-4.11:
+    hypershift-operator-4.13:
       paths:
       - destination_dir: .
         source_path: /usr/bin/hypershift
@@ -124,7 +125,7 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.11"
+      version: "4.13"
   initial:
     integration:
       name: 4.14-priv
@@ -146,133 +147,33 @@ tests:
   commands: GOFLAGS="-mod=readonly" make test
   container:
     from: src
-- as: cluster-api-provider-kubevirt-e2e
-  steps:
-    cluster_profile: gcp
-    env:
-      SUB_CHANNEL: stable
-      SUB_INSTALL_NAMESPACE: openshift-cnv
-      SUB_PACKAGE: kubevirt-hyperconverged
-      SUB_TARGET_NAMESPACES: openshift-cnv
-    test:
-    - ref: operatorhub-subscribe
-    - as: deploy-cnv-hyperconverged-cr
-      commands: |-
-        oc create -f - <<EOF
-        apiVersion: hco.kubevirt.io/v1beta1
-        kind: HyperConverged
-        metadata:
-          name: kubevirt-hyperconverged
-          namespace: openshift-cnv
-        EOF
-
-        oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
-      from: capk-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: deploy-capk
-      commands: |-
-        set -x
-        # Deploy cluster API
-        cat <<EOF > clusterctl_config.yaml
-        cert-manager:
-          url: "https://github.com/cert-manager/cert-manager/releases/latest/cert-manager.yaml"
-        EOF
-
-        clusterctl init -v 4 --config=clusterctl_config.yaml
-
-        oc adm policy add-scc-to-user privileged system:serviceaccount:capk-system:capk-manager
-
-        export MANIFEST_IMG=${CAPK_IMAGE%:*}
-        export MANIFEST_TAG=${CAPK_IMAGE/*:}
-        GOFLAGS="-mod=readonly" make generate-manifests
-
-        sed -i -E "s|(^ +- image: ).*$|\1${CAPK_IMAGE}|" config/default/manager_image_patch.yaml
-
-        oc kustomize config/default | oc apply -f -
-        sleep 60
-
-        # Validate capk manager was created successfully
-        oc wait pod --for=condition=Ready -l cluster.x-k8s.io/provider=kubevirt -n capk-system --timeout=120s
-      dependencies:
-      - env: CAPK_IMAGE
-        name: kubevirt-cluster-api-controllers
-      from: capk-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: run-tests
-      commands: |-
-        set -x
-
-        export CRI_PATH=/var/run/crio/crio.sock
-        export IMAGE_REPO=k8s.gcr.io
-        export TENANT_CLUSTER_KUBERNETES_VERSION=v1.21.0
-        export NODE_VM_IMAGE_TEMPLATE=quay.io/kubevirtci/fedora-kubeadm:35
-
-        go version
-        go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@latest
-        go mod tidy
-        GOFLAGS="-mod=readonly" ginkgo build e2e/
-        TESR_DIR=$(pwd)/test-dir
-        mkdir ${TESR_DIR}
-        e2e/e2e.test \
-          --kubectl-path=/usr/bin/oc \
-          --clusterctl-path=/usr/bin/clusterctl \
-          --working-dir=${TESR_DIR} \
-          --ginkgo.junit-report=${ARTIFACT_DIR}/junit_report.xml \
-          --ginkgo.label-filter="!persistentVMs" \
-          --ginkgo.skip="unrecoverable VMI"
-      from: capk-oc-bin-image
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: ipi-gcp
 - as: cluster-api-provider-kubevirt-with-hypershift
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
     test:
     - as: deploy-cnv
-      commands: ./hack/ci/install-cnv.sh
+      cli: latest
+      commands: CNV_PRERELEASE_VERSION=4.13 ./hack/ci/install-cnv.sh
+      credentials:
+      - mount_path: /etc/cnv-nightly-pull-credentials
+        name: openshift-cnv-quay-credentials
+        namespace: test-credentials
       from: hypershift-cli-e2e
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
     - as: deploy-hypershift
+      cli: latest
       commands: |-
         set -x
         hypershift install
-        oc patch deployment -n hypershift operator --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/env/-", "value": {"name": "IMAGE_KUBEVIRT_CAPI_PROVIDER", "value": "'"${CAPK_IMAGE}"'"}}]'
-
-        # make sure the patch worked
-        oc get deployment -n hypershift operator -o yaml | grep "${CAPK_IMAGE}"
-
-        VALID_IMAGE="false"
-        # verify the image in the manager pod
-        for i in $(seq 20); do
-          sleep 60
-          # wait until the old pods is deleted; eventually we need only 2 pods to run
-          if [[ $(oc get pods -n hypershift -l "app=operator,hypershift.openshift.io/operator-component=operator,name=operator" --no-headers | wc -l) != 2 ]]; then
-            continue
-          fi
-          # check if the pod contains the required env var
-          if [[ $(oc get pods -n hypershift -l "app=operator,hypershift.openshift.io/operator-component=operator,name=operator" -o yaml | grep "name: IMAGE_KUBEVIRT_CAPI_PROVIDER" -A1 | grep "value: ${CAPK_IMAGE}") ]]; then
-            VALID_IMAGE=true
-            break
-          fi
-        done
-
-        if [[ "${VALID_IMAGE}" == "true" ]]; then
-          oc wait deployment -n hypershift operator --for=condition=Available --timeout=5m
-        else
-          echo "error: couldn't validate the manager pod image."
-          exit 1
-        fi
+        oc wait deployment -n hypershift operator --for=condition=Available --timeout=5m
+        oc annotate pod -n hypershift -l app=operator "hypershift.openshift.io/capi-provider-kubevirt-image=${CAPK_IMAGE}"
       dependencies:
       - env: CAPK_IMAGE
         name: kubevirt-cluster-api-controllers
@@ -282,15 +183,14 @@ tests:
           cpu: 500m
           memory: 1Gi
     - as: hypershift-e2e
+      cli: latest
       commands: |-
-        set -x
-        export KUBEVIRT_PLATFORM_ENABLED=true
-
+        set -ex
         # run the test
         bin/test-e2e \
                   --test.v \
                   --test.timeout=0 \
-                  --test.run=TestKubeVirtCreateCluster \
+                  --test.run='^TestCreateCluster$' \
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
                   --e2e.node-pool-replicas=2 \
@@ -312,7 +212,7 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: ipi-gcp-ovn
+    workflow: ipi-aws-ovn
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv
