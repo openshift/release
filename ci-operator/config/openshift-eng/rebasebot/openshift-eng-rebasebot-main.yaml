@@ -2,6 +2,13 @@ build_root:
   project_image:
     dockerfile_literal: |-
       FROM registry.access.redhat.com/ubi8/python-39
+      
+      # Install go toolset
+      ENV GO_VERSION=1.19
+      RUN set -x && \ 
+      curl -Ls https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | \
+      tar -C /usr/local -zxvf - go/bin go/pkg/linux_amd64 go/pkg/tool
+      ENV PATH="/usr/local/go/bin:$PATH"
 
       # Prow expects to be able to check out a repo under /go
       USER 0:0
