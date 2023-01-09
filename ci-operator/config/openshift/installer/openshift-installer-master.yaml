@@ -259,7 +259,7 @@ tests:
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - as: e2e-gcp-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
@@ -285,7 +285,7 @@ tests:
     workflow: openshift-e2e-gcp-sharednetwork
   timeout: 6h0m0s
 - as: e2e-azure-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: azure
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
@@ -358,7 +358,7 @@ tests:
 - as: e2e-metal-ipi-sdn
   cluster: build05
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -370,7 +370,7 @@ tests:
 - as: e2e-metal-ipi-sdn-swapped-hosts
   cluster: build05
   optional: true
-  run_if_changed: (baremetal|metal3-io)
+  run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -382,7 +382,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
-  run_if_changed: (baremetal|metal3-io)
+  run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -394,7 +394,7 @@ tests:
 - as: e2e-metal-ipi-ovn-dualstack
   cluster: build05
   optional: true
-  run_if_changed: (baremetal|metal3-io)
+  run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -406,14 +406,13 @@ tests:
 - as: e2e-metal-ipi-sdn-virtualmedia
   cluster: build05
   optional: true
-  run_if_changed: (baremetal|metal3-io)
+  run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
   timeout: 6h0m0s
-- as: e2e-openstack
-  optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|ovirt|powervs|vsphere)/)
+- as: e2e-openstack-ovn
+  run_if_changed: openstack|(^data/.*/rhcos\.json)
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -458,7 +457,7 @@ tests:
     workflow: openshift-manifests-openstack
   timeout: 6h0m0s
 - as: e2e-vsphere-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs)/)
+  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
@@ -483,21 +482,21 @@ tests:
   timeout: 6h0m0s
 - as: e2e-libvirt
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: libvirt
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-libvirt
   timeout: 6h0m0s
 - as: e2e-metal-assisted
   optional: true
-  skip_if_only_changed: (^(docs|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
   timeout: 6h0m0s
 - as: e2e-ovirt-sdn
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere)/)
+  run_if_changed: ovirt
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal
@@ -511,7 +510,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-metal-single-node-live-iso
   optional: true
-  run_if_changed: (baremetal|metal3-io)
+  run_if_changed: (baremetal|metal3|ironic)
   steps:
     cluster_profile: packet-sno
     workflow: baremetalds-sno
@@ -564,7 +563,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-ibmcloud-ovn
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: ibmcloud
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
