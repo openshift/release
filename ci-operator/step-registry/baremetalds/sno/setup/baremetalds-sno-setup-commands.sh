@@ -42,6 +42,13 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/sno-additional-config" "root@${IP}:sno-additional-config"
 fi
 
+# Copy additional manifests
+if [[ -e "${SHARED_DIR}/manifest_*" ]]
+then
+  ssh "${SSHOPTS[@]}" "root@${IP}" "mkdir sno-additional-manifests"
+  scp "${SSHOPTS[@]}" "${SHARED_DIR}/manifest_*" "root@${IP}:sno-additional-manifests"
+fi
+
 # TODO: Figure out way to get these parameters (used by deploy_ibip) without hardcoding them here
 # preferrably by making deploy_ibip / makefile perform these configurations itself in the assisted_test_infra
 # repo.
@@ -107,6 +114,11 @@ done
 echo Reloading NetworkManager systemd configuration
 systemctl reload NetworkManager
 
-timeout -s 9 105m make setup deploy_ibip TEST_FUNC=${TEST_FUNC}
+export TEST_ARGS="TEST_FUNC=${TEST_FUNC}"
+if [[ -e /root/sno-additional-manifests ]]
+then
+  TEST_ARGS="\${TEST_ARGS} ADDITIONAL_MANIFEST_DIR=/root/sno-additional-manifests"
+fi
+timeout -s 9 105m make setup deploy_ibip \${TEST_ARGS}
 
 EOF
