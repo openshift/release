@@ -226,12 +226,17 @@ if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
     readarray -t config <<< "${E2E_TESTS_CONFIG}"
     for var in "${config[@]}"; do
         if [[ ! -z "${var}" ]]; then
-            if [[ "${var}" == *"T5CI_VERSION"* ]]; then
-                T5CI_VERSION="$(echo "${var}" | cut -d'=' -f2)"
+            if [[ "${var}" == *"CNF_E2E_TESTS"* ]]; then
+                CNF_E2E_TESTS="$(echo "${var}" | cut -d'=' -f2)"
+            elif [[ "${var}" == *"CNF_ORIGIN_TESTS"* ]]; then
+                CNF_ORIGIN_TESTS="$(echo "${var}" | cut -d'=' -f2)"
             fi
         fi
     done
 fi
+
+export CNF_E2E_TESTS
+export CNF_ORIGIN_TESTS
 
 if [[ "$T5CI_VERSION" == "4.13" ]]; then
     export CNF_BRANCH="master"
@@ -281,10 +286,10 @@ create_tests_skip_list_file
 if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
     create_tests_temp_skip_list_11
 fi
-if [[ "$CNF_BRANCH" == *"4.12"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
     create_tests_temp_skip_list_12
 fi
-if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_13
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
@@ -384,6 +389,7 @@ for feature in ${FEATURES}; do
     fi
 done
 
+set +e
 python3 -m venv ${SHARED_DIR}/myenv
 source ${SHARED_DIR}/myenv/bin/activate
 git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci
@@ -397,6 +403,9 @@ python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/cnftests-junit*xml 
 python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.json
 python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.json
 
+junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
+
 rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
+set -e
 
 exit ${exit_code}
