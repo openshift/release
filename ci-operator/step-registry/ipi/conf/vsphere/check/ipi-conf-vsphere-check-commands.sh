@@ -37,7 +37,7 @@ fi
 # For leases >= 200, run on the IBM Cloud vSphere 8 env
 if [ ${LEASE_NUMBER} -ge 200 ]; then
   echo Scheduling job on IBM Cloud instance
-  VCENTER_AUTH_PATH=/var/run/vsphere8-secrets/secrets.sh
+  VCENTER_AUTH_PATH=/var/run/vault/vsphere8-secrets/secrets.sh
   vsphere_url="vcenter.ibmc.devcluster.openshift.com"
   vsphere_datacenter="IBMCdatacenter"
   cloud_where_run="IBM8"
