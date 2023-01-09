@@ -27,33 +27,15 @@ echo ${OCP_NAME}
 cat >> ${SHARED_DIR}/install-config.yaml << EOF
 apiVersion: v1
 baseDomain: qe.devcluster.openshift.com 
-credentialsMode: Mint
 controlPlane:   
   hyperthreading: Enabled 
   name: master
-  platform:
-    aws:
-      zones:
-      - us-west-2a
-      - us-west-2b
-      rootVolume:
-        iops: 4000
-        size: 500
-        type: io1 
-      type: m4.2xlarge
-  replicas: 
+  platform: {}
+  replicas: 3
 compute: 
 - hyperthreading: Enabled 
   name: worker
-  platform:
-    aws:
-      rootVolume:
-        iops: 2000
-        size: 500
-        type: io1 
-      type: m4.2xlarge
-      zones:
-      - us-west-2c
+  platform: {}
   replicas: 3
 metadata:
   name: ${OCP_NAME}
