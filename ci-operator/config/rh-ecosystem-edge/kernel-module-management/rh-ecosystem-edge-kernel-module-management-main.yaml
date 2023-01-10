@@ -18,17 +18,42 @@ build_root:
     namespace: openshift
     tag: golang-1.18
 images:
-- dockerfile_path: Dockerfile
+- build_args:
+  - name: TARGET
+    value: manager
+  dockerfile_path: Dockerfile
   inputs:
     ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: kernel-module-management-operator
+- build_args:
+  - name: TARGET
+    value: manager-hub
+  dockerfile_path: Dockerfile
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+  to: kernel-module-management-operator-hub
 - dockerfile_path: Dockerfile.signimage
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
+- dockerfile_literal: |
+    FROM src
+    # Installing the `oc` client.
+    RUN curl --retry 3 -SL https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz \
+        | tar -xz -C /usr/local/bin
+  from: src
+  to: test-bin
 promotion:
+  excluded_images:
+  - test-bin
   namespace: edge-infrastructure
   tag: latest
   tag_by_commit: true
@@ -55,6 +80,39 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: check-commits-count
+  commands: ci/prow/check-commits-count
+  container:
+    from: src
+- as: check-api-changes
+  commands: |
+    unset GOFLAGS
+    unset VERSION
+    ci/prow/check-api-changes
+  container:
+    from: test-bin
+- as: e2e-in-cluster-build
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        oc project default
+        ./ci/prow/e2e-incluster-build
+      from: test-bin
+      resources:
+        requests:
+          cpu: 300m
+          memory: 500Mi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge

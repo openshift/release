@@ -11,24 +11,24 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-BUILD_ID="${NAMESPACE}"
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 echo 'Deprovisioning HAProxy'
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${BUILD_ID}" << 'EOF'
+  "${CLUSTER_NAME}" << 'EOF'
 set -o nounset
-BUILD_ID="${1}"
+CLUSTER_NAME="${1}"
 
 devices=(eth1.br-ext eth2.br-int eth1.br-int)
 for dev in "${devices[@]}"; do
   interface=${dev%%.*}
   bridge=${dev##*.}
-  /usr/local/bin/ovs-docker del-port "$bridge" "$interface" "haproxy-$BUILD_ID" || echo \
-    "No $interface on $bridge for container haproxy-$BUILD_ID"
+  /usr/local/bin/ovs-docker del-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME" || echo \
+    "No $interface on $bridge for container haproxy-$CLUSTER_NAME"
 done
 
 echo Removing the HAProxy container
-docker rm --force "haproxy-$BUILD_ID"
-rm -rf "/var/builds/$BUILD_ID/haproxy"
+docker rm --force "haproxy-$CLUSTER_NAME"
+rm -rf "/var/builds/$CLUSTER_NAME/haproxy"
 
 EOF

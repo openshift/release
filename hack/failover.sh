@@ -21,15 +21,14 @@ set -o pipefail
 
 CONTAINER_ENGINE=${CONTAINER_ENGINE:-docker}
 
-PROMPASS=$(mktemp)
-trap 'rm -f "${PROMPASS}"' EXIT
+PROMTOKEN=$(mktemp)
+trap 'rm -f "${PROMTOKEN}"' EXIT
 
-oc --context app.ci -n ci extract secret/app-ci-openshift-user-workload-monitoring-credentials --to=- --keys=sa.prometheus-user-workload.app.ci.token.txt > "${PROMPASS}"
+oc --context app.ci -n ci extract secret/app-ci-openshift-user-workload-monitoring-credentials --to=- --keys=sa.prometheus-user-workload.app.ci.token.txt > "${PROMTOKEN}"
 
 ${CONTAINER_ENGINE} pull registry.ci.openshift.org/ci/prow-job-dispatcher:latest
-${CONTAINER_ENGINE} run --rm -v "$PWD:/release:z" -v "${PROMPASS}:/prompass:z" registry.ci.openshift.org/ci/prow-job-dispatcher:latest "$@" \
+${CONTAINER_ENGINE} run --rm -v "$PWD:/release:z" -v "${PROMTOKEN}:/promtoken:z" registry.ci.openshift.org/ci/prow-job-dispatcher:latest "$@" \
     --target-dir=/release \
     --config-path=/release/core-services/sanitize-prow-jobs/_config.yaml \
     --prow-jobs-dir=/release/ci-operator/jobs \
-    --prometheus-username=ci \
-    --prometheus-password-path=/prompass
+    --prometheus-bearer-token-path=/promtoken

@@ -3,24 +3,30 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: cluster-control-plane-machine-set-operator
 promotion:
   name: "4.14"
   namespace: ocp
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.13"
   initial:
     integration:
       name: "4.14"
@@ -78,6 +84,7 @@ tests:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-aws-operator
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:
@@ -102,6 +109,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-aws
 - as: e2e-azure-operator
   optional: true
@@ -137,16 +145,19 @@ tests:
     workflow: openshift-e2e-aws-etcd-scaling
 - as: e2e-gcp-ovn-etcd-scaling
   optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*gcp.*
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-etcd-scaling
 - as: e2e-azure-ovn-etcd-scaling
   optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*azure.*
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-etcd-scaling
 - as: e2e-vsphere-ovn-etcd-scaling
   optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*vsphere.*
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-etcd-scaling

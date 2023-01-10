@@ -16,6 +16,8 @@ if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
   exit 0
 fi
 
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+
 # Retrieves the MACs of the hosts to delete their grub.cfg
 declare -a MAC_ARRAY
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
@@ -29,12 +31,12 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 done
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${NAMESPACE}" "${MAC_ARRAY[@]}" << 'EOF'
+  "${CLUSTER_NAME}" "${MAC_ARRAY[@]}" << 'EOF'
   set -o nounset
-  NAMESPACE="${1}"; shift
+  CLUSTER_NAME="${1}"; shift
   MAC_ARRAY=("$@")
   echo "Removing the DHCP/PXE config..."
-  sed -i "/; BEGIN ${NAMESPACE}/,/; END ${NAMESPACE}$/d" /opt/dhcpd/root/etc/dnsmasq.conf
+  sed -i "/; BEGIN ${CLUSTER_NAME}/,/; END ${CLUSTER_NAME}$/d" /opt/dhcpd/root/etc/dnsmasq.conf
   docker restart dhcpd
   echo "Removing the grub config..."
   for mac in "${MAC_ARRAY[@]}"; do

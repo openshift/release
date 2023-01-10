@@ -1,14 +1,14 @@
 base_images:
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: cli
   libvirt-installer:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: libvirt-installer
   test-bin:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: tests
   ubi-minimal:
@@ -19,7 +19,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.18-openshift-4.12
+    tag: rhel-8-release-golang-1.19-openshift-4.13
 images:
 - dockerfile_literal: |
     FROM libvirt-installer
@@ -32,7 +32,7 @@ images:
         source_path: /go/src/github.com/openshift/microshift/validate-microshift
   to: microshift-validate
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.18-openshift-4.12 as builder
+    FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.13 as builder
     RUN dnf install --setopt=tsflags=nodocs -y \
         rpm-build glibc-static gcc selinux-policy-devel util-linux && \
         dnf clean all && \
@@ -42,6 +42,7 @@ images:
     FROM libvirt-installer
     USER root
     ENV HOME=/tmp/secret
+    RUN dnf install -y jq && dnf clean all && rm -rf /var/cache/dnf/*
     ENV PAYLOAD_PATH=$HOME/payload
     WORKDIR $PAYLOAD_PATH
     COPY oc openshift-tests usr/bin/
@@ -58,7 +59,7 @@ images:
       - libvirt-installer
     src:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.18-openshift-4.12
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.13
     test-bin:
       paths:
       - destination_dir: .
@@ -97,12 +98,12 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:

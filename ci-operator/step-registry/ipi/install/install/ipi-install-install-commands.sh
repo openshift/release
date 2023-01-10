@@ -21,8 +21,6 @@ function populate_artifact_dir() {
     ' "${dir}/terraform.txt" 
   tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt" 
   case "${CLUSTER_TYPE}" in
-    aws|aws-arm64)
-      grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log" > "${SHARED_DIR}/aws-instance-ids.txt";;
     alibabacloud)
       awk -F'id=' '/alicloud_instance.*Creation complete/ && /master/{ print $2 }' "${dir}/.openshift_install.log" | tr -d ']"' > "${SHARED_DIR}/alibaba-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
@@ -66,7 +64,8 @@ function prepare_next_steps() {
           fi
         fi
 
-        cmd="scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i \"${CLUSTER_PROFILE_DIR}/ssh-privatekey\" -r ${dir} ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
+        # this required rsync daemon is running on ${bastion_public_address} and /tmp dir is configured
+        cmd="rsync -rtv ${dir}/ ${bastion_public_address}::tmp/installer/"
         echo "Running Command: ${cmd}"
         eval "${cmd}"
         echo > "${SHARED_DIR}/COPIED_INSTALL_DIR_TO_BASTION"
@@ -310,7 +309,12 @@ fi
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
 azure4|azuremag|azure-arm64) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
-azurestack) export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json;;
+azurestack)
+    export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+    if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+        export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+    fi
+    ;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"

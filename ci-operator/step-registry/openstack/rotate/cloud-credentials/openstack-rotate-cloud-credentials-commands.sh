@@ -43,15 +43,24 @@ delete_application_credential() {
 info 'Replacing clouds.yaml in the openstack-cloud-credentials secret...'
 oc set data -n kube-system secret/openstack-credentials clouds.yaml="$(<"$ALTERNATIVE_CLOUDS_YAML")"
 
-info 'Waiting for the cluster to become ready...'
-declare progressing=1
-while [[ $progressing -gt 0 ]]; do
-	sleep 5
-	progressing="$(oc get clusteroperator -o json \
-			| jq '.items[].status.conditions[] | select(.type=="Progressing") | select(.status=="True").status' \
-			| wc -l)"
-	info "${progressing} operators progressing."
+sleep 5
+
+info 'Waiting for the operators to become ready...'
+# shellcheck disable=SC2046
+oc wait --timeout=5m --for=condition=Progressing=false $(oc get clusteroperator -o NAME) -o template='{{.metadata.name}} is ready
+'
+
+info 'Rebooting cloud-controller-manager: https://issues.redhat.com/browse/OCPBUGS-5036'
+for pod in $(oc -n openshift-cloud-controller-manager get pod -o NAME); do
+	oc -n openshift-cloud-controller-manager delete "$pod"
 done
+
+sleep 5
+
+info 'Waiting for the operators to become ready...'
+# shellcheck disable=SC2046
+oc wait --timeout=5m --for=condition=Progressing=false $(oc get clusteroperator -o NAME) -o template='{{.metadata.name}} is ready
+'
 
 info 'Revoking the credentials that were used so far...'
 delete_application_credential "$ORIGINAL_CLOUDS_YAML"

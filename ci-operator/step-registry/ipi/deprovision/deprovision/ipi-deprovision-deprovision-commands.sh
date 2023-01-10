@@ -23,6 +23,9 @@ if [[ "${CLUSTER_TYPE}" == "ibmcloud" ]]; then
   IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
   export IC_API_KEY
 fi
+if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
+    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+fi
 
 echo "Deprovisioning cluster ..."
 if [[ ! -s "${SHARED_DIR}/metadata.json" ]]; then
@@ -34,6 +37,9 @@ echo ${SHARED_DIR}/metadata.json
 
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
   export AZURE_AUTH_LOCATION=$SHARED_DIR/osServicePrincipal.json
+  if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+  fi
 fi
 
 echo "Copying the installation artifacts to the Installer's asset directory..."
@@ -42,7 +48,7 @@ cp -ar "${SHARED_DIR}" /tmp/installer
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   # C2S/SC2S regions do not support destory
   #   replace ${AWS_REGION} with source_region(us-east-1) in metadata.json as a workaround"
-  
+
   # downloading jq
   curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
 

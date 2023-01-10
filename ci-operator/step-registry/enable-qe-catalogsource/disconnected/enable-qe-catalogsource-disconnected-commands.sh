@@ -112,23 +112,43 @@ function disable_default_catalogsource () {
 # this func only used when the cluster not set the Proxy registy, such as C2S, SC2S clusters
 function mirror_optional_images () {
     registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
+
     optional_auth_user=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.user')
     optional_auth_password=$(cat "/var/run/vault/mirror-registry/registry_quay.json" | jq -r '.password')
     qe_registry_auth=`echo -n "${optional_auth_user}:${optional_auth_password}" | base64 -w 0`
+
+    brew_auth_user=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.user')
+    brew_auth_password=$(cat "/var/run/vault/mirror-registry/registry_brew.json" | jq -r '.password')
+    brew_registry_auth=`echo -n "${brew_auth_user}:${brew_auth_password}" | base64 -w 0`
+
+    redhat_auth_user=$(cat "/var/run/vault/mirror-registry/registry_redhat.json" | jq -r '.user')
+    redhat_auth_password=$(cat "/var/run/vault/mirror-registry/registry_redhat.json" | jq -r '.password')
+    redhat_registry_auth=`echo -n "${redhat_auth_user}:${redhat_auth_password}" | base64 -w 0`
+
+    # run_command "cat ${CLUSTER_PROFILE_DIR}/pull-secret"
+    # Running Command: cat /tmp/.dockerconfigjson
+    # {"auths":{"ec2-3-92-162-185.compute-1.amazonaws.com:5000":{"auth":"XXXXXXXXXXXXXXXX"}}}
+    run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
+    if [[ $ret -eq 0 ]]; then 
+        jq --argjson a "{\"brew.registry.redhat.io\": {\"auth\": \"$brew_registry_auth\"}, \"registry.redhat.io\": {\"auth\": \"$redhat_registry_auth\"}, \"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "/tmp/.dockerconfigjson" > /tmp/new-dockerconfigjson
+    else
+        echo "!!! fail to extract the auth of the cluster"
+        return 1
+    fi
     
-    jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}, \"quay.io/openshift-qe-optional-operators\": {\"auth\": \"${qe_registry_auth}\", \"email\":\"jiazha@redhat.com\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > /tmp/new-dockerconfigjson
+    unset_proxy
     ret=0
     # Running Command: oc adm catalog mirror -a "/tmp/new-dockerconfigjson" ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12 ec2-3-90-59-26.compute-1.amazonaws.com:5000 --continue-on-error --to-manifests=/tmp/olm_mirror
     # error: unable to read image ec2-3-90-59-26.compute-1.amazonaws.com:5000/openshift-qe-optional-operators/aosqe-index:v4.12: Get "https://ec2-3-90-59-26.compute-1.amazonaws.com:5000/v2/": x509: certificate signed by unknown authority
-    run_command "oc adm catalog mirror  --insecure=true  --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${origin_index_image} ${MIRROR_REGISTRY_HOST} --continue-on-error --to-manifests=/tmp/olm_mirror" || ret=$?
+    run_command "oc adm catalog mirror  --insecure=true  --skip-verification=true -a \"/tmp/new-dockerconfigjson\" ${origin_index_image} ${MIRROR_REGISTRY_HOST} --to-manifests=/tmp/olm_mirror" || ret=$?
     if [[ $ret -eq 0 ]]; then
         echo "mirror optional operators' images successfully"
     else
-        run_command "ls -l /etc/pki/ca-trust/source/anchors/"
         run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
         run_command "cat /tmp/olm_mirror/mapping.txt"
         return 1
     fi
+    set_proxy
 }
 
 # Slove: x509: certificate signed by unknown authority
@@ -246,9 +266,18 @@ EOF
     done
     if [[ $STATUS != "READY" ]]; then
         echo "!!! fail to create QE CatalogSource"
+        # ImagePullBackOff nothing with the imagePullSecrets 
+        # run_command "oc get operatorgroup -n openshift-marketplace"
+        # run_command "oc get sa qe-app-registry -n openshift-marketplace -o yaml"
+        # run_command "oc -n openshift-marketplace get secret $(oc -n openshift-marketplace get sa qe-app-registry -o=jsonpath='{.secrets[0].name}') -o yaml"
         run_command "oc get pods -o wide -n openshift-marketplace"
         run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
         run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
+        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o=jsonpath='{.items[0].spec.nodeName}')
+        run_command "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
+        run_command "oc -n debug-qe debug node/${node_name} -- chroot /host podman pull --authfile /var/lib/kubelet/config.json ${mirror_index_image}"
+        run_command "oc adm node-logs ${node_name} -u kubelet"
+
         run_command "oc get mcp,node"
         run_command "oc get mcp worker -o yaml"
         run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
@@ -348,9 +377,7 @@ origin_index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_v
 mirror_index_image="${MIRROR_PROXY_REGISTRY_QUAY}/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
 
 if [ $mirror -eq 1 ]; then
-    unset_proxy
     mirror_optional_images
-    set_proxy
 else
     # no need to set auth for the MIRROR_REGISTRY_HOST
     set_cluster_auth

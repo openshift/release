@@ -10,7 +10,7 @@ then
 fi
 
 # Some kinds of jobs need to skip installing loki by default
-if [[ ! "$JOB_NAME" =~ .*ipv6.* ]]
+if [[ "$JOB_NAME" =~ .*ipv6.* ]]
 then
   echo "IPv6 clusters are disconnected and won't be able to reach Loki."
   exit 0
@@ -330,6 +330,8 @@ spec:
         app.kubernetes.io/part-of: loki
         app.kubernetes.io/version: ${PROMTAIL_VERSION}
     spec:
+      nodeSelector:
+        kubernetes.io/os: linux
       containers:
       - command:
         - promtail

@@ -6,13 +6,21 @@ items:
   metadata:
     name: pj-rehearse-plugin
     namespace: ci
+    labels:
+      app: prow
+      component: pj-rehearse-plugin
   spec:
     selector:
       app: prow
       component: pj-rehearse-plugin
     ports:
-    - port: 80
+    - name: main
+      port: 80
       targetPort: 8888
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
     type: ClusterIP
 - apiVersion: apps/v1
   kind: Deployment
@@ -42,8 +50,7 @@ items:
           image: registry.ci.openshift.org/ci/pj-rehearse:latest
           args:
           - --dry-run=false
-          - --log-level=trace
-          - --pre-check=true
+          - --log-level=debug
           - --prowjob-kubeconfig=/var/kubeconfigs/sa.pj-rehearse.app.ci.config
           - --kubeconfig-dir=/var/kubeconfigs
           - --kubeconfig-suffix=config
@@ -59,7 +66,12 @@ items:
           ports:
             - name: http
               containerPort: 8888
+            - name: metrics
+              containerPort: 9090
           volumeMounts:
+          - mountPath: /etc/gcs
+            name: gcs-credentials
+            readOnly: true
           - mountPath: /var/kubeconfigs
             name: prowjob-kubeconfig
           - name: prow-config
@@ -88,6 +100,9 @@ items:
               path: /healthz/ready
               port: 8081
         volumes:
+        - name: gcs-credentials
+          secret:
+            secretName: gce-sa-credentials-gcs-publisher
         - name: prowjob-kubeconfig
           secret:
             secretName: pj-rehearse

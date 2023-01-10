@@ -119,6 +119,14 @@ spec:
       for: 5m
       labels:
         severity: critical
+    - alert: pj-rehearse-pluginDown
+      annotations:
+        message: The service pj-rehearse-plugin has been down for 5 minutes.
+      expr: |
+        absent(up{job="pj-rehearse-plugin"} == 1)
+      for: 5m
+      labels:
+        severity: critical
   - name: ci-absent-ghproxy
     rules:
     - alert: ghproxyDown
@@ -426,6 +434,13 @@ spec:
         team: cnf-cop
   - name: prow
     rules:
+    - alert: prow-pod-crashlooping
+      annotations:
+        message: Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container}}) is restarting {{ printf "%.2f" $value }} times over the last 1 hour.
+      expr: increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci"}[1h]) > 10
+      for: 10m
+      labels:
+        severity: critical
     - alert: prow-job-backlog-growing
       annotations:
         message: The number of the triggered Prow jobs that have not yet been running has been increasing for the past hour.
@@ -442,6 +457,15 @@ spec:
         severity: critical
     - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)
       record: github:identity_names
+  - name: release-controller-down
+    rules:
+    - alert: releaseControllerDown
+      annotations:
+        message: '{{ $labels.deployment }} has been down for 5 minutes.'
+      expr: kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"release-controller.*"} >= 1
+      for: 5m
+      labels:
+        severity: critical
   - name: release-controller-bugzilla-errors
     rules:
     - alert: releaseControllerBugzillaError

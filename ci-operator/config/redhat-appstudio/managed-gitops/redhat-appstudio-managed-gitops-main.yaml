@@ -15,29 +15,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: managed-gitops-unit-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.11"
-  steps:
-    test:
-    - as: managed-gitops-unit-tests
-      cli: latest
-      commands: |
-        export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-unit-tests-hive-admin-kubeconfig/kubeconfig"
-        make devenv-k8s
-        kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
-        make test
-        killall kubectl
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: generic-claim
 - as: managed-gitops-e2e-tests
   cluster_claim:
     architecture: amd64

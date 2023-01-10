@@ -23,9 +23,7 @@ if [[ "$PROW_JOB_ID" =~ "nightly" ]]; then
     KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:${PROW_JOB_ID/-telco5g/}"
 elif [ ! -z $JOB_NAME ]; then
     # In case of regular periodic job
-    tmpvar="${JOB_NAME/*nightly-/}"
-    ocp_ver="${tmpvar/-e2e-telco5g/}"
-    KCLI_PARAM="-P tag=$ocp_ver -P version=nightly"
+    KCLI_PARAM="-P tag=$T5CI_VERSION -P version=nightly"
 fi
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM  =========="
 
@@ -151,6 +149,7 @@ cat << EOF > ~/ocp-install.yml
     until: result is success
     retries: 150
     delay: 60
+    ignore_errors: true
 
   - name: Check if successful
     stat: path=/home/kni/us_${CLUSTER_NAME}_ready.txt

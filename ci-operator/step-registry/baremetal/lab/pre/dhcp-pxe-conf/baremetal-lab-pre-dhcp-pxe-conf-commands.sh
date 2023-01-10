@@ -13,8 +13,8 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
-
+BASE_DOMAIN="$(<"${CLUSTER_PROFILE_DIR}/base_domain")"
+CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
   echo "Skipping the configuration of the DHCP."
   exit 0
@@ -22,9 +22,9 @@ fi
 
 echo "Generating the DHCP/PXE config..."
 
-DHCP_CONF="#DO NOT EDIT; BEGIN $NAMESPACE
-dhcp-option-force=tag:$NAMESPACE,15,$NAMESPACE.$BASE_DOMAIN
-dhcp-option-force=tag:$NAMESPACE,119,$NAMESPACE.$BASE_DOMAIN"
+DHCP_CONF="#DO NOT EDIT; BEGIN $CLUSTER_NAME
+dhcp-option-force=tag:$CLUSTER_NAME,15,$CLUSTER_NAME.$BASE_DOMAIN
+dhcp-option-force=tag:$CLUSTER_NAME,119,$CLUSTER_NAME.$BASE_DOMAIN"
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -35,16 +35,16 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     exit 1
   fi
   DHCP_CONF="${DHCP_CONF}
-dhcp-host=$mac,$ip,set:$NAMESPACE,infinite"
+dhcp-host=$mac,$ip,set:$CLUSTER_NAME,infinite"
 done
 
 if [ "${IPI}" = "true" ]; then
   DHCP_CONF="${DHCP_CONF}
-dhcp-boot=tag:${NAMESPACE},pxe.disabled"
+dhcp-boot=tag:${CLUSTER_NAME},pxe.disabled"
 fi
 
 DHCP_CONF="${DHCP_CONF}
-# DO NOT EDIT; END $NAMESPACE"
+# DO NOT EDIT; END $CLUSTER_NAME"
 
 echo "Setting the DHCP/PXE config in the auxiliary host..."
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "'${DHCP_CONF}'" <<'EOF'
@@ -92,8 +92,8 @@ load_video
 menuentry 'Install ($flavor)' {
     set gfx_payload=keep
     insmod gzio
-    linux  /${NAMESPACE}/vmlinuz debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${NAMESPACE}/rootfs.img ignition.config.url=http://${INTERNAL_NET_IP}/${NAMESPACE}/$mac_postfix-console-hook.ign ignition.firstboot ignition.platform.id=metal
-    initrd /${NAMESPACE}/initramfs.img
+    linux  /${CLUSTER_NAME}/vmlinuz debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs.img ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/$mac_postfix-console-hook.ign ignition.firstboot ignition.platform.id=metal
+    initrd /${CLUSTER_NAME}/initramfs.img
 }
 EOF
 done

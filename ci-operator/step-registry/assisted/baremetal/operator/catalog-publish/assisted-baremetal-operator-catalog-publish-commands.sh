@@ -54,7 +54,7 @@ umoci config --config.label 'operators.operatorframework.io.bundle.channel.defau
 umoci config --config.label 'operators.operatorframework.io.metrics.builder=operator-sdk-v1.10.0+git' --image bundle:latest
 umoci config --config.label 'operators.operatorframework.io.metrics.mediatype.v1=metrics+v1' --image bundle:latest
 umoci config --config.label 'operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v3' --image bundle:latest
-umoci config --config.label 'quay.expires-after=4w' --image bundle:latest # let quay expire the tag after 1 month from build time
+umoci config --config.label 'quay.expires-after=24w' --image bundle:latest # let quay expire the tag after 6 months from build time
 umoci unpack --rootless --image bundle:latest bundle
 
 # Update the manifests to points to the digest of the images it contains

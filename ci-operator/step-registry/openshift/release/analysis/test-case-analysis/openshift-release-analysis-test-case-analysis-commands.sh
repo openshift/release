@@ -42,24 +42,6 @@ if [ $? -gt 0 ]; then
 fi
 
 echo
-echo "********** Starting testcase analysis for:  aws-sdn-upi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=aws \
-	--network=sdn \
-	--infrastructure=upi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/aws-sdn-upi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP}
-if [ $? -gt 0 ]; then
-	ret=$?
-fi
-
-echo
 echo "********** Starting testcase analysis for:  azure-ovn-ipi "
 echo
 job-run-aggregator analyze-test-case \

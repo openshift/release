@@ -182,6 +182,72 @@ EOF
 patch_ignition_file "${bastion_ignition_file}" "${proxy_ignition_patch}"
 rm -f "${proxy_ignition_patch}"
 
+# ----------------------------------------------------------------
+# RSYNCD ignition
+# /etc/rsyncd.conf
+# ----------------------------------------------------------------
+cat > ${workdir}/rsyncd.service << EOF
+[Unit]
+Description=rsyn daemon service
+After=syslog.target network.target
+ConditionPathExists=/etc/rsyncd.conf
+
+[Service]
+ExecStart=/usr/bin/rsync --daemon --no-detach
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > ${workdir}/rsyncd.conf << EOF
+pid file = /var/run/rsyncd.pid
+lock file = /var/run/rsync.lock
+log file = /var/log/rsync.log
+port = 873
+
+[tmp]
+path = /tmp
+comment = RSYNC FILES
+read only = false
+timeout = 300
+EOF
+
+RSYNCD_CONFIG_CONTENT=$(cat ${workdir}/rsyncd.conf | base64 -w0)
+RSYNCD_SERVICE_CONTENT=$(sed ':a;N;$!ba;s/\n/\\n/g' ${workdir}/rsyncd.service | sed 's/\"/\\"/g')
+
+# rsync ignition
+rsyncd_ignition_patch=$(mktemp)
+cat > "${rsyncd_ignition_patch}" << EOF
+{
+  "storage": {
+    "files": [
+      {
+        "path": "/etc/rsyncd.conf",
+        "contents": {
+          "source": "data:text/plain;base64,${RSYNCD_CONFIG_CONTENT}"
+        },
+        "mode": 420
+      }
+    ]
+  },
+  "systemd": {
+    "units": [
+      {
+        "contents": "${RSYNCD_SERVICE_CONTENT}",
+        "enabled": true,
+        "name": "rsyncd.service"
+      }
+    ]
+  }
+}
+EOF
+
+# patch rsync setting to ignition
+patch_ignition_file "${bastion_ignition_file}" "${rsyncd_ignition_patch}"
+rm -f "${rsyncd_ignition_patch}"
+
 
 ## ----------------------------------------------------------------
 # MIRROR REGISTORY

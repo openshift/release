@@ -98,7 +98,12 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 # Creating ICSP for quay.io/openshiftteste is in enable-qe-catalogsource-disconnected step
 # Set Node CA for Mirror Registry is in enable-qe-catalogsource-disconnected step
 sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_REGISTRY_HOST}/g" "/tmp/mirror-images-list.yaml" 
-oc image mirror -f "/tmp/mirror-images-list.yaml"  --insecure=true -a "${new_pull_secret}" \
+
+# To avoid 409 too many request error, mirroring image one by one
+for image in `cat /tmp/mirror-images-list.yaml`
+do
+    oc image mirror $image  --insecure=true -a "${new_pull_secret}" \
  --skip-missing=true --skip-verification=true --keep-manifest-list=true --filter-by-os='.*'
+done
 
 rm -f "${new_pull_secret}"

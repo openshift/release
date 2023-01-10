@@ -23,25 +23,20 @@ fi
 
 echo "************ telco5g gather-pao commands ************"
 
-if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
-    readarray -t config <<< "${E2E_TESTS_CONFIG}"
-    for var in "${config[@]}"; do
-        if [[ ! -z "${var}" ]]; then
-            if [[ "${var}" == *"CNF_BRANCH"* ]]; then
-                CNF_BRANCH="$(echo "${var}" | cut -d'=' -f2)"
-            fi
-        fi
-    done
+if [[ "$T5CI_VERSION" == "4.13" ]]; then
+    export CNF_BRANCH="master"
+else
+    export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
 
 echo "Running for CNF_BRANCH=${CNF_BRANCH}"
 if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
     pao_mg_tag="4.11"
 fi
-if [[ "$CNF_BRANCH" == *"4.12"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
     pao_mg_tag="4.12"
 fi
-if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     pao_mg_tag="4.12"
 fi
 
