@@ -27,8 +27,8 @@ fi
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM  =========="
 
 # Set environment for jobs to run
-INTERNAL=true
-INTERNAL_ONLY=true
+INTERNAL=false
+INTERNAL_ONLY=false
 # Whether to use the bastion environment
 BASTION_ENV=true
 # Environment - US lab, DS lab or any
@@ -50,6 +50,9 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
 - name: Grab and run kcli to install openshift cluster
   hosts: bastion
   gather_facts: false
+  vars:
+    cluster:
+      {"cnfdu9": {"port": 64416, "ip": "10.19.17.21", "hvip": "192.168.17.2"}}
   tasks:
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
@@ -60,7 +63,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -e $CL_SEARCH
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -c '{{ cluster|to_json }}'
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -87,13 +90,13 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME -s
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
     BASTION_ENV=false
 fi
-
+BASTION_ENV=true
 if $BASTION_ENV; then
 # Run on upstream lab with bastion
 cat << EOF > $SHARED_DIR/inventory
