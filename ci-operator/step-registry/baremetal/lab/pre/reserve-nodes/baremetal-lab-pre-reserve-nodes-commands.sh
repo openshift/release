@@ -19,7 +19,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 # The hostname of nodes and the cluster names have limited length for BM.
 # Other profiles add to the cluster_name the suffix "-${JOB_NAME_HASH}".
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
-CLUSTER_NAME"${NAMESPACE}"
+CLUSTER_NAME="${NAMESPACE}"
 
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$IPI" != true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
