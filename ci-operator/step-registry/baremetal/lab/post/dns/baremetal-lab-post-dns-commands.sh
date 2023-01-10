@@ -10,12 +10,12 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o 'ServerAliveInterval=90'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
-
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 echo "Destroying the dns and reloading bind9"
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${NAMESPACE}" << 'EOF'
+timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "${CLUSTER_NAME}" << 'EOF'
   set -o nounset
-  NAMESPACE="${1}"
-  sed -i "/; BEGIN ${NAMESPACE}/,/; END ${NAMESPACE}$/d" /opt/bind9_zones/{zone,internal_zone.rev}
+  CLUSTER_NAME="${1}"
+  sed -i "/; BEGIN ${CLUSTER_NAME}/,/; END ${CLUSTER_NAME}$/d" /opt/bind9_zones/{zone,internal_zone.rev}
   docker start bind9
   docker exec bind9 rndc reload
   docker exec bind9 rndc flush
