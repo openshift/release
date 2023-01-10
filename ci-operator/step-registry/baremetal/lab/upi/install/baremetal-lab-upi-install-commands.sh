@@ -135,22 +135,18 @@ function reset_host() {
 function approve_csrs() {
   while [[ ! -f '/tmp/install-complete' ]]; do
     sleep 30
-    echo "Approve csrs"
+    echo "approve_csrs() running..."
     oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' \
       | xargs --no-run-if-empty oc adm certificate approve || true
   done
 }
 
 function update_image_registry() {
-  while ! oc get configs.imageregistry.operator.openshift.io/cluster > /dev/null; do
-    sleep 30
+  while ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
+                 --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; do
+    echo "Sleeping before retrying to patch the image registry config..."
+    sleep 60
   done
-  echo "Patching image registry..."
-  if ! oc patch configs.imageregistry.operator.openshift.io cluster --type merge \
-    --patch '{"spec":{"managementState":"Managed","storage":{"emptyDir":{}}}}'; then
-      echo "Failure when patching the image registry storage..."
-      return 1
-  fi
 }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
