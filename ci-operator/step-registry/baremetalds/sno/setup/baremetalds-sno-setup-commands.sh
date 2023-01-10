@@ -43,11 +43,13 @@ then
 fi
 
 # Copy additional manifests
-if [[ -e "${SHARED_DIR}/manifest_*" ]]
-then
-  ssh "${SSHOPTS[@]}" "root@${IP}" "mkdir sno-additional-manifests"
-  scp "${SSHOPTS[@]}" "${SHARED_DIR}/manifest_*" "root@${IP}:sno-additional-manifests"
-fi
+ssh "${SSHOPTS[@]}" "root@${IP}" "mkdir /root/ssh-additional-manifests"
+echo -e "\nThe following manifests will be included at installation time:"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
+while IFS= read -r -d '' item
+do
+  scp "${SSHOPTS[@]}" "${item}" "root@${IP}:/root/sno-additional-manifests"
+done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
 # TODO: Figure out way to get these parameters (used by deploy_ibip) without hardcoding them here
 # preferrably by making deploy_ibip / makefile perform these configurations itself in the assisted_test_infra
