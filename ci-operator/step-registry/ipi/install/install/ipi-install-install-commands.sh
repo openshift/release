@@ -326,7 +326,7 @@ gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
-    if [[ -z "$IC_API_KEY" ]];
+    if [ -z "$IC_API_KEY" ]; then
       echo "Fail to set the IC_API_KEY!!!"
       exit 1
     fi
