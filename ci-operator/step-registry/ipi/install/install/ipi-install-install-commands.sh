@@ -81,6 +81,12 @@ function prepare_next_steps() {
   if [[ "${CLUSTER_TYPE}" == "ovirt" ]]; then
     cp -t "${SHARED_DIR}" "${dir}"/terraform.*
   fi
+
+  echo "install-config.yaml"
+  echo "-------------------"
+  cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+
+  sleep 4h
 }
 
 function inject_promtail_service() {
@@ -319,6 +325,7 @@ gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
+    echo $IC_API_KEY
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
@@ -384,10 +391,6 @@ if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   wait "$!"
   inject_promtail_service
 fi
-
-echo "install-config.yaml"
-echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 TF_LOG_PATH="${dir}/terraform.txt"
