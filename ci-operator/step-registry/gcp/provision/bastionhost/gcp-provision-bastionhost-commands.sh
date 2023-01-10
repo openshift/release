@@ -104,7 +104,7 @@ else
 fi
 gcloud ${project_option} compute firewall-rules create "${bastion_name}-ingress-allow" \
   --network ${NETWORK} \
-  --allow tcp:22,tcp:3128,tcp:3129,tcp:5000,tcp:6001,tcp:6002,tcp:8080 \
+  --allow tcp:22,tcp:3128,tcp:3129,tcp:5000,tcp:6001,tcp:6002,tcp:8080,tcp:873 \
   --target-tags="${bastion_name}"
 cat > "${SHARED_DIR}/bastion-destroy.sh" << EOF
 gcloud compute instances delete -q "${bastion_name}" --zone=${ZONE_0}

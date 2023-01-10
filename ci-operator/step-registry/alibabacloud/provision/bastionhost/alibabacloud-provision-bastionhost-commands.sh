@@ -142,6 +142,13 @@ ${ALIYUN_BIN} ecs AuthorizeSecurityGroup \
   --PortRange "6001/6002" \
   --SourceCidrIp "0.0.0.0/0" \
   --endpoint "${aliyun_ecs_endpoint}"
+${ALIYUN_BIN} ecs AuthorizeSecurityGroup \
+  --RegionId "${REGION}" \
+  --SecurityGroupId "${sg_id}" \
+  --IpProtocol "tcp" \
+  --PortRange "873/873" \
+  --SourceCidrIp "0.0.0.0/0" \
+  --endpoint "${aliyun_ecs_endpoint}"
  
 sleep 30s
 echo "$(date -u --rfc-3339=seconds) - Launching Fedora CoreOS bastion VM..."
