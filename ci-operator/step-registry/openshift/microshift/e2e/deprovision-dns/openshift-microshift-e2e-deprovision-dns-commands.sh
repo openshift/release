@@ -1,7 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
-set -x
+set -eux
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -21,6 +20,6 @@ gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 BASE_DOMAIN_ZONE_NAME="$(gcloud dns managed-zones list --filter "DNS_NAME=${BASE_DOMAIN}." --format json | jq -r .[0].name)"
-gcloud dns record-sets delete "${INSTANCE_PREFIX}.${BASE_DOMAIN}." --type A --zone "${BASE_DOMAIN_ZONE_NAME}"
+gcloud dns record-sets delete "${INSTANCE_PREFIX}.${BASE_DOMAIN}." --type A --zone "${BASE_DOMAIN_ZONE_NAME}" || echo "Unable to delete DNS record, ignoring"
 
-gcloud compute firewall-rules delete "${INSTANCE_PREFIX}"-external
+gcloud compute firewall-rules delete "${INSTANCE_PREFIX}"-external || echo "Unable to delete firewall rules, ignoring"
