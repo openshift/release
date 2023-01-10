@@ -25,7 +25,7 @@ function destroy_bootstrap() {
   . <(yq -P e -I0 -o=p '.[] | select(.name|test("bootstrap"))' "$SHARED_DIR/hosts.yaml" | sed 's/^\(.*\) = \(.*\)$/\1="\2"/')
   # shellcheck disable=SC2154
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-    "${NAMESPACE}" "${mac}"<< 'EOF'
+    "${CLUSTER_NAME}" "${mac}"<< 'EOF'
   BUILD_ID="$1"
   mac="$2"
   echo "Destroying bootstrap: removing the DHCP/PXE config..."
@@ -33,7 +33,7 @@ function destroy_bootstrap() {
   echo "Destroying bootstrap: removing the grub config..."
   rm -f "/opt/tftpboot/grub.cfg-01-${mac//:/-}" || echo "no grub.cfg for $mac."
   echo "Destroying bootstrap: removing dns entries..."
-  sed -i "/bootstrap.*${NAMESPACE}/d" /opt/bind9_zones/{zone,internal_zone.rev}
+  sed -i "/bootstrap.*${BUILD_ID:-glob-protected-from-empty-var}/d" /opt/bind9_zones/{zone,internal_zone.rev}
   echo "Destroying bootstrap: removing the bootstrap node ip in the backup pool of haproxy"
   # haproxy.cfg is mounted as a volume, and we need to remove the bootstrap node from being a backup:
   # using sed -i leads to creating a new file with a different inode number.
@@ -58,7 +58,7 @@ EOF
   fi
   echo "Releasing the bootstrap node..."
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-        "${NAMESPACE}" << 'EOF'
+        "${CLUSTER_NAME}" << 'EOF'
   BUILD_USER=ci-op
   BUILD_ID="$1"
 
@@ -137,7 +137,7 @@ function approve_csrs() {
     sleep 30
     echo "Approve csrs"
     oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' \
-      | xargs --no-run-if-empty oc adm certificate approve
+      | xargs --no-run-if-empty oc adm certificate approve || true
   done
 }
 
@@ -172,12 +172,12 @@ oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
-cluster_name=${NAMESPACE}
+CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
 yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 baseDomain: ${BASE_DOMAIN}
 metadata:
-  name: ${cluster_name}
+  name: ${CLUSTER_NAME}
 platform:
   none: {}
 controlPlane:
@@ -220,7 +220,7 @@ cp "${SHARED_DIR}"/*.ign "${INSTALL_DIR}" || true
 
 echo -e "\nCopying ignition files into bastion host..."
 chmod 644 "${INSTALL_DIR}"/*.ign
-scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${NAMESPACE}/"
+scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/*.ign "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/"
 
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/metadata.json" "${SHARED_DIR}/"
@@ -228,14 +228,15 @@ cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 
 echo -e "\nPower on the hosts..."
+# shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  # shellcheck disable=SC2154
   if [ ${#bmc_address} -eq 0 ] || [ ${#bmc_user} -eq 0 ] || [ ${#bmc_pass} -eq 0 ]; then
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
+  echo "Power on ${bmc_address//.*/} (${name})..."
   reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}"
 done
 

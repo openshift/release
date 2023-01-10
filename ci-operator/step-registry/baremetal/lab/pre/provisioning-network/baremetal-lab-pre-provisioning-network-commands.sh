@@ -20,7 +20,7 @@ python3 - \
     "$(<"${CLUSTER_PROFILE_DIR}"/switch_port)" \
     "$(<"${CLUSTER_PROFILE_DIR}"/switch_user)" \
     "$(<"${CLUSTER_PROFILE_DIR}"/switch_pass)" \
-    "${NAMESPACE}" "${VLAN_ID}" \
+    "$(<"${SHARED_DIR}/cluster_name")" "${VLAN_ID}" \
     "$(yq e '[.[].switch_port]|@csv' < "${SHARED_DIR}"/hosts.yaml)" - <<EOF
 #!/bin/python3
 import os

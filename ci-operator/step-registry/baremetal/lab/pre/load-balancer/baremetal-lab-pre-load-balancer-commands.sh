@@ -13,8 +13,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-BUILD_USER=ci-op
-BUILD_ID="${NAMESPACE}"
+CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 
 MC=""
 APISRV=""
@@ -78,8 +77,8 @@ stats enable
 stats hide-version
 stats refresh 30s
 stats show-node
-stats show-desc Stats for $BUILD_USER-$BUILD_ID cluster
-stats auth admin:$BUILD_USER-$BUILD_ID
+stats show-desc Stats for $CLUSTER_NAME cluster
+stats auth admin:$CLUSTER_NAME
 stats uri /stats
 listen api-server-6443
     bind *:6443
@@ -122,18 +121,17 @@ interface "eth1" {
 echo "Pushing the configuration and starting the load balancer in the auxiliary host..."
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${BUILD_ID}" "${IPI}" "${DISCONNECTED}" "'${HAPROXY}'"  "'${DHCLIENT}'"  << 'EOF'
+  "${CLUSTER_NAME}" "${IPI}" "${DISCONNECTED}" "'${HAPROXY}'"  "'${DHCLIENT}'"  << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
 
-BUILD_ID="${1}"
-BUILD_USER=ci-op
+CLUSTER_NAME="${1}"
 IPI="${2}"
 DISCONNECTED="${3}"
 HAPROXY="${4}"
 DHCLIENT="${5}"
-BUILD_DIR="/var/builds/${BUILD_ID}"
+BUILD_DIR="/var/builds/${CLUSTER_NAME}"
 HAPROXY_DIR="$BUILD_DIR/haproxy"
 
 mkdir -p "$HAPROXY_DIR"
@@ -141,7 +139,7 @@ echo -e "${HAPROXY}" >> "$HAPROXY_DIR/haproxy.cfg"
 echo -e "${DHCLIENT}" >> "$HAPROXY_DIR/dhclient.conf"
 
 echo "Create and start HAProxy container..."
-docker run --name "haproxy-$BUILD_ID" -d --restart=on-failure \
+docker run --name "haproxy-$CLUSTER_NAME" -d --restart=on-failure \
   -v "$HAPROXY_DIR/haproxy.cfg:/etc/haproxy.cfg" \
   -v "$HAPROXY_DIR/dhclient.conf:/etc/dhcp/dhclient.conf" \
   --network none \
@@ -150,7 +148,7 @@ docker run --name "haproxy-$BUILD_ID" -d --restart=on-failure \
 echo "Setting the network interfaces in the HAProxy container"
 
 # Unmount resolv.conf to let the custom network configuration able to modify it
-nsenter -m -u -n -i -p -t "$(docker inspect -f '{{.State.Pid}}' "haproxy-${BUILD_ID}")" \
+nsenter -m -u -n -i -p -t "$(docker inspect -f '{{.State.Pid}}' "haproxy-${CLUSTER_NAME}")" \
   /bin/umount /etc/resolv.conf
 
 # For the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interfaces.
@@ -166,21 +164,21 @@ for dev in "${devices[@]}"; do
   bridge=${dev##*.}
   # for the given dhclient.conf, eth1 will also get default route, dns and other options usual for the main interface
   # eth2 will only get local routes configuration
-  /usr/local/bin/ovs-docker add-port "$bridge" "$interface" "haproxy-$BUILD_ID"
-  nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-$BUILD_ID")" \
+  /usr/local/bin/ovs-docker add-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME"
+  nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
     /sbin/dhclient -v \
     -pf "/var/run/dhclient.$interface.pid" \
     -lf "/var/lib/dhcp/dhclient.$interface.lease" "$interface"
 done
 echo "Sending HUP to HAProxy to trigger the configuration reload..."
-docker kill --signal HUP "haproxy-$BUILD_ID"
+docker kill --signal HUP "haproxy-$CLUSTER_NAME"
 
 echo "Gather the IP Address for the new interface"
 # IPI connected only
 [ ${IPI} == "true" ] && cp "$BUILD_DIR/vips.yaml" "$BUILD_DIR/external_vips.yaml"
 # IPI disconnected and UPI
 if [ "${IPI}" != "true" ] || [ "${DISCONNECTED}" == "true" ]; then
-  api_ip=$(nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-${BUILD_ID}")" -n  \
+  api_ip=$(nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-${CLUSTER_NAME}")" -n  \
     /sbin/ip -o -4 a list eth1 | sed 's/.*inet \(.*\)\/[0-9]* brd.*$/\1/')
   if [ "${#api_ip}" -eq 0 ]; then
     echo "No IP Address has been set for the external API VIP, failing"
@@ -192,4 +190,4 @@ fi
 EOF
 
 echo "Syncing back the external_vips.yaml file"
-scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/external_vips.yaml" "${SHARED_DIR}/"
+scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/$(<"${SHARED_DIR}/cluster_name")/external_vips.yaml" "${SHARED_DIR}/"

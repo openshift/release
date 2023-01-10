@@ -25,7 +25,7 @@ rootfs=$(/tmp/openshift-install coreos print-stream-json | jq -r ".architectures
 
 echo "Pulling the kernel, initramfs and rootfs in the auxiliary host"
 timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${NAMESPACE}" "$kernel" "$initramfs" "$rootfs" << 'EOF'
+  "$(<"${SHARED_DIR}/cluster_name")" "$kernel" "$initramfs" "$rootfs" << 'EOF'
   set -o nounset
   set -o errexit
   set -o pipefail
