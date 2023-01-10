@@ -86,7 +86,7 @@ function prepare_next_steps() {
   echo "-------------------"
   cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
-  sleep 4h
+  sleep 3h
 }
 
 function inject_promtail_service() {
@@ -312,6 +312,7 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+echo "cluster type: ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
 azure4|azuremag|azure-arm64) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
@@ -325,7 +326,10 @@ gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
-    echo $IC_API_KEY
+    if [[ -z "$IC_API_KEY" ]];
+      echo "Fail to set the IC_API_KEY!!!"
+      exit 1
+    fi
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
@@ -343,6 +347,10 @@ esac
 
 dir=/tmp/installer
 mkdir "${dir}/"
+if [ ! -f "${SHARED_DIR}/install-config.yaml" ]; then
+  echo "fail to find ${SHARED_DIR}/install-config.yaml!!"
+  exit 1
+fi
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
