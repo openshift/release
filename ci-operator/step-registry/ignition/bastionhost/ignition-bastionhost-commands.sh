@@ -225,6 +225,7 @@ cat > "${rsyncd_ignition_patch}" << EOF
     "files": [
       {
         "path": "/etc/rsyncd.conf",
+        "overwrite": true,
         "contents": {
           "source": "data:text/plain;base64,${RSYNCD_CONFIG_CONTENT}"
         },
