@@ -137,7 +137,7 @@ function approve_csrs() {
     sleep 30
     echo "Approve csrs"
     oc get csr -o go-template='{{range .items}}{{if not .status}}{{.metadata.name}}{{"\n"}}{{end}}{{end}}' \
-      | xargs --no-run-if-empty oc adm certificate approve
+      | xargs --no-run-if-empty oc adm certificate approve || true
   done
 }
 
