@@ -5,9 +5,15 @@ base_images:
     tag: golang-1.13
 releases:
   latest:
+{{- if eq $.OcpVersionTemplate "release"}}
     release:
       channel: stable
-      version: "4.6"
+      version: "{{.OcpVersion}}"
+{{ else }}
+    integration:
+      name: "{{.OcpVersion}}"
+      namespace: ocp"
+{{ end -}}
 resources:
   '*':
     limits:
@@ -15,9 +21,9 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tests:
-- as: e2e-default
-  cron: 37 20 16 */12 *
+tests:{{range .TestLaneVariants}}
+- as: e2e-{{.VariantName}}
+  cron: {{.CronMinute}} {{.CronHour}} * * *
   steps:
     cluster_profile: azure4
     test:
@@ -35,7 +41,7 @@ tests:
       cli: latest
       commands: |
         curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
-          bash -s deploy_release_test_setup 0.34
+          bash -s {{$.DeployFuncCall}}
       from: base
       resources:
         requests:
@@ -44,21 +50,17 @@ tests:
     - as: test
       cli: latest
       commands: |
-        export DOCKER_PREFIX='kubevirt'
-        export KUBEVIRT_E2E_FOCUS='\[rfe_id:273\]\[crit:high\]'
-        export KUBEVIRT_E2E_SKIP='QUARANTINE'
+        export DOCKER_PREFIX='{{$.DockerPrefix}}'
+        export KUBEVIRT_E2E_FOCUS='{{.VariantFocusExpression}}'
+        export KUBEVIRT_E2E_SKIP='{{.VariantSkipExpression}}'{{if .TestTimeout}}
+        export TEST_TIMEOUT="{{.TestTimeout}}"{{end}}
         curl -L "https://raw.githubusercontent.com/dhiller/kubevirt-testing/main/hack/kubevirt-testing.sh" | \
-          bash -s test_release 0.34
+          bash -s {{$.TestFuncCall}}
       from: base
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-      timeout: 2h0m0s
+      timeout: {{.VariantTimeout}}
     workflow: ipi-azure
-  timeout: 4h0m0s
-zz_generated_metadata:
-  branch: main
-  org: kubevirt
-  repo: kubevirt
-  variant: 0.34_4.6
+  timeout: {{$.ProwJobTimeout}}{{end}}
