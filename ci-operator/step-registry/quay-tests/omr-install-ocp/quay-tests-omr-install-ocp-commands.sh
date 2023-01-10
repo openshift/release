@@ -66,8 +66,8 @@ cat "${SHARED_DIR}/install-config.yaml" || true
 cp "${SHARED_DIR}/install-config.yaml" ${ARTIFACT_DIR} || true
 
 cp "${SHARED_DIR}/install-config.yaml" /tmp || true
-openshift-install --dir=/tmp create cluster --log-level=debug || true
-cp /tmp/log-bundle-*.tar.gz ${ARTIFACT_DIR}
+openshift-install --dir=/tmp create cluster --log-level=debug 
+cp /tmp/log-bundle-*.tar.gz ${ARTIFACT_DIR} || true
 
-cp "${SHARED_DIR}/install-config.yaml" /tmp
+cp "${SHARED_DIR}/install-config.yaml" /tmp || true
 openshift-install --dir=/tmp destroy cluster --log-level=debug || true
