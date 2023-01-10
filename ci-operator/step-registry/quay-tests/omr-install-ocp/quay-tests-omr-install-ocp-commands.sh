@@ -12,7 +12,7 @@ which openshift-install || true
 #Check AWS CLI
 AWS_ACCESS_KEY_ID=$(cat /var/run/quay-qe-omr-secret/access_key) && export AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key) && export AWS_SECRET_ACCESS_KEY
-AWS_DEFAULT_REGION="us-west-2" && export AWS_DEFAULT_REGION
+AWS_DEFAULT_REGION="us-east-2" && export AWS_DEFAULT_REGION
 aws s3 ls
 
 cat "${SHARED_DIR}/new_pull_secret" | jq
@@ -50,7 +50,7 @@ networking:
   - 172.30.0.0/16
 platform:
   aws:
-    region: us-west-2
+    region: us-east-2
     userTags:
       adminContact: luffy
       costCenter: 7536
@@ -66,7 +66,7 @@ cat "${SHARED_DIR}/install-config.yaml" || true
 cp "${SHARED_DIR}/install-config.yaml" ${ARTIFACT_DIR} || true
 
 cp "${SHARED_DIR}/install-config.yaml" /tmp || true
-openshift-install --dir=/tmp create cluster --log-level=debug 
+openshift-install --dir=/tmp create cluster --log-level=debug || true
 cp /tmp/log-bundle-*.tar.gz ${ARTIFACT_DIR} || true
 
 cp "${SHARED_DIR}/install-config.yaml" /tmp || true
