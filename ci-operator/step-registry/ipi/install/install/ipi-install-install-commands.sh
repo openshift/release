@@ -395,8 +395,15 @@ export TF_LOG_PATH
 
 openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
-wait "$!"
-ret="$?"
+# wait "$!"
+# ret="$?"
+#### DEBUG
+installer_pid="$!"
+sleep 1500
+kill $installer_pid
+# wait "$!"
+ret=1
+#### END OF DEBUG
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
