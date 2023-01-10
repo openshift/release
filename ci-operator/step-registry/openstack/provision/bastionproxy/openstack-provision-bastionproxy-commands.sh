@@ -128,7 +128,7 @@ if ! retry 60 5 $SSH_CMD uname -a; then
 		exit 1
 fi
 
-PASSWORD="$(uuidgen | sha256sum | cut -b -32)"
+PASSWORD="$(< /var/run/bastionproxy/secret)"
 SQUID_AUTH="${CLUSTER_NAME}:${PASSWORD}"
 echo ${SQUID_AUTH}>${SHARED_DIR}/SQUID_AUTH
 
