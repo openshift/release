@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  repo-brancher:
-    name: repo-brancher
-    namespace: ci
-    tag: latest
   stolostron_builder_go1.19-linux:
     name: builder
     namespace: stolostron
@@ -25,6 +21,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.19-linux
   to: multicloud-integrations
 promotion:
+  disabled: true
   name: "2.8"
   namespace: stolostron
 resources:
@@ -33,9 +30,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocm-ci-rbac
-  steps:
-    workflow: ocm-ci-rbac
 - as: test-unit
   commands: |
     export SELF="make -f Makefile.prow"
@@ -73,24 +67,30 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: multicloud-integrations
     workflow: ocm-ci-image-mirror
-- as: fast-forward
-  commands: |
-    git clone -b master https://github.com/openshift/release.git /tmp/release
-    repo-brancher \
-        --fast-forward \
-        --confirm \
-        --config-dir=/tmp/release/ci-operator/config/stolostron/multicloud-integrations/ \
-        --username=acm-cicd \
-        --token-path=/etc/github/token \
-        --current-promotion-namespace=stolostron \
-        --current-release=2.8 \
-        --future-release=2.8
-  container:
-    from: repo-brancher
+- as: publish
   postsubmit: true
-  secrets:
-  - mount_path: /etc/github
-    name: acm-cicd-github
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multicloud-integrations
+    env:
+      IMAGE_REPO: multicloud-integrations
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 - as: latest-image-mirror
   postsubmit: true
   steps:
@@ -98,10 +98,10 @@ tests:
       SOURCE_IMAGE_REF: multicloud-integrations
     env:
       IMAGE_REPO: multicloud-integrations
-      IMAGE_TAG: latest
+      IMAGE_TAG: 2.8.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.8
   org: stolostron
   repo: multicloud-integrations
