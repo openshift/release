@@ -29,14 +29,14 @@ fi
 #####################################
 workdir=`mktemp -d`
 
-curl -L -o ${workdir}/fcos-stable.json https://builds.coreos.fedoraproject.org/streams/stable.json
-IMAGE_NAME=$(jq -r .architectures.x86_64.images.gcp.name < ${workdir}/fcos-stable.json)
+curl -sL https://raw.githubusercontent.com/yunjiang29/ocp-test-data/main/coreos-for-bastion-host/fedora-coreos-stable.json -o /tmp/fedora-coreos-stable.json
+IMAGE_NAME=$(jq -r .architectures.x86_64.images.gcp.name < /tmp/fedora-coreos-stable.json)
 if [ -z "${IMAGE_NAME}" ]; then
   echo "Missing IMAGE in region: ${REGION}" 1>&2
   exit 1
 fi
-IMAGE_PROJECT=$(jq -r .architectures.x86_64.images.gcp.project < ${workdir}/fcos-stable.json)
-IMAGE_RELEASE=$(jq -r .architectures.x86_64.images.gcp.release < ${workdir}/fcos-stable.json)
+IMAGE_PROJECT=$(jq -r .architectures.x86_64.images.gcp.project < /tmp/fedora-coreos-stable.json)
+IMAGE_RELEASE=$(jq -r .architectures.x86_64.images.gcp.release < /tmp/fedora-coreos-stable.json)
 echo "Using FCOS ${IMAGE_RELEASE} IMAGE: ${IMAGE_NAME}"
 
 
