@@ -125,8 +125,23 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: ovirt-installer
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    # Cache dir must be accessible when running the integration tests
+    RUN mkdir /.cache -m 0777
+  from: src
+  inputs:
+    ocp_4.10_cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
 promotion:
   disabled: true
+  excluded_images:
+  - src-oc
   name: "4.13"
   namespace: ocp
 releases:
@@ -581,6 +596,11 @@ tests:
     cluster_profile: nutanix
     workflow: openshift-e2e-nutanix-sdn
   timeout: 6h0m0s
+- as: agent-integration-tests
+  commands: hack/go-integration-test.sh
+  container:
+    from: src-oc
+  run_if_changed: /agent/
 - as: e2e-agent-compact-ipv4
   cluster: build05
   run_if_changed: /agent/
