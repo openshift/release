@@ -9,7 +9,7 @@ releases:
     release:
       architecture: amd64
       channel: stable
-      version: "4.10"
+      version: "4.11"
 resources:
   '*':
     limits:
@@ -34,8 +34,24 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: openshift-e2e-aws
+- as: e2e-puppeteer
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: /bin/bash .ci/oci-dashboard-puppeteer.sh
+      dependencies:
+      - env: CI_CHE_DASHBOARD_IMAGE
+        name: che-dashboard-image
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
   org: eclipse-che
   repo: che-dashboard
-  variant: v10
+  variant: v11
