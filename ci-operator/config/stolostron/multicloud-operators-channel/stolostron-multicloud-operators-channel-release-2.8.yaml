@@ -19,9 +19,10 @@ images:
     stolostron_builder_go1.19-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.19-linux
-  to: multicluster-operators-subscription
+  to: multicluster-operators-channel
 promotion:
-  name: "2.7"
+  disabled: true
+  name: "2.8"
   namespace: stolostron
 resources:
   '*':
@@ -42,7 +43,6 @@ tests:
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export HOME="/tmp"
     export XDG_CACHE_HOME="/tmp/.cache"
-    export TEST_GIT_REPO_URL=github.com/stolostron/multicloud-operators-subscription
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -55,7 +55,6 @@ tests:
     export SELF="make -f /opt/build-harness/Makefile.prow"
     export HOME="/tmp"
     export XDG_CACHE_HOME="/tmp/.cache"
-    export TEST_GIT_REPO_URL=github.com/stolostron/multicloud-operators-subscription
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
     from: src
@@ -66,15 +65,15 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-subscription
+      SOURCE_IMAGE_REF: multicluster-operators-channel
     workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-subscription
+      SOURCE_IMAGE_REF: multicluster-operators-channel
     env:
-      IMAGE_REPO: multicluster-operators-subscription
+      IMAGE_REPO: multicluster-operators-channel
       REGISTRY_ORG: stolostron
     test:
     - as: publish
@@ -96,13 +95,13 @@ tests:
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: multicluster-operators-subscription
+      SOURCE_IMAGE_REF: multicluster-operators-channel
     env:
-      IMAGE_REPO: multicluster-operators-subscription
-      IMAGE_TAG: 2.7.0
+      IMAGE_REPO: multicluster-operators-channel
+      IMAGE_TAG: 2.8.0
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.7
+  branch: release-2.8
   org: stolostron
-  repo: multicloud-operators-subscription
+  repo: multicloud-operators-channel
