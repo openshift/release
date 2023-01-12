@@ -1,0 +1,42 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: nodejs14-linux
+images:
+- dockerfile_path: Dockerfile
+  to: cluster-templates-console-plugin
+promotion:
+  name: latest
+  namespace: stolostron
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-merge-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-templates-console-plugin
+    env:
+      IMAGE_REPO: cluster-templates-console-plugin
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+- as: latest-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cluster-templates-console-plugin
+    env:
+      IMAGE_REPO: cluster-templates-console-plugin
+      IMAGE_TAG: latest
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: cluster-templates-console-plugin
