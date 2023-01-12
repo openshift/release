@@ -12,13 +12,13 @@ EOF
 )
 
 for role in master worker; do
-    cat << EOF > "${SHARED_DIR}/${role}-networkmanager-configuration.yaml"
+    cat << EOF > "${SHARED_DIR}/manifest_${role}-networkmanager-configuration.yaml"
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
   labels:
     machineconfiguration.openshift.io/role: ${role}
-  name: nm-trace-logging
+  name: ${role}-nm-trace-logging
 spec:
   config:
     ignition:
@@ -35,4 +35,4 @@ done
 
 echo "master-networkmanager-configuration.yaml"
 echo "---------------------------------------------"
-cat "${SHARED_DIR}/master-networkmanager-configuration.yaml"
+cat "${SHARED_DIR}/manifest_${role}-networkmanager-configuration.yaml"
