@@ -72,11 +72,20 @@ platform:
     network: "${LEASED_RESOURCE}"
     password: "${GOVC_PASSWORD}"
     username: "${GOVC_USERNAME}"
+    ${RESOURCE_POOL_DEF}
+EOF
+
+if [ -f ${SHARED_DIR}/external_lb ]; then 
+  echo "$(date -u --rfc-3339=seconds) - external load balancer in use, not setting VIPs"
+else
+cat >> "${CONFIG}" << EOF
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
-    ${RESOURCE_POOL_DEF}
+EOF
+fi
+
+cat >> "${CONFIG}" << EOF
 networking:
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
-
