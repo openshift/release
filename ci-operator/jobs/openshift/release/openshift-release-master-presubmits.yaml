@@ -80,6 +80,35 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build03
+    context: ci/prow/clusterimageset-validate
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-clusterimageset-validate
+    rerun_command: /test clusterimageset-validate
+    run_if_changed: ^clusters/hive/pools/.*
+    spec:
+      containers:
+      - args:
+        - --pools
+        - ./clusters/hive/pools
+        - --imagesets
+        - ./clusters/hive/pools
+        command:
+        - clusterimageset-updater
+        image: registry.ci.openshift.org/ci/clusterimageset-updater:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )clusterimageset-validate,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: app.ci
     context: ci/build-farm/app-ci-config-dry
     decorate: true
