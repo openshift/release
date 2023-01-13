@@ -1,6 +1,28 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: make build
 build_root:
   from_repository: true
   use_build_cache: true
+images:
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD cps-front-proxy /usr/bin/cps-front-proxy
+    ENTRYPOINT ["/usr/bin/cps-front-proxy"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/redhat-cps/front-proxy/bin/cps-front-proxy
+  to: cps-front-proxy
+promotion:
+  namespace: kcp
+  tag: latest
+  tag_by_commit: true
 resources:
   '*':
     limits:

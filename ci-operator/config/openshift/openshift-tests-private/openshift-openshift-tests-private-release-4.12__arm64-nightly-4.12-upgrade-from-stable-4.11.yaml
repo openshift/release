@@ -72,8 +72,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-p2-f7
-  cron: 25 23 6,14,21,28 * *
+- as: aws-ipi-byo-iam-role-p2-f14
+  cron: 13 13 19,3 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -84,17 +84,16 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-      TEST_FILTERS_PREUPG: ~40667&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.11 and @aws-ipi and @arm64 and
-        @network-openshiftsdn and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.11 and @aws-ipi and @arm64 and
-        @network-openshiftsdn and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-private-p2-f7
-  cron: 56 13 28,5,12,19 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+- as: aws-ipi-byo-route53-p2-f14
+  cron: 24 5 8,23 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -105,15 +104,236 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
-      TEST_FILTERS_PREUPG: ~40667&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.11 and @aws-ipi and @arm64 and
-        @network-ovnkubernetes and not @fips and @disconnected'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.11 and @aws-ipi and @arm64 and
-        @network-ovnkubernetes and not @fips and @disconnected'
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
+- as: aws-ipi-disconnected-cco-manual-sts-ep-p2-f14
+  cron: 18 4 7,22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-with-ep-sts-ec2-elb
+- as: aws-ipi-disconnected-cco-manual-sts-p2-f14
+  cron: 46 6 18,2 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
+- as: aws-ipi-disconnected-private-p2-f14
+  cron: 26 20 25,9 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: aws-ipi-ovn-fips-p2-f14
+  cron: 45 3 8,23 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-fips
+- as: aws-ipi-ovn-ingress-nlb-p2-f14
+  cron: 45 21 23,7 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ingress-nlb
+- as: aws-ipi-ovn-ipsec-p2-f14
+  cron: 32 17 4,19 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-ovn-p2-f14
+  cron: 34 4 18,2 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+- as: aws-ipi-ovn-sdn2ovn-p2-f14
+  cron: 49 4 30,14 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-sdn2ovn
+- as: aws-ipi-private-p2-f14
+  cron: 37 23 15,30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-private
+- as: aws-ipi-proxy-cco-manual-sts-p2-f14
+  cron: 28 0 26,10 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-upi-p3-f28
+  cron: 29 3 30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      BOOTSTRAP_INSTANCE_TYPE: m6g.large
+      MASTER_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.11 and @aws-upi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.11 and @aws-upi and
+        not @fips'
+      WORKER_INSTANCE_TYPE: m6g.xlarge
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-upi
 zz_generated_metadata:
   branch: release-4.12
   org: openshift

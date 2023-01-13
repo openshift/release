@@ -38,6 +38,9 @@ CONFIG = {
     'aws-qe-quota-slice': {
         'us-east-1': 30,
     },
+    'aws-sd-qe-quota-slice': {
+        'us-west-2': 3,
+    },
     'aws-outpost-quota-slice': {
         'us-east-1': 10,
     },
@@ -78,6 +81,9 @@ CONFIG = {
     },
     'azurestack-quota-slice': {
         'ppe3': 2
+    },
+   'azurestack-qe-quota-slice': {
+        'mtcazs': 2
     },
     'azuremag-quota-slice': {
         'usgovvirginia': 5
@@ -157,6 +163,7 @@ CONFIG = {
         'default': 50,
     },
     'vsphere-quota-slice':{},
+    'vsphere-8-quota-slice':{},
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
     'vsphere-connected-quota-slice':{},
@@ -179,10 +186,12 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
+        'mon01': 1,
+        'osa21': 1,
         'syd04': 1,
         'syd05': 1,
-        'tor01': 1,
-        'tok04': 1
+        'tok04': 1,
+        'tor01': 1
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
@@ -199,6 +208,24 @@ CONFIG = {
     'alibabacloud-cn-qe-quota-slice': {
         'us-east-1': 10,
     },
+    'hypershift-hive-quota-slice': {
+        'default': 80
+    },
+    'aws-virtualization-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+        'us-west-1': 5,
+        'us-west-2': 5,
+    },
+    'azure-virtualization-quota-slice': {
+        'centralus': 5,
+        'eastus': 5,
+        'eastus2': 5,
+        'westus': 5
+    },
+    'gcp-virtualization-quota-slice': {
+        'us-central1': 10,
+    }
 }
 
 for i in range(3):
@@ -232,7 +259,7 @@ for i in range(1, 7):
 for i in range(83,93):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(94,106):
+for i in range(94,109):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):
@@ -249,6 +276,9 @@ for i in range(55,56):
 
 for i in range(151,155):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(200,202):
+    CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],

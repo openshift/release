@@ -161,6 +161,10 @@ Resources:
         ToPort: 22
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
+        FromPort: 873
+        ToPort: 873
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
         FromPort: 3128
         ToPort: 3128
         CidrIp: 0.0.0.0/0
@@ -201,10 +205,16 @@ Resources:
       - Key: Name
         Value: !Join ["", [!Ref Machinename]]
       BlockDeviceMappings:
-        - DeviceName: /dev/xvda
-          Ebs:
-            VolumeSize: "120"
-            VolumeType: gp2
+        !If
+          - "UseIgnition"
+          - - DeviceName: /dev/xvda
+              Ebs:
+                VolumeSize: "120"
+                VolumeType: gp2
+          - - DeviceName: /dev/sda1
+              Ebs:
+                VolumeSize: "120"
+                VolumeType: gp2
       UserData:
         !If
           - "UseIgnition"

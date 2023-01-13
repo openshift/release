@@ -2,8 +2,11 @@ build_root:
   project_image:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8/ubi
-      RUN yum install -y --nodocs jq python3-virtualenv make git
+      RUN yum install -y --nodocs jq python3-virtualenv python3-pip make git golang bc
+      RUN ln -s /usr/bin/python3 /usr/bin/python
       RUN ln -s /cli/oc /usr/bin/kubectl
+      RUN curl -Lk -o /usr/bin/yq https://github.com/mikefarah/yq/releases/download/v4.18.1/yq_linux_amd64 && chmod +x /usr/bin/yq
+      RUN pip3 install yamllint
 releases:
   initial:
     candidate:
@@ -48,6 +51,40 @@ tests:
           OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:8}-index;
         fi;
         make -k VERBOSE=2 OPERATOR_INDEX_IMAGE_REF=$OPERATOR_INDEX_IMAGE_REF CATSRC_NAME=sbo-pr-checks SKIP_REGISTRY_LOGIN=true EXTRA_BEHAVE_ARGS="--tags=~@crdv1beta1 --tags=~@olm-descriptors --tags=~@upgrade-with-olm --tags=~@disable-openshift-4.9 --tags=~@disable-openshift-4.8+ --tags=~@disable-openshift-4.9+" -o registry-login test-acceptance-with-bundle test-acceptance-artifacts
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: upgrade-with-olm
+  steps:
+    cluster_profile: aws
+    post:
+    - as: gather-must-gather
+      commands: |
+        curl -skSL https://raw.githubusercontent.com/openshift/release/master/ci-operator/step-registry/gather/must-gather/gather-must-gather-commands.sh | /bin/bash -s
+      from: cli
+      optional_on_success: true
+      resources:
+        requests:
+          cpu: 300m
+          memory: 300Mi
+      timeout: 30m0s
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make yq opm
+        eval $(make local-env)
+        source ./hack/upgrade-sbo-env.sh
+        if [ "$(echo -e $CLONEREFS_OPTIONS | jq -r '.refs[] | select(.org == "openshift").repo')" == "release" ]; then
+          OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:upgrade-index;
+        else
+          OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:8}-index;
+        fi;
+        make -k VERBOSE=2 TEST_ACCEPTANCE_START_SBO=scenarios OPERATOR_INDEX_IMAGE_REF=$OPERATOR_INDEX_IMAGE_REF CATSRC_NAME=sbo-pr-checks SKIP_REGISTRY_LOGIN=true EXTRA_BEHAVE_ARGS="-k --tags=@upgrade-with-olm --tags=~@disable-openshift-4.9 --tags=~@disable-openshift-4.8+ --tags=~@disable-openshift-4.9+" -o registry-login test-acceptance test-acceptance-artifacts
       from: src
       resources:
         requests:

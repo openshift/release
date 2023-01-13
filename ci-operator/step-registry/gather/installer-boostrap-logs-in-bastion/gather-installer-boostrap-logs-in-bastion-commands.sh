@@ -101,6 +101,17 @@ run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "${installer_b
 # run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "${SHARED_DIR}/additional_trust_bundle" "/tmp/"
 # run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "export AWS_CA_BUNDLE=/tmp/additional_trust_bundle ; /tmp/openshift-install gather bootstrap --dir /tmp/installer 2> /tmp/gather.log"
 #
+
+# /tmp/installer/ may be synced via rsync tool, no user and group information, so set user and grou firstly
+cat > /tmp/chownership.sh << EOF
+#!/bin/bash
+usr=\$(id -u)
+grp=\$(id -g)
+sudo chown -R \${usr}:\${grp} /tmp/installer/
+EOF
+run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/chownership.sh" "/tmp/"
+run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "chmod +x /tmp/chownership.sh ; /tmp/chownership.sh"
+
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "rm -f /tmp/installer/metadata.json"
 
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/openshift-install gather bootstrap --dir /tmp/installer --log-level debug 2> /tmp/gather.log"

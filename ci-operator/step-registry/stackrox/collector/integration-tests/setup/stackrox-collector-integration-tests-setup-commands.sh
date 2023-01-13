@@ -6,4 +6,8 @@ source .openshift-ci/jobs/integration-tests/env.sh
 
 .openshift-ci/scripts/gcloud-init.sh
 
-make -C ansible BUILD_TYPE=ci integration-tests-setup integration-tests-provision
+if [[ "${BENCHMARK_ONLY}" == "true" ]]; then
+    make -C ansible BUILD_TYPE=ci create-benchmark-vms
+else
+    make -C ansible BUILD_TYPE=ci create-vms
+fi

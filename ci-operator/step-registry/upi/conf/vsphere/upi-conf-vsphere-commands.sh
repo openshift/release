@@ -71,7 +71,7 @@ vm_template="${ova_url##*/}"
 
 
 # select a hardware version for testing
-hw_versions=(13 15 17 19)
+hw_versions=(15 17 19)
 hw_available_versions=${#hw_versions[@]}
 selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
 target_hw_version=${hw_versions[$selected_hw_version_index]}

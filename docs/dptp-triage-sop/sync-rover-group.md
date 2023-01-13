@@ -20,7 +20,7 @@ The existing Rover groups are referred there to give them the permissions.
 |------------------------------------------------------------------------------------------------------------------|-------------------------|------------------------------------------------------------------------|
 | [test-platform-ci-admins](https://rover.redhat.com/groups/group/test-platform-ci-admins)                         | test-platform-ci-admins | sudoers on all CI clusters                                             |
 | [test-platform-ci-sudoers](https://rover.redhat.com/groups/group/test-platform-ci-sudoers)                       | ci-sudoers              | sudoers on build01, build02, arm01                                     |
-| [test-platform-ci-monitoring-viewers](https://rover.redhat.com/groups/group/test-platform-ci-monitoring-viewers) | ci-monitoring-viewers   | viewers of openshift-monitoring and prow-monitoring on all CI clusters |
+| [test-platform-ci-monitoring-viewers](https://rover.redhat.com/groups/group/test-platform-ci-monitoring-viewers) | ci-monitoring-viewers   | viewers of openshift-monitoring on all CI clusters |
 
 In theory, no groups except `test-platform-ci-admins` should be owned by the TP team.
 In reality, the groups `ci-sudoers` and `ci-monitoring-viewers` are there on the clusters before the support of Rover groups. The members are from different OCP teams.

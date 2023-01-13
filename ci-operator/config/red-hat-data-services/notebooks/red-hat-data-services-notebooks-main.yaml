@@ -15,6 +15,10 @@ images:
   dockerfile_path: Dockerfile
   from: jupyter-minimal-ubi8-python-3.8
   to: jupyter-datascience-ubi8-python-3.8
+- context_dir: jupyter/pytorch/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi8-python-3.8
+  to: jupyter-pytorch-ubi8-python-3.8
 - context_dir: cuda/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: base-ubi8-python-3.8
@@ -27,10 +31,6 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-jupyter-minimal-ubi8-python-3.8
   to: cuda-jupyter-datascience-ubi8-python-3.8
-- context_dir: jupyter/pytorch/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: cuda-jupyter-datascience-ubi8-python-3.8
-  to: cuda-jupyter-pytorch-ubi8-python-3.8
 - context_dir: jupyter/tensorflow/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: cuda-jupyter-datascience-ubi8-python-3.8
@@ -62,6 +62,15 @@ tests:
       IMAGE_REPO: odh-generic-data-science-notebook
       RELEASE_VERSION: v1
     workflow: red-hat-data-services-ci-image-mirror
+- as: notebook-jupyter-pytorch-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-pytorch-ubi8-python-3.8
+    env:
+      IMAGE_REPO: odh-pytorch-notebook
+      RELEASE_VERSION: v1
+    workflow: red-hat-data-services-ci-image-mirror
 - as: notebook-cuda-jupyter-minimal-ubi8-python-3-8-image-mirror
   postsubmit: true
   steps:
@@ -70,15 +79,6 @@ tests:
     env:
       IMAGE_REPO: cuda-notebooks
       RELEASE_VERSION: cuda-jupyter-minimal-ubi8-python-3.8
-    workflow: red-hat-data-services-ci-image-mirror
-- as: notebook-cuda-jupyter-pytorch-ubi8-python-3-8-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cuda-jupyter-pytorch-ubi8-python-3.8
-    env:
-      IMAGE_REPO: cuda-notebooks
-      RELEASE_VERSION: cuda-jupyter-pytorch-ubi8-python-3.8
     workflow: red-hat-data-services-ci-image-mirror
 - as: notebook-cuda-jupyter-tf-ubi8-python-3-8-image-mirror
   postsubmit: true

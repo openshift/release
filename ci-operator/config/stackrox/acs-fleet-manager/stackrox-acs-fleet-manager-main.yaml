@@ -3,28 +3,37 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  cli:
-    name: "4.11"
-    namespace: ocp
-    tag: cli
-binary_build_commands: GOARGS="-mod=mod" make binary
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
 build_root:
-  project_image:
-    dockerfile_path: .openshift-ci/build-root/Dockerfile
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
   use_build_cache: true
 images:
-- dockerfile_literal: |-
-    FROM bin AS builder
-    FROM registry.access.redhat.com/ubi8-minimal:8.6
-    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleet-manager /usr/local/bin/
-    COPY --from=builder /go/src/github.com/stackrox/acs-fleet-manager/fleetshard-sync /usr/local/bin/
-    WORKDIR /
-  from: base
+- dockerfile_path: Dockerfile
   inputs:
-    bin:
+    openshift_release_golang-1.18:
       as:
-      - bin
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+    src:
+      paths:
+      - destination_dir: ./
+        source_path: /go/src/github.com/stackrox/acs-fleet-manager/.
   to: acs-fleet-manager
+- dockerfile_path: .openshift-ci/e2e-runtime/Dockerfile
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+    src:
+      paths:
+      - destination_dir: ./
+        source_path: /go/src/github.com/stackrox/acs-fleet-manager/.
+  to: e2e-runtime
 releases:
   initial:
     integration:
@@ -67,7 +76,7 @@ tests:
       dependencies:
       - env: FLEET_MANAGER_IMAGE
         name: acs-fleet-manager
-      from: bin
+      from: e2e-runtime
       resources:
         requests:
           cpu: 2000m
@@ -96,7 +105,7 @@ tests:
       dependencies:
       - env: FLEET_MANAGER_IMAGE
         name: acs-fleet-manager
-      from: bin
+      from: base
       resources:
         requests:
           cpu: 100m

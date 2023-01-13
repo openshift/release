@@ -257,6 +257,9 @@ secret_configs:
   - cluster: app.ci
     name: ci-slack-api-url
     namespace: ci
+  - cluster: hive
+    name: ci-slack-api-url
+    namespace: hive
 - from:
     integration_key:
       field: integration_key
@@ -268,6 +271,14 @@ secret_configs:
   - cluster: app.ci
     name: pagerduty
     namespace: ci
+- from:
+    integration_key:
+      field: integration_key
+      item: pagerduty
+  to:
+  - cluster: hive
+    name: pagerduty
+    namespace: hive
 - from:
     config.json:
       field: client-configuration
@@ -866,6 +877,10 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-aws-1-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-sd-qe
     namespace: ci
 - from:
     pull-secret:
@@ -1903,6 +1918,10 @@ secret_configs:
     - non_app_ci
     name: cluster-secrets-azure-arm64-qe
     namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-azurestack-qe
+    namespace: ci
 - from:
     osServicePrincipal.json:
       field: osServicePrincipal.json
@@ -2090,6 +2109,18 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: hive-hive-credentials
+    namespace: test-credentials
+- from:
+    kubeconfig:
+      field: sa.hypershift-workload.hive.config
+      item: build_farm
+    sa.hypershift-workload.hive.token.txt:
+      field: sa.hypershift-workload.hive.token.txt
+      item: build_farm
+  to:
+  - cluster_groups:
+    - build_farm
+    name: hypershift-workload-credentials
     namespace: test-credentials
 - from:
     ci.htpasswd:
@@ -2842,20 +2873,12 @@ secret_configs:
     name: github-ldap-user-group-creator
     namespace: ci
 - from:
-    prometheus-k8s-basic-auth-password:
-      field: prometheus-k8s-basic-auth-password
-      item: app-ci-openshift-monitoring-credentials
+    sa.prometheus-user-workload.app.ci.token.txt:
+      field: sa.prometheus-user-workload.app.ci.token.txt
+      item: app-ci-openshift-user-workload-monitoring-credentials
   to:
   - cluster: app.ci
-    name: app-ci-openshift-monitoring-credentials
-    namespace: ci
-- from:
-    hive-openshift-monitoring-ci-token:
-      field: hive-openshift-monitoring-ci-token
-      item: hive-openshift-monitoring-credentials
-  to:
-  - cluster: app.ci
-    name: hive-openshift-monitoring-credentials
+    name: app-ci-openshift-user-workload-monitoring-credentials
     namespace: ci
 - from:
     token:
@@ -2923,28 +2946,6 @@ secret_configs:
   - cluster: build01
     name: cert-issuer
     namespace: cert-manager
-- from:
-    ci.htpasswd:
-      field: ci.htpasswd
-      item: prow-monitoring
-  to:
-  - cluster: app.ci
-    name: prometheus-auth-htpasswd
-    namespace: prow-monitoring
-- from:
-    password:
-      field: prometheus-prow-basic-auth-password
-      item: prow-monitoring
-    username:
-      field: prometheus-prow-basic-auth-username
-      item: prow-monitoring
-  to:
-  - cluster: app.ci
-    name: prometheus-auth-credentials
-    namespace: prow-monitoring
-  - cluster: app.ci
-    name: prometheus-auth-credentials
-    namespace: ci
 - from:
     service-account.json:
       field: service-account.json
@@ -3549,6 +3550,14 @@ secret_configs:
   - cluster: app.ci
     name: art-secret
     namespace: dex
+- from:
+    .env:
+      field: .env
+      item: bookstack
+  to:
+  - cluster: app.ci
+    name: bookstack
+    namespace: ci
 - from:
     clientSecret:
       field: build02-secret
@@ -4282,6 +4291,59 @@ secret_configs:
     - osd_global_pull_secret
     name: pull-secret
     namespace: openshift-config
+- from:
+    OPENSHIFT_MONITORING_CI_TOKEN:
+      field: sa.ci-monitoring.app.ci.token.txt
+      item: openshift-monitoring-credentials
+    OPENSHIFT_MONITORING_CI_TOKEN_ON_HIVE:
+      field: sa.ci-monitoring.hive.token.txt
+      item: openshift-monitoring-credentials
+    PROMETHEUS_USER_WORKLOAD_TOKEN:
+      field: sa.prometheus-user-workload.app.ci.token.txt
+      item: app-ci-openshift-user-workload-monitoring-credentials
+  to:
+  - cluster: app.ci
+    name: external-credentials
+    namespace: ci-grafana
+- from:
+    insights-live.yaml:
+      field: insights-live.yaml
+      item: insights-ci-account
+    ops-mirror.pem:
+      field: cert-key.pem
+      item: mirror.openshift.com
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: jenkins-ci-iam
+    ssh-publickey:
+      field: ssh-publickey
+      item: jenkins-ci-iam
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-virtualization
+    namespace: ci
 user_secrets_target_clusters:
 - app.ci
 - arm01

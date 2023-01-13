@@ -23,6 +23,7 @@ if [[ ! -r "${GITHUB_TOKEN_FILE}" ]]; then
     exit 1
 fi
 GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
+log "$(sha512sum <<<"${GITHUB_TOKEN}")"
 COMPONENT_REPO="github.com/${REPO_OWNER}/${REPO_NAME}"
 {
     echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@${COMPONENT_REPO}.git"

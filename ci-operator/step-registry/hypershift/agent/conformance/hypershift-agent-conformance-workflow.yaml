@@ -1,0 +1,30 @@
+workflow:
+  as: hypershift-agent-conformance
+  documentation: |-
+    The HyperShift agent conformance workflow executes tests against a new ephemeral
+  steps:
+    allow_best_effort_post_steps: true
+    allow_skip_on_success: true
+    post:
+    - chain: hypershift-agent-destroy
+    - ref: assisted-baremetal-operator-gather
+    - ref: baremetalds-packet-gather-metadata
+    - chain: baremetalds-ipi-post
+    test:
+    - chain: hypershift-conformance
+    pre:
+    - chain: assisted-baremetal-operator
+    - chain: hypershift-install
+    - chain: hypershift-agent-create
+    env:
+      PACKET_PLAN: "m3.large.x86"
+      USER_DATA_FILENAME: "user-data"
+      DISCONNECTED: "false"
+      NUM_EXTRA_WORKERS: "3"
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        EXTRA_WORKER_VCPU=8
+        EXTRA_WORKER_MEMORY=16384
+        EXTRA_WORKER_DISK=100
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=True

@@ -290,6 +290,26 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-rosa-stage
     name: osde2e-rosa-stage
+- as: rosa-stage-e2e-sts
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="rosa,e2e-suite"
+    export ROSA_ENV="stage"
+    export ROSA_STS="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-rosa-stage
+    name: osde2e-rosa-stage
 - as: aws-stage-e2e-default
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -393,6 +413,26 @@ tests:
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="rosa,e2e-suite"
     export ROSA_ENV="prod"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-prod"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-rosa-prod
+    name: osde2e-rosa-prod
+- as: rosa-prod-e2e-sts
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="rosa,e2e-suite"
+    export ROSA_ENV="prod"
+    export ROSA_STS="true"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-prod"
 
     /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}

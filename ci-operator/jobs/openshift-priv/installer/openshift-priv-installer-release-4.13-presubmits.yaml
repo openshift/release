@@ -5,7 +5,65 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
+    context: ci/prow/agent-integration-tests
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-installer-release-4.13-agent-integration-tests
+    path_alias: github.com/openshift/installer
+    rerun_command: /test agent-integration-tests
+    run_if_changed: /agent/
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --target=agent-integration-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )agent-integration-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build03
     context: ci/prow/aro-unit
     decorate: true
     decoration_config:
@@ -64,12 +122,13 @@ presubmits:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build05
-    context: ci/prow/e2e-agent-compact
+    context: ci/prow/e2e-agent-compact-ipv4
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -77,10 +136,10 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.13-e2e-agent-compact
+    name: pull-ci-openshift-priv-installer-release-4.13-e2e-agent-compact-ipv4
     path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-agent-compact
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    rerun_command: /test e2e-agent-compact-ipv4
+    run_if_changed: /agent/
     spec:
       containers:
       - args:
@@ -90,8 +149,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agent-compact-cluster-profile
-        - --target=e2e-agent-compact
+        - --secret-dir=/usr/local/e2e-agent-compact-ipv4-cluster-profile
+        - --target=e2e-agent-compact-ipv4
         command:
         - ci-operator
         image: ci-operator:latest
@@ -107,7 +166,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agent-compact-cluster-profile
+        - mountPath: /usr/local/e2e-agent-compact-ipv4-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -141,19 +200,20 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agent-compact,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agent-compact-ipv4,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build05
-    context: ci/prow/e2e-agent-mce
+    context: ci/prow/e2e-agent-ha-dualstack
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -161,10 +221,10 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.13-e2e-agent-mce
+    name: pull-ci-openshift-priv-installer-release-4.13-e2e-agent-ha-dualstack
     optional: true
     path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-agent-mce
+    rerun_command: /test e2e-agent-ha-dualstack
     skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
       containers:
@@ -175,8 +235,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agent-mce-cluster-profile
-        - --target=e2e-agent-mce
+        - --secret-dir=/usr/local/e2e-agent-ha-dualstack-cluster-profile
+        - --target=e2e-agent-ha-dualstack
         command:
         - ci-operator
         image: ci-operator:latest
@@ -192,7 +252,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agent-mce-cluster-profile
+        - mountPath: /usr/local/e2e-agent-ha-dualstack-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -226,19 +286,20 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agent-mce,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agent-ha-dualstack,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build05
-    context: ci/prow/e2e-agent-sno
+    context: ci/prow/e2e-agent-sno-ipv6
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -246,11 +307,11 @@ presubmits:
       ci-operator.openshift.io/cluster: build05
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.13-e2e-agent-sno
+    name: pull-ci-openshift-priv-installer-release-4.13-e2e-agent-sno-ipv6
     optional: true
     path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-agent-sno
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    rerun_command: /test e2e-agent-sno-ipv6
+    run_if_changed: /agent/
     spec:
       containers:
       - args:
@@ -260,8 +321,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-agent-sno-cluster-profile
-        - --target=e2e-agent-sno
+        - --secret-dir=/usr/local/e2e-agent-sno-ipv6-cluster-profile
+        - --target=e2e-agent-sno-ipv6
         command:
         - ci-operator
         image: ci-operator:latest
@@ -277,7 +338,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-agent-sno-cluster-profile
+        - mountPath: /usr/local/e2e-agent-sno-ipv6-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -311,19 +372,20 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-agent-sno,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-agent-sno-ipv6,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-alibaba
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: alibabacloud
@@ -408,6 +470,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -491,6 +554,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -574,6 +638,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -658,6 +723,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -742,6 +808,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -826,6 +893,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -910,6 +978,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -994,6 +1063,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -1077,6 +1147,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -1160,6 +1231,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -1243,6 +1315,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: aws
@@ -1319,13 +1392,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
@@ -1335,7 +1409,7 @@ presubmits:
     name: pull-ci-openshift-priv-installer-release-4.13-e2e-azure-ovn
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-azure-ovn
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    run_if_changed: azure
     spec:
       containers:
       - args:
@@ -1402,13 +1476,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-resourcegroup
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
@@ -1486,13 +1561,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-shared-vpc
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
@@ -1570,13 +1646,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-upi
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azure4
@@ -1653,13 +1730,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azurestack
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azurestack
@@ -1737,13 +1815,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azurestack-upi
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: azurestack
@@ -1828,6 +1907,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -1916,6 +1996,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -1925,7 +2006,7 @@ presubmits:
     name: pull-ci-openshift-priv-installer-release-4.13-e2e-gcp-ovn
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-gcp-ovn
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    run_if_changed: gcp
     spec:
       containers:
       - args:
@@ -2003,6 +2084,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -2091,6 +2173,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -2178,6 +2261,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -2265,6 +2349,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -2346,13 +2431,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-ibmcloud-ovn
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: ibmcloud
@@ -2363,7 +2449,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-ibmcloud-ovn
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    run_if_changed: ibmcloud
     spec:
       containers:
       - args:
@@ -2437,6 +2523,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: gcp
@@ -2447,7 +2534,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-libvirt
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
+    run_if_changed: libvirt
     spec:
       containers:
       - args:
@@ -2518,13 +2605,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
@@ -2535,7 +2623,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-metal-assisted
-    skip_if_only_changed: (^(docs|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    run_if_changed: (baremetal|metal3|ironic)
     spec:
       containers:
       - args:
@@ -2609,6 +2697,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2620,7 +2709,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-metal-ipi-ovn-dualstack
-    run_if_changed: (baremetal|metal3-io)
+    run_if_changed: (baremetal|metal3|ironic)
     spec:
       containers:
       - args:
@@ -2694,6 +2783,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2704,7 +2794,7 @@ presubmits:
     name: pull-ci-openshift-priv-installer-release-4.13-e2e-metal-ipi-ovn-ipv6
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-metal-ipi-ovn-ipv6
-    run_if_changed: (baremetal|metal3-io)
+    run_if_changed: (baremetal|metal3|ironic)
     spec:
       containers:
       - args:
@@ -2778,6 +2868,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2789,7 +2880,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-metal-ipi-sdn
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+    run_if_changed: (baremetal|metal3|ironic)
     spec:
       containers:
       - args:
@@ -2863,6 +2954,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2874,7 +2966,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-metal-ipi-sdn-swapped-hosts
-    run_if_changed: (baremetal|metal3-io)
+    run_if_changed: (baremetal|metal3|ironic)
     spec:
       containers:
       - args:
@@ -2948,6 +3040,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
@@ -2959,7 +3052,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-metal-ipi-sdn-virtualmedia
-    run_if_changed: (baremetal|metal3-io)
+    run_if_changed: (baremetal|metal3|ironic)
     spec:
       containers:
       - args:
@@ -3026,13 +3119,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
@@ -3043,7 +3137,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-metal-single-node-live-iso
-    run_if_changed: (baremetal|metal3-io)
+    run_if_changed: (baremetal|metal3|ironic)
     spec:
       containers:
       - args:
@@ -3110,24 +3204,26 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
-    context: ci/prow/e2e-openstack
+    cluster: build01
+    context: ci/prow/e2e-nutanix-ovn
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
-      ci-operator.openshift.io/cloud: openstack-vexxhost
-      ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
+      ci-operator.openshift.io/cloud: nutanix
+      ci-operator.openshift.io/cloud-cluster-profile: nutanix
+      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.13-e2e-openstack
+    name: pull-ci-openshift-priv-installer-release-4.13-e2e-nutanix-ovn
     optional: true
     path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-openstack
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|ovirt|powervs|vsphere)/)
+    rerun_command: /test e2e-nutanix-ovn
+    run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
     spec:
       containers:
       - args:
@@ -3137,8 +3233,8 @@ presubmits:
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-openstack-cluster-profile
-        - --target=e2e-openstack
+        - --secret-dir=/usr/local/e2e-nutanix-ovn-cluster-profile
+        - --target=e2e-nutanix-ovn
         command:
         - ci-operator
         image: ci-operator:latest
@@ -3154,7 +3250,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-openstack-cluster-profile
+        - mountPath: /usr/local/e2e-nutanix-ovn-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -3181,26 +3277,113 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
-          secretName: cluster-secrets-openstack-vexxhost
+          secretName: cluster-secrets-nutanix
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-nutanix-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build01
+    context: ci/prow/e2e-nutanix-sdn
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: nutanix
+      ci-operator.openshift.io/cloud-cluster-profile: nutanix
+      ci-operator.openshift.io/cluster: build01
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-installer-release-4.13-e2e-nutanix-sdn
+    optional: true
+    path_alias: github.com/openshift/installer
+    rerun_command: /test e2e-nutanix-sdn
+    run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-nutanix-sdn-cluster-profile
+        - --target=e2e-nutanix-sdn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-nutanix-sdn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-nutanix
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-nutanix-sdn,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build03
     context: ci/prow/e2e-openstack-kuryr
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: openstack-kuryr
@@ -3278,13 +3461,98 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
+    context: ci/prow/e2e-openstack-ovn
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: openstack-vexxhost
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-vexxhost
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-installer-release-4.13-e2e-openstack-ovn
+    path_alias: github.com/openshift/installer
+    rerun_command: /test e2e-openstack-ovn
+    run_if_changed: openstack|(^data/.*/rhcos\.json)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-openstack-ovn-cluster-profile
+        - --target=e2e-openstack-ovn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-openstack-vexxhost
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build03
     context: ci/prow/e2e-openstack-proxy
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: openstack-vh-mecha-central
@@ -3362,13 +3630,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-openstack-sdn-parallel
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
@@ -3446,13 +3715,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-openstack-upi
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
@@ -3530,13 +3800,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-ovirt-sdn
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: ovirt
@@ -3547,7 +3818,7 @@ presubmits:
     optional: true
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-ovirt-sdn
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere)/)
+    run_if_changed: ovirt
     spec:
       containers:
       - args:
@@ -3618,91 +3889,6 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build01
-    context: ci/prow/e2e-sdn-nutanix
-    decorate: true
-    decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
-    labels:
-      ci-operator.openshift.io/cloud: nutanix
-      ci-operator.openshift.io/cloud-cluster-profile: nutanix
-      ci-operator.openshift.io/cluster: build01
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-installer-release-4.13-e2e-sdn-nutanix
-    optional: true
-    path_alias: github.com/openshift/installer
-    rerun_command: /test e2e-sdn-nutanix
-    run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-sdn-nutanix-cluster-profile
-        - --target=e2e-sdn-nutanix
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-sdn-nutanix-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-nutanix
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-sdn-nutanix,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
     cluster: vsphere
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
@@ -3710,6 +3896,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
@@ -3719,7 +3906,7 @@ presubmits:
     name: pull-ci-openshift-priv-installer-release-4.13-e2e-vsphere-ovn
     path_alias: github.com/openshift/installer
     rerun_command: /test e2e-vsphere-ovn
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs)/)
+    run_if_changed: vsphere
     spec:
       containers:
       - args:
@@ -3793,6 +3980,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
@@ -3876,6 +4064,7 @@ presubmits:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
@@ -3952,7 +4141,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -4010,7 +4199,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -4068,7 +4257,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -4126,7 +4315,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -4183,13 +4372,14 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/openstack-manifests
     decorate: true
     decoration_config:
       oauth_token_secret:
         key: oauth
         name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
     hidden: true
     labels:
       ci-operator.openshift.io/cloud: openstack-vexxhost
@@ -4266,7 +4456,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -4324,7 +4514,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/verify-codegen
     decorate: true
     decoration_config:
@@ -4381,7 +4571,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:

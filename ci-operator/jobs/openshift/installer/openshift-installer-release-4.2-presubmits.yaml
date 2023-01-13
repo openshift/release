@@ -76,7 +76,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
@@ -232,7 +232,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-upgrade,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
@@ -316,7 +316,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -468,163 +468,6 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
-    context: ci/prow/e2e-openstack
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.2-e2e-openstack
-    optional: true
-    rerun_command: /test e2e-openstack
-    skip_if_only_changed: ^docs/
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-openstack-cluster-profile
-        - --target=e2e-openstack
-        - --template=/usr/local/e2e-openstack
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: openstack
-        - name: JOB_NAME_SAFE
-          value: e2e-openstack
-        - name: KURYR_ENABLED
-          value: "false"
-        - name: TEST_COMMAND
-          value: run-minimal-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openstack-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-openstack
-          name: job-definition
-          subPath: cluster-launch-installer-openstack-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack
-      - configMap:
-          name: prow-job-cluster-launch-installer-openstack-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-    trigger: (?m)^/test( | .* )e2e-openstack,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.2$
-    - ^release-4\.2-
-    cluster: build04
-    context: ci/prow/e2e-openstack-parallel
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.2-e2e-openstack-parallel
-    optional: true
-    rerun_command: /test e2e-openstack-parallel
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --give-pr-author-access-to-namespace=true
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --repo=installer
-        - --secret-dir=/usr/local/e2e-openstack-parallel-cluster-profile
-        - --target=e2e-openstack-parallel
-        - --template=/usr/local/e2e-openstack-parallel
-        command:
-        - ci-operator
-        env:
-        - name: CLUSTER_TYPE
-          value: openstack
-        - name: JOB_NAME_SAFE
-          value: e2e-openstack-parallel
-        - name: KURYR_ENABLED
-          value: "false"
-        - name: TEST_COMMAND
-          value: TEST_SUITE=openshift/conformance/parallel run-tests
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openstack-parallel-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-openstack-parallel
-          name: job-definition
-          subPath: cluster-launch-installer-openstack-e2e.yaml
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-openstack
-      - configMap:
-          name: prow-job-cluster-launch-installer-openstack-e2e
-        name: job-definition
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-    trigger: (?m)^/test( | .* )e2e-openstack-parallel,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.2$
-    - ^release-4\.2-
     cluster: vsphere
     context: ci/prow/e2e-vsphere
     decorate: true
@@ -700,7 +543,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -749,7 +592,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -798,7 +641,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -847,7 +690,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -897,7 +740,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -925,7 +768,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -954,7 +797,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -982,7 +825,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1031,7 +874,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:
@@ -1080,7 +923,7 @@ presubmits:
     branches:
     - ^release-4\.2$
     - ^release-4\.2-
-    cluster: build04
+    cluster: build02
     context: ci/prow/yaml-lint
     decorate: true
     labels:

@@ -1,0 +1,21 @@
+workflow:
+  as: hypershift-hostedcluster-workflow
+  documentation: |-
+    The HyperShift hive workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    This workflow uses a shared HyperShift management cluster run by the Test Platform team.
+
+    OpenShift versions supported by this workflow are 4.12.x.
+    OpenShift 4.13.x are not supported and will cause hypershift-aws-create to stall
+
+  steps:
+    pre:
+    - ref: openshift-cluster-bot-rbac
+    - chain: hypershift-hostedcluster-create
+    post:
+    - chain: hypershift-hostedcluster-destroy

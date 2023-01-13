@@ -60,9 +60,9 @@ metadata:
   labels:
     app: dptp-controller-manager
   name: dptp-controller-manager
-  namespace: prow-monitoring
+  namespace: ci
 spec:
-  # By default up{job="prow-monitoring/dptp-controller-manager"}.
+  # By default up{job="*/dptp-controller-manager"}.
   # We want up{job="dptp-controller-manager"} instead.
   jobLabel: app
   selector:
@@ -72,9 +72,6 @@ spec:
   - port: metrics
     scheme: http
     scrapeTimeout: 20s
-  namespaceSelector:
-    matchNames:
-    - ci
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -105,11 +102,11 @@ spec:
         - --branch=master
         - --root=/tmp/git-sync
         - --one-time=true
-        - --depth 1
+        - --depth=1
         env:
         - name: GIT_SYNC_DEST
           value: release
-        image: gcr.io/google_containers/git-sync:v3.1.6
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -126,7 +123,7 @@ spec:
         env:
         - name: GIT_SYNC_DEST
           value: release
-        image: gcr.io/google_containers/git-sync:v3.1.6
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
         volumeMounts:
         - name: release
           mountPath: /tmp/git-sync
@@ -163,6 +160,8 @@ spec:
         - --enable-controller=serviceaccount_secret_refresher
         - --serviceAccountRefresherOptions.enabled-namespace=ci
         - --serviceAccountRefresherOptions.enabled-namespace=bparees
+        - --serviceAccountRefresherOptions.ignore-service-account=ci/config-updater
+        - --serviceAccountRefresherOptions.ignore-service-account=ci/sync-rover-groups-updater
         - --serviceAccountRefresherOptions.remove-old-secrets=true
         - --enable-controller=testimagestreamimportcleaner
         - --dry-run=false

@@ -3,10 +3,6 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -53,39 +49,7 @@ images:
   to: src-oc
 - context_dir: .
   from: ubi_minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - golang:1.18
   to: volsync
-- context_dir: mover-rclone
-  from: ubi_minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - golang:1.18
-  to: volsync-mover-rclone
-- context_dir: mover-restic
-  from: ubi_minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - golang:1.18
-  to: volsync-mover-restic
-- context_dir: mover-rsync
-  from: ubi_minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - golang:1.18
-  to: volsync-mover-rsync
-- context_dir: mover-syncthing
-  from: ubi_minimal
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - golang:1.18
-  to: volsync-mover-syncthing
 operator:
   bundles:
   - as: volsync-bundle
@@ -96,21 +60,9 @@ operator:
   substitutions:
   - pullspec: quay.io/backube/volsync:latest
     with: pipeline:volsync
-  - pullspec: quay.io/backube/volsync-mover-rclone:latest
-    with: pipeline:volsync-mover-rclone
-  - pullspec: quay.io/backube/volsync-mover-restic:latest
-    with: pipeline:volsync-mover-restic
-  - pullspec: quay.io/backube/volsync-mover-rsync:latest
-    with: pipeline:volsync-mover-rsync
-  - pullspec: quay.io/backube/volsync-mover-syncthing:latest
-    with: pipeline:volsync-mover-syncthing
 promotion:
   additional_images:
     volsync: volsync
-    volsync-mover-rclone: volsync-mover-rclone
-    volsync-mover-restic: volsync-mover-restic
-    volsync-mover-rsync: volsync-mover-rsync
-    volsync-mover-syncthing: volsync-mover-syncthing
   namespace: volsync
   tag: latest
 releases:
@@ -242,10 +194,11 @@ tests:
         helm upgrade --install --create-namespace -n volsync-system \
           --debug \
           --set image.image=${VOLSYNC_OPERATOR} \
-          --set rclone.image=${MOVER_RCLONE} \
-          --set restic.image=${MOVER_RESTIC} \
-          --set rsync.image=${MOVER_RSYNC} \
-          --set syncthing.image=${MOVER_SYNCTHING} \
+          --set rclone.image=${VOLSYNC_OPERATOR} \
+          --set restic.image=${VOLSYNC_OPERATOR} \
+          --set rsync.image=${VOLSYNC_OPERATOR} \
+          --set rsync-tls.image=${VOLSYNC_OPERATOR} \
+          --set syncthing.image=${VOLSYNC_OPERATOR} \
           --set metrics.disableAuth=true \
           --wait --timeout=5m \
           volsync ./helm/volsync
@@ -262,14 +215,6 @@ tests:
       dependencies:
       - env: VOLSYNC_OPERATOR
         name: volsync
-      - env: MOVER_RSYNC
-        name: volsync-mover-rsync
-      - env: MOVER_RCLONE
-        name: volsync-mover-rclone
-      - env: MOVER_RESTIC
-        name: volsync-mover-restic
-      - env: MOVER_SYNCTHING
-        name: volsync-mover-syncthing
       from: src-oc
       resources:
         requests:

@@ -134,7 +134,12 @@ fi
 arch_instance_type=$(echo -n "${CONTROL_PLANE_INSTANCE_TYPE}" | cut -d . -f 1)
 BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 
-workers=3
+workers=${COMPUTE_NODE_REPLICAS:-3}
+if [[ "${COMPUTE_NODE_REPLICAS}" -le 0 ]]; then
+    workers=0
+elif [[ "${COMPUTE_NODE_REPLICAS}" -gt 5 ]]; then
+    workers=5
+fi
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
 fi
@@ -190,6 +195,7 @@ fi
 
 echo "Using control plane instance type: ${CONTROL_PLANE_INSTANCE_TYPE}"
 echo "Using compute instance type: ${COMPUTE_NODE_TYPE}"
+echo "Using compute node replicas: ${workers}"
 
 PATCH="${SHARED_DIR}/install-config-common.yaml.patch"
 cat > "${PATCH}" << EOF

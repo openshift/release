@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   cli:
@@ -28,13 +28,9 @@ base_images:
     namespace: ocp
     tag: cli
   cluster-api-provider-agent:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: cluster-api-provider-agent
-  coreos_centos_stream9:
-    name: stream9
-    namespace: coreos
-    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -43,10 +39,6 @@ base_images:
     name: edge-infrastructure-swagger-codegen-cli
     namespace: ci
     tag: 2.4.18
-  goswagger_swagger:
-    name: goswagger-swagger
-    namespace: ci
-    tag: v0.28.0
   hypershift-operator:
     name: "4.12"
     namespace: ocp
@@ -64,9 +56,6 @@ build_root:
 images:
 - dockerfile_path: ci-images/Dockerfile.base
   inputs:
-    coreos_centos_stream9:
-      as:
-      - quay.io/centos/centos:stream9
     openshift_release_golang-1.18:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
@@ -86,19 +75,12 @@ images:
   to: assisted-service-subsystem
 - dockerfile_path: ci-images/Dockerfile.code-generation
   from: assisted-service-base
-  inputs:
-    goswagger_swagger:
-      as:
-      - quay.io/goswagger/swagger:v0.28.0
   to: assisted-service-generate
 - dockerfile_path: Dockerfile.assisted-service-build
   inputs:
     edge_infrastructure_swagger_codegen_cli:
       as:
       - quay.io/edge-infrastructure/swagger-codegen-cli:2.4.18
-    goswagger_swagger:
-      as:
-      - quay.io/goswagger/swagger:v0.28.0
     openshift_release_golang-1.18:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
@@ -148,7 +130,7 @@ operator:
   - pullspec: quay.io/centos7/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
-  name: ocm-2.7
+  name: ocm-2.8
   namespace: edge-infrastructure
 releases:
   candidate-4-11:
@@ -732,6 +714,16 @@ tests:
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-hypershift
+- as: e2e-ai-operator-ztp-converged
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ALLOW_CONVERGED_FLOW: "True"
+    workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-tpmv2
   optional: true
   steps:
@@ -956,6 +948,15 @@ tests:
         export HOLD_INSTALLATION=true
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
         make deploy_assisted_operator test_kube_api_parallel
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-upgrade-agent
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST=./src/tests/test_upgrade_agent.py
+        TEST_FUNC=test_upgrade_agent
     workflow: assisted-baremetal
 - as: e2e-vsphere-assisted
   optional: true

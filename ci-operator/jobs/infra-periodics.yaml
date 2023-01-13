@@ -224,7 +224,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -266,7 +266,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -308,7 +308,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -350,7 +350,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -425,7 +425,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -471,7 +471,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -517,7 +517,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -567,7 +567,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -617,7 +617,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -666,7 +666,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -715,7 +715,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/commenter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -768,7 +768,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/label_sync:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/label_sync:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1071,7 +1071,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: gcr.io/k8s-prow/generic-autobumper:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/generic-autobumper:v20230113-8f2ffbe0d4
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1158,14 +1158,13 @@ periodics:
       - --config-path=./core-services/sanitize-prow-jobs/_config.yaml
       - --prow-jobs-dir=./ci-operator/jobs
       - --self-approve=true
-      - --prometheus-username=ci
-      - --prometheus-password-path=/etc/prometheus/password
+      - --prometheus-bearer-token-path=/etc/prometheus/token
       - --create-pr=true
       command:
       - /usr/bin/prow-job-dispatcher
       image: registry.ci.openshift.org/ci/prow-job-dispatcher:latest
       imagePullPolicy: Always
-      name: auto-config-brancher
+      name: auto-prow-job-dispatcher
       resources:
         requests:
           cpu: 500m
@@ -1180,9 +1179,9 @@ periodics:
     - name: prometheus
       secret:
         items:
-        - key: password
-          path: password
-        secretName: prometheus-auth-credentials
+        - key: sa.prometheus-user-workload.app.ci.token.txt
+          path: token
+        secretName: app-ci-openshift-user-workload-monitoring-credentials
     - name: token
       secret:
         secretName: github-credentials-openshift-bot
@@ -1292,7 +1291,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: gcr.io/k8s-prow/branchprotector:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/branchprotector:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1346,7 +1345,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/branchprotector:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1403,7 +1402,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: gcr.io/k8s-prow/peribolos:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/peribolos:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1437,16 +1436,6 @@ periodics:
       command:
       - applyconfig
       env:
-      - name: OPENSHIFT_MONITORING_CI_TOKEN_ON_HIVE
-        valueFrom:
-          secretKeyRef:
-            key: hive-openshift-monitoring-ci-token
-            name: hive-openshift-monitoring-credentials
-      - name: OPENSHIFT_PROMETHEUS_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            key: prometheus-k8s-basic-auth-password
-            name: app-ci-openshift-monitoring-credentials
       - name: SLACK_API_URL
         valueFrom:
           secretKeyRef:
@@ -1482,7 +1471,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: gcr.io/k8s-prow/config-bootstrapper:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/config-bootstrapper:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1800,7 +1789,7 @@ periodics:
         log: text/plain
     gcs_credentials_secret: gce-sa-credentials-gcs-private
   hidden: true
-  interval: 10m
+  interval: 30m
   labels:
     ci.openshift.io/role: infra-internal
   name: periodic-ci-secret-bootstrap
@@ -2060,7 +2049,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/invitations-accepter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2092,7 +2081,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/invitations-accepter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2124,7 +2113,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20221123-4b1eb2a191
+      image: gcr.io/k8s-prow/invitations-accepter:v20230113-8f2ffbe0d4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2206,8 +2195,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-image-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.7
-      - --future-release=ocm-2.7
+      - --current-release=ocm-2.8
+      - --future-release=ocm-2.8
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2251,8 +2240,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/cluster-api-provider-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.7
-      - --future-release=ocm-2.7
+      - --current-release=ocm-2.8
+      - --future-release=ocm-2.8
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2296,8 +2285,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.7
-      - --future-release=ocm-2.7
+      - --current-release=ocm-2.8
+      - --future-release=ocm-2.8
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2341,8 +2330,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-installer-agent
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.7
-      - --future-release=ocm-2.7
+      - --current-release=ocm-2.8
+      - --future-release=ocm-2.8
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2386,8 +2375,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-service
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.7
-      - --future-release=ocm-2.7
+      - --current-release=ocm-2.8
+      - --future-release=ocm-2.8
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot
@@ -2431,8 +2420,8 @@ periodics:
     - args:
       - --config-dir=./ci-operator/config/openshift/assisted-test-infra
       - --current-promotion-namespace=edge-infrastructure
-      - --current-release=ocm-2.7
-      - --future-release=ocm-2.7
+      - --current-release=ocm-2.8
+      - --future-release=ocm-2.8
       - --fast-forward
       - --confirm
       - --username=openshift-merge-robot

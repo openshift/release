@@ -7,6 +7,8 @@ set -o pipefail
 node_role=${APPLY_NODE_ROLE:=worker}
 max_cpu=8
 isolated_cpu=${COMPUTE_NODE_ISOLATED_CPU:-4}
+sched_rt_runtime_us=-1
+stalld_service="service.stalld=start,enable"
 gcp_pattern="[n|c|m|a]{1}[1-9]{1}d?-(standard|highcpu|highmem|highgpu){1}-([0-9]+)"
 
 # Currently RT is only supported on GCP
@@ -22,6 +24,13 @@ fi
 if [[ "$isolated_cpu" == "$max_cpu" ]]; then
   isolated_cpu=$(( max_cpu / 2))
   echo "max and isolated cpu are equal, setting isolated CPU to $isolated_cpu"
+fi
+
+if [ ${STALLD_ENABLED:="true"} != "true" ]
+then
+  echo "disabling stalld and setting default realtime timeout"
+  sched_rt_runtime_us=950000
+  stalld_service=""
 fi
 
 echo "Creating new realtime tuned profile on cluster"
@@ -48,6 +57,9 @@ spec:
       energy_perf_bias=performance
       min_perf_pct=100
 
+      [service]
+      $stalld_service
+
       [vm]
       transparent_hugepages=never
 
@@ -63,7 +75,7 @@ spec:
       [sysctl]
       kernel.hung_task_timeout_secs = 600
       kernel.nmi_watchdog = 0
-      kernel.sched_rt_runtime_us = 950000
+      kernel.sched_rt_runtime_us = $sched_rt_runtime_us
       kernel.timer_migration = 0
       kernel.numa_balancing=0
       net.core.busy_read=50

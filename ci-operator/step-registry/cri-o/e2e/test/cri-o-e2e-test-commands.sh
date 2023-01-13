@@ -26,7 +26,7 @@ cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
 cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
 
-latest="v3.5.5"
+latest=$(wget -q -O- https://api.github.com/repos/coreos/etcd/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
 if gcloud alpha storage ls gs://crio-ci | grep -q ${latest} ; then 
     echo "etcd is up to date"
 else 

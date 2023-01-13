@@ -1,0 +1,69 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.46.0
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN yum update -y && yum install -y python39 python39-pip
+    RUN alternatives --set python3 /usr/bin/python3.9
+    RUN pip3 install pre-commit
+  from: src
+  to: pre-commit-container
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: functional
+  commands: |
+    export GOFLAGS=
+    make gotest
+  container:
+    from: src
+- as: govet
+  commands: make govet
+  container:
+    from: src
+- as: golangci
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    golangci-lint run --verbose --timeout=5m0s
+  container:
+    clone: true
+    from: golangci-lint
+- as: golint
+  commands: make golint
+  container:
+    from: src
+- as: gofmt
+  commands: make gofmt || true
+  container:
+    from: src
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export GOFLAGS=
+    export PRE_COMMIT_HOME=/tmp
+    export GOLANGCI_LINT_CACHE=/tmp
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    pre-commit run --all-files --show-diff-on-failure
+  container:
+    from: pre-commit-container
+zz_generated_metadata:
+  branch: master
+  org: openstack-k8s-operators
+  repo: nova-operator

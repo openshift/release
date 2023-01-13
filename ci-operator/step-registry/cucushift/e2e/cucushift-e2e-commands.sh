@@ -42,7 +42,6 @@ echo "E2E_RUN_TAGS is '${E2E_RUN_TAGS}'"
 echo "E2E_SKIP_TAGS is '${E2E_SKIP_TAGS}'"
 
 cd verification-tests
-export BUSHSLICER_LOG_LEVEL=plain
 # run normal tests
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/normal"
 timestamp_start="$(date +%s)"

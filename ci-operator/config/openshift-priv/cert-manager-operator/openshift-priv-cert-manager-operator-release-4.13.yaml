@@ -34,10 +34,9 @@ images:
 operator:
   bundles:
   - as: cert-manager-operator-bundle
-    context_dir: bundle/
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: registry-proxy.engineering.redhat.com/rh-osbs/cert-manager-cert-manager-operator-rhel8:latest
+  - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
   - pullspec: quay.io/jetstack/cert-manager-controller:v1.9.1
     with: cert-manager-controller
@@ -77,7 +76,7 @@ tests:
     from: src
 - as: unit
   commands: |
-    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+    make test --warn-undefined-variables
   container:
     from: src
 - as: e2e-operator
@@ -86,10 +85,10 @@ tests:
     dependencies:
       OO_INDEX: ci-index-cert-manager-operator-bundle
     env:
-      OO_CHANNEL: tech-preview
-      OO_INSTALL_NAMESPACE: openshift-cert-manager-operator
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-marketplace
       OO_PACKAGE: cert-manager-operator
-      OO_TARGET_NAMESPACES: '!all'
+      OO_TARGET_NAMESPACES: '!install'
     test:
     - as: test
       cli: latest

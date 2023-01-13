@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -39,6 +39,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
   origin_4.12_cli:
     name: "4.12"
     namespace: origin
@@ -56,6 +60,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
@@ -63,6 +70,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -97,6 +107,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -104,6 +117,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
   to: ovirt-installer
 promotion:
   name: "4.12"
@@ -230,7 +246,7 @@ tests:
       AWS_METADATA_SERVICE_AUTH: Required
     workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
@@ -253,7 +269,7 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-sharednetwork
 - as: e2e-azure-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: azure
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
@@ -315,7 +331,7 @@ tests:
 - as: e2e-metal-ipi-sdn
   cluster: build05
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: (baremetal|metal3-io)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -363,9 +379,8 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-openstack
-  optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|ovirt|powervs|vsphere)/)
+- as: e2e-openstack-ovn
+  run_if_changed: openstack|(^data/.*/rhcos\.json)
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -405,7 +420,7 @@ tests:
     cluster_profile: openstack-vexxhost
     workflow: openshift-manifests-openstack
 - as: e2e-vsphere-ovn
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs)/)
+  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
@@ -426,19 +441,19 @@ tests:
     workflow: openshift-e2e-gcp-crc
 - as: e2e-libvirt
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: libvirt
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-libvirt
 - as: e2e-metal-assisted
   optional: true
-  skip_if_only_changed: (^(docs|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: (baremetal|metal3-io)
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
 - as: e2e-ovirt-sdn
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|powervs|vsphere)/)
+  run_if_changed: ovirt
   steps:
     cluster_profile: ovirt
     workflow: openshift-e2e-ovirt-minimal
@@ -485,30 +500,33 @@ tests:
   run_if_changed: (azure|azurestack)
   steps:
     cluster_profile: azurestack
-    env:
-      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     workflow: openshift-e2e-azurestack
 - as: e2e-azurestack-upi
   optional: true
   run_if_changed: ^(upi/(azure|azurestack)/.*)
   steps:
     cluster_profile: azurestack
-    env:
-      TEST_SKIPS: provisioning should provision storage with pvc data source in parallel
     workflow: openshift-e2e-azurestack-upi
 - as: e2e-ibmcloud-ovn
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|gcp|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: ibmcloud
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud
-- as: e2e-sdn-nutanix
+- as: e2e-nutanix-ovn
   cluster: build01
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
   steps:
     cluster_profile: nutanix
-    workflow: openshift-e2e-nutanix
+    workflow: openshift-e2e-nutanix-ovn
+- as: e2e-nutanix-sdn
+  cluster: build01
+  optional: true
+  run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
+  steps:
+    cluster_profile: nutanix
+    workflow: openshift-e2e-nutanix-sdn
 - as: e2e-agent-compact
   cluster: build05
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)

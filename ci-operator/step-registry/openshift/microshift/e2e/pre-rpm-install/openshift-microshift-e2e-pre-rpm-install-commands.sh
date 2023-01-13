@@ -62,9 +62,21 @@ firewall-cmd --zone=trusted --add-source=10.42.0.0/16 --permanent
 firewall-cmd --zone=public --add-port=80/tcp --permanent
 firewall-cmd --zone=public --add-port=443/tcp --permanent
 firewall-cmd --zone=public --add-port=5353/udp --permanent
+firewall-cmd --zone=public --add-port=6443/tcp --permanent
 firewall-cmd --reload
 EOF
 chmod +x usr/bin/pre_rpm_install.sh
+
+BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
+
+mkdir -p "${PAYLOAD_PATH}"/etc/microshift
+cat << EOF > "${PAYLOAD_PATH}"/etc/microshift/config.yaml
+---
+apiServer:
+  subjectAltNames:
+  - ${INSTANCE_PREFIX}.${BASE_DOMAIN}
+EOF
+
 mkdir -p "${PAYLOAD_PATH}"/etc/crio/ && cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
 chmod 600 "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
 tar -uvf $PAYLOAD_PATH/payload.tar .

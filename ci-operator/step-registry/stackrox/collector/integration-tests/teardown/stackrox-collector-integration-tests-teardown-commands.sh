@@ -6,4 +6,4 @@ source .openshift-ci/jobs/integration-tests/env.sh
 
 .openshift-ci/scripts/gcloud-init.sh
 
-make -C ansible BUILD_TYPE=ci integration-tests-teardown
+make -C ansible BUILD_TYPE=ci destroy-vms

@@ -43,6 +43,27 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: upgrade-with-olm
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make yq opm
+        eval $(make local-env)
+        source ./hack/upgrade-sbo-env.sh
+        if [ "$(echo -e $CLONEREFS_OPTIONS | jq -r '.refs[] | select(.org == "openshift").repo')" == "release" ]; then
+          OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:upgrade-index;
+        else
+          OPERATOR_INDEX_IMAGE_REF=quay.io/redhat-developer/servicebinding-operator:pr-${PULL_NUMBER}-${PULL_PULL_SHA:0:8}-index;
+        fi;
+        make -k VERBOSE=2 TEST_ACCEPTANCE_START_SBO=scenarios OPERATOR_INDEX_IMAGE_REF=$OPERATOR_INDEX_IMAGE_REF CATSRC_NAME=sbo-pr-checks SKIP_REGISTRY_LOGIN=true EXTRA_BEHAVE_ARGS="--tags=@upgrade-with-olm --tags=~@disable-openshift-4.12 --tags=~@disable-openshift-4.8+ --tags=~@disable-openshift-4.9+ --tags=~@disable-openshift-4.10+ --tags=~@disable-openshift-4.11+ --tags=~@disable-openshift-4.12+" -o registry-login test-acceptance test-acceptance-artifacts
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: validate-master-build
   cron: 0 0 * * *
   steps:
@@ -78,8 +99,10 @@ tests:
         export TEST_PERFORMANCE_USERS_PER_SCENARIO=400
         export REGISTRY_NAMESPACE=ocpappsvc-qe
         source /var/run/secrets/sbo-on-sb-perf/registry-credentials-env.sh
+        source /var/run/secrets/sbo-on-sb-perf/opensearch-aws-credentials-env.sh
         make -k test-performance test-performance-collect-kpi || true
         make test-performance-artifacts
+        make test-performance-upload-kpi || true
         make test-performance-thresholds
       credentials:
       - mount_path: /var/run/secrets/sbo-on-sb-perf
