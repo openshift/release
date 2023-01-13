@@ -35,14 +35,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
-  rhel-coreos-8:
-    name: rhel-coreos-9
-    namespace: rhcos-devel
-    tag: 412.90.202212061116-0
-  rhel-coreos-8-extensions:
-    name: rhel-coreos-9-oci
-    namespace: rhcos-devel
-    tag: 412.90.202212061116-0-extensions
 build_root:
   from_repository: true
 images:
@@ -66,13 +58,13 @@ releases:
       version: "4.12"
   initial:
     integration:
-      name: "4.13"
-      namespace: ocp
+      name: ocp-4.13-9.0
+      namespace: rhcos-devel
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
-      namespace: ocp
+      name: ocp-4.13-9.0
+      namespace: rhcos-devel
 resources:
   '*':
     requests:
@@ -84,6 +76,19 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
+- as: e2e-gcp-op
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: openshift
