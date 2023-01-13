@@ -21,6 +21,27 @@ function run_command() {
     eval "${CMD}"
 }
 
+function check_mcp_status() {
+    machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
+    COUNTER=0
+    while [ $COUNTER -lt 1200 ]
+    do
+        sleep 20
+        COUNTER=`expr $COUNTER + 20`
+        echo "waiting ${COUNTER}s"
+        updatedMachineCount=$(oc get mcp worker -o=jsonpath='{.status.updatedMachineCount}')
+        if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
+            echo "MCP updated successfully"
+            break
+        fi
+    done
+    if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
+        run_command "oc get mcp,node"
+        run_command "oc get mcp worker -o yaml"
+        return 1
+    fi
+}
+
 function update_global_auth () {
   # get the current global auth
   run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
@@ -51,6 +72,7 @@ function update_global_auth () {
   ret=0
   run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=${new_dockerconfig}" || ret=$?
   if [[ $ret -eq 0 ]]; then
+      check_mcp_status
       echo "update the cluster global auth successfully."
   else
       echo "!!! fail to add QE optional registry auth, retry and enable log..."
@@ -141,8 +163,7 @@ EOF
         node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o=jsonpath='{.items[0].spec.nodeName}')
         run_command "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
         run_command "oc -n debug-qe debug node/${node_name} -- chroot /host podman pull --authfile /var/lib/kubelet/config.json ${index_image}"
-        run_command "oc adm node-logs ${node_name} -u kubelet"
-
+        
         run_command "oc get mcp,node"
         run_command "oc get mcp worker -o yaml"
         run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
