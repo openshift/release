@@ -35,17 +35,38 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
-  rhel-coreos-9-extensions-override:
+  rhel-coreos-8-extensions-override:
     name: rhel-coreos-9-oci
     namespace: rhcos-devel
     tag: 412.90.202212061116-0-extensions
-  rhel-coreos-9-override:
+  rhel-coreos-8-override:
     name: rhel-coreos-9-oci
     namespace: rhcos-devel
     tag: 412.90.202212061116-0
 build_root:
   from_repository: true
 images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-9-oci:latest
+  inputs:
+    rhel-coreos-8-override:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-9-oci:latest
+  to: rhel-coreos-8
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-9-oci:extensions-latest
+  inputs:
+    rhel-coreos-8-extensions-override:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-9-oci:extensions-latest
+  to: rhel-coreos-8-extensions
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-9-oci:latest
+  inputs:
+    rhel-coreos-8-override:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-9-oci:latest
+  to: machine-os-content
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
@@ -53,12 +74,6 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: machine-config-operator
-- from: rhel-coreos-9-override
-  to: rhel-coreos-8
-- from: rhelcoreos-9-extensions-override
-  to: rhel-coreos-8-extensions
-- from: rhel-coreos-9-override
-  to: machine-os-content
 promotion:
   disabled: true
   name: "4.13"
@@ -72,13 +87,13 @@ releases:
       version: "4.12"
   initial:
     integration:
-      name: ocp-4.13-9.0
-      namespace: rhcos-devel
+      name: "4.13"
+      namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: ocp-4.13-9.0
-      namespace: rhcos-devel
+      name: "4.13"
+      namespace: ocp
 resources:
   '*':
     requests:
