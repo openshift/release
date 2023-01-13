@@ -37,6 +37,8 @@ elif [[ "${SIZE_VARIANT}" == "large" ]]; then
   master_type_prefix=Standard_D16
 elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
   master_type_prefix=Standard_D8
+elif [[ "${SIZE_VARIANT}" == "storage_optimized" ]]; then
+  master_type_prefix=Standard_L8
 fi
 if [ -n "${master_type_prefix}" ]; then
   if [ "${OCP_ARCH}" = "amd64" ]; then
