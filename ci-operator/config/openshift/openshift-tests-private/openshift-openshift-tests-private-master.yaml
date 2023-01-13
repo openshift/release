@@ -91,6 +91,16 @@ tests:
   commands: make name-check
   container:
     from: src
+- as: util-unit
+  commands: |
+    unset GOFLAGS
+    export KUBECONFIG=/fakekube
+    # for unit test, we do not create real cluster for it, so pleasae ensure unitest code must not depend on real cluster.
+    go test -timeout 10m -v ./test/extended/util
+  container:
+    from: src
+  optional: true
+  run_if_changed: test/extended/util/
 - as: code-check
   commands: make check-code
   container:
