@@ -3,23 +3,23 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  open-cluster-management_builder_go1.17-linux:
+  stolostron_builder_go1.19-linux:
     name: builder
-    namespace: open-cluster-management
-    tag: go1.17-linux
+    namespace: stolostron
+    tag: go1.19-linux
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.17-linux
+    tag: go1.19-linux
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    open-cluster-management_builder_go1.17-linux:
+    stolostron_builder_go1.19-linux:
       as:
-      - registry.ci.openshift.org/open-cluster-management/builder:go1.17-linux
+      - golang:1.19
   to: placement
 promotion:
   name: "2.3"
@@ -27,12 +27,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.7"
+      name: "4.10"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.7"
+      name: "4.10"
       namespace: ocp
 resources:
   '*':
@@ -64,7 +64,7 @@ tests:
   container:
     from: test-bin
 - as: integration
-  commands: make test-integration
+  commands: HOME=/tmp make test-integration
   container:
     from: test-bin
 - as: e2e
@@ -98,8 +98,10 @@ tests:
       commands: |-
         export OSCI_COMPONENT_NAME=placement
         export OSCI_COMPONENT_VERSION=2.3.0
-        export SELF="make -f /opt/build-harness/Makefile.prow"
+        export OSCI_PIPELINE_PRODUCT_PREFIX=backplane
+        export OSCI_PIPELINE_REPO=backplane-pipeline
         export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f /opt/build-harness/Makefile.prow"
         make -f /opt/build-harness/Makefile.prow osci/publish
       credentials:
       - mount_path: /etc/github
@@ -118,10 +120,10 @@ tests:
       SOURCE_IMAGE_REF: placement
     env:
       IMAGE_REPO: placement
-      IMAGE_TAG: release-2.3
+      IMAGE_TAG: backplane-2.3
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.3
+  branch: backplane-2.3
   org: stolostron
   repo: placement
