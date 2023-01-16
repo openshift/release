@@ -35,6 +35,21 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-jupyter-datascience-ubi8-python-3.8
   to: cuda-jupyter-tensorflow-ubi8-python-3.8
+- context_dir: base/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  to: base-ubi9-python-3.9
+- context_dir: jupyter/minimal/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-ubi9-python-3.9
+  to: jupyter-minimal-ubi9-python-3.9
+- context_dir: jupyter/datascience/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: jupyter-minimal-ubi9-python-3.9
+  to: jupyter-datascience-ubi9-python-3.9
+- context_dir: jupyter/pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi9-python-3.9
+  to: jupyter-pytorch-ubi9-python-3.9
 promotion:
   namespace: opendatahub-io
   tag: latest
@@ -194,6 +209,78 @@ tests:
       IMAGE_REPO: notebooks
       RELEASE_VERSION: cuda-jupyter-tensorflow-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
+- as: notebook-base-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: base-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: base-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-base-ubi9-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: base-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: base-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-minimal-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-minimal-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-minimal-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-minimal-ubi9-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-minimal-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-minimal-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-datascience-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-datascience-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-datascience-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-datascience-ubi9-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-datascience-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-datascience-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-pytorch-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-pytorch-ubi9-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: jupyter-pytorch-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
 - as: notebooks-e2e-tests
   skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
   steps:
@@ -204,10 +291,10 @@ tests:
       commands: |
         oc new-project jupyter-minimal-ubi8-python-3-8
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
-        make deploy-jupyter-minimal-ubi8-python-3.8 \
+        make deploy8-jupyter-minimal-ubi8-python-3.8 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-jupyter-minimal-ubi8-python-3.8
-        make undeploy-jupyter-minimal-ubi8-python-3.8
+        make undeploy8-jupyter-minimal-ubi8-python-3.8
       dependencies:
       - env: JUPYTER_MINIMAL_IMAGE
         name: jupyter-minimal-ubi8-python-3.8
@@ -221,10 +308,10 @@ tests:
       commands: |
         oc new-project jupyter-datascience-ubi8-python-3-8
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
-        make deploy-jupyter-datascience-ubi8-python-3.8 \
+        make deploy8-jupyter-datascience-ubi8-python-3.8 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-jupyter-datascience-ubi8-python-3.8
-        make undeploy-jupyter-datascience-ubi8-python-3.8
+        make undeploy8-jupyter-datascience-ubi8-python-3.8
       dependencies:
       - env: JUPYTER_DATA_SCIENCE_IMAGE
         name: jupyter-datascience-ubi8-python-3.8
@@ -238,10 +325,10 @@ tests:
       commands: |
         oc new-project jupyter-pytorch-ubi8-python-3-8
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_PYTORCH_IMAGE}"
-        make deploy-jupyter-pytorch-ubi8-python-3.8 \
+        make deploy8-jupyter-pytorch-ubi8-python-3.8 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-jupyter-pytorch-ubi8-python-3.8
-        make undeploy-jupyter-pytorch-ubi8-python-3.8
+        make undeploy8-jupyter-pytorch-ubi8-python-3.8
       dependencies:
       - env: JUPYTER_PYTORCH_IMAGE
         name: jupyter-pytorch-ubi8-python-3.8
@@ -255,10 +342,10 @@ tests:
       commands: |
         oc new-project cuda-jupyter-minimal-ubi8-python-3-8
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
-        make deploy-cuda-jupyter-minimal-ubi8-python-3.8 \
+        make deploy8-cuda-jupyter-minimal-ubi8-python-3.8 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-cuda-jupyter-minimal-ubi8-python-3.8
-        make undeploy-cuda-jupyter-minimal-ubi8-python-3.8
+        make undeploy8-cuda-jupyter-minimal-ubi8-python-3.8
       dependencies:
       - env: JUPYTER_MINIMAL_IMAGE
         name: cuda-jupyter-minimal-ubi8-python-3.8
@@ -272,10 +359,10 @@ tests:
       commands: |
         oc new-project cuda-jupyter-datascience-ubi8-python-3-8
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
-        make deploy-cuda-jupyter-datascience-ubi8-python-3.8 \
+        make deploy8-cuda-jupyter-datascience-ubi8-python-3.8 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-cuda-jupyter-datascience-ubi8-python-3.8
-        make undeploy-cuda-jupyter-datascience-ubi8-python-3.8
+        make undeploy8-cuda-jupyter-datascience-ubi8-python-3.8
       dependencies:
       - env: JUPYTER_DATA_SCIENCE_IMAGE
         name: cuda-jupyter-datascience-ubi8-python-3.8
@@ -289,13 +376,64 @@ tests:
       commands: |
         oc new-project cuda-jupyter-tensorflow-ubi8-python-3-8
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TENSORFLOW_IMAGE}"
-        make deploy-cuda-jupyter-tensorflow-ubi8-python-3.8 \
+        make deploy8-cuda-jupyter-tensorflow-ubi8-python-3.8 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-cuda-jupyter-tensorflow-ubi8-python-3.8
-        make undeploy-cuda-jupyter-tensorflow-ubi8-python-3.8
+        make undeploy8-cuda-jupyter-tensorflow-ubi8-python-3.8
       dependencies:
       - env: JUPYTER_TENSORFLOW_IMAGE
         name: cuda-jupyter-tensorflow-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-minimal-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-minimal-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
+        make deploy9-jupyter-minimal-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-minimal-ubi9-python-3.9
+        make undeploy9-jupyter-minimal-ubi9-python-3.9
+      dependencies:
+      - env: JUPYTER_MINIMAL_IMAGE
+        name: jupyter-minimal-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-datascience-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-datascience-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
+        make deploy9-jupyter-datascience-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-datascience-ubi9-python-3.9
+        make undeploy9-jupyter-datascience-ubi9-python-3.9
+      dependencies:
+      - env: JUPYTER_DATA_SCIENCE_IMAGE
+        name: jupyter-datascience-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-pytorch-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-pytorch-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_PYTORCH_IMAGE}"
+        make deploy9-jupyter-pytorch-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-pytorch-ubi9-python-3.9
+        make undeploy9-jupyter-pytorch-ubi9-python-3.9
+      dependencies:
+      - env: JUPYTER_PYTORCH_IMAGE
+        name: jupyter-pytorch-ubi9-python-3.9
       from: src
       resources:
         requests:
