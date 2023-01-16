@@ -31,22 +31,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  machine-os-content-override:
-    name: rhel-coreos-9
-    namespace: rhcos-devel
-    tag: 412.90.202212061116-0
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
-  rhel-coreos-8-extensions-override:
-    name: rhel-coreos-9-oci
-    namespace: rhcos-devel
-    tag: 412.90.202212061116-0-extensions
-  rhel-coreos-8-override:
-    name: rhel-coreos-9-oci
-    namespace: rhcos-devel
-    tag: 412.90.202212061116-0
 build_root:
   from_repository: true
 images:
@@ -70,13 +58,13 @@ releases:
       version: "4.12"
   initial:
     integration:
-      name: "4.13"
-      namespace: ocp
+      name: ocp-4.13-9.0
+      namespace: rhcos-devel
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
-      namespace: ocp
+      name: ocp-4.13-9.0
+      namespace: rhcos-devel
 resources:
   '*':
     requests:
@@ -87,71 +75,11 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws
-    pre:
-    - as: test-prestep
-      cli: latest
-      commands: |
-        #!/usr/bin/env bash
-
-        set -x
-
-        oc registry login
-
-        oc adm release new \
-          --from-release="$RELEASE_IMAGE_LATEST" \
-          --to-image="registry.ci.openshift.org/$NAMESPACE/release:latest" \
-            rhel-coreos-8="$RHEL_COREOS_8_OVERRIDE" \
-            rhel-coreos-8-extensions="$RHEL_COREOS_8_EXTENSIONS" \
-            machine-os-content="$MACHINE_OS_CONTENT_OVERRIDE"
-
-        oc adm release info "registry.ci.openshift.org/$NAMESPACE/release:latest"
-      dependencies:
-        - env: "RHEL_COREOS_8_OVERRIDE"
-          name: "pipeline:rhel-coreos-8-override"
-        - env: "RHEL_COREOS_8_EXTENSIONS"
-          name: "pipeline:rhel-coreos-8-extensions-override"
-        - env: "MACHINE_OS_CONTENT_OVERRIDE"
-          name: "pipeline:machine-os-content-override"
-      from: src
-      resources:
-        requests:
-          cpu: 250m
-    - chain: ipi-aws-pre
     workflow: openshift-e2e-aws
 - as: e2e-gcp-op
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
-    pre:
-    - as: test-prestep
-      cli: latest
-      commands: |
-        #!/usr/bin/env bash
-
-        set -x
-
-        oc registry login
-
-        oc adm release new \
-          --from-release="$RELEASE_IMAGE_LATEST" \
-          --to-image="registry.ci.openshift.org/$NAMESPACE/release:latest" \
-            rhel-coreos-8="$RHEL_COREOS_8_OVERRIDE" \
-            rhel-coreos-8-extensions="$RHEL_COREOS_8_EXTENSIONS" \
-            machine-os-content="$MACHINE_OS_CONTENT_OVERRIDE"
-
-        oc adm release info "registry.ci.openshift.org/$NAMESPACE/release:latest"
-      dependencies:
-        - env: "RHEL_COREOS_8_OVERRIDE"
-          name: "pipeline:rhel-coreos-8-override"
-        - env: "RHEL_COREOS_8_EXTENSIONS"
-          name: "pipeline:rhel-coreos-8-extensions-override"
-        - env: "MACHINE_OS_CONTENT_OVERRIDE"
-          name: "pipeline:machine-os-content-override"
-      from: src
-      resources:
-        requests:
-          cpu: 250m
-    - chain: ipi-gcp-pre
     test:
     - as: test
       cli: latest
