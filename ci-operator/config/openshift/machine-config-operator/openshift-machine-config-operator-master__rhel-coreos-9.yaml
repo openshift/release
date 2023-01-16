@@ -32,7 +32,7 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   machine-os-content-override:
-    name: rhel-coreos-9-oci
+    name: rhel-coreos-9
     namespace: rhcos-devel
     tag: 412.90.202212061116-0
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
@@ -93,14 +93,16 @@ tests:
       commands: |
         #!/usr/bin/env bash
 
+        set -x
+
         oc registry login
 
         oc adm release new \
           --from-release="$RELEASE_IMAGE_LATEST" \
           --to-image="registry.ci.openshift.org/$NAMESPACE/release:latest" \
-            rhel-coreos-8="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7e5181599619e8c21e47336f687f94b2af162635fb0a44bcfbb7726560730441" \
-            rhel-coreos-8-extensions="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:fcb1dfb2e6b945c3c14a45f619fc3f61e17273b4584559ea55346cf7f0c4657e" \
-            machine-os-content="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:1a7280333a4f412e037fa025704646b65c7757f53650c1c3a30e792358058aa1"
+            rhel-coreos-8="registry.ci.openshift.org/$NAMESPACE/pipeline:rhel-coreos-8-override" \
+            rhel-coreos-8-extensions="registry.ci.openshift.org/$NAMESPACE/pipeline:rhel-coreos-8-extensions-override" \
+            machine-os-content="registry.ci.openshift.org/$NAMESPACE/pipeline:machine-os-content-override"
 
         oc adm release info "registry.ci.openshift.org/$NAMESPACE/release:latest"
       from: src
@@ -119,14 +121,16 @@ tests:
       commands: |
         #!/usr/bin/env bash
 
+        set -x
+
         oc registry login
 
         oc adm release new \
           --from-release="$RELEASE_IMAGE_LATEST" \
           --to-image="registry.ci.openshift.org/$NAMESPACE/release:latest" \
-            rhel-coreos-8="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7e5181599619e8c21e47336f687f94b2af162635fb0a44bcfbb7726560730441" \
-            rhel-coreos-8-extensions="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:fcb1dfb2e6b945c3c14a45f619fc3f61e17273b4584559ea55346cf7f0c4657e" \
-            machine-os-content="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:1a7280333a4f412e037fa025704646b65c7757f53650c1c3a30e792358058aa1"
+            rhel-coreos-8="registry.ci.openshift.org/$NAMESPACE/pipeline:rhel-coreos-8-override" \
+            rhel-coreos-8-extensions="registry.ci.openshift.org/$NAMESPACE/pipeline:rhel-coreos-8-extensions-override" \
+            machine-os-content="registry.ci.openshift.org/$NAMESPACE/pipeline:machine-os-content-override"
 
         oc adm release info "registry.ci.openshift.org/$NAMESPACE/release:latest"
       from: src
