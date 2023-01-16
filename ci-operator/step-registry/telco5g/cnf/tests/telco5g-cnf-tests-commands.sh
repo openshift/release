@@ -228,7 +228,7 @@ export CNF_NODES="${test_nodes}"
 
 cd cnf-features-deploy
 status=0
-FEATURES_ENVIRONMENT="ci" SKIP_TESTS="${skip_tests}" make functests-on-ci || status=$?
+FEATURES_ENVIRONMENT="ci" make functests-on-ci || status=$?
 cd -
 
 set +e
