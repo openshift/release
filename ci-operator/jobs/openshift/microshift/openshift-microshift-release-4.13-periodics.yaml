@@ -6,16 +6,15 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.13
     org: openshift
     repo: microshift
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-microshift-release-4.12-copr-rpm-health-check
+  name: periodic-ci-openshift-microshift-release-4.13-copr-rpm-health-check
   spec:
     containers:
     - args:
@@ -23,7 +22,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/copr-rpm-health-check-cluster-profile
       - --target=copr-rpm-health-check
       command:
@@ -37,9 +35,6 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/copr-rpm-health-check-cluster-profile
         name: cluster-profile
@@ -60,9 +55,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -83,16 +75,15 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.13
     org: openshift
     repo: microshift
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-microshift-release-4.12-nightly-conformance-parallel
+  name: periodic-ci-openshift-microshift-release-4.13-nightly-conformance-parallel
   spec:
     containers:
     - args:
@@ -100,7 +91,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/nightly-conformance-parallel-cluster-profile
       - --target=nightly-conformance-parallel
       command:
@@ -114,9 +104,6 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/nightly-conformance-parallel-cluster-profile
         name: cluster-profile
@@ -137,9 +124,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -160,16 +144,15 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.13
     org: openshift
     repo: microshift
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-microshift-release-4.12-nightly-conformance-serial
+  name: periodic-ci-openshift-microshift-release-4.13-nightly-conformance-serial
   spec:
     containers:
     - args:
@@ -177,7 +160,6 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/nightly-conformance-serial-cluster-profile
       - --target=nightly-conformance-serial
       command:
@@ -191,9 +173,6 @@ periodics:
       volumeMounts:
       - mountPath: /etc/boskos
         name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/nightly-conformance-serial-cluster-profile
         name: cluster-profile
@@ -214,9 +193,6 @@ periodics:
         - key: credentials
           path: credentials
         secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: cluster-profile
       projected:
         sources:
@@ -224,61 +200,6 @@ periodics:
             name: cluster-secrets-gcp
         - configMap:
             name: cluster-profile-gcp
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build02
-  cron: 0 5 * * 1-5
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.12
-    org: openshift
-    repo: microshift
-  labels:
-    ci.openshift.io/generator: prowgen
-    job-release: "4.12"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-microshift-release-4.12-rebase-on-nightlies
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rebase-on-nightlies
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

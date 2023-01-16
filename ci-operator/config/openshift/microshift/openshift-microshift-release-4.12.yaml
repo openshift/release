@@ -67,6 +67,18 @@ promotion:
   - microshift-validate
   name: "4.12"
   namespace: ocp
+releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -74,9 +86,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tag_specification:
-  name: "4.12"
-  namespace: ocp
 tests:
 - as: verify
   commands: make verify
@@ -157,6 +166,29 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-microshift-e2e-router-smoke-test
+- as: copr-rpm-health-check
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-copr-install
+- as: rebase-on-nightlies
+  cron: 0 5 * * 1-5
+  steps:
+    workflow: openshift-microshift-rebase
+- as: nightly-conformance-parallel
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/conformance/parallel
+    workflow: openshift-microshift-e2e-test
+- as: nightly-conformance-serial
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: openshift/conformance/serial
+    workflow: openshift-microshift-e2e-test
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
