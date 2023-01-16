@@ -4,6 +4,83 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+WORK_DIR=${WORK_DIR:-$(mktemp -d -t shiftstack-ci-XXXXXXXXXX)}
+
+if [ -z "${SHARED_DIR:-}" ]; then
+  echo "SHARED_DIR is not set, this script is probably running outside of CI."
+
+  # We assume that if someone runs this script outside of the CI, they want CONFIG_TYPE to be proxy
+  export CONFIG_TYPE=proxy
+
+  # Some defaults taken from openstack-provision-machine-ref.yaml
+  export BASTION_IMAGE=${BASTION_IMAGE:-"centos9-stream"}
+  ZONES_COUNT="0"
+
+  ssh-keygen -t rsa -N "" -f "${SHARED_DIR}/shiftstack-ci"
+  chmod 0600 "${SHARED_DIR}/shiftstack-ci"
+  mv "${SHARED_DIR}/shiftstack-ci" "${SHARED_DIR}/ssh-privatekey"
+  mv "${SHARED_DIR}/shiftstack-ci.pub" "${SHARED_DIR}/ssh-publickey"
+  eval "$(ssh-agent)"
+  ssh-add "${SHARED_DIR}/ssh-privatekey"
+
+  if [ -z "${OS_CLOUD:-}" ]; then
+    echo "OS_CLOUD is not set, please export it."
+    exit 1
+  fi
+
+  if [ -z "${PREVIOUS_SHARED_DIR:-}" ]; then
+    echo "PREVIOUS_SHARED_DIR is not set, the script will be interactive."
+    export SHARED_DIR=$WORK_DIR
+    echo "SHARED_DIR is set to ${SHARED_DIR}"
+
+    # The following variables are set by openstack-provision-machinesubnet-commands.sh so
+    # if we don't re-use a previously created work directory, we need to gather the data from
+    # the user.
+    touch "${SHARED_DIR}/ZONES"
+
+    if [ -z "${CLUSTER_NAME:-}" ]; then
+      echo "CLUSTER_NAME is not set, we'll pick a random value"
+      CLUSTER_NAME=ci-cluster-$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 10 | head -n 1)
+      echo "${CLUSTER_NAME}" > "${SHARED_DIR}/CLUSTER_NAME"
+    fi
+
+    if [ -z "${OPENSTACK_EXTERNAL_NETWORK:-}" ]; then
+      echo "OPENSTACK_EXTERNAL_NETWORK is not set, please set it to the name of the external network:"
+      read -r OPENSTACK_EXTERNAL_NETWORK
+      echo "${OPENSTACK_EXTERNAL_NETWORK}" > "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
+    fi
+
+    if [ -z "${MACHINES_NET_ID:-}" ]; then
+      echo "MACHINES_NET_ID is not set, please set it to Neutron network UUID for machines:"
+      read -r MACHINES_NET_ID
+      echo "${MACHINES_NET_ID}" > "${SHARED_DIR}/MACHINES_NET_ID"
+    fi
+
+    if [ -z "${MACHINES_SUBNET_ID:-}" ]; then
+      echo "MACHINES_SUBNET_ID is not set, please set it to Neutron subnet UUID for machines:"
+      read -r MACHINES_SUBNET_ID
+      echo "${MACHINES_SUBNET_ID}" > "${SHARED_DIR}/MACHINES_SUBNET_ID"
+    fi
+
+    if [ -z "${BASTION_NET_ID:-}" ]; then
+      echo "BASTION_NET_ID is not set, please set it to Bastion Neutron network UUID for machines:"
+      read -r BASTION_NET_ID
+      echo "${BASTION_NET_ID}" > "${SHARED_DIR}/BASTION_NET_ID"
+    fi
+  else
+    echo "PREVIOUS_SHARED_DIR is set, we'll use the provisioning data from there."
+    export SHARED_DIR=$PREVIOUS_SHARED_DIR
+  fi
+
+  if [ -z "${BASTION_FLAVOR:-}" ]; then
+    echo "BASTION_FLAVOR is not set, please set it to the name of the flavor to use for the bastion:"
+    read -r BASTION_FLAVOR
+    echo "${BASTION_FLAVOR}" > "${SHARED_DIR}/BASTION_FLAVOR"
+  fi
+else
+  export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+fi
+
 if [[ "$CONFIG_TYPE" != "proxy" ]]; then
     if [[ "$ZONES_COUNT" != "0" ]]; then
       echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'proxy'."
@@ -31,8 +108,6 @@ retry() {
     return 0
 }
 
-export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
-WORK_DIR=${WORK_DIR:-$(mktemp -d -t shiftstack-ci-XXXXXXXXXX)}
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 MACHINES_NET_ID=$(<"${SHARED_DIR}"/MACHINES_NET_ID)
 MACHINES_SUBNET_ID=$(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)
@@ -210,3 +285,4 @@ if [[ -f "${SHARED_DIR}/osp-ca.crt" ]]; then
 fi
 
 echo "Bastion proxy is ready!"
+echo "Provisioning data was stored into ${SHARED_DIR}"

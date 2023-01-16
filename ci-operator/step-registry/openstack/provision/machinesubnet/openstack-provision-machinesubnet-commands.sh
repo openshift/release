@@ -6,7 +6,53 @@
 
 set -o nounset
 set -o errexit
-set -o pipefail
+
+if [ -z "${SHARED_DIR:-}" ]; then
+  echo "SHARED_DIR is not set, this script is probably running outside of CI."
+
+  # We assume that if someone runs this script outside of the CI, they want CONFIG_TYPE to be proxy
+  export CONFIG_TYPE=proxy
+
+  # Some defaults taken from openstack-provision-machine-ref.yaml
+  export SUBNET_RANGE="172.16.0.0/24"
+  export DNS_IP="1.1.1.1"
+  export API_VIP="172.16.0.5"
+  export INGRESS_VIP="172.16.0.7"
+  export ALLOCATION_POOL_START="172.16.0.10"
+  export ALLOCATION_POOL_END="172.16.0.254"
+  export BASTION_SUBNET_RANGE="10.0.0.0/16"
+  export ZONES_COUNT="0"
+
+  if [ -z "${OS_CLOUD:-}" ]; then
+    echo "OS_CLOUD is not set, please export it."
+    exit 1
+  fi
+
+  if [ -z "${PREVIOUS_SHARED_DIR:-}" ]; then
+    echo "PREVIOUS_SHARED_DIR is not set, the script will be interactive."
+    export SHARED_DIR=${WORK_DIR:-$(mktemp -d -t shiftstack-ci-XXXXXXXXXX)}
+    echo "SHARED_DIR is set to ${SHARED_DIR}"
+
+    touch "${SHARED_DIR}/ZONES"
+
+    if [ -z "${OPENSTACK_EXTERNAL_NETWORK:-}" ]; then
+      echo "OPENSTACK_EXTERNAL_NETWORK is not set, please set it to the name of the external network:"
+      read -r OPENSTACK_EXTERNAL_NETWORK
+      echo "${OPENSTACK_EXTERNAL_NETWORK}" > "${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK"
+    fi
+
+    if [ -z "${CLUSTER_NAME:-}" ]; then
+      echo "CLUSTER_NAME is not set, we'll pick a random value"
+      CLUSTER_NAME=ci-cluster-$(cat /dev/urandom | tr -dc 'a-z0-9' | fold -w 10 | head -n 1)
+      echo "${CLUSTER_NAME}" > "${SHARED_DIR}/CLUSTER_NAME"
+    fi
+  else
+    echo "PREVIOUS_SHARED_DIR is set, we'll use the provisioning data from there."
+    export SHARED_DIR=$PREVIOUS_SHARED_DIR
+  fi
+else
+  export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+fi
 
 if [[ "$CONFIG_TYPE" != "proxy" ]]; then
     if [[ "$ZONES_COUNT" != "0" ]]; then
@@ -17,7 +63,6 @@ if [[ "$CONFIG_TYPE" != "proxy" ]]; then
     exit 0
 fi
 
-export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 ZONES=$(<"${SHARED_DIR}"/ZONES)
@@ -49,7 +94,7 @@ echo ${BASTION_ROUTER_ID}>${SHARED_DIR}/BASTION_ROUTER_ID
 openstack router set ${BASTION_ROUTER_ID} --external-gateway ${OPENSTACK_EXTERNAL_NETWORK} >/dev/null
 echo "Connected bastion router ${BASTION_ROUTER_ID} to external network: ${OPENSTACK_EXTERNAL_NETWORK}"
 
-if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
+if [[ ${OPENSTACK_PROVIDER_NETWORK:-} != "" ]]; then
   if ! openstack network show ${OPENSTACK_PROVIDER_NETWORK} >/dev/null; then
       echo "ERROR: Provider network not found: ${OPENSTACK_PROVIDER_NETWORK}"
       exit 1
@@ -109,3 +154,5 @@ fi
 
 echo ${API_VIP}>${SHARED_DIR}/API_IP
 echo ${INGRESS_VIP}>${SHARED_DIR}/INGRESS_IP
+
+echo "SHARED_DIR is ${SHARED_DIR}"
