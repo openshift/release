@@ -31,6 +31,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  machine-os-content-override:
+    name: rhel-coreos-9-oci
+    namespace: rhcos-devel
+    tag: 412.90.202212061116-0
   ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
@@ -43,20 +47,9 @@ base_images:
     name: rhel-coreos-9-oci
     namespace: rhcos-devel
     tag: 412.90.202212061116-0
-  machine-os-content-override:
-    name: rhel-coreos-9-oci
-    namespace: rhcos-devel
-    tag: 412.90.202212061116-0
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-9:legacy-latest
-  inputs:
-    machine-os-content-override:
-      as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-9:legacy-latest
-  to: machine-os-content
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
@@ -94,11 +87,27 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: aws
+    pre:
+    - as: test-prestep
+      cli: latest
+      commands: echo 'hello from prestep' && oc get imagestreams
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     workflow: openshift-e2e-aws
 - as: e2e-gcp-op
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: gcp
+    pre:
+    - as: test-prestep
+      cli: latest
+      commands: echo 'hello from prestep' && oc get imagestreams
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     test:
     - as: test
       cli: latest
