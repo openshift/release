@@ -90,11 +90,23 @@ tests:
     pre:
     - as: test-prestep
       cli: latest
-      commands: echo 'hello from prestep' && oc get imagestreams
+      commands: |
+        #!/usr/bin/env bash
+
+        oc registry login
+
+        oc adm release new \
+          --from-release="$RELEASE_IMAGE_LATEST" \
+          --to-image="registry.ci.openshift.org/$NAMESPACE/release:latest" \
+            rhel-coreos-8="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7e5181599619e8c21e47336f687f94b2af162635fb0a44bcfbb7726560730441" \
+            rhel-coreos-8-extensions="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:fcb1dfb2e6b945c3c14a45f619fc3f61e17273b4584559ea55346cf7f0c4657e" \
+            machine-os-content="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:1a7280333a4f412e037fa025704646b65c7757f53650c1c3a30e792358058aa1"
+
+        oc adm release info "registry.ci.openshift.org/$NAMESPACE/release:latest"
       from: src
       resources:
         requests:
-          cpu: 100m
+          cpu: 250m
     workflow: openshift-e2e-aws
 - as: e2e-gcp-op
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -103,11 +115,23 @@ tests:
     pre:
     - as: test-prestep
       cli: latest
-      commands: echo 'hello from prestep' && oc get imagestreams
+      commands: |
+        #!/usr/bin/env bash
+
+        oc registry login
+
+        oc adm release new \
+          --from-release="$RELEASE_IMAGE_LATEST" \
+          --to-image="registry.ci.openshift.org/$NAMESPACE/release:latest" \
+            rhel-coreos-8="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:7e5181599619e8c21e47336f687f94b2af162635fb0a44bcfbb7726560730441" \
+            rhel-coreos-8-extensions="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:fcb1dfb2e6b945c3c14a45f619fc3f61e17273b4584559ea55346cf7f0c4657e" \
+            machine-os-content="quay.io/openshift-release-dev/ocp-v4.0-art-dev@sha256:1a7280333a4f412e037fa025704646b65c7757f53650c1c3a30e792358058aa1"
+
+        oc adm release info "registry.ci.openshift.org/$NAMESPACE/release:latest"
       from: src
       resources:
         requests:
-          cpu: 100m
+          cpu: 250m
     test:
     - as: test
       cli: latest
