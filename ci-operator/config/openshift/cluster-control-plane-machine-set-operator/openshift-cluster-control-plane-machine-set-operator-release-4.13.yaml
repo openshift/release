@@ -97,6 +97,21 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: e2e-aws-periodic-pre
+  optional: true
+  run_if_changed: .*periodic.*
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
 - as: e2e-azure-operator
   optional: true
   run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*azure.*
@@ -147,81 +162,6 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-etcd-scaling
-- as: e2e-aws-periodic-pre
-  optional: true
-  run_if_changed: .*periodic.*
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      commands: |
-        make e2e-periodic
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: ipi-aws
-- as: e2e-aws-periodic
-  interval: 72h
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      commands: |
-        make e2e-periodic
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: ipi-aws
-- as: e2e-aws-arm-periodic
-  interval: 72h
-  steps:
-    cluster_profile: aws-arm64
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: arm-ci.devcluster.openshift.com
-    test:
-    - as: test
-      commands: |
-        make e2e-periodic
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: ipi-aws
-- as: e2e-gcp-periodic
-  interval: 72h
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: test
-      commands: |
-        make e2e-periodic
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: ipi-gcp
-- as: e2e-azure-periodic
-  interval: 72h
-  steps:
-    cluster_profile: azure4
-    test:
-    - as: test
-      commands: |
-        make e2e-periodic
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-      timeout: 3h0m0s
-    workflow: ipi-azure
 zz_generated_metadata:
   branch: release-4.13
   org: openshift
