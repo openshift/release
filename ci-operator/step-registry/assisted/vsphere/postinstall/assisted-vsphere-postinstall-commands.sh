@@ -7,6 +7,9 @@ set -o pipefail
 echo "************ vsphere assisted test-infra post-install ************"
 source ${SHARED_DIR}/platform-conf.sh
 
+# TODO: Remove once OpenShift CI supports it out of the box (see https://access.redhat.com/articles/4859371)
+fix_uid.sh
+
 # Debug
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
