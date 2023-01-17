@@ -6,73 +6,6 @@ presubmits:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: vsphere
-    context: ci/prow/e2e-vsphere--ovnccm-install
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cloud-provider-vsphere-release-4.13-e2e-vsphere--ovnccm-install
-    path_alias: github.com/kubernetes/cloud-provider-vsphere
-    rerun_command: /test e2e-vsphere--ovnccm-install
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-vsphere--ovnccm-install-cluster-profile
-        - --target=e2e-vsphere--ovnccm-install
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-vsphere--ovnccm-install-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-vsphere
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-vsphere--ovnccm-install,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: vsphere
     context: ci/prow/e2e-vsphere-ovn-ccm
     decorate: true
     labels:
@@ -141,17 +74,17 @@ presubmits:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: vsphere
-    context: ci/prow/e2e-vsphere-ovn-techpreview-upgrade
+    context: ci/prow/e2e-vsphere-ovn-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
       ci-operator.openshift.io/cloud-cluster-profile: vsphere
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-cloud-provider-vsphere-release-4.13-e2e-vsphere-ovn-techpreview-upgrade
+    name: pull-ci-openshift-cloud-provider-vsphere-release-4.13-e2e-vsphere-ovn-upgrade
     optional: true
     path_alias: github.com/kubernetes/cloud-provider-vsphere
-    rerun_command: /test e2e-vsphere-ovn-techpreview-upgrade
+    rerun_command: /test e2e-vsphere-ovn-upgrade
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -160,8 +93,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-vsphere-ovn-techpreview-upgrade-cluster-profile
-        - --target=e2e-vsphere-ovn-techpreview-upgrade
+        - --secret-dir=/usr/local/e2e-vsphere-ovn-upgrade-cluster-profile
+        - --target=e2e-vsphere-ovn-upgrade
         command:
         - ci-operator
         image: ci-operator:latest
@@ -174,7 +107,7 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-vsphere-ovn-techpreview-upgrade-cluster-profile
+        - mountPath: /usr/local/e2e-vsphere-ovn-upgrade-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -202,7 +135,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-vsphere-ovn-techpreview-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-vsphere-ovn-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
