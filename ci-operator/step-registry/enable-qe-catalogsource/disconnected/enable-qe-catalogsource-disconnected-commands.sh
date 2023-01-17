@@ -35,6 +35,27 @@ function run_command() {
     eval "${CMD}"
 }
 
+function check_mcp_status() {
+    machineCount=$(oc get mcp worker -o=jsonpath='{.status.machineCount}')
+    COUNTER=0
+    while [ $COUNTER -lt 1200 ]
+    do
+        sleep 20
+        COUNTER=`expr $COUNTER + 20`
+        echo "waiting ${COUNTER}s"
+        updatedMachineCount=$(oc get mcp worker -o=jsonpath='{.status.updatedMachineCount}')
+        if [[ ${updatedMachineCount} = "${machineCount}" ]]; then
+            echo "MCP updated successfully"
+            break
+        fi
+    done
+    if [[ ${updatedMachineCount} != "${machineCount}" ]]; then
+        run_command "oc get mcp,node"
+        run_command "oc get mcp worker -o yaml"
+        return 1
+    fi
+}
+
 # set the registry auths for the cluster
 function set_cluster_auth () {
     # get the registry configures of the cluster
@@ -65,6 +86,7 @@ function set_cluster_auth () {
         # set the registry auth for the cluster
         run_command "oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/new-dockerconfigjson"; ret=$?
         if [[ $ret -eq 0 ]]; then
+            check_mcp_status
             echo "set the mirror registry auth successfully."
         else
             echo "!!! fail to set the mirror registry auth"
@@ -276,7 +298,6 @@ EOF
         node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o=jsonpath='{.items[0].spec.nodeName}')
         run_command "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
         run_command "oc -n debug-qe debug node/${node_name} -- chroot /host podman pull --authfile /var/lib/kubelet/config.json ${mirror_index_image}"
-        run_command "oc adm node-logs ${node_name} -u kubelet"
 
         run_command "oc get mcp,node"
         run_command "oc get mcp worker -o yaml"
@@ -285,6 +306,7 @@ EOF
         return 1
     fi
 }
+
 
 function check_default_catalog () {
     COUNTER=0

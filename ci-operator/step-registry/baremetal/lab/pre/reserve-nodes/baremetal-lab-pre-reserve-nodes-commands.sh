@@ -19,7 +19,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 # The hostname of nodes and the cluster names have limited length for BM.
 # Other profiles add to the cluster_name the suffix "-${JOB_NAME_HASH}".
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
-CLUSTER_NAME"${NAMESPACE}"
+CLUSTER_NAME="${NAMESPACE}"
 
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$IPI" != true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
@@ -38,6 +38,7 @@ set +o allexport
 
 # shellcheck disable=SC2174
 mkdir -m 755 -p {/var/builds,/opt/tftpboot,/opt/html}/${BUILD_ID}
+mkdir -m 777 -p /opt/nfs/${BUILD_ID}
 touch /etc/{hosts_pool_reserved,vips_reserved}
 # The current implementation of the following scripts is different based on the auxiliary host. Keeping the script in
 # the remote aux servers temporarily.
