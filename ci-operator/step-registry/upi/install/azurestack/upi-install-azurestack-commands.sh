@@ -90,6 +90,7 @@ openshift-install create manifests
 # we don't want to create any machine* objects
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 
 RESOURCE_GROUP=$(python3 -c 'import yaml;data = yaml.full_load(open("manifests/cluster-infrastructure-02-config.yml"));print(data["status"]["platformStatus"]["azure"]["resourceGroupName"])')
 oc adm release extract $RELEASE_IMAGE_LATEST --credentials-requests --cloud=azure --to=credentials-request
