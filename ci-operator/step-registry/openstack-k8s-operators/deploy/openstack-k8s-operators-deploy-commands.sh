@@ -60,9 +60,10 @@ make openstack_deploy
 sleep 60
 
 # Waiting for all services to be ready
-oc get OpenStackControlPlane openstack -o jsonpath='{.status.conditions[*].type}' | \
-timeout ${TIMEOUT_SERVICES_READY} xargs -I {} -d ' ' \
-sh -c 'echo testing condition={}; oc wait openstackcontrolplane.core.openstack.org/openstack --for=condition={} --timeout=-1s'
+# TODO(dviroel): Add cinder back to status check once ceph backend is functional
+oc get OpenStackControlPlane openstack -o json | \
+jq -r '.status.conditions[] | select(.type | test("^OpenStackControlPlane(?!Cinder)")).type' | \
+timeout ${TIMEOUT_SERVICES_READY} xargs -d '\n' -I {} sh -c 'echo testing condition={}; oc wait openstackcontrolplane.core.openstack.org/openstack --for=condition={} --timeout=-1s'
 
 # Create clouds.yaml file to be used in further tests.
 mkdir -p ~/.config/openstack
