@@ -28,6 +28,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.19-linux
   to: multiclusterhub-operator-tests
 promotion:
+  disabled: true
   name: "2.8"
   namespace: stolostron
 resources:
@@ -81,13 +82,56 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
-- as: fast-forward
+- as: publish
   postsubmit: true
   steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multiclusterhub-operator
     env:
-      DESTINATION_BRANCH: release-2.8
-    workflow: ocm-ci-fastforward
+      IMAGE_REPO: multiclusterhub-operator
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
+- as: publish-tests
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: multiclusterhub-operator-tests
+    env:
+      IMAGE_REPO: multiclusterhub-operator-tests
+      REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_COMPONENT_NAME="multiclusterhub-operator-tests"
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.8
   org: stolostron
   repo: multiclusterhub-operator
