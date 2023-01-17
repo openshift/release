@@ -1,6 +1,75 @@
 periodics:
 - agent: kubernetes
   cluster: build02
+  cluster: build03
+  cron: 0 */6 * * 0-5
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "false"
+  name: osde2e-hypershift-stage
+  reporter_config:
+    slack:
+      channel: '#sd-hypershift-info'
+      job_states_to_report:
+      - failure
+      - success
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
+      command:
+      - /osde2e
+      env:
+      - name: CHANNEL
+        value: candidate
+      - name: CLUSTER_VERSION
+        value: 4.12.0-rc.8
+      - name: CONFIGS
+        value: hypershift
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc
+      image: quay.io/app-sre/osde2e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+      - mountPath: /usr/local/osde2e-hypershift-byovpc
+        name: osde2e-hypershift-byovpc
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+    - name: osde2e-hypershift-byovpc
+      secret:
+        secretName: osde2e-hypershift-byovpc
+- agent: kubernetes
+  cluster: build03
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -37,7 +106,7 @@ periodics:
       - name: ADDON_POLLING_TIMEOUT
         value: "7200"
       - name: ADDON_TEST_HARNESSES
-        value: quay.io/edge-infrastructure/ci-artifacts
+        value: quay.io/edge-infrastructure/ci-tools-nvidia-gpu-operator:osde2e
       - name: CHANNEL
         value: stable
       - name: CLOUD_PROVIDER_REGION
@@ -80,7 +149,7 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -113,7 +182,7 @@ periodics:
       secret:
         secretName: osde2e-rosa-production
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 4 * * *
   decorate: true
   extra_refs:
@@ -146,7 +215,7 @@ periodics:
       secret:
         secretName: osde2e-rosa-staging
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 14 * * 0
   decorate: true
   extra_refs:
@@ -215,7 +284,7 @@ periodics:
       secret:
         secretName: osde2e-rosa-stage
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 3 * * *
   decorate: true
   extra_refs:
@@ -276,7 +345,7 @@ periodics:
       secret:
         secretName: osde2e-common
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 5 * * 1-5
   decorate: true
   extra_refs:
@@ -350,7 +419,7 @@ periodics:
       secret:
         secretName: rhoc-osde2e-secret
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -417,7 +486,7 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 22 * * 1,4
   decorate: true
   extra_refs:
@@ -485,7 +554,7 @@ periodics:
       secret:
         secretName: osde2e-common
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 22 * * 0
   decorate: true
   extra_refs:
@@ -550,7 +619,7 @@ periodics:
       secret:
         secretName: osde2e-common
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -624,7 +693,7 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -689,7 +758,7 @@ periodics:
       secret:
         secretName: reference-addon-creds
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */3 * * 1-5
   decorate: true
   extra_refs:
@@ -750,7 +819,7 @@ periodics:
       secret:
         secretName: smart-events-osde2e-secret
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -787,7 +856,7 @@ periodics:
       - name: ADDON_POLLING_TIMEOUT
         value: "7200"
       - name: ADDON_TEST_HARNESSES
-        value: quay.io/edge-infrastructure/ci-artifacts
+        value: quay.io/edge-infrastructure/ci-tools-nvidia-gpu-operator:osde2e
       - name: CHANNEL
         value: stable
       - name: CLOUD_PROVIDER_REGION
@@ -830,7 +899,7 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 0 3 * *
   decorate: true
   decoration_config:
@@ -876,7 +945,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: '@midnight'
   decorate: true
   decoration_config:
@@ -922,7 +991,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 0 9 * * *
   decorate: true
   decoration_config:
@@ -968,7 +1037,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 45 * * * *
   decorate: true
   decoration_config:
@@ -1028,7 +1097,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1088,7 +1157,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1148,7 +1217,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1208,7 +1277,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1268,7 +1337,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1328,7 +1397,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1388,7 +1457,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1533,7 +1602,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1601,7 +1670,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 19 * * 0,2,4
   decorate: true
   decoration_config:
@@ -1668,7 +1737,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 5 * * 1
   decorate: true
   decoration_config:
@@ -1735,7 +1804,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1802,7 +1871,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
+  cluster: build03
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
