@@ -19,19 +19,16 @@ workflow:
     Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
   steps:
     env:
-      SUB_CHANNEL: stable
-      SUB_INSTALL_NAMESPACE: openshift-cnv
-      SUB_PACKAGE: kubevirt-hyperconverged
-      SUB_TARGET_NAMESPACES: '!install'
-      COMPUTE_NODE_TYPE: Standard_D8s_v3
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
     pre:
-      - chain: ipi-azure-pre
-      - ref: operatorhub-subscribe
-      - chain: hypershift-install
-      - chain: hypershift-kubevirt-create
+    - chain: ipi-aws-pre
+    - ref: hypershift-kubevirt-install
+    - chain: hypershift-install
+    - chain: hypershift-kubevirt-create
     test:
-      - chain: hypershift-conformance
+    - chain: hypershift-conformance
     post:
     - chain: hypershift-dump
     - chain: hypershift-kubevirt-destroy
-    - chain: ipi-azure-post
+    - chain: ipi-aws-post

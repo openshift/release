@@ -39,6 +39,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.18
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -138,6 +142,13 @@ tests:
     dependencies:
       INDEX_IMAGE: assisted-service-index
     workflow: hypershift-agent-conformance
+- as: e2e-conformance-kubevirt
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      CNV_PRERELEASE_VERSION: "4.12"
+    workflow: hypershift-kubevirt-conformance
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
