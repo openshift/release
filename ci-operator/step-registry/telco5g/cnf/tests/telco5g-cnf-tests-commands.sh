@@ -11,21 +11,6 @@ cat <<EOF >"${SKIP_TESTS_FILE}"
 
 # <feature> <test name>
 
-# this test is checking that there are no none cnf-worker nodes with rt kernel enabled.
-# when running cnf-tests in parallel we do have other nodes with rt kernel so the test is failing.
-performance "a node without performance profile applied should not have RT kernel installed"
-
-# need to investigate why it's failing
-sriov "Test Connectivity Connectivity between client and server Should work over a SR-IOV device"
-
-# this test needs both sriov and sctp available in the cluster.
-# since we run them in parallel we can't run this test.
-sriov "Allow access only to a specific port/protocol SCTP"
-
-# this test needs both sriov and sctp available in the cluster.
-# since we run them in parallel we can't run this test.
-sctp "Allow access only to a specific port/protocol SCTP"
-
 EOF
 }
 
@@ -35,10 +20,6 @@ function create_tests_temp_skip_list_11 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
-# SKIPTEST
-# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
-# TESTNAME
-sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
 EOF
 }
 
@@ -228,7 +209,10 @@ export CNF_NODES="${test_nodes}"
 
 cd cnf-features-deploy
 status=0
-FEATURES_ENVIRONMENT="ci" SKIP_TESTS="${skip_tests}" make functests-on-ci || status=$?
+if [[ -n "$skip_tests" ]]; then
+    export SKIP_TESTS="${skip_tests}"
+fi
+FEATURES_ENVIRONMENT="ci" make functests-on-ci || status=$?
 cd -
 
 set +e
