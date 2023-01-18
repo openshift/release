@@ -24,6 +24,8 @@ if [[ "$REF_ORG" != "$ORG" || "$REF_BASE" != "$BASE" ]]; then
     echo $EXTRA_REF_ORG
     if [[ "$EXTRA_REF_ORG" != "$ORG" || "$EXTRA_REF_BASE" != "$BASE" ]]; then
       echo "Failing since this step supports only ${BASE} changes."
+      # Debug Keystone operator
+      sleep 7200
       exit 1
     fi
 fi
