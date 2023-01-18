@@ -47,6 +47,8 @@ cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/installer/install-config.ya
 export PATH=${HOME}/.local/bin:${PATH}
 
 pushd ${ARTIFACT_DIR}/installer
+echo "waiting 1 hour...."
+sleep 3600
 
 base_domain=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
 AWS_REGION=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["platform"]["aws"]["region"])')
