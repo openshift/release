@@ -45,11 +45,6 @@ sriov "Webhook resource injector"
 sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
 
 # SKIPTEST
-# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
-# TESTNAME
-sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
-
-# SKIPTEST
 # bz### https://issues.redhat.com/browse/OCPBUGS-4194
 # TESTNAME
 performance "Should have the correct RPS configuration"
@@ -58,7 +53,18 @@ EOF
 }
 
 function create_tests_temp_skip_list_13 {
-    create_tests_temp_skip_list_12
+# List of temporarly skipped tests for 4.12
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### known bug
+# TESTNAME
+sriov "Should be able to configure a metaplugin"
+
+
+EOF
+
 }
 
 function is_bm_node {
@@ -187,6 +193,7 @@ status=0
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
+# export SKIP_TESTS=""
 FEATURES_ENVIRONMENT="ci" make functests-on-ci || status=$?
 cd -
 
