@@ -10,6 +10,7 @@ source ${SHARED_DIR}/platform-conf.sh
 # Debug
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+/usr/local/bin/fix_uid.sh
 ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" "find \${KUBECONFIG} -type f -exec cat {} \;" > ${KUBECONFIG}
 oc get nodes
 

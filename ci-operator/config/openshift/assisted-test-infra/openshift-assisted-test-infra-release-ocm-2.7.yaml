@@ -19,10 +19,6 @@ base_images:
     name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service
-  cluster-api-provider-agent:
-    name: ocm-2.7
-    namespace: edge-infrastructure
-    tag: cluster-api-provider-agent
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -31,10 +27,6 @@ base_images:
     name: govc
     namespace: ci
     tag: v0.29.0
-  hypershift-operator:
-    name: "4.11"
-    namespace: ocp
-    tag: hypershift-operator
 build_root:
   from_repository: true
 images:
@@ -158,24 +150,6 @@ tests:
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-capi
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: hypershift-operator
-      PROVIDER_IMAGE: cluster-api-provider-agent
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=12000
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      GATHER_CAPI_LOGS: "true"
-    workflow: assisted-baremetal
 - as: e2e-vsphere-assisted-kube-api
   optional: true
   steps:
@@ -237,24 +211,6 @@ tests:
         TEST_FUNC=test_late_binding_kube_api_ipv4_highly_available
         TEST=./src/tests/test_kube_api.py
         MAKEFILE_TARGET=test
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-upgrade-agent
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        TEST=./src/tests/test_upgrade_agent.py
-        TEST_FUNC=test_upgrade_agent
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-upgrade-agent-periodic
-  cron: 15 05 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        TEST=./src/tests/test_upgrade_agent.py
-        TEST_FUNC=test_upgrade_agent
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: release-ocm-2.7
