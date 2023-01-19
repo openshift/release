@@ -1,0 +1,62 @@
+base_images:
+  ansible:
+    name: "4.12"
+    namespace: ocp
+    tag: ansible
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: acm-interop-aws
+  interval: 960h
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CLOUD_PROVIDER_REGION: us-east-2
+      CLUSTER_DURATION: "3600"
+      CLUSTER_DURATION_AFTER_FAILURE: "3600"
+      CLUSTER_NAME: interop-opp
+      CLUSTER_VERSION: "4.12"
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      OCM_LOGIN_URL: https://api.stage.openshift.com
+      SUB_CHANNEL: release-2.6
+      SUB_INSTALL_NAMESPACE: open-cluster-management
+      SUB_PACKAGE: advanced-cluster-management
+      SUB_SOURCE: redhat-operators
+      SUB_TARGET_NAMESPACES: open-cluster-management
+    post:
+    - ref: osd-delete-delete
+    pre:
+    - ref: osd-create-create
+    test:
+    - chain: layered-product-opp
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: policy-collection
+  variant: opp-ocp4.12-interop
