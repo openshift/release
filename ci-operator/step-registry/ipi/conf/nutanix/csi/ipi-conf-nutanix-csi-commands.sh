@@ -54,11 +54,11 @@ spec:
       status: {}
 EOF
 
-cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-system-namespace.yaml" << EOF
+cat > "${SHARED_DIR}/manifest_0001-nutanix-csi-openshift-nutanix-csi-namespace.yaml" << EOF
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: ntnx-system
+  name: openshift-nutanix-csi
 EOF
 
 cat > "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml" << EOF
@@ -66,7 +66,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: ntnx-secret
-  namespace: ntnx-system
+  namespace: openshift-nutanix-csi
 stringData:
   key: ${PE_HOST}:${PE_PORT}:${PE_USERNAME}:${PE_PASSWORD}
 EOF
@@ -75,11 +75,11 @@ cat > "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml" << EOF
 apiVersion: operators.coreos.com/v1
 kind: OperatorGroup
 metadata:
-  name: ntnx-system-r8czl
-  namespace: ntnx-system
+  name: openshift-nutanix-csi-r8czl
+  namespace: openshift-nutanix-csi
 spec:
   targetNamespaces:
-    - ntnx-system
+    - openshift-nutanix-csi
 EOF
 
 cat > "${SHARED_DIR}/manifest_0004-nutanix-csi-subscription.yaml" << EOF
@@ -87,7 +87,7 @@ apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
   name: nutanixcsioperator
-  namespace: ntnx-system
+  namespace: openshift-nutanix-csi
 spec:
   channel: stable
   name: nutanixcsioperator
@@ -101,9 +101,9 @@ apiVersion: crd.nutanix.com/v1alpha1
 kind: NutanixCsiStorage
 metadata:
   name: nutanixcsistorage
-  namespace: ntnx-system
+  namespace: openshift-nutanix-csi
 spec:
-  namespace: ntnx-system
+  namespace: openshift-nutanix-csi
   tolerations:
     - key: "node-role.kubernetes.io/infra"
       operator: "Exists"
@@ -121,11 +121,11 @@ metadata:
 provisioner: csi.nutanix.com
 parameters:
   csi.storage.k8s.io/provisioner-secret-name: ntnx-secret
-  csi.storage.k8s.io/provisioner-secret-namespace: ntnx-system
+  csi.storage.k8s.io/provisioner-secret-namespace: openshift-nutanix-csi
   csi.storage.k8s.io/node-publish-secret-name: ntnx-secret
-  csi.storage.k8s.io/node-publish-secret-namespace: ntnx-system
+  csi.storage.k8s.io/node-publish-secret-namespace: openshift-nutanix-csi
   csi.storage.k8s.io/controller-expand-secret-name: ntnx-secret
-  csi.storage.k8s.io/controller-expand-secret-namespace: ntnx-system
+  csi.storage.k8s.io/controller-expand-secret-namespace: openshift-nutanix-csi
   csi.storage.k8s.io/fstype: ext4
   storageContainer: ${PE_STORAGE_CONTAINER}
   storageType: NutanixVolumes
