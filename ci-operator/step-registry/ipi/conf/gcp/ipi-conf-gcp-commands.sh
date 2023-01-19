@@ -98,3 +98,20 @@ EOF
   yq-go m -x -i "${CONFIG}" "${PATCH}"
   rm "${PATCH}"
 fi
+
+if ! [[ -z "${SECURE_BOOT}" ]]; then
+  PATCH="${SHARED_DIR}/secure_boot.yaml.patch"
+  cat > "${PATCH}" << EOF
+controlPlane:
+  platform:
+    gcp:
+      secureBoot: "${SECURE_BOOT}"
+compute:
+- name: worker
+  platform:
+    gcp:
+      secureBoot: "${SECURE_BOOT}"
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH}"
+  rm "${PATCH}"
+fi
