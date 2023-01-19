@@ -29,3 +29,4 @@ These resources provide some supplemental images to be used in CI builds.
 - `ubuntu.yaml`: Used by [kata-containers](../../../ci-operator/config/kata-containers)
 - `validation-images`: Used by [openshift/release](../../../ci-operator/config/openshift/release)
 - `hypershift`: Used by DPTP Hypershift-related workflows (e.g., ../../../ci-operator/step-registry/hypershift/hive)
+- `govulncheck`: Used by CRT to be notified about go dependency vulnerabilities (e.g. presubmits for ../../../ci-operator/config/openshift/release-controller)
