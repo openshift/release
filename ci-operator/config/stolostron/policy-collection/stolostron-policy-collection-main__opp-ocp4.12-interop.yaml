@@ -3,10 +3,6 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: ansible
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -32,29 +28,20 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: acm-interop-aws
+- as: opp-interop-aws
   interval: 960h
   steps:
-    cluster_profile: aws-cspi-qe
+    cluster_profile: aws-interop-qe
     env:
-      CLOUD_PROVIDER_REGION: us-east-2
-      CLUSTER_DURATION: "3600"
-      CLUSTER_DURATION_AFTER_FAILURE: "3600"
-      CLUSTER_NAME: interop-opp
-      CLUSTER_VERSION: "4.12"
-      COMPUTE_MACHINE_TYPE: m5.xlarge
-      OCM_LOGIN_URL: https://api.stage.openshift.com
+      BASE_DOMAIN: cnv-qe.rhood.us
       SUB_CHANNEL: release-2.6
       SUB_INSTALL_NAMESPACE: open-cluster-management
       SUB_PACKAGE: advanced-cluster-management
       SUB_SOURCE: redhat-operators
       SUB_TARGET_NAMESPACES: open-cluster-management
-    post:
-    - ref: osd-delete-delete
-    pre:
-    - ref: osd-create-create
     test:
     - chain: layered-product-opp
+    workflow: cucushift-installer-rehearse-aws-ipi-spot
 zz_generated_metadata:
   branch: main
   org: stolostron
