@@ -45,34 +45,9 @@ sriov "Webhook resource injector"
 sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
 
 # SKIPTEST
-# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
-# TESTNAME
-performance "should disable CPU load balancing for CPU\\\'s used by the pod"
-
-# SKIPTEST
-# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
-# TESTNAME
-performance "should run infra containers on reserved CPUs"
-
-# SKIPTEST
-# PR https://github.com/openshift-kni/cnf-features-deploy/pull/1302
-# TESTNAME
-performance "Huge pages support for container workloads"
-
-# SKIPTEST
 # bz### this test can't run in parallel with SRIOV/VRF tests and fails often
 # TESTNAME
 sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/CNF-6862
-# TESTNAME
-performance "Checking IRQBalance settings Verify irqbalance configuration handling Should not overwrite the banned CPU set on tuned restart"
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/CNF-6862
-# TESTNAME
-performance "Checking IRQBalance settings Verify irqbalance configuration handling Should store empty cpu mask in the backup"
 
 # SKIPTEST
 # bz### https://issues.redhat.com/browse/OCPBUGS-4194
