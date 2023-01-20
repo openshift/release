@@ -20,6 +20,7 @@ apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 metadata:
   name: policy-configure-subscription-admin-hub
+  namespace: policies
   annotations:
     policy.open-cluster-management.io/standards: NIST SP 800-53
     policy.open-cluster-management.io/categories: CM Configuration Management
@@ -86,6 +87,7 @@ apiVersion: policy.open-cluster-management.io/v1
 kind: PlacementBinding
 metadata:
   name: binding-policy-configure-subscription-admin-hub
+  namespace: policies
 placementRef:
   name: placement-policy-configure-subscription-admin-hub
   kind: PlacementRule
@@ -99,6 +101,7 @@ apiVersion: apps.open-cluster-management.io/v1
 kind: PlacementRule
 metadata:
   name: placement-policy-configure-subscription-admin-hub
+  namespace: policies
 spec:
   clusterConditions:
   - status: "True"

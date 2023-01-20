@@ -36,3 +36,4 @@ for i in $(seq "${RETRIES}"); do
 done
 
 echo "storage nodes are ready"
+
