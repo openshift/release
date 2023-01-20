@@ -74,14 +74,7 @@ provider "aws" {
   access_key = "${OMR_AWS_ACCESS_KEY}"
   secret_key = "${OMR_AWS_SECRET_KEY}"
 }
-resource "aws_internet_gateway" "igw" {
-  vpc_id = "${VpcId}"
-}
-resource "aws_route" "route-public" {
-  route_table_id         = "${VpcId}.${PublicSubnet}.main_route_table_id"
-  destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = aws_internet_gateway.igw.id
-}
+
 resource "aws_key_pair" "quaybuilder0710" {
   key_name   = var.quay_build_worker_key
   public_key = file("./quaybuilder.pub")
