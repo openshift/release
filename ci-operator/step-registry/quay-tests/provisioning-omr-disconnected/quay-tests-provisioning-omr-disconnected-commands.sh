@@ -14,7 +14,6 @@ HOME_PATH=$(pwd) && echo $HOME_PATH
 OMR_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-omr-secret/access_key)
 OMR_AWS_SECRET_KEY=$(cat /var/run/quay-qe-omr-secret/secret_key)
 OMR_CI_NAME="omrprowci$RANDOM"
-OMR_HOST_NAME="quayomrcitest$RANDOM.qe.devcluster.openshift.com"
 
 ####################
 # get vpc id and public subnet from disconnected AWS VPC
@@ -74,7 +73,6 @@ provider "aws" {
   access_key = "${OMR_AWS_ACCESS_KEY}"
   secret_key = "${OMR_AWS_SECRET_KEY}"
 }
-
 resource "aws_key_pair" "quaybuilder0710" {
   key_name   = var.quay_build_worker_key
   public_key = file("./quaybuilder.pub")
@@ -114,7 +112,7 @@ resource "aws_instance" "quaybuilder" {
       "sudo yum install podman openssl -y",
       "curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz",
       "tar -xzvf mirror-registry.tar.gz",
-      "sudo ./mirror-registry install --quayHostname ${OMR_HOST_NAME} --initPassword password --initUser quay -v"
+      "sudo ./mirror-registry install --quayHostname [aws_instance.quaybuilder.public_dns] --initPassword password --initUser quay -v"
     ]
   }
   connection {
@@ -127,17 +125,13 @@ resource "aws_instance" "quaybuilder" {
     Name = var.quay_build_instance_name
   }
 }
-resource "aws_route53_record" "quayomr" {
-  zone_id = "Z3B3KOVA3TRCWP"
-  name    = "${OMR_HOST_NAME}"
-  type    = "A"
-  ttl     = 300
-  records = [aws_instance.quaybuilder.public_ip]
-}
-output "instance_public_ip" {
-  value = aws_instance.quaybuilder.public_ip
+output "instance_public_dns" {
+  value = aws_instance.quaybuilder.public_dns
 }
 EOF
+
+OMR_HOST_NAME=$(terraform output instance_public_dns)
+echo "OMR HOST NAME is $OMR_HOST_NAME"
 
 cp /var/run/quay-qe-omr-secret/quaybuilder . && cp /var/run/quay-qe-omr-secret/quaybuilder.pub .
 chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >> quaybuilder
