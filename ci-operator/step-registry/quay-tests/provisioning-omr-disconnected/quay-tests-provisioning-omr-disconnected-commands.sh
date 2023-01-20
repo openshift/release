@@ -78,7 +78,7 @@ resource "aws_internet_gateway" "igw" {
   vpc_id = "${VpcId}"
 }
 resource "aws_route" "route-public" {
-  route_table_id         = "${VpcId}".quaybuilder.main_route_table_id
+  route_table_id         = "${VpcId}.${PublicSubnet}.main_route_table_id"
   destination_cidr_block = "0.0.0.0/0"
   gateway_id             = aws_internet_gateway.igw.id
 }
