@@ -196,10 +196,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
     shell: kcli scp root@${CLUSTER_NAME}-installer:/root/ocp/auth/kubeconfig /home/kni/.kube/config_${CLUSTER_NAME}
 
   - name: Add skip-tls-verify to kubeconfig
-    lineinfile:
+    replace:
       path: /home/kni/.kube/config_${CLUSTER_NAME}
-      regexp: '    certificate-authority-data:'
-      line: '    insecure-skip-tls-verify: true'
+      regexp: '    certificate-authority-data:.*'
+      replace: '    insecure-skip-tls-verify: true'
 
   - name: Grab the kubeconfig
     fetch:
@@ -208,11 +208,12 @@ cat << EOF > ~/fetch-kubeconfig.yml
       flat: yes
 
   - name: Modify local copy of kubeconfig
-    lineinfile:
+    replace:
       path: $SHARED_DIR/kubeconfig
       regexp: '    server: https://api.*'
-      line: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
+      replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
+
 EOF
 
 cat << EOF > ~/fetch-information.yml
