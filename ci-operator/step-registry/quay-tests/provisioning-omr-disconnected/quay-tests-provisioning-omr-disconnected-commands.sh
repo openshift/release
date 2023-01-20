@@ -113,7 +113,7 @@ resource "aws_instance" "quaybuilder" {
       "sudo yum install podman openssl -y",
       "curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz",
       "tar -xzvf mirror-registry.tar.gz",
-      "sudo ./mirror-registry install --quayHostname '${aws_instance.quaybuilder.public_dns}' --initPassword password --initUser quay -v"
+      "sudo ./mirror-registry install --quayHostname \$\{aws_instance.quaybuilder.public_dns\} --initPassword password --initUser quay -v"
     ]
   }
   connection {
