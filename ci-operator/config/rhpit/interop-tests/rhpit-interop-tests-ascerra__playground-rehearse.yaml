@@ -1,0 +1,50 @@
+base_images:
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_literal: |
+    FROM this-is-ignored
+    RUN dnf install -y git
+  from: cli
+  to: cli-with-git
+- context_dir: .
+  dockerfile_path: Dockerfile.interops
+  to: acm-clc
+- dockerfile_literal: |
+    FROM quay.io/vboulos/acmqe-automation/centos8-nodejs12
+  to: test-from
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: debug-rehearse-cspi
+  interval: 960h
+  steps:
+    cluster_profile: aws-cspi-qe
+    test:
+    - chain: layered-product-debug
+zz_generated_metadata:
+  branch: ascerra
+  org: rhpit
+  repo: interop-tests
+  variant: playground-rehearse
