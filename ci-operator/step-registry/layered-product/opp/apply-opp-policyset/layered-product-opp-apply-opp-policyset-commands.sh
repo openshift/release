@@ -124,9 +124,9 @@ EOF
 
 sleep 60
 
-# Script is failing here based on the cli iamge being used container not having
-# the git command installed we need a better container env to proceed or a better
-# way to call the policy generator.
+# cd to writeable directory
+cd tmp/
+
 git clone https://github.com/stolostron/policy-collection.git
 
 cd policy-collection/deploy/ 
