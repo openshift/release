@@ -240,6 +240,32 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: cloud-provider-nutanix
+  cron: 10 13 * * Mon,Thu
+  steps:
+    test:
+    - as: cloud-provider-nutanix
+      commands: |
+        rebasebot --source https://github.com/nutanix-cloud-native/cloud-provider-nutanix:main \
+                  --dest openshift/cloud-provider-nutanix:main \
+                  --rebase openshift-cloud-team/cloud-provider-nutanix:rebase-bot-main \
+                  --update-go-modules \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: make deps && make unittests
   container:
