@@ -7,13 +7,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.13
-images:
-- dockerfile_literal: |
-    FROM this-is-ignored
-    RUN dnf install -y git
-  from: cli
-  to: cli-with-git
+    tag: golang-1.15
 releases:
   initial:
     candidate:
@@ -31,12 +25,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: debug-rehearse-cspi
-  interval: 960h
+- as: acceptance
   steps:
-    cluster_profile: aws-cspi-qe
     test:
-    - chain: layered-product-debug
+    - as: test-command-env-var
+      cli: latest
+      commands: |
+        echo $CLONEREFS_OPTIONS
+        ls
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: main
   org: rhpit

@@ -6,7 +6,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/playground-rehearse-images
+    context: ci/prow/playground-rehearse-acceptance
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -15,15 +15,16 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.11"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rhpit-interop-tests-main-playground-rehearse-images
-    rerun_command: /test playground-rehearse-images
+    name: pull-ci-rhpit-interop-tests-main-playground-rehearse-acceptance
+    rerun_command: /test playground-rehearse-acceptance
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=acceptance
         - --variant=playground-rehearse
         command:
         - ci-operator
@@ -34,6 +35,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -45,10 +49,13 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )playground-rehearse-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )playground-rehearse-acceptance,?($|\s.*)
