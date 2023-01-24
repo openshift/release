@@ -246,7 +246,8 @@ cat << EOF > ~/fetch-information.yml
 EOF
 
 if [[ "$T5CI_JOB_TYPE" != "cnftests" ]]; then
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 fi 
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
+exit ${status}
