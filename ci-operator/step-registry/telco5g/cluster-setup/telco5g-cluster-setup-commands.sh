@@ -14,7 +14,6 @@ cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
-DSHVIP="$(cat /var/run/ds-hv-ip/dshvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 KCLI_PARAM=""
@@ -77,7 +76,7 @@ echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
-IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
+IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
 PLAN_NAME="${CLUSTER_NAME}_ci"
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
@@ -106,7 +105,7 @@ else
 # Run on downstream cnfdc1 without bastion
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${DSHVIP} ansible_host=${DSHVIP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
+${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
 fi
