@@ -10,4 +10,4 @@ job-run-aggregator analyze-job-runs \
   --payload-tag=${PAYLOAD_TAG} \
   --job-start-time=${JOB_START_TIME} \
   --working-dir=${WORKING_DIR} \
-  --timeout=6h
+  --timeout=7h
