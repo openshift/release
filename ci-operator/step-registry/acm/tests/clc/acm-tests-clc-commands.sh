@@ -1,17 +1,17 @@
 #!/bin/bash
-
 set -o nounset
 set -o errexit
 set -o pipefail
 
-# OCP parameters
-HUB_OCP_USERNAME=$1
-HUB_OCP_PASSWORD=$2
-HUB_OCP_API_URL=$3
-echo ${HUB_OCP_USERNAME}
-echo ${HUB_OCP_PASSWORD}
-echo ${HUB_OCP_API_URL}
+
+# THE FOLLOWING IS JUST FOR EXAMPLE PURPOSES FOR NOW.
 ls -al
+
+# Define the variables needed to create the MTR test configuration file. The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
+SECRETS_DIR="/tmp/secrets"
+
+# Example of setting a secret in the test script.
+EXAMPLE_CLC_SECRET=$(cat ${SECRETS_DIR}/clc/example_clc_secret)
 
 # Login to the Hub cluster
 oc login --insecure-skip-tls-verify -u $HUB_OCP_USERNAME -p $HUB_OCP_PASSWORD $HUB_OCP_API_URL
