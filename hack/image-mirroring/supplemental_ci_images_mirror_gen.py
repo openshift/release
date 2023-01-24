@@ -75,7 +75,7 @@ spec:
 
 def generate_namespaces(namespaces):
     ret = []
-    for namespace in namespaces:
+    for namespace in sorted(namespaces):
         metadata = {"name": namespace}
         ret.append({
             "apiVersion": "v1",
