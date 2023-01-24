@@ -34,6 +34,9 @@ finished()
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${ARTIFACT_DIR}"/root/dev-scripts/logs/*
 
+  # sleep to manually inspect proxy
+  sleep 3600
+
   # Save exit code for must-gather to generate junit. Make eats exit
   # codes, so we try to fetch it from the dev-scripts artifacts if we can.
   status_file=${ARTIFACT_DIR}/root/dev-scripts/logs/installer-status.txt
