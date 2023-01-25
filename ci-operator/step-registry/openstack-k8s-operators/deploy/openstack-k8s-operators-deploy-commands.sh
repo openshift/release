@@ -4,12 +4,45 @@ set -ex
 
 ORG="openstack-k8s-operators"
 OPENSTACK_OPERATOR="openstack-operator"
+SERVICE_NAME=$(echo "${OPENSTACK_OPERATOR^^}" | cut -f 1 -d '-')
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
 
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
+# Check org and project from job's spec
+REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
+REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
+# PR SHA
+PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
+# Get pull request info
+PR_NUMBER=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')
+#PR_API_URL="https://api.github.com/repos/${REF_ORG}/${REF_REPO}/pulls/${PR_NUMBER}"
+# TODO (dviroel): delete, testing non rehearsal job
+FAKE_PR_API_URL=https://api.github.com/repos/openstack-k8s-operators/openstack-operator/pulls/142
+PR_INFO=$(curl -s  -X GET -H \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    ${FAKE_PR_API_URL} | \
+    jq -r  '.head')
+#PR_REPO_NAME=$(echo ${PR_INFO} | jq -r  '.repo.full_name')
+PR_REPO_URL=$(echo ${PR_INFO} | jq -r  '.repo.html_url')
+PR_REPO_BRANCH=$(echo ${PR_INFO} | jq -r  '.ref')
+
+# Fails if step is not being used on openstack-k8s-operators repos
+# Gets base repo name
+IS_REHEARSAL=false
+if [[ "$REF_ORG" != "$ORG" ]]; then
+    echo "Not a ${ORG} job. Checking if isn't a rehearsal job..."
+    EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
+    EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
+    if [[ "$EXTRA_REF_ORG" != "$ORG" ]]; then
+      echo "Failing since this step supports only ${ORG} changes."
+      exit 1
+    fi
+    IS_REHEARSAL=true
+fi
 
 export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${OPENSTACK_OPERATOR}
 export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
@@ -56,8 +89,14 @@ oc get csv ${INSTALLED_CSV} -o jsonpath='{.spec.install.spec.deployments[*].name
 timeout ${TIMEOUT_OPERATORS_AVAILABLE} xargs -I {} -d ' ' \
 sh -c 'oc wait --for=condition=Available deployment {} --timeout=-1s'
 
+# If is a rehearsal job, there is no change in operator code, runs in master branch
+# TODO(dviroel) move to == false
+if [[ "$IS_REHEARSAL" == true ]]; then
+  export ${SERVICE_NAME}_REPO=${PR_REPO_URL}
+  export ${SERVICE_NAME}_BRANCH=${PR_REPO_BRANCH}
+fi
 # Deploy openstack services with the sample from the PR under test
-OPENSTACK_CR=/go/src/github.com/${ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml make openstack_deploy
+make openstack_deploy
 sleep 60
 
 # Waiting for all services to be ready
