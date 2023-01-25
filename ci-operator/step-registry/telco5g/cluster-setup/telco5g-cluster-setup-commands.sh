@@ -65,6 +65,13 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
+    when: cnftests == "false"
+  - name: Get prepared cluster parameters
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster --cluster-name cnfdc2 --force
+    register: cluster
+    environment:
+      JOB_NAME: ${JOB_NAME:-'unknown'}
+    when: cnftests == "true"
   - name: Create a file with cluster name
     shell: echo "{{ cluster.stdout }}" > $SHARED_DIR/cluster_name
     delegate_to: localhost
@@ -74,7 +81,13 @@ EOF
 ping ${BASTION_IP} -c 10 || true
 echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
 
-ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
+CNF_ARG=""
+
+if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
+  CNF_ARG="-e cnftests=true"
+fi
+
+ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv $CNF_ARG
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
@@ -232,6 +245,8 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
+if [[ "$T5CI_JOB_TYPE" != "cnftests" ]]; then
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv
+fi 
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv
