@@ -33,19 +33,9 @@ tests:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: govet
-  commands: ./hack/go-vet.sh ./...
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
   container:
     from: src
-  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
-- as: golint
-  commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export GOPROXY=https://proxy.golang.org
-    golangci-lint run --verbose --print-resources-usage --new-from-rev=HEAD~
-  container:
-    clone: true
-    from: golangci-lint
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor
