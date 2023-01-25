@@ -182,10 +182,6 @@ publishing-bot:
 	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
 .PHONY: publishing-bot
 
-service-idler:
-	$(MAKE) apply WHAT=projects/service-idler/pipeline.yaml
-.PHONY: service-idler
-
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
 	$(MAKE) apply WHAT=projects/cluster-operator/cluster-operator-team-roles.yaml
