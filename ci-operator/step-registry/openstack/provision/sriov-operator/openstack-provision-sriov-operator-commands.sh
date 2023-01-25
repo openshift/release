@@ -98,6 +98,18 @@ if [ -n "${is_dev_version:-}" ]; then
     # CLUSTER_TYPE is used by both openshift/release and the operator, so we need to unset it
     # to let the operator figure out which cluster type it is.
     unset CLUSTER_TYPE
+
+    oc create ns openshift-sriov-network-operator
+    # This is needed to avoid the error where sriov-network-config-daemon fails to start because
+    # it violates PodSecurity.
+    # When the operator is installed from source, it doesn't have the necessary permissions
+    # to be used in OpenShift.
+    oc label ns openshift-sriov-network-operator --overwrite \
+        pod-security.kubernetes.io/audit=privileged \
+        pod-security.kubernetes.io/enforce=privileged \
+        pod-security.kubernetes.io/warn=privileged \
+        security.openshift.io/scc.podSecurityLabelSync=false
+
     make deploy-setup
     popd
     wait_for_sriov_pods
