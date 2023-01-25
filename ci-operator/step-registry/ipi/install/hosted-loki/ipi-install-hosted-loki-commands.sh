@@ -33,6 +33,8 @@ metadata:
   name: openshift-e2e-loki
   labels:
     pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
 EOF
 cat >> "${SHARED_DIR}/manifest_clusterrole.yml" << EOF
 apiVersion: rbac.authorization.k8s.io/v1

@@ -9,6 +9,14 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.18-openshift-4.12
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN yum update -y && yum install -y python39 python39-pip
+    RUN alternatives --set python3 /usr/bin/python3.9
+    RUN pip3 install pre-commit
+  from: src
+  to: pre-commit-container
 resources:
   '*':
     limits:
@@ -19,7 +27,7 @@ resources:
 tests:
 - as: functional
   commands: |
-    export GOFLAGS=-mod=mod
+    export GOFLAGS=
     make gotest
   container:
     from: src
@@ -44,6 +52,17 @@ tests:
   commands: make gofmt || true
   container:
     from: src
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export GOFLAGS=
+    export PRE_COMMIT_HOME=/tmp
+    export GOLANGCI_LINT_CACHE=/tmp
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    pre-commit run --all-files --show-diff-on-failure
+  container:
+    from: pre-commit-container
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators

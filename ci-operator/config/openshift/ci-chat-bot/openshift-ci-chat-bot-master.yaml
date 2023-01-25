@@ -7,6 +7,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.45.2
+  govulncheck:
+    name: govulncheck
+    namespace: ci
+    tag: latest
 build_root:
   from_repository: true
 images:
@@ -37,6 +41,11 @@ tests:
   commands: make verify
   container:
     from: src
+- as: govulncheck
+  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
+  container:
+    from: govulncheck
+  optional: true
 zz_generated_metadata:
   branch: master
   org: openshift

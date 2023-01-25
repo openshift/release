@@ -92,7 +92,11 @@ if [[ -f ${SHARED_DIR}"/BASTION_NET_ID" ]]; then
   server_params+=" --network $BASTION_NET_ID"
 fi
 
-server_params+=" --network $MACHINES_NET_ID"
+PROXY_PORT_ID="$(openstack port create --security-group $sg_id --fixed-ip subnet=$MACHINES_SUBNET_ID,ip-address=$PROXY_INTERFACE --network $MACHINES_NET_ID $CLUSTER_NAME-proxy -f value -c id)"
+>&2 echo "Created port $CLUSTER_NAME-proxy: ${PROXY_PORT_ID}"
+echo ${PROXY_PORT_ID}>${SHARED_DIR}/PROXY_PORT_ID
+
+server_params+=" --port $PROXY_PORT_ID"
 
 server_id="$(openstack server create -f value -c id $server_params \
 		"bastionproxy-$CLUSTER_NAME-${CONFIG_TYPE}")"
@@ -135,13 +139,12 @@ echo ${SQUID_AUTH}>${SHARED_DIR}/SQUID_AUTH
 MACHINES_GATEWAY_IP=""
 SQUID_IP=$bastion_fip
 if [[ "${CONFIG_TYPE}" == "proxy" ]]; then
-  # Right now we assume that the bastion will be connected to one machines network via a port.
-  # This command will have to be revisited if we want more ports on this machine.
-  PROXY_INTERFACE="$(openstack port list --network $MACHINES_NET_ID --server "$server_id" \
-    -c fixed_ips -f value |cut -d':' -f3 |cut -f1 -d '}' |sed -e "s/'//" -e "s/'$//")"
   SQUID_IP=$PROXY_INTERFACE
   echo ${PROXY_INTERFACE}>${SHARED_DIR}/PROXY_INTERFACE
   openstack subnet set --no-dns-nameservers --dns-nameserver ${PROXY_INTERFACE} ${MACHINES_SUBNET_ID}
+  if [[ "${NETWORK_TYPE}" == "OVNKubernetes" ]]; then
+    openstack subnet set --gateway ${PROXY_INTERFACE} ${MACHINES_SUBNET_ID}
+  fi
   echo "Subnet ${MACHINES_SUBNET_ID} was updated to use ${SQUID_IP} as DNS server"
   if [[ "${NETWORK_TYPE}" == "Kuryr" ]]; then
     MACHINES_GATEWAY_IP="$(openstack subnet show -c gateway_ip -f value $MACHINES_SUBNET_ID)"

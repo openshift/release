@@ -11,6 +11,7 @@ fi
 
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 CLUSTER_NAME=$(<"${SHARED_DIR}"/CLUSTER_NAME)
+PROXY_PORT_ID=$(<"${SHARED_DIR}"/PROXY_PORT_ID)
 
 if [[ -f "${SHARED_DIR}/squid-credentials.txt" ]]; then
     echo "Proxy is permanent, nothing to cleanup"
@@ -47,6 +48,7 @@ EOF
 fi
 
 openstack server delete --wait "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete server bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
+openstack port delete $PROXY_PORT_ID || >&2 echo "Failed to delete proxy port ${PROXY_PORT_ID}"
 openstack security group delete "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete security group bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
 openstack keypair delete "bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}" || >&2 echo "Failed to delete keypair bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
 >&2 echo 'Cleanup done.'

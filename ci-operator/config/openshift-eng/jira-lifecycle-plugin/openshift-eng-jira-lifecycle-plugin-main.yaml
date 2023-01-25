@@ -1,4 +1,8 @@
 base_images:
+  govulncheck:
+    name: govulncheck
+    namespace: ci
+    tag: latest
   os:
     name: centos
     namespace: origin
@@ -34,6 +38,11 @@ tests:
   commands: make test
   container:
     from: src
+- as: govulncheck
+  commands: GOCACHE=$(mktemp -d) GOMODCACHE=$(mktemp -d) govulncheck ./...
+  container:
+    from: govulncheck
+  optional: true
 zz_generated_metadata:
   branch: main
   org: openshift-eng

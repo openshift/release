@@ -12,6 +12,7 @@ ENV VERSION=1.14.6 \
     GOPATH=/go \
     GOROOT=/usr/local/go \
     GOFLAGS='-mod=vendor' \
+    GO111MODULE=on \
     LOGNAME=deadbeef
 ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
@@ -27,18 +28,19 @@ RUN yum install -y epel-release && \
     git config --system user.email origin-release@redhat.com
 
 ADD *.rpm /tmp/origin-rpm/
+COPY glide-go.mod /tmp/glide-install/go.mod
 RUN yum install -y /tmp/origin-rpm/*.rpm && \
     yum clean all && \
     curl https://storage.googleapis.com/golang/go$VERSION.linux-$(uname -m | sed 's/x86_64/amd64/g').tar.gz | tar -C /usr/local -xzf - && \
-    go get golang.org/x/tools/cmd/cover \
-        github.com/Masterminds/glide \
-        golang.org/x/tools/cmd/goimports \
-        github.com/tools/godep \
-        github.com/openshift/release/tools/gotest2junit \
-        github.com/openshift/imagebuilder/cmd/imagebuilder && \
-    GO111MODULE=on go get golang.org/x/lint/golint \
-        gotest.tools/gotestsum && \
-    GO111MODULE=on go get gotest.tools/gotestsum@v0.5.2 && \
+    pushd . && cd /tmp/glide-install && go get github.com/Masterminds/glide && popd && rm -rf /tmp/glide-install && \
+    go get golang.org/x/tools/cmd/cover && \
+    go get golang.org/x/tools/cmd/goimports && \
+    go get github.com/tools/godep && \
+    go get github.com/openshift/release/tools/gotest2junit && \
+    go get github.com/openshift/imagebuilder/cmd/imagebuilder && \
+    go get golang.org/x/lint/golint && \
+    go get gotest.tools/gotestsum && \
+    go get gotest.tools/gotestsum@v0.5.2 && \
     mv $GOPATH/bin/* /usr/bin/ && \
     rm -rf $GOPATH/* $GOPATH/.cache && \
     mkdir $GOPATH/bin && \

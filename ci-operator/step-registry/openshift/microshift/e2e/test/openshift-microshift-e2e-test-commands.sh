@@ -4,6 +4,7 @@ set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
@@ -33,12 +34,9 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-${PAYLOAD_PATH}/usr/bin/openshift-tests run --dry-run --provider=none "${TEST_SUITE}" > "${HOME}"/suite.txt
-chmod +r "${HOME}"/suite.txt
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${INSTANCE_PREFIX}.${BASE_DOMAIN}/kubeconfig" > /tmp/kubeconfig
 
-# scp and install microshift.service
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
---quiet \
---project "${GOOGLE_PROJECT_ID}" \
---zone "${GOOGLE_COMPUTE_ZONE}" \
---recurse "${HOME}"/suite.txt rhel8user@"${INSTANCE_PREFIX}":~/suite.txt
+PATH=${PAYLOAD_PATH}/usr/bin:$PATH KUBECONFIG=/tmp/kubeconfig ${PAYLOAD_PATH}/usr/bin/openshift-tests run "${TEST_SUITE}" -v 2 --provider=none -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
