@@ -4,12 +4,12 @@ build_root:
 releases:
   initial:
     integration:
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.11"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':
@@ -19,20 +19,34 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: che-operator-update
+- as: chectl
   steps:
     cluster_profile: aws
     test:
-    - as: test
+    - as: chectl
       cli: latest
-      commands: build/scripts/oc-tests/oc-test-upgrade-from-stable-to-stable.sh
+      commands: .ci/oc-test-chectl.sh
       from: src
       resources:
         requests:
           cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws
+- as: chectl-devworkspace-happy-path
+  steps:
+    cluster_profile: aws
+    test:
+    - as: chectl-devworkspace-happy-path
+      cli: latest
+      commands: .ci/oc-test-happy-path.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: openshift-e2e-aws
 zz_generated_metadata:
-  branch: 7.60.x
-  org: eclipse-che
-  repo: che-operator
-  variant: v11
+  branch: 7.62.x
+  org: che-incubator
+  repo: chectl
+  variant: v12
