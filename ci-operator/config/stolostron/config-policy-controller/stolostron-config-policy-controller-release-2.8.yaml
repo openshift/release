@@ -11,15 +11,16 @@ binary_build_commands: make build
 build_root:
   from_repository: true
 images:
-- dockerfile_path: ./Dockerfile
+- dockerfile_path: build/Dockerfile
   from: base
   inputs:
     stolostron_builder_go1.19-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.19-linux
-  to: cert-policy-controller
+  to: config-policy-controller
 promotion:
-  name: "2.7"
+  disabled: true
+  name: "2.8"
   namespace: stolostron
 resources:
   '*':
@@ -30,28 +31,28 @@ tests:
 - as: pr-image-mirror
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: cert-policy-controller
+      SOURCE_IMAGE_REF: config-policy-controller
     env:
-      IMAGE_REPO: cert-policy-controller
+      IMAGE_REPO: config-policy-controller
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: latest-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: cert-policy-controller
+      SOURCE_IMAGE_REF: config-policy-controller
     env:
-      IMAGE_REPO: cert-policy-controller
-      IMAGE_TAG: latest-2.7
+      IMAGE_REPO: config-policy-controller
+      IMAGE_TAG: latest-2.8
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: cert-policy-controller
+      SOURCE_IMAGE_REF: config-policy-controller
     env:
-      IMAGE_REPO: cert-policy-controller
+      IMAGE_REPO: config-policy-controller
       REGISTRY_ORG: stolostron
     test:
     - as: publish
@@ -70,6 +71,6 @@ tests:
           memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: release-2.7
+  branch: release-2.8
   org: stolostron
-  repo: cert-policy-controller
+  repo: config-policy-controller
