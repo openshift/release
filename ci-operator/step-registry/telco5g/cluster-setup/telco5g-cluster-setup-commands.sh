@@ -45,6 +45,13 @@ cat << EOF > $SHARED_DIR/bastion_inventory
 ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
+ADDITIONAL_ARG=""
+if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
+  ADDITIONAL_ARG="--cluster-name cnfdc2 --force"
+else
+  ADDITIONAL_ARG="-e $CL_SEARCH"
+fi
+
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
 - name: Grab and run kcli to install openshift cluster
@@ -60,17 +67,10 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -e $CL_SEARCH
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
-    when: cnftests == "false"
-  - name: Get prepared cluster parameters
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster --cluster-name cnfdc2 --force
-    register: cluster
-    environment:
-      JOB_NAME: ${JOB_NAME:-'unknown'}
-    when: cnftests == "true"
   - name: Create a file with cluster name
     shell: echo "{{ cluster.stdout }}" > $SHARED_DIR/cluster_name
     delegate_to: localhost
@@ -80,13 +80,7 @@ EOF
 ping ${BASTION_IP} -c 10 || true
 echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
 
-CNF_ARG=""
-
-if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
-  CNF_ARG="-e cnftests=true"
-fi
-
-ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv $CNF_ARG
+ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
@@ -246,7 +240,7 @@ cat << EOF > ~/fetch-information.yml
 EOF
 
 if [[ "$T5CI_JOB_TYPE" != "cnftests" ]]; then
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+  ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 fi 
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
