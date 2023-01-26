@@ -3,12 +3,31 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: base
+  coreos_centos_stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
   golangci-lint:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
 build_root:
   from_repository: true
+images:
+- dockerfile_literal: |
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y "dnf-command(config-manager)" && \
+    dnf config-manager --set-enabled powertools && \
+    dnf install -y \
+      git \
+      golang \
+      nmstate-devel && \
+    dnf clean all
+  inputs:
+    coreos_centos_stream8:
+      as:
+      - quay.io/centos/centos:stream8
+  to: agent-installer-gotools
 releases:
   initial:
     integration:
@@ -30,15 +49,15 @@ tests:
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
-    from: src
+    from: agent-installer-gotools
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: govet
   commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
   container:
-    from: src
+    from: agent-installer-gotools
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-vendor
-  commands: IS_CONTAINER=TRUE ./hack/verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
   container:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
