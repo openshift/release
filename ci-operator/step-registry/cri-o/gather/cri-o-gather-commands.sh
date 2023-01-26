@@ -11,7 +11,15 @@ ${SHARED_DIR}/login_script.sh
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 
 timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
-    REPO_DIR="/home/deadbeef/cri-o"
-    cd "\${REPO_DIR}/contrib/test/ci"
-    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow" --connection=local -vvv --tags setup,e2e
+    sudo chown -R deadbeef /tmp/*
+    sudo chmod -R 777 /tmp/artifacts/*
 EOF
+
+
+function getlogs() {
+  echo "### Downloading logs..."
+  gcloud compute scp --recurse --zone "${ZONE}" --recurse "${instance_name}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
+}
+
+# Gather logs regardless of what happens after this
+trap getlogs EXIT
