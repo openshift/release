@@ -27,12 +27,24 @@ function populate_artifact_dir() {
   esac
 }
 
-function prepare_next_steps() {
-  #Save exit code for must-gather to generate junit
-  echo "$?" > "${SHARED_DIR}/install-status.txt"
-  set +e
-  echo "Setup phase finished, prepare env for next steps"
-  populate_artifact_dir
+# copy_auth_artifacts runs in the background to monitor auth files
+# when all files are available, it copes it to shared dir to propagate kubconfig
+# to other steps
+function copy_auth_artifacts() {
+  local dir=${1}
+  echo "waiting for ${dir}/auth/kubeconfig to exist"
+  while [ ! -s  "${dir}/auth/kubeconfig" ]
+  do
+    sleep 5
+  done
+  echo 'kubeconfig received!'
+
+  echo 'waiting for api to be available'
+  until env KUBECONFIG="${dir}/auth/kubeconfig" oc get --raw / >/dev/null 2>&1; do
+    sleep 5
+  done
+  echo 'api available'
+
   echo "Copying required artifacts to shared dir"
   #Copy the auth artifacts to shared dir for the next steps
   cp \
@@ -40,6 +52,14 @@ function prepare_next_steps() {
       "${dir}/auth/kubeconfig" \
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
+}
+
+function prepare_next_steps() {
+  #Save exit code for must-gather to generate junit
+  echo "$?" > "${SHARED_DIR}/install-status.txt"
+  set +e
+  echo "Setup phase finished, prepare env for next steps"
+  populate_artifact_dir
 
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
@@ -337,6 +357,8 @@ esac
 dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
+
+copy_auth_artifacts ${dir} &
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
