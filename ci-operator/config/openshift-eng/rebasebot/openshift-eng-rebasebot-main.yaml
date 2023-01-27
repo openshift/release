@@ -266,6 +266,32 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: cluster-api
+  cron: 20 13 * * Mon,Thu
+  steps:
+    test:
+    - as: cluster-api
+      commands: |
+        rebasebot --source https://github.com/kubernetes-sigs/cluster-api:main \
+                  --dest openshift/cluster-api:master \
+                  --rebase openshift-cloud-team/cluster-api:rebase-bot-main \
+                  --update-go-modules \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: make deps && make unittests
   container:
