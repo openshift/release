@@ -239,9 +239,12 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
+NOT_CNFTESTS=`false`
+status=0 
 if [[ "$T5CI_JOB_TYPE" != "cnftests" ]]; then
+  NOT_CNFTESTS=`true`
   ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 fi 
-ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
+ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || $NOT_CNFTESTS
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || $NOT_CNFTESTS
 exit ${status}
