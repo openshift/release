@@ -3,6 +3,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-base-openshift-4.13
+  ocp_builder_rhel-9-base-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.13
 build_root:
   from_repository: true
 images:
@@ -25,6 +29,13 @@ images:
 - context_dir: ipfailover/keepalived
   from: base
   to: keepalived-ipfailover
+- context_dir: base
+  dockerfile_path: Dockerfile.rhel9
+  inputs:
+    ocp_builder_rhel-9-base-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-base-openshift-4.13
+  to: base-rhel9
 promotion:
   name: "4.13"
   namespace: ocp
