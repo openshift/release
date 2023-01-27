@@ -10,6 +10,9 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
     exit 1
 fi
 
+
+echo "REMOVE ME, TRIGGER vSphere 8 job only"
+
 vsphere_datacenter="SDDC-Datacenter"
 vsphere_datastore="WorkloadDatastore"
 vsphere_cluster="Cluster-1"
@@ -21,7 +24,7 @@ vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
 VCENTER_AUTH_PATH=/var/run/vault/vsphere/secrets.sh
 
 LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
-# For leases >= than 88, run on the IBM Cloud 
+# For leases >= than 88, run on the IBM Cloud
 if [ ${LEASE_NUMBER} -ge 88 ] && [ ${LEASE_NUMBER} -lt 200 ]; then
   echo Scheduling job on IBM Cloud instance
   VCENTER_AUTH_PATH=/var/run/vault/ibmcloud/secrets.sh
