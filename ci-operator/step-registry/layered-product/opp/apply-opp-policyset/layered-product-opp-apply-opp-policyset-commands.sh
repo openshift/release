@@ -142,7 +142,7 @@ for i in $(seq "${RETRIES}"); do
     break
   else
     echo "Try ${i}/${RETRIES}: Policies are not compliant. Checking again in 30 seconds"
-    sleep 30
+    sleep 60
   fi
 done
 
