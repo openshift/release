@@ -143,7 +143,7 @@ terraform apply -auto-approve
 tar -cvzf terraform.tgz --exclude=".terraform" *
 cp terraform.tgz ${SHARED_DIR}
 
-#Use Terraform to output the Public DNS Name of AWS EC2 Instance
+#Use Terraform to output the Public DNS Name
 OMR_HOST_NAME=$(terraform output instance_public_dns | tr -d '"')
 echo "OMR HOST NAME is $OMR_HOST_NAME"
 
