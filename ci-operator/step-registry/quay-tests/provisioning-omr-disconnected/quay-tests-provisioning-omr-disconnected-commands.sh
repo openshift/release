@@ -143,7 +143,7 @@ terraform apply -auto-approve
 tar -cvzf terraform.tgz --exclude=".terraform" *
 cp terraform.tgz ${SHARED_DIR}
 
-#Use Terraform to output the Public DNS Name
+#Use Terraform to output the Public DNS Name of Quay OMR
 OMR_HOST_NAME=$(terraform output instance_public_dns | tr -d '"')
 echo "OMR HOST NAME is $OMR_HOST_NAME"
 
