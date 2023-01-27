@@ -11,3 +11,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 echo "Wait for cluster operators' progressing ready..."
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=30m
 echo "All cluster operators are done progressing."
+sleep 3600s
+sleep 3600s
+sleep 3600s
+sleep 3600s
