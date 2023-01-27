@@ -1,0 +1,44 @@
+base_images:
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+images:
+- dockerfile_literal: |
+    FROM this-is-ignored
+    RUN dnf install -y git
+  from: cli
+  to: cli-with-git
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: debug-cspi-qe
+  interval: 960h
+  steps:
+    cluster_profile: aws-cspi-qe
+    test:
+    - chain: layered-product-debug
+zz_generated_metadata:
+  branch: main
+  org: cspi-qe
+  repo: privtest
+  variant: testing
