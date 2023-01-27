@@ -113,7 +113,7 @@ parameters:
   required: true 
 - description: the number of replica 
   name: REPLICA_COUNT
-  value: "7"
+  value: "6"
   required: true 
 - description: instance type of cluter 
   name: INSTANCE_TYPE
