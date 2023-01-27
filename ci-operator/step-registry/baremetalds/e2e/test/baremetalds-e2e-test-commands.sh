@@ -270,3 +270,6 @@ suite)
     exit 1
     ;;
 esac
+
+# sleep to manually inspect environment
+sleep 3600
