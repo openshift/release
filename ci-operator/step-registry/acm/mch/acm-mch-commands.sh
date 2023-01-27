@@ -4,25 +4,27 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "This is the acm-mch-command.sh space running"
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-
-# Apply MultiClusterHub custom resource definition
+echo "Apply multiclusterhub"
+# apply MultiClusterHub crd
 oc apply -f - <<EOF
-apiVersion: "${API_VERSION}"
+apiVersion: operator.open-cluster-management.io/v1
 kind: MultiClusterHub
 metadata:
   name: multiclusterhub
-  namespace: "${NAMESPACE}"
+  namespace: ocm
 spec: {}
 EOF
 
-# Need to sleep a bit before we start checking to see if MCH is running.
+# can't wait before the resource exists. Need to sleep a bit before start watching
 sleep 60
 
 RETRIES=30
 for i in $(seq "${RETRIES}"); do
-  if [[ $(oc get mch -n ${NAMESPACE} -o=jsonpath='{.items[0].status.phase}') == "Running" ]]; then
+  if [[ $(oc get mch -n ocm -o=jsonpath='{.items[0].status.phase}') == "Running" ]]; then
     echo "MCH is Running"
     break
   else
@@ -31,4 +33,6 @@ for i in $(seq "${RETRIES}"); do
   fi
 done
 
-echo "Successfully installed MCH"
+echo "successfully installed MCH"
+
+sleep 600
