@@ -107,6 +107,50 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
+- as: operator-e2e-experimental-features
+  steps:
+    allow_skip_on_success: true
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: addon-operator
+      OO_TARGET_NAMESPACES: '!all'
+    pre:
+    - chain: ipi-aws-pre
+    - as: label-infra-nodes
+      commands: ./mage test:integrationciprepare
+      dependencies:
+      - env: EXPERIMENTAL_FEATURES
+        name: "true"
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - ref: optional-operators-subscribe
+    test:
+    - as: test
+      commands: ENABLE_WEBHOOK=true make test-e2e
+      dependencies:
+      - env: ADDON_OPERATOR_MANAGER_IMAGE
+        name: addon-operator-manager
+      - env: ADDON_OPERATOR_WEBHOOK_IMAGE
+        name: addon-operator-webhook
+      - env: API_MOCK_IMAGE
+        name: api-mock
+      - env: OO_INDEX
+        name: replaced-by-ci-operator
+      - env: EXPERIMENTAL_FEATURES
+        name: "true"
+      from: src
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: openshift

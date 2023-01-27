@@ -5,11 +5,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-4-10
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -80,11 +78,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-4-11
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -155,11 +151,156 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
+    context: ci/prow/e2e-metal-assisted-4-12
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-12
+    rerun_command: /test e2e-metal-assisted-4-12
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-assisted-4-12-cluster-profile
+        - --target=e2e-metal-assisted-4-12
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-assisted-4-12-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-packet-assisted
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-4-12,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^cloud_hotfix_releases$
+    - ^cloud_hotfix_releases-
+    cluster: build05
+    context: ci/prow/e2e-metal-assisted-4-13
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cloud: packet-edge
+      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-service-cloud_hotfix_releases-e2e-metal-assisted-4-13
+    optional: true
+    rerun_command: /test e2e-metal-assisted-4-13
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-metal-assisted-4-13-cluster-profile
+        - --target=e2e-metal-assisted-4-13
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-metal-assisted-4-13-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-packet-assisted
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-metal-assisted-4-13,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^cloud_hotfix_releases$
+    - ^cloud_hotfix_releases-
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-4-8
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -230,11 +371,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-4-9
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -305,11 +444,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-cnv
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -381,11 +518,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-day2
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -456,11 +591,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-ipv4v6
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -531,11 +664,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-lvm
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -607,11 +738,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-ocs
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -683,11 +812,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-odf
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -759,11 +886,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-onprem
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -834,11 +959,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-single-node
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -909,11 +1032,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-metal-assisted-static-ip-suite
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
@@ -984,11 +1105,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.12"
@@ -1034,11 +1153,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/lint
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.12"
@@ -1084,11 +1201,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/subsystem-aws
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.12"
@@ -1149,11 +1264,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/unit-test
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.12"
@@ -1207,11 +1320,9 @@ presubmits:
     branches:
     - ^cloud_hotfix_releases$
     - ^cloud_hotfix_releases-
-    cluster: build04
+    cluster: build05
     context: ci/prow/verify-generated-code
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       job-release: "4.12"

@@ -2,6 +2,7 @@
 
 set -ex
 
+ORG="openstack-k8s-operators"
 OPENSTACK_OPERATOR="openstack-operator"
 
 # We don't want to use OpenShift-CI build cluster namespace
@@ -55,8 +56,8 @@ oc get csv ${INSTALLED_CSV} -o jsonpath='{.spec.install.spec.deployments[*].name
 timeout ${TIMEOUT_OPERATORS_AVAILABLE} xargs -I {} -d ' ' \
 sh -c 'oc wait --for=condition=Available deployment {} --timeout=-1s'
 
-# Deploy openstack services
-make openstack_deploy
+# Deploy openstack services with the sample from the PR under test
+OPENSTACK_CR=/go/src/github.com/${ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml make openstack_deploy
 sleep 60
 
 # Waiting for all services to be ready

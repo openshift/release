@@ -50,6 +50,25 @@ function wait_for_sriov_pods() {
     fi
 }
 
+function wait_for_sriov_network_node_state() {
+    # Wait up to 5 minutes for SriovNetworkNodeState to be succeeded
+    for _ in $(seq 1 10); do
+        NODES_READY=$(oc get SriovNetworkNodeState --no-headers -n openshift-sriov-network-operator -o jsonpath='{.items[*].status.syncStatus}' | grep Succeeded | wc -l || true)
+        if [ "${NODES_READY}" == "1" ]; then
+            FOUND_NODE=1
+            break
+        fi
+        echo "Waiting for SriovNetworkNodeState to be succeeded"
+        sleep 30
+    done
+
+    if [ ! -n "${FOUND_NODE:-}" ] ; then
+        echo "SriovNetworkNodeState is not succeeded after 5 minutes"
+        oc get SriovNetworkNodeState -n openshift-sriov-network-operator -o yaml
+        exit 1
+    fi
+}
+
 oc_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
 ocp_url="curl -o /dev/null -s -w '%{http_code}\n' https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable-${oc_version}/"
 
@@ -79,9 +98,22 @@ if [ -n "${is_dev_version:-}" ]; then
     # CLUSTER_TYPE is used by both openshift/release and the operator, so we need to unset it
     # to let the operator figure out which cluster type it is.
     unset CLUSTER_TYPE
+
+    oc create ns openshift-sriov-network-operator
+    # This is needed to avoid the error where sriov-network-config-daemon fails to start because
+    # it violates PodSecurity.
+    # When the operator is installed from source, it doesn't have the necessary permissions
+    # to be used in OpenShift.
+    oc label ns openshift-sriov-network-operator --overwrite \
+        pod-security.kubernetes.io/audit=privileged \
+        pod-security.kubernetes.io/enforce=privileged \
+        pod-security.kubernetes.io/warn=privileged \
+        security.openshift.io/scc.podSecurityLabelSync=false
+
     make deploy-setup
     popd
     wait_for_sriov_pods
+    wait_for_sriov_network_node_state
 else
     SNO_NAMESPACE=$(
         oc create -f - -o jsonpath='{.metadata.name}' <<EOF

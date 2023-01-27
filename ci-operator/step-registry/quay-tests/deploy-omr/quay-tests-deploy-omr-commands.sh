@@ -8,6 +8,7 @@ set -o pipefail
 #Check podman and skopeo version
 podman -v
 skopeo -v
+yq --version || true
 HOME_PATH=$(pwd) && echo $HOME_PATH
 
 #Create new AWS EC2 Instatnce to deploy Quay OMR

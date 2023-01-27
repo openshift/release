@@ -1,6 +1,5 @@
 #!/bin/bash
 set -euo pipefail
-
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save exit code for must-gather to generate junit
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
@@ -43,8 +42,8 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
-  echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
+if [ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]; then
+  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
   exit 1
 fi
 
@@ -54,9 +53,7 @@ export TEST_PROVIDER='azure'
 cp "$(command -v openshift-install)" /tmp
 mkdir ${ARTIFACT_DIR}/installer
 
-echo "Installing from release ${RELEASE_IMAGE_LATEST}"
-OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}"
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+echo "Installing from release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/installer/install-config.yaml
 export PATH=${HOME}/.local/bin:${PATH}
@@ -107,6 +104,7 @@ fi
 popd
 
 echo "Creating ignition configs"
+
 openshift-install --dir=${ARTIFACT_DIR}/installer create ignition-configs &
 wait "$!"
 
@@ -159,7 +157,7 @@ az storage account create -g $RESOURCE_GROUP --location $AZURE_REGION --name $AC
 ACCOUNT_KEY=$(az storage account keys list -g $RESOURCE_GROUP --account-name $ACCOUNT_NAME --query "[0].value" -o tsv)
 
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >/tmp/coreos.json; then
-  VHD_URL="$(jq -r --arg arch "$OCP_ARCH" '.architectures[$arch]."rhel-coreos-extensions"."azure-disk".url' /tmp/coreos.json)"
+  VHD_URL="$(jq -r --arg arch "$(echo "$OCP_ARCH" | sed 's/amd64/x86_64/;s/arm64/aarch64/')" '.architectures[$arch]."rhel-coreos-extensions"."azure-disk".url' /tmp/coreos.json)"
 else
   VHD_URL="$(jq -r .azure.url /var/lib/openshift-install/rhcos.json)"
 fi
@@ -222,7 +220,7 @@ VHD_BLOB_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $A
 
 # Check if it's the new template using Image Galleries instead of Managed Images
 if grep -qs "Microsoft.Compute/galleries" 02_storage.json; then
-  AZ_ARCH=$(echo $OCP_ARCH | sed 's/x86_64/x64/;s/aarch64/Arm64/')
+  AZ_ARCH=$(echo "$OCP_ARCH" | sed 's/amd64/x64/;s/arm64/Arm64/')
   az deployment group create -g $RESOURCE_GROUP \
     --template-file "02_storage.json" \
     --parameters vhdBlobURL="${VHD_BLOB_URL}" \
@@ -257,8 +255,9 @@ echo "Deploying 04_bootstrap"
 BOOTSTRAP_URL=$(az storage blob url --account-name $ACCOUNT_NAME --account-key $ACCOUNT_KEY -c "files" -n "bootstrap.ign" -o tsv)
 IGNITION_VERSION=$(jq -r .ignition.version ${ARTIFACT_DIR}/installer/bootstrap.ign)
 BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "${IGNITION_VERSION}" --arg url $BOOTSTRAP_URL '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 -w0)
+# shellcheck disable=SC2046
 az deployment group create -g $RESOURCE_GROUP \
-  --template-file "04_bootstrap.json" \
+  --template-file "04_bootstrap.json" $([ -n "${BOOTSTRAP_NODE_TYPE}" ] && echo "--parameters bootstrapVMSize=${BOOTSTRAP_NODE_TYPE}") \
   --parameters bootstrapIgnition="$BOOTSTRAP_IGNITION" \
   --parameters sshKeyData="$SSH_PUB_KEY" \
   --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}
@@ -268,8 +267,9 @@ GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_PUBLIC_I
 
 echo "Deploying 05_masters"
 MASTER_IGNITION=$(cat ${ARTIFACT_DIR}/installer/master.ign | base64 -w0)
+# shellcheck disable=SC2046
 az deployment group create -g $RESOURCE_GROUP \
-  --template-file "05_masters.json" \
+  --template-file "05_masters.json" $([ -n "${CONTROL_PLANE_NODE_TYPE}" ] && echo "--parameters masterVMSize=${CONTROL_PLANE_NODE_TYPE}") \
   --parameters masterIgnition="$MASTER_IGNITION" \
   --parameters sshKeyData="$SSH_PUB_KEY" \
   --parameters privateDNSZoneName="${CLUSTER_NAME}.${BASE_DOMAIN}" \
@@ -283,8 +283,9 @@ GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master 
 echo "Deploying 06_workers"
 WORKER_IGNITION=$(cat ${ARTIFACT_DIR}/installer/worker.ign | base64 -w0)
 export WORKER_IGNITION
+# shellcheck disable=SC2046
 az deployment group create -g $RESOURCE_GROUP \
-  --template-file "06_workers.json" \
+  --template-file "06_workers.json" $([ -n "${COMPUTE_NODE_TYPE}" ] && echo "--parameters nodeVMSize=${COMPUTE_NODE_TYPE}") \
   --parameters workerIgnition="$WORKER_IGNITION" \
   --parameters sshKeyData="$SSH_PUB_KEY" \
   --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}

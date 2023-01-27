@@ -117,3 +117,14 @@ if [[ $(oc get csv -n openshift-cnv ${CSV} -o jsonpath='{.status.phase}') != "Su
   oc describe CSV ${CSV} -n openshift-cnv
   exit 1
 fi
+
+# Deploy HyperConverged custom resource to complete kubevirt's installation
+oc create -f - <<EOF
+apiVersion: hco.kubevirt.io/v1beta1
+kind: HyperConverged
+metadata:
+  name: kubevirt-hyperconverged
+  namespace: openshift-cnv
+EOF
+
+oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m

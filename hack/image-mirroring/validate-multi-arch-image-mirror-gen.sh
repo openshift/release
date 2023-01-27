@@ -4,6 +4,26 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+
+
+function check_diff() {
+    if ! diff -bur "${base_dir}/$1" "${workdir}/$1" >"${workdir}/diff"; then
+    cat <<EOF
+ERROR: To update the the multi-arch image mirroring run the following and
+ERROR: commit the result:
+
+ERROR: $ make multi-arch-gen
+
+ERROR: The following differences were found:
+
+EOF
+    cat "${workdir}/diff"
+    exit 1
+    fi
+}
+
+
+NAMESPACES_FILE="clusters/app.ci/multi-arch/namespaces.yaml"
 workdir="$(mktemp -d)"
 trap 'rm -rf "${workdir}"' EXIT
 
@@ -20,18 +40,9 @@ if ! ./hack/image-mirroring/supplemental_ci_images_mirror_gen.py; then
     exit 1
 fi
 
-for folder in $(find core-services/ -iname "image-mirroring-*");do     
-    if ! diff -bur "${base_dir}/$folder" "${workdir}/$folder" >"${workdir}/diff"; then
-    cat <<EOF
-ERROR: To update the the multi-arch image mirroring run the following and
-ERROR: commit the result:
+# Check generated namespaces
+check_diff ${NAMESPACES_FILE}
 
-ERROR: $ make multi-arch-gen
-
-ERROR: The following differences were found:
-
-EOF
-    cat "${workdir}/diff"
-    exit 1
-    fi
+for folder in $(find core-services/ -iname "image-mirroring-*");do
+    check_diff $folder
 done
