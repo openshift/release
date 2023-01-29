@@ -48,7 +48,7 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 oc adm release -a "${new_pull_secret}" mirror --insecure=true \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
  --to=${target_release_image_repo} \
- --to-release-image=${target_release_image_repo} | tee "${mirror_output}"
+ --to-release-image=${target_release_image} | tee "${mirror_output}"
 
 grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
 grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
