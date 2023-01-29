@@ -7,7 +7,10 @@ set -o pipefail
 cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
 
 #shellcheck source=${SHARED_DIR}/runtime_env
-. .${SHARED_DIR}/runtime_env
+source "${SHARED_DIR}/runtime_env"
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
 if [ -z "${E2E_SKIP_TAGS}" ] ; then
