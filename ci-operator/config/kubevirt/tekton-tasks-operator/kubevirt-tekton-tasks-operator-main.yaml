@@ -32,14 +32,35 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: pipeline-example-test
+- as: win10-pipeline-example-test
   steps:
     cluster_profile: gcp-virtualization
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
     test:
-    - as: pipeline-example-test
-      commands: ./scripts/example-pipelines-test.sh
+    - as: win10-pipeline-example-test
+      commands: export TARGET=windows10 && ./scripts/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: tekton-tasks-operator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win11-pipeline-example-test
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      commands: export TARGET=windows11 && ./scripts/example-pipelines-test.sh
       credentials:
       - mount_path: /tmp/secrets
         name: common-templates-container-disk-puller
