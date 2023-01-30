@@ -21,8 +21,8 @@ function queue() {
 # Appstudio resources
 queue ${ARTIFACT_DIR}/applicationpromotionruns.json  oc --insecure-skip-tls-verify --request-timeout=5s get applicationpromotionruns.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/applications_appstudio.json  oc --insecure-skip-tls-verify --request-timeout=5s get applications.appstudio.redhat.com --all-namespaces -o json
-queue ${ARTIFACT_DIR}/applicationsnapshotenvironmentbindings.json  oc --insecure-skip-tls-verify --request-timeout=5s get applicationsnapshotenvironmentbindings.appstudio.redhat.com --all-namespaces -o json
-queue ${ARTIFACT_DIR}/applicationsnapshots.json  oc --insecure-skip-tls-verify --request-timeout=5s get applicationsnapshots.appstudio.redhat.com --all-namespaces -o json
+queue ${ARTIFACT_DIR}/snapshotenvironmentbindings.json  oc --insecure-skip-tls-verify --request-timeout=5s get snapshotenvironmentbindings.appstudio.redhat.com --all-namespaces -o json
+queue ${ARTIFACT_DIR}/snapshots.json  oc --insecure-skip-tls-verify --request-timeout=5s get snapshots.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/componentdetectionqueries.json  oc --insecure-skip-tls-verify --request-timeout=5s get componentdetectionqueries.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/components.json  oc --insecure-skip-tls-verify --request-timeout=5s get components.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/enterprisecontractpolicies.json  oc --insecure-skip-tls-verify --request-timeout=5s get enterprisecontractpolicies.appstudio.redhat.com --all-namespaces -o json
