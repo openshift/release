@@ -19,9 +19,31 @@ if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
     exit 1
 fi
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: $OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE"
 
 readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
-echo "readable_version: $readable_version"
+echo "readable_version: $readable_version" # e.g. 4.13.0-0.nightly-2023-01-27-165107, 4.12.1
+
+source_release_image_repo="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"
+source_release_image_repo="${source_release_image_repo/@sha256/}"
+source_release_image="${source_release_image_repo}:${readable_version}"
+
+if [[ "${readable_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(\-[a-z]{2}\.[0-9]+){0,1}$ ]]; then
+    # stable, 4.12.0-rc.0 4.12.1 etc.
+    arch=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.config.architecture}')
+    case "$arch" in
+        amd64)
+            source_release_image=${source_release_image}-x86_64
+            ;;
+        arm64)
+            source_release_image=${source_release_image}-aarch64
+            ;;
+        *)
+            ;;
+    esac
+fi
+
+echo "source_release_image: $source_release_image"
 
 # target release
 target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
@@ -44,7 +66,7 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 
 # MIRROR IMAGES
 oc adm release -a "${new_pull_secret}" mirror --insecure=true \
- --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
+ --from=${source_release_image} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"
 
