@@ -24,7 +24,7 @@ kind: Template
 metadata:
   name: add-node-template
   annotations:
-    description: "adding 6 worker nodes"
+    description: "adding 4 worker nodes"
     iconClass: "icon-redis"
     tags: "nodes,worker"
 objects:
@@ -113,7 +113,7 @@ parameters:
   required: true 
 - description: the number of replica 
   name: REPLICA_COUNT
-  value: "6"
+  value: "4"
   required: true 
 - description: instance type of cluter 
   name: INSTANCE_TYPE
