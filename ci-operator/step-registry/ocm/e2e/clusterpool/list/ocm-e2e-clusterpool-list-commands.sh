@@ -3,15 +3,17 @@
 temp=$(mktemp -d -t ocm-XXXXX)
 cd "$temp" || exit 1
 
-echo "INFO Setting clusterpool list file"
+echo "INFO Setting clusterpool list files"
 LIST_FILE="$SHARED_DIR/$CLUSTERPOOL_LIST_FILE"
-echo "     LIST_FILE: $LIST_FILE"
+MANAGED_LIST_FILE="$SHARED_DIR/$CLUSTERPOOL_MANAGED_LIST_FILE"
+echo "     LIST_FILE        : $LIST_FILE"
+echo "     MANAGED_LIST_FILE: $MANAGED_LIST_FILE"
 
 echo "INFO Copying make file"
 echo "     MAKEFILE: $MAKEFILE"
 cp "$MAKEFILE" ./Makefile
 
-echo "INFO Setting location of oc and jq binarys for build harness"
+echo "INFO Setting location of oc and jq binaries for build harness"
 OC=$(which oc)
 JQ=$(which jq)
 export OC
@@ -40,91 +42,178 @@ echo "INFO All ready or standby clusterpools:"
 cat "$LIST_FILE"
 echo "     --- end ---"
 
-echo "INFO Checking inclusion filter..."
+cp "$LIST_FILE" "$MANAGED_LIST_FILE"
+cp "${LIST_FILE}-all" "${MANAGED_LIST_FILE}-all"
+
+echo "INFO Checking primary inclusion filter..."
 if [[ -n "$CLUSTERPOOL_LIST_INCLUSION_FILTER" ]]; then
     echo "     CLUSTERPOOL_LIST_INCLUSION_FILTER: $CLUSTERPOOL_LIST_INCLUSION_FILTER"
 
-    echo "INFO Applying inclusion filter"
+    echo "INFO Applying primary inclusion filter"
     grep -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "${LIST_FILE}" > "${LIST_FILE}.tmp" || true
     grep -e "$CLUSTERPOOL_LIST_INCLUSION_FILTER" "${LIST_FILE}-all" > "${LIST_FILE}-all.tmp" || true
 
-    echo "INFO Clusterpool list after filtering:"
+    echo "INFO Primary clusterpool list after filtering:"
     cat "${LIST_FILE}-all.tmp"
-    echo "INFO Clusterpool list in ready or standby after filtering:"
+    echo "INFO Primary clusterpool list in ready or standby after filtering:"
     cat "${LIST_FILE}.tmp"
     echo "     --- end ---"
 
-    echo "INFO Number of clusterpools after inclusion filter:"
+    echo "INFO Number of primary clusterpools after inclusion filter:"
     echo "     ---$(wc -l < "${LIST_FILE}-all.tmp")---"
-    echo "INFO Number of clusterpools in ready or standby after inclusion filter:"
+    echo "INFO Number of primary clusterpools in ready or standby after inclusion filter:"
     echo "     ---$(wc -l < "$LIST_FILE.tmp")---"
 
-    echo "INFO Checking if any clusterpools are left..."
+    echo "INFO Checking if any primary clusterpools are left..."
     if [[ $(wc -l < "${LIST_FILE}.tmp") == 0 ]]; then
-        echo "WARNING No ready or standby clusterpools left after applying inclusion filter."
+        echo "WARNING No ready or standby primary clusterpools left after applying inclusion filter."
     fi
     if [[ $(wc -l < "${LIST_FILE}-all.tmp") == 0 ]]; then
-        echo "ERROR No clusterpools left after applying inclusion filter."
+        echo "ERROR No primary clusterpools left after applying inclusion filter."
         exit 1
     fi
 
-    echo "INFO Updating list of clusterpools"
+    echo "INFO Updating list of primary clusterpools"
     mv "${LIST_FILE}-all.tmp" "${LIST_FILE}-all"
     mv "${LIST_FILE}.tmp" "$LIST_FILE"
 else
-    echo "     inclusion filter not provided"
+    echo "     primary inclusion filter not provided"
 fi
 
-echo "INFO Checking exclusion filter"
+echo "INFO Checking managed inclusion filter..."
+if [[ -n "$CLUSTERPOOL_MANAGED_LIST_INCLUSION_FILTER" ]]; then
+    echo "     CLUSTERPOOL_MANAGED_LIST_INCLUSION_FILTER: $CLUSTERPOOL_MANAGED_LIST_INCLUSION_FILTER"
+
+    echo "INFO Applying managed inclusion filter"
+    grep -e "$CLUSTERPOOL_MANAGED_LIST_INCLUSION_FILTER" "${MANAGED_LIST_FILE}" > "${MANAGED_LIST_FILE}.tmp" || true
+    grep -e "$CLUSTERPOOL_MANAGED_LIST_INCLUSION_FILTER" "${MANAGED_LIST_FILE}-all" > "${MANAGED_LIST_FILE}-all.tmp" || true
+
+    echo "INFO Managed clusterpool list after filtering:"
+    cat "${MANAGED_LIST_FILE}-all.tmp"
+    echo "INFO Managed clusterpool list in ready or standby after filtering:"
+    cat "${MANAGED_LIST_FILE}.tmp"
+    echo "     --- end ---"
+
+    echo "INFO Number of managed clusterpools after inclusion filter:"
+    echo "     ---$(wc -l < "${MANAGED_LIST_FILE}-all.tmp")---"
+    echo "INFO Number of managed clusterpools in ready or standby after inclusion filter:"
+    echo "     ---$(wc -l < "$MANAGED_LIST_FILE.tmp")---"
+
+    echo "INFO Checking if any managed clusterpools are left..."
+    if [[ $(wc -l < "${MANAGED_LIST_FILE}.tmp") == 0 ]]; then
+        echo "WARNING No ready or standby clusterpools left after applying inclusion filter."
+    fi
+    if [[ $(wc -l < "${MANAGED_LIST_FILE}-all.tmp") == 0 ]]; then
+        echo "ERROR No managed clusterpools left after applying inclusion filter."
+        exit 1
+    fi
+
+    echo "INFO Updating list of managed clusterpools"
+    mv "${MANAGED_LIST_FILE}-all.tmp" "${MANAGED_LIST_FILE}-all"
+    mv "${MANAGED_LIST_FILE}.tmp" "$MANAGED_LIST_FILE"
+else
+    echo "     managed inclusion filter not provided"
+fi
+
+echo "INFO Checking primary exclusion filter"
 if [[ -n "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" ]]; then
     echo "     CLUSTERPOOL_LIST_EXCLUSION_FILTER: $CLUSTERPOOL_LIST_EXCLUSION_FILTER"
 
-    echo "INFO Applying exclusion filter"
+    echo "INFO Applying primary exclusion filter"
     grep -v -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "${LIST_FILE}" > "${LIST_FILE}.tmp" || true
     grep -v -e "$CLUSTERPOOL_LIST_EXCLUSION_FILTER" "${LIST_FILE}-all" > "${LIST_FILE}-all.tmp" || true
 
-    echo "INFO Clusterpool list after filtering:"
+    echo "INFO Primary clusterpool list after filtering:"
     cat "${LIST_FILE}-all.tmp"
-    echo "INFO Clusterpool list in ready or standby after filtering:"
+    echo "INFO Primary clusterpool list in ready or standby after filtering:"
     cat "${LIST_FILE}.tmp"
     echo "     --- end ---"
 
-    echo "INFO Number of clusterpools after exclusion filter:"
+    echo "INFO Number of primary clusterpools after exclusion filter:"
     echo "     ---$(wc -l < "${LIST_FILE}-all.tmp")---"
-    echo "INFO Number of clusterpools in ready or standby after exclusion filter:"
+    echo "INFO Number of primary clusterpools in ready or standby after exclusion filter:"
     echo "     ---$(wc -l < "$LIST_FILE.tmp")---"
 
-    echo "INFO Checking if any clusterpools are left..."
+    echo "INFO Checking if any primary clusterpools are left..."
     if [[ $(wc -l < "${LIST_FILE}.tmp") == 0 ]]; then
-        echo "WARNING No ready or standby clusterpools left after applying exclusion filter."
+        echo "WARNING No ready or standby primary clusterpools left after applying exclusion filter."
     fi
     if [[ $(wc -l < "${LIST_FILE}-all.tmp") == 0 ]]; then
-        echo "ERROR No clusterpools left after applying exclusion filter."
+        echo "ERROR No primary clusterpools left after applying exclusion filter."
         exit 1
     fi
 
-    echo "INFO Updating list of clusterpools"
+    echo "INFO Updating list of primary clusterpools"
     mv "${LIST_FILE}-all.tmp" "${LIST_FILE}-all"
     mv "${LIST_FILE}.tmp" "$LIST_FILE"
 else
-    echo "     exclusion filter not provided"
+    echo "     primaryexclusion filter not provided"
 fi
 
-echo "INFO All clusterpool list:"
+echo "INFO Checking managed cluster exclusion filter"
+if [[ -n "$CLUSTERPOOL_MANAGED_LIST_EXCLUSION_FILTER" ]]; then
+    echo "     CLUSTERPOOL_MANAGED_LIST_EXCLUSION_FILTER: $CLUSTERPOOL_MANAGED_LIST_EXCLUSION_FILTER"
+
+    echo "INFO Applying managed cluster exclusion filter"
+    grep -v -e "$CLUSTERPOOL_MANAGED_LIST_EXCLUSION_FILTER" "${MANAGED_LIST_FILE}" > "${MANAGED_LIST_FILE}.tmp" || true
+    grep -v -e "$CLUSTERPOOL_MANAGED_LIST_EXCLUSION_FILTER" "${MANAGED_LIST_FILE}-all" > "${MANAGED_LIST_FILE}-all.tmp" || true
+
+    echo "INFO Managed clusterpool list after filtering:"
+    cat "${MANAGED_LIST_FILE}-all.tmp"
+    echo "INFO Managed clusterpool list in ready or standby after filtering:"
+    cat "${MANAGED_LIST_FILE}.tmp"
+    echo "     --- end ---"
+
+    echo "INFO Number of managed clusterpools after exclusion filter:"
+    echo "     ---$(wc -l < "${MANAGED_LIST_FILE}-all.tmp")---"
+    echo "INFO Number of managed clusterpools in ready or standby after exclusion filter:"
+    echo "     ---$(wc -l < "${MANAGED_LIST_FILE}.tmp")---"
+
+    echo "INFO Checking if any managed clusterpools are left..."
+    if [[ $(wc -l < "${MANAGED_LIST_FILE}.tmp") == 0 ]]; then
+        echo "WARNING No ready or standby managed clusterpools left after applying exclusion filter."
+    fi
+    if [[ $(wc -l < "${MANAGED_LIST_FILE}-all.tmp") == 0 ]]; then
+        echo "ERROR No managed clusterpools left after applying exclusion filter."
+        exit 1
+    fi
+
+    echo "INFO Updating list of managed clusterpools"
+    mv "${MANAGED_LIST_FILE}-all.tmp" "${MANAGED_LIST_FILE}-all"
+    mv "${MANAGED_LIST_FILE}.tmp" "${MANAGED_LIST_FILE}"
+else
+    echo "     managed exclusion filter not provided"
+fi
+
+echo "INFO All primary clusterpool list:"
 cat "${LIST_FILE}-all"
-echo "INFO Ready or standby clusterpool list:"
+echo "INFO Ready or standby primary clusterpool list:"
 cat "$LIST_FILE"
 echo "     --- end ---"
 
-echo "INFO Verifying ready or standby clusterpool list..."
+echo "INFO Verifying primary ready or standby clusterpool list..."
 if [[ $(wc -l < "${LIST_FILE}") == 0 ]]; then
-    echo "WARNING No ready or standby clusterpools left. Replacing the list with the list of all clusterpools."
+    echo "WARNING No ready or standby primary clusterpools left. Replacing the list with the list of all clusterpools."
     mv "${LIST_FILE}-all" "${LIST_FILE}"
 else
     rm "${LIST_FILE}-all"
 fi
 
-echo "INFO Checking if list needs to be reordered"
+echo "INFO All managed clusterpool list:"
+cat "${MANAGED_LIST_FILE}-all"
+echo "INFO Ready or standby managed clusterpool list:"
+cat "$MANAGED_LIST_FILE"
+echo "     --- end ---"
+
+echo "INFO Verifying managed ready or standby clusterpool list..."
+if [[ $(wc -l < "${MANAGED_LIST_FILE}") == 0 ]]; then
+    echo "WARNING No ready or standby managed clusterpools left. Replacing the list with the list of all clusterpools."
+    mv "${MANAGED_LIST_FILE}-all" "${MANAGED_LIST_FILE}"
+else
+    rm "${MANAGED_LIST_FILE}-all"
+fi
+
+echo "INFO Checking if primary list needs to be reordered"
 echo "     CLUSTERPOOL_LIST_ORDER: $CLUSTERPOOL_LIST_ORDER"
 case "$CLUSTERPOOL_LIST_ORDER" in
     "")
@@ -132,25 +221,25 @@ case "$CLUSTERPOOL_LIST_ORDER" in
         echo "     Will not change list order"
         ;;
     sort)
-        echo "INFO Sorting clusterpool list"
+        echo "INFO Sorting primary clusterpool list"
         sort "$LIST_FILE" > "$LIST_FILE.tmp"
 
-        echo "INFO Sorted clusterpool list:"
+        echo "INFO Sorted primary clusterpool list:"
         cat "$LIST_FILE.tmp"
         echo "     --- end ---"
 
-        echo "INFO Updating list of available clusterpools"
+        echo "INFO Updating list of available primary clusterpools"
         mv "$LIST_FILE.tmp" "$LIST_FILE"
         ;;
     shuffle)
-        echo "INFO Shuffling clusterpool list"
+        echo "INFO Shuffling primary clusterpool list"
         shuf "$LIST_FILE" > "$LIST_FILE.tmp"
 
-        echo "INFO Shuffled clusterpool list:"
+        echo "INFO Shuffled primary clusterpool list:"
         cat "$LIST_FILE.tmp"
         echo "     --- end ---"
 
-        echo "INFO Updating list of available clusterpools"
+        echo "INFO Updating list of available primary clusterpools"
         mv "$LIST_FILE.tmp" "$LIST_FILE"
         ;;
     *)
@@ -159,6 +248,45 @@ case "$CLUSTERPOOL_LIST_ORDER" in
         ;;
 esac
 
-echo "INFO Final clusterpool list:"
+echo "INFO Checking if managed list needs to be reordered"
+echo "     MANAGED_CLUSTERPOOL_LIST_ORDER: $MANAGED_CLUSTERPOOL_LIST_ORDER"
+case "$MANAGED_CLUSTERPOOL_LIST_ORDER" in
+    "")
+        echo "     CLUSTERPOOL_LIST_ORDER is empty"
+        echo "     Will not change list order"
+        ;;
+    sort)
+        echo "INFO Sorting managed clusterpool list"
+        sort "$MANAGED_LIST_FILE" > "$MANAGED_LIST_FILE.tmp"
+
+        echo "INFO Sorted managed clusterpool list:"
+        cat "$MANAGED_LIST_FILE.tmp"
+        echo "     --- end ---"
+
+        echo "INFO Updating list of available managed clusterpools"
+        mv "$MANAGED_LIST_FILE.tmp" "$MANAGED_LIST_FILE"
+        ;;
+    shuffle)
+        echo "INFO Shuffling managed clusterpool list"
+        shuf "$MANAGED_LIST_FILE" > "$MANAGED_LIST_FILE.tmp"
+
+        echo "INFO Shuffled managed clusterpool list:"
+        cat "$MANAGED_LIST_FILE.tmp"
+        echo "     --- end ---"
+
+        echo "INFO Updating list of available managed clusterpools"
+        mv "$MANAGED_LIST_FILE.tmp" "$MANAGED_LIST_FILE"
+        ;;
+    *)
+        echo "     Invalid CLUSTERPOOL_MANAGED_LIST_ORDER"
+        echo "     Ignoring"
+        ;;
+esac
+
+echo "INFO Final primary clusterpool list:"
 cat "$LIST_FILE"
+echo "     --- end ---"
+
+echo "INFO Final managed clusterpool list:"
+cat "$MANAGED_LIST_FILE"
 echo "     --- end ---"

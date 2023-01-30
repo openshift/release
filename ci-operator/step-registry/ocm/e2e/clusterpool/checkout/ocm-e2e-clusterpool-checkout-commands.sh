@@ -1,7 +1,7 @@
 #!/bin/bash
 
 temp=$(mktemp -d -t ocm-XXXXX)
-cd $temp || exit 1
+cd "$temp" || exit 1
 
 cp "$MAKEFILE" ./Makefile
 
@@ -17,18 +17,28 @@ if [[ -z "$pools" ]]; then
     exit 1
 fi
 
-suffix=$(cat /dev/urandom | tr -dc "a-z0-9" | head -c 5 )
+managed_pools=""
+if [[ "$CLUSTERPOOL_MANAGED_LIST" == "CLUSTERPOOL_LIST" ]]; then
+    managed_pools="$pools"
+elif [[ -n "$CLUSTERPOOL_LIST" ]] ; then
+    managed_pools=$(echo "$CLUSTERPOOL_MANAGED_LIST" | tr "," "\n")
+elif [[ -f "${SHARED_DIR}/${CLUSTERPOOL_MANAGED_LIST_FILE}" ]] ; then
+    managed_pools=$(cat "${SHARED_DIR}/${CLUSTERPOOL_MANAGED_LIST_FILE}")
+fi
+
+if [[ -z "$managed_pools" ]]; then
+    echo "No pools specified by CLUSTERPOOL_MANAGED_LIST or CLUSTERPOOL_MANAGED_LIST_FILE"
+    exit 1
+fi
+
+suffix=$( tr -dc "a-z0-9" < /dev/urandom | head -c 5 )
 
 # Checkout hub clusters
 for ((i=1;i<=CLUSTERPOOL_HUB_COUNT;i++)); do
     cluster_claim=""
     for pool in $pools; do
         tmp_claim="hub-$i-$suffix"
-        make clusterpool/checkout \
-            CLUSTERPOOL_NAME=$pool \
-            CLUSTERPOOL_CLUSTER_CLAIM=$tmp_claim
-    
-        if [[ "$?" == 0 ]]; then
+        if make clusterpool/checkout CLUSTERPOOL_NAME="$pool" CLUSTERPOOL_CLUSTER_CLAIM="$tmp_claim" ; then
             cluster_claim="$tmp_claim"
             break
         fi
@@ -47,13 +57,9 @@ done
 # Checkout managed clusters
 for ((i=1;i<=CLUSTERPOOL_MANAGED_COUNT;i++)); do
     cluster_claim=""
-    for pool in $pools; do
+    for pool in $managed_pools; do
         tmp_claim="managed-$i-$suffix"
-        make clusterpool/checkout \
-            CLUSTERPOOL_NAME=$pool \
-            CLUSTERPOOL_CLUSTER_CLAIM=$tmp_claim
-    
-        if [[ "$?" == 0 ]]; then
+        if make clusterpool/checkout CLUSTERPOOL_NAME="$pool" CLUSTERPOOL_CLUSTER_CLAIM="$tmp_claim" ; then
             cluster_claim="$tmp_claim"
             break
         fi
@@ -61,7 +67,7 @@ for ((i=1;i<=CLUSTERPOOL_MANAGED_COUNT;i++)); do
     
     if [[ -z "$cluster_claim" ]]; then
         echo "No cluster was checked out for managed $i. Tried these cluster pools:"
-        echo "$pools"
+        echo "$managed_pools"
         exit 1
     fi
     
