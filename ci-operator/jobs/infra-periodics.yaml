@@ -2746,3 +2746,26 @@ periodics:
     - name: bg-token
       secret:
         secretName: ci-data-bigquery-readonly
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@daily'
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  name: periodic-openshift-release-image-graph-generator
+  spec:
+    containers:
+    - args:
+      - --ci-operator-configs-path=./ci-operator/config
+      - --graphql-endpoint-address=http://dgraph-public:8080/graphql
+      - --image-mirroring-path=./core-services/image-mirroring
+      command:
+      - image-graph-generator
+      image: image-graph-generator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
