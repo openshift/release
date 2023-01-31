@@ -242,13 +242,13 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
-cat << EOF > ~/test-jq.sh
+cat << EOF > $SHARED_DIR/test-jq.sh
   #!/bin/bash
   # simple bash script to check if cluster is available
   oc get clusterversion -o json|jq '.items[0].status.conditions[]|select(.type=="Available").status'
 EOF
 
-cat << EOF > ~/check-cluster.yml
+cat << EOF > $SHARED_DIR/check-cluster.yml
 ---
 - name: Check if cluster is ready
   hosts: hypervisor
