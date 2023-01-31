@@ -250,7 +250,7 @@ cat << EOF > $SHARED_DIR/check-cluster.yml
   tasks:
 
   - name: Check if cluster is available
-    shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status'}"
+    shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'"
     register: ready_check
 
   - name: Fail when cluster is not available
