@@ -54,7 +54,9 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
   --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
   --release-image ${RELEASE_IMAGE} \
   --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
-  --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+  --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+  --annotations "prow.k8s.io/job=${JOB_NAME}" \
+  --annotations "prow.k8s.io/build-id=${BUILD_ID}"
 
 echo "Wait to check if release image is valid"
 n=0
