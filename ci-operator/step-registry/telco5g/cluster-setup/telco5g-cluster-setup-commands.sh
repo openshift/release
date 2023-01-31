@@ -242,7 +242,7 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
-cat << EOF > ~/check-cluster.yml
+cat << EOF > $SHARED_DIR/check-cluster.yml
 ---
 - name: Check if cluster is ready
   hosts: hypervisor
