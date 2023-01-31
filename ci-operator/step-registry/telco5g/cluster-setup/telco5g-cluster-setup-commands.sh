@@ -267,7 +267,7 @@ if [[ "$T5CI_JOB_TYPE" != "cnftests" ]]; then
 else
   ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/check-cluster.yml -vv 
 fi 
-ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || `$NOT_CNFTESTS`
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || `$NOT_CNFTESTS`
+ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $NOT_CNFTESTS
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $NOT_CNFTESTS
 exit ${status}
 
