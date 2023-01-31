@@ -242,12 +242,6 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
-cat << EOF > ~/test-jq.sh
-  #!/bin/bash
-  # simple bash script to check if cluster is available
-  oc get clusterversion -o json|jq '.items[0].status.conditions[]|select(.type=="Available").status'
-EOF
-
 cat << EOF > ~/check-cluster.yml
 ---
 - name: Check if cluster is ready
@@ -255,11 +249,8 @@ cat << EOF > ~/check-cluster.yml
   gather_facts: false
   tasks:
 
-  - name: Copy test script to installer vm
-    shell: kcli scp ~/test-jq.sh root@${CLUSTER_NAME}-installer:/tmp/test-jq.sh
-
   - name: Check if cluster is available
-    shell: kcli ssh root@${CLUSTER_NAME}-installer "bash /tmp/test-jq.sh"
+    shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status'}"
     register: ready_check
 
   - name: Fail when cluster is not available
