@@ -16,6 +16,8 @@ EOF
 
 oc label namespace openshift-storage openshift.io/cluster-monitoring=true
 
+#THis is for ACS and QUAY
+oc scale --replicas=5 machineset $(oc get machineset -n  openshift-machine-api -o jsonpath='{.items[0].metadata.name}') -n openshift-machine-api
 
 # create 6 machinesets for ocp storage on aws
 
@@ -43,7 +45,7 @@ metadata:
   name: $CLUSTERID-workerocs-$AZ
   namespace: openshift-machine-api
 spec:
-  replicas: 6
+  replicas: 10
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: $CLUSTERID
