@@ -31,8 +31,7 @@ echo $VOLUME_TYPE
 echo $INSTANCE_TYPE
 
 
-cat <<EOF | oc apply -f -
----
+oc apply -f - <<EOF 
 apiVersion: machine.openshift.io/v1beta1
 kind: MachineSet
 metadata:
@@ -102,8 +101,6 @@ spec:
             name: worker-user-data
       versions:
         kubelet: ""
----
-
 EOF
 echo "machineset applied..."
 
