@@ -16,8 +16,21 @@ EOF
 
 oc label namespace openshift-storage openshift.io/cluster-monitoring=true
 
+
 # create 6 machinesets for ocp storage on aws
-cat <<'EOF' > add-worker-nodes.yaml
+
+CLUSTERID=$(oc get machineset -n openshift-machine-api -o jsonpath='{.items[0].metadata.labels.machine\.openshift\.io/cluster-api-cluster}')
+AZ=$(oc get machineset -n openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.placement.availabilityZone}')
+REGION=$(oc get machineset -n openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.placement.region}')
+VOLUME_TYPE=$(oc get machineset -n  openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.blockDevices[0].ebs.volumeType}')
+INSTANCE_TYPE=$( oc get machineset -n  openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.instanceType}')
+echo $AZ
+echo $REGION
+echo $CLUSTERID
+echo $VOLUME_TYPE
+echo $INSTANCE_TYPE
+
+cat <<'EOF' | oc process -f - -p CLUSTERID=$CLUSTERID -p AZ=$AZ -p REGION=$REGION -p VOLUME_TYPE=$VOLUME_TYPE -p INSTANCE_TYPE=$INSTANCE_TYPE | oc apply -f - -n openshift-machine-api
 ---
 apiVersion: template.openshift.io/v1
 kind: Template
@@ -121,20 +134,7 @@ parameters:
   required: true 
 ---
 EOF
-
-chmod 777 add-worker-nodes.yaml
-CLUSTERID=$(oc get machineset -n openshift-machine-api -o jsonpath='{.items[0].metadata.labels.machine\.openshift\.io/cluster-api-cluster}')
-AZ=$(oc get machineset -n openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.placement.availabilityZone}')
-REGION=$(oc get machineset -n openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.placement.region}')
-VOLUME_TYPE=$(oc get machineset -n  openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.blockDevices[0].ebs.volumeType}')
-INSTANCE_TYPE=$( oc get machineset -n  openshift-machine-api -o jsonpath='{.items[0].spec.template.spec.providerSpec.value.instanceType}')
-echo $AZ
-echo $REGION
-echo $CLUSTERID
-echo $VOLUME_TYPE
-echo $INSTANCE_TYPE
-
-oc process -f add-worker-nodes.yaml -p CLUSTERID=$CLUSTERID -p AZ=$AZ -p REGION=$REGION -p VOLUME_TYPE=$VOLUME_TYPE -p INSTANCE_TYPE=$INSTANCE_TYPE | oc apply -f - -n openshift-machine-api
+echo "machineset applied..."
 
 # wait for storage nodes to be ready
 RETRIES=30
