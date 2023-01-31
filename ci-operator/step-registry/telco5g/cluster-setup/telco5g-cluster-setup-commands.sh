@@ -256,7 +256,7 @@ cat << EOF > ~/check-cluster.yml
   tasks:
 
   - name: Copy test script to installer vm
-    shell: kcli scp ~/test-jq.sh root@${CLUSTER_NAME}-installer:/tmp/test-jq.sh
+    shell: kcli scp $SHARED_DIR/test-jq.sh root@${CLUSTER_NAME}-installer:/tmp/test-jq.sh
 
   - name: Check if cluster is available
     shell: kcli ssh root@${CLUSTER_NAME}-installer "bash /tmp/test-jq.sh"
