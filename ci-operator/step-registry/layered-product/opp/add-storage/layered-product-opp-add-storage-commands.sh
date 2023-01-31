@@ -43,7 +43,7 @@ metadata:
   name: $CLUSTERID-workerocs-$AZ
   namespace: openshift-machine-api
 spec:
-  replicas: 6
+  replicas: 7
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: $CLUSTERID
