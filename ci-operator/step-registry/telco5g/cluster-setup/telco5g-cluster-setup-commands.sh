@@ -242,6 +242,12 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
+cat << EOF > ~/test-jq.sh
+  #!/bin/bash
+  # simple bash script to check if cluster is available
+  oc get clusterversion -o json|jq '.items[0].status.conditions[]|select(.type=="Available").status'
+EOF
+
 cat << EOF > ~/check-cluster.yml
 ---
 - name: Check if cluster is ready
@@ -249,25 +255,31 @@ cat << EOF > ~/check-cluster.yml
   gather_facts: false
   tasks:
 
+  - name: Copy test script to installer vm
+    shell: kcli scp ~/test-jq.sh root@${CLUSTER_NAME}-installer:/tmp/test-jq.sh
+
   - name: Check if cluster is available
-    shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o json|jq '.items[0].status.conditions[]|select(.type==\"Available\").status'"
+    shell: kcli ssh root@${CLUSTER_NAME}-installer "bash /tmp/test-jq.sh"
     register: ready_check
 
   - name: Fail when cluster is not available
     shell: "echo Cluster ready: {{ ready_check.stdout }}"
-    failed_when: "False" in ready_check.stdout 
+    failed_when: "True" not in ready_check.stdout 
 EOF
 
-
-NOT_CNFTESTS="false"
+# PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering. 
+# CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.
+# It is intentionally set to a string so that it can be evaluated as a command (either /bin/true or /bin/false) 
+# in order to provide the desired return code later.
+PROCEED_AFTER_FAILURES="false" 
 status=0 
 if [[ "$T5CI_JOB_TYPE" != "cnftests" ]]; then
-  NOT_CNFTESTS="true"
+  PROCEED_AFTER_FAILURES="true"
   ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 else
   ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/check-cluster.yml -vv 
 fi 
-ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $NOT_CNFTESTS
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $NOT_CNFTESTS
+ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 exit ${status}
 
