@@ -16,6 +16,9 @@ BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
+# Cluster to use for cnf-tests, and to exclude from selection in other jobs
+PREPARED_CLUSTER="cnfdc2"
+
 KCLI_PARAM=""
 if [[ "$PROW_JOB_ID" =~ "nightly" ]]; then
     # In case of running on nightly releases we need to figure out what release exactly to use
@@ -47,9 +50,9 @@ EOF
 
 ADDITIONAL_ARG=""
 if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
-  ADDITIONAL_ARG="--cluster-name cnfdc2 --force"
+  ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
 else
-  ADDITIONAL_ARG="-e $CL_SEARCH"
+  ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
 fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
@@ -239,12 +242,32 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
+cat << EOF > ~/check-cluster.yml
+---
+- name: Check if cluster is ready
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Check if cluster is available
+    shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o json|jq '.items[0].status.conditions[]|select(.type==\"Available\").status'"
+    register: ready_check
+
+  - name: Fail when cluster is not available
+    shell: "echo Cluster ready: {{ ready_check.stdout }}"
+    failed_when: "False" in ready_check.stdout 
+EOF
+
+
 NOT_CNFTESTS="false"
 status=0 
 if [[ "$T5CI_JOB_TYPE" != "cnftests" ]]; then
   NOT_CNFTESTS="true"
   ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+else
+  ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/check-cluster.yml -vv 
 fi 
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || `$NOT_CNFTESTS`
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || `$NOT_CNFTESTS`
 exit ${status}
+
