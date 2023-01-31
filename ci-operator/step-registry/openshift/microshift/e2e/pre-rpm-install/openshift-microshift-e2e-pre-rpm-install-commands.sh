@@ -79,6 +79,8 @@ EOF
 
 mkdir -p "${PAYLOAD_PATH}"/etc/crio/ && cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
 chmod 600 "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
+
+sleep 30m
 tar -uvf $PAYLOAD_PATH/payload.tar .
 
 gcloud compute scp "${PAYLOAD_PATH}/payload.tar" rhel8user@"${INSTANCE_PREFIX}":~
