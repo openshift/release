@@ -255,7 +255,7 @@ cat << EOF > $SHARED_DIR/check-cluster.yml
 
   - name: Fail when cluster is not available
     shell: "echo Cluster ready: {{ ready_check.stdout }}"
-    failed_when: "True" not in ready_check.stdout 
+    failed_when: "'True' not in ready_check.stdout"
 EOF
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering. 
