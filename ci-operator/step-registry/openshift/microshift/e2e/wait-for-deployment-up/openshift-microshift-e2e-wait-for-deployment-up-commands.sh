@@ -35,12 +35,18 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 cat > "${HOME}"/wait_for_deployment_ready.sh <<'EOF'
 #!/bin/bash
-set -xeuo pipefail
+set -xuo pipefail
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
 echo "waiting for deployment response" >&2
 oc wait --for=condition=available --timeout=120s deployment nginx
 echo "deployment posted ready status" >&2
+oc describe deployment nginx
+oc describe pod
+oc get pod -o yaml
+oc logs deployments/nginx --previous
+oc get pod -A
+oc describe pod -n openshift-ovn-kubernetes
 EOF
 chmod +x "${HOME}"/wait_for_deployment_ready.sh
 
@@ -48,7 +54,7 @@ chmod +x "${HOME}"/wait_for_deployment_ready.sh
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
 
 # Steps may not be used more than once in a test, so this block duplicates the behavior of wait-for-ssh for reboot tests.
-timeout=1200 # 20 minute wait.  
+timeout=120 # 20 minute wait.
 >&2 echo "Polling ssh connectivity before proceeding.  Timeout=$timeout second"
 start=$(date +"%s")
 until LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
@@ -73,3 +79,5 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJE
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo ~/wait_for_deployment_ready.sh'
+
+exit 1
