@@ -1,12 +1,3 @@
-base_images:
-  cli:
-    name: "4.11"
-    namespace: ocp
-    tag: cli
-  cli-jq:
-    name: cli-jq
-    namespace: ocp
-    tag: latest
 build_root:
   project_image:
     dockerfile_path: .ci/openshift-ci/Dockerfile
@@ -34,18 +25,12 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: |
-        export GITHUB_TOKEN=$(cat /usr/local/ci-secrets/test-harness-secrets/github-token)
-        build/scripts/oc-tests/oc-test-upgrade-from-stable-to-stable.sh
-      credentials:
-      - mount_path: /usr/local/ci-secrets/test-harness-secrets
-        name: test-harness-secrets
-        namespace: test-credentials
+      commands: build/scripts/oc-tests/oc-test-upgrade-from-stable-to-stable.sh
       from: src
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: 7.60.x
   org: eclipse-che
