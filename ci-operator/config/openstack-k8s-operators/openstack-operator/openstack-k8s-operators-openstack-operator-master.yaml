@@ -11,27 +11,54 @@ base_images:
     name: opm-builder
     namespace: ci
     tag: latest
+  rhel-8-golang-1.19:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.19-openshift-4.12
 binary_build_commands: make build
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.18-openshift-4.12
-      USER root
-      RUN yum install -y gcc git jq make python39 python39-pip && \
-      yum clean all && rm -rf /var/cache/dnf/*
-      RUN alternatives --set python3 /usr/bin/python3.9
-      RUN curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v1.23.0/operator-sdk_linux_amd64" -o operator-sdk
-      RUN chmod +x ./operator-sdk
-      RUN mv ./operator-sdk /usr/local/bin
-      RUN curl -s -L https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv4.5.7/kustomize_v4.5.7_linux_amd64.tar.gz | tar xvzf - -C /usr/local/bin kustomize
-      RUN chmod +x /usr/local/bin/kustomize
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
+- dockerfile_literal: |
+    FROM src
+    ARG SDK_VERSION=v1.23.0
+    ARG KUSTOMIZE_VERSION=v4.5.7
+    USER root
+    RUN yum install -y gcc git jq make python39 python39-pip && yum clean all && rm -rf /var/cache/dnf/*
+    RUN alternatives --set python3 /usr/bin/python3.9
+    RUN curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/${SDK_VERSION}/operator-sdk_linux_amd64" -o operator-sdk
+    RUN chmod +x ./operator-sdk
+    RUN mv ./operator-sdk /usr/local/bin
+    RUN curl -s -L https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz | tar xvzf - -C /usr/local/bin kustomize
+    RUN chmod +x /usr/local/bin/kustomize
+  from: src
+  to: openstack-operator-root-1.18
+- build_args:
+  - name: SDK_VERSION
+    value: v1.26.0
+  dockerfile_literal: |
+    FROM src
+    ARG SDK_VERSION=v1.23.0
+    ARG KUSTOMIZE_VERSION=v4.5.7
+    USER root
+    RUN yum install -y gcc git jq make python39 python39-pip && yum clean all && rm -rf /var/cache/dnf/*
+    RUN alternatives --set python3 /usr/bin/python3.9
+    RUN curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/${SDK_VERSION}/operator-sdk_linux_amd64" -o operator-sdk
+    RUN chmod +x ./operator-sdk
+    RUN mv ./operator-sdk /usr/local/bin
+    RUN curl -s -L https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2F${KUSTOMIZE_VERSION}/kustomize_${KUSTOMIZE_VERSION}_linux_amd64.tar.gz | tar xvzf - -C /usr/local/bin kustomize
+    RUN chmod +x /usr/local/bin/kustomize
+  from: rhel-8-golang-1.19
+  to: openstack-operator-root-1.19
 - dockerfile_literal: |
     FROM src
     RUN pip3 install python-openstackclient
     COPY oc /usr/bin/oc
     COPY opm /usr/bin/opm
-  from: src
+  from: openstack-operator-root-1.18
   inputs:
     cli:
       paths:
@@ -45,7 +72,7 @@ images:
 - dockerfile_literal: |
     FROM src
     RUN pip3 install pre-commit
-  from: src
+  from: openstack-operator-root-1.18
   to: openstack-operator-ci-pre-commit
 releases:
   latest:
@@ -109,6 +136,10 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy
+- as: test-1-19
+  commands: go version; kustomize version; operator-sdk version
+  container:
+    from: openstack-operator-root-1.19
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
