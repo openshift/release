@@ -12,6 +12,19 @@ def add_art_publish(gendoc):
         }
     })
 
+    gendoc.append({
+        'apiVersion': 'v1',
+        'kind': 'Secret',
+        'metadata': {
+            'name': 'art-publish-secret',
+            'namespace': 'ocp',
+            'annotations': {
+                'kubernetes.io/service-account.name': 'art-publish'
+            }
+        },
+        'type': 'kubernetes.io/service-account-token'
+    }, comment='Long lived API token for art-publish')
+
     gendoc.append_all([{
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'Role',
