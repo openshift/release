@@ -8,8 +8,27 @@ OPENSTACK_OPERATOR="openstack-operator"
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
 
+# Check org and project from job's spec
+REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
+REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
 # PR SHA
 PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
+
+# Fails if step is not being used on openstack-k8s-operators repos
+# Gets base repo name
+BASE_OP=${REF_REPO}
+if [[ "$REF_ORG" != "$ORG" ]]; then
+    echo "Not a ${ORG} job. Checking if isn't a rehearsal job..."
+    EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
+    EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
+    #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
+    if [[ "$EXTRA_REF_ORG" != "$ORG" ]]; then
+      echo "Failing since this step supports only ${ORG} changes."
+      exit 1
+    fi
+    BASE_OP=${EXTRA_REF_REPO}
+fi
+SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g')
 
 export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${OPENSTACK_OPERATOR}
 export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
@@ -56,8 +75,12 @@ oc get csv ${INSTALLED_CSV} -o jsonpath='{.spec.install.spec.deployments[*].name
 timeout ${TIMEOUT_OPERATORS_AVAILABLE} xargs -I {} -d ' ' \
 sh -c 'oc wait --for=condition=Available deployment {} --timeout=-1s'
 
+# Export OPENSTACK_CR if testing openstack-operator changes
+if [[ "$SERVICE_NAME" == "OPENSTACK" ]]; then
+  export ${SERVICE_NAME}_CR=/go/src/github.com/${ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml
+fi
 # Deploy openstack services with the sample from the PR under test
-OPENSTACK_CR=/go/src/github.com/${ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml make openstack_deploy
+make openstack_deploy
 sleep 60
 
 # Waiting for all services to be ready

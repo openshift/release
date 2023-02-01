@@ -8,7 +8,27 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-8-release-golang-1.19-openshift-4.12
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.12
+    USER root
+    RUN yum install -y gcc git jq make python39 python39-pip && \
+    yum clean all && rm -rf /var/cache/dnf/*
+    RUN alternatives --set python3 /usr/bin/python3.9
+    RUN pip3 install python-openstackclient
+    RUN curl -s -L "https://github.com/operator-framework/operator-sdk/releases/download/v1.26.0/operator-sdk_linux_amd64" -o operator-sdk
+    RUN chmod +x ./operator-sdk
+    RUN mv ./operator-sdk /usr/local/bin
+    RUN curl -s -L "https://github.com/operator-framework/operator-registry/releases/latest/download/linux-amd64-opm" -o opm
+    RUN chmod +x ./opm
+    RUN mv ./opm /usr/local/bin
+    RUN curl -s -L https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv4.5.7/kustomize_v4.5.7_linux_amd64.tar.gz | tar xvzf - -C /usr/local/bin kustomize
+    RUN chmod +x /usr/local/bin/kustomize
+    RUN curl -s -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /usr/local/bin oc
+    RUN chmod +x /usr/local/bin/oc
+  from: src
+  to: openstack-operator-ci-build-deploy
 resources:
   '*':
     limits:
@@ -42,6 +62,17 @@ tests:
   commands: make gofmt || true
   container:
     from: src
+- as: mariadb-operator-build-deploy
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  optional: true
+  steps:
+    workflow: openstack-k8s-operators-test-build-deploy
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
