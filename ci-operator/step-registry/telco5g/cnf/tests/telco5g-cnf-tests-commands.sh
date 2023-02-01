@@ -11,6 +11,11 @@ cat <<EOF >"${SKIP_TESTS_FILE}"
 
 # <feature> <test name>
 
+# SKIPTEST
+# bz### we can stop testing N3000
+# TESTNAME
+sriov "FPGA Programmable Acceleration Card N3000 for Networking"
+
 EOF
 }
 

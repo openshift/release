@@ -80,7 +80,6 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 ### Create manifests
 echo "Creating manifests..."
 openshift-install --dir="${dir}" create manifests &
-rm -f ${dir}/openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 set +e
 wait "$!"
 ret="$?"
@@ -98,6 +97,10 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 ### Remove compute machinesets (optional)
 echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+
+### Remove control-plane machinesets
+echo "Removing control-plane machineset..."
+rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 
 ### Make control-plane nodes unschedulable
 echo "Making control-plane nodes unschedulable..."
@@ -145,6 +148,11 @@ do
   manifest="$( basename "${item}" )"
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+
+echo "--------------------------------------------------"
+echo "ls -la ${dir} ${dir}/manifests ${dir}/openshift"
+ls -la ${dir} ${dir}/manifests ${dir}/openshift
+echo "--------------------------------------------------"
 
 ### Create Ignition configs
 echo "Creating Ignition configs..."
