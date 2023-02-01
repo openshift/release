@@ -52,6 +52,8 @@ SnapshotClass:
   FromName: true
 DriverInfo:
   Name: filestore.csi.storage.gke.io
+  SupportedMountOption:
+    sync: {}
   SupportedSizeRange:
     Min: 1Ti
     Max: 63.9Ti
