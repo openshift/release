@@ -190,11 +190,11 @@ function run_command_oc() {
 function check_clusteroperators() {
     local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc null_version unavailable_operator degraded_operator skip_operator
 
-    skip_operator="aro" # ARO operator is not versioned so version column may be empty
+    skip_operator="aro" # ARO operator versioned but based on RP git commit ID not cluster version
     echo "Make sure every operator do not report empty column"
     tmp_clusteroperator=$(mktemp /tmp/health_check-script.XXXXXX)
     input="${tmp_clusteroperator}"
-    ${OC} get clusteroperator | grep -v ${skip_operator} $>"${tmp_clusteroperator}"
+    ${OC} get clusteroperator $>"${tmp_clusteroperator}"
     column=$(head -n 1 "${tmp_clusteroperator}" | awk '{print NF}')
     last_column_name=$(head -n 1 "${tmp_clusteroperator}" | awk '{print $NF}')
     if [[ ${last_column_name} == "MESSAGE" ]]; then
@@ -217,10 +217,8 @@ function check_clusteroperators() {
 
     echo "Make sure every operator column reports version"
     if null_version=$(${OC} get clusteroperator -o json | jq '.items[] | select(.status.versions == null) | .metadata.name') && [[ ${null_version} != "" ]]; then
-      if ${null_version} != ${skip_operator}; then 
-         echo >&2 "Null Version: ${null_version}"
-         (( tmp_ret += 1 ))
-      fi
+      echo >&2 "Null Version: ${null_version}"
+      (( tmp_ret += 1 ))
     fi
 
     echo "Make sure every operator reports correct version"
@@ -231,7 +229,7 @@ function check_clusteroperators() {
 
     # In disconnected install, marketplace often get into False state, so it is better to remove it from cluster from flexy post-action
     echo "Make sure every operator's AVAILABLE column is True"
-    if unavailable_operator=$(${OC} get clusteroperator | grep -v ${skip_operator} | awk '$3 == "False"' | grep "False"); then
+    if unavailable_operator=$(${OC} get clusteroperator | awk '$3 == "False"' | grep "False"); then
         echo >&2 "Some operator's AVAILABLE is False"
         echo >&2 "$unavailable_operator"
         (( tmp_ret += 1 ))
