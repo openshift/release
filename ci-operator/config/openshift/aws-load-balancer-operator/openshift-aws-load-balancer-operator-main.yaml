@@ -69,6 +69,27 @@ tests:
         requests:
           cpu: 100m
     workflow: aws-load-balancer-install
+- as: e2e-aws-rosa-operator
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-load-balancer-operator-bundle
+    env:
+      OO_CHANNEL: stable-v0
+      OO_INSTALL_NAMESPACE: aws-load-balancer-operator
+      OO_PACKAGE: aws-load-balancer-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export ALBO_E2E_PLATFORM=ROSA
+        make test-e2e || true
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: aws-load-balancer-install-rosa
 zz_generated_metadata:
   branch: main
   org: openshift
