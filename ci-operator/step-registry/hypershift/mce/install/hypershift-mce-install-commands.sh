@@ -2,11 +2,38 @@
 
 set -ex
 
-DOWNSTREAM=${DOWNSTREAM:-"false"}
-_REPO="quay.io/stolostron/cmb-custom-registry"
-if [ "$DOWNSTREAM" == "true" ]; then
-    _REPO="quay.io/acm-d/mce-custom-registry"
-fi
+_REPO="quay.io/acm-d/mce-custom-registry"
+
+cat << EOF | oc apply -f -
+apiVersion: operator.openshift.io/v1alpha1
+kind: ImageContentSourcePolicy
+metadata:
+  name: rhacm-repo
+spec:
+  repositoryDigestMirrors:
+  - mirrors:
+    - quay.io/acm-d
+    source: registry.redhat.io/rhacm2
+  - mirrors:
+    - quay.io/acm-d
+    source: registry.redhat.io/multicluster-engine
+  - mirrors:
+    - registry.redhat.io/openshift4/ose-oauth-proxy
+    source: registry.access.redhat.com/openshift4/ose-oauth-proxy"
+EOF
+
+QUAY_USERNAME=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_username)
+QUAY_PASSWORD=$(cat /etc/acm-d-mce-quay-pull-credentials/acm_d_mce_quay_pullsecret)
+oc get secret pull-secret -n openshift-config -o json | jq -r '.data.".dockerconfigjson"' | base64 -d > /tmp/global-pull-secret.json
+QUAY_AUTH=$(echo -n "${QUAY_USERNAME}:${QUAY_PASSWORD}" | base64 -w 0)
+jq --arg QUAY_AUTH "$QUAY_AUTH" '.auths += {"quay.io/acm-d": {"auth":$QUAY_AUTH,"email":""}}' /tmp/global-pull-secret.json > /tmp/global-pull-secret.json.tmp
+mv /tmp/global-pull-secret.json.tmp /tmp/global-pull-secret.json
+oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/tmp/global-pull-secret.json
+rm /tmp/global-pull-secret.json
+
+sleep 5
+oc wait mcp master worker --for condition=updated --timeout=20m
+
 MCE_VERSION=${MCE_VERSION:-"2.2"}
 
 VER=`oc version | grep "Client Version:"`
@@ -80,7 +107,7 @@ done
 _apiReady=0
 echo "* Using CSV: ${CSVName}"
 for ((i=1; i<=20; i++)); do
-  sleep 10
+  sleep 30
   output=$(oc get csv -n multicluster-engine $CSVName -o jsonpath='{.status.phase}' >> /dev/null && echo "exists" || echo "not found")
   if [ "$output" != "exists" ]; then
     continue
@@ -102,9 +129,7 @@ metadata:
   name: multiclusterengine-sample
 spec: {}
 EOF
-  if [ "$DOWNSTREAM" == "true" ]; then
-    oc annotate mce multiclusterengine-sample imageRepository=quay.io:443/acm-d
-  fi
+  oc annotate mce multiclusterengine-sample imageRepository=quay.io/acm-d
   echo "multiclusterengine installed successfully"
   sleep 5
 else
