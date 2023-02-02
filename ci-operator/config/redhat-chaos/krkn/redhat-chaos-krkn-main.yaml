@@ -3,6 +3,15 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.13
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -12,9 +21,13 @@ resources:
       memory: 200Mi
 tests:
 - as: pod-scenarios
-  commands: python run_kraken.py
-  container:
-    from: src
+  steps:
+    cluster_profile: gcp
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    workflow: redhat-chaos-krkn-tests
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
