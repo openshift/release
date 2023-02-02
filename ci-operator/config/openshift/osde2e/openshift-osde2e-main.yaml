@@ -53,6 +53,23 @@ tests:
   - mount_path: /usr/local/sd-cicd-aws-prod
     name: sd-cicd-aws-prod
   skip_if_only_changed: ^(?:docs|\.github)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
+- as: hypershift-pr-check
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="hypershift"
+    export CHANNEL="stable"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    from: src
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-hypershift-byovpc
+    name: osde2e-hypershift-byovpc
 - as: aro-ovn-e2e-default
   cron: 0 0 9 * * *
   steps:
@@ -290,6 +307,25 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-rosa-stage
     name: osde2e-rosa-stage
+- as: hypershift-stage-e2e-default
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="hypershift"
+    export CHANNEL="stable"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-hypershift-byovpc
+    name: osde2e-hypershift-byovpc
 - as: rosa-stage-e2e-sts
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
