@@ -1,21 +1,28 @@
 chain:
-  as: cucushift-installer-rehearse-aws-ipi-network-mtu-localzone-provision
+  as: cucushift-installer-rehearse-aws-ipi-disconnected-private-network-mtu-localzone-provision
   steps:
-  - ref: ipi-install-rbac
   - ref: openshift-cluster-bot-rbac
-  - ref: aws-provision-vpc-shared
+  - ref: aws-provision-vpc-disconnected
   - ref: aws-provision-localzone-subnet
   - ref: ipi-conf-aws-localzone-machineset-manifests
+  - chain: aws-provision-bastionhost
+  - ref: aws-provision-cco-manual-users-static
+  - chain: mirror-images-by-oc-adm
   - ref: ipi-conf
   - ref: ipi-conf-telemetry
   - ref: ipi-conf-aws-custom-vpc
+  - ref: ipi-conf-manual-creds
   - ref: ipi-conf-aws
   - ref: ipi-conf-network-mtu
+  - ref: ipi-conf-mirror
   - ref: ipi-install-monitoringpvc
+  - ref: proxy-config-generate
+  - ref: ipi-conf-manual-creds-remove-unnecessary-creds
   - ref: ipi-install-install-aws
   - ref: ipi-install-times-collection
   - ref: aws-provision-tags-for-byo-vpc
-  - ref: enable-qe-catalogsource
+  - ref: enable-qe-catalogsource-disconnected
+  - ref: set-sample-operator-disconnected
   env:
   - name: CONTROL_PLANE_INSTANCE_TYPE
     default: "m6i.xlarge"
@@ -33,6 +40,12 @@ chain:
     default: "yes"
   - name: NETWORK_MTU
     default: "1200"
+  - name: ADD_INGRESS_RECORDS_MANUALLY
+    default: "yes"
+    documentation: "Enable manually create apps dns record."
+  - name: PUBLISH
+    default: "Internal"
+    documentation: "Cluster publish strategy."
   documentation: |-
     Create an IPI cluster on AWS for QE e2e tests.
     Additional worker nodes will be created in Local Zone with taints:NoSchedule
