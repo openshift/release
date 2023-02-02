@@ -144,7 +144,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/osde2e-common
         - --secret-dir=/secrets/osde2e-credentials
-        - --secret-dir=/secrets/sd-cicd-aws-prod
+        - --secret-dir=/secrets/osde2e-rosa-prod
         - --target=verify
         command:
         - ci-operator
@@ -164,14 +164,14 @@ presubmits:
         - mountPath: /secrets/osde2e-credentials
           name: osde2e-credentials
           readOnly: true
+        - mountPath: /secrets/osde2e-rosa-prod
+          name: osde2e-rosa-prod
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
-          readOnly: true
-        - mountPath: /secrets/sd-cicd-aws-prod
-          name: sd-cicd-aws-prod
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
@@ -181,13 +181,13 @@ presubmits:
       - name: osde2e-credentials
         secret:
           secretName: osde2e-credentials
+      - name: osde2e-rosa-prod
+        secret:
+          secretName: osde2e-rosa-prod
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-      - name: sd-cicd-aws-prod
-        secret:
-          secretName: sd-cicd-aws-prod
     trigger: (?m)^/test( | .* )verify,?($|\s.*)
