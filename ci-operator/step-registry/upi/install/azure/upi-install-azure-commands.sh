@@ -61,12 +61,13 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 export AZURE_AUTH_LOCATION
 
 pushd ${ARTIFACT_DIR}/installer
-python3 -c "import yaml" || pip3 install --user pyyaml
 
-CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
-BASE_DOMAIN=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
-AZURE_REGION=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["platform"]["azure"]["region"])')
-BASE_DOMAIN_RESOURCE_GROUP=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["platform"]["azure"]["baseDomainResourceGroupName"])')
+CLUSTER_NAME=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'metadata.name')
+BASE_DOMAIN=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'baseDomain')
+AZURE_REGION=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'platform.azure.region')
+BASE_DOMAIN_RESOURCE_GROUP=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'platform.azure.baseDomainResourceGroupName')
+
+
 SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 export CLUSTER_NAME
 export BASE_DOMAIN
@@ -76,7 +77,7 @@ az_deployment_optional_parameters=""
 provisioned_vnet_file="${SHARED_DIR}/customer_vnet_subnets.yaml"
 if [ -f "${provisioned_vnet_file}" ]; then
     echo "vnet already created"
-    vnet_name=$(python3 -c "import yaml;data = yaml.full_load(open('${provisioned_vnet_file}'));print(data['platform']['azure']['virtualNetwork'])")
+    vnet_name=$(yq-go r "${provisioned_vnet_file}" 'platform.azure.virtualNetwork')
     vnet_basename=$(echo "${vnet_name}" | sed 's/-vnet$//')
     az_deployment_optional_parameters="--parameters vnetBaseName=${vnet_basename}"
     [ -z "${vnet_basename}" ] && echo "Did not get vnet basename" && exit 1
