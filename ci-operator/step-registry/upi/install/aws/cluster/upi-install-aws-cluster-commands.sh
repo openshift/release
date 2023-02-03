@@ -48,6 +48,10 @@ export PATH=${HOME}/.local/bin:${PATH}
 
 pushd ${ARTIFACT_DIR}/installer
 
+
+echo "debugging 1 hour...."
+sleep 3600
+
 base_domain=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
 AWS_REGION=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["platform"]["aws"]["region"])')
 CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
