@@ -17,10 +17,10 @@ QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-toke
 QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-source)
 QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
 export OPENSHIFT_API=$(yq e '.clusters[0].cluster.server' $KUBECONFIG)
-export OPENSHIFT_USERNAME=kubeadmin
-export OPENSHIFT_PASSWORD=$(cat $KUBEADMIN_PASSWORD_FILE)
+export OPENSHIFT_USERNAME="kubeadmin"
+export OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
 
-oc login -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" -p "$OPENSHIFT_API"
+oc login -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" -p "$OPENSHIFT_API" --insecure-skip-tls-verify
 oc whoami -t
 
 git config --global user.name "redhat-appstudio-qe-bot"
