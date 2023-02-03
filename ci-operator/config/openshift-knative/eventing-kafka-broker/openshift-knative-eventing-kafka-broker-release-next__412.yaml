@@ -1,8 +1,4 @@
 base_images:
-  openshift_release_golang-1.17:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
   openshift_release_golang-1.18:
     name: release
     namespace: openshift
@@ -11,8 +7,6 @@ build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
-- dockerfile_path: openshift/ci-operator/knative-images/dispatcher/Dockerfile
-  to: knative-eventing-kafka-broker-dispatcher
 - dockerfile_path: openshift/ci-operator/knative-images/kafka-controller/Dockerfile
   inputs:
     openshift_release_golang-1.18:
@@ -25,8 +19,6 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: knative-eventing-kafka-broker-post-install
-- dockerfile_path: openshift/ci-operator/knative-images/receiver/Dockerfile
-  to: knative-eventing-kafka-broker-receiver
 - dockerfile_path: openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
   inputs:
     openshift_release_golang-1.18:
@@ -51,15 +43,6 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: knative-eventing-kafka-broker-test-event-flaker
-- dockerfile_path: openshift/ci-operator/knative-test-images/event-library/Dockerfile
-  inputs:
-    openshift_release_golang-1.17:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: knative-eventing-kafka-broker-test-event-library
 - dockerfile_path: openshift/ci-operator/knative-test-images/event-sender/Dockerfile
   inputs:
     openshift_release_golang-1.18:
@@ -138,6 +121,10 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: knative-eventing-kafka-broker-test-wathola-sender
+- dockerfile_path: openshift/ci-operator/static-images/dispatcher/Dockerfile
+  to: knative-eventing-kafka-broker-dispatcher
+- dockerfile_path: openshift/ci-operator/static-images/receiver/Dockerfile
+  to: knative-eventing-kafka-broker-receiver
 promotion:
   additional_images:
     eventing-kafka-broker-src: src
@@ -176,14 +163,10 @@ tests:
       cli: latest
       commands: make test-conformance
       dependencies:
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -192,8 +175,6 @@ tests:
         name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_FLAKER
         name: knative-eventing-kafka-broker-test-event-flaker
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_LIBRARY
-        name: knative-eventing-kafka-broker-test-event-library
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
         name: knative-eventing-kafka-broker-test-event-sender
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
@@ -220,6 +201,10 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
@@ -253,14 +238,10 @@ tests:
       cli: latest
       commands: make test-conformance
       dependencies:
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -269,8 +250,6 @@ tests:
         name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_FLAKER
         name: knative-eventing-kafka-broker-test-event-flaker
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_LIBRARY
-        name: knative-eventing-kafka-broker-test-event-library
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
         name: knative-eventing-kafka-broker-test-event-sender
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
@@ -297,6 +276,10 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
@@ -329,14 +312,10 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -345,8 +324,6 @@ tests:
         name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_FLAKER
         name: knative-eventing-kafka-broker-test-event-flaker
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_LIBRARY
-        name: knative-eventing-kafka-broker-test-event-library
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
         name: knative-eventing-kafka-broker-test-event-sender
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
@@ -373,6 +350,10 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
@@ -406,14 +387,10 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -422,8 +399,6 @@ tests:
         name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_FLAKER
         name: knative-eventing-kafka-broker-test-event-flaker
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_LIBRARY
-        name: knative-eventing-kafka-broker-test-event-library
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
         name: knative-eventing-kafka-broker-test-event-sender
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
@@ -450,6 +425,10 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
@@ -482,14 +461,10 @@ tests:
       cli: latest
       commands: make test-reconciler
       dependencies:
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -498,8 +473,6 @@ tests:
         name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_FLAKER
         name: knative-eventing-kafka-broker-test-event-flaker
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_LIBRARY
-        name: knative-eventing-kafka-broker-test-event-library
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
         name: knative-eventing-kafka-broker-test-event-sender
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
@@ -526,6 +499,10 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
@@ -559,14 +536,10 @@ tests:
       cli: latest
       commands: make test-reconciler
       dependencies:
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -575,8 +548,6 @@ tests:
         name: knative-eventing-kafka-broker-test-consumer-group-lag-provider-test
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_FLAKER
         name: knative-eventing-kafka-broker-test-event-flaker
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_LIBRARY
-        name: knative-eventing-kafka-broker-test-event-library
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENT_SENDER
         name: knative-eventing-kafka-broker-test-event-sender
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_EVENTSHUB
@@ -603,6 +574,10 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
