@@ -21,7 +21,14 @@ OPENSHIFT_USERNAME="kubeadmin"
 OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
 
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
-oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true
+
+function waitForNewOCPLogin() {
+    while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
+        sleep 20
+    done
+}
+
+timeout --foreground 10m bash -c waitForNewOCPLogin
 
 git config --global user.name "redhat-appstudio-qe-bot"
 git config --global user.email redhat-appstudio-qe-bot@redhat.com
