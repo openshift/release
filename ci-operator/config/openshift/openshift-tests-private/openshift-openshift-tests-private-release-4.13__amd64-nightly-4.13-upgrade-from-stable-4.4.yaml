@@ -1,25 +1,22 @@
 base_images:
   ansible:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: ansible
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: cli
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  tools:
-    name: "4.12"
-    namespace: ocp
-    tag: tools
-  upi-installer:
-    name: "4.5"
-    namespace: ocp
-    tag: upi-installer
 releases:
+  intermediate45:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.5"
   intermediate46:
     release:
       architecture: amd64
@@ -50,42 +47,47 @@ releases:
       architecture: amd64
       channel: stable
       version: "4.11"
+  intermediate412:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.12"
   latest:
     release:
       architecture: amd64
       channel: stable
-      version: "4.5"
+      version: "4.4"
   target:
     candidate:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: azure-ipi-p1-f30
-  cron: 3 11 30 * *
+- as: aws-ipi-p1-f30
+  cron: 51 17 31 * *
   steps:
-    cluster_profile: azure-qe
+    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BASE_DOMAIN: qe.devcluster.openshift.com
       LOKI_ENABLED: "false"
     post:
-    - chain: cucushift-installer-rehearse-azure-ipi-deprovision
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
     pre:
-    - ref: ipi-conf
-    - ref: ipi-conf-telemetry
-    - ref: ipi-conf-azure
+    - chain: ipi-conf-aws
     - chain: ipi-install
     test:
     - as: set-upgrade-releases
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE46},${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_TARGET}"
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE45},${RELEASE_IMAGE_INTERMEDIATE46},${RELEASE_IMAGE_INTERMEDIATE47},${RELEASE_IMAGE_INTERMEDIATE48},${RELEASE_IMAGE_INTERMEDIATE49},${RELEASE_IMAGE_INTERMEDIATE410},${RELEASE_IMAGE_INTERMEDIATE411},${RELEASE_IMAGE_INTERMEDIATE412},${RELEASE_IMAGE_TARGET}"
         > ${SHARED_DIR}/upgrade-edge
       dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE412
+        name: release:intermediate412
       - env: RELEASE_IMAGE_INTERMEDIATE411
         name: release:intermediate411
       - env: RELEASE_IMAGE_INTERMEDIATE410
@@ -98,6 +100,8 @@ tests:
         name: release:intermediate47
       - env: RELEASE_IMAGE_INTERMEDIATE46
         name: release:intermediate46
+      - env: RELEASE_IMAGE_INTERMEDIATE45
+        name: release:intermediate45
       - env: RELEASE_IMAGE_TARGET
         name: release:target
       from: cli
@@ -108,7 +112,7 @@ tests:
     - ref: cucushift-upgrade-healthcheck
     - ref: cucushift-upgrade-toimage
 zz_generated_metadata:
-  branch: release-4.12
+  branch: release-4.13
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-4.12-upgrade-from-stable-4.5
+  variant: amd64-nightly-4.13-upgrade-from-stable-4.4
