@@ -27,7 +27,6 @@ function waitForNewOCPLogin() {
         sleep 20
     done
 }
-
 timeout --foreground 10m bash -c waitForNewOCPLogin
 
 git config --global user.name "redhat-appstudio-qe-bot"
