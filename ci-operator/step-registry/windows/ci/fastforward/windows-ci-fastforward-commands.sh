@@ -61,9 +61,8 @@ if ! git clone -b "$DESTINATION_BRANCH" "$repo_url" ; then
         exit 1
     fi
 
-    echo "INFO Pushing the following commits to $DESTINATION_BRANCH to origin"
-    git --no-pager log --pretty=oneline origin/"$DESTINATION_BRANCH"..HEAD
-    if ! git push origin $DESTINATION_BRANCH; then
+    echo "INFO Pushing to new branch $DESTINATION_BRANCH"
+    if ! git push origin "$DESTINATION_BRANCH" ; then
         echo "ERROR Could not push to origin DESTINATION_BRANCH"
         exit 1
     fi
