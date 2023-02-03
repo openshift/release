@@ -201,7 +201,10 @@ resources:
       memory: 5Gi
 tests:
 - as: unit
-  commands: go test ./pkg/...
+  commands: |
+    go test -coverprofile=/tmp/coverprofile.out ./pkg/...
+    go tool cover -o $ARTIFACT_DIR/cover.txt -func /tmp/coverprofile.out
+    go tool cover -o $ARTIFACT_DIR/cover.html -html /tmp/coverprofile.out
   container:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
