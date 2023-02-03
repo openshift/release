@@ -33,6 +33,6 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
 cd "$(mktemp -d)"
 
-git clone --branch remove_oauth "https://${GITHUB_TOKEN}@github.com/flacatus/e2e-tests.git" .
+git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
 make ci/prepare/e2e-branch
 make ci/test/e2e
