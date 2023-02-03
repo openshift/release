@@ -3,6 +3,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: base
+  builder3:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.13
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -20,17 +24,12 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: aws-ebs-csi-driver
 - dockerfile_literal: |-
-    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13 AS builder
+    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
     WORKDIR /go/src/k8s.io/kubernetes
     RUN git clone --depth 1 https://github.com/openshift/kubernetes.git .
     RUN make WHAT=k8s.io/kubernetes/openshift-hack/commitchecker
-    FROM registry.ci.openshift.org/ocp/4.13:base
-    COPY --from=builder /go/src/k8s.io/kubernetes/_output/bin/commitchecker /bin/commitchecker
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    RUN cp /go/src/k8s.io/kubernetes/_output/bin/commitchecker /bin/commitchecker
+  from: builder3
   to: commitchecker
 promotion:
   excluded_images:
@@ -71,6 +70,9 @@ tests:
 - as: verify-commits
   commands: |
     set -x
+    pwd
+    ls -la
+    git log -n 50
     commitchecker --start ${PULL_BASE_SHA:-master}
   container:
     clone: true
