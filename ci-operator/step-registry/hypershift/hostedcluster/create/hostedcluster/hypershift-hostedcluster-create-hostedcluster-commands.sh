@@ -56,7 +56,9 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
   --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
   --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
   --annotations "prow.k8s.io/job=${JOB_NAME}" \
-  --annotations "prow.k8s.io/build-id=${BUILD_ID}"
+  --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
+  --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
+  --additional-tags "prow.k8s.io/build-id=${BUILD_ID}"
 
 echo "Wait to check if release image is valid"
 n=0
