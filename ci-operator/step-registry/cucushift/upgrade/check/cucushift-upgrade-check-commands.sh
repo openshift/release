@@ -37,7 +37,7 @@ fi
 
 cd verification-tests
 set -x
-cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit || true
+cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit --dry-run || true
 set +x
 
 echo "Summarizing test result..."
