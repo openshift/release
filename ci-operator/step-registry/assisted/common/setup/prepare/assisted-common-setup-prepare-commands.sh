@@ -256,8 +256,13 @@ cat > run_test_playbook.yaml <<-"EOF"
         delay: 5
       - name: Setup working directory for machine type m3.large.x86
         ansible.builtin.shell: |
-          mkfs.xfs -f /dev/nvme0n1
-          mount /dev/nvme0n1 {{ REPO_DIR }}
+          # Get disk where / is mounted
+          ROOT_DISK=$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
+
+          # Use the largest disk available for assisted
+          DATA_DISK=$(lsblk -o name --noheadings --sort size --path | grep -v "${ROOT_DISK}" | tail -n1)
+          mkfs.xfs -f "${DATA_DISK}"
+          mount "${DATA_DISK}" {{ REPO_DIR }}
         when: "equinix_metadata.json.plan == 'm3.large.x86'"
       - name: Setup extra swap for machine type {{ equinix_metadata.json.plan }}
         ansible.builtin.shell: |
