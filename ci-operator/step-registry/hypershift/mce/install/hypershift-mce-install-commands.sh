@@ -174,14 +174,14 @@ EOF
 # wait for hypershift operator to come online
 _hypershiftReady=0
 set +e
-for ((i=1; i<=10; i++)); do
+for ((i=1; i<=20; i++)); do
   oc get pods -n hypershift | grep "operator.*Running"
   if [ $? -eq 0 ]; then
     _hypershiftReady=1
     break
   fi
   echo "Waiting on hypershift operator to install"
-  sleep 15
+  sleep 30
 done
 set -e
 
