@@ -60,26 +60,17 @@ spec:
     - containerPort: 8080
       protocol: TCP
     securityContext:
-      privileged: false" | oc create -f -
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault" | oc create -f -
 
-oc expose pod/hello-microshift
+oc expose pod hello-microshift
+oc expose svc hello-microshift --hostname hello-microshift.cluster.local
 
-# Cannot use `oc expose svc hello-microshift` due to empty spec.to.kind bug
-echo "
-apiVersion: route.openshift.io/v1
-kind: Route
-metadata:
-  labels:
-    name: hello-microshift
-  name: hello-microshift
-spec:
-  host: hello-microshift.cluster.local
-  port:
-    targetPort: 8080
-  to:
-    kind: Service
-    name: hello-microshift" | oc create -f -
-  
 oc wait pods -l name=hello-microshift --for condition=Ready --timeout=300s
 EOF
 

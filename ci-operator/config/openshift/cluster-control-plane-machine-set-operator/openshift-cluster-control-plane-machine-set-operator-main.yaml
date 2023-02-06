@@ -21,6 +21,12 @@ promotion:
   name: "4.13"
   namespace: ocp
 releases:
+  arm64-latest:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.13"
   initial:
     integration:
       name: "4.13"
@@ -67,12 +73,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws
-- as: e2e-aws-serial
+- as: e2e-aws-ovn-serial
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
-- as: e2e-aws-upgrade
+- as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
@@ -103,9 +109,10 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-aws
 - as: e2e-aws-periodic
-  interval: 72h
+  interval: 24h
   steps:
     cluster_profile: aws
     test:
@@ -116,6 +123,25 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
+    workflow: ipi-aws
+- as: e2e-aws-arm-periodic
+  interval: 24h
+  steps:
+    cluster_profile: aws-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: arm-ci.devcluster.openshift.com
+    test:
+    - as: test
+      commands: |
+        make e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-aws
 - as: e2e-azure-operator
   optional: true
@@ -132,7 +158,7 @@ tests:
           cpu: 100m
     workflow: ipi-azure
 - as: e2e-azure-periodic
-  interval: 72h
+  interval: 24h
   steps:
     cluster_profile: azure4
     test:
@@ -143,6 +169,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-azure
 - as: e2e-gcp-operator
   optional: true
@@ -159,7 +186,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-gcp-periodic
-  interval: 72h
+  interval: 24h
   steps:
     cluster_profile: gcp
     test:
@@ -170,6 +197,7 @@ tests:
       resources:
         requests:
           cpu: 100m
+      timeout: 3h0m0s
     workflow: ipi-gcp
 - as: e2e-aws-ovn-etcd-scaling
   steps:

@@ -80,9 +80,17 @@ fi
 versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq '.[].raw_id')
 echo -e "Available cluster versions:\n${versionList}"
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
-  OPENSHIFT_VERSION=$(echo "$versionList" | head -1 | tr -d '"')
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 | tr -d '"' || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | head -1 | tr -d '"')
+  fi
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  OPENSHIFT_VERSION=$(echo "$versionList" | { grep "${OPENSHIFT_VERSION}" || true; } | head -1 | tr -d '"')
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | grep -i ec | head -1 | tr -d "'" || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | head -1 | tr -d '"' || true)
+  fi
 else
   # Match the whole line
   OPENSHIFT_VERSION=$(echo "$versionList" | { grep -x "\"${OPENSHIFT_VERSION}\"" || true; } | tr -d '"')
@@ -222,6 +230,7 @@ while true; do
   fi
 done
 rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
+rosa describe cluster -c ${CLUSTER_ID} -o json
 
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
@@ -230,3 +239,6 @@ echo "API URL: ${API_URL}"
 echo "Console URL: ${CONSOLE_URL}"
 echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
 echo "${API_URL}" > "${SHARED_DIR}/api.url"
+
+PRODUCT_ID=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.product.id')
+echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"

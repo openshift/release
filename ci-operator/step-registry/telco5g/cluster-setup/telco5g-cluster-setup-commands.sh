@@ -14,7 +14,6 @@ cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
-DSHVIP="$(cat /var/run/ds-hv-ip/dshvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 KCLI_PARAM=""
@@ -23,9 +22,7 @@ if [[ "$PROW_JOB_ID" =~ "nightly" ]]; then
     KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:${PROW_JOB_ID/-telco5g/}"
 elif [ ! -z $JOB_NAME ]; then
     # In case of regular periodic job
-    tmpvar="${JOB_NAME/*nightly-/}"
-    ocp_ver="${tmpvar/-e2e-telco5g/}"
-    KCLI_PARAM="-P tag=$ocp_ver -P version=nightly"
+    KCLI_PARAM="-P tag=$T5CI_VERSION -P version=nightly"
 fi
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM  =========="
 
@@ -79,7 +76,7 @@ echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
-IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
+IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
 PLAN_NAME="${CLUSTER_NAME}_ci"
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
@@ -108,7 +105,7 @@ else
 # Run on downstream cnfdc1 without bastion
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${DSHVIP} ansible_host=${DSHVIP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
+${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
 fi
@@ -198,10 +195,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
     shell: kcli scp root@${CLUSTER_NAME}-installer:/root/ocp/auth/kubeconfig /home/kni/.kube/config_${CLUSTER_NAME}
 
   - name: Add skip-tls-verify to kubeconfig
-    lineinfile:
+    replace:
       path: /home/kni/.kube/config_${CLUSTER_NAME}
-      regexp: '    certificate-authority-data:'
-      line: '    insecure-skip-tls-verify: true'
+      regexp: '    certificate-authority-data:.*'
+      replace: '    insecure-skip-tls-verify: true'
 
   - name: Grab the kubeconfig
     fetch:
@@ -210,11 +207,12 @@ cat << EOF > ~/fetch-kubeconfig.yml
       flat: yes
 
   - name: Modify local copy of kubeconfig
-    lineinfile:
+    replace:
       path: $SHARED_DIR/kubeconfig
       regexp: '    server: https://api.*'
-      line: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
+      replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
+
 EOF
 
 cat << EOF > ~/fetch-information.yml
@@ -234,6 +232,9 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv
-ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv
+status=0
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
+exit ${status}
+

@@ -80,6 +80,35 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: build05
+    context: ci/prow/clusterimageset-validate
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-clusterimageset-validate
+    rerun_command: /test clusterimageset-validate
+    run_if_changed: ^clusters/hive/pools/.*
+    spec:
+      containers:
+      - args:
+        - --pools
+        - ./clusters/hive/pools
+        - --imagesets
+        - ./clusters/hive/pools
+        command:
+        - clusterimageset-updater
+        image: registry.ci.openshift.org/ci/clusterimageset-updater:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )clusterimageset-validate,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: app.ci
     context: ci/build-farm/app-ci-config-dry
     decorate: true
@@ -200,7 +229,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20221208-ecb4ed8
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20230127-b1fb292
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -680,7 +709,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20230101-b6d4dcfde2
+        image: gcr.io/k8s-prow/checkconfig:v20230205-1a18f0ced9
         imagePullPolicy: IfNotPresent
         name: ""
         resources:

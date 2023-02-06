@@ -35,6 +35,21 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-jupyter-datascience-ubi8-python-3.8
   to: cuda-jupyter-tensorflow-ubi8-python-3.8
+- context_dir: base/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  to: base-ubi9-python-3.9
+- context_dir: jupyter/minimal/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-ubi9-python-3.9
+  to: jupyter-minimal-ubi9-python-3.9
+- context_dir: jupyter/datascience/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: jupyter-minimal-ubi9-python-3.9
+  to: jupyter-datascience-ubi9-python-3.9
+- context_dir: jupyter/pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi9-python-3.9
+  to: jupyter-pytorch-ubi9-python-3.9
 promotion:
   namespace: red-hat-data-services
   tag: latest
@@ -88,6 +103,33 @@ tests:
     env:
       IMAGE_REPO: cuda-notebooks
       RELEASE_VERSION: cuda-jupyter-tensorflow-ubi8-python-3.8
+    workflow: red-hat-data-services-ci-image-mirror
+- as: notebook-jupyter-minimal-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-minimal-ubi9-python-3.9
+    env:
+      IMAGE_REPO: odh-minimal-notebook-container
+      RELEASE_VERSION: v2
+    workflow: red-hat-data-services-ci-image-mirror
+- as: notebook-jupyter-datascience-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-datascience-ubi9-python-3.9
+    env:
+      IMAGE_REPO: odh-generic-data-science-notebook
+      RELEASE_VERSION: v2
+    workflow: red-hat-data-services-ci-image-mirror
+- as: notebook-jupyter-pytorch-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-pytorch-ubi9-python-3.9
+    env:
+      IMAGE_REPO: odh-pytorch-notebook
+      RELEASE_VERSION: v2
     workflow: red-hat-data-services-ci-image-mirror
 zz_generated_metadata:
   branch: main

@@ -22,7 +22,7 @@ function join_by_semicolon() {
 
 echo "Rendering the ignition hook from butane..."
 
-base_url="http://${INTERNAL_NET_IP}/${NAMESPACE}"
+base_url="http://${INTERNAL_NET_IP}/$(<"${SHARED_DIR}/cluster_name")"
 
 # We use a different console-hook ignition file for each node to allow the configuration of heterogeneous nodes
 # (i.e., nodes from different vendors)

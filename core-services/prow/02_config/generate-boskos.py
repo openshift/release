@@ -163,6 +163,7 @@ CONFIG = {
         'default': 50,
     },
     'vsphere-quota-slice':{},
+    'vsphere-8-quota-slice':{},
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
     'vsphere-connected-quota-slice':{},
@@ -189,8 +190,7 @@ CONFIG = {
         'osa21': 1,
         'syd04': 1,
         'syd05': 1,
-        'tok04': 1,
-        'tor01': 1
+        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
@@ -209,6 +209,21 @@ CONFIG = {
     },
     'hypershift-hive-quota-slice': {
         'default': 80
+    },
+    'aws-virtualization-quota-slice': {
+        'us-east-1': 5,
+        'us-east-2': 5,
+        'us-west-1': 5,
+        'us-west-2': 5,
+    },
+    'azure-virtualization-quota-slice': {
+        'centralus': 5,
+        'eastus': 5,
+        'eastus2': 5,
+        'westus': 5
+    },
+    'gcp-virtualization-quota-slice': {
+        'us-central1': 10,
     }
 }
 
@@ -260,6 +275,9 @@ for i in range(55,56):
 
 for i in range(151,155):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(200,204):
+    CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],

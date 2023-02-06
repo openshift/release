@@ -34,6 +34,9 @@ bastion_info_yaml="${SHARED_DIR}/bastion-info.yaml"
 
 bastion_name="${cluster_name}-bastion"
 MACHINE_TYPE="bx2-2x8"
+#The default coreos image value is gotten from
+#imgProfile="fedora-coreos.*available.*amd64.*stable.*public"
+#ibmcloud is images --visibility public --owner-type provider --resource-group-name Default | grep -i ${imgProfile}
 IMAGE="ibm-fedora-coreos-36-stable-2"
 workdir=${ARTIFACT_DIR}
 bastion_ignition_file="${SHARED_DIR}/${cluster_name}-bastion.ign"
@@ -76,6 +79,7 @@ run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound tcp --remote
 run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound icmp --remote \"0.0.0.0/0\" --icmp-type 8 --icmp-code 0 "
 run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound tcp --remote \"0.0.0.0/0\" --port-min=5000 --port-max=5000"
 run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound tcp --remote \"0.0.0.0/0\" --port-min=6001 --port-max=6002"
+run_command "${IBMCLOUD_CLI} is security-group-rule-add $sg inbound tcp --remote \"0.0.0.0/0\" --port-min=873 --port-max=873"
 
 echo "Created bastion instance"
 run_command "${IBMCLOUD_CLI} is instance-create ${bastion_name} ${vpcName} ${zone} ${MACHINE_TYPE} ${subnet} --image ${IMAGE} --user-data "@${bastion_ignition_file}" --output JSON"

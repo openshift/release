@@ -73,6 +73,7 @@ if [[ "${CONTROL_PLANE_INSTANCE_TYPE}" != "${COMPUTE_INSTANCE_TYPE}" ]]; then
 fi
 
 # Create VPC
+echo "$(date -u --rfc-3339=seconds) - CreateVpc"
 ${ALIYUN_BIN} vpc CreateVpc --RegionId "${REGION}" --CidrBlock "${VPC_CIDR}" \
   --endpoint "${aliyun_vpc_endpoint}" --VpcName "${CLUSTER_NAME}-vpc" > out.json
 sleep 30s
@@ -107,12 +108,16 @@ for the_zone in "${nat_gateway_avail_zones[@]}"; do
 
   # Configure NAT gateway in the first available zone
   if [ X"${NATGW_FLAG}" == X"yes" ] && [ ${index} -eq 240 ]; then
+    echo "$(date -u --rfc-3339=seconds) - Configure NAT gateway in the first available zone"
+
+    echo "$(date -u --rfc-3339=seconds) - AllocateEipAddress"
     ${ALIYUN_BIN} vpc AllocateEipAddress --RegionId "${REGION}" --InternetChargeType "PayByTraffic" \
       --endpoint "${aliyun_vpc_endpoint}" > out.json
     eip_id=$(jq -r '.AllocationId' out.json)
     eip_addr=$(jq -r '.EipAddress' out.json)
 
     sleep 5s
+    echo "$(date -u --rfc-3339=seconds) - CreateVSwitch"
     ${ALIYUN_BIN} vpc CreateVSwitch --RegionId "${REGION}" --VpcId "${vpc_id}" --ZoneId "${the_zone}" \
       --CidrBlock "10.0.192.0/20" --endpoint "${aliyun_vpc_endpoint}" \
       --VSwitchName "${CLUSTER_NAME}-vswitch-natgw" > out.json
@@ -120,6 +125,7 @@ for the_zone in "${nat_gateway_avail_zones[@]}"; do
     no_vswitch_cmds="${no_vswitch_cmds}\n${ALIYUN_BIN} vpc DeleteVSwitch --RegionId ${REGION} --VSwitchId ${vswitch_id} --endpoint ${aliyun_vpc_endpoint}"
 
     sleep 10s
+    echo "$(date -u --rfc-3339=seconds) - CreateNatGateway"
     ${ALIYUN_BIN} vpc CreateNatGateway --RegionId "${REGION}" --VpcId "${vpc_id}" --NatType "Enhanced" \
       --Spec "Small" --InternetChargeType "PayByLcu" --endpoint "${aliyun_vpc_endpoint}" \
       --VSwitchId "${vswitch_id}" > out.json
@@ -127,11 +133,14 @@ for the_zone in "${nat_gateway_avail_zones[@]}"; do
     natgw_snat_table_id=$(jq -r '.SnatTableIds.SnatTableId[0]' out.json)
 
     sleep 90s
+    echo "$(date -u --rfc-3339=seconds) - AssociateEipAddress"
     ${ALIYUN_BIN} vpc AssociateEipAddress --RegionId "${REGION}" --AllocationId "${eip_id}" \
       --InstanceType "Nat" --InstanceId "${natgw_id}" --endpoint "${aliyun_vpc_endpoint}"
+    sleep 90s
   fi
 
   sleep 5s
+  echo "$(date -u --rfc-3339=seconds) - CreateVSwitch"
   ${ALIYUN_BIN} vpc CreateVSwitch --RegionId "${REGION}" --VpcId "${vpc_id}" --ZoneId "${the_zone}" \
     --CidrBlock "10.0.${index}.0/20" --endpoint "${aliyun_vpc_endpoint}" \
     --VSwitchName "${CLUSTER_NAME}-vswitch-${the_zone}" > out.json
@@ -144,6 +153,7 @@ EOF
 
   if [ X"${NATGW_FLAG}" == X"yes" ]; then
     sleep 5s
+    echo "$(date -u --rfc-3339=seconds) - CreateSnatEntry"
     ${ALIYUN_BIN} vpc CreateSnatEntry --RegionId "${REGION}" --endpoint "${aliyun_vpc_endpoint}" \
       --SnatIp "${eip_addr}" --SnatTableId "${natgw_snat_table_id}" \
       --SourceVSwitchId "${vswitch_id}" > out.json
@@ -157,9 +167,9 @@ if [ X"${NATGW_FLAG}" == X"yes" ]; then
 $(echo -e ${no_snat_cmds})
 sleep 60s
 ${ALIYUN_BIN} vpc UnassociateEipAddress --RegionId ${REGION} --AllocationId ${eip_id} --InstanceType 'Nat' --InstanceId ${natgw_id} --endpoint ${aliyun_vpc_endpoint}
-sleep 30s
+sleep 90s
 ${ALIYUN_BIN} vpc ReleaseEipAddress --AllocationId ${eip_id} --RegionId ${REGION} --endpoint ${aliyun_vpc_endpoint}
-sleep 10s
+sleep 60s
 ${ALIYUN_BIN} vpc DeleteNatGateway --NatGatewayId ${natgw_id} --Force true --RegionId ${REGION} --endpoint ${aliyun_vpc_endpoint}
 sleep 120s
 EOF

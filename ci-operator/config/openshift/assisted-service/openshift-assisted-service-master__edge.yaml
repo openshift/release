@@ -31,10 +31,6 @@ base_images:
     name: ocm-2.8
     namespace: edge-infrastructure
     tag: cluster-api-provider-agent
-  coreos_centos_stream9:
-    name: stream9
-    namespace: coreos
-    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -60,9 +56,6 @@ build_root:
 images:
 - dockerfile_path: ci-images/Dockerfile.base
   inputs:
-    coreos_centos_stream9:
-      as:
-      - quay.io/centos/centos:stream9
     openshift_release_golang-1.18:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
@@ -863,6 +856,15 @@ tests:
         OPENSHIFT_VERSION=4.12
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-13
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.13
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
@@ -870,7 +872,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -890,7 +892,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs

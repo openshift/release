@@ -50,6 +50,76 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )code-quality-checks,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/hypershift-pr-check
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-osde2e-main-hypershift-pr-check
+    rerun_command: /test hypershift-pr-check
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/osde2e-common
+        - --secret-dir=/secrets/osde2e-credentials
+        - --secret-dir=/secrets/osde2e-hypershift-byovpc
+        - --target=hypershift-pr-check
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/osde2e-common
+          name: osde2e-common
+          readOnly: true
+        - mountPath: /secrets/osde2e-credentials
+          name: osde2e-credentials
+          readOnly: true
+        - mountPath: /secrets/osde2e-hypershift-byovpc
+          name: osde2e-hypershift-byovpc
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: osde2e-common
+        secret:
+          secretName: osde2e-common
+      - name: osde2e-credentials
+        secret:
+          secretName: osde2e-credentials
+      - name: osde2e-hypershift-byovpc
+        secret:
+          secretName: osde2e-hypershift-byovpc
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )hypershift-pr-check,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^main$

@@ -52,9 +52,17 @@ fi
 versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
 echo -e "Available cluster versions:\n${versionList}"
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
-  OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | tail -1 || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
+  fi
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  OPENSHIFT_VERSION=$(echo "$versionList" | { grep "${OPENSHIFT_VERSION}" || true; } | tail -1)
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | grep -i ec |tail -1 || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | tail -1 || true)
+  fi
 else
   # Match the whole line
   OPENSHIFT_VERSION=$(echo "$versionList" | { grep -x "${OPENSHIFT_VERSION}" || true; })
@@ -150,8 +158,12 @@ while true; do
   fi
 done
 ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.cluster_install.log"
+ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"
 
 # Print console.url
 CONSOLE_URL=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.console.url')
 echo "Console URL: ${CONSOLE_URL}"
 echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
+
+PRODUCT_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.product.id')
+echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
