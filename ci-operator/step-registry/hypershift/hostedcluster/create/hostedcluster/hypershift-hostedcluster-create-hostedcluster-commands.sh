@@ -89,6 +89,10 @@ bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${
   exit 1
 }
 
+sleep 3600s
+sleep 3600s
+sleep 3600s
+
 # Data for cluster bot.
 # The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 2 minutes for it to become available
 echo "Retrieving kubeadmin password"
