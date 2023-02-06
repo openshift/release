@@ -1,0 +1,34 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: latest
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: aws.interop.ccitredhat.com
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-streams
+      SUB_PACKAGE: amq-streams
+      SUB_SOURCE: redhat-operators
+    test:
+    - ref: operatorhub-subscribe
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: amq-streams
+  org: rhpit
+  repo: interop-tests
