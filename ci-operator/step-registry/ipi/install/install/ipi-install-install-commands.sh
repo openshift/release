@@ -405,6 +405,8 @@ tries=1
 max=3
 set +o errexit
 set +o pipefail
+backup=/tmp/install-orig
+cp -rfpv "$dir" "$backup"
 while [ $ret -eq 4 ] && [ $tries -le $max ]
 do
   echo "Install attempt $tries of $max"
@@ -412,6 +414,8 @@ do
     write_install_status
     cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
     openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    rm -rf "$dir"
+    cp -rfpv "$backup" "$dir"
   else
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
   fi
