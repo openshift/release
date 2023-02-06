@@ -48,7 +48,7 @@ EOT
 # Trigger ovn-kubenetes deployment
 oc patch Network.config.openshift.io cluster --type='merge' --patch "{\"spec\":{\"networkType\":\"${TARGET}\"}}"
 
-oc wait co network --for='condition=PROGRESSING=True' --timeout=30s
+oc wait co network --for='condition=PROGRESSING=True' --timeout=60s
 # Wait until the multus pods are restarted
 timeout 300s oc rollout status ds/multus -n openshift-multus
 
