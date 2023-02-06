@@ -19,6 +19,7 @@ images:
     FROM registry.ci.openshift.org/ocp/4.13:base
     RUN dnf install -y nmstate-libs && dnf clean all
     COPY --from=builder /go/src/github.com/openshift/agent-installer-utils/bin/agent-tui /usr/bin/agent-tui
+    #LABEL io.openshift.release.operator=true
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
@@ -42,16 +43,17 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: dnf install -y nmstate-devel
 tests:
 - as: gofmt
   commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
   container:
-    from: agent-installer-utils
+    from: test-bin
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: govet
   commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
   container:
-    from: agent-installer-utils
+    from: test-bin
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: verify-vendor
   commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
