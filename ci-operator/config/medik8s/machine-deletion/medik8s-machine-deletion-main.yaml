@@ -28,6 +28,24 @@ tests:
   commands: make test
   container:
     from: src
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    workflow: optional-operators-ci-aws
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: mdr-install
+      OO_PACKAGE: machine-deletion-remediation
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: medik8s
