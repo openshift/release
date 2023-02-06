@@ -27,6 +27,44 @@ curl --silent --location --fail --show-error "https://github.com/cilium/cilium-o
 tar -C /tmp -xf /tmp/cilium-olm.tgz
 
 cd "/tmp/cilium-olm-${cilium_olm_rev}/manifests/cilium.v${cilium_version}"
+
+cat > "cluster-network-07-cilium-ciliumconfig.yaml" << EOF
+apiVersion: cilium.io/v1alpha1
+kind: CiliumConfig
+metadata:
+  name: cilium
+  namespace: cilium
+spec:
+  debug:
+    enabled: true
+  k8s:
+    requireIPv4PodCIDR: true
+  logSystemLoad: true
+  bpf:
+    preallocateMaps: true
+  etcd:
+    leaseTTL: 30s
+  ipv4:
+    enabled: true
+  ipv6:
+    enabled: true
+  identityChangeGracePeriod: 0s
+  ipam:
+    mode: "cluster-pool"
+  endpointRoutes: {enabled: true}
+  kubeProxyReplacement: "disabled"
+  clusterHealthPort: 9940
+  tunnelPort: 4789
+  cni:
+    binPath: "/var/lib/cni/bin"
+    confPath: "/var/run/multus/cni/net.d"
+    chainingMode: portMap
+  prometheus:
+    serviceMonitor: {enabled: false}
+  hubble:
+    tls: {enabled: false}
+EOF
+
 for manifest in *.yaml ; do
   cp "${manifest}" "${SHARED_DIR}/manifest_${manifest}"
 done
