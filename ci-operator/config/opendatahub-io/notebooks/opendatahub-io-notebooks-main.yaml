@@ -50,6 +50,22 @@ images:
   dockerfile_path: Dockerfile
   from: jupyter-datascience-ubi9-python-3.9
   to: jupyter-pytorch-ubi9-python-3.9
+- context_dir: cuda/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-ubi9-python-3.9
+  to: cuda-ubi9-python-3.9
+- context_dir: jupyter/minimal/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: cuda-ubi9-python-3.9
+  to: cuda-jupyter-minimal-ubi9-python-3.9
+- context_dir: jupyter/datascience/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: cuda-jupyter-minimal-ubi9-python-3.9
+  to: cuda-jupyter-datascience-ubi9-python-3.9
+- context_dir: jupyter/tensorflow/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: cuda-jupyter-datascience-ubi9-python-3.9
+  to: cuda-jupyter-tensorflow-ubi9-python-3.9
 promotion:
   namespace: opendatahub-io
   tag: latest
@@ -281,6 +297,78 @@ tests:
       IMAGE_REPO: notebooks
       RELEASE_VERSION: jupyter-pytorch-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-ubi9-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-minimal-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-minimal-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-minimal-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-minimal-ubi8-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-minimal-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-minimal-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-ds-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-datascience-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-datascience-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-ds-ubi9-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-datascience-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-datascience-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-tf-ubi9-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-jupyter-tf-ubi9-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-jupyter-tensorflow-ubi9-python-3.9
+    env:
+      IMAGE_REPO: notebooks
+      RELEASE_VERSION: cuda-jupyter-tensorflow-ubi9-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
 - as: notebooks-e2e-tests
   skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
   steps:
@@ -434,6 +522,57 @@ tests:
       dependencies:
       - env: JUPYTER_PYTORCH_IMAGE
         name: jupyter-pytorch-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-minimal-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project cuda-jupyter-minimal-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_MINIMAL_IMAGE}"
+        make deploy9-cuda-jupyter-minimal-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-cuda-jupyter-minimal-ubi9-python-3.9
+        make undeploy9-cuda-jupyter-minimal-ubi9-python-3.9
+      dependencies:
+      - env: JUPYTER_MINIMAL_IMAGE
+        name: cuda-jupyter-minimal-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-datascience-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project cuda-jupyter-datascience-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_DATA_SCIENCE_IMAGE}"
+        make deploy9-cuda-jupyter-datascience-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-cuda-jupyter-datascience-ubi9-python-3.9
+        make undeploy9-cuda-jupyter-datascience-ubi9-python-3.9
+      dependencies:
+      - env: JUPYTER_DATA_SCIENCE_IMAGE
+        name: cuda-jupyter-datascience-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: cuda-jupyter-tensorflow-ubi9-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project cuda-jupyter-tensorflow-ubi9-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TENSORFLOW_IMAGE}"
+        make deploy9-cuda-jupyter-tensorflow-ubi9-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-cuda-jupyter-tensorflow-ubi9-python-3.9
+        make undeploy9-cuda-jupyter-tensorflow-ubi9-python-3.9
+      dependencies:
+      - env: JUPYTER_TENSORFLOW_IMAGE
+        name: cuda-jupyter-tensorflow-ubi9-python-3.9
       from: src
       resources:
         requests:
