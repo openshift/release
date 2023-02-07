@@ -10,6 +10,16 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 export PATH=/tmp:${PATH}
 GATHER_BOOTSTRAP_ARGS=
 
+function add_param_to_json() {
+    local k="$1"
+    local v="$2"
+    local param_json="$3"
+    if [ ! -e "$param_json" ]; then
+        echo -n '[]' > "$param_json"
+    fi
+    cat <<< "$(jq  --arg k "$k" --arg v "$v" '. += [{"ParameterKey":$k, "ParameterValue":$v}]' "$param_json")" > "$param_json"
+}
+
 function gather_bootstrap_and_fail() {
   if test -n "${GATHER_BOOTSTRAP_ARGS}"; then
     openshift-install --dir=${ARTIFACT_DIR}/installer gather bootstrap --key "${SSH_PRIV_KEY_PATH}" ${GATHER_BOOTSTRAP_ARGS}
@@ -46,11 +56,20 @@ cp "${SSH_PRIV_KEY_PATH}" ~/.ssh/
 cp ${SHARED_DIR}/install-config.yaml ${ARTIFACT_DIR}/installer/install-config.yaml
 export PATH=${HOME}/.local/bin:${PATH}
 
+cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
+oc registry login --to /tmp/pull-secret
+ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+echo "OCP Version: ${ocp_version}"
+rm /tmp/pull-secret
+
 pushd ${ARTIFACT_DIR}/installer
 
-base_domain=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
-AWS_REGION=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["platform"]["aws"]["region"])')
-CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
+base_domain=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'baseDomain')
+AWS_REGION=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'platform.aws.region')
+CLUSTER_NAME=$(yq-go r "${ARTIFACT_DIR}/installer/install-config.yaml" 'metadata.name')
+
 echo ${AWS_REGION} > ${SHARED_DIR}/AWS_REGION
 echo ${CLUSTER_NAME} > ${SHARED_DIR}/CLUSTER_NAME
 MACHINE_CIDR=10.0.0.0/16
@@ -97,11 +116,14 @@ aws s3 mb s3://"${CLUSTER_NAME}-infra"
 
 # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
 # For now this is just a placeholder...
+cf_params_vpc=${ARTIFACT_DIR}/cf_params_vpc.json
+add_param_to_json AvailabilityZoneCount 3 "${cf_params_vpc}"
+cat "${cf_params_vpc}"
+
 aws cloudformation create-stack  --stack-name "${CLUSTER_NAME}-vpc" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/01_vpc.yaml")" \
   --tags "${TAGS}" \
-  --parameters \
-    ParameterKey=AvailabilityZoneCount,ParameterValue=3 &
+  --parameters file://${cf_params_vpc} &
 wait "$!"
 
 aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-vpc" &
@@ -120,19 +142,23 @@ PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSub
 echo ${VPC_ID} > "${SHARED_DIR}/vpc_id"
 echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PrivateSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/private_subnet_ids"
 
+cf_params_infra=${ARTIFACT_DIR}/cf_params_infra.json
+add_param_to_json ClusterName "${CLUSTER_NAME}" "${cf_params_infra}"
+add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_infra}"
+add_param_to_json HostedZoneId "${HOSTED_ZONE}" "${cf_params_infra}"
+add_param_to_json HostedZoneName "${base_domain}" "${cf_params_infra}"
+add_param_to_json VpcId "${VPC_ID}" "${cf_params_infra}"
+add_param_to_json PrivateSubnets "$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g')" "${cf_params_infra}"
+add_param_to_json PublicSubnets "$(echo "${PUBLIC_SUBNETS}" | sed 's/"//g')" "${cf_params_infra}"
+
+cat "${cf_params_infra}"
+
 aws cloudformation create-stack \
   --stack-name "${CLUSTER_NAME}-infra" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/02_cluster_infra.yaml")" \
   --tags "${TAGS}" \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameters \
-    ParameterKey=ClusterName,ParameterValue="${CLUSTER_NAME}" \
-    ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
-    ParameterKey=HostedZoneId,ParameterValue="${HOSTED_ZONE}" \
-    ParameterKey=HostedZoneName,ParameterValue="${base_domain}" \
-    ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
-    ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" \
-    ParameterKey=PublicSubnets,ParameterValue="${PUBLIC_SUBNETS}" &
+  --parameters file://${cf_params_infra} &
 wait "$!"
 
 aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-infra" &
@@ -146,16 +172,20 @@ INTERNAL_API_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputK
 INTERNAL_SERVICE_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "InternalServiceTargetGroupArn").OutputValue')"
 PRIVATE_HOSTED_ZONE="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "PrivateHostedZoneId").OutputValue')"
 
+cf_params_security=${ARTIFACT_DIR}/cf_params_security.json
+add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_security}"
+add_param_to_json VpcCidr "${MACHINE_CIDR}" "${cf_params_security}"
+add_param_to_json VpcId "${VPC_ID}" "${cf_params_security}"
+add_param_to_json PrivateSubnets "$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g')" "${cf_params_security}"
+
+cat "${cf_params_security}"
+
 aws cloudformation create-stack \
   --stack-name "${CLUSTER_NAME}-security" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/03_cluster_security.yaml")" \
   --tags "${TAGS}" \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameters \
-    ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
-    ParameterKey=VpcCidr,ParameterValue="${MACHINE_CIDR}" \
-    ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
-    ParameterKey=PrivateSubnets,ParameterValue="${PRIVATE_SUBNETS}" &
+  --parameters file://${cf_params_security} &
 wait "$!"
 
 aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-security" &
@@ -216,24 +246,32 @@ fi
 S3_BOOTSTRAP_URI="s3://${CLUSTER_NAME}-infra/bootstrap.ign"
 aws s3 cp ${ARTIFACT_DIR}/installer/bootstrap.ign "$S3_BOOTSTRAP_URI"
 
+cf_params_bootstrap=${ARTIFACT_DIR}/cf_params_bootstrap.json
+add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_bootstrap}"
+add_param_to_json RhcosAmi "${RHCOS_AMI}" "${cf_params_bootstrap}"
+add_param_to_json VpcId "${VPC_ID}" "${cf_params_bootstrap}"
+add_param_to_json PublicSubnet "$(echo ${PUBLIC_SUBNETS%%,*} | sed 's/"//g')" "${cf_params_bootstrap}"
+add_param_to_json MasterSecurityGroupId "${MASTER_SECURITY_GROUP}" "${cf_params_bootstrap}"
+add_param_to_json BootstrapIgnitionLocation "${S3_BOOTSTRAP_URI}" "${cf_params_bootstrap}"
+add_param_to_json RegisterNlbIpTargetsLambdaArn "${NLB_IP_TARGETS_LAMBDA}" "${cf_params_bootstrap}"
+add_param_to_json ExternalApiTargetGroupArn "${EXTERNAL_API_TARGET_GROUP}" "${cf_params_bootstrap}"
+add_param_to_json InternalApiTargetGroupArn "${INTERNAL_API_TARGET_GROUP}" "${cf_params_bootstrap}"
+add_param_to_json InternalServiceTargetGroupArn "${INTERNAL_SERVICE_TARGET_GROUP}" "${cf_params_bootstrap}"
+
+# For OCP <= 4.9, there is no BootstrapInstanceType param in UPI template
+if (( ocp_minor_version >= 10 && ocp_major_version >= 4 )); then
+  add_param_to_json BootstrapInstanceType "${BOOTSTRAP_INSTANCE_TYPE}" "${cf_params_bootstrap}"
+fi
+
+
+cat "${cf_params_bootstrap}"
+
 aws cloudformation create-stack \
   --stack-name "${CLUSTER_NAME}-bootstrap" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/04_cluster_bootstrap.yaml")" \
   --tags "${TAGS}" \
   --capabilities CAPABILITY_NAMED_IAM \
-  --parameters \
-    ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
-    ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
-    ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
-    ParameterKey=PublicSubnet,ParameterValue="${PUBLIC_SUBNETS%%,*}\"" \
-    ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
-    ParameterKey=VpcId,ParameterValue="${VPC_ID}" \
-    ParameterKey=BootstrapIgnitionLocation,ParameterValue="${S3_BOOTSTRAP_URI}" \
-    ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
-    ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
-    ParameterKey=InternalApiTargetGroupArn,ParameterValue="${INTERNAL_API_TARGET_GROUP}" \
-    ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" \
-    ParameterKey=BootstrapInstanceType,ParameterValue="${BOOTSTRAP_INSTANCE_TYPE}" &
+  --parameters file://${cf_params_bootstrap} &
 wait "$!"
 
 aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
@@ -243,27 +281,31 @@ BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}
   --query 'Stacks[].Outputs[?OutputKey == `BootstrapPublicIp`].OutputValue' --output text)"
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
+cf_params_control_plane=${ARTIFACT_DIR}/cf_params_control_plane.json
+add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_control_plane}"
+add_param_to_json RhcosAmi "${RHCOS_AMI}" "${cf_params_control_plane}"
+add_param_to_json PrivateHostedZoneId "${PRIVATE_HOSTED_ZONE}" "${cf_params_control_plane}"
+add_param_to_json PrivateHostedZoneName "${CLUSTER_NAME}.${base_domain}" "${cf_params_control_plane}"
+add_param_to_json Master0Subnet "${PRIVATE_SUBNET_0}" "${cf_params_control_plane}"
+add_param_to_json Master1Subnet "${PRIVATE_SUBNET_1}" "${cf_params_control_plane}"
+add_param_to_json Master2Subnet "${PRIVATE_SUBNET_2}" "${cf_params_control_plane}"
+add_param_to_json MasterSecurityGroupId "${MASTER_SECURITY_GROUP}" "${cf_params_control_plane}"
+add_param_to_json IgnitionLocation "https://api-int.${CLUSTER_NAME}.${base_domain}:22623/config/master" "${cf_params_control_plane}"
+add_param_to_json CertificateAuthorities "$(echo ${IGNITION_CA} | sed 's/"//g')" "${cf_params_control_plane}"
+add_param_to_json MasterInstanceProfileName "${MASTER_INSTANCE_PROFILE}" "${cf_params_control_plane}"
+add_param_to_json RegisterNlbIpTargetsLambdaArn "${NLB_IP_TARGETS_LAMBDA}" "${cf_params_control_plane}"
+add_param_to_json ExternalApiTargetGroupArn "${EXTERNAL_API_TARGET_GROUP}" "${cf_params_control_plane}"
+add_param_to_json InternalApiTargetGroupArn "${INTERNAL_API_TARGET_GROUP}" "${cf_params_control_plane}"
+add_param_to_json InternalServiceTargetGroupArn "${INTERNAL_SERVICE_TARGET_GROUP}" "${cf_params_control_plane}"
+add_param_to_json MasterInstanceType "${MASTER_INSTANCE_TYPE}" "${cf_params_control_plane}"
+
+cat "${cf_params_control_plane}"
+
 aws cloudformation create-stack \
   --stack-name "${CLUSTER_NAME}-control-plane" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/05_cluster_master_nodes.yaml")" \
   --tags "${TAGS}" \
-  --parameters \
-    ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
-    ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
-    ParameterKey=PrivateHostedZoneId,ParameterValue="${PRIVATE_HOSTED_ZONE}" \
-    ParameterKey=PrivateHostedZoneName,ParameterValue="${CLUSTER_NAME}.${base_domain}" \
-    ParameterKey=Master0Subnet,ParameterValue="${PRIVATE_SUBNET_0}" \
-    ParameterKey=Master1Subnet,ParameterValue="${PRIVATE_SUBNET_1}" \
-    ParameterKey=Master2Subnet,ParameterValue="${PRIVATE_SUBNET_2}" \
-    ParameterKey=MasterSecurityGroupId,ParameterValue="${MASTER_SECURITY_GROUP}" \
-    ParameterKey=IgnitionLocation,ParameterValue="https://api-int.${CLUSTER_NAME}.${base_domain}:22623/config/master" \
-    ParameterKey=CertificateAuthorities,ParameterValue="${IGNITION_CA}" \
-    ParameterKey=MasterInstanceProfileName,ParameterValue="${MASTER_INSTANCE_PROFILE}" \
-    ParameterKey=RegisterNlbIpTargetsLambdaArn,ParameterValue="${NLB_IP_TARGETS_LAMBDA}" \
-    ParameterKey=ExternalApiTargetGroupArn,ParameterValue="${EXTERNAL_API_TARGET_GROUP}" \
-    ParameterKey=InternalApiTargetGroupArn,ParameterValue="${INTERNAL_API_TARGET_GROUP}" \
-    ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" \
-    ParameterKey=MasterInstanceType,ParameterValue="${MASTER_INSTANCE_TYPE}" &
+  --parameters file://${cf_params_control_plane} &
 wait "$!"
 
 aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-control-plane" &
@@ -279,19 +321,24 @@ GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} -
 for INDEX in 0 1 2
 do
   SUBNET="PRIVATE_SUBNET_${INDEX}"
+
+  cf_params_compute="${ARTIFACT_DIR}/cf_params_compute_${INDEX}.json"
+  add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_compute}"
+  add_param_to_json RhcosAmi "${RHCOS_AMI}" "${cf_params_compute}"
+  add_param_to_json Subnet "${!SUBNET}" "${cf_params_compute}"
+  add_param_to_json WorkerSecurityGroupId "${WORKER_SECURITY_GROUP}" "${cf_params_compute}"
+  add_param_to_json IgnitionLocation "https://api-int.${CLUSTER_NAME}.${base_domain}:22623/config/worker" "${cf_params_compute}"
+  add_param_to_json CertificateAuthorities "$(echo ${IGNITION_CA} | sed 's/"//g')" "${cf_params_compute}"
+  add_param_to_json WorkerInstanceType "${WORKER_INSTANCE_TYPE}" "${cf_params_compute}"
+  add_param_to_json WorkerInstanceProfileName "${WORKER_INSTANCE_PROFILE}" "${cf_params_compute}"
+  
+
+  cat "${cf_params_compute}"
   aws cloudformation create-stack \
     --stack-name "${CLUSTER_NAME}-compute-${INDEX}" \
     --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/06_cluster_worker_node.yaml")" \
     --tags "${TAGS}" \
-    --parameters \
-      ParameterKey=InfrastructureName,ParameterValue="${INFRA_ID}" \
-      ParameterKey=RhcosAmi,ParameterValue="${RHCOS_AMI}" \
-      ParameterKey=Subnet,ParameterValue="${!SUBNET}" \
-      ParameterKey=WorkerSecurityGroupId,ParameterValue="${WORKER_SECURITY_GROUP}" \
-      ParameterKey=IgnitionLocation,ParameterValue="https://api-int.${CLUSTER_NAME}.${base_domain}:22623/config/worker" \
-      ParameterKey=CertificateAuthorities,ParameterValue="${IGNITION_CA}" \
-      ParameterKey=WorkerInstanceType,ParameterValue="${WORKER_INSTANCE_TYPE}" \
-      ParameterKey=WorkerInstanceProfileName,ParameterValue="${WORKER_INSTANCE_PROFILE}" &
+    --parameters file://${cf_params_compute} &
   wait "$!"
 
   aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-compute-${INDEX}" &
