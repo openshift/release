@@ -19,5 +19,5 @@ echo "Merging results reports..."
 npm run mergereports
 
 # Copy combined report into $SHARED_DIR
-echo "Copying ${$CYPRESS_WORKSPACE}/cypress/reports/junitreport.xml to SHARED_DIR/windup-ui-results.xml..."
+echo "Copying ${CYPRESS_WORKSPACE}/cypress/reports/junitreport.xml to SHARED_DIR/windup-ui-results.xml..."
 cp $CYPRESS_WORKSPACE/cypress/reports/junitreport.xml $SHARED_DIR/windup-ui-results.xml
