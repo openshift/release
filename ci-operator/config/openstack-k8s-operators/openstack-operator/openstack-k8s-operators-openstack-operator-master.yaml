@@ -35,6 +35,28 @@ images:
     RUN pip3 install pre-commit
   from: src
   to: openstack-operator-ci-pre-commit
+- dockerfile_literal: |
+    FROM centos/centos:stream9
+    USER root
+    RUN dnf install -y gcc git jq make python3 python3-pip python-setuptools python-requests
+    RUN git clone https://git.openstack.org/openstack/tripleo-repos && \
+        pushd tripleo-repos && \
+        python3 setup.py install && \
+        popd && \
+        /usr/local/bin/tripleo-repos current-tripleo-dev
+
+    RUN dnf update -y && \
+        dnf install -y python3-tempestconf openstack-tempest openstack-tempest-all && \
+        dnf clean all && \
+        rm -rf /var/cache/dnf/*
+
+    RUN git clone https://git.openstack.org/openstack/openstack-tempest-skiplist && \
+        pushd openstack-tempest-skiplist && \
+        python3 -m pip install . && \
+        popd
+    RUN curl -s -L https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz | tar xvzf - -C /usr/local/bin oc
+    RUN chmod +x /usr/local/bin/oc
+  to: openstack-operator-ci-tempest
 resources:
   '*':
     limits:
@@ -90,6 +112,17 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy
+- as: openstack-operator-build-deploy-tempest
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h20m0s
+    version: "4.10"
+  optional: true
+  steps:
+    workflow: openstack-k8s-operators-test-build-deploy-tempest
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
