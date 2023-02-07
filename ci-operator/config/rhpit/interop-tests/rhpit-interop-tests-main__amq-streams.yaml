@@ -11,6 +11,8 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM quay.io/rh_integration/strimzi-interop:latest
+    WORKDIR /home/jenkins/interop
+    CMD ["/bin/bash"]
   to: test-image
 releases:
   latest:
@@ -33,9 +35,9 @@ tests:
       COMPUTE_NODE_TYPE: m4.xlarge
       SUB_CHANNEL: stable
       SUB_INSTALL_NAMESPACE: openshift-streams
-      SUB_TARGET_NAMESPACES: openshift-streams
       SUB_PACKAGE: amq-streams
       SUB_SOURCE: redhat-operators
+      SUB_TARGET_NAMESPACES: openshift-streams
     test:
     - ref: operatorhub-subscribe
     - as: test
@@ -43,9 +45,11 @@ tests:
         export USER_NAME=kubeadmin
         export PASSWORD=`cat ${KUBEADMIN_PASSWORD_FILE}`
         export API_URL=`oc whoami --show-server`
-        export NAMESPACE="openshift-streams"
+        export NAMESPACE=openshift-streams
         export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-        cd /home/jenkins/interop && make interop
+        pwd
+        stat .
+        make interop
       from: test-image
       resources:
         requests:
