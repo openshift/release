@@ -23,7 +23,9 @@ cd verification-tests
 # run destructive tests in serial
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/destructive"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
+set -x
 cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS}" -p junit || true
+set +x
 
 # only exit 0 if junit result has no failures
 echo "Summarizing test result..."
