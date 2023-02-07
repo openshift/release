@@ -64,7 +64,9 @@ show_time_used "$timestamp_start" 'admin'
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/serial"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
 timestamp_start="$(date +%s)"
+set -x
 cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and (@console or @serial)" -p junit || true
+set +x
 show_time_used "$timestamp_start" 'console or serial'
 
 # summarize test results
