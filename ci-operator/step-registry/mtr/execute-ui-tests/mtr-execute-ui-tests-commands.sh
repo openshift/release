@@ -7,6 +7,10 @@ set -o pipefail
 # Set the TARGET_URL value using the cluster_url
 TARGET_URL="mtr-mtr.$(cat ${SHARED_DIR}/cluster_url)"
 
+# Installing Cypress
+echo "Installing Cypress"
+npx cypress install
+
 # Execute Cypress
 echo "Executing Cypress tests..."
 CYPRESS_INCLUDE_TAGS=$CYPRESS_TAG npx cypress run \
