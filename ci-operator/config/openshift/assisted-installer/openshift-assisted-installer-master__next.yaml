@@ -1,0 +1,111 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer-agent:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-service:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-service-index:
+    name: assisted-service-index
+    namespace: edge-infrastructure
+    tag: latest
+  assisted-service-scripts:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  assisted-test-infra:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  assisted-test-infra-internal:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-test-infra-internal
+  coreos-centos-stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.assisted-installer-build
+images:
+- dockerfile_path: Dockerfile.assisted-installer
+  from: coreos-centos-stream8
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: assisted-installer
+- dockerfile_path: Dockerfile.assisted-installer-controller
+  from: coreos-centos-stream8
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: assisted-installer-controller
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+tests:
+- as: e2e-vsphere-assisted
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    dependencies:
+      ASSISTED_INSTALLER_IMAGE: assisted-installer
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=2
+        MAKEFILE_TARGET=test
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-metal-assisted-single-node
+  cluster: build03
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=1
+    workflow: assisted-baremetal
+- as: e2e-ai-operator-ztp
+  cluster: build03
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      INDEX_IMAGE: assisted-service-index
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    workflow: assisted-baremetal-operator-ztp
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: assisted-installer
+  variant: next
