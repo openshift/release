@@ -8,7 +8,7 @@ export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT QONTRACT_PASSWORD QONTRACT_USERNAME
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
@@ -66,6 +66,9 @@ EOF
 	  echo "Timed out waiting for login"
 	  exit 1
   fi
+
+QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
+QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
 
 git config --global user.name "redhat-appstudio-qe-bot"
 git config --global user.email redhat-appstudio-qe-bot@redhat.com
