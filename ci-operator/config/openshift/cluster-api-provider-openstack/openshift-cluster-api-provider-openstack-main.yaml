@@ -1,8 +1,14 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  project_image:
+    dockerfile_literal: |-
+      FROM registry.access.redhat.com/ubi9/go-toolset:1.18
+
+      # Prow expects to be able to check out a repo under /go
+      USER 0:0
+      WORKDIR /go
+      RUN chown 1001:1001 .
+
+      USER 1001:1001
 resources:
   '*':
     requests:
