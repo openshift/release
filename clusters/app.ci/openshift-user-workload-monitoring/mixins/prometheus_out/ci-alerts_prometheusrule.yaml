@@ -285,7 +285,7 @@ spec:
         sum by (workload_name, workload_type, determined_memory, configured_memory) (increase(pod_scaler_admission_high_determined_memory{workload_type!~"undefined|build"}[5m])) > 0
       for: 1m
       labels:
-        severity: warning
+        severity: critical
   - name: openshift-mirroring-failures
     rules:
     - alert: openshift-mirroring-failures
@@ -311,7 +311,7 @@ spec:
       expr: |
         sum(rate(github_request_duration_count{status=~"[45]..",status!="404",status!="410"}[5m])) by (status,path) / ignoring(status) group_left sum(rate(github_request_duration_count[5m])) by (path) * 100 > 10
       labels:
-        severity: critical
+        severity: warning
     - alert: ghproxy-global-status-code-abnormal
       annotations:
         message: '{{ $value | humanize }}% of all API requests through the GitHub proxy are errorring with code {{ $labels.status }}. Check <https://grafana-route-ci-grafana.apps.ci.l2s4.p1.openshiftapps.com/d/d72fe8d0400b2912e319b1e95d0ab1b3/github-cache?orgId=1&fullscreen&viewPanel=8|grafana>'
