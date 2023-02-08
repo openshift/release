@@ -1,22 +1,179 @@
 presubmits:
   openshift/microshift:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/periodics-rhel-8-x86_64-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: periodics-rhel-8-x86_64
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-periodics-rhel-8-x86_64-images
+    rerun_command: /test periodics-rhel-8-x86_64-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=periodics-rhel-8-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )periodics-rhel-8-x86_64-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/periodics-rhel-9-aarch64-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: periodics-rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-periodics-rhel-9-aarch64-images
+    rerun_command: /test periodics-rhel-9-aarch64-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=periodics-rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )periodics-rhel-9-aarch64-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/periodics-rhel-9-x86_64-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: periodics-rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-periodics-rhel-9-x86_64-images
+    rerun_command: /test periodics-rhel-9-x86_64-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=periodics-rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )periodics-rhel-9-x86_64-images,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-api-machinery
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-api-machinery
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-api-machinery
-    rerun_command: /test e2e-openshift-conformance-sig-api-machinery
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-api-machinery
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-api-machinery
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
     spec:
       containers:
@@ -27,6 +184,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-api-machinery-cluster-profile
         - --target=e2e-openshift-conformance-sig-api-machinery
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -71,24 +229,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-api-machinery,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-api-machinery,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-apps
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-apps
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-apps
-    rerun_command: /test e2e-openshift-conformance-sig-apps
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-apps
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-apps
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -99,6 +258,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-apps-cluster-profile
         - --target=e2e-openshift-conformance-sig-apps
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -143,24 +303,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-apps,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-apps,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-arch
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-arch
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-arch
-    rerun_command: /test e2e-openshift-conformance-sig-arch
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-arch
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-arch
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -171,6 +332,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-arch-cluster-profile
         - --target=e2e-openshift-conformance-sig-arch
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -215,24 +377,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-arch,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-arch,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-auth
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-auth
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-auth
-    rerun_command: /test e2e-openshift-conformance-sig-auth
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-auth
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-auth
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -243,6 +406,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-auth-cluster-profile
         - --target=e2e-openshift-conformance-sig-auth
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -287,24 +451,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-auth,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-auth,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-cli
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-cli
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-cli
-    rerun_command: /test e2e-openshift-conformance-sig-cli
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-cli
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-cli
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -315,6 +480,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-cli-cluster-profile
         - --target=e2e-openshift-conformance-sig-cli
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -359,24 +525,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-cli,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-cli,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-instrumentation
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-instrumentation
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-instrumentation
-    rerun_command: /test e2e-openshift-conformance-sig-instrumentation
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-instrumentation
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-instrumentation
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -387,6 +554,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-instrumentation-cluster-profile
         - --target=e2e-openshift-conformance-sig-instrumentation
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -431,24 +599,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-instrumentation,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-instrumentation,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-network
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-network
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-network
-    rerun_command: /test e2e-openshift-conformance-sig-network
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-network
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-network
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -459,6 +628,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-network-cluster-profile
         - --target=e2e-openshift-conformance-sig-network
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -503,24 +673,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-network,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-network,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-node
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-node
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-node
-    rerun_command: /test e2e-openshift-conformance-sig-node
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-node
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-node
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -531,6 +702,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-node-cluster-profile
         - --target=e2e-openshift-conformance-sig-node
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -575,24 +747,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-node,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-node,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-scheduling
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-scheduling
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-scheduling
-    rerun_command: /test e2e-openshift-conformance-sig-scheduling
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-scheduling
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-scheduling
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -603,6 +776,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-scheduling-cluster-profile
         - --target=e2e-openshift-conformance-sig-scheduling
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -647,24 +821,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-scheduling,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-scheduling,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-storage
+    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-sig-storage
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-sig-storage
-    rerun_command: /test e2e-openshift-conformance-sig-storage
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-sig-storage
+    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-sig-storage
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -675,6 +850,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-sig-storage-cluster-profile
         - --target=e2e-openshift-conformance-sig-storage
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -719,24 +895,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-storage,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-sig-storage,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-reboot
+    context: ci/prow/rhel-8-x86_64-e2e-reboot
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-reboot
-    rerun_command: /test e2e-reboot
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-reboot
+    rerun_command: /test rhel-8-x86_64-e2e-reboot
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -747,6 +924,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-reboot-cluster-profile
         - --target=e2e-reboot
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -791,25 +969,26 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-reboot,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-reboot,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/e2e-router-smoke-test
+    context: ci/prow/rhel-8-x86_64-e2e-router-smoke-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-e2e-router-smoke-test
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-router-smoke-test
     optional: true
-    rerun_command: /test e2e-router-smoke-test
+    rerun_command: /test rhel-8-x86_64-e2e-router-smoke-test
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
     spec:
       containers:
@@ -820,6 +999,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-router-smoke-test-cluster-profile
         - --target=e2e-router-smoke-test
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -864,22 +1044,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-router-smoke-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-router-smoke-test,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/images
+    context: ci/prow/rhel-8-x86_64-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-images
-    rerun_command: /test images
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-images
+    rerun_command: /test rhel-8-x86_64-images
     spec:
       containers:
       - args:
@@ -888,6 +1069,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -914,74 +1096,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.12$
-    - ^release-4\.12-
-    cluster: build02
-    context: ci/prow/periodics-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: periodics
-      ci.openshift.io/generator: prowgen
-      job-release: "4.12"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-periodics-images
-    rerun_command: /test periodics-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=periodics
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )periodics-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/test-srpm
+    context: ci/prow/rhel-8-x86_64-test-srpm
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-test-srpm
-    rerun_command: /test test-srpm
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-test-srpm
+    rerun_command: /test rhel-8-x86_64-test-srpm
     run_if_changed: ^(rpm/*|packaging/.*|Makefile)
     spec:
       containers:
@@ -990,6 +1121,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=test-srpm
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1016,22 +1148,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-srpm,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-test-srpm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/test-unit
+    context: ci/prow/rhel-8-x86_64-test-unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-test-unit
-    rerun_command: /test test-unit
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-test-unit
+    rerun_command: /test rhel-8-x86_64-test-unit
     spec:
       containers:
       - args:
@@ -1039,6 +1172,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=test-unit
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1065,22 +1199,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-test-unit,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/verify
+    context: ci/prow/rhel-8-x86_64-verify
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-verify
-    rerun_command: /test verify
+    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-verify
+    rerun_command: /test rhel-8-x86_64-verify
     spec:
       containers:
       - args:
@@ -1088,6 +1223,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=verify
+        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1114,4 +1250,2342 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhel-8-x86_64-verify,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-api-machinery
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-api-machinery
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-api-machinery
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-api-machinery-cluster-profile
+        - --target=e2e-openshift-conformance-sig-api-machinery
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-api-machinery-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-api-machinery,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-apps
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-apps
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-apps
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-apps-cluster-profile
+        - --target=e2e-openshift-conformance-sig-apps
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-apps-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-apps,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-arch
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-arch
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-arch
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-arch-cluster-profile
+        - --target=e2e-openshift-conformance-sig-arch
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-arch-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-arch,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-auth
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-auth
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-auth
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-auth-cluster-profile
+        - --target=e2e-openshift-conformance-sig-auth
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-auth-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-auth,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-cli
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-cli
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-cli
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-cli-cluster-profile
+        - --target=e2e-openshift-conformance-sig-cli
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-cli-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-cli,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-instrumentation
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-instrumentation
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-instrumentation
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-instrumentation-cluster-profile
+        - --target=e2e-openshift-conformance-sig-instrumentation
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-instrumentation-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-instrumentation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-network
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-network
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-network
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-network-cluster-profile
+        - --target=e2e-openshift-conformance-sig-network
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-network-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-network,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-node
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-node
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-node-cluster-profile
+        - --target=e2e-openshift-conformance-sig-node
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-node,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-scheduling
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-scheduling
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-scheduling
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-scheduling-cluster-profile
+        - --target=e2e-openshift-conformance-sig-scheduling
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-scheduling-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-scheduling,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-openshift-conformance-sig-storage
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-openshift-conformance-sig-storage
+    rerun_command: /test rhel-9-aarch64-e2e-openshift-conformance-sig-storage
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-storage-cluster-profile
+        - --target=e2e-openshift-conformance-sig-storage
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-storage-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-openshift-conformance-sig-storage,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-reboot
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-reboot
+    rerun_command: /test rhel-9-aarch64-e2e-reboot
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-reboot-cluster-profile
+        - --target=e2e-reboot
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-reboot-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-reboot,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-router-smoke-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-router-smoke-test
+    optional: true
+    rerun_command: /test rhel-9-aarch64-e2e-router-smoke-test
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-router-smoke-test-cluster-profile
+        - --target=e2e-router-smoke-test
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-router-smoke-test-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-router-smoke-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-e2e-rpm-install
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-e2e-rpm-install
+    rerun_command: /test rhel-9-aarch64-e2e-rpm-install
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-rpm-install-cluster-profile
+        - --target=e2e-rpm-install
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-rpm-install-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-e2e-rpm-install,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-images
+    rerun_command: /test rhel-9-aarch64-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-test-srpm
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-test-srpm
+    rerun_command: /test rhel-9-aarch64-test-srpm
+    run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=test-srpm
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-test-srpm,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-test-unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-test-unit
+    rerun_command: /test rhel-9-aarch64-test-unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=test-unit
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-test-unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-aarch64-verify
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: rhel-9-aarch64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-aarch64-verify
+    rerun_command: /test rhel-9-aarch64-verify
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=verify
+        - --variant=rhel-9-aarch64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-aarch64-verify,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-api-machinery
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-api-machinery
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-api-machinery
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-api-machinery-cluster-profile
+        - --target=e2e-openshift-conformance-sig-api-machinery
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-api-machinery-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-api-machinery,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-apps
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-apps
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-apps
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-apps-cluster-profile
+        - --target=e2e-openshift-conformance-sig-apps
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-apps-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-apps,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-arch
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-arch
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-arch
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-arch-cluster-profile
+        - --target=e2e-openshift-conformance-sig-arch
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-arch-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-arch,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-auth
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-auth
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-auth
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-auth-cluster-profile
+        - --target=e2e-openshift-conformance-sig-auth
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-auth-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-auth,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-cli
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-cli
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-cli
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-cli-cluster-profile
+        - --target=e2e-openshift-conformance-sig-cli
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-cli-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-cli,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-instrumentation
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-instrumentation
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-instrumentation
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-instrumentation-cluster-profile
+        - --target=e2e-openshift-conformance-sig-instrumentation
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-instrumentation-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-instrumentation,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-network
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-network
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-network
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-network-cluster-profile
+        - --target=e2e-openshift-conformance-sig-network
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-network-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-network,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-node
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-node
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-node
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-node-cluster-profile
+        - --target=e2e-openshift-conformance-sig-node
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-node-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-node,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-scheduling
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-scheduling
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-scheduling
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-scheduling-cluster-profile
+        - --target=e2e-openshift-conformance-sig-scheduling
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-scheduling-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-scheduling,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-openshift-conformance-sig-storage
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-openshift-conformance-sig-storage
+    rerun_command: /test rhel-9-x86_64-e2e-openshift-conformance-sig-storage
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-storage-cluster-profile
+        - --target=e2e-openshift-conformance-sig-storage
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-sig-storage-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-openshift-conformance-sig-storage,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-reboot
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-reboot
+    rerun_command: /test rhel-9-x86_64-e2e-reboot
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-reboot-cluster-profile
+        - --target=e2e-reboot
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-reboot-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-reboot,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-router-smoke-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-router-smoke-test
+    optional: true
+    rerun_command: /test rhel-9-x86_64-e2e-router-smoke-test
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-router-smoke-test-cluster-profile
+        - --target=e2e-router-smoke-test
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-router-smoke-test-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-router-smoke-test,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-e2e-rpm-install
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-e2e-rpm-install
+    rerun_command: /test rhel-9-x86_64-e2e-rpm-install
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/e2e-rpm-install-cluster-profile
+        - --target=e2e-rpm-install
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/e2e-rpm-install-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-e2e-rpm-install,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-images
+    rerun_command: /test rhel-9-x86_64-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --target=[release:latest]
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-test-srpm
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-test-srpm
+    rerun_command: /test rhel-9-x86_64-test-srpm
+    run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=test-srpm
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-test-srpm,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-test-unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-test-unit
+    rerun_command: /test rhel-9-x86_64-test-unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=test-unit
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-test-unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/rhel-9-x86_64-verify
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: rhel-9-x86_64
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-rhel-9-x86_64-verify
+    rerun_command: /test rhel-9-x86_64-verify
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=verify
+        - --variant=rhel-9-x86_64
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )rhel-9-x86_64-verify,?($|\s.*)
