@@ -2769,3 +2769,29 @@ periodics:
       resources:
         requests:
           cpu: 500m
+- agent: kubernetes
+  cluster: build01
+  cron: '@hourly'
+  decorate: true
+  name: periodic-openshift-dptp-3312-hypershift-leaks-cleaner
+  spec:
+    containers:
+    - command:
+      - /cleanup-hypershift-leaks.sh
+      env:
+      - name: AWS_CONFIG_FILE
+        value: /token/.awscred
+      image: dptp-3312-hypershift-leaks-cleaner:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /token
+        name: token
+        readOnly: true
+    volumes:
+    - name: token
+      secret:
+        secretName: cluster-secrets-aws-2
