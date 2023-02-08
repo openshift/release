@@ -131,7 +131,7 @@ in 3.11).''')
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'ClusterRole',
         'metadata': {
-            'name': 'art-publish-cluster',
+            'name': 'art-publish-release-admin',
             'namespace': 'ocp'
         },
         'rules': [
@@ -150,13 +150,13 @@ in 3.11).''')
         'apiVersion': 'rbac.authorization.k8s.io/v1',
         'kind': 'ClusterRoleBinding',
         'metadata': {
-            'name': 'art-publish-cluster-binding',
+            'name': 'art-publish-release-admin-binding',
             'namespace': 'ocp'
         },
         'roleRef': {
             'apiGroup': 'rbac.authorization.k8s.io',
             'kind': 'ClusterRole',
-            'name': 'art-publish-cluster'
+            'name': 'art-publish-release-admin'
         },
         'subjects': [{
             'kind': 'ServiceAccount',
