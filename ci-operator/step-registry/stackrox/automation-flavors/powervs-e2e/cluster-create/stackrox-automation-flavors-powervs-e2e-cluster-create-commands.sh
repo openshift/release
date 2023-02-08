@@ -4,12 +4,6 @@
 set -o errexit
 set -o pipefail
 
-if [[ -z $1 ]]; then
-  echo "Please provide 'create' or 'delete' action."
-  exit 1
-fi
-
-ACTION="$1"
 LAST_WORK_DIR="$(pwd)"
 POWERVS_OCP_DIR="/tmp/powervs-ocp"
 SECRET_DIR="/tmp/vault/powervs-rhr-creds"
@@ -89,63 +83,27 @@ function on_exit(){
 trap on_exit EXIT
 
 
-if [ "$ACTION" == "create" ]
-then
-  echo "Creating cluster..."
-  
-  echo "Setting up automation..."
-  setup_automation
-  
-  echo "Setting up cluster configurations..."
-  create_tfvars_file
-  
-  echo "Deploying cluster..."
-  ./openshift-install-powervs create &> "${POWERVS_OCP_DIR}/create-log.txt"
-  
-  echo "Copy cluster files..."
-  # https://docs.ci.openshift.org/docs/architecture/step-registry/#sharing-data-between-steps
-  cp -f "${POWERVS_OCP_DIR}/automation/kubeconfig" "${SHARED_DIR}/kubeconfig"
-  cp -f "${POWERVS_OCP_DIR}/automation/terraform.tfstate" "${SHARED_DIR}/terraform.tfstate"
-  cp -f "${POWERVS_OCP_DIR}/automation/tfplan" "${SHARED_DIR}/tfplan"
-  ls -l "$SHARED_DIR/" # DEBUG
-  
-  echo "Validating cluster access..."
-  KUBECONFIG="${SHARED_DIR}/kubeconfig" ./oc get nodes
-  
-  echo "Cluster created successfully."
-elif [ "$ACTION" == "destroy" ]
-then
-  echo "Destroying cluster..."
-  ls -l "$SHARED_DIR/" # DEBUG
-  
-  echo "Setting up automation..."
-  setup_automation
-  
-  echo "Setting up cluster configurations..."
-  create_tfvars_file
-  
-  echo "Configure automation to destroy cluster..."
-  cp -f "${SHARED_DIR}/kubeconfig" "${POWERVS_OCP_DIR}/automation/kubeconfig"
-  cp -f "${SHARED_DIR}/terraform.tfstate" "${POWERVS_OCP_DIR}/automation/terraform.tfstate"
-  cp -f "${SHARED_DIR}/tfplan" "${POWERVS_OCP_DIR}/automation/tfplan"
-  cd ./automation
-  if [[ "$(uname -m)" == "ppc64le" ]]; then
-    ../terraform init --plugin-dir ../ > /dev/null
-  else
-    ../terraform init > /dev/null
-  fi
-  cd ../
-  
-  echo "Removing cloud resources..."
-  NO_OF_RETRY=1 ./openshift-install-powervs destroy -force-destroy &> "${POWERVS_OCP_DIR}/destroy-log.txt"
-  
-  # temporary workaround: https://github.com/ocp-power-automation/openshift-install-power/issues/208 
-  cd ./automation
-  ../terraform state rm 'module.prepare.ibm_pi_volume.volume[0]' || true
-  cd ../
-  ./openshift-install-powervs destroy -force-destroy &> "${POWERVS_OCP_DIR}/destroy-log.txt"
-  
-  echo "Cluster destroyed successfully."
-fi
+echo "Creating cluster..."
+
+echo "Setting up automation..."
+setup_automation
+
+echo "Setting up cluster configurations..."
+create_tfvars_file
+
+echo "Deploying cluster..."
+./openshift-install-powervs create &> "${POWERVS_OCP_DIR}/create-log.txt"
+
+echo "Copy cluster files..."
+# https://docs.ci.openshift.org/docs/architecture/step-registry/#sharing-data-between-steps
+cp -f "${POWERVS_OCP_DIR}/automation/kubeconfig" "${SHARED_DIR}/kubeconfig"
+cp -f "${POWERVS_OCP_DIR}/automation/terraform.tfstate" "${SHARED_DIR}/terraform.tfstate"
+cp -f "${POWERVS_OCP_DIR}/automation/tfplan" "${SHARED_DIR}/tfplan"
+ls -l "$SHARED_DIR/" # DEBUG
+
+echo "Validating cluster access..."
+KUBECONFIG="${SHARED_DIR}/kubeconfig" ./oc get nodes
+
+echo "Cluster created successfully."
 
 cd "$LAST_WORK_DIR"
