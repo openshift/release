@@ -19,6 +19,14 @@ if [ -z "${MTU_OFFSET}" ]; then
   log "error: MTU_OFFSET not defined"
   exit 1
 fi
+# By default do the migration in 3 steps:
+# 1. Start the MTU migration (MCO reboots)
+# 2. Configure the host mtu (MCO reboots)
+# 3. End the MTU migration (MCO reboots)
+# Steps 2 and 3 can be merged together to shorten the job duration but is not an
+# official supported procedure. It might be useful through if we want to shorten the
+# duration of procedure on CI or QE tests.
+STEPS=${STEPS:-3}
 
 mirror_support_tools() {
   log "Mirroring support tools image..."
@@ -76,7 +84,7 @@ wait_for_mcp() {
       sleep 10
     done
 EOT
-  log "All MachineConfigPools to finished updating"
+  log "All MachineConfigPools finished updating"
 }
 
 wait_for_co() {
@@ -94,32 +102,20 @@ EOT
   log "All ClusterOperators finished updating"
 }
 
-wait_for_cno_cleanup() {
+wait_for_mc_contents() {
   timeout=${1}
-  log "Waiting for CNO to clean migration status..."
-  timeout "${timeout}" bash <<EOT
-  until
-    ! oc get network -o yaml | grep migration > /dev/null
-  do
-    echo "migration field is not cleaned by CNO"
-    sleep 10
-  done
-EOT
-  log "CNO cleaned migration status"
-}
-
-wait_for_final_mc() {
-  timeout=${1}
-  log "Waiting for final MachineConfigs..."
-  script=$(sed -e "s,%%data%%,${encoded_set_mtu},g" <<'EOT'
+  contains=${2}
+  misses=${3:-}
+  log "Waiting for MachineConfig contents..."
+  script=$(sed -e "s,%%contains%%,${contains},g" -e "s,%%misses%%,${misses},g" <<'EOT'
   while [ "${is_final:-0}" = "0" ]; do
     is_final=1
     for pool in worker master; do
-      mc_name=$(oc get mc -o custom-columns=:metadata.name --sort-by=.metadata.creationTimestamp | grep rendered-$pool | tail -1)
-      mc=$(oc get mc $mc_name -o yaml || true)
+      mc_name=$(oc get mcp "$pool" -o jsonpath='{.spec.configuration.name}')
+      mc=$(oc get mc "$mc_name" -o yaml || true)
       [ -z "$mc" ] && is_final=0 && break
-      echo $mc | grep -q "mtu-migration.sh" && is_final=0 && break
-      echo $mc | grep -q "%%data%%" || (is_final=0 && break)
+      [ -n "%%misses%%" ] && echo $mc | grep -q "%%misses%%" && is_final=0 && break
+      if ! echo $mc | grep -q "%%contains%%"; then is_final=0 && break; fi
     done
     [ "$is_final" = "1" ] || sleep 10
   done
@@ -131,28 +127,17 @@ SCRIPT
   log "MachineConfigs are at their final state"
 }
 
-wait_for_final_mc_controller_config() {
-  timeout=${1}
-  log "Waiting for final Machine Controller Config..."
-  timeout "${timeout}" bash <<EOT
-  until
-    ! oc get controllerconfigs machine-config-controller -o yaml | grep mtuMigration > /dev/null
-  do
-    echo "migration field is not cleaned by MCO"
-    sleep 10
-  done
-EOT
-  log "Machine Controller Config is at its final state"
-}
-
 check_no_api_alerts() {
   timeout=${1}
   log "Checking for no API alerts during ${timeout} ..."
   timeout "${timeout}" bash <<'EOT' || result=$?
   ALERT_HOSTNAME=$(oc get routes/prometheus-k8s -n openshift-monitoring -o json | jq -r '.spec.host')
   ALERT_URL="https://${ALERT_HOSTNAME}/api/v1/alerts"
-	ALERT_TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s)
   ALERTS="(KubeAggregatedAPIErrors|KubeAggregatedAPIDown)"
+  ALERT_TOKEN=$(oc -n openshift-monitoring create token prometheus-k8s)
+  # for old openshift versions 'create token' is not supported but the token is
+  # already created
+  [ -z "${ALERT_TOKEN}" ] && ALERT_TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s)
   while true
   do
     alerts=$(curl --silent --insecure --header "Authorization: Bearer ${ALERT_TOKEN}" "${ALERT_URL}" | jq -r '.data.alerts[] | select(.state=="firing") | .labels.alertname // empty' | sort -u | tr '\n' ' ')
@@ -387,6 +372,80 @@ print_debug_on_error() {
 }
 trap "print_debug_on_error" EXIT
 
+set_mtu_migration() {
+  mtu_offset=${1}
+  set_host_mtu=${2:-}
+  
+  # Pausing the pools is not strictly required but we do it to be more in
+  # control of the procedure and also to optionally apply the final host mtu
+  # config at the same time the mtu migration procedure is ended.
+  # There is a bug causing MCO to take 10 minutes to notice some updates when
+  # the MCPs are paused:
+  # https://bugzilla.redhat.com/show_bug.cgi?id=2005694
+  # So we need to be prepared to check and wait for up to 10 minutes for any
+  # configuration change to be rendered before unpausing the pools.
+  log "Pausing MCO pools..."
+  oc patch MachineConfigPool master --type='merge' --patch '{ "spec": { "paused": true } }'
+  oc patch MachineConfigPool worker --type='merge' --patch '{ "spec":{ "paused": true } }'
+
+  # configure the host mtu if requested
+  if [ -n "$set_host_mtu" ]; then
+    time configure_host_mtu "${host_to}"
+    # wait until the machine config contains the host mtu configuration
+    time wait_for_mc_contents "900s" "${encoded_set_mtu}" ""
+  fi
+
+  if [ "${mtu_offset}" -ne 0 ]; then
+    from=${cluster_mtu}
+    to=$((from+mtu_offset))
+    host_to=$((host_mtu+mtu_offset))
+    log "Setting MTU migration from cluster network MTU ${from} and host MTU ${host_mtu} to cluster network MTU ${to} and host MTU ${host_to}"
+    oc patch Network.operator.openshift.io cluster --type='merge' --patch "{\"spec\": { \"migration\": { \"mtu\": { \"network\": { \"from\": ${from}, \"to\": ${to} } , \"machine\": { \"to\" : ${host_to}} } } } }"
+    # wait until the machine configs contains the mtu migration configuration
+    time wait_for_mc_contents "900s" "mtu-migration.sh"
+  else
+    to=$(oc get network.config --output=jsonpath='{.items..status.migration.mtu.network.to}')
+    host_to=$(oc get network.config --output=jsonpath='{.items..status.migration.mtu.machine.to}')
+    if [ -z "${host_to}" ] || [ -z "${to}" ]; then
+      log "error: unable to get ongoing migration status information"
+      exit 1
+    fi
+
+    log "Ending MTU migration to host mtu ${host_to} and cluster network MTU ${to}"
+    oc patch Network.operator.openshift.io cluster --type=merge --patch "{ \"spec\": { \"migration\": null, \"defaultNetwork\":{ \"${network_config}\":{ \"mtu\":${to} }}}}"
+    # wait until the machine config does not contain the mtu migration configuration
+    time wait_for_mc_contents "900s" "" "mtu-migration.sh"
+  fi
+  
+  log "Unpausing MCO pools..."
+  oc patch MachineConfigPool master --type='merge' --patch '{ "spec": { "paused": false } }'
+  oc patch MachineConfigPool worker --type='merge' --patch '{ "spec":{ "paused": false } }'
+
+  # Check all machine config pools are updated
+  time wait_for_mcp "2700s"
+
+  # Check all cluster operators are operational
+  time wait_for_co "600s"
+
+  # Check for some time that there are not firing api alerts
+  time check_no_api_alerts "60s"
+
+  # Check that the expected MTU is being used
+  if [ "${mtu_offset}" -gt 0 ]; then
+    # While increasing MTU, interface MTU needs to be at the 
+    # final value and the path MTU needs to stay unchanged
+    time check_expected_mtu "${host_to}" "${host_mtu}" "${to}" "${from}"
+  elif [ "${mtu_offset}" -lt 0 ]; then
+    # While decreasing MTU, interface MTU needs to stay unchanged 
+    # and the path MTU needs to be at the final value
+    time check_expected_mtu "${host_mtu}" "${host_to}" "${from}" "${to}"
+  else
+    # Once the MTU migration procedure is complete, both interface
+    # and path MTU need to reflect the final value
+    time check_expected_mtu "${host_to}" "${host_to}" "${to}" "${to}"
+  fi
+}
+
 log "Applying MTU offset ${MTU_OFFSET} to the cluster"
 
 # create a namespace with pod-security allowing node debugging
@@ -399,86 +458,47 @@ time setup_packet_cluster
 
 time wait_for_co "600s"
 
-log "Getting the current cluster network MTU..."
-cluster_mtu=$(oc get network.config --output=jsonpath='{.items..status.clusterNetworkMTU}')
-if [ -z "${cluster_mtu}" ]; then
-  log "error: unable to get clusterNetworkMTU"
+# Check what type of network we are dealing with to use the the correct
+# configuration
+network_type=$(oc get network.config --output=jsonpath='{.items..status.networkType}')
+if [ -z "${network_type}" ]; then
+  log "error: unable to get networkType"
   exit 1
 fi
-log "Cluster network MTU is ${cluster_mtu}"
+network_config="ovnKubernetesConfig"
+if [ "${network_type}" = "OpenShiftSDN" ]; then
+  network_config="openshiftSDNConfig"
+fi
+
+log "Getting the configured cluster network MTU..."
+# get the original cluster mtu from migration if in progress
+cluster_mtu=$(oc get network.operator --output=jsonpath='{.items..spec.migration.mtu.network.from}')
+if [ -z "${cluster_mtu}" ]; then
+  # otherwise get it from the network status
+  cluster_mtu=$(oc get network.config --output=jsonpath='{.items..status.clusterNetworkMTU}')
+fi
+if [ -z "${cluster_mtu}" ]; then
+  log "error: unable to get the configured cluster network MTU"
+  exit 1
+fi
+log "Configured cluster network MTU is ${cluster_mtu}"
 
 # Get host default gateway interface & MTU...
 node=$(oc get nodes -o jsonpath='{.items[0].metadata.name}')
 time get_node_host_data "${node}"
 
-if [ "${MTU_OFFSET}" -ne 0 ]; then
-  from=${cluster_mtu}
-  to=$((from+MTU_OFFSET))
-  host_to=$((host_mtu+MTU_OFFSET))
-  oc patch Network.operator.openshift.io cluster --type='merge' --patch '{"spec":{"migration":null}}'
-  time wait_for_cno_cleanup "60s"
-  log "Starting MTU migration from cluster network MTU ${from} and host MTU ${host_mtu} to cluster network MTU ${to} and host MTU ${host_to}"
-  oc patch Network.operator.openshift.io cluster --type='merge' --patch "{\"spec\": { \"migration\": { \"mtu\": { \"network\": { \"from\": ${from}, \"to\": ${to} } , \"machine\": { \"to\" : ${host_to}} } } } }"
-else
-  # Check what type of network we are dealing with to use the the correct
-  # configuration
-  network_type=$(oc get network.config --output=jsonpath='{.items..status.networkType}')
-  if [ -z "${network_type}" ]; then
-    log "error: unable to get networkType"
-    exit 1
-  fi
-  network_config="ovnKubernetesConfig"
-  if [ "${network_type}" = "OpenShiftSDN" ]; then
-    network_config="openshiftSDNConfig"
-  fi
+# start the migration for the given offset
+set_mtu_migration "${MTU_OFFSET}"
 
-  to=$(oc get network.config --output=jsonpath='{.items..status.migration.mtu.network.to}')
-  host_to=$(oc get network.config --output=jsonpath='{.items..status.migration.mtu.machine.to}')
-  if [ -z "${host_to}" ] || [ -z "${to}" ]; then
-    log "error: unable to get ongoing migration status information"
-    exit 1
-  fi
+if [ "${STEPS}" = "3" ]; then
+  # configure the host mtu
+  set_mtu_migration "${MTU_OFFSET}" "set_host_mtu"
 
-  log "Ending MTU migration to host mtu ${host_to} and cluster network MTU ${to}"
-  oc patch MachineConfigPool master --type='merge' --patch '{ "spec": { "paused": true } }'
-  oc patch MachineConfigPool worker --type='merge' --patch '{ "spec":{ "paused": true } }'
-  # There is a bug causing MCO to take 10 minutes to notice some updates when
-  # the MCPs are paused:
-  # https://bugzilla.redhat.com/show_bug.cgi?id=2005694
-  # This requires that we do this in this precise order checking for the result
-  # step by step
-  # If other updates not controlled by this script interleave with these ones,
-  # we migh actually have that delay so be prepared for it.
-  oc patch Network.operator.openshift.io cluster --type=merge --patch "{ \"spec\": { \"migration\": null, \"defaultNetwork\":{ \"${network_config}\":{ \"mtu\":${to} }}}}"
-  time wait_for_final_mc_controller_config "900s"
-  time configure_host_mtu "${host_to}"
-  time wait_for_final_mc "900s"
-  oc patch MachineConfigPool master --type='merge' --patch '{ "spec": { "paused": false } }'
-  oc patch MachineConfigPool worker --type='merge' --patch '{ "spec":{ "paused": false } }'
-fi
-
-# Check all machine config pools are updated
-time wait_for_mcp "2700s"
-
-# Check all cluster operators are operational
-time wait_for_co "600s"
-
-# Check for some time that there are not firing api alerts
-time check_no_api_alerts "60s"
-
-# Check that the expected MTU is being used
-if [ "${MTU_OFFSET}" -gt 0 ]; then
-  # While increasing MTU, interface MTU needs to be at the 
-  # final value and the path MTU needs to stay unchanged
-  time check_expected_mtu "${host_to}" "${host_mtu}" "${to}" "${from}"
-elif [ "${MTU_OFFSET}" -lt 0 ]; then
-  # While decreasing MTU, interface MTU needs to stay unchanged 
-  # and the path MTU needs to be at the final value
-  time check_expected_mtu "${host_mtu}" "${host_to}" "${from}" "${to}"
-else
-  # Once the MTU migration procedure is complete, both interface
-  # and path MTU need to reflect the final value
-  time check_expected_mtu "${host_to}" "${host_to}" "${to}" "${to}"
+  # end the migration
+  set_mtu_migration "0"
+elif [ "${STEPS}" = "2" ]; then
+  # configure the host mtu and end the migration
+  set_mtu_migration "0" "set_host_mtu"
 fi
 
 log "MTU migration with OFFSET ${MTU_OFFSET} finished"
