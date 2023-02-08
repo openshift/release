@@ -40,9 +40,9 @@ cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
 ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
 install_config="${SHARED_DIR}/install-config.yaml"
 
-printf "datacenter-2" > "${SHARED_DIR}/ova-datacenters"
-printf "mdcnc-ds-4" > "${SHARED_DIR}/ova-datastores"
-printf "vcs-mdcnc-workload-4" > "${SHARED_DIR}/ova-clusters"
+printf "IBMCloud\ndatacenter-2" > "${SHARED_DIR}/ova-datacenters"
+printf "mdcnc-ds-1\nmdcnc-ds-4" > "${SHARED_DIR}/ova-datastores"
+printf "vcs-mdcnc-workload-1\nvcs-mdcnc-workload-4" > "${SHARED_DIR}/ova-clusters"
 
 legacy_installer_json="${openshift_install_path}/rhcos.json"
 fcos_json_file="${openshift_install_path}/fcos.json"
