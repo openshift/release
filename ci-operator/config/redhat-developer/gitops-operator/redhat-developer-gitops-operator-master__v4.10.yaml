@@ -20,6 +20,9 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: oc-bin-image
+- context_dir: .
+  from: src
+  to: gitops-backend-operator
 operator:
   bundles:
   - as: gitops-operator-bundle
@@ -28,7 +31,7 @@ operator:
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/redhat-developer/gitops-backend-operator:v0.0.3
-    with: pipeline:oc-bin-image
+    with: pipeline:gitops-backend-operator
 releases:
   initial:
     integration:
@@ -51,10 +54,9 @@ tests:
     dependencies:
       OO_INDEX: ci-index-gitops-operator-bundle
     env:
-      INITIAL_CSV: openshift-gitops-operator.v0.0.3
       OO_CHANNEL: latest
       OO_INSTALL_NAMESPACE: openshift-operators
-      OO_PACKAGE: openshift-gitops-operator
+      OO_PACKAGE: gitops-operator
       OO_TARGET_NAMESPACES: '!all'
     test:
     - as: sequential-e2e-steps
@@ -83,7 +85,7 @@ tests:
     env:
       OO_CHANNEL: latest
       OO_INSTALL_NAMESPACE: openshift-operators
-      OO_PACKAGE: openshift-gitops-operator
+      OO_PACKAGE: gitops-operator
       OO_TARGET_NAMESPACES: '!all'
     test:
     - as: parallel-e2e-steps
