@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 # Set the TARGET_URL value using the cluster_url
-TARGET_URL="mtr-mtr.$(cat ${SHARED_DIR}/cluster_url)"
+TARGET_URL="http://mtr-mtr.$(cat ${SHARED_DIR}/cluster_url)"
 
 # Installing Cypress
 echo "Installing Cypress"
