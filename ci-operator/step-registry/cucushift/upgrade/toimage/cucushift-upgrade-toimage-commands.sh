@@ -194,7 +194,7 @@ function check_clusteroperators() {
     echo "Make sure every operator do not report empty column"
     tmp_clusteroperator=$(mktemp /tmp/health_check-script.XXXXXX)
     input="${tmp_clusteroperator}"
-    ${OC} get clusteroperator $>"${tmp_clusteroperator}"
+    ${OC} get clusteroperator >"${tmp_clusteroperator}"
     column=$(head -n 1 "${tmp_clusteroperator}" | awk '{print NF}')
     last_column_name=$(head -n 1 "${tmp_clusteroperator}" | awk '{print $NF}')
     if [[ ${last_column_name} == "MESSAGE" ]]; then
