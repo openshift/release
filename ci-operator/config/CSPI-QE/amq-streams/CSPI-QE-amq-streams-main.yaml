@@ -9,11 +9,11 @@ build_root:
     namespace: openshift
     tag: golang-1.17
 images:
-- inputs:
-    src:
-      as:
-      - quay.io/rh_integration/strimzi-interop
-  to: src-test
+- dockerfile_literal: |
+    FROM quay.io/rh_integration/strimzi-interop:latest
+    WORKDIR /home/jenkins/interop
+    CMD ["/bin/bash"]
+  to: strimzi-interop
 releases:
   latest:
     candidate:
@@ -33,6 +33,7 @@ tests:
   steps:
     cluster_profile: aws-cspi-qe
     env:
+      BASE_DOMAIN: aws.interop.ccitredhat.com
       SUB_CHANNEL: stable
       SUB_INSTALL_NAMESPACE: openshift-streams
       SUB_PACKAGE: amq-streams
@@ -40,19 +41,9 @@ tests:
       SUB_TARGET_NAMESPACES: openshift-streams
     test:
     - ref: operatorhub-subscribe
-    - as: test
-      commands: |
-        export USER_NAME=kubeadmin
-        export PASSWORD=`cat ${KUBEADMIN_PASSWORD_FILE}`
-        export API_URL=`oc whoami --show-server`
-        export NAMESPACE=openshift-streams
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-        /bin/bash -c "make interop && cp -r tests/target/surefire-reports/$TESTS_OUTPUT && oc delete -f scenario -n $NAMESPACE"
-      from: strimzi-interop
-      resources:
-        requests:
-          cpu: 100m
+    - ref: cspi-qe-amq-streams
+    workflow: ipi-aws
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: CSPI-QE
   repo: amq-streams
