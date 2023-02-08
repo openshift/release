@@ -69,10 +69,10 @@ done
 
 wait
 
-FAILED="$(find ${clusters} -name failure -printf '%H\n' | sort)"
+echo 'Collecting any failed deprovisions...'
+FAILED="$(find "${logdir}" -name failure | sed 's|.*/\([^/]*\)/failure|\1|' | sort)"
 if [[ -n "${FAILED}" ]]; then
-  echo "Deprovision failed on the following clusters:"
-  xargs --max-args 1 basename <<< $FAILED
+  printf "Deprovision failed on the following clusters:\n%s\n" "${FAILED}"
   exit 1
 fi
 
