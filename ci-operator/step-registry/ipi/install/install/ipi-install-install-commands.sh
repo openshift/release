@@ -423,6 +423,7 @@ do
   openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
+  echo "Installer exit with code $ret"
 
   tries=$((tries+1))
 done
