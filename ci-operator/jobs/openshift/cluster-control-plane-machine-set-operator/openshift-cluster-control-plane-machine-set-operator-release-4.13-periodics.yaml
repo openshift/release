@@ -1,18 +1,20 @@
 periodics:
 - agent: kubernetes
-  cluster: build03
+  cluster: build05
   decorate: true
   extra_refs:
-  - base_ref: main
+  - base_ref: release-4.13
     org: openshift
     repo: cluster-control-plane-machine-set-operator
   interval: 24h
   labels:
-    ci-operator.openshift.io/cloud: aws-arm64
-    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
+    job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-control-plane-machine-set-operator-main-e2e-aws-arm-periodic
+  name: periodic-ci-openshift-cluster-control-plane-machine-set-operator-release-4.13-periodics-e2e-aws
   spec:
     containers:
     - args:
@@ -21,8 +23,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-arm-periodic-cluster-profile
-      - --target=e2e-aws-arm-periodic
+      - --secret-dir=/usr/local/e2e-aws-cluster-profile
+      - --target=e2e-aws
+      - --variant=periodics
       command:
       - ci-operator
       image: ci-operator:latest
@@ -38,7 +41,80 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-aws-arm-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-aws-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  extra_refs:
+  - base_ref: release-4.13
+    org: openshift
+    repo: cluster-control-plane-machine-set-operator
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/cloud: aws-arm64
+    ci-operator.openshift.io/cloud-cluster-profile: aws-arm64
+    ci-operator.openshift.io/variant: periodics
+    ci.openshift.io/generator: prowgen
+    job-release: "4.13"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-cluster-control-plane-machine-set-operator-release-4.13-periodics-e2e-aws-arm
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-arm-cluster-profile
+      - --target=e2e-aws-arm
+      - --variant=periodics
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-arm-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -73,86 +149,18 @@ periodics:
   cluster: build01
   decorate: true
   extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: cluster-control-plane-machine-set-operator
-  interval: 24h
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci.openshift.io/generator: prowgen
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-control-plane-machine-set-operator-main-e2e-aws-periodic
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-aws-periodic-cluster-profile
-      - --target=e2e-aws-periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/e2e-aws-periodic-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  decorate: true
-  extra_refs:
-  - base_ref: main
+  - base_ref: release-4.13
     org: openshift
     repo: cluster-control-plane-machine-set-operator
   interval: 24h
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure4
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
+    job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-control-plane-machine-set-operator-main-e2e-azure-periodic
+  name: periodic-ci-openshift-cluster-control-plane-machine-set-operator-release-4.13-periodics-e2e-azure
   spec:
     containers:
     - args:
@@ -161,8 +169,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-azure-periodic-cluster-profile
-      - --target=e2e-azure-periodic
+      - --secret-dir=/usr/local/e2e-azure-cluster-profile
+      - --target=e2e-azure
+      - --variant=periodics
       command:
       - ci-operator
       image: ci-operator:latest
@@ -178,7 +187,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-azure-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-azure-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -213,16 +222,18 @@ periodics:
   cluster: build02
   decorate: true
   extra_refs:
-  - base_ref: main
+  - base_ref: release-4.13
     org: openshift
     repo: cluster-control-plane-machine-set-operator
   interval: 24h
   labels:
     ci-operator.openshift.io/cloud: gcp
     ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
+    job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-cluster-control-plane-machine-set-operator-main-e2e-gcp-periodic
+  name: periodic-ci-openshift-cluster-control-plane-machine-set-operator-release-4.13-periodics-e2e-gcp
   spec:
     containers:
     - args:
@@ -231,8 +242,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-gcp-periodic-cluster-profile
-      - --target=e2e-gcp-periodic
+      - --secret-dir=/usr/local/e2e-gcp-cluster-profile
+      - --target=e2e-gcp
+      - --variant=periodics
       command:
       - ci-operator
       image: ci-operator:latest
@@ -248,7 +260,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-gcp-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-gcp-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
