@@ -33,8 +33,22 @@ pushd ~/tempest/openshift
 
 discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create
 
+# Generate skiplist and allow list
+
+REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
+curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_allow.yml
+curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_skip.yml
+
+tempest-skip list-allowed --file tempest_allow.yml --group ${REPO} --job ${REPO} -f value allow.txt
+tempest-skip list-skipped --file tempest_skip.yml --group ${REPO} --job ${REPO} -f value skip.txt
+
 set +e
-tempest run --regex 'tempest.api.identity.*.v3'
+if [ -f allow.txt ] && [ -f skip.txt ]; then
+    TEMPEST_ARGS=" --exclude-list skip.txt --include-list allow.txt"    
+else
+    TEMPEST_ARGS=" --regex 'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON'"
+fi
+tempest run ${TEMPEST_ARGS}
 EXIT_CODE=$?
 set -e
 
