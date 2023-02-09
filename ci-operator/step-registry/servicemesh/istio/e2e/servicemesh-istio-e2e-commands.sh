@@ -75,15 +75,6 @@ spec:
         add: ["IPC_LOCK","SYS_ADMIN"]
       privileged: true
       runAsUser: 0
-    resources:
-      requests:
-        memory: 1Gi
-        cpu: '2'
-        ${RESOURCE_REQUEST:-}
-      limits:
-        memory: 1Gi
-        cpu: '2'
-        ${RESOURCE_REQUEST:-}
     volumeMounts:
     - mountPath: /lib/modules
       name: modules
