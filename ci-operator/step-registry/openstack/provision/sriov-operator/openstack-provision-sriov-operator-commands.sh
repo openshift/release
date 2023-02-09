@@ -170,6 +170,7 @@ EOF
 
     if [ -n "${FOUND_SNO:-}" ] ; then
         wait_for_sriov_pods
+        wait_for_sriov_network_node_state
         echo "sriov-network-operator was installed successfully"
     else
         echo "sriov-network-operator was not installed after 15 minutes"
