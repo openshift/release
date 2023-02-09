@@ -39,8 +39,8 @@ REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
 curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_allow.yml
 curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_skip.yml
 
-tempest-skip list-allowed --file tempest_allow.yml --group ${REPO} --job ${REPO} -f value allow.txt
-tempest-skip list-skipped --file tempest_skip.yml --group ${REPO} --job ${REPO} -f value skip.txt
+tempest-skip list-allowed --file tempest_allow.yml --group ${REPO} --job ${REPO} -f value > allow.txt
+tempest-skip list-skipped --file tempest_skip.yml --group ${REPO} --job ${REPO} -f value > skip.txt
 
 set +e
 if [ -f allow.txt ] && [ -f skip.txt ]; then
