@@ -13,12 +13,25 @@ read_profile_file() {
   fi
 }
 
+delete_remote_cluster() {
+    remote_cluster_id=$(cat "${HOME}/remote-cluster-id")
+    ocm delete "/api/clusters_mgmt/v1/clusters/${remote_cluster_id}"
+    echo "Waiting for cluster deletion..."
+    while ocm get "/api/clusters_mgmt/v1/clusters/${remote_cluster_id}" ; do
+      sleep 60
+    done
+
+echo "Cluster is no longer accessible; delete successful"
+}
+
 SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 OCM_TOKEN=$(read_profile_file "ocm-token")
 
 # ocm login created files here that we now use to delete the cluster
 export HOME=${SHARED_DIR}
+
+
 
 if [[ ! -z "${SSO_CLIENT_ID}" && ! -z "${SSO_CLIENT_SECRET}" ]]; then
   echo "Logging into ${OCM_LOGIN_URL} with SSO credentials"
@@ -41,4 +54,8 @@ while ocm get "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}" ; do
 done
 
 echo "Cluster is no longer accessible; delete successful"
+
+if [[ "${REMOTE_CLUSTER_REQUIRED}" ]]; then
+  delete_remote_cluster
+fi
 exit 0

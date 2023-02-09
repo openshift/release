@@ -42,6 +42,91 @@ handle_installation_failure() {
   fi
 }
 
+create_remote_cluster() {
+
+  local remote_cluster_name="${1}"
+  local remote_cluster_version="${2}"
+  echo "Parameters for cluster request:"
+  echo "  Cluster name: ${remote_cluster_name}"
+  echo "  Compute nodes: ${COMPUTE_NODES}"
+  echo "  Cluster version: ${CLUSTER_VERSION}"
+  echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
+  echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
+  echo "  Cluster multi-az: ${CLUSTER_MULTI_AZ}"
+  ocm create cluster ${OCM_CREATE_ARGS} \
+                     --ccs "${remote_cluster_name}" \
+                     --compute-nodes "${COMPUTE_NODES}" \
+                     --version "${remote_cluster_version}" \
+                     --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
+                     --region "${CLOUD_PROVIDER_REGION}" \
+                     ${CLUSTER_MULTI_AZ_SWITCH} \
+                     > "${REMOTE_CLUSTER_INFO}"
+
+  local REMOTE_CLUSTER_ID
+  REMOTE_CLUSTER_ID=$(cat "${REMOTE_CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
+  echo "Cluster ${remote_cluster_name} is being created with cluster-id: ${REMOTE_CLUSTER_ID}"
+
+
+  # By default, OSD will setup clusters running for a few days before they expire.
+  # In case things go wrong in our flow, give the cluster an initial expiration
+  # that will minimize wasted compute if post steps are not successful.
+  # After installation, the expiration will be bumped according to CLUSTER_DURATION.
+  echo "Set the initial expiration time"
+  set_expiration_time "${REMOTE_CLUSTER_ID}" "+3hours"
+
+  # Store the cluster ID for the delete operation
+  echo -n "${REMOTE_CLUSTER_ID}" > "${HOME}/remote-cluster-id"
+
+  echo "Waiting for cluster ready..."
+  start_time=$(date +"%s")
+  while true; do
+    sleep 60
+    CLUSTER_STATE=$(ocm get cluster "${REMOTE_CLUSTER_ID}" | jq -r '.status.state')
+    echo "Cluster state: ${CLUSTER_STATE}"
+    if [[ "${CLUSTER_STATE}" == "ready" ]]; then
+      echo "Cluster is reported as ready"
+      break
+    fi
+    if (( $(date +"%s") - $start_time >= $CLUSTER_TIMEOUT )); then
+      echo "error: Timed out while waiting for cluster to be ready"
+      handle_installation_failure "${REMOTE_CLUSTER_ID}"
+      exit 1
+    fi
+    if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" ]]; then
+      echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
+      handle_installation_failure "${REMOTE_CLUSTER_ID}"
+      exit 1
+    fi
+  done
+
+  if [[ -n "${CLUSTER_DURATION}" ]]; then
+    echo "Set the expiration time as set in CLUSTER_DURATION"
+    set_expiration_time "${REMOTE_CLUSTER_ID}" "+${CLUSTER_DURATION}sec"
+  fi
+
+  ocm get "/api/clusters_mgmt/v1/clusters/${REMOTE_CLUSTER_ID}/logs/install" > "${ARTIFACT_DIR}/.remote_cluster_osd_install.log"
+  ocm get "/api/clusters_mgmt/v1/clusters/${REMOTE_CLUSTER_ID}/credentials" | jq -r .kubeconfig > "${SHARED_DIR}/kubeconfig-remote"
+  ocm get "/api/clusters_mgmt/v1/clusters/${REMOTE_CLUSTER_ID}/credentials" | jq -jr .admin.password > "${SHARED_DIR}/kubeadmin-password-remote"
+  local REMOTE_CONSOLE_URL
+  REMOTE_CONSOLE_URL=$(ocm get "/api/clusters_mgmt/v1/clusters/${REMOTE_CLUSTER_ID}" | jq -r .console.url)
+  echo "${REMOTE_CONSOLE_URL}" > "${SHARED_DIR}/remote_cluster_console.url"
+
+  echo "Console URL: ${CONSOLE_URL}"
+  while true; do
+    echo "Waiting for reachable api.."
+    if oc --kubeconfig "${SHARED_DIR}/kubeconfig-remote" get project/openshift-apiserver; then
+      break
+    fi
+    sleep 30
+  done
+
+  # OSD replaces the provider selection template and eliminate the kube:admin option.
+  # Restore the ugly, but kube:admin containing, default template.
+  cd /tmp
+  oc --kubeconfig "${SHARED_DIR}/kubeconfig-remote" patch oauth.config.openshift.io cluster --type='json' -p='{"spec":{"templates": null}}' --type=merge
+
+}
+
 CLUSTER_NAME=${CLUSTER_NAME:-$NAMESPACE}
 CLUSTER_VERSION=${CLUSTER_VERSION:-}
 CLUSTER_MULTI_AZ=${CLUSTER_MULTI_AZ:-false}
@@ -49,6 +134,8 @@ SSO_CLIENT_ID=$(read_profile_file "sso-client-id")
 SSO_CLIENT_SECRET=$(read_profile_file "sso-client-secret")
 OCM_TOKEN=$(read_profile_file "ocm-token")
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
+REMOTE_CLUSTER_REQUIRED=${REMOTE_CLUSTER_REQUIRED}
+REMOTE_CLUSTER_VERSION=${REMOTE_CLUSTER_VERSION}
 
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 OCM_CREATE_ARGS=""
@@ -109,6 +196,7 @@ if [[ "$OLD_CLUSTER_ID" != ID* ]]; then
 fi
 
 CLUSTER_INFO="${ARTIFACT_DIR}/ocm-cluster.txt"
+REMOTE_CLUSTER_INFO="${ARTIFACT_DIR}/ocm-cluster-remote.txt"
 
 CLUSTER_MULTI_AZ_SWITCH=""
 if [[ "$CLUSTER_MULTI_AZ" == "true" ]]; then
@@ -190,5 +278,9 @@ done
 # Restore the ugly, but kube:admin containing, default template.
 cd /tmp
 oc --kubeconfig "${SHARED_DIR}/kubeconfig" patch oauth.config.openshift.io cluster --type='json' -p='{"spec":{"templates": null}}' --type=merge
+
+if [[ "${REMOTE_CLUSTER_REQUIRED}" ]]; then
+  create_remote_cluster "${CLUSTER_NAME}-remote" "${REMOTE_CLUSTER_VERSION}"
+fi
 
 exit 0
