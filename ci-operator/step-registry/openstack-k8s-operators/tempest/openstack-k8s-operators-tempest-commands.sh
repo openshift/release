@@ -45,6 +45,7 @@ tempest-skip list-skipped --file tempest_skip.yml --job ${REPO} -f value > skip.
 set +e
 if [ -f allow.txt ] && [ -f skip.txt ]; then
     TEMPEST_ARGS=( --exclude-list skip.txt --include-list allow.txt)
+    cp allow.txt skip.txt ${ARTIFACT_DIR}
 else
     TEMPEST_ARGS=( --regex 'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON')
 fi
