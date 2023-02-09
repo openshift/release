@@ -25,7 +25,7 @@ PULL_SECRET_FILE="${SECRET_DIR}/PULL_SECRET_FILE"
 PRIVATE_KEY_FILE="${SECRET_DIR}/PRIVATE_KEY_FILE"
 PUBLIC_KEY_FILE="${SECRET_DIR}/PUBLIC_KEY_FILE"
 
-create_tfvars_file(){
+function create_tfvars_file(){
 
 cat > "${POWERVS_OCP_DIR}/var.tfvars" << EOF
 ## IBM cloud configurations
@@ -59,7 +59,7 @@ EOF
 
 }
 
-setup_automation(){
+function setup_automation(){
   curl https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/devel/openshift-install-powervs --output openshift-install-powervs --silent
   chmod +x openshift-install-powervs
     
