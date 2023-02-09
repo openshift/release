@@ -52,19 +52,21 @@ for i in "${!DATACENTERS[@]}"; do
     export GOVC_RESOURCE_POOL=$RESOURCE_POOL
 
     OVA_NETWORK=""
-    NETWORKS=$(govc find -i network -name $LEASED_RESOURCE)
+    NETWORKS=($(govc find -i network -name $LEASED_RESOURCE))
 
     # Search the found networks for a network that exists in the target cluster.
-    echo "$(date -u --rfc-3339=seconds) - Validating network configuration..."
-    if [ ${!NETWORKS[@]} > 1 ]; then
-        for NET in $NETWORKS; do
-            case "$NET" in
+    echo "$(date -u --rfc-3339=seconds) - Validating network configuration... ${#NETWORKS[@]}"
+    if [ ${#NETWORKS[@]} > 1 ]; then
+        echo "$(date -u --rfc-3339=seconds) - Detected multiple matching networks.  Searching for valid network target."
+        for NET in ${NETWORKS[@]}; do
+            case "${NET}" in
                 DistributedVirtualPortgroup*)
-                    DVPG=$(echo $NET | cut -d':' -f2-)
+                    DVPG=$(echo ${NET} | cut -d':' -f2-)
+                    echo "Checking ${DVPG}"
                     FOUND=$(govc object.collect -json -type c | jq -r --arg CLUSTER "$CLUSTER" --arg DVPG "$DVPG" 'select(.changeSet[] | .name == "name" and .val == $CLUSTER) | .changeSet[] | select(.name == "network") | .val._value | any(.value == $DVPG)')
                     if [ "$FOUND" = true ]; then
                         echo "$(date -u --rfc-3339=seconds) - Found network matching for name=${LEASED_RESOURCE}.  Setting ova network to ${NET}"
-                        OVA_NETWORK=$NET
+                        OVA_NETWORK=${NET}
                         break;
                     fi;;
                 *)
@@ -74,7 +76,7 @@ for i in "${!DATACENTERS[@]}"; do
         done
     else
         echo "$(date -u --rfc-3339=seconds) - Only one network found with name=${LEASED_RESOURCE} for datacenter ${DATACENTER}.  Setting ova network to ${LEASED_RESOURCE}"
-        OVA_NETWORK=$LEASED_RESOURCE
+        OVA_NETWORK=${LEASED_RESOURCE}
     fi
 
     # Generate rhcos.json for ova import
@@ -97,6 +99,8 @@ EOF
         curl -L -o /tmp/rhcos.ova "${ova_url}"
         govc import.ova -options=/tmp/rhcos.json /tmp/rhcos.ova &
         wait "$!"
+    else
+        echo "$(date -u --rfc-3339=seconds) - Skipping ova import due to image already existing."
     fi
 
     hw_versions=(15 17 19)
@@ -106,6 +110,8 @@ EOF
             echo "$(date -u --rfc-3339=seconds) - Cloning and upgrading ${vm_template} to hw version ${hw_version}..."
             govc vm.clone -net=${LEASED_RESOURCE} -on=false -cluster=$CLUSTER -vm="${vm_template}" "${vm_template}-hw${hw_version}"
             govc vm.upgrade -vm="${vm_template}-hw${hw_version}" -version=${hw_version}
+        else
+            echo "$(date -u --rfc-3339=seconds) - Skipping ova import for hw${hw_version} due to image already existing."
         fi
     done
 done
