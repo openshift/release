@@ -1,7 +1,8 @@
 #!/bin/bash
 
 set -o nounset
-set +o errexit
+set -o errexit
+set -o pipefail
 
 function createInstallJunit() {
   EXIT_CODE_CONFIG=3
@@ -14,11 +15,13 @@ function createInstallJunit() {
     cp "${SHARED_DIR}/install-status.txt" "${ARTIFACT_DIR}/"
     if [ "$EXIT_CODE" ==  0  ]
     then
+      set +o errexit
       grep -q "^$EXIT_CODE_INFRA$" "${SHARED_DIR}/install-status.txt"
       PREVIOUS_INFRA_FAILURE=$((1-$?))
+      set -o errexit
 
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
-      <testsuite name="cluster install" tests="6" failures="$PREVIOUS_INFRA_FAILURE">
+      <testsuite name="cluster install" tests="$((PREVIOUS_INFRA_FAILURE+6))" failures="$PREVIOUS_INFRA_FAILURE">
         <testcase name="install should succeed: other"/>
         <testcase name="install should succeed: configuration"/>
         <testcase name="install should succeed: infrastructure"/>
@@ -118,7 +121,7 @@ EOF
 # see https://github.com/elmiko/camgi.rs for more information
 function installCamgi() {
     CAMGI_VERSION="0.8.1"
-    pushd /tmp || exit
+    pushd /tmp
 
     # no internet access in C2S/SC2S env, disable proxy
     if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
@@ -141,7 +144,7 @@ function installCamgi() {
       source "${SHARED_DIR}/proxy-conf.sh"
     fi
 
-    popd || exit
+    popd
 }
 
 if test ! -f "${KUBECONFIG}"
