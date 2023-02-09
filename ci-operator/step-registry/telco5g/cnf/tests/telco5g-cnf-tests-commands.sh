@@ -192,6 +192,7 @@ status=0
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
+export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
 FEATURES_ENVIRONMENT="ci" make functests-on-ci || status=$?
 cd -
 
