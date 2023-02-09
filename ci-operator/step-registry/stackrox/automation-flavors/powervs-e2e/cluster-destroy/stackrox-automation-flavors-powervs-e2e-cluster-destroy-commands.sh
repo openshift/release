@@ -3,7 +3,6 @@
 #set -o nounset
 set -o errexit
 set -o pipefail
-set -v
 
 LAST_WORK_DIR="$(pwd)"
 POWERVS_OCP_DIR="/tmp/powervs-ocp"
@@ -26,22 +25,8 @@ PULL_SECRET_FILE="${SECRET_DIR}/PULL_SECRET_FILE"
 PRIVATE_KEY_FILE="${SECRET_DIR}/PRIVATE_KEY_FILE"
 PUBLIC_KEY_FILE="${SECRET_DIR}/PUBLIC_KEY_FILE"
 
-echo "Destroying cluster..."
-ls -l "$SHARED_DIR/" # DEBUG
+function create_tfvars_file(){
 
-echo "Setting up automation..."
-curl https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/devel/openshift-install-powervs --output openshift-install-powervs --silent
-ls -l  # DEBUG
-chmod +x openshift-install-powervs
-  
-./openshift-install-powervs setup 
-
-cp -f ${PULL_SECRET_FILE} ${POWERVS_OCP_DIR}/pull-secret.txt
-cp -f ${PUBLIC_KEY_FILE} ${POWERVS_OCP_DIR}/id_rsa.pub
-cp -f ${PRIVATE_KEY_FILE} ${POWERVS_OCP_DIR}/id_rsa
-chmod 400 ${POWERVS_OCP_DIR}/id_rsa
-
-echo "Setting up cluster configurations..."
 cat > "${POWERVS_OCP_DIR}/var.tfvars" << EOF
 ## IBM cloud configurations
 ibmcloud_region = "mon"
@@ -71,6 +56,31 @@ volume_size = "200"
 cluster_id_prefix = "ci-ocp"
 cluster_domain = "nip.io"
 EOF
+
+}
+
+function setup_automation(){
+  curl https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/devel/openshift-install-powervs --output openshift-install-powervs --silent
+  chmod +x openshift-install-powervs
+    
+  ./openshift-install-powervs setup &> "${POWERVS_OCP_DIR}/setup-log.txt"
+  
+  cp -f ${PULL_SECRET_FILE} ${POWERVS_OCP_DIR}/pull-secret.txt
+  cp -f ${PUBLIC_KEY_FILE} ${POWERVS_OCP_DIR}/id_rsa.pub
+  cp -f ${PRIVATE_KEY_FILE} ${POWERVS_OCP_DIR}/id_rsa
+  chmod 400 ${POWERVS_OCP_DIR}/id_rsa
+  
+}
+
+
+echo "Destroying cluster..."
+ls -l "$SHARED_DIR/" # DEBUG
+
+echo "Setting up automation..."
+setup_automation
+
+echo "Setting up cluster configurations..."
+create_tfvars_file
 
 echo "Configure automation to destroy cluster..."
 cp -f "${SHARED_DIR}/kubeconfig" "${POWERVS_OCP_DIR}/automation/kubeconfig"
