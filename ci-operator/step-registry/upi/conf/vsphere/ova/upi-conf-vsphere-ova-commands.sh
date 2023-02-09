@@ -56,7 +56,7 @@ for i in "${!DATACENTERS[@]}"; do
 
     # Search the found networks for a network that exists in the target cluster.
     echo "$(date -u --rfc-3339=seconds) - Validating network configuration..."
-    if [ ${#NETWORKS[@]} > 1 ]; then
+    if [ ${!NETWORKS[@]} > 1 ]; then
         for NET in $NETWORKS; do
             case "$NET" in
                 DistributedVirtualPortgroup*)
