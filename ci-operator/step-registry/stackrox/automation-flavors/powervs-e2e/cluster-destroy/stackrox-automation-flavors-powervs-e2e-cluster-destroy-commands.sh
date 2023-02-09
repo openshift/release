@@ -4,6 +4,9 @@
 set -o errexit
 set -o pipefail
 
+yum update -y &> /dev/null
+yum install sudo -y &> /dev/null
+
 LAST_WORK_DIR="$(pwd)"
 POWERVS_OCP_DIR="/tmp/powervs-ocp"
 SECRET_DIR="/tmp/vault/powervs-rhr-creds"
