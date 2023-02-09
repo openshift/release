@@ -40,6 +40,23 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
+- as: odh-notebook-controller-e2e
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      commands: opendatahub-io-kubeflow-e2e-commands.sh
+      dependencies:
+      - env: ODH_NOTEBOOK_CONTROLLER_IMAGE
+        name: odh-notebook-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 - as: kf-notebook-controller-unit
   run_if_changed: ^(components/common/.*|components/notebook-controller/.*)
   steps:
