@@ -114,6 +114,7 @@ export SERVICE_BRANCH={{ PULL_PULL_SHA }}
 {% endif %}
 
 source /root/platform-conf.sh
+source /root/assisted-additional-config
 
 {# Additional mechanism to inject assisted additional variables directly #}
 {% if ASSISTED_CONFIG is defined %}
@@ -196,6 +197,11 @@ cat > run_test_playbook.yaml <<-"EOF"
       ansible.builtin.copy:
         src: "{{ SHARED_DIR }}/platform-conf.sh"
         dest: /root/platform-conf.sh
+    - name: Copy assisted-additional-config file
+      become: true
+      ansible.builtin.copy:
+        src: "{{ SHARED_DIR }}/assisted-additional-config"
+        dest: /root/assisted-additional-config
     - name: Install packages
       dnf:
         name:
