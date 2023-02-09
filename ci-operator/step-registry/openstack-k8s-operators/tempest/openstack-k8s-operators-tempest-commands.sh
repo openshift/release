@@ -48,7 +48,7 @@ if [ -f allow.txt ] && [ -f skip.txt ]; then
 else
     TEMPEST_ARGS=( --regex 'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON')
 fi
-tempest run "${TEMPEST_ARGS}"
+tempest run "${TEMPEST_ARGS[@]}"
 EXIT_CODE=$?
 set -e
 
