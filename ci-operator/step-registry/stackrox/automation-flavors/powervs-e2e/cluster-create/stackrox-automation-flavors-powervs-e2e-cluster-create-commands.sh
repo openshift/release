@@ -3,6 +3,7 @@
 #set -o nounset
 set -o errexit
 set -o pipefail
+set -v
 
 LAST_WORK_DIR="$(pwd)"
 POWERVS_OCP_DIR="/tmp/powervs-ocp"
@@ -25,8 +26,33 @@ PULL_SECRET_FILE="${SECRET_DIR}/PULL_SECRET_FILE"
 PRIVATE_KEY_FILE="${SECRET_DIR}/PRIVATE_KEY_FILE"
 PUBLIC_KEY_FILE="${SECRET_DIR}/PUBLIC_KEY_FILE"
 
-function create_tfvars_file(){
+function on_exit(){
+  (
+  cp -f "${POWERVS_OCP_DIR}/automation/kubeconfig" "${SHARED_DIR}/kubeconfig" || true
+  cp -f "${POWERVS_OCP_DIR}/automation/terraform.tfstate" "${SHARED_DIR}/terraform.tfstate" || true
+  cp -f "${POWERVS_OCP_DIR}/automation/tfplan" "${SHARED_DIR}/tfplan" || true
+  ) &> /dev/null
+  ls -l "$SHARED_DIR/" # DEBUG
+}
 
+trap on_exit EXIT
+
+
+echo "Creating cluster..."
+
+echo "Setting up automation..."
+curl https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/devel/openshift-install-powervs --output openshift-install-powervs --silent
+ls -l  # DEBUG
+chmod +x openshift-install-powervs
+  
+./openshift-install-powervs setup 
+
+cp -f ${PULL_SECRET_FILE} ${POWERVS_OCP_DIR}/pull-secret.txt
+cp -f ${PUBLIC_KEY_FILE} ${POWERVS_OCP_DIR}/id_rsa.pub
+cp -f ${PRIVATE_KEY_FILE} ${POWERVS_OCP_DIR}/id_rsa
+chmod 400 ${POWERVS_OCP_DIR}/id_rsa
+
+echo "Setting up cluster configurations..."
 cat > "${POWERVS_OCP_DIR}/var.tfvars" << EOF
 ## IBM cloud configurations
 ibmcloud_region = "mon"
@@ -56,41 +82,6 @@ volume_size = "200"
 cluster_id_prefix = "ci-ocp"
 cluster_domain = "nip.io"
 EOF
-
-}
-
-function setup_automation(){
-  curl https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/devel/openshift-install-powervs --output openshift-install-powervs --silent
-  chmod +x openshift-install-powervs
-    
-  ./openshift-install-powervs setup &> "${POWERVS_OCP_DIR}/setup-log.txt"
-  
-  cp -f ${PULL_SECRET_FILE} ${POWERVS_OCP_DIR}/pull-secret.txt
-  cp -f ${PUBLIC_KEY_FILE} ${POWERVS_OCP_DIR}/id_rsa.pub
-  cp -f ${PRIVATE_KEY_FILE} ${POWERVS_OCP_DIR}/id_rsa
-  chmod 400 ${POWERVS_OCP_DIR}/id_rsa
-  
-}
-
-function on_exit(){
-  (
-  cp -f "${POWERVS_OCP_DIR}/automation/kubeconfig" "${SHARED_DIR}/kubeconfig" || true
-  cp -f "${POWERVS_OCP_DIR}/automation/terraform.tfstate" "${SHARED_DIR}/terraform.tfstate" || true
-  cp -f "${POWERVS_OCP_DIR}/automation/tfplan" "${SHARED_DIR}/tfplan" || true
-  ) &> /dev/null
-  ls -l "$SHARED_DIR/" # DEBUG
-}
-
-trap on_exit EXIT
-
-
-echo "Creating cluster..."
-
-echo "Setting up automation..."
-setup_automation
-
-echo "Setting up cluster configurations..."
-create_tfvars_file
 
 echo "Deploying cluster..."
 ./openshift-install-powervs create &> "${POWERVS_OCP_DIR}/create-log.txt"
