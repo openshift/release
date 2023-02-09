@@ -44,11 +44,11 @@ tempest-skip list-skipped --file tempest_skip.yml --group ${REPO} --job ${REPO} 
 
 set +e
 if [ -f allow.txt ] && [ -f skip.txt ]; then
-    TEMPEST_ARGS=" --exclude-list skip.txt --include-list allow.txt"    
+    TEMPEST_ARGS=( --exclude-list skip.txt --include-list allow.txt)
 else
-    TEMPEST_ARGS=" --regex \'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON\'"
+    TEMPEST_ARGS=( --regex 'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON')
 fi
-tempest run ${TEMPEST_ARGS}
+tempest run "${TEMPEST_ARGS}"
 EXIT_CODE=$?
 set -e
 
