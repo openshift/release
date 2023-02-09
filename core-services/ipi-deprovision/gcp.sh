@@ -63,13 +63,16 @@ wait
 gcs_bucket_age_cutoff="$(TZ="GMT" date --date="${CLUSTER_TTL}-8 hours" '+%a, %d %b %Y %H:%M:%S GMT')"
 gcs_bucket_age_cutoff_seconds="$(date --date="${gcs_bucket_age_cutoff}" '+%s')"
 echo "deleting GCS buckets with a creationTimestamp before ${gcs_bucket_age_cutoff} in GCE ..."
+BUCKET_DATA="$(gsutil -m ls -p "${GCP_PROJECT}" -L -b 'gs://ci-op-*')"
+printf "got %d characters of bucket listing output\n" "${#BUCKET_DATA}"
 buckets=()
 while read -r bucket; do
   read -r creationTime
   if [[ ${gcs_bucket_age_cutoff_seconds} -ge $( date --date="${creationTime}" '+%s' ) ]]; then
     buckets+=("${bucket}")
   fi
-done <<< $( gsutil -m ls -p "${GCP_PROJECT}" -L -b 'gs://ci-op-*' | grep -Po "(gs:[^ ]+)|(?<=Time created:).*" )
+done <<< $( printf '%s' "${BUCKET_DATA}" | grep -Po "(gs:[^ ]+)|(?<=Time created:).*" )
+echo "found ${#buckets[@]} old buckets"
 if [[ "${#buckets[@]}" -gt 0 ]]; then
   timeout 30m gsutil -m rm -r "${buckets[@]}"
 fi

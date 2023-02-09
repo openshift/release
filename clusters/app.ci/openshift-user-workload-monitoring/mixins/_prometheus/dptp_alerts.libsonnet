@@ -197,7 +197,7 @@
             |||,
             'for': '1m',
             labels: {
-              severity: 'warning',
+              severity: 'critical',
             },
             annotations: {
               message: 'Workload {{ $labels.workload_name }} ({{ $labels.workload_type }}) used 10x more than configured amount of memory (actual: {{ $labels.determined_memory }}, configured: {{ $labels.configured_memory }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',
