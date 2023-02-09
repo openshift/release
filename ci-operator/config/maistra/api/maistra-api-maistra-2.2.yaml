@@ -4,18 +4,6 @@ build_root:
     namespace: ci
     tag: "2.2"
   use_build_cache: true
-images:
-- dockerfile_literal: |
-    FROM quay.io/maistra-dev/maistra-builder:2.2
-    # Git checks if the user that owns the files on the filesystem match the
-    # current user.  We need to disable this check because tests in Prow are
-    # running with a random user.
-    RUN git config --system --add safe.directory '*'
-  inputs:
-    src:
-      as:
-      - quay.io/maistra-dev/maistra-builder:2.2
-  to: src-test
 resources:
   '*':
     limits:
@@ -32,7 +20,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src-test
+    from: src
 - as: api-gencheck-2-2
   commands: |
     make gen-check \
@@ -41,7 +29,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src-test
+    from: src
 zz_generated_metadata:
   branch: maistra-2.2
   org: maistra

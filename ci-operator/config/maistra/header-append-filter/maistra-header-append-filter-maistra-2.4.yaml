@@ -4,18 +4,6 @@ build_root:
     namespace: ci
     tag: "2.4"
   use_build_cache: true
-images:
-- dockerfile_literal: |
-    FROM quay.io/maistra-dev/maistra-builder:2.4
-    # Git checks if the user that owns the files on the filesystem match the
-    # current user.  We need to disable this check because tests in Prow are
-    # running with a random user.
-    RUN git config --system --add safe.directory '*'
-  inputs:
-    src:
-      as:
-      - quay.io/maistra-dev/maistra-builder:2.4
-  to: src-test
 resources:
   '*':
     requests:
@@ -28,12 +16,12 @@ tests:
     ISTIO_REPO=istio/istio \
     ISTIO_BRANCH=release-1.16
   container:
-    from: src-test
+    from: src
 - as: lint-2-4
   commands: |
     make lint
   container:
-    from: src-test
+    from: src
 zz_generated_metadata:
   branch: maistra-2.4
   org: maistra
