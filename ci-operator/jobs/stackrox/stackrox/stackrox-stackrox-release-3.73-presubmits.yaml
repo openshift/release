@@ -641,7 +641,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )mitre-bundles-checks,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-3\.73$
     - ^release-3\.73-
@@ -705,7 +705,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openshift-newest-operator-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-3\.73$
     - ^release-3\.73-
@@ -769,7 +769,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openshift-newest-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-3\.73$
     - ^release-3\.73-
@@ -833,7 +833,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openshift-oldest-operator-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-3\.73$
     - ^release-3\.73-
@@ -897,7 +897,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openshift-oldest-qa-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-3\.73$
     - ^release-3\.73-
@@ -961,7 +961,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )openshift-penult-operator-e2e-tests,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^release-3\.73$
     - ^release-3\.73-
@@ -1222,6 +1222,57 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )stackrox_branding-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-3\.73$
+    - ^release-3\.73-
+    cluster: build03
+    context: ci/prow/stackrox_branding-push-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: stackrox_branding
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stackrox-stackrox-release-3.73-stackrox_branding-push-images
+    rerun_command: /test stackrox_branding-push-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=push-images
+        - --variant=stackrox_branding
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )stackrox_branding-push-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
