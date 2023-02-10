@@ -12,6 +12,12 @@ function get_ready_nodes_count() {
     grep -c -E ",True$"
 }
 
+function get_ready_master_nodes_count() {
+  oc get nodes  -l node-role.kubernetes.io/master\
+    -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
+    grep -c -E ",True$"
+}
+
 # wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
 function wait_for_nodes_readiness()
 {
@@ -44,7 +50,7 @@ PATH=${PATH}:/tmp
 
 echo "Fetching Worker MachineSet..."
 
-EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
+EXPECTED_NODES=$(( $(get_ready_master_nodes_count) + ADDITIONAL_WORKERS ))
 
 MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets | yq-v4 "$(cat <<EOF
   [.items[] | select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")][0]
@@ -56,6 +62,9 @@ MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets | yq-v4 "$(cat
   | del(.metadata.generation)
 EOF
 )")
+
+#Scale down original x86 machinesets
+oc scale --replicas=0 machineset --all -n openshift-machine-api
 
 echo "Cluster type is ${CLUSTER_TYPE}"
 # AMI for AWS ARM
