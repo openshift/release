@@ -18,6 +18,7 @@ git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner
 export JOB_ITERATIONS=10
 export WORKLOAD=cluster-density
+export GEN_CSV=false
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
