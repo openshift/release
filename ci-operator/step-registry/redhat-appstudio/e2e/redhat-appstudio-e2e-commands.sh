@@ -45,7 +45,7 @@ do :
 done
 
 echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
-HAC_SA_TOKEN=$(cat /usr/local/ci-sercrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
+HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
 if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
