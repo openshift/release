@@ -18,10 +18,16 @@ MIRROR_REGISTRY_HOST="${OMR_HOST_NAME}:8443"
 
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
+readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
+echo "readable_version: $readable_version"
+
 # target release
 target_release_image="${MIRROR_REGISTRY_HOST}/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 target_release_image_repo="${target_release_image%:*}"
 target_release_image_repo="${target_release_image_repo%@sha256*}"
+
+# ensure mirror release image by tag name, refer to https://github.com/openshift/oc/pull/1331
+target_release_image="${target_release_image_repo}:${readable_version}"
 
 echo "target_release_image: $target_release_image"
 echo "target_release_image_repo: $target_release_image_repo"
@@ -42,7 +48,7 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 oc adm release -a "${new_pull_secret}" mirror --insecure=true \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
  --to=${target_release_image_repo} \
- --to-release-image="${target_release_image_repo}:install" | tee "${mirror_output}"
+ --to-release-image=${target_release_image} | tee "${mirror_output}"
 
 grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
 grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
