@@ -12,6 +12,19 @@ def add_art_publish(gendoc):
         }
     })
 
+    gendoc.append({
+        'apiVersion': 'v1',
+        'kind': 'Secret',
+        'metadata': {
+            'name': 'art-publish-secret',
+            'namespace': 'ocp',
+            'annotations': {
+                'kubernetes.io/service-account.name': 'art-publish'
+            }
+        },
+        'type': 'kubernetes.io/service-account-token'
+    }, comment='Long lived API token for art-publish')
+
     gendoc.append_all([{
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'Role',
@@ -113,6 +126,44 @@ in 3.11).''')
             'namespace': 'ocp'
         }]
     }], comment='Allow ART to create prowjobs in the ci namespace for running upgrade tests')
+
+    gendoc.append_all([{
+        'apiVersion': 'authorization.openshift.io/v1',
+        'kind': 'ClusterRole',
+        'metadata': {
+            'name': 'art-publish-release-admin',
+            'namespace': 'ocp'
+        },
+        'rules': [
+            {
+                'apiGroups': ['config.openshift.io'],
+                'resources': ['clusterversions'],
+                'verbs': ['get', 'list', 'watch']
+            },
+            {
+                'apiGroups': ['release.openshift.io'],
+                'resources': ['releasepayloads'],
+                'verbs': ['get', 'list', 'patch', 'update', 'watch']
+            }
+        ]
+    }, {
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'ClusterRoleBinding',
+        'metadata': {
+            'name': 'art-publish-release-admin-binding',
+            'namespace': 'ocp'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'ClusterRole',
+            'name': 'art-publish-release-admin'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    }], comment='Allow ART to patch releases (accept/reject) in the ocp namespace')
 
     for private in (False, True):
         for arch in config.arches:

@@ -5,9 +5,14 @@ SHELL=/usr/bin/env bash -o errexit
 export CONTAINER_ENGINE ?= docker
 export SKIP_PULL ?= false
 
+VOLUME_MOUNT_FLAGS = :z
 ifeq ($(CONTAINER_ENGINE), docker)
 	USER=--user $(shell id -u):$(shell id -g)
 else
+	ifeq ($(shell uname -s), Darwin)
+		# if you're running podman on macOS, don't set the SELinux label
+		VOLUME_MOUNT_FLAGS =
+	endif
 	USER=
 endif
 
@@ -61,60 +66,60 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" gcr.io/k8s-prow/checkconfig:v20230128-8b677bb83b --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230209-f319bbff04 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
 	$(MAKE) sanitize-prow-jobs
 
 ci-operator-checkconfig:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-checkconfig:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry:z" registry.ci.openshift.org/ci/ci-operator-checkconfig:latest --config-dir /ci-operator/config --registry /ci-operator/step-registry
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/ci-operator-checkconfig:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/ci-operator-checkconfig:latest --config-dir /ci-operator/config --registry /ci-operator/step-registry
 .PHONY: ci-operator-checkconfig
 
 ci-operator-config:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/determinize-ci-operator:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config:z" registry.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/determinize-ci-operator:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
 
 ci-operator-prowgen:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-prowgen:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/go/src/github.com/openshift/release:z" -e GOPATH=/go registry.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo $(WHAT)
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/ci-operator-prowgen:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go registry.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo $(WHAT)
 
 sanitize-prow-jobs:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/sanitize-prow-jobs:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs:z" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs:z" registry.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml $(WHAT)
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/sanitize-prow-jobs:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml $(WHAT)
 
 registry-metadata:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/generate-registry-metadata:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry:z" registry.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/generate-registry-metadata:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
 
 boskos-config:
 	cd core-services/prow/02_config && ./generate-boskos.py
 
 prow-config:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/determinize-prow-config:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/core-services/prow/02_config:/config:z" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/determinize-prow-config:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
 
 branch-cut:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/config-brancher:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator:/ci-operator:z" registry.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --current-release=4.8 --future-release=4.9 --bump-release=4.9 --confirm
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/config-brancher:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/ci-operator:/ci-operator$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --current-release=4.8 --future-release=4.9 --bump-release=4.9 --confirm
 	$(MAKE) update
 
 new-repo:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/repo-init:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -it -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/repo-init:latest --release-repo /release
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/repo-init:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -it -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/repo-init:latest --release-repo /release
 	$(MAKE) update
 
 validate-step-registry:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ci-operator-configresolver:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/core-services/prow/02_config:/prow:z" -v "$(CURDIR)/ci-operator/config:/config:z" -v "$(CURDIR)/ci-operator/step-registry:/step-registry:z" registry.ci.openshift.org/ci/ci-operator-configresolver:latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/ci-operator-configresolver:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR)/core-services/prow/02_config:/prow$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/step-registry$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/ci-operator-configresolver:latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
 
 refresh-bugzilla-prs:
 	./hack/refresh-bugzilla-prs.sh
 
 python-validation:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/python-validation:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/python-validation:latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/python-validation:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/python-validation:latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
@@ -181,10 +186,6 @@ oauth-proxy:
 publishing-bot:
 	$(MAKE) apply WHAT=projects/publishing-bot/storage-class.yaml
 .PHONY: publishing-bot
-
-service-idler:
-	$(MAKE) apply WHAT=projects/service-idler/pipeline.yaml
-.PHONY: service-idler
 
 cluster-operator-roles:
 	oc create ns openshift-cluster-operator --dry-run -o yaml | oc apply -f -
@@ -258,16 +259,16 @@ build_farm_credentials_folder:
 .PHONY: build_farm_credentials_folder
 
 update-ci-build-clusters:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/cluster-init:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/cluster-init:latest -release-repo=/release -create-pr=false -update=true
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/cluster-init:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/cluster-init:latest -release-repo=/release -create-pr=false -update=true
 .PHONY: update-ci-build-clusters
 
 verify-app-ci:
 	true
 
 mixins:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/dashboards-validation:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --user=$(UID) --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/openshift-user-workload-monitoring/mixins install all
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/dashboards-validation:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --user=$(UID) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/openshift-user-workload-monitoring/mixins install all
 .PHONY: mixins
 
 # Runs e2e secrets generation and sync to clusters.
@@ -290,17 +291,17 @@ new-pool-admins:
 .PHONY: new-pool-admins
 
 openshift-image-mirror-mappings:
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/promoted-image-governor:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release:z" registry.ci.openshift.org/ci/promoted-image-governor:latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/promoted-image-governor:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/promoted-image-governor:latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
 .PHONY: openshift-image-mirror-mappings
 
 config_updater_vault_secret:
 	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/applyconfig:latest
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/applyconfig:latest
 	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 \
 		--rm \
-		-v $(CURDIR)/clusters/build-clusters/common:/manifests:z \
-		-v "$(kubeconfig_path):/_kubeconfig:z" \
+		-v "$(CURDIR)/clusters/build-clusters/common:/manifests$(VOLUME_MOUNT_FLAGS)" \
+		-v "$(kubeconfig_path):/_kubeconfig$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/applyconfig:latest \
 		--config-dir=/manifests \
 		--context=$(cluster) \
@@ -322,10 +323,10 @@ build_farm_day2:
 # Need to run inside Red Had network
 update_github_ldap_mapping_config_map:
 	ldapsearch -LLL -x -h ldap.corp.redhat.com -b ou=users,dc=redhat,dc=com '(rhatSocialURL=GitHub*)' rhatSocialURL uid 2>&1 | tee /tmp/out
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull registry.ci.openshift.org/ci/ldap-users-from-github-owners-files:latest
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/amd64 registry.ci.openshift.org/ci/ldap-users-from-github-owners-files:latest
 	$(CONTAINER_ENGINE) run $(USER) --platform linux/amd64 \
 		--rm \
-		-v "/tmp:/tmp:z" \
+		-v "/tmp:/tmp$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/ldap-users-from-github-owners-files:latest \
 		-ldap-file /tmp/out \
 		-mapping-file /tmp/mapping.yaml
@@ -368,7 +369,7 @@ next_token_version ?= $(shell expr $(token_version) + 1 )
 
 increase-token-version:
 	yq -y '.nonExpiringToken.currentVersion = $(next_token_version)' ./hack/_token.yaml > $(TMPDIR)/_token.yaml
-	mv $(TMPDIR)/_token.yaml ./hack/_token.yaml 
+	mv $(TMPDIR)/_token.yaml ./hack/_token.yaml
 .PHONY: increase-token-version
 
 refresh-token-version:
@@ -408,7 +409,7 @@ secret-config-updater:
 	--from-file=sa.config-updater.build05.config=$(TMPDIR)/sa.config-updater.build05.config \
 	--from-file=sa.config-updater.hive.config=$(TMPDIR)/sa.config-updater.hive.config \
 	--from-file=sa.config-updater.vsphere.config=$(TMPDIR)/sa.config-updater.vsphere.config \
-	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f - 
+	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f -
 .PHONY: secret-config-updater
 
 multi-arch-gen:
