@@ -201,7 +201,10 @@ resources:
       memory: 5Gi
 tests:
 - as: unit
-  commands: go test ./pkg/...
+  commands: |
+    go test -coverprofile=/tmp/coverprofile.out ./pkg/...
+    go tool cover -o $ARTIFACT_DIR/cover.txt -func /tmp/coverprofile.out
+    go tool cover -o $ARTIFACT_DIR/cover.html -html /tmp/coverprofile.out
   container:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
@@ -282,6 +285,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
   optional: true
+  run_if_changed: gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-secureboot
@@ -469,6 +473,7 @@ tests:
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
+      NETWORK_TYPE: OpenShiftSDN
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
@@ -505,6 +510,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-vsphere-zones
   optional: true
+  run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-zones
