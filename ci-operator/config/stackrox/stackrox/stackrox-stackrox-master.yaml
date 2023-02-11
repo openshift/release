@@ -30,7 +30,7 @@ releases:
       product: ocp
       stream: 4-dev-preview
       version_bounds:
-        lower: 4.1.0
+        lower: 4.13.0
         upper: 4.999.0
   latest:
     candidate:
@@ -44,6 +44,106 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
+- as: ocp-next-qa-e2e-tests
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: openshift-newest-qa-e2e-tests
+    test:
+    - as: qa-e2e-tests
+      cli: ec
+      commands: |
+        oc version || true
+        oc get nodes -o wide || true
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: style-checks
+  commands: .openshift-ci/dispatch.sh style-checks
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
+- as: policy-checks
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: mitre-bundles-checks
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: grouped-static-checks
+  steps:
+    test:
+    - as: check-generated
+      commands: .openshift-ci/dispatch.sh check-generated
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: check-todos
+      commands: .openshift-ci/dispatch.sh check-todos
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: check-pr-fixes
+      commands: .openshift-ci/dispatch.sh check-pr-fixes
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: go-unit-tests
+  commands: .openshift-ci/dispatch.sh go-unit-tests
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
+- as: go-unit-tests-release
+  commands: .openshift-ci/dispatch.sh go-unit-tests-release
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
+- as: go-postgres-tests
+  commands: .openshift-ci/dispatch.sh go-postgres-tests
+  container:
+    clone: true
+    from: root
+  secrets:
+  - mount_path: /tmp/vault/stackrox-stackrox-base
+    name: stackrox-stackrox-base
+- as: integration-unit-tests
+  steps:
+    test:
+    - ref: stackrox-initial
 - as: shell-unit-tests
   steps:
     test:
