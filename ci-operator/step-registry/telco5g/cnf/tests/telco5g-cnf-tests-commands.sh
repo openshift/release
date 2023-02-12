@@ -101,7 +101,7 @@ function get_skip_tests {
     echo "${skip_list}"
 }
 
-export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy ovs_qos ptp dpdk s2i fec vrf}" # next: ovs_qos
+export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy ovs_qos ptp dpdk s2i vrf}" # next: ovs_qos
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
