@@ -34,7 +34,8 @@ chain:
           --memory 16Gi \
           --cores 4 \
           --namespace local-cluster \
-          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
+          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
+          --release-image ${RELEASE_IMAGE_LATEST}
 
         oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
         oc apply -f - <<EOF
@@ -90,10 +91,6 @@ chain:
         sleep 10s
         done
 
-        sleep 3600s
-        sleep 3600s
-        sleep 3600s
-
       from_image:
         namespace: ocp
         name: "4.13"
@@ -103,7 +100,7 @@ chain:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 3h50m0s
+      timeout: 50m0s
       credentials:
         - mount_path: /etc/ci-pull-credentials
           name: ci-pull-credentials
