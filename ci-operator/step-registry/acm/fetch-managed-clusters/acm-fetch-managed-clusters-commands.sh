@@ -12,6 +12,7 @@ HUB_OCP_PASSWORD=$(cat $SHARED_DIR/kubeadmin-password)
 export HUB_OCP_PASSWORD
 
 # run the test execution script
+<<<<<<< HEAD
 ./fetch_clusters_commands.sh
 
 if [ -s /tmp/ci/managed.cluster.name ] && ! grep -q "null" /tmp/ci/managed.cluster.name; then
@@ -25,4 +26,16 @@ else
     echo "managed.cluster.name file is empty, missing, or it contains null."
     echo "Failed to fetch managed clusters, killing job."
     exit 1
+=======
+./ci/containerimages/fetch-managed-clusters/fetch_clusters_commands.sh
+
+if [ -s /tmp/ci/managed.cluster.name ] && ! grep -q "null" /tmp/ci/managed.cluster.name; then
+    echo "managed.cluster.name file was found saving as artifact."
+    cp -r /tmp/ci/managed.cluster.name ./
+else
+    echo "managed.cluster.name file is empty, missing, or it contains null."
+    echo "Failed to fetch managed clusters, killing job."
+    # could do exit, or pkill -f <filename>
+    pkill -9 sh
+>>>>>>> a274d34c640 (switch back to use official file path, add fetch cluster step.)
 fi
