@@ -4,14 +4,16 @@
 set -o errexit
 set -o pipefail
 
-yum update -y 
-yum install sudo -y 
-
 LAST_WORK_DIR="$(pwd)"
 POWERVS_OCP_DIR="/tmp/powervs-ocp"
 SECRET_DIR="/tmp/vault/powervs-rhr-creds"
 
-ls -l "$SECRET_DIR" # DEBUG
+# DEBUG
+ls -l "$SECRET_DIR"
+whoami
+uid
+cat /etc/os-release
+sudo whoami
 
 # tmp dir for cluster files
 mkdir -p "$POWERVS_OCP_DIR"
