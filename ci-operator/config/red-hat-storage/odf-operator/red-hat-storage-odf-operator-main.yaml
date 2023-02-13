@@ -3,6 +3,11 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.19
+  oc-client-image: # provides an image with the OpenShift CLI for other builds to use when they reference "cli"
+    name: "4.13"
+    namespace: "ocp"
+    tag: "cli"
+binary_build_commands: echo $KUBECONFIG; echo $KUBECONFIG > KUBECONFIG
 build_root:
   image_stream_tag:
     name: release
@@ -12,9 +17,63 @@ images:
 - dockerfile_path: Dockerfile
   from: golang-image
   to: odf-operator
-- dockerfile_path: bundle.Dockerfile
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/4.13:cli AS oc
+
+    COPY KUBECONFIG KUBECONFIG
+
+    RUN KUBECONFIG=$(cat KUBECONFIG) && oc get is stable -o custom-columns=:.status.publicDockerImageRepository --no-headers > /registry
+
+    FROM docker.io/library/fedora:latest AS builder
+
+    COPY --from=oc /registry registry
+    COPY bundle/manifests /manifests/
+    RUN export REGISTRY=$(cat registry); sed -i "s/quay.io\/ocs-dev\/odf-operator:latest/$REGISTRYstable:odf-operator/" /manifests/odf-operator.clusterserviceversion.yaml
+
+    FROM scratch
+
+    LABEL operators.operatorframework.io.bundle.mediatype.v1=registry+v1
+    LABEL operators.operatorframework.io.bundle.manifests.v1=manifests/
+    LABEL operators.operatorframework.io.bundle.metadata.v1=metadata/
+    LABEL operators.operatorframework.io.bundle.package.v1=odf-operator
+    LABEL operators.operatorframework.io.bundle.channels.v1=alpha
+    LABEL operators.operatorframework.io.bundle.channel.default.v1=alpha
+    LABEL operators.operatorframework.io.metrics.builder=operator-sdk-v1.13.0+git
+    LABEL operators.operatorframework.io.metrics.mediatype.v1=metrics+v1
+    LABEL operators.operatorframework.io.metrics.project_layout=go.kubebuilder.io/v3
+
+    LABEL operators.operatorframework.io.test.mediatype.v1=scorecard+v1
+    LABEL operators.operatorframework.io.test.config.v1=tests/scorecard/
+
+    COPY --from=builder /manifests/ /manifests/
+    COPY bundle/metadata /metadata/
+    COPY bundle/tests/scorecard /tests/scorecard/
   to: odf-operator-bundle
-- dockerfile_path: catalog.Dockerfile
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/4.13:cli AS oc
+
+    COPY KUBECONFIG KUBECONFIG
+
+    RUN KUBECONFIG=$(cat KUBECONFIG) && oc get is stable -o custom-columns=:.status.publicDockerImageRepository --no-headers > /registry
+
+    FROM quay.io/operator-framework/upstream-opm-builder:v1.19.5 AS builder
+
+    COPY --from=oc /registry registry
+
+    RUN mkdir /catalog/
+    RUN opm render --output=yaml "$(cat registry)":odf-operator-bundle \
+      quay.io/ocs-dev/ocs-operator-bundle:v4.12.0 \
+      quay.io/ocs-dev/ibm-storage-odf-operator-bundle:1.3.0 \
+      quay.io/noobaa/noobaa-operator-bundle:v5.12.0 \
+      quay.io/csiaddons/k8s-bundle:v0.5.0 > /catalog/bundle.yaml
+    COPY catalog/index.yaml /catalog/index.yaml
+
+    FROM quay.io/operator-framework/opm:v1.26.0
+
+    LABEL operators.operatorframework.io.index.configs.v1=/configs
+    ENTRYPOINT ["/bin/opm"]
+    CMD ["serve", "/configs"]
+    COPY --from=builder /catalog /configs
   to: odf-operator-catalog
 releases:
   initial:
@@ -52,6 +111,7 @@ tests:
         unset VERSION
         export GOFLAGS=''
         make e2e-test
+        sleep 1h
       from: src
       resources:
         requests:
