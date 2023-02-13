@@ -362,6 +362,18 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-upi
+- as: vsphere-ipi-disconnected-registry-pvc-p2-f7
+  cron: 39 17 2,10,17,24 * *
+  steps:
+    cluster_profile: vsphere-discon
+    env:
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @vsphere-ipi and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected-image-registry-pvc
 - as: vsphere-ipi-ovn-ipsec-p2-f7
   cron: 18 11 21,29,5,12 * *
   steps:
@@ -373,8 +385,8 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
-- as: vsphere-ipi-proxy-p2-f7
-  cron: 37 12 27,4,11,18 * *
+- as: vsphere-ipi-proxy-fips-p2-f7
+  cron: 16 13 25,2,9,16 * *
   steps:
     cluster_profile: vsphere-discon
     env:
@@ -383,7 +395,7 @@ tests:
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-fips
 - as: vsphere-ipi-proxy-workers-rhel8-p2-f7
   cron: 29 1 17,25,1,8 * *
   steps:

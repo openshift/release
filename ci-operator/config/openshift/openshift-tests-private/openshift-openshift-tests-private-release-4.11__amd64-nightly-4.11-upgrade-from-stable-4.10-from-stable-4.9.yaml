@@ -44,10 +44,6 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @aws-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @aws-ipi and not @fips'
-    post:
-    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-aws-ipi-provision
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -62,8 +58,9 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: cucushift-upgrade
-- as: vsphere-ipi-disconnected-p1-f7
-  cron: 22 3 27,4,11,18 * *
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: vsphere-ipi-disconnected-registry-pvc-p1-f14
+  cron: 37 7 7,22 * *
   steps:
     cluster_profile: vsphere-discon
     env:
@@ -71,10 +68,6 @@ tests:
         and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @vsphere-ipi and @disconnected
         and not @fips'
-    post:
-    - chain: cucushift-installer-rehearse-vsphere-ipi-disconnected-deprovision
-    pre:
-    - chain: cucushift-installer-rehearse-vsphere-ipi-disconnected-provision
     test:
     - as: set-upgrade-releases
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_TARGET}" > ${SHARED_DIR}/upgrade-edge
@@ -89,6 +82,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - chain: cucushift-upgrade-disconnected
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected-image-registry-pvc
 zz_generated_metadata:
   branch: release-4.11
   org: openshift
