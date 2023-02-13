@@ -13,13 +13,13 @@ function populate_artifact_dir() {
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
-    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-$(date +%s).log"
   sed -i '
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
-    ' "${dir}/terraform.txt" 
-  tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt" 
+    ' "${dir}/terraform.txt"
+  tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
   case "${CLUSTER_TYPE}" in
     alibabacloud)
       awk -F'id=' '/alicloud_instance.*Creation complete/ && /master/{ print $2 }' "${dir}/.openshift_install.log" | tr -d ']"' > "${SHARED_DIR}/alibaba-instance-ids.txt";;
@@ -27,12 +27,17 @@ function populate_artifact_dir() {
   esac
 }
 
-function prepare_next_steps() {
+function write_install_status() {
   #Save exit code for must-gather to generate junit
-  echo "$?" > "${SHARED_DIR}/install-status.txt"
+  echo "$ret" >> "${SHARED_DIR}/install-status.txt"
+}
+
+function prepare_next_steps() {
+  write_install_status
   set +e
   echo "Setup phase finished, prepare env for next steps"
   populate_artifact_dir
+
   echo "Copying required artifacts to shared dir"
   #Copy the auth artifacts to shared dir for the next steps
   cp \
@@ -390,13 +395,38 @@ echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-TF_LOG_PATH="${dir}/terraform.txt"
-export TF_LOG_PATH
+export TF_LOG_PATH="${dir}/terraform.txt"
 
-openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+# Cloud infrastructure problems are common, instead of failing and
+# forcing a retest of the entire job, try the installation again if
+# the installer exits with 4, indicating an infra problem.
+ret=4
+tries=1
+max=3
+set +o errexit
+backup=/tmp/install-orig
+cp -rfpv "$dir" "$backup"
+while [ $ret -eq 4 ] && [ $tries -le $max ]
+do
+  echo "Install attempt $tries of $max"
+  if [ $tries -gt 1 ]; then
+    write_install_status
+    cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+    openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    rm -rf "$dir"
+    cp -rfpv "$backup" "$dir"
+  else
+    date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
+  fi
 
-wait "$!"
-ret="$?"
+  openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  wait "$!"
+  ret="$?"
+  echo "Installer exit with code $ret"
+
+  tries=$((tries+1))
+done
+set -o errexit
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
