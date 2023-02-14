@@ -417,6 +417,45 @@ do
 done
 echo "$(date) - all imagestreams are imported."
 
+echo "Collecting cluster data for analysis..."
+set +o errexit
+set +o pipefail
+if [ ! -f /tmp/jq ]; then
+  curl -L https://stedolan.github.io/jq/download/linux64/jq -o /tmp/jq && chmod +x /tmp/jq
+fi
+if ! pip -V; then
+  echo "pip is not installed: installing"
+  if python -c "import sys; assert(sys.version_info >= (3,0))"; then
+    python -m ensurepip --user || easy_install --user 'pip'
+  else
+    echo "python < 3, installing pip<21"
+    python -m ensurepip --user || easy_install --user 'pip<21'
+  fi
+fi
+echo "Installing python modules: json"
+python3 -c "import json" || pip3 install --user pyjson
+PLATFORM="$(oc get infrastructure/cluster -o json|/tmp/jq '.status.platform')" || ""
+TOPOLOGY="$(oc get infrastructure/cluster -o json|/tmp/jq '.status.infrastructureTopology')" || ""
+NETWORKTYPE="$(oc get network.operator cluster -o json|/tmp/jq '.spec.defaultNetwork.type')" || ""
+if [[ "$(oc get network.operator cluster -o json|/tmp/jq '.spec.clusterNetwork[0].cidr')" =~ .*":".*  ]]; then
+  NETWORKSTACK="IPv6" || ""
+else
+  NETWORKSTACK="IPv4" || ""
+fi
+python3 -c '
+import json;
+dictionary = {
+    "Platform": '$PLATFORM',
+    "Topology": '$TOPOLOGY',
+    "NetworkType": '$NETWORKTYPE',
+    "NetworkStack": "'$NETWORKSTACK'",
+}
+with open("'${ARTIFACT_DIR}/junit/cluster-data.json'", "w") as outfile:
+    json.dump(dictionary, outfile)'
+set -o errexit
+set -o pipefail
+echo "Done collecting cluster data for analysis!"
+
 case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade_conformance
