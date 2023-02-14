@@ -38,8 +38,6 @@ ORG="openstack-k8s-operators"
 # Check org and project from job's spec
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
 REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
-# PR SHA
-PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
