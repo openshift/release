@@ -413,6 +413,13 @@ do
     write_install_status
     cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
     openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    wait "$!"
+    ret="$?"
+    if test "${ret}" -ne 0 ; then
+      echo "Failed to destroy cluster, aborting retries."
+      ret=4
+      break
+    fi
     rm -rf "$dir"
     cp -rfpv "$backup" "$dir"
   else
