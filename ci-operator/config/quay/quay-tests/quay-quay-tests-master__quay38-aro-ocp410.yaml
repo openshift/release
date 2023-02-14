@@ -1,0 +1,42 @@
+base_images:
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
+  upi-installer:
+    name: "4.10"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.10"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: quay-e2e-tests-quay38-aro-ocp410
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: azure-qe
+    test:
+    - ref: quay-tests-deploy-quay-azure
+    - ref: quay-tests-test-quay-e2e
+    workflow: cucushift-installer-rehearse-azure-aro
+zz_generated_metadata:
+  branch: master
+  org: quay
+  repo: quay-tests
+  variant: quay38-aro-ocp410
