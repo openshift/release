@@ -54,20 +54,25 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
     BASE_OP=${EXTRA_REF_REPO}
 fi
 
-curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_allow.yml
-curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_skip.yml
-
-tempest-skip list-allowed --file tempest_allow.yml --group ${BASE_OP} --job ${BASE_OP} -f value > allow.txt
-tempest-skip list-skipped --file tempest_skip.yml --job ${BASE_OP} -f value > skip.txt
 
 set +e
-if [ -f allow.txt ] && [ -f skip.txt ]; then
-    TEMPEST_ARGS=( --exclude-list skip.txt --include-list allow.txt)
-    cp allow.txt skip.txt ${ARTIFACT_DIR}
+
+if [ "$TEMPEST_REGEX" ]; then
+    tempest run --regex $TEMPEST_REGEX
 else
-    TEMPEST_ARGS=( --regex 'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON')
+    curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_allow.yml
+    curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_skip.yml
+
+    tempest-skip list-allowed --file tempest_allow.yml --group ${BASE_OP} --job ${BASE_OP} -f value > allow.txt
+    tempest-skip list-skipped --file tempest_skip.yml --job ${BASE_OP} -f value > skip.txt
+    if [ -f allow.txt ] && [ -f skip.txt ]; then
+        TEMPEST_ARGS=( --exclude-list skip.txt --include-list allow.txt)
+        cp allow.txt skip.txt ${ARTIFACT_DIR}
+    else
+        TEMPEST_ARGS=( --regex 'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON')
+    fi
+    tempest run "${TEMPEST_ARGS[@]}"
 fi
-tempest run "${TEMPEST_ARGS[@]}"
 EXIT_CODE=$?
 set -e
 
