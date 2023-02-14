@@ -44,7 +44,6 @@ PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
 BASE_OP=${REF_REPO}
-IS_REHEARSAL=false
 if [[ "$REF_ORG" != "$ORG" ]]; then
     echo "Not a ${ORG} job. Checking if isn't a rehearsal job..."
     EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
@@ -54,7 +53,6 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
       echo "Failing since this step supports only ${ORG} changes."
       exit 1
     fi
-    IS_REHEARSAL=true
     BASE_OP=${EXTRA_REF_REPO}
 fi
 
