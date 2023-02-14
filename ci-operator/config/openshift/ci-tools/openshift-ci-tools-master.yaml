@@ -693,21 +693,45 @@ resources:
 test_binary_build_commands: make race-install
 tests:
 - as: unit
-  commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
-  container:
-    from: src
+  steps:
+    test:
+    - as: test
+      commands: make test TESTFLAGS='-count=25 -coverprofile=cover.out'
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: codegen
-  commands: make verify-gen
-  container:
-    from: src
+  steps:
+    test:
+    - as: test
+      commands: make verify-gen
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: format
-  commands: make format
-  container:
-    from: src
+  steps:
+    test:
+    - as: test
+      commands: make format
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: integration
-  commands: make integration
-  container:
-    from: test-bin
+  steps:
+    test:
+    - as: test
+      commands: make integration
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: e2e
   steps:
     test:
@@ -795,29 +819,55 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: breaking-changes
-  commands: make check-breaking-changes
-  container:
-    from: test-bin
   optional: true
+  steps:
+    test:
+    - as: test
+      commands: make check-breaking-changes
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: checkconfig
-  commands: make validate-checkconfig
-  container:
-    from: test-bin
+  steps:
+    test:
+    - as: test
+      commands: make validate-checkconfig
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: validate-vendor
-  commands: make validate-vendor
-  container:
-    from: src
+  steps:
+    test:
+    - as: test
+      commands: make validate-vendor
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: frontend-checks
-  commands: make verify-frontend-format frontend-checks
-  container:
-    from: test-bin
+  steps:
+    test:
+    - as: test
+      commands: make verify-frontend-format frontend-checks
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: lint
-  commands: make lint
+  commands: |
+    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=* make lint
   container:
     from: golangci-lint
 - as: continuouslint
   cluster: build02
-  commands: make lint
+  commands: |
+    GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0=* make lint
   container:
     from: golangci-lint
   interval: 5m
