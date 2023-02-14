@@ -34,35 +34,30 @@ cat <<EOF > "${PAYLOAD_PATH}"/usr/bin/pre_rpm_install.sh
 #! /bin/bash
 set -xeuo pipefail
 
+cat /etc/*-release
+
 rpm --rebuilddb
-dnf install subscription-manager -y
+dnf install subscription-manager jq firewalld -y
 
 subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
 
-tee /etc/yum.repos.d/rhocp-4.12-el8-beta-$(uname -i)-rpms.repo >/dev/null <<EOF2
-[rhocp-4.12-el8-beta-$(uname -i)-rpms]
-name=Beta rhocp-4.12 RPMs for RHEL8
-baseurl=https://mirror.openshift.com/pub/openshift-v4/\\\$basearch/dependencies/rpms/4.12-el8-beta/
-enabled=1
-gpgcheck=0
-skip_if_unavailable=1
-EOF2
-
+OSVERSION=\$(awk -F: '{print \$5}' /etc/system-release-cpe)
 subscription-manager repos \
-  --enable "fast-datapath-for-rhel-8-$(uname -i)-rpms"
-#  --enable "rhocp-4.12-for-rhel-8-$(uname -i)-rpms" \
+  --enable rhocp-4.12-for-rhel-\${OSVERSION}-\$(uname -i)-rpms \
+  --enable fast-datapath-for-rhel-\${OSVERSION}-\$(uname -i)-rpms
 
-dnf install jq firewalld -y
-dnf install -y /packages/*.rpm
+dnf localinstall -y /packages/*.rpm
+
 systemctl enable --now crio.service firewalld
 
-firewall-cmd --zone=trusted --add-source=10.42.0.0/16 --permanent
-firewall-cmd --zone=public --add-port=80/tcp --permanent
-firewall-cmd --zone=public --add-port=443/tcp --permanent
-firewall-cmd --zone=public --add-port=5353/udp --permanent
-firewall-cmd --zone=public --add-port=6443/tcp --permanent
+firewall-cmd --permanent --zone=trusted --add-source=10.42.0.0/16
+firewall-cmd --permanent --zone=trusted --add-source=169.254.169.1
+firewall-cmd --permanent --zone=public --add-port=80/tcp
+firewall-cmd --permanent --zone=public --add-port=443/tcp
+firewall-cmd --permanent --zone=public --add-port=5353/udp
+firewall-cmd --permanent --zone=public --add-port=6443/tcp
 firewall-cmd --reload
 EOF
 chmod +x usr/bin/pre_rpm_install.sh
@@ -79,7 +74,7 @@ EOF
 
 mkdir -p "${PAYLOAD_PATH}"/etc/crio/ && cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
 chmod 600 "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
-tar -uvf $PAYLOAD_PATH/payload.tar .
+tar -uvf ${PAYLOAD_PATH}/payload.tar .
 
 gcloud compute scp "${PAYLOAD_PATH}/payload.tar" rhel8user@"${INSTANCE_PREFIX}":~
 gcloud compute ssh rhel8user@"${INSTANCE_PREFIX}" \
