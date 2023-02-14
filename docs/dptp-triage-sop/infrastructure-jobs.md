@@ -143,7 +143,7 @@ members, teams, team membership and other properties of the `openshift`
 GitHub organization based on configuration stored in private [openshift/config](https://github.com/openshift/config)
 repository. We share the ownership of this job with DPP: we make sure that `peribolos` works and DPP owns the config in
 [openshift/config](https://github.com/openshift/config). Most problems with this job are caused by the configuration, so
-we often just ping `@dpp-triage` to resolve them.
+we often just ping `@triage-dpp` to resolve them.
 
 #### Useful links
 
@@ -178,7 +178,7 @@ a team, organization or something similar.
 2. The status code hints about what kind of error was encountered: `status code 404 not one of [200]` hints that one of
    the entities was not found (and so likely does not exist).
 3. Confirm the existence of `some-user` by visiting https://github.com/some-user
-4. Ping `@dpp-triage` to remove the user from their Peribolos configuration.
+4. Ping `@triage-dpp` to remove the user from their Peribolos configuration.
 
 
 ## `periodic-openshift-release-fast-forward`
