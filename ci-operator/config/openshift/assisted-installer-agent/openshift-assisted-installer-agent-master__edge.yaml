@@ -35,6 +35,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_rhel-8-golang-1.19-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.13
   openshift_release_golang-1.18:
     name: release
     namespace: openshift
@@ -55,6 +59,16 @@ images:
     COPY . .
   from: src
   to: assisted-installer-agent-src
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    WORKDIR /go/src/github.com/openshift/assisted-installer-agent
+    COPY . .
+    COPY --from=quay.io/app-sre/golangci-lint:v1.46.0 /usr/bin/golangci-lint /usr/bin/golangci-lint
+    RUN dnf install -y gcc nmstate-devel nmstate-libs git && dnf clean all
+    RUN go mod vendor
+    RUN mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+  from: ocp_rhel-8-golang-1.19-openshift-4.13
+  to: assisted-test-bin
 promotion:
   name: ocm-2.8
   namespace: edge-infrastructure
@@ -99,9 +113,10 @@ tests:
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
+    export "GOROOT=$(go env GOROOT)"
     make lint
   container:
-    from: test-bin
+    from: assisted-test-bin
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
   commands: |
