@@ -57,7 +57,7 @@ fi
 
 set +e
 
-if [ "$TEMPEST_REGEX" ]; then
+if [ "${TEMPEST_REGEX:-}" ]; then
     tempest run --regex $TEMPEST_REGEX
 else
     curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_allow.yml
