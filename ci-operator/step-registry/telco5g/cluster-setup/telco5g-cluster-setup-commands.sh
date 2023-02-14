@@ -49,7 +49,7 @@ ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS"
 EOF
 
 ADDITIONAL_ARG=""
-if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
+if [[ "$T5CI_JOB_TYPE" == "cnftests" ]] && [[ "$JOB_NAME" != *"rehears"* ]]; then
   ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
 else
   ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
@@ -258,18 +258,18 @@ cat << EOF > $SHARED_DIR/check-cluster.yml
     failed_when: "'True' not in ready_check.stdout"
 EOF
 
-# PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering. 
+# PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
 # CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.
-# It is intentionally set to a string so that it can be evaluated as a command (either /bin/true or /bin/false) 
+# It is intentionally set to a string so that it can be evaluated as a command (either /bin/true or /bin/false)
 # in order to provide the desired return code later.
-PROCEED_AFTER_FAILURES="false" 
-status=0 
-if [[ "$T5CI_JOB_TYPE" != "cnftests" ]]; then
-  PROCEED_AFTER_FAILURES="true"
-  ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+PROCEED_AFTER_FAILURES="false"
+status=0
+if [[ "$T5CI_JOB_TYPE" == "cnftests" ]] && [[ "$JOB_NAME" != *"rehears"* ]]; then
+    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv
 else
-  ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv 
-fi 
+    PROCEED_AFTER_FAILURES="true"
+    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+fi
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 exit ${status}
