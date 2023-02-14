@@ -29,6 +29,7 @@ operator:
     dockerfile_path: bundle.Dockerfile
     update_graph: replaces
 promotion:
+  disabled: true
   name: "2.8"
   namespace: stolostron
 resources:
@@ -46,44 +47,6 @@ tests:
     make -f Makefile.prow test
   container:
     from: src
-- as: sonar-pre-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    export XDG_DATA_HOME=/tmp
-    export XDG_CONFIG_HOME="/tmp/xdg_config"
-    export ENVTEST_K8S_VERSION=1.24.1
-    make -f Makefile.prow envtest
-    export KUBEBUILDER_ASSETS=$(./bin/setup-envtest use $ENVTEST_K8S_VERSION -p path)
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: sonar-post-submit
-  commands: |
-    export SELF="make -f Makefile.prow"
-    export XDG_DATA_HOME=/tmp
-    export XDG_CONFIG_HOME="/tmp/xdg_config"
-    export ENVTEST_K8S_VERSION=1.24.1
-    make -f Makefile.prow envtest
-    export KUBEBUILDER_ASSETS=$(./bin/setup-envtest use $ENVTEST_K8S_VERSION -p path)
-    make -f Makefile.prow sonar/go/prow
-  container:
-    from: src
-  postsubmit: true
-  secrets:
-  - mount_path: /etc/sonarcloud/
-    name: acm-sonarcloud-token
-- as: pr-merge-image-mirror
-  postsubmit: true
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: cluster-templates-operator
-    env:
-      IMAGE_REPO: cluster-templates-operator
-      REGISTRY_ORG: stolostron
-    workflow: ocm-ci-image-mirror
 - as: latest-image-mirror
   postsubmit: true
   steps:
@@ -91,7 +54,7 @@ tests:
       SOURCE_IMAGE_REF: cluster-templates-operator
     env:
       IMAGE_REPO: cluster-templates-operator
-      IMAGE_TAG: latest
+      IMAGE_TAG: latest-2.8
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
 - as: bundle-pr-merge-image-mirror
@@ -103,17 +66,37 @@ tests:
       IMAGE_REPO: cluster-templates-bundle
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror
-- as: bundle-lates-image-mirror
+- as: fast-forward
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: release-2.8
+    workflow: ocm-ci-fastforward
+- as: publish
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: cluster-templates-bundle
+      SOURCE_IMAGE_REF: cluster-templates-operator
     env:
-      IMAGE_REPO: cluster-templates-bundle
-      IMAGE_TAG: latest
+      IMAGE_REPO: cluster-templates-operator
       REGISTRY_ORG: stolostron
+    test:
+    - as: publish
+      commands: |-
+        export OSCI_PUBLISH_DELAY="0"
+        export SELF="make -f Makefile.prow"
+        make -f Makefile.prow osci/publish
+      credentials:
+      - mount_path: /etc/github
+        name: acm-cicd-github
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     workflow: ocm-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: release-2.8
   org: stolostron
   repo: cluster-templates-operator
