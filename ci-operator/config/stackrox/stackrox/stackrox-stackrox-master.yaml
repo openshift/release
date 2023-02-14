@@ -44,26 +44,6 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: ocp-next-qa-e2e-tests
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
-    env:
-      TEST_SUITE: openshift-newest-qa-e2e-tests
-    test:
-    - as: qa-e2e-tests
-      cli: ec
-      commands: |
-        oc version || true
-        oc get nodes -o wide || true
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    - ref: stackrox-e2e
-    workflow: ipi-aws
-  timeout: 5h0m0s
 - as: style-checks
   commands: .openshift-ci/dispatch.sh style-checks
   container:
@@ -341,6 +321,111 @@ tests:
   steps:
     workflow: stackrox-automation-flavors-rosa-e2e
   timeout: 5h0m0s
+- as: ocp-next-qa-e2e-tests
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: openshift-newest-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: ocp-next-operator-e2e-tests
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: openshift-newest-operator-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: ocp-next-ui-e2e-tests
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: merge-style-checks
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-policy-checks
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-mitre-bundles-checks
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-grouped-static-checks
+  postsubmit: true
+  steps:
+    test:
+    - as: merge-check-generated
+      commands: .openshift-ci/dispatch.sh check-generated
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: merge-check-todos
+      commands: .openshift-ci/dispatch.sh check-todos
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: merge-check-pr-fixes
+      commands: .openshift-ci/dispatch.sh check-pr-fixes
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-go-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-go-unit-tests-release
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-go-postgres-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-integration-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
 - as: merge-shell-unit-tests
   postsubmit: true
   steps:
