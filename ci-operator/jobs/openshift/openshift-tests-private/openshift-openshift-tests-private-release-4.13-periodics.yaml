@@ -81,6 +81,88 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build01
+  cron: 59 13 20 * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.13
+    org: openshift
+    repo: openshift-tests-private
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-qe
+    ci-operator.openshift.io/variant: amd64-nightly-4.13-upgrade-from-aro
+    ci.openshift.io/generator: prowgen
+    job-release: "4.13"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-4.13-upgrade-from-aro-aro-p1-f30
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/aro-p1-f30-cluster-profile
+      - --target=aro-p1-f30
+      - --variant=amd64-nightly-4.13-upgrade-from-aro
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/aro-p1-f30-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: build03
   cron: 24 18 19,3 * *
   decorate: true
@@ -1296,8 +1378,6 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-<<<<<<< HEAD
-=======
   cluster: build01
   cron: 27 14 15,30 * *
   decorate: true
@@ -2432,7 +2512,6 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
->>>>>>> upstream/master
   cluster: build03
   cron: 56 22 18,2 * *
   decorate: true
@@ -7006,12 +7085,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-aws-ipi-disconnected-private-p3-f28-long-duration-cloud
-  reporter_config:
-    slack:
-      channel: '#forum-prow-long-duration-cloudinfra-testcases'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -9964,16 +10037,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-aws-ipi-p3-f28-long-duration-part3-3
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hive-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - aborted
-      - success
-      - pending
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -14156,16 +14219,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-azure-ipi-ovn-hypershift-install-p3-f21
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - aborted
-      - success
-      - pending
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -14248,16 +14301,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-azure-ipi-ovn-hypershift-mgmt-p3-f21
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - aborted
-      - success
-      - pending
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -14340,16 +14383,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-azure-ipi-ovn-hypershift-p3-f21
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hypershift-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - aborted
-      - success
-      - pending
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -14596,16 +14629,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-azure-ipi-p3-f28-long-duration-part3-3
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hive-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - aborted
-      - success
-      - pending
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -16164,12 +16187,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-azure-mag-ipi-fullyprivate-p3-f28-long-duration-cloud
-  reporter_config:
-    slack:
-      channel: '#forum-prow-long-duration-cloudinfra-testcases'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -18140,16 +18157,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-gcp-ipi-p3-f28-long-duration-part3-3
-  reporter_config:
-    slack:
-      channel: '#forum-prow-hive-qe-ci'
-      job_states_to_report:
-      - failure
-      - error
-      - aborted
-      - success
-      - pending
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -18314,12 +18321,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-amd64-nightly-gcp-ipi-private-p3-f28-long-duration-cloud
-  reporter_config:
-    slack:
-      channel: '#forum-prow-long-duration-cloudinfra-testcases'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -26991,12 +26992,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-arm64-nightly-aws-ipi-private-p3-f28-long-duration-cloud
-  reporter_config:
-    slack:
-      channel: '#forum-prow-long-duration-cloudinfra-testcases'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -28719,12 +28714,6 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-openshift-tests-private-release-4.13-arm64-nightly-azure-ipi-disconnected-p3-f28-long-duration-cloud
-  reporter_config:
-    slack:
-      channel: '#forum-prow-long-duration-cloudinfra-testcases'
-      job_states_to_report:
-      - failure
-      report_template: Job {{.Spec.Job}} failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
