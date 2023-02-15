@@ -10,10 +10,10 @@ build_root:
     tag: golang-1.17
 images:
 - dockerfile_literal: |
-    FROM quay.io/rh_integration/strimzi-interop:latest
-    WORKDIR /home/jenkins/interop
+    FROM /interop_qe_ms/managed-services-interop-framework
+    WORKDIR managed-services-integration-framework
     CMD ["/bin/bash"]
-  to: strimzi-interop
+  to: managed-services-interop-framework
 releases:
   latest:
     candidate:
@@ -41,18 +41,7 @@ tests:
       SUB_TARGET_NAMESPACES: openshift-streams
     test:
     - ref: operatorhub-subscribe
-    - as: test
-      commands: |
-        export USER_NAME=kubeadmin
-        export PASSWORD=`cat ${KUBEADMIN_PASSWORD_FILE}`
-        export API_URL=`oc whoami --show-server`
-        export NAMESPACE=openshift-streams
-        export KUBECONFIG="${SHARED_DIR}/kubeconfig"
-        make interop
-      from: strimzi-interop
-      resources:
-        requests:
-          cpu: 100m
+    - ref: CSPI-QE-amq-streams
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
