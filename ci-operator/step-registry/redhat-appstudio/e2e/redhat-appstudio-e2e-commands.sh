@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
+sleep 3600
+sleep 3600
+sleep 3600
+
+
+
 export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
