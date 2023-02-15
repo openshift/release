@@ -1,0 +1,244 @@
+base_images:
+  aro:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aro-0.3.8
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.3.1
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-0.3.6
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.3.8
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.55
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: merge-style-checks
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-policy-checks
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-mitre-bundles-checks
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-grouped-static-checks
+  postsubmit: true
+  steps:
+    test:
+    - as: merge-check-generated
+      commands: .openshift-ci/dispatch.sh check-generated
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: merge-check-todos
+      commands: .openshift-ci/dispatch.sh check-todos
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+    - as: merge-check-pr-fixes
+      commands: .openshift-ci/dispatch.sh check-pr-fixes
+      credentials:
+      - mount_path: /tmp/vault/stackrox-stackrox-initial
+        name: stackrox-stackrox-initial
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4000Mi
+- as: merge-go-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-go-unit-tests-release
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-go-postgres-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-integration-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-shell-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-ui-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-gke-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-openshift-oldest-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.8"
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-openshift-newest-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.11"
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-ui-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-postgres-ui-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: merge-gke-postgres-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: merge-gke-upgrade-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: merge-gke-version-compatibility-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: merge-gke-kernel-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-race-condition-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-postgres-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-postgres-upgrade-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-openshift-oldest-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.8"
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-openshift-newest-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.11"
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-local-roxctl-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+zz_generated_metadata:
+  branch: release-3.74
+  org: stackrox
+  repo: stackrox

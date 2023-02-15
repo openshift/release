@@ -85,26 +85,25 @@ spec:
 EOF
   yq-go m -x -i "${localzone_machineset}" "${schedulable_patch}"
 fi
-
-default_ingress="${SHARED_DIR}/manifest_localzone_cluster-ingress-default-ingresscontroller.yaml"
-echo "Creating ingress manifests ... "
-cat <<EOF > "${default_ingress}"
-apiVersion: operator.openshift.io/v1
-kind: IngressController
-metadata:
-  creationTimestamp: null
-  name: default
-  namespace: openshift-ingress-operator
-spec:
-  endpointPublishingStrategy:
-    loadBalancer:
-      scope: External
-      providerParameters:
-        type: AWS
-        aws:
-          type: NLB
-    type: LoadBalancerService
-EOF
-
 cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
-cp "${default_ingress}" "${ARTIFACT_DIR}/"
+
+# default_ingress="${SHARED_DIR}/manifest_localzone_cluster-ingress-default-ingresscontroller.yaml"
+# echo "Creating ingress manifests ... "
+# cat <<EOF > "${default_ingress}"
+# apiVersion: operator.openshift.io/v1
+# kind: IngressController
+# metadata:
+#   creationTimestamp: null
+#   name: default
+#   namespace: openshift-ingress-operator
+# spec:
+#   endpointPublishingStrategy:
+#     loadBalancer:
+#       scope: External
+#       providerParameters:
+#         type: AWS
+#         aws:
+#           type: NLB
+#     type: LoadBalancerService
+# EOF
+# cp "${default_ingress}" "${ARTIFACT_DIR}/"

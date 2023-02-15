@@ -15,7 +15,7 @@ presubmits:
     skip_branches:
     - gh-pages
     - release-1.20
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     trigger: (?m)^/test( | .* )kata-containers,?($|\s.*)
   - agent: kubernetes
     always_run: false
@@ -35,7 +35,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-cgroupv2-e2e
     rerun_command: /test ci-cgroupv2-e2e
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -116,7 +116,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-cgroupv2-e2e-crun
     rerun_command: /test ci-cgroupv2-e2e-crun
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -197,7 +197,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-cgroupv2-e2e-features
     rerun_command: /test ci-cgroupv2-e2e-features
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -266,6 +266,87 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
+    context: ci/prow/ci-cgroupv2-integration
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/variant: ci
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-cri-o-cri-o-main-ci-cgroupv2-integration
+    rerun_command: /test ci-cgroupv2-integration
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/cgroupv2-integration-cluster-profile
+        - --target=cgroupv2-integration
+        - --variant=ci
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/cgroupv2-integration-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ci-cgroupv2-integration,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/ci-crun-e2e
     decorate: true
     decoration_config:
@@ -278,7 +359,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-crun-e2e
     rerun_command: /test ci-crun-e2e
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -359,7 +440,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-e2e
     rerun_command: /test ci-e2e
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -440,7 +521,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-e2e-conmonrs
     rerun_command: /test ci-e2e-conmonrs
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -521,7 +602,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-fedora-critest
     rerun_command: /test ci-fedora-critest
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -602,7 +683,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-fedora-integration
     rerun_command: /test ci-fedora-integration
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -670,7 +751,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/ci-images
     decorate: true
     decoration_config:
@@ -681,7 +762,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-images
     rerun_command: /test ci-images
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -735,7 +816,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-rhel-critest
     rerun_command: /test ci-rhel-critest
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -816,7 +897,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-ci-rhel-e2e
     rerun_command: /test ci-rhel-e2e
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -884,87 +965,6 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
-    context: ci/prow/ci-rhel-integration
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/variant: ci
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-cri-o-cri-o-main-ci-rhel-integration
-    rerun_command: /test ci-rhel-integration
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rhel-integration-cluster-profile
-        - --target=rhel-integration
-        - --variant=ci
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/rhel-integration-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-rhel-integration,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
     cluster: build05
     context: ci/prow/e2e-aws-ovn
     decorate: true
@@ -977,7 +977,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-e2e-aws-ovn
     rerun_command: /test e2e-aws-ovn
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1052,7 +1052,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-e2e-gcp-ovn
     rerun_command: /test e2e-gcp-ovn
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1119,7 +1119,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1129,7 +1129,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-cri-o-cri-o-main-images
     rerun_command: /test images
-    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE)$
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -1164,3 +1164,55 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/periodics-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: periodics
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-cri-o-cri-o-main-periodics-images
+    rerun_command: /test periodics-images
+    skip_if_only_changed: ^(?:docs|tutorials|logo|\.github)/|\.md$|^(?:\.gitignore|OWNERS|SECURITY_CONTACTS|PROJECT|LICENSE)$
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=periodics
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )periodics-images,?($|\s.*)

@@ -8,6 +8,21 @@ def get_kubeconfig_volume_mounts():
         }]
 
 
+def get_rcapi_volume_mounts():
+    return [
+        {
+            'mountPath': '/etc/kubeconfigs',
+            'name': 'release-controller-kubeconfigs',
+            'readOnly': True
+        },
+        {
+            'mountPath': '/etc/jira',
+            'name': 'jira',
+            'readOnly': True
+        }
+    ]
+
+
 def get_rc_volume_mounts():
     return [
         {
@@ -56,6 +71,28 @@ def get_kubeconfig_volumes(context, secret_name=None):
             }
         }]
 
+
+def get_rcapi_volumes(context, secret_name=None):
+    if secret_name is None:
+        secret_name = context.secret_name_tls
+
+    return [
+        *_get_dynamic_deployment_volumes(context, secret_name),
+        {
+            'name': 'release-controller-kubeconfigs',
+            'secret': {
+                'defaultMode': 420,
+                'secretName': 'release-controller-kubeconfigs'
+            }
+        },
+        {
+            'name': 'jira',
+            'secret': {
+                'defaultMode': 420,
+                'secretName': 'jira-credentials-openshift-jira-robot'
+            }
+        }
+    ]
 
 def get_rc_volumes(context):
     return [

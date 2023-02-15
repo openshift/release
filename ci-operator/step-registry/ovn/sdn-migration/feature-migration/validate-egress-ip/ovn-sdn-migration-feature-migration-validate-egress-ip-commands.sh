@@ -19,9 +19,9 @@ validate_sdn_egressip_crs () {
   HOSTSUBNET_NAME=$(oc get nodes --selector="node-role.kubernetes.io/worker" -o jsonpath='{.items[0].metadata.name}')
   NETNAMESPACE_NAME="test-migration"
 
-  kubectl get hostsubnet -n test-migration $HOSTSUBNET_NAME -o json | jq .egressCIDRs | tee current_egressCIDRs
-  kubectl get hostsubnet -n test-migration $HOSTSUBNET_NAME -o json | jq .egressIPs | tee current_hsn_egressIPs
-  kubectl get netnamespace -n test-migration $NETNAMESPACE_NAME -o json | jq .egressIPs | tee current_nns_egressIPs
+  kubectl get hostsubnet $HOSTSUBNET_NAME -o json | jq .egressCIDRs | tee current_egressCIDRs
+  kubectl get hostsubnet $HOSTSUBNET_NAME -o json | jq .egressIPs | tee current_hsn_egressIPs
+  kubectl get netnamespace $NETNAMESPACE_NAME -o json | jq .egressIPs | tee current_nns_egressIPs
 
   echo "$EXPECT_HOSTSUBNET_EGRESS_CIDRS" | tee expected_egressCIDRs
   echo "$EXPECT_HOSTSUBNET_EGRESS_IPS" | tee expected_hsn_egressIPs
@@ -58,7 +58,9 @@ RUNNING_CNI=$(oc get network.operator cluster -o=jsonpath='{.spec.defaultNetwork
 if [[ $RUNNING_CNI == "OpenShiftSDN" ]]; then
   echo "It's an OpenShiftSDN cluster, check the HostSubnet and Netnamespace CRs"
   validate_sdn_egressip_crs
+  kubectl patch netnamespace $NETNAMESPACE_NAME --type=merge -p '{"egressIPs": []}'
 elif [[ $RUNNING_CNI == "OVNKubernetes" ]]; then
   echo "It's an OVNKubernetes cluster, check the EgressIP CR"
   validate_egressip_cr
+  kubectl delete egressip -n test-migration egressip-test-migration
 fi
