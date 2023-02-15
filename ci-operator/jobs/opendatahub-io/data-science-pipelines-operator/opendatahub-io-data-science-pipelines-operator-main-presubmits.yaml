@@ -1,11 +1,11 @@
 presubmits:
-  redhat-appstudio/e2e-tests:
+  opendatahub-io/data-science-pipelines-operator:
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -13,7 +13,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-appstudio-e2e-tests-main-images
+    name: pull-ci-opendatahub-io-data-science-pipelines-operator-main-images
     rerun_command: /test images
     spec:
       containers:
@@ -50,33 +50,27 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build05
-    context: ci/prow/redhat-appstudio-e2e
+    cluster: build01
+    context: ci/prow/unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-redhat-appstudio-e2e-tests-main-redhat-appstudio-e2e
-    rerun_command: /test redhat-appstudio-e2e
-    skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    name: pull-ci-opendatahub-io-data-science-pipelines-operator-main-unit
+    rerun_command: /test unit
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/redhat-appstudio-e2e-cluster-profile
-        - --target=redhat-appstudio-e2e
+        - --target=unit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -86,14 +80,6 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/redhat-appstudio-e2e-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -105,22 +91,10 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )redhat-appstudio-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )unit,?($|\s.*)
