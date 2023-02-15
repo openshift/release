@@ -223,7 +223,7 @@ CONFIG = {
         'westus': 5
     },
     'gcp-virtualization-quota-slice': {
-        'us-central1': 10,
+        'us-central1': 50,
     }
 }
 
