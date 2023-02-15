@@ -51,11 +51,22 @@ function gatherLBs() {
     done    
 }
 
+function getResourceGroup() {
+    local CONFIG 
+    CONFIG="${SHARED_DIR}/install-config.yaml"
+    RESOURCE_GROUP=$(yq-go r "${CONFIG}" 'platform.azure.resourceGroupName')
+    echo "resourceGroupName in $CONFIG: $RESOURCE_GROUP"
+    if [[ -z "${RESOURCE_GROUP}" ]]; then
+        RESOURCE_GROUP="$(jq -r .infraID ${SHARED_DIR}/metadata.json)-rg"
+    fi
+    export RESOURCE_GROUP
+}
+
 cli_Login
 
 OUTPUT_DIR="${ARTIFACT_DIR}"
 
-RESOURCE_GROUP="$(jq -r .infraID ${SHARED_DIR}/metadata.json)-rg"
+getResourceGroup
 run_command "az group show --name $RESOURCE_GROUP"
 
 run_command "az vm list --resource-group $RESOURCE_GROUP -o tsv"
