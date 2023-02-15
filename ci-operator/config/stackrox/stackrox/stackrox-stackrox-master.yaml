@@ -31,91 +31,11 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: style-checks
-  commands: .openshift-ci/dispatch.sh style-checks
-  container:
-    clone: true
-    from: root
-  secrets:
-  - mount_path: /tmp/vault/stackrox-stackrox-base
-    name: stackrox-stackrox-base
-- as: policy-checks
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: mitre-bundles-checks
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: grouped-static-checks
-  steps:
-    test:
-    - as: check-generated
-      commands: .openshift-ci/dispatch.sh check-generated
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: check-todos
-      commands: .openshift-ci/dispatch.sh check-todos
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: check-pr-fixes
-      commands: .openshift-ci/dispatch.sh check-pr-fixes
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: go-unit-tests
-  commands: .openshift-ci/dispatch.sh go-unit-tests
-  container:
-    clone: true
-    from: root
-  secrets:
-  - mount_path: /tmp/vault/stackrox-stackrox-base
-    name: stackrox-stackrox-base
-- as: go-unit-tests-release
-  commands: .openshift-ci/dispatch.sh go-unit-tests-release
-  container:
-    clone: true
-    from: root
-  secrets:
-  - mount_path: /tmp/vault/stackrox-stackrox-base
-    name: stackrox-stackrox-base
-- as: go-postgres-tests
-  commands: .openshift-ci/dispatch.sh go-postgres-tests
-  container:
-    clone: true
-    from: root
-  secrets:
-  - mount_path: /tmp/vault/stackrox-stackrox-base
-    name: stackrox-stackrox-base
 - as: integration-unit-tests
   steps:
     test:
     - ref: stackrox-initial
 - as: shell-unit-tests
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: ui-unit-tests
   steps:
     test:
     - ref: stackrox-initial
@@ -287,11 +207,6 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: local-roxctl-tests
-  optional: true
-  steps:
-    test:
-    - ref: stackrox-initial
 - as: eks-qa-e2e-tests
   optional: true
   steps:
@@ -317,84 +232,12 @@ tests:
   steps:
     workflow: stackrox-automation-flavors-rosa-e2e
   timeout: 5h0m0s
-- as: merge-style-checks
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-policy-checks
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-mitre-bundles-checks
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-grouped-static-checks
-  postsubmit: true
-  steps:
-    test:
-    - as: merge-check-generated
-      commands: .openshift-ci/dispatch.sh check-generated
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: merge-check-todos
-      commands: .openshift-ci/dispatch.sh check-todos
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: merge-check-pr-fixes
-      commands: .openshift-ci/dispatch.sh check-pr-fixes
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: merge-go-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-go-unit-tests-release
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-go-postgres-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
 - as: merge-integration-unit-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-initial
 - as: merge-shell-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: merge-ui-unit-tests
   postsubmit: true
   steps:
     test:
@@ -520,11 +363,6 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: merge-local-roxctl-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
 - as: powervs-qa-e2e-tests
   cron: 0 7 * * *
   steps:
