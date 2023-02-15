@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
 #Create Azure Storage Account and Storage Container
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 
@@ -16,7 +15,7 @@ QUAY_AZURE_STORAGE_ID="quayazure$RANDOM"
 
 echo "quay azure storage ID is $QUAY_AZURE_STORAGE_ID"
 
-cat >> variables.tf << EOF
+cat >>variables.tf <<EOF
 variable "resource_group" {
     default = "quayazure"
 }
@@ -30,7 +29,7 @@ variable "storage_container" {
 }
 EOF
 
-cat >> create_azure_storage_container.tf << EOF
+cat >>create_azure_storage_container.tf <<EOF
 provider "azurerm" {
     subscription_id = "${QUAY_AZURE_SUBSCRIPTION_ID}"
     tenant_id       = "${QUAY_AZURE_TENANT_ID}"
@@ -134,7 +133,7 @@ spec:
 EOF
 
 SUB=$(
-    cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
+  cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -152,19 +151,19 @@ EOF
 echo "The Quay Operator subscription is $SUB"
 
 for _ in {1..60}; do
-    CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
-    if [[ -n "$CSV" ]]; then
-        if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            echo "ClusterServiceVersion \"$CSV\" ready"
-            break
-        fi
+  CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
+  if [[ -n "$CSV" ]]; then
+    if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+      echo "ClusterServiceVersion \"$CSV\" ready"
+      break
     fi
-    sleep 10
+  fi
+  sleep 10
 done
 echo "Quay Operator is deployed successfully"
 
 #Deploy Quay, here disable monitoring component
-cat >> config.yaml << EOF
+cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
 CREATE_NAMESPACE_ON_PUSH: true
 FEATURE_EXTENDED_REPOSITORY_NAMES: true
@@ -191,6 +190,8 @@ EOF
 
 oc create secret generic -n quay-enterprise --from-file config.yaml=./config.yaml config-bundle-secret
 
+sleep 3600
+
 echo "Creating Quay registry..." >&2
 cat <<EOF | oc apply -f -
 apiVersion: quay.redhat.com/v1
@@ -208,11 +209,11 @@ spec:
 EOF
 
 for _ in {1..60}; do
-    if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-        echo "Quay is in ready status" >&2
-        exit 0
-    fi
-    sleep 15
+  if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
+    echo "Quay is in ready status" >&2
+    exit 0
+  fi
+  sleep 15
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
-oc -n quay-enterprise get quayregistries -o yaml > "$ARTIFACT_DIR/quayregistries.yaml"
+oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"
