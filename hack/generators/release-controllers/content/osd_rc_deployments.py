@@ -355,7 +355,10 @@ def _add_osd_rc_deployment(gendoc):
                                         f'--release-architecture={context.get_supported_architecture_name()}',
                                         '-v=6',
                                         '--authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.',
-                                        f'--art-suffix={context.art_suffix}'
+                                        f'--art-suffix={context.art_suffix}',
+                                        '--enable-jira',
+                                        '--jira-endpoint=https://issues.redhat.com',
+                                        '--jira-bearer-token-file=/etc/jira/api',
                                         ],
                             'image': 'release-controller-api:latest',
                             'name': 'controller',
