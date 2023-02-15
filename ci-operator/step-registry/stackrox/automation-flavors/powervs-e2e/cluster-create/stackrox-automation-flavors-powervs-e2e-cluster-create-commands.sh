@@ -9,11 +9,11 @@ POWERVS_OCP_DIR="/tmp/powervs-ocp"
 SECRET_DIR="/tmp/vault/powervs-rhr-creds"
 
 # DEBUG
-ls -l "$SECRET_DIR"
-whoami
-uid
-cat /etc/os-release
-sudo whoami
+ls -l "$SECRET_DIR" || true
+whoami || true
+id || true
+cat /etc/os-release || true
+sudo whoami || true
 
 # tmp dir for cluster files
 mkdir -p "$POWERVS_OCP_DIR"
@@ -70,7 +70,7 @@ function setup_automation(){
   curl https://raw.githubusercontent.com/ocp-power-automation/openshift-install-power/devel/openshift-install-powervs --output openshift-install-powervs --silent
   chmod +x openshift-install-powervs
     
-  ./openshift-install-powervs setup &> "${POWERVS_OCP_DIR}/setup-log.txt"
+  ./openshift-install-powervs setup
   
   cp -f ${PULL_SECRET_FILE} ${POWERVS_OCP_DIR}/pull-secret.txt
   cp -f ${PUBLIC_KEY_FILE} ${POWERVS_OCP_DIR}/id_rsa.pub
