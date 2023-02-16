@@ -33,5 +33,5 @@ failures=$(grep '<testsuite failures="[1-9].*"' "${ARTIFACT_DIR}" -r | wc -l || 
 if [ $((failures)) == 0 ]; then
     echo "All tests have passed"
 else
-    echo "There are ${failures} test failures"
+    echo "There are ${failures} test failures in cucushift-e2e" | tee -a "${SHARED_DIR}/cucushift-e2e-failures"
 fi
