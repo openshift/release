@@ -60,21 +60,21 @@ images:
   from: src
   to: assisted-installer-agent-src
 - dockerfile_literal: |
-    FROM root AS builder
+    FROM test-bin AS builder
     FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    WORKDIR /go/src/github.com/openshift/assisted-installer-agent
-    COPY . .
     COPY --from=builder /usr/bin/golangci-lint /usr/bin/golangci-lint
-    RUN dnf install -y gcc nmstate-devel nmstate-libs git && dnf clean all
+    COPY --from=builder /go/src/github.com/openshift/assisted-installer-agent /go/src/github.com/openshift/assisted-installer-agent
+    WORKDIR /go/src/github.com/openshift/assisted-installer-agent
     RUN go mod vendor
     RUN mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+    RUN dnf install -y gcc nmstate-devel nmstate-libs git && dnf clean all
   inputs:
     ocp_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    root:
+    test-bin:
       as:
-      - root
+      - test-bin
   to: assisted-test-bin
 promotion:
   name: ocm-2.8
