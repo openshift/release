@@ -1,0 +1,57 @@
+ref:
+  as: baremetal-lab-ipi-install
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: baremetal-lab-ipi-install-commands.sh
+  resources:
+    requests:
+      cpu: '1'
+      memory: 128Mi
+  grace_period: 600
+  env:
+  - name: IPI
+    default: "true"
+    documentation: ""
+  - name: INTERNAL_NET_IP
+    default: "192.168.90.1"
+    documentation: ""
+  - name: INTERNAL_NET_CIDR
+    default: "192.168.90.0/24"
+  - name: architecture
+    default: ""
+    documentation: ""
+  - name: masters
+    default: "3"
+    documentation: ""
+  - name: workers
+    default: "2"
+    documentation: ""
+  - name: AUX_HOST
+    default: ""
+    documentation: |
+      The IP address or FQDN of the host that runs the infrastructure services (DHCP, PXE, DNS, Load Balancer).
+      The auxiliary host runs the VNFs needed for running the infrastructure and maintaining the persistent state 
+      to allow multiple clusters to run and install concurrently
+  - name: PROVISIONING_HOST
+    default: ""
+    documentation: |-
+      The IP address or FQDN of the provisioning host. It is the target executor of the installation process.
+      The provisioning host will also get the configuration of the provisioning network.
+      The provisioning host and the auxiliary host may be the same host, but the provisioning host's instruction set
+      architecture must match the one of the cluster nodes and is not supported for multi-arch compute nodes 
+      scenarios yet.
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+    - name: "release:latest"
+      env: MULTI_RELEASE_IMAGE
+  documentation: |-
+    The baremetal-lab-ipi-install will provision a UPI baremetal cluster, given the configuration assets
+    prepared in the earlier steps. 
+    The minimum requirement for this step to work is to run it after the chain baremetal-lab-ipi-conf.
+    Users that want implement their specific installation configuration should implement workflows that execute 
+    (1) the baremetal-lab-ipi-conf chain, 
+    (2) a set of custom chains/steps to either patch the install-config.yaml or define custom manifest_*.yaml files that will be included in install-dir/manifests, to be consumed by the installer,
+    (3) the baremetal-lab-ipi-install step.

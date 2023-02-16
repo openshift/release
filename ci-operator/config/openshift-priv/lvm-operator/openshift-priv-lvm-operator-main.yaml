@@ -1,16 +1,20 @@
 base_images:
   base:
-    name: 4.11-priv
+    name: 4.12-priv
     namespace: ocp-private
     tag: base
   must-gather:
-    name: 4.11-priv
+    name: 4.12-priv
     namespace: ocp-private
     tag: must-gather
   opm-builder:
     name: opm-builder
     namespace: ci
     tag: v1.14.3
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 binary_build_commands: make build build-vgmanager
 build_root:
   image_stream_tag:
@@ -20,7 +24,7 @@ build_root:
 canonical_go_repository: github.com/openshift/lvm-operator
 images:
 - dockerfile_path: Dockerfile.combined
-  from: base
+  from: ubi_minimal
   to: lvm-operator
 - dockerfile_path: bundle.Dockerfile
   from: base
@@ -68,12 +72,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: 4.11-priv
+      name: 4.12-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.11-priv
+      name: 4.12-priv
       namespace: ocp-private
 resources:
   '*':
@@ -105,7 +109,7 @@ tests:
       LVM_OPERATOR_UNINSTALL: "false"
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-storage
-      OO_PACKAGE: lvm-operator
+      OO_PACKAGE: lvms-operator
       OO_TARGET_NAMESPACES: '!install'
     post:
     - as: lvm-must-gather

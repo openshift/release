@@ -11,18 +11,37 @@ function createInstallJunit() {
   EXIT_CODE_CLUSTER=6
   if test -f "${SHARED_DIR}/install-status.txt"
   then
-    EXIT_CODE=`cat ${SHARED_DIR}/install-status.txt | awk '{print $1}'`
-    cp "${SHARED_DIR}/install-status.txt" ${ARTIFACT_DIR}/
+    EXIT_CODE=`tail -n1 "${SHARED_DIR}/install-status.txt" | awk '{print $1}'`
+    cp "${SHARED_DIR}/install-status.txt" "${ARTIFACT_DIR}/"
     if [ "$EXIT_CODE" ==  0  ]
     then
+      set +o errexit
+      grep -q "^$EXIT_CODE_INFRA$" "${SHARED_DIR}/install-status.txt"
+      PREVIOUS_INFRA_FAILURE=$((1-$?))
+      set -o errexit
+
       cat >"${ARTIFACT_DIR}/junit_install.xml" <<EOF
-      <testsuite name="cluster install" tests="6" failures="0">
+      <testsuite name="cluster install" tests="$((PREVIOUS_INFRA_FAILURE+6))" failures="$PREVIOUS_INFRA_FAILURE">
         <testcase name="install should succeed: other"/>
         <testcase name="install should succeed: configuration"/>
         <testcase name="install should succeed: infrastructure"/>
         <testcase name="install should succeed: cluster bootstrap"/>
         <testcase name="install should succeed: cluster creation"/>
         <testcase name="install should succeed: overall"/>
+EOF
+
+      # If we ultimately succeeded, but encountered at least 1 infra
+      # failure, insert that failure case so CI tracks it as a flake.
+      if [ "$PREVIOUS_INFRA_FAILURE" = 1 ]
+      then
+      cat >>"${ARTIFACT_DIR}/junit_install.xml" <<EOF
+        <testcase name="install should succeed: infrastructure">
+          <failure message="">openshift cluster install failed with infrastructure setup</failure>
+        </testcase>
+EOF
+      fi
+
+      cat >>"${ARTIFACT_DIR}/junit_install.xml" <<EOF
       </testsuite>
 EOF
     elif [ "$EXIT_CODE" == "$EXIT_CODE_CONFIG" ]
@@ -37,7 +56,6 @@ EOF
           <failure message="">openshift cluster install failed overall</failure>
         </testcase>
       </testsuite>
-EOF
 EOF
     elif [ "$EXIT_CODE" == "$EXIT_CODE_INFRA" ]
     then
