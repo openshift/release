@@ -29,6 +29,7 @@ function populate_artifact_dir() {
 
 function write_install_status() {
   #Save exit code for must-gather to generate junit
+  echo "Installer exit with code $ret"
   echo "$ret" >> "${SHARED_DIR}/install-status.txt"
 }
 
@@ -87,6 +88,17 @@ function prepare_next_steps() {
     cp -t "${SHARED_DIR}" "${dir}"/terraform.*
   fi
 }
+
+# Capture artifacts if install gets terminated
+function install_terminated() {
+  echo "Install terminated, cleaning up..."
+  ret=1
+  prepare_next_steps
+}
+
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'prepare_next_steps' EXIT
+trap 'install_terminated' TERM
 
 function inject_promtail_service() {
   GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
@@ -286,9 +298,6 @@ EOF
 
   echo "Enabled AWS Spot instances for worker nodes"
 }
-
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'prepare_next_steps' EXIT TERM
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
