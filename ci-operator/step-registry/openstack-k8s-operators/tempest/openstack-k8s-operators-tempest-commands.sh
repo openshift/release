@@ -33,8 +33,48 @@ pushd ~/tempest/openshift
 
 discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create
 
+# Generate skiplist and allow list
+ORG="openstack-k8s-operators"
+# Check org and project from job's spec
+REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')
+REF_ORG=$(echo ${JOB_SPEC} | jq -r '.refs.org')
+
+# Fails if step is not being used on openstack-k8s-operators repos
+# Gets base repo name
+BASE_OP=${REF_REPO}
+if [[ "$REF_ORG" != "$ORG" ]]; then
+    echo "Not a ${ORG} job. Checking if isn't a rehearsal job..."
+    EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
+    EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
+    #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
+    if [[ "$EXTRA_REF_ORG" != "$ORG" ]]; then
+      echo "Failing since this step supports only ${ORG} changes."
+      exit 1
+    fi
+    BASE_OP=${EXTRA_REF_REPO}
+fi
+
+
 set +e
-tempest run --regex 'tempest.api.identity.*.v3'
+
+TEMPEST_REGEX=${TEMPEST_REGEX:-}
+
+if [ "$TEMPEST_REGEX" ]; then
+    tempest run --regex $TEMPEST_REGEX
+else
+    curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_allow.yml
+    curl -O https://opendev.org/openstack/openstack-tempest-skiplist/raw/branch/master/openstack-operators/tempest_skip.yml
+
+    tempest-skip list-allowed --file tempest_allow.yml --group ${BASE_OP} --job ${BASE_OP} -f value > allow.txt
+    tempest-skip list-skipped --file tempest_skip.yml --job ${BASE_OP} -f value > skip.txt
+    if [ -f allow.txt ] && [ -f skip.txt ]; then
+        TEMPEST_ARGS=( --exclude-list skip.txt --include-list allow.txt)
+        cp allow.txt skip.txt ${ARTIFACT_DIR}
+    else
+        TEMPEST_ARGS=( --regex 'tempest.api.compute.admin.test_aggregates_negative.AggregatesAdminNegativeTestJSON')
+    fi
+    tempest run "${TEMPEST_ARGS[@]}"
+fi
 EXIT_CODE=$?
 set -e
 
