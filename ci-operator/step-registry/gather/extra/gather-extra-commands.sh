@@ -33,6 +33,48 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+echo "Collecting cluster data for analysis..."
+set +o errexit
+set +o pipefail
+if ! pip -V; then
+  echo "pip is not installed: installing"
+  if python -c "import sys; assert(sys.version_info >= (3,0))"; then
+    python -m ensurepip --user || easy_install --user 'pip'
+  else
+    echo "python < 3, installing pip<21"
+    python -m ensurepip --user || easy_install --user 'pip<21'
+  fi
+fi
+echo "Installing python modules: json"
+python3 -c "import json" || pip3 install --user pyjson
+PLATFORM="$(oc get infrastructure/cluster -o jsonpath='{.status.platform}')" || ""
+TOPOLOGY="$(oc get infrastructure/cluster -o jsonpath='{.status.infrastructureTopology}')" || ""
+NETWORKTYPE="$(oc get network.operator cluster -o jsonpath='{.spec.defaultNetwork.type}')" || ""
+if [[ "$(oc get network.operator cluster -o jsonpath='{.spec.clusterNetwork[0].cidr}')" =~ .*":".*  ]]; then
+  NETWORKSTACK="IPv6" || ""
+else
+  NETWORKSTACK="IPv4" || ""
+fi
+CLOUDREGION="$(oc get node -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/region}')" || ""
+CLOUDZONE="$(oc get node -o jsonpath='{.items[0].metadata.labels.topology\.kubernetes\.io/zone}')" || ""
+CLUSTERVERSIONHISTORY="$(oc get clusterversion -o jsonpath='{.items[].status.history[*].version}')" || ""
+python3 -c '
+import json;
+dictionary = {
+    "Platform": "'$PLATFORM'",
+    "Topology": "'$TOPOLOGY'",
+    "NetworkType": "'$NETWORKTYPE'",
+    "NetworkStack": "'$NETWORKSTACK'",
+    "CloudRegion": "'$CLOUDREGION'",
+    "CloudZone": "'$CLOUDZONE'",
+    "ClusterVersionHistory": "'"$CLUSTERVERSIONHISTORY"'".split()
+}
+with open("'${ARTIFACT_DIR}/cluster-data.json'", "w") as outfile:
+    json.dump(dictionary, outfile)'
+set -o errexit
+set -o pipefail
+echo "Done collecting cluster data for analysis!"
+
 echo "Gathering artifacts ..."
 mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network ${ARTIFACT_DIR}/oc_cmds
 
