@@ -19,15 +19,8 @@ COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 
 # Cluster to use for cnf-tests, and to exclude from selection in other jobs
 PREPARED_CLUSTER="cnfdc2"
 
-KCLI_PARAM=""
-if [[ "$PROW_JOB_ID" =~ "nightly" ]]; then
-    # In case of running on nightly releases we need to figure out what release exactly to use
-    KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:${PROW_JOB_ID/-telco5g/}"
-elif [ ! -z $JOB_NAME ]; then
-    # In case of regular periodic job
-    KCLI_PARAM="-P tag=$T5CI_VERSION -P version=nightly"
-fi
-echo "==========  Running with KCLI_PARAM=$KCLI_PARAM  =========="
+source $SHARED_DIR/main.env
+echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 
 # Set environment for jobs to run
 INTERNAL=true
@@ -49,7 +42,7 @@ ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS"
 EOF
 
 ADDITIONAL_ARG=""
-if [[ "$T5CI_JOB_TYPE" == "cnftests" ]] && [[ "$JOB_NAME" != *"rehears"* ]]; then
+if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
   ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
 else
   ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
@@ -264,7 +257,7 @@ EOF
 # in order to provide the desired return code later.
 PROCEED_AFTER_FAILURES="false"
 status=0
-if [[ "$T5CI_JOB_TYPE" == "cnftests" ]] && [[ "$JOB_NAME" != *"rehears"* ]]; then
+if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv
 else
     PROCEED_AFTER_FAILURES="true"
