@@ -18,9 +18,18 @@ QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/
 QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
-OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
 
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
+
+if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
+    OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
+elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then
+    # Recommendation from hypershift qe team in slack channel..
+    OPENSHIFT_PASSWORD="$(cat ${SHARED_DIR}/kubeadmin-password)"
+else
+    echo "Kubeadmin password file is empty... Aborting job"
+    exit 1
+fi
 
 timeout --foreground 5m bash  <<- "EOF"
     while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
@@ -28,7 +37,7 @@ timeout --foreground 5m bash  <<- "EOF"
     done
 EOF
   if [ $? -ne 0 ]; then
-	  echo "Timed out waiting for registration-service to be available"
+	  echo "Timed out waiting for login"
 	  exit 1
   fi
 
