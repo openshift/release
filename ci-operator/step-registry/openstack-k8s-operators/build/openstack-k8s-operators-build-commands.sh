@@ -38,6 +38,7 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
     IS_REHEARSAL=true
     BASE_OP=${EXTRA_REF_REPO}
 fi
+SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/')
 
 function create_openstack_namespace {
   pushd ${BASE_DIR}
@@ -137,6 +138,7 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
   # Build openstack-operator bundle and index
   export IMAGENAMESPACE=${ORGANIZATION}
   export IMAGEREGISTRY=${REGISTRY}
+  export IMAGEBASE=${SERVICE_NAME}
   IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}
   build_push_operator_images "${META_OPERATOR}" "${BASE_DIR}/${META_OPERATOR}" "${IMAGE_TAG_BASE}" "${PR_SHA}"
 
