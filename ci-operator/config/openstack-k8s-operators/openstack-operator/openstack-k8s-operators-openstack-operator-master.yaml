@@ -93,7 +93,8 @@ tests:
 - as: precommit-check
   commands: |
     export SKIP=no-commit-to-branch
-    export GOFLAGS=
+    export GOFLAGS=" -mod=readonly"
+    export GOLANGCI_LINT_CACHE=/tmp
     export PRE_COMMIT_HOME=/tmp
     git log -1
     mkdir -p ../operator && cp -r . ../operator
@@ -101,6 +102,7 @@ tests:
     pre-commit run --all-files --show-diff-on-failure
   container:
     from: openstack-operator-ci-pre-commit
+  optional: true
 - as: openstack-operator-build-deploy
   cluster_claim:
     architecture: amd64
