@@ -21,6 +21,11 @@ sriov "FPGA Programmable Acceleration Card N3000 for Networking"
 # TESTNAME
 dpdk "Should be able to transmit packets"
 
+# SKIPTEST
+# bz### It takes too much time (4 tests)
+# TESTNAME
+ovs_qos "Validate MCO"
+
 EOF
 }
 
@@ -108,8 +113,8 @@ function get_skip_tests {
 
 source $SHARED_DIR/main.env
 
-#export FEATURES="${FEATURES:-multinetworkpolicy sctp sriov dpdk ovs_qos}"
-export FEATURES="${FEATURES:-ovs_qos}"
+export FEATURES="${FEATURES:-multinetworkpolicy sctp sriov dpdk ovs_qos}"
+#export FEATURES="${FEATURES:-ovs_qos}"
 
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
