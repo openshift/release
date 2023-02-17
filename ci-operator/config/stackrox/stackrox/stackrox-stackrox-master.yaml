@@ -24,6 +24,19 @@ build_root:
     name: apollo-ci
     namespace: stackrox
     tag: stackrox-test-0.3.56
+releases:
+  ec:
+    prerelease:
+      product: ocp
+      stream: 4-dev-preview
+      version_bounds:
+        lower: 4.1.0
+        upper: 4.999.0
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
 resources:
   '*':
     requests:
@@ -227,6 +240,42 @@ tests:
   optional: true
   steps:
     workflow: stackrox-automation-flavors-rosa-e2e
+  timeout: 5h0m0s
+- as: ocp-next-qa-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: openshift-newest-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: ocp-next-operator-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: openshift-newest-operator-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: ocp-next-ui-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
   timeout: 5h0m0s
 - as: merge-shell-unit-tests
   postsubmit: true
