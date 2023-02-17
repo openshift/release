@@ -15,11 +15,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 #[ -z "${masters}" ] && {  echo "\$masters is not filled. Failing."; exit 1; }
 #[ -z "${workers}" ] && {  echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${IPI}" ] && {  echo "\$IPI is not filled. Failing."; exit 1; }
-[ -z "${architecture}" ] && {  echo "\$architecture is not filled. Failing."; exit 1; }
+[ -z "${ARCHITECTURE}" ] && {  echo "\$ARCHITECTURE is not filled. Failing."; exit 1; }
 [ -z "${DEPLOYMENT_TYPE}" ] && {  echo "\$DEPLOYMENT_TYPE is not filled. Failing."; exit 1; }
 
 
-gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
+gnu_arch=$(echo "${ARCHITECTURE}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
 
 if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
     N_WORKERS=1
