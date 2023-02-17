@@ -31,12 +31,15 @@ periodics:
   spec:
     containers:
     - args:
-      - adm
-      - upgrade
-      - --to-latest
-      command:
-      - /usr/bin/oc
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      - |
+        if /usr/bin/oc adm upgrade | grep -q "Progressing=True" ; then
+          >&2 echo "Error: The previous upgrade is still in progress. Something went wrong."
+          exit 1
+        else
+          /usr/bin/oc adm upgrade --to-latest
+        fi
+      command: ["/bin/sh","-c"]
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
