@@ -38,7 +38,7 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
     IS_REHEARSAL=true
     BASE_OP=${EXTRA_REF_REPO}
 fi
-SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/')
+SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 
 function create_openstack_namespace {
   pushd ${BASE_DIR}
