@@ -32,12 +32,17 @@ resources:
       cpu: 400m
       memory: 2Gi
 tests:
-- as: lint-check-unittests-sonarcloud
+- as: check
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow install
-    make -f Makefile.prow lint
     make -f Makefile.prow check
+  container:
+    from: src
+- as: unit-tests-sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
     make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-tests
     make -f Makefile.prow sonar/js/prow
