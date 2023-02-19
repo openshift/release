@@ -113,7 +113,7 @@ function get_skip_tests {
 
 source $SHARED_DIR/main.env
 
-export FEATURES="${FEATURES:-sriov s2i}"
+export FEATURES="${FEATURES:-sriov s2i sctp dpdk}"
 #export FEATURES="${FEATURES:-ovs_qos}"
 
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
