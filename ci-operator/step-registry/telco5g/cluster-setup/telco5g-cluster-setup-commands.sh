@@ -17,7 +17,7 @@ HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 # Cluster to use for cnf-tests, and to exclude from selection in other jobs
-PREPARED_CLUSTER="cnfdc2"
+PREPARED_CLUSTER="cnfdc5"
 
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
