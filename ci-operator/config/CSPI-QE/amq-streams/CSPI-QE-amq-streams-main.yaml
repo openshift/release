@@ -8,6 +8,13 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.17
+images:
+- dockerfile_literal: |
+    FROM quay.io/interop_qe_ms/managed-services-interop-framework1:latest
+    USER podman
+    WORKDIR /home/podman/managed-services-integration-framework
+    CMD ["/bin/bash"]
+  to: framework-image
 releases:
   latest:
     candidate:
@@ -22,16 +29,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: smoke-tests
+- as: amq-streams-smoke-tests
   cron: 0 0 1 1 *
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: aws.interop.ccitredhat.com
-      IMAGE_NAME: managed-services-interop-framework
-      QUAY_REPO: interop_qe_ms
+      PRODUCT_NAME: amq-streams
+      SUB_CHANNEL: stable
+      SUB_INSTALL_NAMESPACE: openshift-streams
+      SUB_PACKAGE: amq-streams
+      SUB_SOURCE: redhat-operators
+      SUB_TARGET_NAMESPACES: openshift-streams
     test:
-    - ref: cspi-qe-mirror-images
+    - ref: operatorhub-subscribe
+    - ref: cspi-qe-msi-framework
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
