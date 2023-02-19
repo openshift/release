@@ -38,7 +38,7 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
     IS_REHEARSAL=true
     BASE_OP=${EXTRA_REF_REPO}
 fi
-SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/')
+SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 
 function create_openstack_namespace {
   pushd ${BASE_DIR}
@@ -126,6 +126,12 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
   else
     API_SHA=${PR_SHA}
     REPO_NAME=${PR_REPO_NAME}
+    # NOTE(dviroel): We need to replace registry in bundle only when testing
+    #  a PR against operator's repo. When testing rehearsal jobs, we consume
+    #  from latest commit.
+    export IMAGENAMESPACE=${ORGANIZATION}
+    export IMAGEREGISTRY=${REGISTRY}
+    export IMAGEBASE=${SERVICE_NAME}
   fi
 
   go mod edit -replace github.com/${ORG}/${BASE_OP}/api=github.com/${REPO_NAME}/api@${API_SHA}
@@ -136,9 +142,6 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
   popd
 
   # Build openstack-operator bundle and index
-  export IMAGENAMESPACE=${ORGANIZATION}
-  export IMAGEREGISTRY=${REGISTRY}
-  export IMAGEBASE=${SERVICE_NAME}
   IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}
   build_push_operator_images "${META_OPERATOR}" "${BASE_DIR}/${META_OPERATOR}" "${IMAGE_TAG_BASE}" "${PR_SHA}"
 
