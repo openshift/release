@@ -17,7 +17,7 @@ HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 # Cluster to use for cnf-tests, and to exclude from selection in other jobs
-PREPARED_CLUSTER="cnfdc5"
+PREPARED_CLUSTER="cnfdc2"
 
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
@@ -42,11 +42,11 @@ ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS"
 EOF
 
 ADDITIONAL_ARG=""
-if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-  ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
-else
-  ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
-fi
+# if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
+ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
+# else
+#   ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
+# fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
@@ -257,12 +257,12 @@ EOF
 # in order to provide the desired return code later.
 PROCEED_AFTER_FAILURES="false"
 status=0
-if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv
-else
-    PROCEED_AFTER_FAILURES="true"
-    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
-fi
+# if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv
+# else
+#     PROCEED_AFTER_FAILURES="true"
+#     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+# fi
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
 exit ${status}
