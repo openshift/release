@@ -17,11 +17,6 @@ cat <<EOF >"${SKIP_TESTS_FILE}"
 sriov "FPGA Programmable Acceleration Card N3000 for Networking"
 
 # SKIPTEST
-# bz### It takes too much time
-# TESTNAME
-dpdk "Should be able to transmit packets"
-
-# SKIPTEST
 # bz### It takes too much time (4 tests)
 # TESTNAME
 ovs_qos "Validate MCO"
@@ -113,7 +108,7 @@ function get_skip_tests {
 
 source $SHARED_DIR/main.env
 
-export FEATURES="${FEATURES:-sriov s2i sctp dpdk}"
+export FEATURES="${FEATURES:-sriov sctp dpdk tuningcni bondcni gatekeeper}"
 #export FEATURES="${FEATURES:-ovs_qos}"
 
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
