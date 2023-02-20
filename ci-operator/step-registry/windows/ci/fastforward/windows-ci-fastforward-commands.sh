@@ -63,7 +63,7 @@ if ! git clone -b "$DESTINATION_BRANCH" "$repo_url" ; then
 
     echo "INFO Pushing to new branch $DESTINATION_BRANCH"
     if ! git push origin "$DESTINATION_BRANCH" ; then
-        echo "ERROR Could not push to origin DESTINATION_BRANCH"
+        echo "ERROR Could not push to origin $DESTINATION_BRANCH"
         exit 1
     fi
 
@@ -74,7 +74,7 @@ fi
 echo "INFO Changing into repo directory"
 cd "$REPO_NAME" || exit 1
 
-echo "INFO Pulling from SOURCE_BRANCH into $DESTINATION_BRANCH"
+echo "INFO Pulling from $SOURCE_BRANCH into $DESTINATION_BRANCH"
 if ! git pull --ff-only origin "$SOURCE_BRANCH" ; then
     echo "ERROR Could not pull from $SOURCE_BRANCH"
     exit 1
@@ -82,8 +82,8 @@ fi
 
 echo "INFO Pushing the following commits to origin/$DESTINATION_BRANCH"
 git --no-pager log --pretty=oneline origin/"$DESTINATION_BRANCH"..HEAD
-if ! git push origin $DESTINATION_BRANCH; then
-    echo "ERROR Could not push to DESTINATION_BRANCH"
+if ! git push origin "$DESTINATION_BRANCH"; then
+    echo "ERROR Could not push to $DESTINATION_BRANCH"
    exit 1
 fi
 

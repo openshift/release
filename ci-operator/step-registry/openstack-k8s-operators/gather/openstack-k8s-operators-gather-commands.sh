@@ -13,5 +13,5 @@ oc get all
 
 oc get -o yaml MariaDB,RabbitMQCluster,KeystoneAPI,PlacementAPI,Glance,Cinder,NeutronAPI,Nova
 
-oc get pods --selector control-plane=controller-manager -o name | xargs -n1 oc logs
+oc get pods -n openstack --show-labels | grep -i '.*control\-plane\=.*controller\-manager.*' | awk '{print $1}' | xargs -n1 oc logs
 

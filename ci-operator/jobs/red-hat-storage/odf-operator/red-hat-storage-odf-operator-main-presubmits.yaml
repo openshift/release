@@ -5,56 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
-    context: ci/prow/ci-index-odf-operator-static-deps
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-storage-odf-operator-main-ci-index-odf-operator-static-deps
-    rerun_command: /test ci-index-odf-operator-static-deps
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-odf-operator-static-deps
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index-odf-operator-static-deps,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build03
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -71,7 +22,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -105,7 +55,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/odf-operator-bundle-e2e-aws
+    context: ci/prow/odf-operator-e2e-aws
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -114,8 +64,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-red-hat-storage-odf-operator-main-odf-operator-bundle-e2e-aws
-    rerun_command: /test odf-operator-bundle-e2e-aws
+    name: pull-ci-red-hat-storage-odf-operator-main-odf-operator-e2e-aws
+    rerun_command: /test odf-operator-e2e-aws
     spec:
       containers:
       - args:
@@ -124,8 +74,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/odf-operator-bundle-e2e-aws-cluster-profile
-        - --target=odf-operator-bundle-e2e-aws
+        - --secret-dir=/usr/local/odf-operator-e2e-aws-cluster-profile
+        - --target=odf-operator-e2e-aws
         command:
         - ci-operator
         image: ci-operator:latest
@@ -141,7 +91,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/odf-operator-bundle-e2e-aws-cluster-profile
+        - mountPath: /usr/local/odf-operator-e2e-aws-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -172,4 +122,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )odf-operator-bundle-e2e-aws,?($|\s.*)
+    trigger: (?m)^/test( | .* )odf-operator-e2e-aws,?($|\s.*)

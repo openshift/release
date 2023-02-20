@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+source $SHARED_DIR/main.env
+
 # Check if cluster exists
 if [[ ! -e ${SHARED_DIR}/cluster_name ]]; then
     echo "Cluster doesn't exist, job failed, no need to run gather"

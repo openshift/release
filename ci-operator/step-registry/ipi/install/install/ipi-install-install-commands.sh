@@ -400,11 +400,18 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # Cloud infrastructure problems are common, instead of failing and
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
+case $JOB_NAME in
+  *vsphere*)
+    # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
+    max=1
+    ;;
+  *)
+    max=3
+    ;;
+esac
 ret=4
 tries=1
-max=3
 set +o errexit
-set +o pipefail
 backup=/tmp/install-orig
 cp -rfpv "$dir" "$backup"
 while [ $ret -eq 4 ] && [ $tries -le $max ]
@@ -414,6 +421,13 @@ do
     write_install_status
     cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
     openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    wait "$!"
+    ret="$?"
+    if test "${ret}" -ne 0 ; then
+      echo "Failed to destroy cluster, aborting retries."
+      ret=4
+      break
+    fi
     rm -rf "$dir"
     cp -rfpv "$backup" "$dir"
   else
@@ -423,11 +437,11 @@ do
   openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
+  echo "Installer exit with code $ret"
 
   tries=$((tries+1))
 done
 set -o errexit
-set -o pipefail
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"

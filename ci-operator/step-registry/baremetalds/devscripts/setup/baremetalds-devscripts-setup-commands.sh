@@ -109,7 +109,17 @@ mkdir dev-scripts
 tar -xzvf dev-scripts.tar.gz -C /root/dev-scripts
 chown -R root:root dev-scripts
 
-if [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ] && [[ "\$(mount | grep ${NVME_DEVICE})" == "" ]];
+if [ "${NVME_DEVICE}" = "auto" ];
+then
+  # Get disk where the system is installed
+  ROOT_DISK=\$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
+
+  # Use the largest disk available for dev-scripts
+  DATA_DISK=\$(lsblk -o name --noheadings --sort size --path | grep -v "\${ROOT_DISK}" | tail -n1)
+  mkfs.xfs -f "\${DATA_DISK}"
+  mkdir /opt/dev-scripts
+  mount "\${DATA_DISK}" /opt/dev-scripts
+elif [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ] && [[ "\$(mount | grep ${NVME_DEVICE})" == "" ]];
 then
   mkfs.xfs -f "${NVME_DEVICE}"
   mkdir /opt/dev-scripts
