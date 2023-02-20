@@ -89,6 +89,8 @@ computeSubnet=$(cat "${vnet_info_file}" | jq -r ".[].subnets[].name" | grep "wor
 #workaround for BZ#1822903
 clusterSubnetSNG="${VNET_BASE_NAME}-nsg"
 run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'worker-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges 80 443" || exit 3
+#Add port 22 to debug easily and to gather bootstrap log
+run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'ssh-allow' --priority 1001 --access Allow --source-port-ranges '*' --destination-port-ranges 22" || exit 3
 
 if [ X"${RESTRICTED_NETWORK}" == X"yes" ]; then
     echo "Remove outbound internet access from the Network Security groups used for master and worker subnets"
