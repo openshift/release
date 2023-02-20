@@ -190,6 +190,10 @@ fi
 export CNF_NODES="${test_nodes}"
 
 cd cnf-features-deploy
+
+git fetch origin pull/1406/head:test
+git checkout test
+
 status=0
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
