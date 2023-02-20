@@ -31,11 +31,6 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 # GPC instance config script
 export LD_PRELOAD=/usr/lib64/libnss_wrapper.so
 
-# JOB_NAME is a Prow-provided env var and embeds the top-level CI config name of the tests.
-TARGET_ARCH="$(echo "$JOB_NAME" | sed -En 's,.*(x86_64|aarch64).*,\1,p')"
-TARGET_OS_MAJOR_VER="$(echo "$JOB_NAME" | sed -En 's,.*rhel-(8|9).*,\1,p')"
-TARGET_OCP_RELEASE="$(echo "$JOB_NAME" | sed -En 's/.*release-(4\.[0-9]{,2}).*/\1/p')"
-
 cat <<EOF > "${PAYLOAD_PATH}"/usr/bin/pre_rpm_install.sh
 #! /bin/bash
 set -xeuo pipefail
@@ -47,20 +42,10 @@ subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
 
-subscription-manager repos \
-  --enable rhocp-${TARGET_OCP_RELEASE}-for-rhel-${TARGET_OS_MAJOR_VER}-${TARGET_ARCH}-rpms \
-  --enable "fast-datapath-for-rhel-${TARGET_OS_MAJOR_VER}-${TARGET_ARCH}-rpms"
+sed -i '2i set -x' /usr/bin/configure-vm.sh
 
-dnf install jq firewalld -y
-dnf install -y /packages/*.rpm
-systemctl enable --now crio.service firewalld
-
-firewall-cmd --zone=trusted --add-source=10.42.0.0/16 --permanent
-firewall-cmd --zone=public --add-port=80/tcp --permanent
-firewall-cmd --zone=public --add-port=443/tcp --permanent
-firewall-cmd --zone=public --add-port=5353/udp --permanent
-firewall-cmd --zone=public --add-port=6443/tcp --permanent
-firewall-cmd --reload
+sudo useradd -M -G wheel microshift
+sudo -nu microshift configure-vm.sh --no-build /etc/crio/openshift-pull-secret
 EOF
 chmod +x usr/bin/pre_rpm_install.sh
 
