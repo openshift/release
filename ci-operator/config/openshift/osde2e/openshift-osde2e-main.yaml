@@ -334,6 +334,26 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-hypershift-byovpc
     name: osde2e-hypershift-byovpc
+- as: hypershift-stage-e2e-nightly-default
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="hypershift"
+    export CHANNEL="nightly"
+    export INSTALL_LATEST_NIGHTLY="4.12"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */6 * * 0-5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-hypershift-byovpc
+    name: osde2e-hypershift-byovpc
 - as: rosa-stage-e2e-sts
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
