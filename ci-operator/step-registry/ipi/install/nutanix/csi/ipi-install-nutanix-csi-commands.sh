@@ -6,7 +6,6 @@ set -o pipefail
 
 source ${SHARED_DIR}/nutanix_context.sh
 
-
 echo "$(date -u --rfc-3339=seconds) - Creating CSI manifests..."
 cat > "${SHARED_DIR}/manifest_0000-nutanix-csi-crd-manifest.yaml" << EOF
 apiVersion: apiextensions.k8s.io/v1
@@ -133,36 +132,13 @@ allowVolumeExpansion: true
 reclaimPolicy: Delete
 EOF
 
-cat > "${SHARED_DIR}/manifest_iscsid-enable-master.yaml" << EOF
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  labels:
-    machineconfiguration.openshift.io/role: master
-  name: 99-master-ntnx-csi-enable-iscsid
-spec:
-  config:
-    ignition:
-      version: 3.2.0
-    systemd:
-      units:
-      - enabled: true
-        name: iscsid.service
-EOF
+oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-crd-manifest.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-system-namespace.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0003-nutanix-csi-operator-group.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0004-nutanix-csi-subscription.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0005-nutanix-csi-storage.yaml"
+oc apply -f "${SHARED_DIR}/manifest_0006-nutanix-csi-storage-class.yaml"
 
-cat > "${SHARED_DIR}/manifest_iscsid-enable-worker.yaml" << EOF
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  labels:
-    machineconfiguration.openshift.io/role: worker
-  name: 99-worker-ntnx-csi-enable-iscsid
-spec:
-  config:
-    ignition:
-      version: 3.2.0
-    systemd:
-      units:
-      - enabled: true
-        name: iscsid.service
-EOF
+sleep 60
+oc wait --for condition=Available=True --timeout=5m deployment/nutanix-csi-controller -n ntnx-system
