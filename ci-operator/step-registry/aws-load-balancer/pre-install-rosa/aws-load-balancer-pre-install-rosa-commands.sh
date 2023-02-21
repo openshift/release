@@ -8,12 +8,13 @@ AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 PULL_SECRET="${CLUSTER_PROFILE_DIR}/pull-secret"
 CI_BUILD01_AUTH="$(cat /var/run/albo/ci/build01/auth-token)"
+CI_REGISTRY_PULL_SECRET="/var/run/albo/registry/.dockerconfigjson"
 REGION="${LEASED_RESOURCE}"
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 # ALBO roles have to be cleaned up, otherwise ccoctl won't create secret manifests.
 # IAM roles with the prefix below are cleaned up by rosa-sts-account-roles-delete ref.
 ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
-ALBO_SRC_DIR="/go/src/github.com/openshift/aws-load-balancer-operator"
+#ALBO_SRC_DIR="/go/src/github.com/openshift/aws-load-balancer-operator"
 CR_DIR="/tmp/albo-credrequests"
 MANIFEST_DIR="/tmp/albo-manifests"
 # RELEASE_IMAGE_LATEST value needs a pull secret, use a public image instead.
@@ -21,10 +22,12 @@ OCP_RELEASE_IMAGE="quay.io/openshift-release-dev/ocp-release:4.12.0-x86_64"
 
 echo "=> registry pull secret"
 [ -d "/var/run/albo/registry" ] && ls -ltra /var/run/albo/registry
-grep -v auth /var/run/albo/registry/.dockerconfigjson || true
+grep -v auth "${CI_REGISTRY_PULL_SECRET}" || true
+cat "${CI_REGISTRY_PULL_SECRET}" | python3 -m json.tool | grep -v auth || true
 
 echo "=> checking pull secret"
 grep -v auth "${PULL_SECRET}" || true
+cat "${PULL_SECRET}" | python3 -m json.tool | grep -v auth || true
 
 echo "=> configuring aws"
 if [ -f "${AWSCRED}" ]; then
@@ -49,10 +52,12 @@ OIDC_IDP_NAME=$(rosa describe cluster --cluster="${CLUSTER_ID}" | grep 'OIDC End
 IDP_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_IDP_NAME}"
 
 echo "=> preparing credential requests"
-mkdir -p "${CR_DIR}"
-cp ${ALBO_SRC_DIR}/hack/operator-credentials-request.yaml "${CR_DIR}"
-cp ${ALBO_SRC_DIR}/hack/controller/controller-credentials-request.yaml "${CR_DIR}"
-cat ${CR_DIR}/*
+#mkdir -p "${CR_DIR}"
+#cp ${ALBO_SRC_DIR}/hack/operator-credentials-request.yaml "${CR_DIR}"
+#cp ${ALBO_SRC_DIR}/hack/controller/controller-credentials-request.yaml "${CR_DIR}"
+#cat ${CR_DIR}/*
+curl --create-dirs -o ${CR_DIR}/operator.yaml https://raw.githubusercontent.com/openshift/aws-load-balancer-operator/main/hack/operator-credentials-request.yaml
+curl --create-dirs -o ${CR_DIR}/controller.yaml https://raw.githubusercontent.com/openshift/aws-load-balancer-operator/main/hack/controller/controller-credentials-request.yaml
 
 echo "=> extracting ccoctl binary from cco image"
 CCO_IMAGE=$(oc adm release info --image-for='cloud-credential-operator' "${OCP_RELEASE_IMAGE}")
@@ -73,17 +78,30 @@ oc -n openshift-config get secret pull-secret --template='{{index .data ".docker
 cat /tmp/albo-rosa-pull-secret.json | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["registry.build01.ci.openshift.org"]={"auth":"'${CI_BUILD01_AUTH}'"};j["auths"]=a;print(json.dumps(j))' > /tmp/albo-rosa-pull-secret-with-ci.json
 oc -n openshift-config set data secret pull-secret --from-file=.dockerconfigjson=/tmp/albo-rosa-pull-secret-with-ci.json
 
+echo "=> extracting ccoctl binary from cco image using registry secret"
+oc adm release info --registry-config=${CI_REGISTRY_PULL_SECRET} --image-for='cloud-credential-operator' "${RELEASE_IMAGE_LATEST}" || true
+mkdir -p /tmp/albo4
+oc image extract "${CCO_IMAGE}" --path=/usr/bin/ccoctl:/tmp/albo4 -a ${CI_REGISTRY_PULL_SECRET} || true
+if [ -f /tmp/albo4/ccoctl ]; then
+    chmod 775 /tmp/albo4/ccoctl
+    /tmp/albo4/ccoctl
+fi
+
 echo "=> extracting ccoctl binary from cco image using personal token"
 echo '{"auths":{"registry.build01.ci.openshift.org":{"auth":"'${CI_BUILD01_AUTH}'"}}}' > /tmp/ci-pull-secret.json
 oc adm release info --registry-config=/tmp/ci-pull-secret.json --image-for='cloud-credential-operator' "${RELEASE_IMAGE_LATEST}" || true
 mkdir -p /tmp/albo2
 oc image extract "${CCO_IMAGE}" --path=/usr/bin/ccoctl:/tmp/albo2 -a /tmp/ci-pull-secret.json || true
-chmod 775 /tmp/albo2/ccoctl
-/tmp/albo2/ccoctl
+if [ -f /tmp/albo2/ccoctl ]; then
+    chmod 775 /tmp/albo2/ccoctl
+    /tmp/albo2/ccoctl
+fi
 
 echo "=> extracting ccoctl binary from cco image using ci token"
 oc adm release info --registry-config=${PULL_SECRET} --image-for='cloud-credential-operator' "${RELEASE_IMAGE_LATEST}" || true
 mkdir -p /tmp/albo3
 oc image extract "${CCO_IMAGE}" --path=/usr/bin/ccoctl:/tmp/albo3 --registry-config=${PULL_SECRET} || true
-chmod 775 /tmp/albo3/ccoctl
-/tmp/albo3/ccoctl
+if [ -f /tmp/albo3/ccoctl ]; then
+    chmod 775 /tmp/albo3/ccoctl
+    /tmp/albo3/ccoctl
+fi
