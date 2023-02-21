@@ -53,14 +53,13 @@ dnf localinstall -y /packages/*.rpm
 EOF
 chmod +x usr/bin/pre_rpm_install.sh
 
-BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
-
 mkdir -p "${PAYLOAD_PATH}"/etc/microshift
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 cat << EOF > "${PAYLOAD_PATH}"/etc/microshift/config.yaml
 ---
 apiServer:
   subjectAltNames:
-  - ${INSTANCE_PREFIX}.${BASE_DOMAIN}
+  - ${IP_ADDRESS}
 EOF
 
 mkdir -p "${PAYLOAD_PATH}"/etc/crio/ && cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
@@ -71,3 +70,7 @@ gcloud compute scp "${PAYLOAD_PATH}/payload.tar" rhel8user@"${INSTANCE_PREFIX}":
 gcloud compute ssh rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo tar -xhvf $HOME/payload.tar -C / && \
              sudo pre_rpm_install.sh'
+
+gcloud compute firewall-rules create "${INSTANCE_PREFIX}"-external \
+  --network "${INSTANCE_PREFIX}" \
+  --allow tcp:80,tcp:443,tcp:6443
