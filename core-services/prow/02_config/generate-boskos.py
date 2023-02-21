@@ -108,6 +108,9 @@ CONFIG = {
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
     },
+    'fleet-manager-qe-quota-slice': {
+        'default': 3,
+    },
     'gcp-qe-quota-slice': {
         'us-central1': 30,
     },
