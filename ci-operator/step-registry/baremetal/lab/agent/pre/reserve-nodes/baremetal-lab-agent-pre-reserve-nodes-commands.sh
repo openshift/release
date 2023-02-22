@@ -24,9 +24,6 @@ echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
 
 PULL_SECRET=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\"
 
-echo "Pull secret is ${PULL_SECRET}"
-
-
 if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
     N_WORKERS=1
 elif [ "${DEPLOYMENT_TYPE}" == "compact" ]; then
@@ -114,17 +111,38 @@ PULL_SECRET=${PULL_SECRET}
 SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
 EOF
 
+set -x
+
+if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
+
+    echo "DEPLOYMENT_TYPE is sno, running ip lookup scripts locally "
+
+    if [[ "${IP_STACK}" == *"v4"* ]]; then
+        vip=$(echo "${hosts[0]}" | yq '.ip')
+        echo "api_vip=${vip}" >> "${INVENTORY}"
+        echo "ingress_vip=${vip}" >> "${INVENTORY}"
+    fi
+
+    if [[ "${IP_STACK}" == *"v6"* ]]; then
+        vip_v6=$(echo "${hosts[0]}" | yq '.ipv6')
+        echo "api_vip_v6=${vip_v6}" >> "${INVENTORY}"
+        echo "ingress_vip_v6=${vip_v6}" >> "${INVENTORY}"
+    fi
+
+fi
+
 echo "Copying inventory file from local to AUX HOST"
 
-set -x
 scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${id}/"
-set +x
+
 
 
 echo "Running ip lookup scripts on AUX HOST"
 
 
 if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
+    echo "DEPLOYMENT_TYPE is NOT sno, running ip lookup scripts on AUX HOST "
+
     if [[ "${IP_STACK}" == *"v4"* ]]; then
         ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" /usr/local/bin/ip_lookup_v4.sh >> "${REMOTE_INVENTORY}"
     fi
@@ -132,16 +150,6 @@ if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
     if [[ "${IP_STACK}" == *"v6"* ]]; then
         ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" /usr/local/bin/ip_lookup_v6.sh >> "${REMOTE_INVENTORY}"
     fi
-else
-    if [[ "${IP_STACK}" == *"v4"* ]]; then
-        vip=$(echo "${hosts[0]}" | yq '.ip')
-        echo "api_vip=${vip}" >> "${REMOTE_INVENTORY}"
-        echo "ingress_vip=${vip}" >> "${REMOTE_INVENTORY}"
-    fi
-
-    if [[ "${IP_STACK}" == *"v6"* ]]; then
-        vip_v6=$(echo "${hosts[0]}" | yq '.ipv6')
-        echo "api_vip_v6=${vip_v6}" >> "${REMOTE_INVENTORY}"
-        echo "ingress_vip_v6=${vip_v6}" >> "${REMOTE_INVENTORY}"
-    fi
 fi
+
+set +x
