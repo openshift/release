@@ -7,7 +7,8 @@ set -o pipefail
 #source inventory.env
 
 #PULL_SECRET=\'$(cat ~/.docker/config.json | jq -c)\'
-SSH_PUBLIC_KEY=\"$(ssh root@"${AUX_HOST}" cat /root/.ssh/id_rsa.pub)\"
+
+echo "Building SSHOPTS"
 
 SSHOPTS=(-o 'ConnectTimeout=5'
 -o 'StrictHostKeyChecking=no'
@@ -15,6 +16,11 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 -o 'ServerAliveInterval=90'
 -o LogLevel=ERROR
 -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
+echo "Connecting to ${AUX_HOST} to retrieve ssh pub key"
+
+SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.pub)\"
+
 
 if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
     N_WORKERS=1
@@ -24,8 +30,15 @@ elif [ "${DEPLOYMENT_TYPE}" == "ha" ]; then
     N_WORKERS=6
 fi
 
+echo "DEPLOYMENT_TYPE is ${DEPLOYMENT_TYPE}"
+
+echo "Reserving nodes for baremetal installation with ${N_WORKERS} workers..."
+
+
 LC_ALL=C rand=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 6 | head -n 1 || true)
 id="ci-prow-${rand}"
+
+echo "id for current session is: ${id}" 
 
 INVENTORY="/var/builds/${id}/agent-install-inventory"
 
