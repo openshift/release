@@ -16,43 +16,19 @@ BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
-# Cluster to use for cnf-tests, and to exclude from selection in other jobs
-PREPARED_CLUSTER="cnfdu1"
-
 source $SHARED_DIR/main.env
+export MAINENV=${SHARED_DIR}/main.env
+
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
-
-# Set environment for jobs to run
-INTERNAL=true
-INTERNAL_ONLY=true
-# Run cnftests job on Upstream cluster
-if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
-    INTERNAL=false
-    INTERNAL_ONLY=false
-fi
-# Whether to use the bastion environment
-BASTION_ENV=true
-# Environment - US lab, DS lab or any
-CL_SEARCH="upstreambil"
-
-if $INTERNAL_ONLY && $INTERNAL; then
-    CL_SEARCH="internalbos"
-elif $INTERNAL; then
-    CL_SEARCH="any"
-fi
 
 cat << EOF > $SHARED_DIR/bastion_inventory
 [bastion]
 ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
-ADDITIONAL_ARG=""
-if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-  ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
-else
-  ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
-fi
 
+
+# Discover a cluster to run job
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
 - name: Grab and run kcli to install openshift cluster
@@ -68,7 +44,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $GET_CLUSTER_ARGS
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -77,51 +53,53 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     delegate_to: localhost
 EOF
 
-# Check connectivity
+# Check connectivity to bastion
+echo "Check connectivity to bastion host"
 ping ${BASTION_IP} -c 10 || true
 echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
 
+echo "Discover cluster to run job"
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
 PLAN_NAME="${CLUSTER_NAME}_ci"
+# Save cluster name for later use (job parsing, etc.)
+echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 
-cat << EOF > $SHARED_DIR/release-cluster.yml
----
-- name: Release cluster $CLUSTER_NAME
-  hosts: bastion
-  gather_facts: false
-  tasks:
-
-  - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
-EOF
-
+# If not running on BOS2 lab, no need to use bastion
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
     BASTION_ENV=false
 fi
 
 if $BASTION_ENV; then
-# Run on upstream lab with bastion
-cat << EOF > $SHARED_DIR/inventory
+    # Run on upstream lab with bastion
+    cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
 ${HYPERV_IP} ansible_host=${HYPERV_IP} ansible_user=kni ansible_ssh_private_key_file="${SSH_PKEY}" ansible_ssh_common_args='${COMMON_SSH_ARGS} -o ProxyCommand="ssh -i ${SSH_PKEY} ${COMMON_SSH_ARGS} -p 22 -W %h:%p -q centos@${BASTION_IP}"'
 EOF
-
 else
-# Run on downstream cnfdc1 without bastion
-cat << EOF > $SHARED_DIR/inventory
+    # Run on downstream HV without bastion
+    cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
 ${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
-
 fi
+
+# Update main.env file for next steps
+echo "# Updated variables from cluster-install step" >> $MAINENV
+echo "export CLUSTER_ENV=${CLUSTER_ENV}" >> $MAINENV
+echo "export CLUSTER_NAME=${CLUSTER_NAME}" >> $MAINENV
+echo "export PLAN_NAME=${PLAN_NAME}" >> $MAINENV
+echo "export BASTION_ENV=${BASTION_ENV}" >> $MAINENV
+echo "# End of updated variables from cluster-install step" >> $MAINENV
+cp $MAINENV $ARTIFACT_DIR/main.env
+
 echo "#############################################################################..."
 echo "========  Deploying plan $PLAN_NAME on cluster $CLUSTER_NAME $(if $BASTION_ENV; then echo "with a bastion"; fi)  ========"
 echo "#############################################################################..."
 
-# Start the deployment
+# Create files for deployment
 cat << EOF > ~/ocp-install.yml
 ---
 - name: Grab and run kcli to install openshift cluster
@@ -251,24 +229,46 @@ cat << EOF > $SHARED_DIR/check-cluster.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'"
     register: ready_check
 
+  - name: Grab the kcli log from installer
+    shell: >-
+      kcli scp root@${CLUSTER_NAME}-installer:/var/log/cloud-init-output.log /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+    ignore_errors: true
+    register: get_log
+
+  - name: Grab the log from HV to artifacts
+    fetch:
+      src: /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+      dest: ${ARTIFACT_DIR}/cloud-init-output.log
+      flat: yes
+    ignore_errors: true
+    when: get_log is success
+
   - name: Fail when cluster is not available
     shell: "echo Cluster ready: {{ ready_check.stdout }}"
     failed_when: "'True' not in ready_check.stdout"
 EOF
 
-# PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
-# CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.
-# It is intentionally set to a string so that it can be evaluated as a command (either /bin/true or /bin/false)
-# in order to provide the desired return code later.
-PROCEED_AFTER_FAILURES="false"
+cat << EOF > $SHARED_DIR/release-cluster.yml
+---
+- name: Release cluster $CLUSTER_NAME
+  hosts: bastion
+  gather_facts: false
+  tasks:
+
+  - name: Release cluster from job
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+EOF
+
 status=0
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv
 else
-    PROCEED_AFTER_FAILURES="true"
     ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 fi
-ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
+ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || fetch_status=$?
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || info_status=$?
+if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
+    (( result_status = fetch_status && info_status ))
+    exit ${result_status}
+fi
 exit ${status}
-
