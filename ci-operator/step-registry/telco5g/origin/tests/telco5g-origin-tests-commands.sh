@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+source $SHARED_DIR/main.env
 
 export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy}" # next: ovs_qos
 export CNF_REPO="${CNF_REPO:-https://github.com/openshift-kni/cnf-features-deploy.git}"

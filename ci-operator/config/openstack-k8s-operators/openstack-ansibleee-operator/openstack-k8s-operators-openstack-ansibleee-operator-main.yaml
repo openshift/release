@@ -1,22 +1,40 @@
 base_images:
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
   golangci-lint:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-binary_build_commands: make build
+  opm-builder:
+    name: opm-builder
+    namespace: ci
+    tag: latest
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.18-openshift-4.12
+  from_repository: true
 images:
 - dockerfile_literal: |
     FROM src
-    RUN yum update -y && yum install -y python39 python39-pip
-    RUN alternatives --set python3 /usr/bin/python3.9
     RUN pip3 install pre-commit
   from: src
-  to: pre-commit-container
+  to: openstack-operator-ci-pre-commit
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install python-openstackclient
+    COPY oc /usr/bin/oc
+    COPY opm /usr/bin/opm
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    opm-builder:
+      paths:
+      - destination_dir: .
+        source_path: /bin/opm
+  to: openstack-operator-ci-build-deploy
 resources:
   '*':
     limits:
@@ -58,11 +76,23 @@ tests:
     export GOFLAGS=
     export PRE_COMMIT_HOME=/tmp
     export GOLANGCI_LINT_CACHE=/tmp
+    git log -1
     mkdir -p ../operator && cp -r . ../operator
     cd ../operator
     pre-commit run --all-files --show-diff-on-failure
   container:
-    from: pre-commit-container
+    from: openstack-operator-ci-pre-commit
+- as: openstack-ansibleee-operator-build-deploy
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  optional: true
+  steps:
+    workflow: openstack-k8s-operators-test-build-deploy
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators

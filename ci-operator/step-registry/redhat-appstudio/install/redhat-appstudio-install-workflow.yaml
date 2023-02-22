@@ -2,11 +2,17 @@ workflow:
   as: redhat-appstudio-install
   steps:
     pre:
-    - chain: ipi-azure-pre
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - chain: hypershift-aws-setup-nested-management-cluster
     post:
     - ref: redhat-appstudio-gather
-    - chain: ipi-azure-post
+    - ref: redhat-appstudio-hypershift-gather
+    - chain: hypershift-dump
+    - chain: hypershift-aws-destroy-nested-management-cluster
   documentation: |-
-    This workflows perform the install of ocp and then gathers resources from the cluster using
-    the gather chain and redhat-appstudio-gather step (for gathering additional CRs). It should end
-    with the deprovision of the cluster (using ipi-*-post chain)
+    The HyperShift aws cluster workflow provides pre- and post- steps that provision and
+    deprovision a HostedCluster which is given to the end user via cluster bot.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
