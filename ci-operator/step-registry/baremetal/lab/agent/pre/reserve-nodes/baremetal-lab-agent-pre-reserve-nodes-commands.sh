@@ -35,12 +35,14 @@ mkdir /var/builds/"${id}"
 BUILD_ID="${id}" N_MASTERS=0 N_WORKERS="${N_WORKERS}" IPI=true /usr/local/bin/reserve_hosts.sh
 EOF
 
+# shellcheck disable=SC2140
 scp "${SSHOPTS[@]}" root@"${AUX_HOST}":"/var/builds/${id}/hosts.yaml" .
 
 if [[ -f "${INVENTORY}" ]]; then
     rm -f "${INVENTORY}"
 fi
 
+# shellcheck disable=SC2207
 hosts=($(yq e -o=j -I=0 '.[]' hosts.yaml))
 echo "[hosts]" > ${INVENTORY}
 for i in "${!hosts[@]}"; do
