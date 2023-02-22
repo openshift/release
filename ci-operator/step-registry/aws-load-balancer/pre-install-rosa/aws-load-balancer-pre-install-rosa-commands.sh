@@ -42,10 +42,7 @@ OIDC_IDP_NAME=$(rosa describe cluster --cluster="${CLUSTER_ID}" | grep 'OIDC End
 IDP_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_IDP_NAME}"
 
 echo "=> preparing credential requests"
-ls -ltr
-[ -d /go/src ] && ls -ltr /go/src
-[ -d /go/src/github.com/openshift ] && ls -ltr /go/src/github.com/openshift
-[ -d /go/src/github.com/openshift/aws-load-balancer-operator ] && ls -ltr /go/src/github.com/openshift/aws-load-balancer-operator
+find / -name \*aws-load-balancer-operator\* 2> /dev/null || true
 #mkdir -p "${CR_DIR}"
 #cp ${ALBO_SRC_DIR}/hack/operator-credentials-request.yaml "${CR_DIR}"
 #cp ${ALBO_SRC_DIR}/hack/controller/controller-credentials-request.yaml "${CR_DIR}"
@@ -68,6 +65,11 @@ oc apply -f "${MANIFEST_DIR}/manifests"
 
 echo "=> adding ci pull secret"
 oc -n openshift-config get secret pull-secret --template='{{index .data ".dockerconfigjson" | base64decode}}' > /tmp/albo-rosa-pull-secret.json
-CI_REGISTRY_AUTH=$(cat ${CI_REGISTRY_PULL_SECRET} | python3 -c 'import json,sys;print(json.load(sys.stdin)["auths"]["registry.build01.ci.openshift.org"]["auth"])')
-cat /tmp/albo-rosa-pull-secret.json | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["registry.build01.ci.openshift.org"]={"auth":"'${CI_REGISTRY_AUTH}'"};j["auths"]=a;print(json.dumps(j))' > /tmp/albo-rosa-pull-secret-with-ci.json
+# getting the auth of the build registry (e.g. registry.build01.ci.openshift.org)
+cat ${CI_REGISTRY_PULL_SECRET} | python3 -c 'import json,sys
+for k,v in json.load(sys.stdin)["auths"].items(): print(k,":",v["auth"])' | grep -P -m1 'registry.build\d+.ci' | tr -d ' ' > /tmp/buildregistryauth
+CI_BUILD_REGISTRY=$(cat /tmp/buildregistryauth | cut -d: -f1)
+CI_BUILD_REGISTRY_AUTH=$(cat /tmp/buildregistryauth | cut -d: -f2)
+echo "=> build registry: ${CI_BUILD_REGISTRY}"
+cat /tmp/albo-rosa-pull-secret.json | python3 -c 'import json,sys;j=json.load(sys.stdin);a=j["auths"];a["'${CI_BUILD_REGISTRY}'"]={"auth":"'${CI_BUILD_REGISTRY_AUTH}'"};j["auths"]=a;print(json.dumps(j))' > /tmp/albo-rosa-pull-secret-with-ci.json
 oc -n openshift-config set data secret pull-secret --from-file=.dockerconfigjson=/tmp/albo-rosa-pull-secret-with-ci.json
