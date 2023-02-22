@@ -1,0 +1,97 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+images:
+- dockerfile_literal: |
+      FROM quay.io/migqe/migqe-base:latest
+      ENV GOROOT=/usr/local/go
+      ENV PATH=/usr/local/go/bin:$PATH
+      ENV GOBIN=/usr/local/go/bin
+      ENV GOCACHE=/tmp/
+      ENV BUCKET=interopoadp
+      ARG GO_VER=go1.18.10.linux-amd64.tar.gz
+      RUN yum update -y && yum install gcc -y && yum install diffutils -y
+      RUN curl -s -k https://dl.google.com/go/$GO_VER -o $GO_VER && \
+      tar -C /usr/local -xzf $GO_VER && rm -fr $GO_VER
+      RUN go install github.com/onsi/ginkgo/v2/ginkgo@v2.1.6 && go install github.com/onsi/gomega/... && \
+      which ginkgo && \
+      chmod 777 -R $HOME/.cache && \
+      mkdir /go && chmod 777 /go && mkdir -p /alabama/.ansible/tmp && chmod 777 /alabama/.ansible/tmp
+      RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 && \
+          chmod 700 get_helm.sh && \
+          ./get_helm.sh
+  to: go-runner
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
+- dockerfile_literal: |
+    FROM src
+    RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+      unzip -q awscliv2.zip && \
+      ./aws/install && \
+      rm -rf awscliv2.zip aws &&\
+      mkdir /.aws && chmod 777 /.aws
+  from: src
+  to: aws-console
+releases:
+  initial:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: nightly
+      version: "4.12"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+tests:
+- as: oadp-interop-e2e
+  interval: 960h
+  steps:
+    cluster-profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: aws.interop.ccitredhat.com
+      BUCKET_NAME: oadptest
+      OPERATORS: |
+      [
+        {"name": "volsync-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": "openshift-operators"},
+        {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp"}
+      ]
+    test:
+    - ref: interop-oadp-execute
+    workflow: interop-oadp
+zz_generated_metadata:
+  branch: master
+  org: CSPI-QE
+  repo: oadp-e2e-qe
