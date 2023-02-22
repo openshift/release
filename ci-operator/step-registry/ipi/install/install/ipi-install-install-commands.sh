@@ -400,9 +400,17 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # Cloud infrastructure problems are common, instead of failing and
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
+case $JOB_NAME in
+  *vsphere*)
+    # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
+    max=1
+    ;;
+  *)
+    max=3
+    ;;
+esac
 ret=4
 tries=1
-max=3
 set +o errexit
 backup=/tmp/install-orig
 cp -rfpv "$dir" "$backup"
