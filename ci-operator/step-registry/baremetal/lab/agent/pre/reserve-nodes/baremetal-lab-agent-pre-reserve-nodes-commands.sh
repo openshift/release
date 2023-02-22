@@ -6,7 +6,6 @@ set -o pipefail
 
 #source inventory.env
 
-#PULL_SECRET=\'$(cat ~/.docker/config.json | jq -c)\'
 
 echo "Building SSHOPTS"
 
@@ -20,6 +19,8 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 echo "Connecting to ${AUX_HOST} to retrieve ssh pub key"
 
 SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.pub)\"
+
+PULL_SECRET=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat ~/.docker/config.json | jq -c)\"
 
 
 if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
@@ -80,8 +81,10 @@ for i in "${!hosts[@]}"; do
     bmc_user=$(echo "${hosts[$i]}" | yq '.bmc_user')
     bmc_pass=$(echo "${hosts[$i]}" | yq '.bmc_pass')
     echo "node${i} hostname=${hostname} mac=${mac} ip=${ip} ipv6=${ipv6} bmc_address=${bmc_address} bmc_user=${bmc_user} bmc_pass=${bmc_pass}" >> "${INVENTORY}"
-
 done
+
+echo "Populating ${INVENTORY} file"
+
 
 cat >>"${INVENTORY}"<<EOF
 
@@ -103,7 +106,7 @@ DISCONNECTED=${DISCONNECTED}
 PROXY=${PROXY}
 FIPS=${FIPS}
 RELEASE_IMAGE=${RELEASE_IMAGE}
-#PULL_SECRET=${PULL_SECRET}
+PULL_SECRET=${PULL_SECRET}
 SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
 EOF
 
