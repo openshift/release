@@ -16,7 +16,7 @@ ES_USERNAME=$(cat "/secret/username")
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner
-export JOB_ITERATIONS=10
+export JOB_ITERATIONS=27
 export WORKLOAD=cluster-density
 export GEN_CSV=false
 

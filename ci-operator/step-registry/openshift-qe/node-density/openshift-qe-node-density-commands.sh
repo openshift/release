@@ -18,7 +18,7 @@ git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner
 export WORKLOAD=node-density
 export NODE_COUNT=3
-export PODS_PER_NODE=240
+export PODS_PER_NODE=230
 export POD_READY_THRESHOLD=120000ms
 export GEN_CSV=false
 
