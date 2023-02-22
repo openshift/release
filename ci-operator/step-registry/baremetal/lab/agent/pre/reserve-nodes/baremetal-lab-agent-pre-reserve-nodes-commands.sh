@@ -20,7 +20,11 @@ echo "Connecting to ${AUX_HOST} to retrieve ssh pub key"
 
 SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.pub)\"
 
+echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
+
 PULL_SECRET=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\"
+
+echo "Pull secret is ${PULL_SECRET}"
 
 
 if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
@@ -112,8 +116,10 @@ EOF
 
 echo "Copying inventory file from local to AUX HOST"
 
+set -x
+scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${id}/"
+set +x
 
-scp "${SSHOPTS[@]}" "${INVENTORY} root@${AUX_HOST}:/var/builds/${id}/"
 
 echo "Running ip lookup scripts on AUX HOST"
 
