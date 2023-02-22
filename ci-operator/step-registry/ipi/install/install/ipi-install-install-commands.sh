@@ -451,6 +451,10 @@ if test "${ret}" -eq 0 ; then
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 
+  sleep 3600s
+  sleep 3600s
+  sleep 3600s
+
   echo "Collecting cluster data for analysis..."
   set +o errexit
   set +o pipefail
