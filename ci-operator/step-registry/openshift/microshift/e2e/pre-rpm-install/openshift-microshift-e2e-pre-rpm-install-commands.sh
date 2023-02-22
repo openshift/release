@@ -42,6 +42,8 @@ subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
 
+which configure-vm.sh
+
 sed -i '2i set -x' /usr/bin/configure-vm.sh
 
 sudo useradd -M -G wheel microshift
