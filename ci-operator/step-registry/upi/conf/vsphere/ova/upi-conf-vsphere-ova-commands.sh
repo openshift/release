@@ -63,7 +63,7 @@ for i in "${!DATACENTERS[@]}"; do
                 DistributedVirtualPortgroup*)
                     DVPG=$(echo ${NET} | cut -d':' -f2-)
                     echo "Checking ${DVPG}"
-                    FOUND=$(govc object.collect -json -type c | jq -r --arg CLUSTER "$CLUSTER" --arg DVPG "$DVPG" 'select(.changeSet[] | .name == "name" and .val == $CLUSTER) | .changeSet[] | select(.name == "network") | .val._value | any(.value == $DVPG)')
+                    FOUND=$(govc object.collect -json -type c | jq -r --arg CLUSTER "$CLUSTER" --arg DVPG "$DVPG" 'select(.ChangeSet[] | .Name == "name" and .Val == $CLUSTER) | .ChangeSet[] | select(.Name == "network") | .Val.ManagedObjectReference | any(.Value == $DVPG)')
                     if [ "$FOUND" = true ]; then
                         echo "$(date -u --rfc-3339=seconds) - Found network matching for name=${LEASED_RESOURCE}.  Setting ova network to ${NET}"
                         OVA_NETWORK=${NET}
