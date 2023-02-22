@@ -20,7 +20,7 @@ echo "Connecting to ${AUX_HOST} to retrieve ssh pub key"
 
 SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.pub)\"
 
-PULL_SECRET=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat ~/.docker/config.json | jq -c)\"
+PULL_SECRET=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\"
 
 
 if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
