@@ -36,7 +36,7 @@ echo "Reserving nodes for baremetal installation with ${N_WORKERS} workers..."
 
 
 LC_ALL=C rand=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 6 | head -n 1 || true)
-id="ci-prow-${rand}"
+id="ci-op-${rand}"
 
 echo "id for current session is: ${id}" 
 
