@@ -32,7 +32,6 @@ fi
 
 echo "DEPLOYMENT_TYPE is ${DEPLOYMENT_TYPE}"
 
-echo "Reserving nodes for baremetal installation with ${N_WORKERS} workers..."
 
 
 LC_ALL=C rand=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 6 | head -n 1 || true)
@@ -40,7 +39,11 @@ id="ci-op-${rand}"
 
 echo "id for current session is: ${id}" 
 
-INVENTORY="/var/builds/${id}/agent-install-inventory"
+
+INVENTORY="${SHARED_DIR}/agent-install-inventory"
+REMOTE_INVENTORY="/var/builds/${id}/agent-install-inventory"
+
+echo "Reserving nodes for baremetal installation with ${N_WORKERS} workers..."
 
 
 # shellcheck disable=SC2087
@@ -50,16 +53,24 @@ mkdir /var/builds/"${id}"
 BUILD_ID="${id}" N_MASTERS=0 N_WORKERS="${N_WORKERS}" IPI=true /usr/local/bin/reserve_hosts.sh
 EOF
 
-# shellcheck disable=SC2140
-scp "${SSHOPTS[@]}" root@"${AUX_HOST}":"/var/builds/${id}/hosts.yaml" .
+echo "Copying YAML files to container's shared dir ${SHARED_DIR}"
 
-if [[ -f "${INVENTORY}" ]]; then
-    rm -f "${INVENTORY}"
-fi
+
+# shellcheck disable=SC2140
+#scp "${SSHOPTS[@]}" root@"${AUX_HOST}":"/var/builds/${id}/hosts.yaml" .
+scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${id}/*.yaml" "${SHARED_DIR}/"
+
+
+#if [[ -f "${INVENTORY}" ]]; then
+#    rm -f "${INVENTORY}"
+#fi
+
+echo "Parsing hosts.yaml file"
+
 
 # shellcheck disable=SC2207
-hosts=($(yq e -o=j -I=0 '.[]' hosts.yaml))
-echo "[hosts]" > ${INVENTORY}
+hosts=($(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/"hosts.yaml))
+echo "[hosts]" > "${INVENTORY}"
 for i in "${!hosts[@]}"; do
     hostname=$(echo "${hosts[$i]}" | yq '.host')."${BASE_DOMAIN}"
     mac=$(echo "${hosts[$i]}" | yq '.mac')
@@ -68,11 +79,11 @@ for i in "${!hosts[@]}"; do
     bmc_address=$(echo "${hosts[$i]}" | yq '.bmc_address')
     bmc_user=$(echo "${hosts[$i]}" | yq '.bmc_user')
     bmc_pass=$(echo "${hosts[$i]}" | yq '.bmc_pass')
-    echo "node${i} hostname=${hostname} mac=${mac} ip=${ip} ipv6=${ipv6} bmc_address=${bmc_address} bmc_user=${bmc_user} bmc_pass=${bmc_pass}" >> ${INVENTORY}
+    echo "node${i} hostname=${hostname} mac=${mac} ip=${ip} ipv6=${ipv6} bmc_address=${bmc_address} bmc_user=${bmc_user} bmc_pass=${bmc_pass}" >> "${INVENTORY}"
 
 done
 
-cat >>${INVENTORY}<<EOF
+cat >>"${INVENTORY}"<<EOF
 
 [aux]
 ${AUX_HOST} ansible_connection=ssh ansible_ssh_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa
@@ -96,25 +107,32 @@ RELEASE_IMAGE=${RELEASE_IMAGE}
 SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
 EOF
 
+echo "Copying inventory file from local to AUX HOST"
+
+
+scp "${SSHOPTS[@]}" "${INVENTORY} root@${AUX_HOST}:/var/builds/${id}/"
+
+echo "Running ip lookup scripts on AUX HOST"
+
 
 if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
     if [[ "${IP_STACK}" == *"v4"* ]]; then
-        ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" /usr/local/bin/ip_lookup_v4.sh >> "${INVENTORY}"
+        ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" /usr/local/bin/ip_lookup_v4.sh >> "${REMOTE_INVENTORY}"
     fi
 
     if [[ "${IP_STACK}" == *"v6"* ]]; then
-        ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" /usr/local/bin/ip_lookup_v6.sh >> "${INVENTORY}"
+        ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" /usr/local/bin/ip_lookup_v6.sh >> "${REMOTE_INVENTORY}"
     fi
 else
     if [[ "${IP_STACK}" == *"v4"* ]]; then
         vip=$(echo "${hosts[0]}" | yq '.ip')
-        echo "api_vip=${vip}" >> "${INVENTORY}"
-        echo "ingress_vip=${vip}" >> "${INVENTORY}"
+        echo "api_vip=${vip}" >> "${REMOTE_INVENTORY}"
+        echo "ingress_vip=${vip}" >> "${REMOTE_INVENTORY}"
     fi
 
     if [[ "${IP_STACK}" == *"v6"* ]]; then
         vip_v6=$(echo "${hosts[0]}" | yq '.ipv6')
-        echo "api_vip_v6=${vip_v6}" >> "${INVENTORY}"
-        echo "ingress_vip_v6=${vip_v6}" >> "${INVENTORY}"
+        echo "api_vip_v6=${vip_v6}" >> "${REMOTE_INVENTORY}"
+        echo "ingress_vip_v6=${vip_v6}" >> "${REMOTE_INVENTORY}"
     fi
 fi
