@@ -25,7 +25,7 @@ elif [ "${DEPLOYMENT_TYPE}" == "ha" ]; then
 fi
 
 LC_ALL=C rand=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 6 | head -n 1 || true)
-id="ci-op-${rand}"
+id="ci-prow-${rand}"
 
 INVENTORY="/var/builds/${id}/agent-install-inventory"
 
