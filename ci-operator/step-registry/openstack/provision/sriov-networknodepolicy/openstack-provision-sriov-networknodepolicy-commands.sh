@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
 wait_for_sriov_pods() {
     # Wait up to 15 minutes for SNO to be installed
     for _ in $(seq 1 15); do
