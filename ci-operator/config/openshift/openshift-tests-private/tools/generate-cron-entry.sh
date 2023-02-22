@@ -69,13 +69,14 @@ case "$FN" in
 		DAY_OF_MONTH_FINAL=$(echo $DAY_OF_MONTH_TMP | sed 's/,/\n/g' | sort -n | paste -s -d ',' -)
 		echo "$MINUTE $HOUR $DAY_OF_MONTH_FINAL * *"
 		;;
-	32|33|34|35|36|37|38|39|40|41|42|43|44|45|46|47|48|49|50|51|52|53|54|55|56|57|58|59|60)
-		let MONTH_FINAL=$MONTH%2
-		if [[ $MONTH_FINAL -eq 1 ]] ; then
-			echo "$MINUTE $HOUR $DAY_OF_MONTH 1,3,5,7,9,11 *"
-		else
-			echo "$MINUTE $HOUR $DAY_OF_MONTH 2,4,6,8,10,12 *"
-		fi
+	60|90|120|180|360)
+		let MONTH_TMP=MONTH
+		for ((i=1 ; i<365/FN; ++i)) ; do
+			let TMP=(i*FN/30+MONTH-1)%12+1
+			MONTH_TMP+=",$TMP"
+		done
+		MONTH_FINAL=$(echo $MONTH_TMP | sed 's/,/\n/g' | sort -n | paste -s -d ',' -)
+		echo "$MINUTE $HOUR $DAY_OF_MONTH $MONTH_FINAL *"
 		;;
 	*)
 		echo "to be implemented"
