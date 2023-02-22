@@ -62,6 +62,7 @@ function build_push_operator_images {
 
   unset GOFLAGS
   pushd ${OP_DIR}
+  sleep 7200
   GOWORK='' make build bundle
 
   # Build and push operator image
