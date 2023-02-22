@@ -21,7 +21,7 @@ export NODE_COUNT=3
 export PODS_PER_NODE=230
 export POD_READY_THRESHOLD=120000ms
 export GEN_CSV=false
-
+export CLEANUP_WHEN_FINISH=true
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
