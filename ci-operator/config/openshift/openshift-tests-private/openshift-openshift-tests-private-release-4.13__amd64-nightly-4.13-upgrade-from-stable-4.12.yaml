@@ -60,6 +60,28 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: alibaba-ipi-fips-p2-f14
+  cron: 28 15 8,24 * *
+  steps:
+    cluster_profile: alibabacloud-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @alibaba-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @alibaba-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-alibabacloud-ipi-fips
+- as: alibaba-ipi-private-p2-f14
+  cron: 19 23 5,21 * *
+  steps:
+    cluster_profile: alibabacloud-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @alibaba-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @alibaba-ipi and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
 - as: aws-ipi-byo-iam-role-p2-f14
   cron: 56 22 2,18 * *
   steps:
