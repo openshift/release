@@ -92,4 +92,5 @@ for ((n = 1; n <= OPERATOR_HEALTH_TIMEOUT; n++)); do
 done
 
 echo "Cluster operators not ready after ${OPERATOR_HEALTH_TIMEOUT} minute(s); exiting"
+oc get clusteroperators -o json > "${ARTIFACT_DIR}/clusteroperators.json"
 exit 1
