@@ -54,6 +54,12 @@ cat > packing-test-infra.yaml <<-EOF
             ServerAliveInterval 90
             LogLevel ERROR
             IdentityFile {{ lookup('env', 'SSH_KEY_FILE') }}
+    - name: Create ansible configuration
+      ansible.builtin.copy:
+        dest: "{{ SHARED_DIR }}/ansible.cfg"
+        content: |
+          [defaults]
+          callback_whitelist = profile_tasks
 EOF
 
 ansible-playbook packing-test-infra.yaml
@@ -322,4 +328,5 @@ cat > run_test_playbook.yaml <<-"EOF"
           echo "Finish running post installation script"
 EOF
 
+export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
 ansible-playbook run_test_playbook.yaml -i "${SHARED_DIR}/inventory"
