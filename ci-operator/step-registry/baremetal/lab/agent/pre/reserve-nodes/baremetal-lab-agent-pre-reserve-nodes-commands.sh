@@ -8,11 +8,13 @@ set -o pipefail
 
 #PULL_SECRET=\'$(cat ~/.docker/config.json | jq -c)\'
 SSH_PUBLIC_KEY=\"$(ssh root@"${AUX_HOST}" cat /root/.ssh/id_rsa.pub)\"
+
 SSHOPTS=(-o 'ConnectTimeout=5'
-  -o 'StrictHostKeyChecking=no'
-  -o 'UserKnownHostsFile=/dev/null'
-  -o 'ServerAliveInterval=90'
-  -o LogLevel=ERROR)
+-o 'StrictHostKeyChecking=no'
+-o 'UserKnownHostsFile=/dev/null'
+-o 'ServerAliveInterval=90'
+-o LogLevel=ERROR
+-i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
     N_WORKERS=1
