@@ -42,11 +42,10 @@ subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
 
-which configure-vm.sh
-
 sed -i '2i set -x' /usr/bin/configure-vm.sh
 
 sudo useradd -M -G wheel microshift
+sudo echo -e 'microshift\tALL=(ALL)\tNOPASSWD: ALL' > /etc/sudoers.d/microshift
 sudo -nu microshift configure-vm.sh --no-build /etc/crio/openshift-pull-secret
 EOF
 chmod +x usr/bin/pre_rpm_install.sh
