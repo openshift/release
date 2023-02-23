@@ -25,7 +25,7 @@ resources:
       memory: 200Mi
 test_binary_build_commands: automation/build-test.sh
 tests:
-- as: openshift-e2e
+- as: openshift-pipelines-e2e
   cluster_claim:
     architecture: amd64
     as: latest
@@ -36,10 +36,32 @@ tests:
     version: "4.11"
   steps:
     test:
-    - as: openshift-e2e
+    - as: openshift-pipelines-e2e
       cli: latest
       commands: "printenv KUBECONFIG\nprintenv KUBEADMIN_PASSWORD_FILE\noc get node\noc
-        config view\noc whoami   \nmake test-e2e-openshift\n"
+        config view\noc whoami   \n./automation/e2e-deploy-openshift-resources.sh
+        latest\nmake test-e2e-openshift\n"
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: openshift-pipelines-nightly-e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: openshift-pipelines-nightly-e2e
+      cli: latest
+      commands: "printenv KUBECONFIG\nprintenv KUBEADMIN_PASSWORD_FILE\noc get node\noc
+        config view\noc whoami   \n./automation/e2e-deploy-openshift-resources.sh
+        nightly\nmake test-e2e-openshift\n"
       from: base-tests
       resources:
         requests:
