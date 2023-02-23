@@ -14,7 +14,6 @@
 
 - **Repository**: [windup/windup-ui-tests](https://github.com/windup/windup-ui-tests)
 - **Operator Tested**: [MTR (Migration Toolkit for Runtimes)](https://developers.redhat.com/products/mtr/overview)
-- **Maintainers**: Interop QE
 
 ## Purpose
 
