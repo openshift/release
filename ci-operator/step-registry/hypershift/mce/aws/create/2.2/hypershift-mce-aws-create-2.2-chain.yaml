@@ -16,10 +16,18 @@ chain:
       commands: |-
         set -exuo pipefail
 
+        arch=$(arch)
+        if [ "$arch" == "x86_64" ]; then
+          downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/hypershift.tar.gz ${downURL}
+          cd /tmp && tar -xvf /tmp/hypershift.tar.gz --strip-components 5
+          chmod +x /tmp/hypershift
+          cd -
+        fi
+
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
       
-        /usr/bin/hypershift create cluster aws \
+        /tmp/hypershift create cluster aws \
         --name ${CLUSTER_NAME} \
         --infra-id ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
@@ -53,7 +61,7 @@ chain:
         echo "Waiting for cluster to become available"
         oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
         echo "Cluster became available, creating kubeconfig"
-        bin/hypershift create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+        /tmp/hypershift create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
         echo "Waiting for clusteroperators to be ready"
         export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
         until \
@@ -74,7 +82,7 @@ chain:
       from_image:
         namespace: ocp
         name: "4.12"
-        tag: hypershift-operator
+        tag: upi-installer
       grace_period: 5m0s
       resources:
         requests:

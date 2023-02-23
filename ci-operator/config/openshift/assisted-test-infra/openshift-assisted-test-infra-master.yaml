@@ -53,6 +53,12 @@ releases:
       product: ocp
       stream: nightly
       version: "4.12"
+  latest-multi:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -221,7 +227,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-periodic
   cron: 15 02 */1 * 0-5
@@ -230,7 +236,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
@@ -263,7 +269,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-periodic
@@ -273,7 +279,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
       PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
@@ -688,8 +694,29 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
     env:
       ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
+        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
+        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+    workflow: assisted-equinix
+- as: e2e-metal-assisted-day2-arm-workers-periodic
+  cron: 15 15 */1 * 0,3
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
+    env:
+      ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
+        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
+        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
     workflow: assisted-equinix
 zz_generated_metadata:
   branch: master

@@ -1,8 +1,4 @@
 base_images:
-  must-gather:
-    name: "4.12"
-    namespace: ocp
-    tag: must-gather
   operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -31,10 +27,6 @@ images:
 - dockerfile_path: openshift-ci/Dockerfile.registry
   from: operator-registry
   to: ocs-registry-quay
-- context_dir: must-gather/
-  dockerfile_path: Dockerfile
-  from: must-gather
-  to: ocs-must-gather
 operator:
   bundles:
   - as: ocs-operator-bundle
@@ -83,7 +75,6 @@ tests:
     cluster_profile: aws
     dependencies:
       CATALOG_FULL_IMAGE_NAME: ocs-registry
-      MUST_GATHER_FULL_IMAGE_NAME: ocs-must-gather
       OO_INDEX: ci-index-ocs-operator-bundle
     env:
       OCP_MUST_GATHER_DIR: ${ARTIFACT_DIR}/ocp-must-gather
@@ -96,9 +87,6 @@ tests:
     - as: ocs-must-gather
       cli: latest
       commands: hack/dump-debug-info.sh
-      dependencies:
-      - env: MUST_GATHER_FULL_IMAGE_NAME
-        name: ocs-must-gather
       env:
       - name: OCP_MUST_GATHER_DIR
       - name: OCS_MUST_GATHER_DIR
@@ -115,8 +103,6 @@ tests:
       dependencies:
       - env: CATALOG_FULL_IMAGE_NAME
         name: ocs-registry
-      - env: MUST_GATHER_FULL_IMAGE_NAME
-        name: ocs-must-gather
       - env: OO_INDEX
         name: ci-index
       from: src

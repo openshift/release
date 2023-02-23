@@ -65,12 +65,6 @@ images:
   from: src-oc
   to: src-test
 releases:
-  initial:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: nightly
-      version: "4.12"
   latest:
     candidate:
       product: ocp
@@ -88,15 +82,25 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: aws.interop.ccitredhat.com
-      SUB_CHANNEL: stable-1.1
-      SUB_INSTALL_NAMESPACE: openshift-adp
-      SUB_PACKAGE: redhat-oadp-operator
-      SUB_SOURCE: redhat-operators
-      SUB_TARGET_NAMESPACES: openshift-adp
+      OPERATORS: |
+        [
+        {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable-1.1", "install_namespace": "openshift-operators", "target_namespaces": "openshift-adp"},
+        {"name": "volsync-product", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators", "target_namespaces": ""}
+        ]
       BUCKET_NAME: oadptest
+      SPOT_INSTANCES: "true"
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: install-operators
+    - ref: lp-interop-tooling-create-s3
+    - ref: interop-tests-deploy-odf
     test:
     - ref: interop-oadp-execute
-    workflow: interop-oadp
+    post:
+    - ref: gather-aws-console
+    - ref: lp-interop-tooling-delete-s3
+    - chain: ipi-deprovision
 zz_generated_metadata:
   branch: main
   org: CSPI-QE

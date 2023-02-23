@@ -9,6 +9,18 @@ build_root:
     namespace: ci
     tag: "2.4"
   use_build_cache: true
+images:
+- dockerfile_literal: |
+    FROM quay.io/maistra-dev/maistra-builder:2.4
+    # Git checks if the user that owns the files on the filesystem match the
+    # current user.  We need to disable this check because tests in Prow are
+    # running with a random user.
+    RUN git config --system --add safe.directory '*'
+  inputs:
+    src:
+      as:
+      - quay.io/maistra-dev/maistra-builder:2.4
+  to: src-test
 releases:
   latest:
     release:
@@ -31,7 +43,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
   timeout: 1h0m0s
 - as: maistra-istio-lint-2-4
   commands: |
@@ -42,7 +54,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
   timeout: 1h0m0s
 - as: maistra-istio-gencheck-2-4
   commands: |
@@ -53,7 +65,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
   timeout: 1h0m0s
 - as: maistra-istio-integ-aws-2-4
   cluster_claim:
@@ -80,13 +92,13 @@ tests:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_MC_POD
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
           memory: 100Mi
       timeout: 30m0s
-    - as: maistra-istio-integration-kube-sc-2-4
+    - as: maistra-istio-integ-kube-singlecluster-2-4
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
@@ -95,17 +107,18 @@ tests:
           test.integration.helm.kube.presubmit \
           test.integration.security.kube.presubmit \
           test.integration.pilot.kube.presubmit \
+          test.integration.servicemesh.kube.presubmit \
           test.integration.telemetry.kube.presubmit
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: "2"
           memory: 2Gi
       timeout: 2h0m0s
-    - as: maistra-istio-integration-servicemesh-kube-2-4
+    - as: maistra-istio-integ-servicemesh-kube-multicluster-2-4
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" \
@@ -113,12 +126,11 @@ tests:
           prow/integ-suite-kind.sh \
           --topology \
           MULTICLUSTER \
-          test.integration.servicemesh.kube.presubmit \
           test.integration.servicemesh.kube
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_MC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: "2"

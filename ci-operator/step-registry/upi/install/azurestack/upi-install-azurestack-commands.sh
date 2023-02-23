@@ -101,12 +101,17 @@ do
   SECRET_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["name"])')
   SECRET_NAMESPACE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["namespace"])')
   FEATURE_GATE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-gate" in data["metadata"]["annotations"])')
+  FEATURE_SET=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-set" in data["metadata"]["annotations"])')
 
 # 4.10 includes techpreview of CAPI which without the namespace: openshift-cluster-api
 # fails to bootstrap. Below checks if TechPreviewNoUpgrade is annotated and if so skips
 # creating that secret.
 
   if [[ $FEATURE_GATE == *"True"* ]]; then
+      continue
+  fi
+
+  if [[ $FEATURE_SET == *"True"* ]]; then
       continue
   fi
 

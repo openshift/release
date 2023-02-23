@@ -1,4 +1,32 @@
 base_images:
+  assisted-image-service:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   upi-installer:
     name: "4.13"
     namespace: origin
@@ -32,6 +60,16 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: upi-vsphere
+- as: e2e-assisted
+  interval: 48h
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=3
+        NUM_WORKERS=2
+        OS_IMAGES='[{"openshift_version":"4.13","cpu_architecture":"x86_64","url":"https://builds.coreos.fedoraproject.org/prod/streams/stable/builds/37.20221127.3.0/x86_64/fedora-coreos-37.20221127.3.0-live.x86_64.iso","version": "37.20221127.3.0"}]'
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -27,6 +27,9 @@ presubmits:
         - --ignore=kata-containers/kata-containers
         - --ignore=containers/gvisor-tap-vsock
         - --ignore=containers/podman-py
+        - --ignore=CSPI-QE
+        - --ignore=redhat-openshift-ecosystem/certified-operators-prod
+        - --ignore=redhat-openshift-ecosystem/preflight
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -229,7 +232,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20230109-3e30fa4
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20230220-1a2ebb1
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -709,7 +712,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20230125-a579b87e2c
+        image: gcr.io/k8s-prow/checkconfig:v20230222-1346bb3cfc
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1134,7 +1137,7 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )release-config,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^master$
     - ^master-
@@ -1145,7 +1148,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-release-controller-config
     rerun_command: /test release-controller-config
-    run_if_changed: ^(core-services/release-controller|clusters/app.ci/release-controller|clusters/build-clusters/common/release-controller|ci-operator/config/openshift/release|ci-operator/jobs/openshift/release)/.*
     spec:
       containers:
       - args:
