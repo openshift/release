@@ -48,9 +48,9 @@ if [[ -z "$IMAGE_TAG" ]]; then
     esac
 fi
 
-# Get IMAGE_TAG if it's equal to YearIndex in YYYYq_YYYYMMDD format
+# Get IMAGE_TAG if it's equal to YearIndex in YYYYMMDD format
 if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
-    YEAR_INDEX=$(echo "$(date +%Y)""$(echo "$(date +%q)"|sed 's/1/a/g;s/2/b/g;s/3/c/g;s/4/d/g')"_"$(date +%Y%m%d)")
+    YEAR_INDEX=$(echo "$(date +%Y%m%d)")
     case "$JOB_TYPE" in
         presubmit)
             log "INFO Building YearIndex image tag for a $JOB_TYPE job"
@@ -65,8 +65,8 @@ if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
             IMAGE_FLOATING_TAG="${RELEASE_VERSION}"
             ;;
         periodic)
-            log "INFO Building YearIndex image tag for a $JOB_TYPE job"
-            IMAGE_TAG="${RELEASE_VERSION}-nightly-${YEAR_INDEX}"
+            log "INFO Building weekly image tag for a $JOB_TYPE job"
+            IMAGE_TAG="${RELEASE_VERSION}-weekly"
             ;;
         *)
             log "ERROR Cannot publish an image from a $JOB_TYPE job"
