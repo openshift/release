@@ -16,7 +16,7 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     CREATE_FIPS=0
 fi
 
-if [[ "$CONFIG_TYPE" == "proxy" ]]; then
+if [[ "$CONFIG_TYPE" == *"proxy"* ]]; then
     BASTION_FIP=$(<"${SHARED_DIR}/BASTION_FIP")
     BASTION_USER=$(<"${SHARED_DIR}/BASTION_USER")
 fi
@@ -63,7 +63,7 @@ collect_bootstrap_logs() {
     			if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     			    echo "This job uses a proxy but without a bastion, `openshift-install gather` is not supported yet, see CORS-2367"
 			else
-                            if [[ "$CONFIG_TYPE" == "proxy" ]]; then
+                            if [[ "$CONFIG_TYPE" == *"proxy"* ]]; then
 			    	# configure the local container environment to have the correct SSH configuration
 			    	if ! whoami &> /dev/null; then
 			    		if [[ -w /etc/passwd ]]; then
