@@ -77,7 +77,7 @@ tests:
     workflow: generic-claim
 - as: sonar
   commands: |
-    export SONAR_GO_TEST_ARGS="./..."
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
@@ -87,7 +87,7 @@ tests:
     name: acm-sonarcloud-token
 - as: sonar-post-submit
   commands: |
-    export SONAR_GO_TEST_ARGS="./..."
+    export SONAR_GO_TEST_ARGS="$(go list ./... | awk '!/e2e/ {printf $0" "}')"
     export SELF="make -f /opt/build-harness/Makefile.prow"
     make -f /opt/build-harness/Makefile.prow sonar/go/prow
   container:
