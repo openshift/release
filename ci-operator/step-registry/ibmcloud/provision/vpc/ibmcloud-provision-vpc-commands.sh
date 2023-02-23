@@ -179,6 +179,7 @@ cat > "${SHARED_DIR}/customer_vpc_subnets.yaml" << EOF
 platform:
   ibmcloud:
     resourceGroupName: ${resource_group}
+    networkResourceGroupName: ${resource_group}
     vpcName: ${vpc_name}
 networking:
   machineNetwork:

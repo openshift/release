@@ -13,6 +13,8 @@ SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 
+source $SHARED_DIR/main.env
+
 if [[ ! -e ${SHARED_DIR}/cluster_name ]]; then
     echo "Cluster doesn't exist, job failed"
     exit 1

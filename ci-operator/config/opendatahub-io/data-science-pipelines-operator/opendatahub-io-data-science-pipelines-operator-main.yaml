@@ -27,11 +27,29 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: GOFLAGS="" go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 tests:
 - as: unit
-  commands: make test
+  commands: GOFLAGS="" make test
   container:
-    from: src
+    from: test-bin
+- as: image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: data-science-pipelines-operator
+    env:
+      IMAGE_REPO: data-science-pipelines-operator
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: data-science-pipelines-operator
+    env:
+      IMAGE_REPO: data-science-pipelines-operator
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

@@ -188,19 +188,19 @@
         ],
       },
       {
-        name: 'pod-scaler-admission-memory-warning',
+        name: 'pod-scaler-admission-resource-warning',
         rules: [
           {
-            alert: 'pod-scaler-admission-memory-warning',
+            alert: 'pod-scaler-admission-resource-warning',
             expr: |||
-             sum by (workload_name, workload_type, determined_memory, configured_memory) (increase(pod_scaler_admission_high_determined_memory{workload_type!~"undefined|build"}[5m])) > 0
+             sum by (workload_name, workload_type, determined_amount, configured_amount, resource_type) (increase(pod_scaler_admission_high_determined_resource{workload_type!~"undefined|build"}[5m])) > 0
             |||,
             'for': '1m',
             labels: {
               severity: 'critical',
             },
             annotations: {
-              message: 'Workload {{ $labels.workload_name }} ({{ $labels.workload_type }}) used 10x more than configured amount of memory (actual: {{ $labels.determined_memory }}, configured: {{ $labels.configured_memory }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',
+              message: 'Workload {{ $labels.workload_name }} ({{ $labels.workload_type }}) used 10x more than configured amount of {{ $labels.resource_type }} (actual: {{ $labels.determined_amount }}, configured: {{ $labels.configured_amount }}. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/pod-scaler-admission.md|SOP>.',
             },
           }
         ],
