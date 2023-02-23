@@ -190,6 +190,10 @@ sed -i '/^  channel:/d' "manifests/cvo-overrides.yaml"
 echo "Removing control plane machines..."
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 
+### Remove control plane machineset
+echo "Removing control plane machineset..."
+rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
+
 ### Remove compute machinesets (optional)
 echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
