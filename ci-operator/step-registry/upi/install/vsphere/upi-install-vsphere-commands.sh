@@ -157,6 +157,18 @@ if [ ${SECURE_BOOT_ENABLED} = "true" ]; then
   sed -i '/guest_id/a\  firmware         = "efi"\n  efi_secure_boot_enabled = "true"' ./vm/main.tf
 fi
 
+if [ "${STORAGE_POLICY_ID}" != "" ]; then
+  # shellcheck source=/dev/null
+  source "${SHARED_DIR}/govc.sh"
+  govc storage.policy.ls "${STORAGE_POLICY_ID}"
+  ret="$?"
+  if [ $ret -ne 0 ]; then
+    echo "ERROR: Can not find storage policy id ${STORAGE_POLICY_ID}"
+    exit "$ret"
+  fi
+  sed -i "/guest_id/a\ storage_policy_id = \"${STORAGE_POLICY_ID}\"" ./vm/main.tf
+fi
+
 date +%s > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "$(date -u --rfc-3339=seconds) - terraform init..."
@@ -231,7 +243,7 @@ cp -t "${SHARED_DIR}" \
 if [[ $JOB_NAME =~ 4.6-e2e-vsphere.* ]]; then
   echo "Remapping dockerhub e2e images to local mirror for 4.6 e2e vSphere jobs"
   setE2eMirror
-  
+
 elif [[ $JOB_NAME =~ .*okd-4.*-e2e-vsphere.* ]]; then
   echo "Remapping dockerhub e2e images to local mirror for OKD e2e vSphere jobs"
   setE2eMirror
