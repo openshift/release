@@ -6,6 +6,8 @@ set -o pipefail
 # Every cluster that can should have a PV for prometheus data so that data is preserved
 # across reschedules of pods.
 
+/tmp/yq --version
+
 if test false = "${PERSISTENT_MONITORING}"
 then
 	echo "Nothing to do with PERSISTENT_MONITORING='${PERSISTENT_MONITORING}'"
@@ -24,6 +26,7 @@ else
   touch "${CONFIG}"
 fi
 
+echo "yq 1"
 CONFIG_CONTENTS="$(/tmp/yq r ${CONFIG} 'data."config.yaml"')"
 if [ -z "${CONFIG_CONTENTS}" ]; then
   cat >> "${CONFIG}" << EOF
@@ -58,6 +61,8 @@ prometheusK8s:
           storage: ${STORAGE}
 EOF
 
+echo "yq 2"
 CONFIG_CONTENTS="$(echo "${CONFIG_CONTENTS}" | /tmp/yq m - "${PATCH}")"
+echo "yq 3"
 /tmp/yq w --style folded -i "${CONFIG}" 'data."config.yaml"' "${CONFIG_CONTENTS}"
 cat "${CONFIG}"
