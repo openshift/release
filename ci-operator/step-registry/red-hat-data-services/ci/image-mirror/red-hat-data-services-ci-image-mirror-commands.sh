@@ -61,7 +61,7 @@ if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
             ;;
         postsubmit)
             log "INFO Building YearIndex image tag for a $JOB_TYPE job"
-            IMAGE_TAG="${RELEASE_VERSION}-${YEAR_INDEX}"
+            IMAGE_TAG="${RELEASE_VERSION}-${YEAR_INDEX}-${PULL_BASE_SHA:0:7}"
             IMAGE_FLOATING_TAG="${RELEASE_VERSION}"
             ;;
         periodic)
