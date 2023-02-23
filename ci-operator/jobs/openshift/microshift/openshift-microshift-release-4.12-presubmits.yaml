@@ -1,64 +1,12 @@
 presubmits:
   openshift/microshift:
   - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-4\.12$
-    - ^release-4\.12-
-    cluster: build02
-    context: ci/prow/periodics-rhel-8-x86_64-images
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: periodics-rhel-8-x86_64
-      ci.openshift.io/generator: prowgen
-      job-release: "4.12"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-periodics-rhel-8-x86_64-images
-    rerun_command: /test periodics-rhel-8-x86_64-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=periodics-rhel-8-x86_64
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )periodics-rhel-8-x86_64-images,?($|\s.*)
-  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/rhel-8-x86_64-e2e-openshift-conformance-reduced
+    context: ci/prow/e2e-openshift-conformance-reduced
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -66,11 +14,10 @@ presubmits:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci-operator.openshift.io/cluster: build02
-      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-openshift-conformance-reduced
-    rerun_command: /test rhel-8-x86_64-e2e-openshift-conformance-reduced
+    name: pull-ci-openshift-microshift-release-4.12-e2e-openshift-conformance-reduced
+    rerun_command: /test e2e-openshift-conformance-reduced
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
     spec:
       containers:
@@ -81,7 +28,6 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-openshift-conformance-reduced-cluster-profile
         - --target=e2e-openshift-conformance-reduced
-        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -126,25 +72,24 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-openshift-conformance-reduced,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openshift-conformance-reduced,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/rhel-8-x86_64-e2e-reboot
+    context: ci/prow/e2e-reboot
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-reboot
-    rerun_command: /test rhel-8-x86_64-e2e-reboot
+    name: pull-ci-openshift-microshift-release-4.12-e2e-reboot
+    rerun_command: /test e2e-reboot
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
     spec:
       containers:
@@ -155,7 +100,6 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-reboot-cluster-profile
         - --target=e2e-reboot
-        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -200,26 +144,25 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-reboot,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-reboot,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/rhel-8-x86_64-e2e-router-smoke-test
+    context: ci/prow/e2e-router-smoke-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: gcp
       ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-e2e-router-smoke-test
+    name: pull-ci-openshift-microshift-release-4.12-e2e-router-smoke-test
     optional: true
-    rerun_command: /test rhel-8-x86_64-e2e-router-smoke-test
+    rerun_command: /test e2e-router-smoke-test
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
     spec:
       containers:
@@ -230,7 +173,6 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/e2e-router-smoke-test-cluster-profile
         - --target=e2e-router-smoke-test
-        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -275,23 +217,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-8-x86_64-e2e-router-smoke-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-router-smoke-test,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/rhel-8-x86_64-images
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-images
-    rerun_command: /test rhel-8-x86_64-images
+    name: pull-ci-openshift-microshift-release-4.12-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
@@ -300,7 +241,6 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
-        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -327,23 +267,74 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-8-x86_64-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.12$
+    - ^release-4\.12-
+    cluster: build02
+    context: ci/prow/periodics-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: periodics
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.12-periodics-images
+    rerun_command: /test periodics-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=periodics
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )periodics-images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/rhel-8-x86_64-test-srpm
+    context: ci/prow/test-srpm
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-test-srpm
-    rerun_command: /test rhel-8-x86_64-test-srpm
+    name: pull-ci-openshift-microshift-release-4.12-test-srpm
+    rerun_command: /test test-srpm
     run_if_changed: ^(rpm/*|packaging/.*|Makefile)
     spec:
       containers:
@@ -352,7 +343,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=test-srpm
-        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -379,23 +369,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-8-x86_64-test-srpm,?($|\s.*)
+    trigger: (?m)^/test( | .* )test-srpm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/rhel-8-x86_64-test-unit
+    context: ci/prow/test-unit
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-test-unit
-    rerun_command: /test rhel-8-x86_64-test-unit
+    name: pull-ci-openshift-microshift-release-4.12-test-unit
+    rerun_command: /test test-unit
     spec:
       containers:
       - args:
@@ -403,7 +392,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=test-unit
-        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -430,23 +418,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-8-x86_64-test-unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )test-unit,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-4\.12$
     - ^release-4\.12-
     cluster: build02
-    context: ci/prow/rhel-8-x86_64-verify
+    context: ci/prow/verify
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: rhel-8-x86_64
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.12-rhel-8-x86_64-verify
-    rerun_command: /test rhel-8-x86_64-verify
+    name: pull-ci-openshift-microshift-release-4.12-verify
+    rerun_command: /test verify
     spec:
       containers:
       - args:
@@ -454,7 +441,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=verify
-        - --variant=rhel-8-x86_64
         command:
         - ci-operator
         image: ci-operator:latest
@@ -481,4 +467,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhel-8-x86_64-verify,?($|\s.*)
+    trigger: (?m)^/test( | .* )verify,?($|\s.*)
