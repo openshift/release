@@ -1,14 +1,14 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.12"
     namespace: ocp
     tag: cli
   libvirt-installer:
-    name: "4.13"
+    name: "4.12"
     namespace: ocp
     tag: libvirt-installer
   test-bin:
-    name: "4.13"
+    name: "4.12"
     namespace: ocp
     tag: tests
   ubi-minimal:
@@ -19,7 +19,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.19-openshift-4.13
+    tag: rhel-8-release-golang-1.18-openshift-4.12
 images:
 - dockerfile_literal: |
     FROM libvirt-installer
@@ -32,7 +32,7 @@ images:
         source_path: /go/src/github.com/openshift/microshift/validate-microshift
   to: microshift-validate
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.13 as builder
+    FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.18-openshift-4.12 as builder
     RUN dnf install --setopt=tsflags=nodocs -y \
         rpm-build glibc-static gcc selinux-policy-devel util-linux && \
         dnf clean all && \
@@ -47,8 +47,6 @@ images:
     WORKDIR $PAYLOAD_PATH
     COPY oc openshift-tests usr/bin/
     RUN chmod 755 usr/bin/oc && ln -rs usr/bin/oc usr/bin/kubectl
-    COPY --from=builder /go/src/github.com/openshift/microshift/scripts/devenv-builder/configure-vm.sh usr/bin/configure-vm.sh
-    RUN chmod 755 usr/bin/configure-vm.sh
     COPY --from=builder /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
     RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
   inputs:
@@ -61,7 +59,7 @@ images:
       - libvirt-installer
     src:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.18-openshift-4.12
     test-bin:
       paths:
       - destination_dir: .
@@ -100,12 +98,12 @@ releases:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.12"
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -114,6 +112,11 @@ resources:
       cpu: 100m
       memory: 800Mi
 tests:
+- as: copr-rpm-health-check
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-copr-install
 - as: test-unit
   commands: make test-unit
   container:
@@ -128,24 +131,63 @@ tests:
   cron: 0 0 * * *
   steps:
     cluster_profile: gcp
-    env:
-      GOOGLE_COMPUTE_IMAGE_NAME: rhel-8-v20230202
-      GOOGLE_COMPUTE_MACHINE_TYPE: e2-standard-8
     workflow: openshift-microshift-e2e-openshift-conformance-sig-api-machinery
+- as: e2e-openshift-conformance-sig-apps
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-apps
+- as: e2e-openshift-conformance-sig-arch
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-arch
+- as: e2e-openshift-conformance-sig-auth
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-auth
+- as: e2e-openshift-conformance-sig-cli
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-cli
+- as: e2e-openshift-conformance-sig-instrumentation
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-instrumentation
+- as: e2e-openshift-conformance-sig-network
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-network
+- as: e2e-openshift-conformance-sig-node
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-node
+- as: e2e-openshift-conformance-sig-scheduling
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-scheduling
+- as: e2e-openshift-conformance-sig-storage
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-microshift-e2e-openshift-conformance-sig-storage
 - as: e2e-reboot
   cron: 0 0 * * *
   steps:
     cluster_profile: gcp
-    env:
-      GOOGLE_COMPUTE_IMAGE_NAME: rhel-8-v20230202
-      GOOGLE_COMPUTE_MACHINE_TYPE: e2-standard-8
     workflow: openshift-microshift-e2e-reboot-tests
 - as: rebase-on-nightlies
   cron: 0 5 * * 1-5
   steps:
     workflow: openshift-microshift-rebase
 zz_generated_metadata:
-  branch: main
+  branch: release-4.12
   org: openshift
   repo: microshift
-  variant: periodics_rhel-8-x86_64
+  variant: periodics
