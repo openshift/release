@@ -3,6 +3,12 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -10,11 +16,12 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+test_binary_build_commands: GOFLAGS="" go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 tests:
-- as: unit
-  commands: make test-unit
+- as: codeflare-operator-unit
+  commands: GOFLAGS="" make test-unit
   container:
-    from: src
+    from: test-bin
 zz_generated_metadata:
   branch: main
   org: project-codeflare
