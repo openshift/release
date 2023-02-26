@@ -31,6 +31,11 @@ ovs_qos "Validate MCO"
 # TESTNAME
 dpdk "Client should be able to forward packets"
 
+# SKIPTEST
+# bz### It takes too much time (1 test)
+# TESTNAME
+dpdk "Server should be able to receive packets and forward to tap device"
+
 EOF
 }
 
