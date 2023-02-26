@@ -16,6 +16,21 @@ cat <<EOF >"${SKIP_TESTS_FILE}"
 # TESTNAME
 sriov "FPGA Programmable Acceleration Card N3000 for Networking"
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-4194
+# TESTNAME
+performance "Should have the correct RPS configuration"
+
+# SKIPTEST
+# bz### It takes too much time (4 tests)
+# TESTNAME
+ovs_qos "Validate MCO"
+
+# SKIPTEST
+# bz### It takes too much time (1 test)
+# TESTNAME
+dpdk "Client should be able to forward packets"
+
 EOF
 }
 
