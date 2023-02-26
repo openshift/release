@@ -16,11 +16,6 @@ cat <<EOF >"${SKIP_TESTS_FILE}"
 # TESTNAME
 sriov "FPGA Programmable Acceleration Card N3000 for Networking"
 
-# SKIPTEST
-# bz### It takes too much time (4 tests)
-# TESTNAME
-ovs_qos "Validate MCO"
-
 EOF
 }
 
@@ -38,31 +33,6 @@ function create_tests_temp_skip_list_12 {
 # List of temporarly skipped tests for 4.12
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "Should be able to configure a metaplugin"
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "Webhook resource injector"
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
-
-# SKIPTEST
-# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
-# TESTNAME
-sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-4194
-# TESTNAME
-performance "Should have the correct RPS configuration"
 
 EOF
 }
@@ -113,7 +83,7 @@ function get_skip_tests {
 
 source $SHARED_DIR/main.env
 
-export FEATURES="${FEATURES:-sriov sctp dpdk tuningcni bondcni s2i ovs_qos vrf multinetworkpolicy}"
+export FEATURES="${FEATURES:-sriov performance sctp xt_u32 dpdk ovn metallb tuningcni bondcni s2i ovs_qos vrf multinetworkpolicy}"
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
