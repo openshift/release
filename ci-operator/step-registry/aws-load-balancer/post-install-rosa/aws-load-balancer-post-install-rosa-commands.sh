@@ -4,6 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+KCONF="${SHARED_DIR}/kubeconfig"
+MUST_GATHER="${ARTIFACT_DIR}/must-gather"
+
+mkdir -p "${MUST_GATHER}"
+oc --kubeconfig="${KCONF}" adm must-gather --dest-dir="${MUST_GATHER}"
+tar -czC "${MUST_GATHER}" -f "${ARTIFACT_DIR}/must-gather.tar.gz" .
+rm -rf "${MUST_GATHER}"
+
 echo "=> get albo catalog source"
 oc -n aws-load-balancer-operator get catalogsource -o yaml
 echo "=> get albo operatorgroup"
