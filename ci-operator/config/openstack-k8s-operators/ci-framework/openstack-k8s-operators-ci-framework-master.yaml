@@ -1,6 +1,16 @@
 build_root:
   project_image:
     dockerfile_path: containerfiles/Containerfile.ci
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN make setup_molecule USE_VENV=no
+  from: src
+  to: ci-framework-image
+promotion:
+  name: cifwm
+  namespace: openstack-k8s-operators
+  tag_by_commit: true
 resources:
   '*':
     limits:
@@ -16,7 +26,7 @@ tests:
     export ANSIBLE_REMOTE_TMP=/tmp
     make pre_commit_nodeps
   container:
-    from: src
+    from: ci-framework-image
 - as: molecule
   commands: |
     export HOME=/tmp
@@ -24,7 +34,7 @@ tests:
     export ANSIBLE_REMOTE_TMP=/tmp
     make molecule_nodeps
   container:
-    from: src
+    from: ci-framework-image
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
