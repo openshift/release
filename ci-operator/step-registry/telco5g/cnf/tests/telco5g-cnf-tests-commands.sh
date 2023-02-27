@@ -36,6 +36,11 @@ dpdk "Client should be able to forward packets"
 # TESTNAME
 dpdk "Server should be able to receive packets and forward to tap device"
 
+# SKIPTEST
+# bz### It takes too much time (1 test)
+# TESTNAME
+dpdk "Validate a DPDK workload running inside a pod"
+
 EOF
 }
 
