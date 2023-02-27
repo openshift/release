@@ -54,6 +54,12 @@ cat > packing-test-infra.yaml <<-EOF
             ServerAliveInterval 90
             LogLevel ERROR
             IdentityFile {{ lookup('env', 'SSH_KEY_FILE') }}
+    - name: Create ansible configuration
+      ansible.builtin.copy:
+        dest: "{{ SHARED_DIR }}/ansible.cfg"
+        content: |
+          [defaults]
+          callback_whitelist = profile_tasks
 EOF
 
 ansible-playbook packing-test-infra.yaml
@@ -114,6 +120,7 @@ export SERVICE_BRANCH={{ PULL_PULL_SHA }}
 {% endif %}
 
 source /root/platform-conf.sh
+source /root/assisted-additional-config
 
 {# Additional mechanism to inject assisted additional variables directly #}
 {% if ASSISTED_CONFIG is defined %}
@@ -196,6 +203,11 @@ cat > run_test_playbook.yaml <<-"EOF"
       ansible.builtin.copy:
         src: "{{ SHARED_DIR }}/platform-conf.sh"
         dest: /root/platform-conf.sh
+    - name: Copy assisted-additional-config file
+      become: true
+      ansible.builtin.copy:
+        src: "{{ SHARED_DIR }}/assisted-additional-config"
+        dest: /root/assisted-additional-config
     - name: Install packages
       dnf:
         name:
@@ -316,4 +328,5 @@ cat > run_test_playbook.yaml <<-"EOF"
           echo "Finish running post installation script"
 EOF
 
+export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
 ansible-playbook run_test_playbook.yaml -i "${SHARED_DIR}/inventory"

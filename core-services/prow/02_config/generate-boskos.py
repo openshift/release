@@ -108,6 +108,9 @@ CONFIG = {
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
     },
+    'fleet-manager-qe-quota-slice': {
+        'default': 3,
+    },
     'gcp-qe-quota-slice': {
         'us-central1': 30,
     },
@@ -223,7 +226,7 @@ CONFIG = {
         'westus': 5
     },
     'gcp-virtualization-quota-slice': {
-        'us-central1': 10,
+        'us-central1': 50,
     }
 }
 
@@ -273,7 +276,7 @@ for i in range(50,54):
 for i in range(55,56):
     CONFIG['vsphere-connected-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(151,155):
+for i in range(151,158):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(200,204):

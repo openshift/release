@@ -1,0 +1,22 @@
+chain:
+  as: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption-provision
+  steps:
+  - ref: aws-provision-kms-key
+  - ref: ipi-conf
+  - ref: ipi-conf-telemetry
+  - ref: ipi-conf-aws
+  - ref: ipi-conf-aws-kms-key
+  - ref: ipi-install-monitoringpvc
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - ref: etcd-encryption
+  env:
+  - name: CONTROL_PLANE_INSTANCE_TYPE
+    default: "m6i.xlarge"
+    documentation: "Instance type for control plane nodes"
+  - name: COMPUTE_NODE_TYPE
+    default: "m5.xlarge"
+    documentation: "Instance type for compute nodes"
+  documentation: |-
+    Create an IPI cluster using byo-kms key with etcd encryption enabled on AWS for QE e2e tests.
+    One KMS key will be cretaed by aws-provision-kms-key, and put it install-config.yaml for both control plane and compute nodes

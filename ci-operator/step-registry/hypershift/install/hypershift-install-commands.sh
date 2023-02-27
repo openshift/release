@@ -6,7 +6,6 @@ bin/hypershift install --hypershift-image="${HYPERSHIFT_RELEASE_LATEST}" \
 --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
 --oidc-storage-provider-s3-bucket-name=hypershift-ci-oidc \
 --oidc-storage-provider-s3-region=us-east-1 \
---enable-validating-webhook \
 --private-platform=AWS \
 --aws-private-creds=/etc/hypershift-pool-aws-credentials/credentials \
 --aws-private-region="${HYPERSHIFT_AWS_REGION}" \
