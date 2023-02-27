@@ -10,6 +10,12 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   to: dpu-network-operator
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/origin-dpu-network-operator:4.13
+    with: pipeline:dpu-network-operator
 promotion:
   name: "4.13"
   namespace: ocp
@@ -39,6 +45,25 @@ tests:
   commands: HOME=/tmp make test
   container:
     from: src
+- as: operator-e2e
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-dpu-network-operator
+      OO_PACKAGE: dpu-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: make test-e2e-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: master
   org: openshift
