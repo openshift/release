@@ -26,8 +26,9 @@ fi
 echo "$(date -u --rfc-3339=seconds) - Validating parsed Ansible inventory"
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 echo "$(date -u --rfc-3339=seconds) - Running RHEL worker scaleup"
+set +o
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" playbooks/scaleup.yml -vvv
-
+sleep 5h
 
 if [[ "${REMOVE_RHCOS_WORKER}" == "no" ]]; then
     echo "RHCOS worker will not be removed!"
