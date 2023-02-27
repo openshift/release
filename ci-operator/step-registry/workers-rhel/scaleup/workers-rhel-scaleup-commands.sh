@@ -29,6 +29,7 @@ echo "$(date -u --rfc-3339=seconds) - Running RHEL worker scaleup"
 set +o
 set +e
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" playbooks/scaleup.yml -vvv
+echo "waiting for debug..."
 sleep 5h
 
 if [[ "${REMOVE_RHCOS_WORKER}" == "no" ]]; then
