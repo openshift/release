@@ -1,9 +1,31 @@
+base_images:
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
     tag: "2.3"
   use_build_cache: true
+images:
+- dockerfile_literal: |
+    FROM quay.io/maistra-dev/maistra-builder:2.3
+    # Git checks if the user that owns the files on the filesystem match the
+    # current user.  We need to disable this check because tests in Prow are
+    # running with a random user.
+    RUN git config --system --add safe.directory '*'
+  inputs:
+    src:
+      as:
+      - quay.io/maistra-dev/maistra-builder:2.3
+  to: src-test
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -21,7 +43,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     TEST_FLAGS="-v"
   container:
-    from: src
+    from: src-test
   timeout: 4h0m0s
 - as: istio-operator-gencheck-2-3
   commands: |
@@ -31,7 +53,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
 - as: istio-operator-lint-2-3
   commands: |
     make lint \
@@ -40,7 +62,68 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
+- as: istio-operator-push-image-2-3
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      GOBIN: /gobin
+      GOCACHE: /tmp/cache
+      GOMODCACHE: /tmp/cache
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: istio-operator-copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: istio-operator-push-image-2-3
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          sh -c \
+          "docker login -u='maistra-dev+prow' \
+          -p=${QUAY_PASS} quay.io; \
+          make push \
+          IMAGE=quay.io/maistra-dev/istio-ubi8-operator:PR-${PULL_NUMBER}"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      - name: GOCACHE
+      - name: GOBIN
+      - name: GOMODCACHE
+      from: src-test
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 20m0s
+    workflow: servicemesh-istio-e2e-aws
 zz_generated_metadata:
   branch: maistra-2.3
   org: maistra

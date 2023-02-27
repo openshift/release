@@ -61,6 +61,13 @@ cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" ~/.ssh/ssh-publickey || true
 chmod 0644 ~/.ssh/ssh-publickey || true
 eval export SSH_CLOUD_PUB_KEY="~/.ssh/ssh-publickey"
 
+#set env for rosa which are required by hypershift qe team
+if test -f "${CLUSTER_PROFILE_DIR}/ocm-token"
+then
+    TEST_ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token") || true
+    export TEST_ROSA_TOKEN
+fi
+
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
@@ -90,6 +97,15 @@ aws-usgov|aws-c2s|aws-sc2s)
     export KUBE_SSH_USER=core
     export TEST_PROVIDER="none"
     ;;
+alibabacloud)
+    mkdir -p ~/.ssh
+    cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_alibaba_rsa || true
+    export SSH_CLOUD_PRIV_ALIBABA_USER="${QE_BASTION_SSH_USER:-core}"
+    export KUBE_SSH_USER=core
+    export PROVIDER_ARGS="-provider=alibabacloud -gce-zone=us-east-1"
+    REGION="$(oc get -o jsonpath='{.status.platformStatus.alibabacloud.region}' infrastructure cluster)"
+    export TEST_PROVIDER="{\"type\":\"alibabacloud\",\"region\":\"${REGION}\",\"multizone\":true,\"multimaster\":true}"
+;;
 azure4|azure-arm64)
     mkdir -p ~/.ssh
     cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/kube_azure_rsa || true
@@ -156,8 +172,12 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 # execute the cases
 function run {
     test_scenarios=""
+    hardcoded_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&"
     echo "TEST_SCENARIOS_POSTUPG: \"${TEST_SCENARIOS_POSTUPG:-}\""
     echo "TEST_ADDITIONAL_POSTUPG: \"${TEST_ADDITIONAL_POSTUPG:-}\""
+    echo "TEST_FILTERS: \"${TEST_FILTERS:-}\""
+    echo "FILTERS_ADDITIONAL: \"${FILTERS_ADDITIONAL:-}\""
+    echo "TEST_FILTERS_POSTUPG: \"${TEST_FILTERS_POSTUPG:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     if [[ -n "${TEST_SCENARIOS_POSTUPG:-}" ]]; then
@@ -198,13 +218,14 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
-    test_filters=""
+    test_filters="${hardcoded_filters};${TEST_FILTERS}"
+    if [[ -n "${FILTERS_ADDITIONAL:-}" ]]; then
+        echo "add filter FILTERS_ADDITIONAL"
+        test_filters="${test_filters};${FILTERS_ADDITIONAL:-}"
+    fi
     if [[ -n "${TEST_FILTERS_POSTUPG:-}" ]]; then
-        # shellcheck disable=SC2153
-        test_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&;${TEST_FILTERS};${TEST_FILTERS_POSTUPG}"
-    else
-        # shellcheck disable=SC2153
-        test_filters="~NonUnifyCI&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&;${TEST_FILTERS}"
+        echo "add filter TEST_FILTERS_POSTUPG"
+        test_filters="${test_filters};${TEST_FILTERS_POSTUPG:-}"
     fi
     echo "final test_filters: \"${test_filters}\""
 

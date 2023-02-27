@@ -2,12 +2,13 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 echo "Changing to local gateway mode"
 echo "-------------------"
 oc patch Network.operator.openshift.io cluster --type='merge' --patch "{\"spec\":{\"defaultNetwork\":{\"ovnKubernetesConfig\":{\"gatewayConfig\":{\"routingViaHost\":true}}}}}"
 
-oc wait co network --for='condition=PROGRESSING=True' --timeout=30s
+oc wait co network --for='condition=PROGRESSING=True' --timeout=60s
 # Wait until the ovn-kubernetes pods are restarted
 timeout 300s oc rollout status ds/ovnkube-node -n openshift-ovn-kubernetes
 timeout 300s oc rollout status ds/ovnkube-master -n openshift-ovn-kubernetes

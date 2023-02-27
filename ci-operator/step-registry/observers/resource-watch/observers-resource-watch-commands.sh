@@ -19,6 +19,8 @@ function cleanup() {
   rm -rf $STORE_PATH
 
   echo "ended resource watch gracefully"
+
+  exit 0
 }
 trap cleanup EXIT
 

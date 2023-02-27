@@ -33,9 +33,9 @@ RUN \
         golang.org/x/tools/cmd/goimports \
         github.com/tools/godep \
         golang.org/x/lint/golint \
-        github.com/openshift/release/tools/gotest2junit \
-        github.com/openshift/imagebuilder/cmd/imagebuilder && \
-    GO111MODULE=on go get gotest.tools/gotestsum@v0.6.0 && \
+        github.com/openshift/release/tools/gotest2junit && \
+    GO111MODULE=on go get github.com/openshift/imagebuilder/cmd/imagebuilder \
+        gotest.tools/gotestsum@v0.6.0 && \
     mv $GOPATH/bin/* /usr/bin/ && \
     rm -rf $GOPATH/* $GOPATH/.cache && \
     mkdir $GOPATH/bin && \

@@ -1,0 +1,43 @@
+ref:
+  as: baremetal-lab-upi-install
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: baremetal-lab-upi-install-commands.sh
+  resources:
+    requests:
+      cpu: '1'
+      memory: 128Mi
+  grace_period: 600
+  env:
+  - name: IPI
+    default: "false"
+    documentation: ""
+  - name: INTERNAL_NET_IP
+    default: "192.168.90.1"
+    documentation: ""
+  - name: architecture
+    default: ""
+    documentation: ""
+  - name: masters
+    default: "3"
+    documentation: ""
+  - name: workers
+    default: "2"
+    documentation: ""
+  - name: AUX_HOST
+    default: ""
+    documentation: ""
+  dependencies:
+    - name: "release:latest"
+      env: OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+  documentation: |-
+    The baremetal-lab-upi-install will provision a UPI baremetal cluster, given the configuration assets
+    prepared in the earlier steps. 
+    The minimum requirement for this step to work is to run it after the chain baremetal-lab-upi-conf-base.
+    Users that want implement their specific installation configuration should implement workflows that execute 
+    (1) the baremetal-lab-upi-conf-base chain, 
+    (2) a set of custom chains/steps to either patch the install-config.yaml or define custom manifest_*.yaml files that will be included in install-dir/manifests, to be consumed by the installer,
+    (3) the baremetal-lab-upi-install step.
+    

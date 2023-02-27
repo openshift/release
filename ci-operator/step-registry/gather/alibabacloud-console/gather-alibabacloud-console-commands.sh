@@ -9,6 +9,15 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 echo "${KUBECONFIG}"
 
+# while gathering logs from a private cluster, proxy setting is required for connecting cluster
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	echo "Going to enable client proxy by 'source ${SHARED_DIR}/proxy-conf.sh'"
+	source "${SHARED_DIR}/proxy-conf.sh"
+else
+	echo "No '${SHARED_DIR}/proxy-conf.sh' found, skip enabling cient proxy."
+fi
+
 if test -f "${KUBECONFIG}"
 then
     oc --request-timeout=5s -n openshift-machine-api get machines -o go-template='{{range .items}}{{.status.providerStatus.instanceId}}{{"\n"}}{{end}}' >> "${TMPDIR}/node-provider-IDs.txt" &

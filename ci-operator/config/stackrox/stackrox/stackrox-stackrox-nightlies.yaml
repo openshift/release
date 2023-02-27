@@ -11,6 +11,10 @@ base_images:
     name: automation-flavors
     namespace: stackrox
     tag: osd-0.3.6
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.3.8
   ubi-minimal:
     name: ubi-minimal
     namespace: ocp
@@ -19,110 +23,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-test-0.3.50
-images:
-- build_args:
-  - name: ROX_PRODUCT_BRANDING
-    value: RHACS_BRANDING
-  dockerfile_path: .openshift-ci/build/Dockerfile.build-main-and-bundle
-  from: src
-  to: main-bundle
-- build_args:
-  - name: ROX_PRODUCT_BRANDING
-    value: RHACS_BRANDING
-  dockerfile_path: .openshift-ci/build/Dockerfile.build-central-db-bundle
-  from: src
-  to: central-db-bundle
-- build_args:
-  - name: ROX_PRODUCT_BRANDING
-    value: RHACS_BRANDING
-  dockerfile_path: .openshift-ci/build/Dockerfile.build-operator-artifacts
-  from: src
-  to: operator-artifacts
-- build_args:
-  - name: ROX_PRODUCT_BRANDING
-    value: RHACS_BRANDING
-  dockerfile_path: Dockerfile.gen
-  from: ubi-minimal
-  inputs:
-    main-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
-  to: main
-- dockerfile_path: Dockerfile
-  inputs:
-    main-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/image/roxctl/.
-  to: roxctl
-- build_args:
-  - name: ROX_PRODUCT_BRANDING
-    value: RHACS_BRANDING
-  dockerfile_path: Dockerfile.gen
-  from: ubi-minimal
-  inputs:
-    central-db-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/image/postgres/.
-  to: central-db
-- dockerfile_path: Dockerfile
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/docs/.
-  to: docs
-- dockerfile_path: operator/build/Dockerfile.gen
-  inputs:
-    operator-artifacts:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/.
-  to: operator-controller
-- dockerfile_path: bundle.Dockerfile
-  inputs:
-    operator-artifacts:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/operator/.
-  to: operator-bundle
-- dockerfile_path: rhacs-operator-index.Dockerfile
-  inputs:
-    operator-artifacts:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/operator/build/index/.
-  to: operator-bundle-index
-- build_args:
-  - name: ROX_PRODUCT_BRANDING
-    value: RHACS_BRANDING
-  - name: RACE_CONDITION_DEBUG
-    value: "true"
-  dockerfile_path: .openshift-ci/build/Dockerfile.build-main-and-bundle
-  from: src
-  to: main-rcd-bundle
-- build_args:
-  - name: ROX_PRODUCT_BRANDING
-    value: RHACS_BRANDING
-  dockerfile_path: Dockerfile.gen
-  from: ubi-minimal
-  inputs:
-    main-rcd-bundle:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/stackrox/stackrox/image/rhel/.
-  to: main-rcd
-promotion:
-  excluded_images:
-  - main-bundle
-  - central-db-bundle
-  - main-rcd-bundle
-  - operator-artifacts
-  namespace: stackrox
-  tag: nightlies
+    tag: stackrox-test-0.3.56
 resources:
   '*':
     requests:
@@ -130,127 +31,7 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: push-and-release
-  postsubmit: true
-  steps:
-    test:
-    - as: push
-      commands: .openshift-ci/dispatch.sh push-images "RHACS_BRANDING"
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-push
-        name: stackrox-stackrox-push
-        namespace: test-credentials
-      dependencies:
-      - env: MAIN_IMAGE
-        name: main
-      - env: ROXCTL_IMAGE
-        name: roxctl
-      - env: CENTRAL_DB_IMAGE
-        name: central-db
-      - env: PIPELINE_DOCS_IMAGE
-        name: docs
-      - env: MAIN_RCD_IMAGE
-        name: main-rcd
-      - env: OPERATOR_IMAGE
-        name: operator-controller
-      - env: OPERATOR_BUNDLE_IMAGE
-        name: operator-bundle
-      - env: OPERATOR_BUNDLE_INDEX_MAGE
-        name: operator-bundle-index
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: release-mgmt
-      commands: .openshift-ci/dispatch.sh release-mgmt
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-push
-        name: stackrox-stackrox-push
-        namespace: test-credentials
-      from: test-bin
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: style-checks
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: policy-checks
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: mitre-bundles-checks
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: grouped-static-checks
-  postsubmit: true
-  steps:
-    test:
-    - as: check-generated
-      commands: .openshift-ci/dispatch.sh check-generated
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: check-todos
-      commands: .openshift-ci/dispatch.sh check-todos
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-    - as: check-pr-fixes
-      commands: .openshift-ci/dispatch.sh check-pr-fixes
-      credentials:
-      - mount_path: /tmp/vault/stackrox-stackrox-initial
-        name: stackrox-stackrox-initial
-        namespace: test-credentials
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
-- as: go-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: go-unit-tests-release
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: go-postgres-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: integration-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
 - as: shell-unit-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-initial
-- as: ui-unit-tests
   postsubmit: true
   steps:
     test:
@@ -263,7 +44,7 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: openshift-oldest-qa-e2e-tests
+- as: ocp-4-8-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -275,25 +56,11 @@ tests:
   steps:
     env:
       QA_TEST_TARGET: test
+      TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: openshift-penultimate-qa-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.10"
-  postsubmit: true
-  steps:
-    env:
-      QA_TEST_TARGET: test
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: openshift-newest-qa-e2e-tests
+- as: ocp-4-11-qa-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -305,6 +72,23 @@ tests:
   steps:
     env:
       QA_TEST_TARGET: test
+      TEST_SUITE: openshift-newest-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: ocp-4-12-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.12"
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+      TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
@@ -346,7 +130,14 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: gke-postgres-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: gke-postgres-upgrade-tests
   postsubmit: true
   steps:
     test:
@@ -368,7 +159,7 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: openshift-oldest-operator-e2e-tests
+- as: ocp-4-8-operator-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -378,23 +169,12 @@ tests:
     version: "4.8"
   postsubmit: true
   steps:
+    env:
+      TEST_SUITE: openshift-4-operator-e2e-tests
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: openshift-penultimate-operator-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.10"
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: openshift-newest-operator-e2e-tests
+- as: ocp-4-11-operator-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -404,14 +184,26 @@ tests:
     version: "4.11"
   postsubmit: true
   steps:
+    env:
+      TEST_SUITE: openshift-4-operator-e2e-tests
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: local-roxctl-tests
+- as: ocp-4-12-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.12"
   postsubmit: true
   steps:
+    env:
+      TEST_SUITE: openshift-4-operator-e2e-tests
     test:
-    - ref: stackrox-initial
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
 - as: eks-qa-e2e-tests
   postsubmit: true
   steps:
@@ -428,7 +220,7 @@ tests:
     workflow: stackrox-automation-flavors-aro-e2e
   timeout: 5h0m0s
 - as: nightly-tag
-  cron: 0 5 * * *
+  cron: 0 5 * * 1,2,3,4,5
   steps:
     test:
     - as: tag

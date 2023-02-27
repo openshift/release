@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
-REGION="ppe3"
+REGION="${LEASED_RESOURCE}"
 echo "Azure region: ${REGION}"
 
 workers=3
@@ -24,10 +24,22 @@ echo $master_type
 
 ENDPOINT="${AZURESTACK_ENDPOINT}"
 echo "ASH ARM Endpoint: ${ENDPOINT}"
+
 cp "/var/run/azurestack-cluster-secrets/service-principal" "${SHARED_DIR}/osServicePrincipal.json"
+if [[ -f "${CLUSTER_PROFILE_DIR}/cloud_name" ]]; then
+    cloud_name=$(< "${CLUSTER_PROFILE_DIR}/cloud_name")
+    if [[ "${cloud_name}" == "WWT" ]]; then
+      cp "${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" "${SHARED_DIR}/osServicePrincipal.json"
+    fi
+fi
+
+BASE_DOMAIN="ppe.azurestack.devcluster.openshift.com"
+if [[ -f "${CLUSTER_PROFILE_DIR}/public_hosted_zone" ]]; then
+  BASE_DOMAIN=$(< "${CLUSTER_PROFILE_DIR}/public_hosted_zone")
+fi
 
 cat >> "${CONFIG}" << EOF
-baseDomain: ppe.azurestack.devcluster.openshift.com
+baseDomain: ${BASE_DOMAIN}
 credentialsMode: Manual
 platform:
   azure:

@@ -1,0 +1,31 @@
+ref:
+  as: hypershift-hostedcluster-destroy-hostedcluster
+  cli: latest
+  env:
+  - name: HYPERSHIFT_BASE_DOMAIN
+    default: ""
+    documentation: "The cluster's FQDN will be a subdomain of the base domain."
+  - name: HYPERSHIFT_AWS_REGION
+    default: "us-east-1"
+    documentation: "The AWS region of the cluster."
+  - name: HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT
+    default: "false"
+    documentation: "Whether to use the generic CI account or the HyperShift OSD account for the guest clusters infra. For the infra created for the clusters. E.g. For cluster-bot we use the generic CI account"
+  commands: hypershift-hostedcluster-destroy-hostedcluster-commands.sh
+  from_image:
+    namespace: ci
+    name: "hypershift-cli"
+    tag: latest
+  grace_period: 5m0s
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  timeout: 15m0s
+  credentials:
+  - mount_path: /etc/hypershift-ci-jobs-awscreds
+    name: hypershift-ci-jobs-awscreds
+    namespace: test-credentials
+  - mount_path: /var/run/hypershift-workload-credentials
+    name: hypershift-workload-credentials
+    namespace: test-credentials

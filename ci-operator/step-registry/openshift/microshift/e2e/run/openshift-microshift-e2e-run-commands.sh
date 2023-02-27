@@ -26,7 +26,6 @@ echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
 echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
 chmod 0600 "${HOME}"/.ssh/config
 
-# Copy pull secret to user home
 cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
 
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
@@ -34,47 +33,17 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
+BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 
-
-cat  > "${HOME}"/run-test.sh <<'EOF'
-#!/bin/bash
-set -euo pipefail
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-set +e
-openshift-tests run -v 2 --provider=none -f suite.txt -o /home/rhel8user/e2e.log --junit-dir /home/rhel8user/junit
-res=$?
-set -e
-chown rhel8user:rhel8user /home/rhel8user/e2e.log
-chown -R rhel8user:rhel8user /home/rhel8user/junit
-exit $res
-EOF
-chmod +x "${HOME}"/run-test.sh
-
-# scp the test runner script and execute it
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/run-test.sh rhel8user@"${INSTANCE_PREFIX}":~/run-test.sh
-
-set +e
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ~/run-test.sh'
-res=$?
-set -e
+  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${INSTANCE_PREFIX}.${BASE_DOMAIN}/kubeconfig" > /tmp/kubeconfig
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse rhel8user@"${INSTANCE_PREFIX}":~/e2e.log "${ARTIFACT_DIR}/e2e.log"
+--quiet \
+--project "${GOOGLE_PROJECT_ID}" \
+--zone "${GOOGLE_COMPUTE_ZONE}" \
+rhel8user@"${INSTANCE_PREFIX}":~/suite.txt "${HOME}"/suite.txt
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse rhel8user@"${INSTANCE_PREFIX}":~/junit "${ARTIFACT_DIR}/junit"
-
-exit $res
+PATH=${PAYLOAD_PATH}/usr/bin:$PATH KUBECONFIG=/tmp/kubeconfig ${PAYLOAD_PATH}/usr/bin/openshift-tests run -v 2 --provider=none -f "${HOME}"/suite.txt -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit

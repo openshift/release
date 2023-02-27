@@ -1,6 +1,6 @@
 # Rebalancing tests among platforms
 
-If test volume for a given platform exceeds [the Boskos lease capacity][boskos-leases], [`jobs-failing-with-lease-acquire-timeout`](../../clusters/app.ci/prow-monitoring/mixins/prometheus_out/prometheus-prow-rules_prometheusrule.yaml) will fire.
+If test volume for a given platform exceeds [the Boskos lease capacity][boskos-leases], [`jobs-failing-with-lease-acquire-timeout`](../../clusters/app.ci/openshift-user-workload-monitoring/mixins/prometheus_out/ci-alerts_prometheusrule.yaml) will fire.
 Presubmit jobs may be rebalanced to move platform-agnostic jobs to platforms with available capacity.
 Component teams may mark their presubmit jobs as platform-agnostic by configuring `as` names which exclude the platform slug (e.g. `aws`), whose absence is used as a marker of "this test is platform-agnostic".
 For example, see [release#10152][release-10152].

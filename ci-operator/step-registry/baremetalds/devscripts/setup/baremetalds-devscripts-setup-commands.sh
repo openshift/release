@@ -55,6 +55,20 @@ tar -czf - . | ssh "${SSHOPTS[@]}" "root@${IP}" "cat > /root/dev-scripts.tar.gz"
 # Prepare configuration and run dev-scripts
 scp "${SSHOPTS[@]}" "${CLUSTER_PROFILE_DIR}/pull-secret" "root@${IP}:pull-secret"
 
+# Copy any additional manifests from previous CI steps
+export EXTRA_MANIFESTS=false
+echo "Will include manifests:"
+find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
+
+ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/manifests
+
+while IFS= read -r -d '' item
+do
+  EXTRA_MANIFESTS=true
+  manifest="$( basename "${item}" )"
+  scp "${SSHOPTS[@]}" "${item}" "root@${IP}:manifests/${manifest##manifest_}"
+done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+
 # Additional mechanism to inject dev-scripts additional variables directly
 # from a multistage step configuration.
 # Backward compatible with the previous approach based on creating the
@@ -95,7 +109,17 @@ mkdir dev-scripts
 tar -xzvf dev-scripts.tar.gz -C /root/dev-scripts
 chown -R root:root dev-scripts
 
-if [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ] && [[ "\$(mount | grep ${NVME_DEVICE})" == "" ]];
+if [ "${NVME_DEVICE}" = "auto" ];
+then
+  # Get disk where the system is installed
+  ROOT_DISK=\$(lsblk -o pkname --noheadings --path | grep -E "^\S+" | sort | uniq)
+
+  # Use the largest disk available for dev-scripts
+  DATA_DISK=\$(lsblk -o name --noheadings --sort size --path | grep -v "\${ROOT_DISK}" | tail -n1)
+  mkfs.xfs -f "\${DATA_DISK}"
+  mkdir /opt/dev-scripts
+  mount "\${DATA_DISK}" /opt/dev-scripts
+elif [ ! -z "${NVME_DEVICE}" ] && [ -e "${NVME_DEVICE}" ] && [[ "\$(mount | grep ${NVME_DEVICE})" == "" ]];
 then
   mkfs.xfs -f "${NVME_DEVICE}"
   mkdir /opt/dev-scripts
@@ -114,6 +138,12 @@ echo "export OPENSHIFT_CI=true" >> /root/dev-scripts/config_root.sh
 echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
+
+# If any extra manifests, then set ASSETS_EXTRA_FOLDER
+if [ "${EXTRA_MANIFESTS}" == "true" ];
+then
+  echo "export ASSETS_EXTRA_FOLDER=/root/manifests" >> /root/dev-scripts/config_root.sh
+fi
 
 if [[ "${ARCHITECTURE}" == "arm64" ]]; then
   echo "export OPENSHIFT_RELEASE_IMAGE=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" >> /root/dev-scripts/config_root.sh

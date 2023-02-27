@@ -21,6 +21,17 @@ function set_proxy () {
     fi
 }
 
+function unset_proxy () {
+    if test -s "${SHARED_DIR}/unset-proxy.sh" ; then
+        echo "unset the proxy"
+        # cat "${SHARED_DIR}/unset-proxy.sh"
+        echo "source ${SHARED_DIR}/unset-proxy.sh"
+        source "${SHARED_DIR}/unset-proxy.sh"
+    else
+        echo "no proxy setting."
+    fi
+}
+
 # In order to the usr can use the ImageStream that the images stores in the Proxy registry.
 # Config the sample operator to retrive the images data from the proxy registry
 function config_samples_operator()
@@ -143,8 +154,8 @@ MIRROR_PROXY_REGISTRY=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
 echo "MIRROR_PROXY_REGISTRY: ${MIRROR_PROXY_REGISTRY}"
 set_CA_for_nodes
 # config_mirror_auth
-unset http_proxy
-unset https_proxy
+# When mirror images using `oc image mirror` command, need unset proxies
+unset_proxy
 mirror_tag_images
 set_proxy
 if [[ $ret -eq 0 ]]; then

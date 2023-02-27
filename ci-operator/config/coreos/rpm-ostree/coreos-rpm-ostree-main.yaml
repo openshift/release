@@ -3,26 +3,33 @@ base_images:
     name: coreos-assembler
     namespace: coreos
     tag: latest
-  coreos_fcos-buildroot_testing-devel:
-    name: fcos-buildroot
-    namespace: coreos
-    tag: testing-devel
-binary_build_commands: ./ci/build.sh && make install
 build_root:
   image_stream_tag:
     name: fcos-buildroot
     namespace: coreos
     tag: testing-devel
 images:
+- dockerfile_path: ci/prow/Dockerfile.fcos
+  inputs:
+    root:
+      as:
+      - quay.io/coreos-assembler/fcos-buildroot:testing-devel
+  to: target
+- dockerfile_path: ci/prow/Dockerfile.ci-updates
+  from: coreos_coreos-assembler_latest
+  to: kola
 - dockerfile_path: ci/prow/Dockerfile
   inputs:
     coreos_coreos-assembler_latest:
       as:
       - registry.ci.openshift.org/coreos/coreos-assembler:latest
-    coreos_fcos-buildroot_testing-devel:
+    root:
       as:
       - registry.ci.openshift.org/coreos/fcos-buildroot:testing-devel
   to: rpmostree-fcos-e2e
+- dockerfile_path: ci/prow/Dockerfile.fcos2
+  from: target
+  to: target-upgrade
 resources:
   '*':
     requests:
@@ -40,6 +47,25 @@ tests:
   commands: fcos-e2e
   container:
     from: rpmostree-fcos-e2e
+- as: kola-upgrade
+  cluster: build02
+  steps:
+    test:
+    - as: kola-upgrades
+      commands: e2e-upgrades
+      dependencies:
+      - env: TARGET_IMAGE
+        name: target
+      - env: UPGRADE_IMAGE
+        name: target-upgrade
+      from: kola
+      resources:
+        limits:
+          devices.kubevirt.io/kvm: "1"
+        requests:
+          cpu: 1000m
+          devices.kubevirt.io/kvm: "1"
+          memory: 2Gi
 zz_generated_metadata:
   branch: main
   org: coreos

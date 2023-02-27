@@ -78,11 +78,8 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_OSA21")
       POWERVS_REGION=osa
       VPCREGION=jp-osa
-      read -r -d '' CONFIG_PLATFORM << '___EOF___'
-  platform:
-    powervs:
-      sysType: e980
-___EOF___
+      # https://www.gnu.org/software/bash/manual/html_node/ANSI_002dC-Quoting.html#ANSI_002dC-Quoting
+      CONFIG_PLATFORM=$'  platform:\n    powervs:\n      sysType: e980'
    ;;
    "sao01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")

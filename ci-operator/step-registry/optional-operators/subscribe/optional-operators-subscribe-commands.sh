@@ -119,11 +119,20 @@ else
   CS_NAMESPACE="${OO_INSTALL_NAMESPACE}"
 fi
 
+# The securityContextConfig API field was added in 4.12
+CS_PODCONFIG=""
+OCP_MINOR_VERSION=$(oc version | grep "Server Version" | cut -d '.' -f2)
+if [ "$OCP_MINOR_VERSION" -gt "11" ]; then
+  CS_PODCONFIG=$(cat <<EOF
+grpcPodConfig:
+    securityContextConfig: restricted
+EOF
+)
+fi
 CATSRC=""
 IS_CATSRC_CREATED=${IS_CATSRC_CREATED:-false}
 if [ "$IS_CATSRC_CREATED" = false ] ; then
-CATSRC=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
+CS_MANIFEST=$(cat <<EOF
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
@@ -132,9 +141,12 @@ metadata:
 spec:
   sourceType: grpc
   image: "$OO_INDEX"
+  $CS_PODCONFIG
 EOF
 )
 
+echo "Creating CatalogSource: $CS_MANIFEST"
+CATSRC=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${CS_MANIFEST}" )
 echo "CatalogSource name is \"$CATSRC\""
 
 else

@@ -16,7 +16,7 @@ set -e
 echo "Running tcpdump:"
 
 # Grab all 443 traffic, all attempts to filter have caused us to miss what we need.
-/usr/sbin/tcpdump -nn -U -i any -s 256 -w "/var/log/tcpdump/tcpdump-\$(date +'%FT%H%M%S').pcap" tcp and port 443
+/usr/sbin/tcpdump -nn -U -i any -s 256 -w "/var/log/tcpdump/tcpdump-\$(date +'%FT%H%M%S').pcap" 'tcp and (port 443 or 6443)'
 EOF
 )
 
@@ -57,7 +57,7 @@ spec:
           [Service]
           Type=oneshot
           ExecStart=rpm-ostree usroverlay
-          ExecStart=rpm -ihv http://mirror.centos.org/centos/8/AppStream/x86_64/os/Packages/tcpdump-4.9.3-2.el8.x86_64.rpm
+          ExecStart=rpm -ihv http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/tcpdump-4.9.3-3.el8.x86_64.rpm
           RemainAfterExit=yes
 
           [Install]

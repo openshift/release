@@ -35,6 +35,7 @@ if [[ "${REMOVE_RHCOS_WORKER}" == "no" ]]; then
 fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
+#cp ${SHARED_DIR}/kubeconfig "${ARTIFACT_DIR}"
 
 # Remove CoreOS machine sets
 echo "$(date -u --rfc-3339=seconds) - Deleting CoreOS machinesets"
@@ -47,14 +48,14 @@ fi
 echo "$(date -u --rfc-3339=seconds) - Waiting for CoreOS nodes to be removed"
 oc wait node \
     --for=delete \
-    --timeout=10m \
+    --timeout=20m \
     --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/worker \
     || true
 
 echo "$(date -u --rfc-3339=seconds) - Waiting for worker machineconfigpool to update"
 oc wait machineconfigpool/worker \
     --for=condition=Updated=True \
-    --timeout=10m
+    --timeout=20m
 
 echo "$(date -u --rfc-3339=seconds) - Waiting for clusteroperators to complete"
 oc wait clusteroperator.config.openshift.io \

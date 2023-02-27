@@ -7,19 +7,19 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: must-gather
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+    tag: rhel-8-golang-1.19-openshift-4.13
 binary_build_commands: make build
 build_root:
   from_repository: true
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: csi-driver-shared-resource
 - dockerfile_path: Dockerfile.mustgather
   from: must_gather
@@ -27,9 +27,9 @@ images:
 - dockerfile_path: Dockerfile.webhook
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: csi-driver-shared-resource-webhook
 promotion:
   additional_images:
@@ -75,7 +75,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: csi-driver-shared-resource-e2e-techpreview
+    workflow: openshift-e2e-aws-csi
 - as: e2e-aws-csi-driver-no-refreshresource
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -88,7 +88,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: csi-driver-shared-resource-e2e-techpreview
+    workflow: openshift-e2e-aws-csi
 - as: e2e-aws-csi-driver-disruptive
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -101,7 +101,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: csi-driver-shared-resource-e2e-techpreview
+    workflow: openshift-e2e-aws-csi
 - as: e2e-aws-csi-driver-slow
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -114,7 +114,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: csi-driver-shared-resource-e2e-techpreview
+    workflow: openshift-e2e-aws-csi
 zz_generated_metadata:
   branch: master
   org: openshift

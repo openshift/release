@@ -1,7 +1,17 @@
 build_root:
   project_image:
     dockerfile_literal: |-
-      FROM registry.access.redhat.com/ubi8/python-39
+      FROM registry.access.redhat.com/ubi9/python-39
+
+      # Install go toolset
+      USER root
+
+      ENV GO_VERSION=1.19
+      RUN curl -Ls https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | \
+      tar -C /usr/local -zxvf - go/bin go/pkg/linux_amd64 go/pkg/tool
+      ENV PATH="/usr/local/go/bin:$PATH"
+
+      USER default
 
       # Prow expects to be able to check out a repo under /go
       USER 0:0
@@ -53,7 +63,7 @@ tests:
     test:
     - as: cloud-provider-ibm
       commands: |
-        export BRANCH_NAME=release-1.25
+        export BRANCH_NAME=release-1.26
         rebasebot --source https://github.com/IBM-Cloud/cloud-provider-ibm:${BRANCH_NAME} \
                   --dest openshift/cloud-provider-ibm:master \
                   --rebase openshift-cloud-team/cloud-provider-ibm:rebase-bot-master \
@@ -230,8 +240,34 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: cloud-provider-nutanix
+  cron: 10 13 * * Mon,Thu
+  steps:
+    test:
+    - as: cloud-provider-nutanix
+      commands: |
+        rebasebot --source https://github.com/nutanix-cloud-native/cloud-provider-nutanix:main \
+                  --dest openshift/cloud-provider-nutanix:main \
+                  --rebase openshift-cloud-team/cloud-provider-nutanix:rebase-bot-main \
+                  --update-go-modules \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
-  commands: make unittests
+  commands: make deps && make unittests
   container:
     from: src
 - as: lint

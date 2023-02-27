@@ -90,6 +90,7 @@ openshift-install create manifests
 # we don't want to create any machine* objects
 rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
+rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 
 RESOURCE_GROUP=$(python3 -c 'import yaml;data = yaml.full_load(open("manifests/cluster-infrastructure-02-config.yml"));print(data["status"]["platformStatus"]["azure"]["resourceGroupName"])')
 oc adm release extract $RELEASE_IMAGE_LATEST --credentials-requests --cloud=azure --to=credentials-request
@@ -100,12 +101,17 @@ do
   SECRET_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["name"])')
   SECRET_NAMESPACE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["namespace"])')
   FEATURE_GATE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-gate" in data["metadata"]["annotations"])')
+  FEATURE_SET=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-set" in data["metadata"]["annotations"])')
 
 # 4.10 includes techpreview of CAPI which without the namespace: openshift-cluster-api
 # fails to bootstrap. Below checks if TechPreviewNoUpgrade is annotated and if so skips
 # creating that secret.
 
   if [[ $FEATURE_GATE == *"True"* ]]; then
+      continue
+  fi
+
+  if [[ $FEATURE_SET == *"True"* ]]; then
       continue
   fi
 

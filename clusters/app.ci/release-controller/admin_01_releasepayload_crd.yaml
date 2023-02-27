@@ -25,48 +25,68 @@ spec:
           is a definition of how releases are calculated.  When a ReleasePayload is
           generated, it will be generated in the same namespace as the imagstream
           that produced it. If/when an update occurs, to one of these imagestreams,
-          the release-controller will:   1) Create a point-in-time mirror of the updated
-          imagestream   2) Create a new Release from the mirror        - Any errors
-          before this point will cause the release to marked `Failed`   3) Launches
-          a set of release analysis jobs   4) Launches an aggregation job   5) Launches
-          a set of release verification jobs        - These can either be `Blocking
-          Jobs` which will prevent release acceptance or `Informing Jobs` which will
-          \         not prevent release acceptance.   6) Monitors for job completions
-          \       - If all `Blocking Jobs` complete successfully, then the release
-          is `Accepted`.  If any `Blocking Jobs` fail,          the release will be
-          marked `Rejected`   7) Publishes all results to the respective webpage \n
-          Example: ART:   1) Publishes an update to the `ocp/4.9-art-latest` imagestream
-          \n Release-controller:   1) Creates a mirror named: `ocp/4.9-art-latest-2021-09-27-105859`
-          \  2) Creates a ReleasePayload: `ocp/4.9.0-0.nightly-2021-09-27-105859`
-          \      -Labels:         release.openshift.io/imagestream=release         release.openshift.io/imagestreamtag-name=4.9.0-0.nightly-2021-09-27-105859
-          \  3) Creates an OpenShift Release: `ocp/release:4.9.0-0.nightly-2021-09-27-105859`
-          \  4) Update ReleasePayload conditions with results of release creation
-          job   If the release was created successfully, the release-controller:   5)
+          the release-controller will:  1. Create a point-in-time mirror of the updated
+          imagestream  2. Create a new Release from the mirror     - Any errors before
+          this point will cause the release to marked `Failed`  3. Launches a set
+          of release analysis jobs  4. Launches an aggregation job  5. Launches a
+          set of release verification jobs     - These can either be `Blocking Jobs`
+          which will prevent release acceptance or `Informing Jobs` which will     not
+          prevent release acceptance.  6. For Stable releases, launches a set of jobs
+          to test a subset of the supported upgrades defined inside the release     image
+          itself.  While these jobs do not have any real bearing on the acceptance
+          or rejection of a ReleasePayload,     they will be monitored and their respective
+          results captured.  The hope would be to use these results to     provide
+          a convenient way to override a \"Rejected\" release caused by a blocking
+          upgrade job.  7. Monitors for job completions     - If all `Blocking Jobs`
+          complete successfully, then the release is `Accepted`.  If any `Blocking
+          Jobs` fail,     the release will be marked `Rejected`  8. Publishes all
+          results to the respective webpage \n Example: ART:  1. Publishes an update
+          to the `ocp/4.9-art-latest` imagestream \n Release-controller:  1. Creates
+          a mirror named: `ocp/4.9-art-latest-2021-09-27-105859`  2. Creates a ReleasePayload:
+          `ocp/4.9.0-0.nightly-2021-09-27-105859`     -Labels:     release.openshift.io/imagestream=release
+          \    release.openshift.io/imagestreamtag-name=4.9.0-0.nightly-2021-09-27-105859
+          \ 3. Creates an OpenShift Release: `ocp/release:4.9.0-0.nightly-2021-09-27-105859`
+          \ 4. Update ReleasePayload conditions with results of release creation job
+          \    If the release was created successfully, the release-controller:  5.
           Launches: 4.9.0-0.nightly-2021-09-27-105859-aggregated-<name>-analysis-<count>
-          \  6) Launches: 4.9.0-0.nightly-2021-09-27-105859-aggregated-<name>-aggregator
-          \  7) Launches: 4.9.0-0.nightly-2021-09-27-105859-<name> \n When ART promotes
+          \ 6. Launches: 4.9.0-0.nightly-2021-09-27-105859-aggregated-<name>-aggregator
+          \ 7. Launches: 4.9.0-0.nightly-2021-09-27-105859-<name> \n When ART promotes
           a GA release, they will assemble releases themselves, publish it to quay.io,
           and then update the \"stable\" release stream (i.e. ocp/release) with the
           corresponding payload.  In this scenario, the release-controller will perform
           all the same steps, mentioned above, but the mirror will be named after
           the \"official\" release (i.e. 4.9.7) and not not contain a timestamp.  Likewise,
           any verification tests will only contain the release name and the name of
-          the verification test as defined in the ReleaseConfig. \n Mapping from a
-          Release to ReleasePayload: A ReleasePayload will always be named after the
-          Release that it corresponds to, with the addition of a random string suffix.
-          \ Both objects will reside in the same namespace.   For a release: `ocp/release:4.9.0-0.nightly-2021-09-27-105859`
-          \  A corresponding ReleasePayload will exist: `ocp/4.9.0-0.nightly-2021-09-27-105859`
+          the verification test as defined in the ReleaseConfig.  The release-controller
+          will also launch a small sample of jobs to test upgrades from the list of
+          upgrade versions defined inside the release image itself: \n For example:
+          $ oc adm release info quay.io/openshift-release-dev/ocp-release:4.11.22-x86_64
+          \n The list of supported upgrades is: 4.10.16, 4.10.17, 4.10.18, 4.10.20,
+          4.10.21, 4.10.22, 4.10.23, 4.10.24, 4.10.25, 4.10.26, 4.10.27, 4.10.28,
+          4.10.29, 4.10.30, 4.10.31, 4.10.32, 4.10.33, 4.10.34, 4.10.35, 4.10.36,
+          4.10.37, 4.10.38, 4.10.39, 4.10.40, 4.10.41, 4.10.42, 4.10.43, 4.10.44,
+          4.10.45, 4.10.46, 4.10.47, 4.11.0, 4.11.1, 4.11.2, 4.11.3, 4.11.4, 4.11.5,
+          4.11.6, 4.11.7, 4.11.8, 4.11.9, 4.11.10, 4.11.11, 4.11.12, 4.11.13, 4.11.14,
+          4.11.16, 4.11.17, 4.11.18, 4.11.19, 4.11.20, 4.11.21 \n From the list above,
+          the release-controller will launch a subset of jobs named like: 4.11.22-upgrade-from-4.10.16-<platform>
+          4.11.22-upgrade-from-4.11.0-<platform> \n Where <platform> is defined in
+          the Release Configuration definitions in the openshift/release repo: https://github.com/openshift/release/blob/e5c9122144c09c4095f0f87888b9685712dc7b1e/core-services/release-controller/_releases/release-ocp-4.y-stable.json#L20-L30
+          \n Mapping from a Release to ReleasePayload: A ReleasePayload will always
+          be named after the Release that it corresponds to, with the addition of
+          a random string suffix.  Both objects will reside in the same namespace.
+          \n \tFor a release: `ocp/release:4.9.0-0.nightly-2021-09-27-105859` \tA
+          corresponding ReleasePayload will exist: `ocp/4.9.0-0.nightly-2021-09-27-105859`
           \n Mapping from ReleasePayload to Release: A ReleasePayload is decorated
           with a couple labels that will point back to the Release that it corresponds
           to:   - release.openshift.io/imagestream=release   - release.openshift.io/imagestreamtag-name=4.9.0-0.nightly-2021-09-27-105859
-          Because the ReleasePayload and the Release will both reside in the same
+          \n Because the ReleasePayload and the Release will both reside in the same
           namespace, the release that created the ReleasePayload will be located here:
-          \  <namespace>/<release.openshift.io/imagestream>:<release.openshift.io/imagestreamtag-name>
-          Similarly, the ReleasePayload object itself also has the PayloadCoordinates
-          (.spec.payloadCoordinates) that point back to the Release as well:   spec:
-          \    payloadCoordinates:       imagestreamName: release       imagestreamTagName:
-          4.9.0-0.nightly-2021-09-27-105859       namespace: ocp The release that
-          created the ReleasePayload will be located here:   <namespace>/<imagestreamName>:<imagestreamTagName>
+          \n \t<namespace>/<release.openshift.io/imagestream>:<release.openshift.io/imagestreamtag-name>
+          \n Similarly, the ReleasePayload object itself also has the PayloadCoordinates
+          (.spec.payloadCoordinates) that point back to the Release as well: \n \tspec:
+          \t  payloadCoordinates: \t    imagestreamName: release \t    imagestreamTagName:
+          4.9.0-0.nightly-2021-09-27-105859 \t    namespace: ocp \n The release that
+          created the ReleasePayload will be located here: \n \t<namespace>/<imagestreamName>:<imagestreamTagName>
           \n Compatibility level 4: No compatibility is provided, the API can change
           at any point for any reason. These capabilities should not be used by applications
           needing long term support."
@@ -167,7 +187,7 @@ spec:
                         ciConfigurationName:
                           description: CIConfigurationName the unique name given to
                             a verification test.  This value will be used as the key
-                            to lookup the configuration and the results of the respective
+                            to look up the configuration and the results of the respective
                             verification test
                           type: string
                         maxRetries:
@@ -196,7 +216,36 @@ spec:
                         ciConfigurationName:
                           description: CIConfigurationName the unique name given to
                             a verification test.  This value will be used as the key
-                            to lookup the configuration and the results of the respective
+                            to look up the configuration and the results of the respective
+                            verification test
+                          type: string
+                        maxRetries:
+                          description: MaxRetries Maximum retry attempts for the job.
+                            Defaults to 0 - do not retry on fail
+                          type: integer
+                      type: object
+                    type: array
+                  upgradeJobs:
+                    description: UpgradeJobs are automatically generated jobs used
+                      to execute upgrade tests against a ReleasePayload
+                    items:
+                      description: CIConfiguration is an Openshift CI system's job
+                        definition of a verification test to run against a ReleasePayload
+                      properties:
+                        analysisJobCount:
+                          description: AnalysisJobCount Number of asynchronous jobs
+                            to execute for release analysis.
+                          type: integer
+                        ciConfigurationJobName:
+                          description: CIConfigurationJobName is the actual name of
+                            the prowjob definition as stored in the CI Job Configuration.  This
+                            value is used to lookup and read in the prowjob for processing
+                            by the release-controller
+                          type: string
+                        ciConfigurationName:
+                          description: CIConfigurationName the unique name given to
+                            a verification test.  This value will be used as the key
+                            to look up the configuration and the results of the respective
                             verification test
                           type: string
                         maxRetries:
@@ -273,6 +322,10 @@ spec:
                             type: string
                           state:
                             description: State the current state of the job run
+                            type: string
+                          upgradeType:
+                            description: UpgradeType the type of upgrade performed
+                              via this job
                             type: string
                         type: object
                       type: array
@@ -418,6 +471,10 @@ spec:
                           state:
                             description: State the current state of the job run
                             type: string
+                          upgradeType:
+                            description: UpgradeType the type of upgrade performed
+                              via this job
+                            type: string
                         type: object
                       type: array
                     state:
@@ -452,6 +509,82 @@ spec:
                       job
                     type: string
                 type: object
+              upgradeJobResults:
+                description: UpgradeJobResults stores the results of generated upgrade
+                  jobs
+                items:
+                  description: JobStatus encapsulates the name of the job, all the
+                    results of the jobs, and an aggregated result of all the jobs
+                  properties:
+                    analysisJobCount:
+                      description: AnalysisJobCount Number of asynchronous jobs to
+                        execute for release analysis.
+                      type: integer
+                    ciConfigurationJobName:
+                      description: CIConfigurationJobName is the name of the prowjob
+                        definition as stored in the CI Job Configuration
+                      type: string
+                    ciConfigurationName:
+                      description: CIConfigurationName the unique name given to a
+                        verification test
+                      type: string
+                    maxRetries:
+                      description: MaxRetries maximum times to retry a job
+                      type: integer
+                    results:
+                      description: JobRunResults contains the links for individual
+                        jobs
+                      items:
+                        description: JobRunResult the results of a prowjob run The
+                          release-controller creates ProwJobs (prowv1.ProwJob) during
+                          the sync_ready control loop and relies on an informer to
+                          process jobs, that it created, as they are completed. The
+                          JobRunResults will be created, by the release-controller
+                          during the sync_ready loop and updated whenever any changes,
+                          to the respective job is received by the informer.
+                        properties:
+                          completionTime:
+                            description: CompletionTime timestamp for when the prow
+                              pipeline controller observes the final state of the
+                              ProwJob For instance, if a client Aborts a ProwJob,
+                              the Pipeline controller will receive notification of
+                              the change and update the PtowJob's Status accordingly.
+                            format: date-time
+                            type: string
+                          coordinates:
+                            description: Coordinates the location of the job
+                            properties:
+                              cluster:
+                                type: string
+                              name:
+                                type: string
+                              namespace:
+                                type: string
+                            type: object
+                          humanProwResultsURL:
+                            description: HumanProwResultsURL the html link to the
+                              prow results
+                            type: string
+                          startTime:
+                            description: StartTime timestamp for when the prowjob
+                              was created
+                            format: date-time
+                            type: string
+                          state:
+                            description: State the current state of the job run
+                            type: string
+                          upgradeType:
+                            description: UpgradeType the type of upgrade performed
+                              via this job
+                            type: string
+                        type: object
+                      type: array
+                    state:
+                      description: AggregateState is the overall success/failure of
+                        all the executed jobs
+                      type: string
+                  type: object
+                type: array
             type: object
         type: object
     served: true

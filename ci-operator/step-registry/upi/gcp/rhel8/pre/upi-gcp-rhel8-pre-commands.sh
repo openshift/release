@@ -29,7 +29,8 @@ set -x
 # Create the network and firewall rules to attach it to VM
 gcloud compute networks create "${INSTANCE_PREFIX}" \
   --subnet-mode=custom \
-  --bgp-routing-mode=regional
+  --bgp-routing-mode=regional \
+  --mtu=1500
 gcloud compute networks subnets create "${INSTANCE_PREFIX}" \
   --network "${INSTANCE_PREFIX}" \
   --range=10.0.0.0/9

@@ -3,6 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: cli
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
 binary_build_commands: make bin
 build_root:
   project_image:
@@ -16,6 +20,12 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: oc-bin-image
+operator:
+  bundles:
+  - as: gitops-operator-bundle
+    base_index: operator-index
+    context_dir: bundle/
+    dockerfile_path: bundle.Dockerfile
 releases:
   initial:
     integration:
@@ -32,6 +42,64 @@ resources:
       cpu: 800m
       memory: 6Gi
 tests:
+- as: kuttl-sequential
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-gitops-operator-bundle
+    env:
+      OO_CHANNEL: latest
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: openshift-gitops-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: sequential-e2e-steps
+      commands: |
+        scripts/openshift-CI-kuttl-tests.sh
+        make e2e-tests-sequential
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index-gitops-operator-bundle
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: optional-operators-ci-aws
+- as: kuttl-parallel
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-gitops-operator-bundle
+    env:
+      OO_CHANNEL: latest
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: openshift-gitops-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: parallel-e2e-steps
+      commands: |
+        scripts/openshift-CI-kuttl-tests.sh
+        make e2e-tests-parallel
+      dependencies:
+      - env: OO_INDEX
+        name: ci-index-gitops-operator-bundle
+      env:
+      - name: OO_CHANNEL
+      - name: OO_INSTALL_NAMESPACE
+      - name: OO_PACKAGE
+      - name: OO_TARGET_NAMESPACES
+      from: oc-bin-image
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
+    workflow: optional-operators-ci-aws
 - as: e2e
   steps:
     cluster_profile: aws

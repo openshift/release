@@ -190,8 +190,10 @@ $ curl --insecure -v "https://${site}" 2>&1 | awk 'BEGIN { cert=0 } /^\* Server 
 
 ##### Troubleshooting
 
-* Due to [cert-manager/issues/2968](https://github.com/jetstack/cert-manager/issues/2968), we have to edit the deployment of cert-manager
-with the additional arg `--dns01-recursive-nameservers="8.8.8.8:53"`:
+* [cert-manager/issues/2968](https://github.com/jetstack/cert-manager/issues/2968) is resovled by `hostedZoneName`
+which is implemented by [cert-manager/pull/2975](https://github.com/cert-manager/cert-manager/pull/2975).
+
+However, it [turned out](https://redhat-internal.slack.com/archives/CHY2E1BL4/p1675374499210699?thread_ts=1675372628.735039&cid=CHY2E1BL4) we still need the additional arg `--dns01-recursive-nameservers="8.8.8.8:53"` in the deployment of cert-manager.
 
 ```bash
 oc get deployment -n cert-manager cert-manager -o yaml | yq -r '.spec.template.spec.containers[0].args[]'
@@ -199,10 +201,9 @@ oc get deployment -n cert-manager cert-manager -o yaml | yq -r '.spec.template.s
 --cluster-resource-namespace=$(POD_NAMESPACE)
 --leader-election-namespace=kube-system
 --dns01-recursive-nameservers="8.8.8.8:53"
-
 ```
 
-* The above workaround does NOT work when we have selector defined in the clusterissuer
+* The selector in ClusterIssuer seems to not work as mentioned in [cert-manager/issues/2968](https://github.com/jetstack/cert-manager/issues/2968):
 
 ```
 apiVersion: cert-manager.io/v1

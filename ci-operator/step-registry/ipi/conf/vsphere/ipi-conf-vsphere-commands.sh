@@ -33,6 +33,7 @@ RESOURCE_POOL_DEF=""
 set +o errexit
 VERSION=$(echo "${JOB_NAME}" | grep -o -E '4\.[0-9]+')
 set -o errexit
+
 if [ ! -z ${VERSION} ]; then
     Z_VERSION=$(echo ${VERSION} | cut -d'.' -f2)
     if [ ${Z_VERSION} -gt 9 ]; then
@@ -57,7 +58,23 @@ compute:
       memoryMB: 16384
       osDisk:
         diskSizeGB: 120"
-    fi    
+    fi
+fi
+
+if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+        echo "Compact SIZE_VARIANT was configured, setting worker's replicas to 0"
+        MACHINE_POOL_OVERRIDES="controlPlane:
+  name: master
+  replicas: 3
+  platform:
+    vsphere:
+      cpus: 8
+      memoryMB: 32768
+      osDisk:
+        diskSizeGB: 120
+compute:
+- name: worker
+  replicas: 0"
 fi
 
 cat >> "${CONFIG}" << EOF
@@ -72,11 +89,20 @@ platform:
     network: "${LEASED_RESOURCE}"
     password: "${GOVC_PASSWORD}"
     username: "${GOVC_USERNAME}"
+    ${RESOURCE_POOL_DEF}
+EOF
+
+if [ -f ${SHARED_DIR}/external_lb ]; then 
+  echo "$(date -u --rfc-3339=seconds) - external load balancer in use, not setting VIPs"
+else
+cat >> "${CONFIG}" << EOF
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
-    ${RESOURCE_POOL_DEF}
+EOF
+fi
+
+cat >> "${CONFIG}" << EOF
 networking:
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
-

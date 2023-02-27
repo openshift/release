@@ -1,28 +1,24 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-service
-  cluster-api-provider-agent:
-    name: ocm-2.7
-    namespace: edge-infrastructure
-    tag: cluster-api-provider-agent
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -31,10 +27,6 @@ base_images:
     name: govc
     namespace: ci
     tag: v0.29.0
-  hypershift-operator:
-    name: "4.11"
-    namespace: ocp
-    tag: hypershift-operator
 build_root:
   from_repository: true
 images:
@@ -45,16 +37,25 @@ images:
   to: assisted-test-infra
 - dockerfile_path: Dockerfile.assisted-test-infra
   inputs:
+    assisted-service:
+      as:
+      - quay.io/edge-infrastructure/assisted-service:latest
     govc:
       as:
       - quay.io/ocp-splat/govc:v0.29.0
   to: assisted-test-infra-internal
 promotion:
-  name: ocm-2.7
+  name: ocm-2.8
   namespace: edge-infrastructure
 releases:
   latest:
     candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  latest-multi:
+    candidate:
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.12"
@@ -202,6 +203,14 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-13
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.13
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-12-periodic
   cron: 00 02 */1 * 0-5
   steps:
@@ -218,7 +227,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-periodic
   cron: 15 02 */1 * 0-5
@@ -227,7 +236,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
@@ -260,7 +269,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-periodic
@@ -270,7 +279,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.11
+        OPENSHIFT_VERSION=4.12
       PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
@@ -431,7 +440,7 @@ tests:
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite
-  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     env:
@@ -443,6 +452,21 @@ tests:
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-kube-api-net-suite-periodic
+  cron: 43 22 */1 * 1-5
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        KUBE_API=true
+        ENABLE_KUBE_API=true
+        NUM_MASTERS=1
+        ISO_IMAGE_TYPE=minimal-iso
+        STATIC_IPS=true
+        TEST_FUNC=test_kubeapi
+        MAKEFILE_TARGET="test_kube_api_parallel"
+      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api
   optional: true
@@ -482,24 +506,6 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-capi
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: hypershift-operator
-      PROVIDER_IMAGE: cluster-api-provider-agent
-    env:
-      ASSISTED_CONFIG: |
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=12000
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      GATHER_CAPI_LOGS: "true"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite
   optional: true
@@ -640,8 +646,17 @@ tests:
         MAKEFILE_TARGET=test
       PLATFORM: vsphere
     workflow: assisted-vsphere
-- as: e2e-metal-upgrade-agent
+- as: e2e-metal-assisted-upgrade-agent
   optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        TEST=./src/tests/test_upgrade_agent.py
+        TEST_FUNC=test_upgrade_agent
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-upgrade-agent-periodic
+  cron: 15 05 */1 * 0,3
   steps:
     cluster_profile: packet-assisted
     env:
@@ -675,6 +690,34 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
       PLATFORM: nutanix
     workflow: assisted-nutanix
+- as: e2e-metal-assisted-day2-arm-workers
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
+    env:
+      ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
+        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
+        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+    workflow: assisted-equinix
+- as: e2e-metal-assisted-day2-arm-workers-periodic
+  cron: 15 15 */1 * 0,3
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
+    env:
+      ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
+        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
+        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+    workflow: assisted-equinix
 zz_generated_metadata:
   branch: master
   org: openshift

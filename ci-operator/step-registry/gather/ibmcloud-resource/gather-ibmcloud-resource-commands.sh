@@ -63,24 +63,19 @@ function command_retry {
     return 1
 }
 
-# Install IBM Cloud CLI and plugins
-function install_ibmcloud_cli {
-    # Download the latest IBM Cloud release binary
-    latest_binary_url=$(curl -m 10 https://api.github.com/repos/IBM-Cloud/ibm-cloud-cli-release/releases/latest | /tmp/jq .body | sed 's,.*\[Linux 64 bit\](\(https://.*linux_amd64\.tgz\)).*,\1,g')
-    curl -Lo "/tmp/IBM_Cloud_CLI.tgz" "${latest_binary_url}"
-    # Extract binary and move to bin
-    tar -C /tmp -xzf "/tmp/IBM_Cloud_CLI.tgz"
-    export IBMCLOUD_CLI=/tmp/ibmcloud
-    mv /tmp/IBM_Cloud_CLI/ibmcloud "${IBMCLOUD_CLI}"
-    # Install required plugins
-    "${IBMCLOUD_CLI}" plugin install cloud-object-storage
-    "${IBMCLOUD_CLI}" plugin install vpc-infrastructure
-    "${IBMCLOUD_CLI}" plugin install cloud-internet-services
+function checkCli() {
+  export IBMCLOUD_CLI=ibmcloud
+  export IBMCLOUD_HOME=/output  
+  echo "check IBMCLOUD_CLI: ${IBMCLOUD_CLI}..."
+  command -v ${IBMCLOUD_CLI}
+  ${IBMCLOUD_CLI} --version
+  ${IBMCLOUD_CLI} plugin list
 }
 
 # IBM Cloud CLI login
 function ibmcloud_login {
-    "${IBMCLOUD_CLI}" login -a https://cloud.ibm.com -r ${LEASED_RESOURCE} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+    echo "Try to login..."
+    "${IBMCLOUD_CLI}" login -r ${LEASED_RESOURCE} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
 
 # Gather load-balancer resources
@@ -167,24 +162,12 @@ function gather_resources {
     gather_cis
 }
 
-install_ibmcloud_cli
+checkCli
 
-# Disable exit on error for login
-set +o errexit
-login_success=false
-for _ in $(seq 5); do
-    if ibmcloud_login; then
-        login_success=true
-        break
-    fi
-    sleep 10
-done
-if [[ ${login_success} == false ]]; then
-    echo "ERROR: Failed to log into IBM Cloud CLI."
-    exit 1
-fi
+ibmcloud_login
 
 # Enable exit on error to short circuit if there are failures during gather
-set -o errexit
+
 mkdir -p "${RESOURCE_DUMP_DIR}"
+
 gather_resources

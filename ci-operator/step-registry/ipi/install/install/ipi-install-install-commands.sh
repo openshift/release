@@ -13,22 +13,31 @@ function populate_artifact_dir() {
     s/password: .*/password: REDACTED/;
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
-    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+    ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install-$(date +%s).log"
+  sed -i '
+    s/password: .*/password: REDACTED/;
+    s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+    s/UserData:.*,/UserData: REDACTED,/;
+    ' "${dir}/terraform.txt"
+  tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
   case "${CLUSTER_TYPE}" in
-    aws|aws-arm64)
-      grep -Po 'Instance ID: \Ki\-\w+' "${dir}/.openshift_install.log" > "${SHARED_DIR}/aws-instance-ids.txt";;
     alibabacloud)
       awk -F'id=' '/alicloud_instance.*Creation complete/ && /master/{ print $2 }' "${dir}/.openshift_install.log" | tr -d ']"' > "${SHARED_DIR}/alibaba-instance-ids.txt";;
   *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}' to collect machine IDs"
   esac
 }
 
-function prepare_next_steps() {
+function write_install_status() {
   #Save exit code for must-gather to generate junit
-  echo "$?" > "${SHARED_DIR}/install-status.txt"
+  echo "$ret" >> "${SHARED_DIR}/install-status.txt"
+}
+
+function prepare_next_steps() {
+  write_install_status
   set +e
   echo "Setup phase finished, prepare env for next steps"
   populate_artifact_dir
+
   echo "Copying required artifacts to shared dir"
   #Copy the auth artifacts to shared dir for the next steps
   cp \
@@ -60,7 +69,8 @@ function prepare_next_steps() {
           fi
         fi
 
-        cmd="scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i \"${CLUSTER_PROFILE_DIR}/ssh-privatekey\" -r ${dir} ${bastion_ssh_user}@${bastion_public_address}:/tmp/installer"
+        # this required rsync daemon is running on ${bastion_public_address} and /tmp dir is configured
+        cmd="rsync -rtv ${dir}/ ${bastion_public_address}::tmp/installer/"
         echo "Running Command: ${cmd}"
         eval "${cmd}"
         echo > "${SHARED_DIR}/COPIED_INSTALL_DIR_TO_BASTION"
@@ -304,7 +314,12 @@ fi
 case "${CLUSTER_TYPE}" in
 aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
 azure4|azuremag|azure-arm64) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
-azurestack) export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json;;
+azurestack)
+    export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+    if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+        export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+    fi
+    ;;
 gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
 ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
@@ -312,7 +327,10 @@ ibmcloud)
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
-vsphere) export VSPHERE_PERSIST_SESSION=true;;
+vsphere)
+    export VSPHERE_PERSIST_SESSION=true
+    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
 openstack*) export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml ;;
@@ -379,11 +397,58 @@ if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   inject_promtail_service
 fi
 
-date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
-wait "$!"
-ret="$?"
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
+export TF_LOG_PATH="${dir}/terraform.txt"
+
+# Cloud infrastructure problems are common, instead of failing and
+# forcing a retest of the entire job, try the installation again if
+# the installer exits with 4, indicating an infra problem.
+case $JOB_NAME in
+  *vsphere*)
+    # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
+    max=1
+    ;;
+  *)
+    max=3
+    ;;
+esac
+ret=4
+tries=1
+set +o errexit
+backup=/tmp/install-orig
+cp -rfpv "$dir" "$backup"
+while [ $ret -eq 4 ] && [ $tries -le $max ]
+do
+  echo "Install attempt $tries of $max"
+  if [ $tries -gt 1 ]; then
+    write_install_status
+    cp "${dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}/" 2>/dev/null
+    openshift-install --dir="${dir}" destroy cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+    wait "$!"
+    ret="$?"
+    if test "${ret}" -ne 0 ; then
+      echo "Failed to destroy cluster, aborting retries."
+      ret=4
+      break
+    fi
+    rm -rf "$dir"
+    cp -rfpv "$backup" "$dir"
+  else
+    date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
+  fi
+
+  openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  wait "$!"
+  ret="$?"
+  echo "Installer exit with code $ret"
+
+  tries=$((tries+1))
+done
+set -o errexit
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
@@ -392,10 +457,53 @@ if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
-fi
 
-echo "install-config.yaml"
-echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+  echo "Collecting cluster data for analysis..."
+  set +o errexit
+  set +o pipefail
+  if [ ! -f /tmp/jq ]; then
+    curl -L https://stedolan.github.io/jq/download/linux64/jq -o /tmp/jq && chmod +x /tmp/jq
+  fi
+  if ! pip -V; then
+    echo "pip is not installed: installing"
+    if python -c "import sys; assert(sys.version_info >= (3,0))"; then
+      python -m ensurepip --user || easy_install --user 'pip'
+    else
+      echo "python < 3, installing pip<21"
+      python -m ensurepip --user || easy_install --user 'pip<21'
+    fi
+  fi
+  echo "Installing python modules: json"
+  python3 -c "import json" || pip3 install --user pyjson
+  PLATFORM="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get infrastructure/cluster -o json|/tmp/jq '.status.platform')"
+  TOPOLOGY="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get infrastructure/cluster -o json|/tmp/jq '.status.infrastructureTopology')"
+  NETWORKTYPE="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get network.operator cluster -o json|/tmp/jq '.spec.defaultNetwork.type')"
+  if [[ "$(env KUBECONFIG=${dir}/auth/kubeconfig oc get network.operator cluster -o json|/tmp/jq '.spec.clusterNetwork[0].cidr')" =~ .*":".*  ]]; then
+    NETWORKSTACK="IPv6"
+  else
+    NETWORKSTACK="IPv4"
+  fi
+  CLOUDREGION="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get node -o json|/tmp/jq '.items[]|.metadata.labels'|grep topology.kubernetes.io/region|cut -d : -f 2| head -1| sed 's/,//g')"
+  CLOUDZONE="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get node -o json|/tmp/jq '.items[]|.metadata.labels'|grep topology.kubernetes.io/zone|cut -d : -f 2| sort -u)"
+  CLUSTERVERSIONHISTORY="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get clusterversion -o json|/tmp/jq '.items[]|.status.history'|grep version|cut -d : -f 2)"
+  CLOUDZONE="$(echo $CLOUDZONE | tr -d \")"
+  CLUSTERVERSIONHISTORY="$(echo $CLUSTERVERSIONHISTORY | tr -d \")"
+  python3 -c '
+import json;
+dictionary = {
+    "Platform": '$PLATFORM',
+    "Topology": '$TOPOLOGY',
+    "NetworkType": '$NETWORKTYPE',
+    "NetworkStack": "'$NETWORKSTACK'",
+    "CloudRegion": '"$CLOUDREGION"',
+    "CloudZone": "'"$CLOUDZONE"'".split(),
+    "ClusterVersionHistory": "'"$CLUSTERVERSIONHISTORY"'".split()
+}
+with open("'${ARTIFACT_DIR}/cluster-data.json'", "w") as outfile:
+    json.dump(dictionary, outfile)'
+  set -o errexit
+  set -o pipefail
+  echo "Done collecting cluster data for analysis!"
+fi
 
 exit "$ret"

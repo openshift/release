@@ -1,36 +1,36 @@
 base_images:
-  stolostron_builder_nodejs14-linux:
+  stolostron_builder_nodejs18-linux:
     name: builder
     namespace: stolostron
-    tag: nodejs14-linux
-  stolostron_common-nodejs-parent_nodejs-14:
+    tag: nodejs18-linux
+  stolostron_common-nodejs-parent_nodejs-18:
     name: common-nodejs-parent
     namespace: stolostron
-    tag: nodejs-14
+    tag: nodejs-18
 binary_build_commands: make -f Makefile.prow install && make -f Makefile.prow build
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: nodejs16-linux
+    tag: nodejs18-linux
 images:
 - dockerfile_path: Dockerfile.prow
   inputs:
-    stolostron_builder_nodejs14-linux:
+    stolostron_builder_nodejs18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:nodejs14-linux
-    stolostron_common-nodejs-parent_nodejs-14:
+      - registry.ci.openshift.org/stolostron/builder:nodejs18-linux
+    stolostron_common-nodejs-parent_nodejs-18:
       as:
-      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-14
+      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-18
   to: console
 - dockerfile_path: Dockerfile.mce.prow
   inputs:
-    stolostron_builder_nodejs14-linux:
+    stolostron_builder_nodejs18-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:nodejs14-linux
-    stolostron_common-nodejs-parent_nodejs-14:
+      - registry.ci.openshift.org/stolostron/builder:nodejs18-linux
+    stolostron_common-nodejs-parent_nodejs-18:
       as:
-      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-14
+      - registry.ci.openshift.org/stolostron/common-nodejs-parent:nodejs-18
   to: console-mce
 resources:
   '*':
@@ -38,12 +38,18 @@ resources:
       cpu: 400m
       memory: 2Gi
 tests:
-- as: lint-check-unittests-sonarcloud
+- as: check
   commands: |
     export SELF="make -f Makefile.prow"
     make -f Makefile.prow install
-    make -f Makefile.prow lint
     make -f Makefile.prow check
+  container:
+    from: src
+- as: unit-tests-sonarcloud
+  commands: |
+    export SELF="make -f Makefile.prow"
+    make -f Makefile.prow install
+    make -f Makefile.prow sonar/js/jest-init
     make -f Makefile.prow unit-tests
     make -f Makefile.prow sonar/js/prow
   container:
@@ -84,7 +90,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.7
+      DESTINATION_BRANCH: release-2.8
     workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: main

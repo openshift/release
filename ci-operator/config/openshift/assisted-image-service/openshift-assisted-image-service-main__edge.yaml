@@ -1,18 +1,18 @@
 base_images:
   assisted-installer:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -20,11 +20,11 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.7
+    name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
@@ -57,11 +57,17 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.17
   to: assisted-image-service
 promotion:
-  name: ocm-2.7
+  name: ocm-2.8
   namespace: edge-infrastructure
 releases:
   latest:
     candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+  latest-multi:
+    candidate:
+      architecture: multi
       product: ocp
       stream: nightly
       version: "4.12"
@@ -131,6 +137,20 @@ tests:
       ASSISTED_CONFIG: |
         MAKEFILE_TARGET="deploy_nodes"
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-day2-arm-workers
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest-multi
+    env:
+      ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
+      ASSISTED_CONFIG: |
+        TEST_FUNC=test_deploy_day2_nodes_cloud
+        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
+        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
+        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+    workflow: assisted-equinix
 - as: e2e-ai-operator-ztp
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:

@@ -61,7 +61,7 @@ items:
   kind: ServiceMonitor
   metadata:
     name: ci-operator-configresolver
-    namespace: prow-monitoring
+    namespace: ci
     labels:
       app: prow
       component: ci-operator-configresolver
@@ -71,9 +71,6 @@ items:
     - interval: 30s
       port: metrics
       scheme: http
-    namespaceSelector:
-      matchNames:
-      - ci
     selector:
       matchLabels:
         app: prow
@@ -120,10 +117,11 @@ items:
           - --branch=master
           - --root=/tmp/git-sync
           - --one-time=true
+          - --depth=1
           env:
           - name: GIT_SYNC_DEST
             value: release
-          image: gcr.io/google_containers/git-sync:v3.1.6
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync
@@ -136,10 +134,11 @@ items:
           - --branch=master
           - --wait=30
           - --root=/tmp/git-sync
+          - --max-sync-failures=3
           env:
           - name: GIT_SYNC_DEST
             value: release
-          image: gcr.io/google_containers/git-sync:v3.1.6
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
           volumeMounts:
           - name: release
             mountPath: /tmp/git-sync

@@ -11,14 +11,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.8
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
+    tag: rhel-8-golang-1.19-openshift-4.13
   tools:
     name: 4.13-priv
     namespace: ocp-private
@@ -31,19 +27,16 @@ images:
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: hello-openshift
 promotion:
   name: 4.13-priv
@@ -99,11 +92,11 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TELEMETRY_ENABLED: "false"
-    workflow: openshift-e2e-aws-loki
+    workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
-    workflow: openshift-e2e-gcp-loki
+    workflow: openshift-e2e-gcp
 - as: e2e-gcp-fips-serial
   optional: true
   steps:
@@ -360,6 +353,26 @@ tests:
   container:
     clone: true
     from: golangci-lint
+- as: e2e-aws-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-etcd-scaling
+- as: e2e-gcp-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-etcd-scaling
+- as: e2e-azure-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-etcd-scaling
+- as: e2e-vsphere-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-etcd-scaling
 zz_generated_metadata:
   branch: master
   org: openshift-priv

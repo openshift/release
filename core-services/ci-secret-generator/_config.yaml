@@ -157,6 +157,7 @@
     - cluster-display
     - github-ldap-user-group-creator
     - hive
+    - hypershift-workload
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -180,11 +181,17 @@
     - cluster-display
     - dptp-controller-manager
 - fields:
-  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.hive.config
-      create token --namespace openshift-monitoring ci --duration=2419200s --bound-object-kind=Secret
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      create token --namespace ci ci-monitoring --duration=2419200s --bound-object-kind=Secret
       --bound-object-name=token-bound-object-0
-    name: hive-openshift-monitoring-ci-token
-  item_name: hive-openshift-monitoring-credentials
+    name: sa.$(service_account).$(cluster).token.txt
+  item_name: openshift-monitoring-credentials
+  params:
+    cluster:
+    - app.ci
+    - hive
+    service_account:
+    - ci-monitoring
 - fields:
   - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
       create token -n ci $(service_account) --duration=2419200s --bound-object-kind=Secret
@@ -200,3 +207,13 @@
     - build02
     service_account:
     - sprint-automation
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      -n openshift-user-workload-monitoring get secrets -o json | jq -r '.items[]
+      | select(.type=="kubernetes.io/service-account-token") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="prometheus-user-workload")|.data.token'
+      | base64 -d
+    name: sa.prometheus-user-workload.$(cluster).token.txt
+  item_name: app-ci-openshift-user-workload-monitoring-credentials
+  params:
+    cluster:
+    - app.ci

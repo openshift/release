@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
+set +o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -39,7 +39,7 @@ echo "butane_version_list:" "${butane_version_list[@]}"
 TANG_SERVER_KEY=$(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${SSH_PRIV_KEY_PATH}" ${BASTION_SSH_USER}@${BASTION_IP} "sudo podman exec -it tang tang-show-keys 8080")
 
 declare -a roles=("master" "worker")
-ret_code=0
+ret_code=1
 for butane_version in "${butane_version_list[@]}"; do
   for role in "${roles[@]}"; do
     cat > "${workdir}/${role}_tang_disk_encryption.bu" << EOF
@@ -57,13 +57,14 @@ boot_device:
         thumbprint: ${TANG_SERVER_KEY}
     threshold: 1
 EOF
-    /tmp/butane "${workdir}/${role}_tang_disk_encryption.bu" > "${workdir}/manifest_${role}_tang_disk_encryption.yml" || ret_code=$?
+    /tmp/butane "${workdir}/${role}_tang_disk_encryption.bu" > "${workdir}/manifest_${role}_tang_disk_encryption.yml"
+    ret_code=$?
     [ ${ret_code} -ne 0 ] && echo "Butane failed to transform '${role}-tang_disk_encryption.bu' to machineconfig file using version '${butane_version}' (non-GA?)." && break
-    cp "${workdir}/manifest_${role}_tang_disk_encryption.yml" "${SHARED_DIR}/manifest_${role}_tang_disk_encryption.yml"
-    cp "${workdir}/manifest_${role}_tang_disk_encryption.yml" "${ARTIFACT_DIR}/manifest_${role}_tang_disk_encryption.yml"
+    cp -f "${workdir}/manifest_${role}_tang_disk_encryption.yml" "${SHARED_DIR}/manifest_${role}_tang_disk_encryption.yml"
+    cp -f "${workdir}/manifest_${role}_tang_disk_encryption.yml" "${ARTIFACT_DIR}/manifest_${role}_tang_disk_encryption.yml"
   done
   # skip other versions from the array if current one was successful (GA scenario or non-GA 2nd run)
-  [ ${ret_code} -eq 0 ] && break
+  [ ${ret_code} -eq 0 ] && echo "Succeed to transform 'tang_disk_encryption.bu' to machineconfig file using version '${butane_version}'." && break
 done
 # abort if all versions from the array have failed
 if [ ${ret_code} -ne 0 ]; then
