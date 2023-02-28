@@ -13,8 +13,14 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_name=$(jq --raw-output '.name' <<< "$operator_obj")
     operator_source=$(jq --raw-output '.source' <<< "$operator_obj")
     operator_channel=$(jq --raw-output '.channel' <<< "$operator_obj")
+    operator_group=$(jq --raw-output '.operator_group' <<< "$operator_obj")
     operator_install_namespace=$(jq --raw-output '.install_namespace' <<< "$operator_obj")
     operator_target_namespaces=$(jq --raw-output '.target_namespaces' <<< "$operator_obj")
+
+    # If operator_group not defined, use default value.
+    if [[ -z "${operator_group}" ]]; then
+        operator_group="${operator_install_namespace}-operator-group"
+    fi
 
     # If install_namespace not defined, exit.
     if [[ -z "${operator_install_namespace}" ]]; then
@@ -65,7 +71,7 @@ EOF
     apiVersion: operators.coreos.com/v1
     kind: OperatorGroup
     metadata:
-        name: "${operator_install_namespace}-operator-group"
+        name: "${operator_group}"
         namespace: "${operator_install_namespace}"
     spec:
         targetNamespaces:

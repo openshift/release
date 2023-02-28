@@ -7,8 +7,8 @@ set -o pipefail
 ODF_INSTALL_NAMESPACE=openshift-storage
 ODF_OPERATOR_CHANNEL="$ODF_OPERATOR_CHANNEL"
 ODF_SUBSCRIPTION_NAME="$ODF_SUBSCRIPTION_NAME"
-ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2-csi'}"
-ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-10}Gi"
+ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2'}"
+ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
 
 
 echo "Installing ODF from ${ODF_OPERATOR_CHANNEL} into ${ODF_INSTALL_NAMESPACE}"
@@ -116,20 +116,7 @@ spec:
 EOF
 
 # Wait for StorageCluster to be deployed
-# oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
-#   -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='10m'
+oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
+   -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='10m'
 
-# echo "ODF/OCS Operator is deployed successfully"
-
-for _ in {1..60}; do
-    SC=$(oc -n "$ODF_INSTALL_NAMESPACE" get storagecluster ocs-storagecluster -o json || true)
-    oc get storagecluster --all-namespaces
-    if [[ -n "$SC" ]]; then
-        if [[ "$(oc -n "$ODF_INSTALL_NAMESPACE" get storagecluster ocs-storagecluster -o jsonpath='{.status.phase}')" == "Ready" ]]; then
-            echo "storagecluster \"$SC\" ready"
-            break
-        fi
-    fi
-    sleep 20
-done
-
+echo "ODF/OCS Operator is deployed successfully"

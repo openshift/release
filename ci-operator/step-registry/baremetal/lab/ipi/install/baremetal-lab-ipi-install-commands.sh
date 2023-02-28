@@ -31,7 +31,7 @@ function prepare_bmc() {
     chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
   ipmitool -I lanplus -H "$bmc_address" \
     -U "$bmc_user" -P "$bmc_pass" \
-    power off
+    power off || echo "Already off"
 }
 
 function update_image_registry() {

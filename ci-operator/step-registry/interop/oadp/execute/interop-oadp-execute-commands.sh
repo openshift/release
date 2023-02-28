@@ -6,12 +6,17 @@ set -o pipefail
 
 SECRETS_DIR="/tmp/secrets"
 OADP_GH_PAT=$(cat ${SECRETS_DIR}/oadp/oadp-gh-pat)
+OADP_GH_USER=$(cat ${SECRETS_DIR}/oadp/oadp-gh-user)
 
 
 readonly OADP_GIT_DIR="${HOME}/cspi"
+readonly OADP_APPS_DIR="${HOME}/oadpApps"
+readonly PYCLIENT_DIR="${HOME}/pyclient"
 mkdir -p "${OADP_GIT_DIR}"
 mkdir -p /tmp/test-settings
 touch /tmp/test-settings/default_settings.json
+mkdir -p "${OADP_APPS_DIR}"
+mkdir -p "${PYCLIENT_DIR}"
 
 
 echo "Annotate oadp namespace"
@@ -23,39 +28,43 @@ cp "${CLUSTER_PROFILE_DIR}/.awscred" /tmp/test-settings/aws_creds
 echo "End of AWS info"
 
 
-echo "ls /usr/local/go/bin"
-ls -laht /usr/local/go/bin
 
-git clone --branch master https://madunn:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-e2e-qe "${OADP_GIT_DIR}"
+echo "clone oadp-e2e-qe"
+git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-e2e-qe "${OADP_GIT_DIR}"
+
+echo "clone appsdeployer"
+git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${OADP_APPS_DIR}"
+
+echo "clone pyclient"
+git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${PYCLIENT_DIR}"
 
 
-echo "CLOUD_PROVIDER"
-oc get infrastructures cluster -o jsonpath='{.status.platform}' | awk '{print tolower($0)}'
+cd /alabama/oadpApps
+python3 -m pip install pip --upgrade
+python3 -m venv test
+source test/bin/activate
+python3 -m pip install . --target "${OADP_GIT_DIR}/sample-applications/"
+
+echo "pip install python-client"
+cd /alabama/pyclient
+
+python3 -m pip install . 
+
+
+echo "pip install ansible_runner"
+pip install ansible_runner
+
 
 echo "chdir to OADP_GIT_DIR"
 cd /alabama/cspi
 
-cat > ./ansible.cfg << EOF
-[defaults]
- local_tmp = /tmp/
- remote_tmp = /tmp/
- ANSIBLE_DEBUG=true
- ANSIBLE_VERBOSITY=4
-EOF
+export ANSIBLE_REMOTE_TMP=/tmp/
 
 
-cat >> /alabama/cspi/sample-applications/ansible/ansible.cfg << EOF
-ansible_verbosity=4
-ansible_debug=true
-EOF
+#echo "EXPORT TMP AS HOME DIR"
+#export HOME=/tmp/
 
-echo "PWD"
-pwd
-
-echo "EXPORT TMP AS HOME DIR"
-export HOME=/tmp/
-echo "DONE"
-
+echo "sleep"
 sleep 600
 
 echo "Run tests from CLI"
