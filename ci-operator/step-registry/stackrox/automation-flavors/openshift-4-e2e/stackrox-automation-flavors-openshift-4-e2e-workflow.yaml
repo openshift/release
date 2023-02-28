@@ -3,7 +3,12 @@ workflow:
   steps:
     pre:
     - as: openshift-4-create
-      commands: stackrox-automation-flavors-openshift-4-e2e-commands.sh
+      commands: |
+        if [[ -z "${OPENSHIFT_VERSION:-}" ]]; then
+            echo "ERROR: Expect a defined OPENSHIFT_VERSION"
+            exit 1
+        fi
+        /usr/bin/openshift-ci.sh create openshift-4 "${OPENSHIFT_VERSION}"
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
         name: stackrox-automation-flavors
