@@ -8,11 +8,14 @@ workflow:
             echo "ERROR: Expect a defined OPENSHIFT_VERSION"
             exit 1
         fi
-        sed -i 33s#/usr/bin#/tmp# /usr/bin/entrypoint.sh
-        sed -i 34s#openshift-install#/tmp/openshift-install# /usr/bin/entrypoint.sh
-        sed -i 56s#openshift-install#/tmp/openshift-install# /usr/bin/entrypoint.sh
-        sed -i 94s#openshift-install#/tmp/openshift-install# /usr/bin/entrypoint.sh
-        /usr/bin/openshift-ci.sh create openshift-4 "${OPENSHIFT_VERSION}"
+        cp /usr/bin/entrypoint.sh .
+        cp /usr/bin/openshift-ci.sh .
+        sed -i 33s#/usr/bin#/tmp# entrypoint.sh
+        sed -i 34s#openshift-install#/tmp/openshift-install# entrypoint.sh
+        sed -i 56s#openshift-install#/tmp/openshift-install# entrypoint.sh
+        sed -i 94s#openshift-install#/tmp/openshift-install# entrypoint.sh
+        sed -i 86s#/usr/bin#/tmp# openshift-ci.sh
+        ./openshift-ci.sh create openshift-4 "${OPENSHIFT_VERSION}"
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
         name: stackrox-automation-flavors
@@ -30,10 +33,13 @@ workflow:
     post:
     - as: openshift-4-destroy
       commands: |
-        sed -i 33s#/usr/bin#/tmp# /usr/bin/entrypoint.sh
-        sed -i 34s#openshift-install#/tmp/openshift-install# /usr/bin/entrypoint.sh
-        sed -i 56s#openshift-install#/tmp/openshift-install# /usr/bin/entrypoint.sh
-        sed -i 94s#openshift-install#/tmp/openshift-install# /usr/bin/entrypoint.sh
+        cp /usr/bin/entrypoint.sh .
+        cp /usr/bin/openshift-ci.sh .
+        sed -i 33s#/usr/bin#/tmp# entrypoint.sh
+        sed -i 34s#openshift-install#/tmp/openshift-install# entrypoint.sh
+        sed -i 56s#openshift-install#/tmp/openshift-install# entrypoint.sh
+        sed -i 94s#openshift-install#/tmp/openshift-install# entrypoint.sh
+        sed -i 86s#/usr/bin#/tmp# openshift-ci.sh
         /usr/bin/openshift-ci.sh destroy openshift-4
       credentials:
       - mount_path: /tmp/vault/stackrox-automation-flavors
