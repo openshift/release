@@ -5,18 +5,13 @@ base_images:
     tag: v1.46.0
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.18-openshift-4.12
+  from_repository: true
 images:
 - dockerfile_literal: |
     FROM src
-    RUN yum update -y && yum install -y python39 python39-pip
-    RUN alternatives --set python3 /usr/bin/python3.9
     RUN pip3 install pre-commit
   from: src
-  to: pre-commit-container
+  to: openstack-operator-ci-pre-commit
 resources:
   '*':
     limits:
@@ -66,7 +61,7 @@ tests:
     cd ../operator
     pre-commit run --all-files --show-diff-on-failure
   container:
-    from: pre-commit-container
+    from: openstack-operator-ci-pre-commit
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators

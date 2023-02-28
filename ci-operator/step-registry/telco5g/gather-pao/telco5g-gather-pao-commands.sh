@@ -27,6 +27,8 @@ echo "************ telco5g gather-pao commands ************"
 
 if [[ "$T5CI_VERSION" == "4.13" ]]; then
     export CNF_BRANCH="master"
+elif [[ "$T5CI_VERSION" == "4.14" ]]; then
+    export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
