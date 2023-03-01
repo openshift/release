@@ -26,6 +26,12 @@ cat > scaleup-pre-hook-azure.yaml <<- 'EOF'
     shell: |
       sudo lvextend -l +100%FREE /dev/rootvg/varlv
       sudo xfs_growfs /dev/rootvg/varlv
+  - name: Update rhui-azure-rhel8 package to renew the expired cert for Azure RHUI
+    yum:
+      name: rhui-azure-rhel8
+      state: latest
+      disablerepo: "*"
+      enablerepo: "rhui-microsoft-azure-rhel8"
 EOF
 
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
