@@ -61,7 +61,21 @@ function reset_host() {
     chassis bootparam set bootflag force_pxe options=PEF,watchdog,reset,power
   ipmitool -I lanplus -H "$bmc_address" \
     -U "$bmc_user" -P "$bmc_pass" \
-    power reset
+    power off || echo "Already off"
+  # If the host is not already powered off, the power on command can fail while the host is still powering off.
+  # Let's retry the power on command multiple times to make sure the command is received in the correct state.
+  for i in {1..10} max; do
+    if [ "$i" == "max" ]; then
+      echo "Failed to reset $bmc_address"
+      return 1
+    fi
+    ipmitool -I lanplus -H "$bmc_address" \
+      -U "$bmc_user" -P "$bmc_pass" \
+      power on && break
+    echo "Failed to power on $bmc_address, retrying..."
+    sleep 5
+  done
+
   if ! wait_for_power_down "$bmc_address" "$bmc_user" "$bmc_pass" "${name}"; then
     echo "$bmc_address" >> /tmp/failed
   fi
