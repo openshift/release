@@ -15,6 +15,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 CLUSTER_NAME="$(<"${SHARED_DIR}/cluster_name")"
 API_VIP="$(yq .api_vip "$SHARED_DIR/vips.yaml")"
+INGRESS_VIP="$(yq .ingress_vip "$SHARED_DIR/vips.yaml")"
 echo "Generating the template..."
 HAPROXY="
 global
@@ -62,12 +63,12 @@ listen ingress-router-80
     bind *:80
     mode tcp
     balance source
-    server api_vip $API_VIP:80 check inter 1s
+    server api_vip $INGRESS_VIP:80 check inter 1s
 listen ingress-router-443
     bind *:443
     mode tcp
     balance source
-    server api_vip $API_VIP:443 check inter 1s
+    server api_vip $INGRESS_VIP:443 check inter 1s
 "
 
 echo "Templating for HAProxy done..."
