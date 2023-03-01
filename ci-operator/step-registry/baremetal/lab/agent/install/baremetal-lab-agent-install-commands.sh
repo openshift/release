@@ -20,7 +20,7 @@ echo "Run playbook"
 
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" <<EOF
-cd /root/workdir/agent-bm-deployments/
+cd /root/bmanzari/agent-bm-deployments/
 ansible-playbook -i /var/builds/${NAMESPACE}/agent-install-inventory install.yaml -vv
 EOF
 
