@@ -27,6 +27,36 @@ function populate_artifact_dir() {
   esac
 }
 
+# copy_kubeconfig_minimal runs in the background to monitor kubeconfig file
+# As soon as kubeconfig file is available, it copes it to shared dir as kubeconfig-minimal
+# Installer might still amend the file. But this is a minimally working kubeconfig and is
+# useful for components like observers. In the end, the complete kubeconfig will be copies
+# as before.
+function copy_kubeconfig_minimal() {
+  local dir=${1}
+  echo "waiting for ${dir}/auth/kubeconfig to exist"
+  while [ ! -s  "${dir}/auth/kubeconfig" ]
+  do
+    sleep 5
+  done
+  echo 'kubeconfig received!'
+
+  echo 'waiting for api to be available'
+  until env KUBECONFIG="${dir}/auth/kubeconfig" oc get --raw / >/dev/null 2>&1; do
+    sleep 5
+  done
+  echo 'api available'
+
+  echo 'waiting for bootstrap to complete'
+  openshift-install --dir="${dir}" wait-for bootstrap-complete &
+  wait "$!"
+  ret=$?
+  if [ $ret -eq 0 ]; then
+    echo "Copying kubeconfig to shared dir as kubeconfig-minimal"
+    cp "${dir}/auth/kubeconfig" "${SHARED_DIR}/kubeconfig-minimal"
+  fi
+}
+
 function write_install_status() {
   #Save exit code for must-gather to generate junit
   echo "$ret" >> "${SHARED_DIR}/install-status.txt"
@@ -428,12 +458,17 @@ do
       ret=4
       break
     fi
+    if [[ -v copy_kubeconfig_pid ]]; then
+      kill $copy_kubeconfig_pid
+    fi
     rm -rf "$dir"
     cp -rfpv "$backup" "$dir"
   else
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
   fi
 
+  copy_kubeconfig_minimal "${dir}" &
+  copy_kubeconfig_pid=$!
   openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
