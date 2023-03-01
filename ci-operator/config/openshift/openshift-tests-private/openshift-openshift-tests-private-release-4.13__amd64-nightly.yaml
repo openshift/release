@@ -23,6 +23,14 @@ base_images:
     name: tests-private
     namespace: ci
     tag: "4.13"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
   tests-private-ui:
     name: tests-private-ui
     namespace: ci
@@ -47,6 +55,14 @@ releases:
       product: ocp
       stream: nightly
       version: "4.13"
+  target:
+    prerelease:
+      architecture: multi
+      product: ocp
+      stream: 4-dev-preview
+      version_bounds:
+        lower: 4.13.0-0
+        upper: 4.14.0-0
 resources:
   '*':
     limits:
@@ -786,6 +802,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-ovn-ipsec-to-multiarch-p2-f14
+  cron: 16 23 15,31 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-heterogeneous
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 - as: aws-ipi-p3-f28-long-duration-part1-3
   cron: 17 23 25 * *
   steps:
@@ -996,6 +1025,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-sdn
+- as: aws-ipi-to-multiarch-p2-f14
+  cron: 35 11 2,18 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-heterogeneous
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-workers-marketplace-p2-f14
   cron: 17 17 11,26 * *
   steps:
@@ -1198,6 +1240,20 @@ tests:
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-baselinecaps-v412
+- as: azure-ipi-baselinecaps-v413-to-multiarch-p2-f14
+  cron: 31 13 4,20 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-azure-ipi-baselinecaps-v412
 - as: azure-ipi-compact-p2-f14
   cron: 21 18 14,29 * *
