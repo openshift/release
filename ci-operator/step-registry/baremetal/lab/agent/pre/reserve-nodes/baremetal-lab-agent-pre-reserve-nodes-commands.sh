@@ -41,6 +41,8 @@ id="ci-op-${rand}"
 
 echo "id for current session is: ${id}" 
 
+echo "NAMESPACE for current session is: ${NAMESPACE}"
+
 SHARED_DIR="${SHARED_DIR}/${id}"
 
 echo "Creating shared dir ${SHARED_DIR}"
