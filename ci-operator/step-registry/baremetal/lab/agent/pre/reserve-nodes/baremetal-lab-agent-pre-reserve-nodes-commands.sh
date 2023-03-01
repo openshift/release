@@ -41,8 +41,9 @@ id="ci-op-${rand}"
 
 echo "id for current session is: ${id}" 
 
+SHARED_DIR="${SHARED_DIR}/${id}"
 
-INVENTORY="${SHARED_DIR}/${id}/agent-install-inventory"
+INVENTORY="${SHARED_DIR}/agent-install-inventory"
 REMOTE_INVENTORY="/var/builds/${id}/agent-install-inventory"
 
 echo "Reserving nodes for baremetal installation with ${N_WORKERS} workers..."
