@@ -43,6 +43,10 @@ echo "id for current session is: ${id}"
 
 SHARED_DIR="${SHARED_DIR}/${id}"
 
+echo "Creating shared dir ${SHARED_DIR}"
+
+mkdir -p "${SHARED_DIR}"
+
 INVENTORY="${SHARED_DIR}/agent-install-inventory"
 REMOTE_INVENTORY="/var/builds/${id}/agent-install-inventory"
 
