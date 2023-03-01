@@ -42,7 +42,7 @@ id="ci-op-${rand}"
 echo "id for current session is: ${id}" 
 
 
-INVENTORY="${SHARED_DIR}/agent-install-inventory"
+INVENTORY="${SHARED_DIR}/${id}/agent-install-inventory"
 REMOTE_INVENTORY="/var/builds/${id}/agent-install-inventory"
 
 echo "Reserving nodes for baremetal installation with ${N_WORKERS} workers..."
@@ -93,7 +93,7 @@ cat >>"${INVENTORY}"<<EOF
 ${AUX_HOST} ansible_connection=ssh ansible_ssh_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa
 [aux:vars]
 repo=ocp4
-workdir=/root/install
+workdir=/root/install/${id}
 ca_bundle=/opt/registry/certs/domain.crt
 
 [all:vars]
@@ -136,10 +136,6 @@ echo "Copying inventory file from local to AUX HOST"
 scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${id}/"
 
 
-
-echo "Running ip lookup scripts on AUX HOST"
-
-
 if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
     echo "DEPLOYMENT_TYPE is NOT sno, running ip lookup scripts on AUX HOST "
 
@@ -151,5 +147,8 @@ if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
         ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" /usr/local/bin/ip_lookup_v6.sh >> "${REMOTE_INVENTORY}"
     fi
 fi
+
+echo "Reserve nodes step completed"
+
 
 set +x
