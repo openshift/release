@@ -53,6 +53,7 @@ echo "Reserving nodes for baremetal installation with ${N_WORKERS} worker(s)..."
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" <<EOF
 mkdir /var/builds/"${NAMESPACE}"
+mkdir -p /root/install/"${NAMESPACE}"
 # We don't use the ipi/upi flow so we dont need N_MASTERS
 BUILD_ID="${NAMESPACE}" N_MASTERS=0 N_WORKERS="${N_WORKERS}" IPI=true /usr/local/bin/reserve_hosts.sh
 EOF
