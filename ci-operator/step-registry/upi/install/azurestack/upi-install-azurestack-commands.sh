@@ -41,7 +41,7 @@ sed -i "s|ppe.azurestack.devcluster.openshift.com|ppe.upi.azurestack.devcluster.
 
 CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
 AAD_CLIENT_ID=$(jq -r .clientId ${SHARED_DIR}/osServicePrincipal.json)
-AZURE_REGION=ppe3
+AZURE_REGION=$(yq -r .platform.azure.region "${SHARED_DIR}/install-config.yaml")
 SSH_KEY=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["sshKey"])')
 BASE_DOMAIN=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
 TENANT_ID=$(jq -r .tenantId ${SHARED_DIR}/osServicePrincipal.json)
@@ -64,11 +64,23 @@ echo $APP_ID >> ${SHARED_DIR}/APP_ID
 AZURESTACK_ENDPOINT=$(cat ${SHARED_DIR}/AZURESTACK_ENDPOINT)
 SUFFIX_ENDPOINT=$(cat ${SHARED_DIR}/SUFFIX_ENDPOINT)
 
+if [[ -f "${CLUSTER_PROFILE_DIR}/cloud_name" ]]; then
+  cloud_name=$(< "${CLUSTER_PROFILE_DIR}/cloud_name")
+else
+  cloud_name="PPE"
+fi
+
+if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+  cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
+  cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+  export REQUESTS_CA_BUNDLE=/tmp/ca.pem
+fi
+
 az cloud register \
-    -n PPE \
+    -n ${cloud_name} \
     --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
     --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
-az cloud set -n PPE
+az cloud set -n ${cloud_name}
 az cloud update --profile 2019-03-01-hybrid
 az login --service-principal -u $APP_ID -p $AAD_CLIENT_SECRET --tenant $TENANT_ID > /dev/null
 
@@ -93,57 +105,18 @@ rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 
 RESOURCE_GROUP=$(python3 -c 'import yaml;data = yaml.full_load(open("manifests/cluster-infrastructure-02-config.yml"));print(data["status"]["platformStatus"]["azure"]["resourceGroupName"])')
-oc adm release extract $RELEASE_IMAGE_LATEST --credentials-requests --cloud=azure --to=credentials-request
-ls credentials-request
-files=$(ls credentials-request)
-for f in $files
-do
-  SECRET_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["name"])')
-  SECRET_NAMESPACE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["namespace"])')
-  FEATURE_GATE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-gate" in data["metadata"]["annotations"])')
-  FEATURE_SET=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-set" in data["metadata"]["annotations"])')
 
-# 4.10 includes techpreview of CAPI which without the namespace: openshift-cluster-api
-# fails to bootstrap. Below checks if TechPreviewNoUpgrade is annotated and if so skips
-# creating that secret.
-
-  if [[ $FEATURE_GATE == *"True"* ]]; then
-      continue
-  fi
-
-  if [[ $FEATURE_SET == *"True"* ]]; then
-      continue
-  fi
-
-  filename=${f/request/secret}
-  cat >> "manifests/$filename" << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-    name: ${SECRET_NAME}
-    namespace: ${SECRET_NAMESPACE}
-stringData:
-  azure_subscription_id: ${SUBSCRIPTION_ID}
-  azure_client_id: ${AAD_CLIENT_ID}
-  azure_client_secret: ${AAD_CLIENT_SECRET}
-  azure_tenant_id: ${TENANT_ID}
-  azure_resource_prefix: ${CLUSTER_NAME}
-  azure_resourcegroup: ${RESOURCE_GROUP}
-  azure_region: ${AZURE_REGION}
-EOF
-done
-
-cat >> manifests/cco-configmap.yaml <<EOF
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cloud-credential-operator-config
-  namespace: openshift-cloud-credential-operator
-  annotations:
-    release.openshift.io/create-only: "true"
-data:
-  disabled: "true"
-EOF
+#cat >> manifests/cco-configmap.yaml <<EOF
+#apiVersion: v1
+#kind: ConfigMap
+#metadata:
+#  name: cloud-credential-operator-config
+#  namespace: openshift-cloud-credential-operator
+#  annotations:
+#    release.openshift.io/create-only: "true"
+#data:
+#  disabled: "true"
+#EOF
 
 # typical upi instruction
 python3 -c '
@@ -162,7 +135,6 @@ del data["spec"]["publicZone"];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 INFRA_ID=$(python3 -c 'import yaml;data = yaml.full_load(open("manifests/cluster-infrastructure-02-config.yml"));print(data["status"]["infrastructureName"])')
-echo "${RESOURCE_GROUP}" > "${SHARED_DIR}/RESOURCE_GROUP_NAME"
 
 openshift-install create ignition-configs &
 
@@ -183,10 +155,6 @@ export SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}"
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-RESOURCE_GROUP=$(cat "${SHARED_DIR}/RESOURCE_GROUP_NAME")
-
-az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
-
 KUBECONFIG="${dir}/auth/kubeconfig"
 export KUBECONFIG
 
@@ -203,7 +171,7 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/01_vnet.json" \
   --parameters baseName="$INFRA_ID"
 
-VHD_BLOB_URL="https://rhcossa.blob.ppe3.stackpoc.com/vhd/rhcos-49-84-202108221651.vhd"
+VHD_BLOB_URL="${CLUSTER_OS_IMAGE}"
 az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/02_storage.json" \
   --parameters vhdBlobURL="$VHD_BLOB_URL" \
