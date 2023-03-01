@@ -25,18 +25,19 @@ build_root:
     namespace: stackrox
     tag: stackrox-test-0.3.56
 releases:
-  ec:
-    prerelease:
-      product: ocp
-      stream: 4-dev-preview
-      version_bounds:
-        lower: 4.1.0
-        upper: 4.999.0
   latest:
+    release:
+      channel: stable
+      version: "4.12"
+  next:
     candidate:
       product: ocp
       stream: ci
       version: "4.13"
+  ocp-4-6:
+    release:
+      channel: stable
+      version: "4.6"
 resources:
   '*':
     requests:
@@ -57,9 +58,15 @@ tests:
 - as: ocp-4-6-qa-e2e-tests
   optional: true
   steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ocp-4-6
+      RELEASE_IMAGE_LATEST: release:ocp-4-6
     env:
       TEST_SUITE: openshift-newest-qa-e2e-tests
-    workflow: stackrox-automation-flavors-eks-e2e
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
   timeout: 5h0m0s
 - as: ocp-4-8-qa-e2e-tests
   cluster_claim:
@@ -76,6 +83,7 @@ tests:
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: ocp-4-11-qa-e2e-tests
   cluster_claim:
@@ -91,6 +99,7 @@ tests:
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: ocp-4-12-qa-e2e-tests
   cluster_claim:
@@ -107,13 +116,15 @@ tests:
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: ocp-next-qa-e2e-tests
   optional: true
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
+      RELEASE_IMAGE_LATEST: release:next
     env:
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
@@ -125,7 +136,8 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
+      RELEASE_IMAGE_LATEST: release:next
     env:
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
@@ -158,13 +170,15 @@ tests:
       TEST_SUITE: ocp-ui-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: ocp-next-ui-e2e-tests
   optional: true
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
+      RELEASE_IMAGE_LATEST: release:next
     env:
       TEST_SUITE: ocp-ui-e2e-tests
     test:
@@ -176,7 +190,8 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
+      RELEASE_IMAGE_LATEST: release:next
     env:
       TEST_SUITE: ocp-ui-e2e-tests
     test:
@@ -260,6 +275,7 @@ tests:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: ocp-4-11-operator-e2e-tests
   cluster_claim:
@@ -275,6 +291,7 @@ tests:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: ocp-4-12-operator-e2e-tests
   cluster_claim:
@@ -291,13 +308,15 @@ tests:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: ocp-next-operator-e2e-tests
   optional: true
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
+      RELEASE_IMAGE_LATEST: release:next
     env:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
@@ -309,7 +328,8 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:next
+      RELEASE_IMAGE_LATEST: release:next
     env:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
@@ -369,6 +389,7 @@ tests:
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: merge-ocp-4-12-qa-e2e-tests
   cluster_claim:
@@ -385,6 +406,7 @@ tests:
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: merge-gke-ui-e2e-tests
   postsubmit: true
@@ -444,6 +466,7 @@ tests:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: merge-ocp-4-12-operator-e2e-tests
   cluster_claim:
@@ -459,6 +482,7 @@ tests:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: powervs-qa-e2e-tests
   cron: 0 7 * * *
