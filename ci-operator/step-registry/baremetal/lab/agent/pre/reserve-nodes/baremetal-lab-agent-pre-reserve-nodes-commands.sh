@@ -35,39 +35,34 @@ fi
 echo "DEPLOYMENT_TYPE is ${DEPLOYMENT_TYPE}"
 
 
+echo "id for current session is: ${NAMESPACE}" 
 
-LC_ALL=C rand=$(< /dev/urandom tr -dc 'a-z0-9' | fold -w 6 | head -n 1 || true)
-id="ci-op-${rand}"
 
-echo "id for current session is: ${id}" 
-
-echo "NAMESPACE for current session is: ${NAMESPACE}"
-
-SHARED_DIR="${SHARED_DIR}/${id}"
+SHARED_DIR="${SHARED_DIR}/${NAMESPACE}"
 
 echo "Creating shared dir ${SHARED_DIR}"
 
 mkdir -p "${SHARED_DIR}"
 
 INVENTORY="${SHARED_DIR}/agent-install-inventory"
-REMOTE_INVENTORY="/var/builds/${id}/agent-install-inventory"
+REMOTE_INVENTORY="/var/builds/${NAMESPACE}/agent-install-inventory"
 
-echo "Reserving nodes for baremetal installation with ${N_WORKERS} workers..."
+echo "Reserving nodes for baremetal installation with ${N_WORKERS} worker(s)..."
 
 
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" <<EOF
-mkdir /var/builds/"${id}"
+mkdir /var/builds/"${NAMESPACE}"
 # We don't use the ipi/upi flow so we dont need N_MASTERS
-BUILD_ID="${id}" N_MASTERS=0 N_WORKERS="${N_WORKERS}" IPI=true /usr/local/bin/reserve_hosts.sh
+BUILD_ID="${NAMESPACE}" N_MASTERS=0 N_WORKERS="${N_WORKERS}" IPI=true /usr/local/bin/reserve_hosts.sh
 EOF
 
 echo "Copying YAML files to container's shared dir ${SHARED_DIR}"
 
 
 # shellcheck disable=SC2140
-#scp "${SSHOPTS[@]}" root@"${AUX_HOST}":"/var/builds/${id}/hosts.yaml" .
-scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${id}/*.yaml" "${SHARED_DIR}/"
+#scp "${SSHOPTS[@]}" root@"${AUX_HOST}":"/var/builds/${NAMESPACE}/hosts.yaml" .
+scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/*.yaml" "${SHARED_DIR}/"
 
 
 #if [[ -f "${INVENTORY}" ]]; then
@@ -100,7 +95,7 @@ cat >>"${INVENTORY}"<<EOF
 ${AUX_HOST} ansible_connection=ssh ansible_ssh_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa
 [aux:vars]
 repo=ocp4
-workdir=/root/install/${id}
+workdir=/root/install/${NAMESPACE}
 ca_bundle=/opt/registry/certs/domain.crt
 
 [all:vars]
@@ -140,7 +135,7 @@ fi
 
 echo "Copying inventory file from local to AUX HOST"
 
-scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${id}/"
+scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/"
 
 
 if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
