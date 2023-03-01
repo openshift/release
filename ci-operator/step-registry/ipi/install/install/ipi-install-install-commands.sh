@@ -404,6 +404,23 @@ do
   cp "${item}" "${dir}/manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
+# User requested an OS image override
+# https://docs.openshift.com/container-platform/4.12/post_installation_configuration/coreos-layering.html#coreos-layering
+if test -n "${OPERATING_SYSTEM_IMAGE:-}"; then
+  for x in master worker; do
+    cat >> ${dir}/manifests/95-custom-os-${x}.yaml << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: $x
+  name: 95-custom-os-$x
+spec:
+  osImageURL: ${OPERATING_SYSTEM_IMAGE}
+EOF
+  done
+fi
+
 find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \)
 
 mkdir -p "${dir}/tls"
