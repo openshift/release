@@ -108,6 +108,7 @@ function get_skip_tests {
 
 source $SHARED_DIR/main.env
 
+export CNF_REPO_PR="${CNF_REPO_PR:-}"
 export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy}" # next: ovs_qos
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
@@ -192,6 +193,11 @@ fi
 export CNF_NODES="${test_nodes}"
 
 cd cnf-features-deploy
+# TODO: figure out later how to detect the targe branch for PR
+if [[ -n "${CNF_REPO_PR}" ]]; then
+    git fetch origin pull/"${CNF_REPO_PR}"/head:pr/"${CNF_REPO_PR}"
+    git checkout pr/"${CNF_REPO_PR}"
+fi
 status=0
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
