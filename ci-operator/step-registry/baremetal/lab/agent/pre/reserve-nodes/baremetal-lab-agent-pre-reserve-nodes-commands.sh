@@ -92,25 +92,29 @@ echo "Populating ${INVENTORY} file"
 cat >>"${INVENTORY}"<<EOF
 
 [aux]
+
 ${AUX_HOST} ansible_connection=ssh ansible_ssh_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa
+
 [aux:vars]
+
 repo=ocp4
 workdir=/root/install/${NAMESPACE}
 ca_bundle=/opt/registry/certs/domain.crt
 
 [all:vars]
-aux_host=${AUX_HOST}
 
+AUX_HOST=${AUX_HOST}
 DEPLOYMENT_TYPE=${DEPLOYMENT_TYPE}
 BASE_DOMAIN=${BASE_DOMAIN}
 IP_STACK=${IP_STACK}
-CLUSTER_NAME=agent${DEPLOYMENT_TYPE}
+CLUSTER_NAME=${CLUSTER_NAME}
 DISCONNECTED=${DISCONNECTED}
 PROXY=${PROXY}
 FIPS=${FIPS}
 RELEASE_IMAGE=${RELEASE_IMAGE}
 PULL_SECRET=${PULL_SECRET}
 SSH_PUBLIC_KEY=${SSH_PUBLIC_KEY}
+
 EOF
 
 set -x
