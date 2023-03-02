@@ -92,7 +92,7 @@ case "$CLUSTER_TYPE" in
   # TODO: Should we ensure the worker.ign file is the one of the current running cluster version?
   echo -e "\nPower on the hosts..."
   # shellcheck disable=SC2154
-  for bmhost in $(yq-v4 e -o=j -I=0 '.[] | select(.name|test("addnl"))' "${SHARED_DIR}/hosts.yaml"); do
+  for bmhost in $(yq-v4 e -o=j -I=0 '.[] | select(.name|test("-a-"))' "${SHARED_DIR}/hosts.yaml"); do
     # shellcheck disable=SC1090
     . <(echo "$bmhost" | yq-v4 e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
     if [ ${#bmc_address} -eq 0 ] || [ ${#bmc_user} -eq 0 ] || [ ${#bmc_pass} -eq 0 ]; then

@@ -273,7 +273,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
-  if [[ "${name}" == *addnl* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
     # Do not power on the additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
     # on a single-arch payload migrated to a multi-arch cluster)
     continue
