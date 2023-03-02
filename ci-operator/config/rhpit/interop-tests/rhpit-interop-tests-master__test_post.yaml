@@ -1,0 +1,40 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  clc-ui-e2e:
+    name: "2.7"
+    namespace: acm-qe
+    tag: clc-ui-e2e
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_literal: |
+    FROM this-is-ignored
+    RUN dnf install -y git wget
+  from: cli
+  to: cli-git-kustomize
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: testing-parallel-1
+  steps:
+    post:
+    - ref: post-test-from-ref
+    workflow: post-test
+- as: testing-parallel-2
+  steps:
+    test:
+    - ref: post-test-from-ref
+zz_generated_metadata:
+  branch: master
+  org: rhpit
+  repo: interop-tests
+  variant: test_post
