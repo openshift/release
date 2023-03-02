@@ -52,13 +52,13 @@ for i in "${!DATACENTERS[@]}"; do
     export GOVC_RESOURCE_POOL=$RESOURCE_POOL
 
     OVA_NETWORK=""
-    NETWORKS=($(govc find -i network -name $LEASED_RESOURCE))
+    mapfile -t NETWORKS < <(govc find -i network -name $LEASED_RESOURCE)
 
     # Search the found networks for a network that exists in the target cluster.
     echo "$(date -u --rfc-3339=seconds) - Validating network configuration... ${#NETWORKS[@]}"
     if [ "${#NETWORKS[@]}" -gt 1 ]; then
         echo "$(date -u --rfc-3339=seconds) - Detected multiple matching networks.  Searching for valid network target."
-        for NET in ${NETWORKS[@]}; do
+        for NET in "${NETWORKS[@]}"; do
             case "${NET}" in
                 DistributedVirtualPortgroup*)
                     DVPG=$(echo ${NET} | cut -d':' -f2-)
@@ -81,7 +81,7 @@ for i in "${!DATACENTERS[@]}"; do
 
     # Generate rhcos.json for ova import
     echo "$(date -u --rfc-3339=seconds) - Generating rhcos.json for ova import using network ${OVA_NETWORK}"
-    cat > /tmp/rhcos.json << EOF
+    cat << EOF > /tmp/rhcos.json
 {
    "DiskProvisioning": "thin",
    "MarkAsTemplate": false,
