@@ -13,5 +13,3 @@ nodeName=$(basename "$node")
 oc get node "$nodeName"
 oc label node "$nodeName" node-role.kubernetes.io/tests=""
 oc adm taint node "$nodeName" node-role.kubernetes.io/tests="":NoSchedule
-
-touch "${SHARED_DIR}/dedicated"
