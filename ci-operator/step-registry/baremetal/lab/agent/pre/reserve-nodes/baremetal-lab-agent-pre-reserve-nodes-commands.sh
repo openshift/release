@@ -22,13 +22,18 @@ SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.
 
 echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
 
-#PULL_SECRET=\'$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\'
+echo "Showing shared dir contents $(ls "${SHARED_DIR}")"
 
-PULL_SECRET=$(< /tmp/secret/pull-secret/.dockerconfigjson jq -c)
+echo "Showing stored credentials in namespace ocp-qe $(oc get secrets -n ocp-qe --sort-by=.metadata.creationTimestamp -o json)"
+
+#oc registry login --auth-basic "$(oc get secrets -n ocp-qe --sort-by=.metadata.creationTimestamp -o json)"
+
+PULL_SECRET=\'$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\'
+
+#PULL_SECRET=$(< /tmp/secret/pull-secret/.dockerconfigjson jq -c)
 
 #PULL_SECRET_FILE="/tmp/secret/pull-secret/.dockerconfigjson"
 
-echo "Showing shared dir contents $(ls "${SHARED_DIR}")"
 
 if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
     N_WORKERS=1
