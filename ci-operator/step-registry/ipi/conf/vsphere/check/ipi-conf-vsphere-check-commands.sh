@@ -10,47 +10,17 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
     exit 1
 fi
 
-vsphere_datacenter="SDDC-Datacenter"
-vsphere_datastore="WorkloadDatastore"
-vsphere_cluster="Cluster-1"
-cloud_where_run="VMC"
-dns_server="10.0.0.2"
-vsphere_resource_pool=""
-vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
-
-VCENTER_AUTH_PATH=/var/run/vault/vsphere/secrets.sh
-
-LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
-# For leases >= than 88, run on the IBM Cloud 
-if [ ${LEASE_NUMBER} -ge 88 ] && [ ${LEASE_NUMBER} -lt 200 ]; then
-  echo Scheduling job on IBM Cloud instance
-  VCENTER_AUTH_PATH=/var/run/vault/ibmcloud/secrets.sh
-  vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
-  vsphere_datacenter="IBMCloud"
-  cloud_where_run="IBM"
-  dns_server="10.38.76.172"
-  vsphere_resource_pool="/IBMCloud/host/vcs-ci-workload/Resources"
-  vsphere_cluster="vcs-ci-workload"
-  vsphere_datastore="vsanDatastore"
-fi
-# For leases >= than 151 and < 160, pull from alternate DNS which has context
-# relevant to NSX-T segments.
-if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -lt 160 ]; then
-  dns_server="192.168.133.73"
-fi
-
-# For leases >= 200, run on the IBM Cloud vSphere 8 env
-if [ ${LEASE_NUMBER} -ge 200 ]; then
-  echo Scheduling job on IBM Cloud instance
-  VCENTER_AUTH_PATH=/var/run/vault/vsphere8-secrets/secrets.sh
-  vsphere_url="vcenter.ibmc.devcluster.openshift.com"
-  vsphere_datacenter="IBMCdatacenter"
-  cloud_where_run="IBM8"
-  dns_server="10.177.56.78"
-  vsphere_resource_pool="/IBMCdatacenter/host/IBMCcluster/Resources/ipi-ci-clusters"
-  vsphere_cluster="IBMCcluster"
-  vsphere_datastore="vsanDatastore"
-fi
+echo "$(date -u --rfc-3339=seconds) - getting configuration from vault"
+declare vsphere_datacenter
+declare vsphere_datastore
+declare vsphere_cluster
+declare cloud_where_run
+declare dns_server
+declare vsphere_resource_pool
+declare vsphere_url
+declare VCENTER_AUTH_PATH
+# shellcheck source=/dev/null
+source /var/run/vault/vsphere-config/load-vsphere-env-config.sh
 
 declare vcenter_usernames
 declare vcenter_passwords
