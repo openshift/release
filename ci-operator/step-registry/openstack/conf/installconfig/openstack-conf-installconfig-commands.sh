@@ -76,7 +76,7 @@ case "$CONFIG_TYPE" in
 			| .platform.openstack.lbFloatingIP = \"${API_IP}\"
 		" "$INSTALL_CONFIG"
 		;;
-	proxy)
+	proxy*)
 		yq --yaml-output --in-place ".
 			| .networking.machineNetwork[0].cidr = \"$(<"${SHARED_DIR}"/MACHINES_SUBNET_RANGE)\"
 			| .platform.openstack.apiVIP = \"${API_IP}\"
@@ -92,6 +92,13 @@ case "$CONFIG_TYPE" in
 				| .proxy.httpsProxy = \"https://${SQUID_AUTH}@${PROXY_INTERFACE}:3130/\"
 				| .additionalTrustBundle = \"$(<"${SHARED_DIR}/domain.crt")\"
 			" "$INSTALL_CONFIG"
+		fi
+
+		if [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
+    			yq --yaml-output --in-place ".
+    			    | .platform.openstack.loadBalancer.type = \"UserManaged\"
+    			    | .featureSet = \"TechPreviewNoUpgrade\"
+    			" "$INSTALL_CONFIG"
 		fi
 		;;
 	*)

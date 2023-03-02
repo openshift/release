@@ -82,7 +82,7 @@ operator:
     with: pipeline:logging-vector
   - pullspec: quay.io/openshift-logging/log-file-metric-exporter:latest
     with: pipeline:log-file-metric-exporter
-  - pullspec: quay.io/openshift-logging/log-file-metric-exporter:latest
+  - pullspec: quay.io/openshift-logging/logging-view-plugin:latest
     with: pipeline:logging-view-plugin
 promotion:
   name: "5.7"
@@ -296,6 +296,43 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: functional-target
+  optional: true
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
+        make test-functional
+      dependencies:
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
+        name: pipeline:cluster-logging-operator-registry
+      - env: IMAGE_CLUSTER_LOGGING_OPERATOR
+        name: pipeline:cluster-logging-operator
+      - env: IMAGE_OAUTH_PROXY
+        name: pipeline:oauth-proxy
+      - env: IMAGE_LOGGING_CONSOLE_PLUGIN
+        name: pipeline:logging-view-plugin
+      - env: IMAGE_LOGGING_CURATOR5
+        name: pipeline:logging-curator5
+      - env: IMAGE_LOGGING_FLUENTD
+        name: pipeline:logging-fluentd
+      - env: IMAGE_ELASTICSEARCH_PROXY
+        name: pipeline:elasticsearch-proxy
+      - env: IMAGE_ELASTICSEARCH6
+        name: pipeline:logging-elasticsearch6
+      - env: IMAGE_LOGGING_KIBANA6
+        name: pipeline:logging-kibana6
+      - env: IMAGE_LOGGING_EVENTROUTER
+        name: pipeline:logging-eventrouter
+      - env: IMAGE_LOG_FILE_METRIC_EXPORTER
+        name: pipeline:log-file-metric-exporter
+      from: pipeline:cluster-logging-operator-e2e
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: master
   org: openshift
