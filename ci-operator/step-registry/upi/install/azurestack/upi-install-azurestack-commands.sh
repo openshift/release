@@ -40,7 +40,6 @@ python3 -c "import yaml" || pip3 install --user pyyaml
 sed -i "s|ppe.azurestack.devcluster.openshift.com|ppe.upi.azurestack.devcluster.openshift.com|g" install-config.yaml
 
 CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
-AZURE_REGION=ppe3
 SSH_KEY=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["sshKey"])')
 BASE_DOMAIN=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
 TENANT_ID=$(jq -r .tenantId ${SHARED_DIR}/osServicePrincipal.json)
@@ -48,7 +47,6 @@ AAD_CLIENT_SECRET=$(jq -r .clientSecret ${SHARED_DIR}/osServicePrincipal.json)
 APP_ID=$(jq -r .clientId ${SHARED_DIR}/osServicePrincipal.json)
 
 export CLUSTER_NAME
-export AZURE_REGION
 export SSH_KEY
 export TENANT_ID
 export BASE_DOMAIN
@@ -110,7 +108,6 @@ del data["spec"]["publicZone"];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 INFRA_ID=$(python3 -c 'import yaml;data = yaml.full_load(open("manifests/cluster-infrastructure-02-config.yml"));print(data["status"]["infrastructureName"])')
-echo "${RESOURCE_GROUP}" > "${SHARED_DIR}/RESOURCE_GROUP_NAME"
 
 openshift-install create ignition-configs &
 
@@ -133,14 +130,14 @@ export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 RESOURCE_GROUP=$(cat "${SHARED_DIR}/RESOURCE_GROUP_NAME")
 
-az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
+az group create --name "$RESOURCE_GROUP" --location "$LEASED_RESOURCE"
 
 KUBECONFIG="${dir}/auth/kubeconfig"
 export KUBECONFIG
 
 ACCOUNT_NAME=$(echo ${CLUSTER_NAME}sa | tr -cd '[:alnum:]')
 echo "Creating storage account"
-az storage account create -g "$RESOURCE_GROUP" --location "$AZURE_REGION" --name "$ACCOUNT_NAME" --kind Storage --sku Standard_LRS
+az storage account create -g "$RESOURCE_GROUP" --location "$LEASED_RESOURCE" --name "$ACCOUNT_NAME" --kind Storage --sku Standard_LRS
 ACCOUNT_KEY=$(az storage account keys list -g "$RESOURCE_GROUP" --account-name "$ACCOUNT_NAME" --query "[0].value" -o tsv)
 
 az storage container create --name files --account-name "${ACCOUNT_NAME}" --public-access blob --account-key "$ACCOUNT_KEY"
