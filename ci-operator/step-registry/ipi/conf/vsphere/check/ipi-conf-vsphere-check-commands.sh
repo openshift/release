@@ -11,6 +11,10 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
 fi
 
 echo "$(date -u --rfc-3339=seconds) - getting configuration from vault"
+echo "$(date -u --rfc-3339=seconds) - leases 83 - 87 target VMC"
+echo "$(date -u --rfc-3339=seconds) - leases 88 - 108 target IBM vSphere 7"
+echo "$(date -u --rfc-3339=seconds) - leases 151 - 157 target IBM vSphere 7 multi-zone"
+echo "$(date -u --rfc-3339=seconds) - leases 200 - 203 target IBM vSphere 8"
 declare vsphere_datacenter
 declare vsphere_datastore
 declare vsphere_cluster
