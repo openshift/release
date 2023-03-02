@@ -104,6 +104,7 @@ ca_bundle=/opt/registry/certs/domain.crt
 
 [all:vars]
 
+BUILD_ID=${NAMESPACE}
 AUX_HOST=${AUX_HOST}
 DEPLOYMENT_TYPE=${DEPLOYMENT_TYPE}
 BASE_DOMAIN=${BASE_DOMAIN}
