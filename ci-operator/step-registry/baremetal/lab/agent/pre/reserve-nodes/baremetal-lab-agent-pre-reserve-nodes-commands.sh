@@ -22,7 +22,7 @@ SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.
 
 echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
 
-PULL_SECRET=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\"
+PULL_SECRET=\'$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\'
 
 if [ "${DEPLOYMENT_TYPE}" == "sno" ]; then
     N_WORKERS=1
