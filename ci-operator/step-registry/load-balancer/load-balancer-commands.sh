@@ -93,7 +93,7 @@ $( if [ -n "${API_IP}" ];
         balance: roundrobin
         frontend_port: 6443
         haproxy_monitor_port: 8081
-        backend_opts: "check check-ssl inter 1s fall 2 rise 3 verify none backup"
+        backend_opts: "check check-ssl inter 1s fall 2 rise 3 verify none"
         backend_port: 6443
         backend_hosts: &master_hosts
 $( for ip in ${MASTER_IPS}
@@ -149,7 +149,7 @@ $( if [ -n "${API_IP}" ];
         frontend_port: 22623
         haproxy_monitor_port: 8084
         balance: roundrobin
-        backend_opts: "check check-ssl inter 5s fall 2 rise 3 verify none backup"
+        backend_opts: "check check-ssl inter 5s fall 2 rise 3 verify none"
         backend_port: 22623
         backend_hosts: *master_hosts
 EOF

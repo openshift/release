@@ -20,32 +20,34 @@ cat > gather_logs.yaml <<-EOF
       - "{{ (lookup('env', 'MUST_GATHER') == 'true') | ternary('--must-gather','', '') }}"
       - "{{ (lookup('env', 'GATHER_ALL_CLUSTERS') == 'true') | ternary('--download-all','', '') }}"
   tasks:
-    - name: Gather logs and debug information
+    - name: Gather logs and debug information from all hosts
+      block:
+      - name: Ensure LOGS_DIR exists
+        ansible.builtin.file:
+          path: "{{ LOGS_DIR }}"
+          state: directory
+          mode: '0755'
+
+      - name: Gather sosreport from all hosts
+        ansible.builtin.command: >-
+          sos report --batch --tmp-dir "{{ LOGS_DIR }}" --all-logs
+            -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum
+            -k podman.all -k podman.logs
+      ignore_errors: true
+
+    - name: Gather logs and debug information from primary host
       block:
       - name: Copy junit report files
-        copy:
+        ansible.builtin.copy:
           remote_src: true
           src: /home/assisted/reports
           dest: "{{ LOGS_DIR }}"
-      - name: Run sos report
-        ansible.builtin.shell: |
-          source /root/config.sh
-          # Get sosreport including sar data
-          sos report --batch --tmp-dir {{ LOGS_DIR }} --all-logs \
-            -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum \
-            -k podman.all -k podman.logs
-      - name: Copy libvirt qemu log
-        copy:
-          remote_src: true
-          src: /var/log/swtpm/libvirt/qemu/
-          dest: "{{ LOGS_DIR }}/libvirt-qemu"
-      - name: List swtpm-localca files to a file
-        ansible.builtin.shell: |
-          ls -ltr /var/lib/swtpm-localca/ >> {{ LOGS_DIR }}/libvirt-qemu/ls-swtpm-localca.txt
+
       - name: Check minikube kubeconfig file existence
-        stat:
+        ansible.builtin.stat:
           path: /root/.kube/config
         register: kubeconfig
+
       - name: Extract assisted service logs
         ansible.builtin.shell: |
           source /root/config.sh
@@ -56,6 +58,7 @@ cat > gather_logs.yaml <<-EOF
         args:
           chdir: /home/assisted
         when: kubeconfig.stat.exists
+
       - name: Extract capi logs
         ansible.builtin.shell: |
           source /root/config.sh
@@ -66,8 +69,11 @@ cat > gather_logs.yaml <<-EOF
         args:
           chdir: /home/assisted
         when: kubeconfig.stat.exists and GATHER_CAPI_LOGS == "true"
-      - debug:
+
+      - name: Print CLUSTER_GATHER value
+        ansible.builtin.debug:
           msg: "CLUSTER_GATHER = {{ CLUSTER_GATHER }}"
+
       - name: Download cluster logs
         ansible.builtin.shell: |
           source /root/config.sh
@@ -78,18 +84,21 @@ cat > gather_logs.yaml <<-EOF
           LOGS_DEST: "{{ LOGS_DIR }}"
         args:
           chdir: /home/assisted
+
       - name: Find kubeconfig files
-        find:
+        ansible.builtin.find:
           paths: /home/assisted/build/kubeconfig
           patterns: "*kubeconfig*"
           recurse: true
         register: kubeconfig_files
+
       - name: Print kubeconfig file names
-        debug:
+        ansible.builtin.debug:
           msg: "{{ item.path | basename }}"
         loop: "{{ kubeconfig_files.files }}"
         loop_control:
           label: "{{ item.path }}"
+
       - name: Download service logs
         ansible.builtin.shell: |
           make download_service_logs
@@ -102,34 +111,44 @@ cat > gather_logs.yaml <<-EOF
         loop_control:
           label: "{{ item.path }}"
       ignore_errors: yes
-    - name: Collect and download logs
+      when: "'primary' in group_names"
+
+    - name: Collect and download logs from primary host
       block:
       - name: Find all log files
-        find:
+        ansible.builtin.find:
           paths: /home/assisted/
           patterns: "*.log"
           recurse: true
         register: log_files
+
       - name: Print log file names
-        debug:
+        ansible.builtin.debug:
           msg: "{{ item.path | basename }}"
         loop: "{{ log_files.files }}"
         loop_control:
           label: "{{ item.path }}"
+
       - name: Copy log files
-        copy:
+        ansible.builtin.copy:
           remote_src: true
           src: "{{ item.path }}"
           dest: "{{ LOGS_DIR }}/{{ item.path | basename }}"
         loop: "{{ log_files.files }}"
         loop_control:
           label: "{{ item.path }}"
+      ignore_errors: yes
+      when: "'primary' in group_names"
+
+    - name: Collect and download logs from all hosts
+      block:
       - name: Download log files
-        synchronize:
+        ansible.builtin.synchronize:
           src: "{{ LOGS_DIR }}/"
           dest: "{{ lookup('env', 'ARTIFACT_DIR') }}"
           mode: pull
+      ignore_errors: yes
 EOF
 
 export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
-ansible-playbook gather_logs.yaml -i ${SHARED_DIR}/inventory -vv
+ansible-playbook gather_logs.yaml -i "${SHARED_DIR}/inventory" -vv

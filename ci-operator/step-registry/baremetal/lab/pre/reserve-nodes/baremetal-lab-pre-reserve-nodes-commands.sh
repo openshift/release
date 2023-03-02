@@ -14,7 +14,6 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 [ -z "${AUX_HOST}" ] && {  echo "\$AUX_HOST is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && {  echo "\$masters is not filled. Failing."; exit 1; }
 [ -z "${workers}" ] && {  echo "\$workers is not filled. Failing."; exit 1; }
-[ -z "${IPI}" ] && {  echo "\$IPI is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && {  echo "\$architecture is not filled. Failing."; exit 1; }
 
 gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
@@ -24,9 +23,9 @@ gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
 CLUSTER_NAME="${NAMESPACE}"
 
-echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$IPI" != true ] && echo "+ 1 bootstrap physical node")..."
+echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${CLUSTER_NAME}" "${masters}" "${workers}" "${IPI}" "${gnu_arch}" << 'EOF'
+  "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -36,7 +35,14 @@ BUILD_USER=ci-op
 BUILD_ID="${1}"
 N_MASTERS="${2}"
 N_WORKERS="${3}"
-IPI="${4}"
+# The IPI variable is to be deprecated in order to be more generic and better exploit the prow steps patterns for supporting
+# multiple kind of installations
+# However, for now, we need to keep it in the following as it is used by the baremetal lab scripts in the internal CI.
+if [ "${4}" == "true" ]; then
+  IPI=false
+else
+  IPI=true
+fi
 ARCH="${5}"
 set +o allexport
 

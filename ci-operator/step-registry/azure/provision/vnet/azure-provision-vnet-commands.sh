@@ -95,7 +95,12 @@ fi
 VNET_BASE_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
 
 # create vnet
-vnet_arm_template_file="/var/lib/openshift-install/upi/${CLUSTER_TYPE}/01_vnet.json"
+if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+    arm_template_folder_name="azurestack"
+else
+    arm_template_folder_name="azure"
+fi
+vnet_arm_template_file="/var/lib/openshift-install/upi/${arm_template_folder_name}/01_vnet.json"
 run_command "az deployment group create --name ${VNET_BASE_NAME} -g ${RESOURCE_GROUP} --template-file '${vnet_arm_template_file}' --parameters baseName='${VNET_BASE_NAME}'"
 
 #Due to sometime frequent vnet list will return empty, so save vnet list output into a local file
