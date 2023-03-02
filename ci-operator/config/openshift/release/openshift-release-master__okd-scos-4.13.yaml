@@ -1,3 +1,36 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  upi-installer:
+    name: "4.13"
+    namespace: origin
+    tag: upi-installer
 releases:
   initial:
     prerelease:
@@ -31,6 +64,16 @@ tests:
       BASE_DOMAIN: aws-2.ci.openshift.org
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-aws
+- as: e2e-assisted
+  interval: 48h
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        NUM_MASTERS=3
+        NUM_WORKERS=2
+        OS_IMAGES='[{"openshift_version":"4.13","cpu_architecture":"x86_64","url":"https://okd-scos.s3.amazonaws.com/okd-scos/builds/413.9.202303020610-0/x86_64/scos-413.9.202303020610-0-live.x86_64.iso","version": "413.9.202303020610-0"}]'
+    workflow: assisted-baremetal
 zz_generated_metadata:
   branch: master
   org: openshift
