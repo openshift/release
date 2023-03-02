@@ -20,15 +20,17 @@ echo "Connecting to ${AUX_HOST} to retrieve ssh pub key"
 
 SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.pub)\"
 
+
+#echo "Generating registry credentials using image-puller service account"
+
+#oc --namespace ocp-qe registry login --service-account image-puller --registry-config=/tmp/config.json
+
+#PULL_SECRET=$(< /tmp/config.json jq -c)
+
 echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
 
-echo "Generating registry credentials using image-puller service account"
+PULL_SECRET=\'$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\'
 
-oc --namespace ocp-qe registry login --service-account image-puller --registry-config=/tmp/config.json
-
-#PULL_SECRET=\'$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\'
-
-PULL_SECRET=$(< /tmp/config.json jq -c)
 
 
 
