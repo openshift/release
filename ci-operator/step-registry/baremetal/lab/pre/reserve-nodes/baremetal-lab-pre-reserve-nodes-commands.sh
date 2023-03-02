@@ -12,11 +12,9 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
 [ -z "${AUX_HOST}" ] && {  echo "\$AUX_HOST is not filled. Failing."; exit 1; }
-#[ -z "${masters}" ] && {  echo "\$masters is not filled. Failing."; exit 1; }
-#[ -z "${workers}" ] && {  echo "\$workers is not filled. Failing."; exit 1; }
-[ -z "${IPI}" ] && {  echo "\$IPI is not filled. Failing."; exit 1; }
-[ -z "${ARCHITECTURE}" ] && {  echo "\$ARCHITECTURE is not filled. Failing."; exit 1; }
-[ -z "${DEPLOYMENT_TYPE}" ] && {  echo "\$DEPLOYMENT_TYPE is not filled. Failing."; exit 1; }
+[ -z "${masters}" ] && {  echo "\$masters is not filled. Failing."; exit 1; }
+[ -z "${workers}" ] && {  echo "\$workers is not filled. Failing."; exit 1; }
+[ -z "${architecture}" ] && {  echo "\$architecture is not filled. Failing."; exit 1; }
 
 
 gnu_arch=$(echo "${ARCHITECTURE}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
@@ -36,9 +34,9 @@ masters=0
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
 CLUSTER_NAME="${NAMESPACE}"
 
-echo "Reserving nodes for baremetal installation (${masters} masters, ${N_WORKERS} workers) $([ "$IPI" != true ] && echo "+ 1 bootstrap physical node")..."
+echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${CLUSTER_NAME}" "${masters}" "${N_WORKERS}" "${IPI}" "${gnu_arch}" << 'EOF'
+  "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
