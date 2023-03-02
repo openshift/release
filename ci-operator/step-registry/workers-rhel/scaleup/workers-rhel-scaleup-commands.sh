@@ -38,11 +38,11 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 #cp ${SHARED_DIR}/kubeconfig "${ARTIFACT_DIR}"
 
 # Remove CoreOS machine sets
-echo "$(date -u --rfc-3339=seconds) - Deleting CoreOS machinesets"
+echo "$(date -u --rfc-3339=seconds) - Deleting/scaling CoreOS machinesets to zero"
 mapfile -t COREOS_MACHINE_SETS < <(oc get machinesets --namespace openshift-machine-api | grep worker | grep -v rhel | awk '{print $1}' || true)
 if [[ ${#COREOS_MACHINE_SETS[@]} != 0 ]]
 then
-    oc delete machinesets --namespace openshift-machine-api "${COREOS_MACHINE_SETS[@]}"
+    oc scale machinesets --namespace openshift-machine-api "${COREOS_MACHINE_SETS[@]}" --replicas 0
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Waiting for CoreOS nodes to be removed"
