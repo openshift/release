@@ -82,6 +82,27 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
     az cloud set --name AzureUSGovernment
+elif [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+    if [ ! -f "${CLUSTER_PROFILE_DIR}/cloud_name" ]; then
+        echo "Unable to get specific ASH cloud name!"
+        exit 1
+    fi
+    cloud_name=$(< "${CLUSTER_PROFILE_DIR}/cloud_name")
+
+    AZURESTACK_ENDPOINT=$(cat "${SHARED_DIR}"/AZURESTACK_ENDPOINT)
+    SUFFIX_ENDPOINT=$(cat "${SHARED_DIR}"/SUFFIX_ENDPOINT)
+
+    if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+        cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
+        cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+        export REQUESTS_CA_BUNDLE=/tmp/ca.pem
+    fi
+    az cloud register \
+        -n ${cloud_name} \
+        --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
+        --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
+    az cloud set --name ${cloud_name}
+    az cloud update --profile 2019-03-01-hybrid
 else
     az cloud set --name AzureCloud
 fi
@@ -110,7 +131,7 @@ while [ X"${status}" != X"success" ] && [ $try -lt $retries ]; do
     echo "check copy complete, ${try} try..."
     cmd="az storage blob show --container-name ${storage_contnainer} --name '${vhd_name}' --account-name ${sa_name} --account-key ${account_key} -o tsv --query properties.copy.status"
     echo "Command: $cmd"
-    status=$(eval "$cmd")
+    status=$(eval "$cmd" || echo "pending")
     echo "Status: $status"
     sleep $interval
     try=$(expr $try + 1)
@@ -131,11 +152,145 @@ run_command "az network nsg create -g ${bastion_rg} -n ${bastion_nsg}" &&
 run_command "az network nsg rule create -g ${bastion_rg} --nsg-name '${bastion_nsg}' -n '${bastion_name}-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges ${open_port}" &&
 #subnet cidr for int service is hard code, it should be a sub rang of the whole VNet cidr, and not conflicts with master subnet and worker subnet
 bastion_subnet_cidr="10.0.99.0/24"
-vnet_subnet_address_parameter="--address-prefixes ${bastion_subnet_cidr}"
+if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+    # for ash wwt, the parameter name get changed
+    vnet_subnet_address_parameter="--address-prefix ${bastion_subnet_cidr}"
+else
+    vnet_subnet_address_parameter="--address-prefixes ${bastion_subnet_cidr}"
+fi
 run_command "az network vnet subnet create -g ${bastion_rg} --vnet-name ${bastion_vnet_name} -n ${bastion_subnet} ${vnet_subnet_address_parameter} --network-security-group ${bastion_nsg}" || exit 2
 
 echo "Create bastion vm"
-run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --os-disk-size-gb 199 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'" || exit 2
+if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+    workdir=$(mktemp -d)
+    bastion_vm_arm_template="${workdir}/bastion_vm.json"
+    cat > "${bastion_vm_arm_template}" << EOF
+{
+    "\$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmName" : {
+            "type" : "string",
+            "minLength" : 1
+        },
+        "vnetName" : {
+            "type" : "string",
+            "minLength" : 1
+        },
+        "subnetName" : {
+            "type" : "string",
+            "minLength" : 1
+        },
+        "vmSize" : {
+            "type" : "string",
+            "minLength" : 1,
+            "defaultValue" : "Standard_DS4_v2"
+        },
+        "vmImageId" : {
+            "type" : "string",
+            "minLength" : 1
+        },
+        "ignitionContent" : {
+            "type" : "string",
+            "minLength" : 1
+        }
+    },
+    "variables": {
+        "location" : "[resourceGroup().location]",
+        "nicName" : "[concat(parameters('vmName'), 'VMNic')]",
+        "virtualNetworkID" : "[resourceId('Microsoft.Network/virtualNetworks', parameters('vnetName'))]",
+        "SubnetRef" : "[concat(variables('virtualNetworkID'), '/subnets/', parameters('subnetName'))]",
+        "PublicIpAddressName" : "[concat(parameters('vmName'), 'PublicIP')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2017-10-01",
+            "name": "[variables('PublicIpAddressName')]",
+            "location": "[variables('location')]",
+            "dependsOn": [],
+            "tags": {},
+            "properties": {
+                "publicIPAllocationMethod": null
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2015-06-15",
+            "name": "[variables('nicName')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/publicIpAddresses/', variables('PublicIpAddressName'))]"
+            ],
+            "tags": {},
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "vmIpConfig",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[variables('SubnetRef')]"
+                            },
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('PublicIpAddressName'))]"
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2017-12-01",
+            "name": "[parameters('vmName')]",
+            "location": "[variables('location')]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkInterfaces/', variables('nicName'))]"
+            ],
+            "tags": {},
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vmSize')]"
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('nicName'))]"
+                        }
+                    ]
+                },
+                "storageProfile": {
+                    "osDisk": {
+                        "createOption": "fromImage",
+                        "name": null,
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "storageAccountType": null
+                        },
+                        "diskSizeGb": 99
+                    },
+                    "imageReference": {
+                        "id": "[parameters('vmImageId')]"
+                    }
+                },
+                "osProfile": {
+                    "computerName": "[parameters('vmName')]",
+                    "adminUsername": "core",
+                    "adminPassword": "NotActuallyApplied!",
+                    "customData" : "[parameters('ignitionContent')]"
+                }
+            }
+        }
+    ]
+}
+EOF
+    arm_deployment_name="${bastion_name}-arm"
+    ign_b64="$(cat ${bastion_ignition_file} | base64 -w0)"
+    run_command "az deployment group create --resource-group ${bastion_rg} --name ${arm_deployment_name} --template-file '${bastion_vm_arm_template}' --parameters ignitionContent='${ign_b64}' --parameters vmName=${bastion_name} --parameters vnetName=${bastion_vnet_name} --parameters subnetName=${bastion_subnet} --parameters vmSize=Standard_DS1_v2 --parameters vmImageId=${bastion_image_id}"
+else
+    run_command "az vm create --resource-group ${bastion_rg} --name ${bastion_name} --admin-username core --admin-password 'NotActuallyApplied!' --image '${bastion_image_id}' --os-disk-size-gb 199 --subnet ${bastion_subnet} --vnet-name ${bastion_vnet_name} --nsg '' --size 'Standard_DS1_v2' --debug --custom-data '${bastion_ignition_file}' | tee '${SHARED_DIR}/${bastion_name}_output.json'" 
+fi
 
 # sleep for a while to wait registry/proxy image get pulled and services boot up after vm is running
 sleep 180

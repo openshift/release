@@ -2,7 +2,7 @@
 
 set -o nounset
 
-if [ "${ENABLE_PROVISIONING_NETWORK:-true}" != "true" ] || [ "${IPI}" != "true" ]; then
+if [ ! -f "${SHARED_DIR}/provisioning_network" ]; then
   echo "No need to rollback the provisioning network. Skipping..."
   exit 0
 fi

@@ -55,19 +55,11 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: ocp-4-6-qa-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.6"
   optional: true
   steps:
     env:
       TEST_SUITE: openshift-newest-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
+    workflow: stackrox-automation-flavors-eks-e2e
   timeout: 5h0m0s
 - as: ocp-4-8-qa-e2e-tests
   cluster_claim:
@@ -128,6 +120,18 @@ tests:
     - ref: stackrox-e2e
     workflow: ipi-aws
   timeout: 5h0m0s
+- as: weekly-ocp-next-qa-e2e-tests
+  cron: 0 5 * * 2
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: openshift-newest-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
 - as: gke-ui-e2e-tests
   optional: true
   steps:
@@ -157,6 +161,18 @@ tests:
   timeout: 5h0m0s
 - as: ocp-next-ui-e2e-tests
   optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: weekly-ocp-next-ui-e2e-tests
+  cron: 0 5 * * 2
   steps:
     cluster_profile: aws
     dependencies:
@@ -223,19 +239,11 @@ tests:
     test:
     - ref: stackrox-e2e
 - as: ocp-4-6-operator-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.6"
   optional: true
   steps:
     env:
       TEST_SUITE: openshift-4-operator-e2e-tests
-    test:
-    - ref: stackrox-e2e
+    workflow: stackrox-automation-flavors-eks-e2e
   timeout: 5h0m0s
 - as: ocp-4-8-operator-e2e-tests
   cluster_claim:
@@ -286,6 +294,18 @@ tests:
   timeout: 5h0m0s
 - as: ocp-next-operator-e2e-tests
   optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
+    env:
+      TEST_SUITE: openshift-4-operator-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: weekly-ocp-next-operator-e2e-tests
+  cron: 0 5 * * 2
   steps:
     cluster_profile: aws
     dependencies:
