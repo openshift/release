@@ -111,28 +111,12 @@ tests:
       commands: |
         unset GOFLAGS
         pushd components/odh-notebook-controller
-        oc new-project odh-notebook-controller-system
-        IFS=':' read -r -a CTRL_IMG <<< "${ODH_NOTEBOOK_CONTROLLER_IMAGE}"
-        echo "${ODH_NOTEBOOK_CONTROLLER_IMAGE}"
-        export IMG="${CTRL_IMG[0]}"
-        export TAG="${CTRL_IMG[1]}"
-        export KUSTOMIZE=/go/src/github.com/opendatahub-io/kubeflow/components/odh-notebook-controller/bin/kustomize
-        export K8S_NAMESPACE="odh-notebook-controller-system"
-        cp $KUBECONFIG /tmp/kubeconfig
-        chmod 644 /tmp/kubeconfig
-        export KUBECONFIG=/tmp/kubeconfig
-
-        make setup
-        make setup-kf
-        $KUSTOMIZE build ../notebook-controller/config/overlays/openshift | oc apply -f -
-        $KUSTOMIZE build config/base | oc apply -f -
-
-        make e2e-test
-
-        oc delete project odh-notebook-controller-system
+        make run-ci-e2e-tests
       dependencies:
       - env: ODH_NOTEBOOK_CONTROLLER_IMAGE
         name: odh-notebook-controller
+      - env: KF_NOTEBOOK_CONTROLLER
+        name: kf-notebook-controller
       from: src
       resources:
         requests:
