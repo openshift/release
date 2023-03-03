@@ -148,4 +148,4 @@ cat > gather_logs.yaml <<-EOF
 EOF
 
 export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
-ansible-playbook gather_logs.yaml -i "${SHARED_DIR}/inventory" -vv
+ansible-playbook gather_logs.yaml -i "${SHARED_DIR}/inventory"
