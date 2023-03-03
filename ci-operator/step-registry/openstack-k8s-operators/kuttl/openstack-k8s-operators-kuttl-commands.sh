@@ -26,12 +26,14 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
       exit 1
     fi
     BASE_OP=${EXTRA_REF_REPO}
+else
+
 fi
 
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 
 export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${SERVICE_NAME}-operator
-export ${SERVICE_NAME^^}_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
+export ${SERVICE_NAME^^}_IMG=${IMAGE_TAG_BASE}-index:${PR_SHA}
 export ${SERVICE_NAME^^}_KUTTL_CONF=/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml
 export ${SERVICE_NAME^^}_KUTTL_DIR=/go/src/github.com/${ORG}/${BASE_OP}/tests/kuttl/tests
 
