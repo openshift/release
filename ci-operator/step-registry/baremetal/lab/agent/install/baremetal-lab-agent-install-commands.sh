@@ -24,5 +24,5 @@ cd /root/bmanzari/agent-bm-deployments/
 ansible-playbook -i /var/builds/${NAMESPACE}/agent-install-inventory install.yaml -v
 EOF
 
-./root/install/"${NAMESPACE}"/openshift-install agent wait-for bootstrap-complete --log-level debug
-./root/install/"${NAMESPACE}"/openshift-install agent wait-for install-complete --log-level debug
+#/root/install/"${NAMESPACE}"/openshift-install agent wait-for bootstrap-complete --log-level debug
+#/root/install/"${NAMESPACE}"/openshift-install agent wait-for install-complete --log-level debug
