@@ -30,10 +30,13 @@ source ocp_install_env.sh
 cp ${KUBECONFIG} ${HOME}/ovn.conf
 
 version=`openshift_version`
-unsupported_versions=("4.8" "4.9" "4.10" "4.11") # ipv4-metal-ipi was added since 4.8, exgw e2e support 4.12+
+unsupported_versions=("4.6", "4.7", "4.8" "4.9" "4.10" "4.11") # ipv4-metal-ipi was added since 4.8, exgw e2e support 4.12+
 
 if [[ "${unsupported_versions[*]}" =~ ${version} ]]; then
-    echo "version ${version} not supported for external gateway e2e"
+    # Make collecting artifact trap not raising errors
+	mkdir -p ./ovn-kubernetes/test/_artifacts/ovnk-ex-gw-e2e_not_run
+    
+	echo "version ${version} not supported for external gateway e2e"
     exit 0
 fi
 
@@ -93,13 +96,20 @@ cd ..
 export PATH=${PATH}:${HOME}/.local/bin
 export CONTAINER_RUNTIME=podman
 export OVN_TEST_EX_GW_NETWORK=host
-make control-plane WHAT="e2e non-vxlan external gateway through a gateway pod"
+make control-plane WHAT="External Gateway"
 EOF
 
 chmod +x /tmp/ovnk-ex-gw-e2e.sh
 
 echo "### Copying E2E script to dev-scripts"
 scp "${SSHOPTS[@]}" -r "/tmp/ovnk-ex-gw-e2e.sh" "root@${IP}:/root/dev-scripts/"
+
+function collect_artifacts {
+  	echo "### Collecting report artifacts"
+	mkdir -p "${ARTIFACT_DIR}/"
+	scp -r "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ovn-kubernetes/test/_artifacts/*" "${ARTIFACT_DIR}"
+}
+trap collect_artifacts EXIT
 
 echo "### Running external gateways E2E on remote host"
 ssh "${SSHOPTS[@]}" "root@${IP}" "cd /root/dev-scripts/ && ./ovnk-ex-gw-e2e.sh"
