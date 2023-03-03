@@ -25,11 +25,13 @@ SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.
 
 #oc --namespace ocp-qe registry login --service-account image-puller --registry-config=/tmp/config.json
 
-#PULL_SECRET=$(< /tmp/config.json jq -c)
+PULL_SECRET=$(< "${CLUSTER_PROFILE_DIR}"/pull-secret jq -c)
 
-echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
+echo "${CLUSTER_PROFILE_DIR} pull secret is: ${PULL_SECRET}"
 
-PULL_SECRET=\'$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\'
+#echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
+
+#PULL_SECRET=\'$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\'
 
 
 
