@@ -313,6 +313,16 @@ Outputs:
         ",",
         [!Ref PrivateSubnet, !If [DoAz2, !Ref PrivateSubnet2, !Ref "AWS::NoValue"], !If [DoAz3, !Ref PrivateSubnet3, !Ref "AWS::NoValue"]]
       ]
+  PublicRouteTableId:
+    Description: Public Route table ID
+    Value: !Ref PublicRouteTable
+  PrivateRouteTableIds:
+    Description: Private Route table ID
+    Value:
+      !Join [
+        ",",
+        [!Ref PrivateRouteTable, !If [DoAz2, !Ref PrivateRouteTable2, !Ref "AWS::NoValue"], !If [DoAz3, !Ref PrivateRouteTable3, !Ref "AWS::NoValue"]]
+      ]
 EOF
 
 # The above cloudformation template's max zones account is 3
@@ -353,6 +363,7 @@ echo "VpcId: ${VpcId}"
 # ['subnet-pub1', 'subnet-pub2', 'subnet-priv1', 'subnet-priv2']
 AllSubnetsIds="$(jq -c '[.Stacks[].Outputs[] | select(.OutputKey | endswith("SubnetIds")).OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g")"
 echo "$AllSubnetsIds" > "${SHARED_DIR}/subnet_ids"
+echo "$AllSubnetsIds" > "${SHARED_DIR}/subnet_ids_region"
 
 # save public subnets ids
 # ['subnet-pub1', 'subnet-pub2']
@@ -365,6 +376,18 @@ echo "PublicSubnetIds: ${PublicSubnetIds}"
 PrivateSubnetIds="$(jq -c '[.Stacks[].Outputs[] | select(.OutputKey=="PrivateSubnetIds") | .OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g")"
 echo "$PrivateSubnetIds" > "${SHARED_DIR}/private_subnet_ids"
 echo "PrivateSubnetIds: ${PrivateSubnetIds}"
+
+# save public route table id
+# 'public-rtb'
+PublicRouteTableId="$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="PublicRouteTableId") | .OutputValue' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g")"
+echo "$PublicRouteTableId" > "${SHARED_DIR}/public_route_table_id"
+echo "PublicRouteTableId: ${PublicRouteTableId}"
+
+# save private route table ids
+# ['subnet-pub1', 'subnet-pub2']
+PrivateRouteTableIds="$(jq -c '[.Stacks[].Outputs[] | select(.OutputKey=="PrivateRouteTableIds") | .OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g")"
+echo "$PrivateRouteTableIds" > "${SHARED_DIR}/private_route_table_ids"
+echo "PrivateRouteTableIds: ${PrivateRouteTableIds}"
 
 # save AZs
 #  ["us-east-2a","us-east-2b"]
@@ -382,3 +405,5 @@ cp "${SHARED_DIR}/vpc_id" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/subnet_ids" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/public_subnet_ids" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/private_subnet_ids" "${ARTIFACT_DIR}/"
+cp "${SHARED_DIR}/public_route_table_id" "${ARTIFACT_DIR}/"
+cp "${SHARED_DIR}/private_route_table_ids" "${ARTIFACT_DIR}/"

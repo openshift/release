@@ -151,6 +151,7 @@ if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
   yq-go d -i "${dir}/manifests/cluster-dns-02-config.yml" spec.publicZone
 fi
 
+# TODO rename to ENABLE_AWS_LOCALZONE_BYO_MACHINESET
 if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
   if [[ -f "${SHARED_DIR}/manifest_localzone_machineset.yaml" ]]; then
     # Phase 0, inject manifests
