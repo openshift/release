@@ -4,11 +4,11 @@ DEBUG='false'
 
 function display_usage() {
 	echo "This script generates a cron entry, based on provided test_name and yaml_file_name."
-	echo "Usage: $0 test_name yaml_file_name"
+	echo "Usage: $0 <test_name> <yaml_file_name> [--force]"
 	echo "  e.g, $0 aws-c2s-ipi-disconnected-private-p2-f7 openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml"
 }
 
-if [[ $# -ne 2 ]] ; then
+if [[ $# -lt 2 ]] ; then
 	display_usage
 	exit 1
 fi
@@ -20,6 +20,14 @@ fi
 
 TEST_NAME="$1"    # aws-c2s-ipi-disconnected-private-p2-f7
 YAML_FILE="$2"    # openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml
+
+if [[ "${TEST_NAME}" == *baremetal-* ]] && [[ "$@" != *\ --force* ]]; then
+    echo "The test config ${TEST_NAME} should not get changes in the cron entry as
+      the schedule rotation scheme is different than the other tests.
+      Use --force to skip this check."
+    exit 0
+fi
+
 if [[ $DEBUG = "true" ]] ; then
 	echo "TEST_NAME: $TEST_NAME"
 	echo "YAML_FILE: $YAML_FILE"

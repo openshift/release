@@ -72,9 +72,6 @@ ansible-playbook packing-test-infra.yaml
 # shellcheck disable=SC2034
 export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
 
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
-
 echo "********** ${ASSISTED_CONFIG} ************* "
 
 cat << EOF > config.sh.j2

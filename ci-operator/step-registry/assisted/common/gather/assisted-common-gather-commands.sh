@@ -6,9 +6,6 @@ set -o pipefail
 
 echo "************ assisted common gather command ************"
 
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
-
 cat > gather_logs.yaml <<-EOF
 - name: Gather logs and debug information and save them for debug purpose
   hosts: all
