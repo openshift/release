@@ -1,15 +1,16 @@
 base_images:
-  centos:
-    name: stream9
-    namespace: coreos
-    tag: "9"
+  base:
+    name: "4.14"
+    namespace: origin
+    tag: base
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.okd
-  from: centos
-  to: ironic-agent
+- dockerfile_path: Dockerfile
+  from: base
+  to: cluster-update-keys
 promotion:
+  disabled: true
   name: scos-4.14
   namespace: origin
 releases:
@@ -27,8 +28,17 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: e2e-aws
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
 zz_generated_metadata:
-  branch: main
+  branch: release-4.14
   org: openshift
-  repo: ironic-agent-image
+  repo: cluster-update-keys
   variant: okd-scos
