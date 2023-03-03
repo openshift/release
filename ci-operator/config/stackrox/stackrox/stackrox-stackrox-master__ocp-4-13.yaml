@@ -10,9 +10,10 @@ build_root:
     tag: stackrox-test-0.3.56
 releases:
   latest:
-    release:
-      channel: stable
-      version: "4.12"
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
 resources:
   '*':
     requests:
@@ -55,19 +56,40 @@ tests:
     - ref: stackrox-e2e
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: merge-qa-e2e-tests
-  postsubmit: true
+- as: weekly-ocp-13-qa-e2e-tests
+  cron: 0 5 * * 2
   steps:
     cluster_profile: aws
     env:
-      QA_TEST_TARGET: test
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
     workflow: ipi-aws
   timeout: 5h0m0s
-- as: merge-operator-e2e-tests
-  postsubmit: true
+- as: gke-ui-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: gke-postgres-ui-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: weekly-ocp-13-ui-e2e-tests
+  cron: 0 5 * * 2
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: weekly-ocp-13-operator-e2e-tests
+  cron: 0 5 * * 2
   steps:
     cluster_profile: aws
     env:
@@ -80,4 +102,4 @@ zz_generated_metadata:
   branch: master
   org: stackrox
   repo: stackrox
-  variant: ocp-4-12
+  variant: ocp-4-13
