@@ -3,20 +3,23 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+  ocp_4.13_installer:
+    name: scos-4.14
+    namespace: origin
+    tag: installer
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.okd
+- build_args:
+  - name: DIRECT_DOWNLOAD
+    value: "true"
+  dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    ocp_4.13_installer:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
-  to: operator-marketplace
+      - registry.ci.openshift.org/ocp/4.13:installer
+  to: machine-os-images
 promotion:
   name: scos-4.14
   namespace: origin
@@ -35,14 +38,8 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-tests:
-- as: e2e-gcp
-  optional: true
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
 zz_generated_metadata:
-  branch: master
-  org: operator-framework
-  repo: operator-marketplace
+  branch: main
+  org: openshift
+  repo: machine-os-images
   variant: okd-scos
