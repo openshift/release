@@ -223,7 +223,7 @@ while true; do
     echo "error: Timed out while waiting for cluster to be ready"
     exit 1
   fi
-  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" ]]; then
+  if [[ "${CLUSTER_STATE}" != "installing" && "${CLUSTER_STATE}" != "pending" && "${CLUSTER_STATE}" != "waiting" && "${CLUSTER_STATE}" != "validating" ]]; then
     rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}" || echo "error: Unable to pull installation log."
     echo "error: Cluster reported invalid state: ${CLUSTER_STATE}"
     exit 1
