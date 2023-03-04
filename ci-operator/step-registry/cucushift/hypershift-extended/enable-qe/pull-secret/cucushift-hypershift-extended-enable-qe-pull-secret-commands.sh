@@ -4,6 +4,11 @@ set -e
 set -u
 set -o pipefail
 
+if [[ $SKIP_HYPERSHIFT_PULL_SECRET_UPDATE == "true" ]]; then
+  echo "SKIP ....."
+  exit 0
+fi
+
 if [ ! -f "${SHARED_DIR}/nested_kubeconfig" ]; then
   exit 1
 fi
@@ -47,9 +52,11 @@ for i in $(seq ${RETRIES}); do
   fi
   done
   if [ "$UPDATED_COUNT" == "$COUNT" ] ; then
-      break
+      echo "day 2 pull-secret successful"
+      exit 0
   fi
   echo "Try ${i}/${RETRIES}: pull-secret is not updated yet. Checking again in 60 seconds"
   sleep 60
 done
-echo "day 2 pull-secret successful"
+echo "day 2 pull-secret update error"
+exit 1
