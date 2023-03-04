@@ -98,6 +98,11 @@ EOF
     set -e
 }
 
+if [[ $SKIP_HYPERSHIFT_PULL_SECRET_UPDATE == "true" ]]; then
+  echo "SKIP ....."
+  exit 0
+fi
+
 if [ ! -f "${SHARED_DIR}/nested_kubeconfig" ]; then
   exit 1
 fi
