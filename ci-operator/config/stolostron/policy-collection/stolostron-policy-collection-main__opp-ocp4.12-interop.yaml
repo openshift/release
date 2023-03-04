@@ -1,4 +1,8 @@
 base_images:
+  clc-ui-e2e:
+    name: "2.7"
+    namespace: acm-qe
+    tag: clc-ui-e2e
   cli:
     name: "4.12"
     namespace: ocp
@@ -15,11 +19,6 @@ images:
   from: cli
   to: cli-with-git
 releases:
-  initial:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.12"
   latest:
     candidate:
       product: ocp
@@ -32,18 +31,22 @@ resources:
       memory: 200Mi
 tests:
 - as: opp-interop-aws
-  interval: 960h
+  cron: 0 1 * * 1
   steps:
-    cluster_profile: aws-interop-qe
+    cluster_profile: aws-cspi-qe
     env:
-      BASE_DOMAIN: cnv-qe.rhood.us
-      SUB_CHANNEL: release-2.6
-      SUB_INSTALL_NAMESPACE: open-cluster-management
-      SUB_PACKAGE: advanced-cluster-management
-      SUB_SOURCE: redhat-operators
-      SUB_TARGET_NAMESPACES: open-cluster-management
+      BASE_DOMAIN: aws.interop.ccitredhat.com
+      COMPUTE_NODE_REPLICAS: "7"
+      OPERATORS: |
+        [
+          {"name": "advanced-cluster-management", "source": "redhat-operators", "channel": "release-2.7", "install_namespace": "ocm", "target_namespaces": "ocm"}
+        ]
+      ZONES_COUNT: "3"
     test:
-    - chain: layered-product-opp
+    - ref: install-operators
+    - ref: acm-mch
+    - ref: acm-policies-openshift-plus-setup
+    - ref: acm-policies-openshift-plus
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main
