@@ -45,8 +45,10 @@ EOF
 # shellcheck disable=SC2046,SC2034
 ADDITIONAL_ARG=""
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
+# shellcheck disable=SC2046,SC2034
   ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
 else
+# shellcheck disable=SC2046,SC2034
   ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
 fi
 
