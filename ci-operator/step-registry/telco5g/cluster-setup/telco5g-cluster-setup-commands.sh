@@ -30,6 +30,7 @@ BASTION_ENV=true
 # Environment - US lab, DS lab or any
 CL_SEARCH="upstreambil"
 
+# shellcheck disable=SC2046,SC2034
 if $INTERNAL_ONLY && $INTERNAL; then
     CL_SEARCH="internalbos"
 elif $INTERNAL; then
@@ -41,12 +42,13 @@ cat << EOF > $SHARED_DIR/bastion_inventory
 ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
-#ADDITIONAL_ARG=""
-#if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-#  ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
-#else
-#  ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
-#fi
+# shellcheck disable=SC2046,SC2034
+ADDITIONAL_ARG=""
+if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
+  ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
+else
+  ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
+fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
