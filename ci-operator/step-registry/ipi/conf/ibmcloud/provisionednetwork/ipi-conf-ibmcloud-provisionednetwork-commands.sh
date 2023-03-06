@@ -31,9 +31,8 @@ fi
 
 if [ ${isOldVersion} = true ]; then
     yq-go d -i "${SHARED_DIR}/customer_vpc_subnets.yaml" 'platform.ibmcloud.networkResourceGroupName'
-else
-    yq-go d -i "${SHARED_DIR}/customer_vpc_subnets.yaml" 'platform.ibmcloud.resourceGroupName'
 fi
+#specify resourceGroupName in new version
 
 cat "${SHARED_DIR}/customer_vpc_subnets.yaml"
 
