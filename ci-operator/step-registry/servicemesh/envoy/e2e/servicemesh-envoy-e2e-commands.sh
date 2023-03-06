@@ -66,43 +66,26 @@ metadata:
     cpu-quota.crio.io: "disable"
     ${ANNOTATIONS:-}
 spec:
+  nodeSelector:
+    node.kubernetes.io/instance-type: "m5.4xlarge"
   containers:
   - name: testpmd
     command: ["sleep", "99999"]
     image: ${MAISTRA_BUILDER_IMAGE}
+    resources:
+      requests:
+        cpu: "14"
+        memory: 32Gi
     securityContext:
       capabilities:
         add: ["IPC_LOCK","SYS_ADMIN"]
       privileged: true
       runAsUser: 0
-    volumeMounts:
-    - mountPath: /lib/modules
-      name: modules
-      readOnly: true
-    - mountPath: /sys/fs/cgroup
-      name: cgroup
-      readOnly: true
-    - mountPath: /var/lib/docker
-      name: varlibdocker
-      readOnly: false
-  volumes:
-  - hostPath:
-      path: /lib/modules
-      type: Directory
-    name: modules
-  - hostPath:
-      path: /sys/fs/cgroup
-      type: Directory
-    name: cgroup
-  - emptyDir: {}
-    name: varlibdocker
 EOF
 }
 
 create_namespace "${MAISTRA_NAMESPACE}"
 create_pod "${MAISTRA_SC_POD}"
-create_pod "${MAISTRA_MC_POD}"
 check_pod_status "${MAISTRA_SC_POD}"
-check_pod_status "${MAISTRA_MC_POD}"
 
 echo "Successfully created maistra istio builder pods"
