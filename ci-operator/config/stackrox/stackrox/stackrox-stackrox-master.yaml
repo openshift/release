@@ -33,10 +33,9 @@ releases:
         lower: 4.1.0
         upper: 4.999.0
   latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.13"
+    release:
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -53,13 +52,6 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: ocp-4-6-qa-e2e-tests
-  optional: true
-  steps:
-    env:
-      TEST_SUITE: openshift-newest-qa-e2e-tests
-    workflow: stackrox-automation-flavors-eks-e2e
   timeout: 5h0m0s
 - as: ocp-4-8-qa-e2e-tests
   cluster_claim:
@@ -93,20 +85,15 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: ocp-4-12-qa-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.12"
   optional: true
   run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|EXPECTED_GO_VERSION)
   steps:
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: ipi-aws
   timeout: 5h0m0s
 - as: ocp-next-qa-e2e-tests
   optional: true
@@ -145,19 +132,14 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: ocp-4-12-ui-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.12"
   optional: true
   steps:
+    cluster_profile: aws
     env:
       TEST_SUITE: ocp-ui-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: ipi-aws
   timeout: 5h0m0s
 - as: ocp-next-ui-e2e-tests
   optional: true
@@ -238,13 +220,6 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: ocp-4-6-operator-e2e-tests
-  optional: true
-  steps:
-    env:
-      TEST_SUITE: openshift-4-operator-e2e-tests
-    workflow: stackrox-automation-flavors-eks-e2e
-  timeout: 5h0m0s
 - as: ocp-4-8-operator-e2e-tests
   cluster_claim:
     architecture: amd64
@@ -277,20 +252,15 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: ocp-4-12-operator-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.12"
   optional: true
   run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|EXPECTED_GO_VERSION)
   steps:
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: ipi-aws
   timeout: 5h0m0s
 - as: ocp-next-operator-e2e-tests
   optional: true
@@ -371,20 +341,15 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: merge-ocp-4-12-qa-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.12"
   postsubmit: true
   steps:
+    cluster_profile: aws
     env:
       QA_TEST_TARGET: test
       TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
+    workflow: ipi-aws
   timeout: 5h0m0s
 - as: merge-gke-ui-e2e-tests
   postsubmit: true
@@ -446,15 +411,9 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: merge-ocp-4-12-operator-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.12"
   postsubmit: true
   steps:
+    cluster_profile: aws
     env:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
