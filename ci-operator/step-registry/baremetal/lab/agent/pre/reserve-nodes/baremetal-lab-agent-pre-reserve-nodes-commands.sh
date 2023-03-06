@@ -147,7 +147,7 @@ fi
 
 echo "Copying inventory file from local to AUX HOST"
 
-scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/"
+scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/agent-install-inventory"
 
 
 if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
