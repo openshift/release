@@ -15,6 +15,8 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 
+echo "Sanitizing install for ${CLUSTER_NAME}"
+
 timeout -s 9 15m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- "$CLUSTER_NAME" << 'EOF'
 CLUSTER_NAME="$1"
 
@@ -42,5 +44,5 @@ sed -i "/,${CLUSTER_NAME},ci-op,/d" /etc/vips_reserved
 echo "Releasing lock $LOCK_FD ($LOCK)"
 flock -u $LOCK_FD
 # TODO normalize and sanitize paths
-rm -rf /{var/builds,opt/html,opt/tftpboot,opt/nfs}/${CLUSTER_NAME}
+rm -rf /{var/builds,root/install,var/www/html/agent}/${CLUSTER_NAME}
 EOF
