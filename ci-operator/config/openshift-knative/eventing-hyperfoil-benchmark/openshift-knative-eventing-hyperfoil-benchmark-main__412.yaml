@@ -12,7 +12,7 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: test-kafka--7465737-aws-ocp-412
+- as: test-kafka-7465737-aws-ocp-412
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -33,6 +33,15 @@ tests:
         requests:
           cpu: 100m
       timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
     test:
     - as: test
       cli: latest
@@ -43,7 +52,7 @@ tests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-kafka--7465737-aws-ocp-412-continuous
+- as: test-kafka-7465737-aws-ocp-412-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -60,6 +69,15 @@ tests:
       cli: latest
       commands: oc adm must-gather --image=quay.io/openshift-knative/must-gather --dest-dir
         "${ARTIFACT_DIR}/gather-knative"
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 20m0s
+    - as: openshift-must-gather
+      best_effort: true
+      cli: latest
+      commands: oc adm must-gather --dest-dir "${ARTIFACT_DIR}/gather-openshift"
       from: src
       resources:
         requests:

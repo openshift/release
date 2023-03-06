@@ -41,6 +41,8 @@ images:
     RUN dnf install -y jq && dnf clean all && rm -rf /var/cache/dnf/*
     ENV PAYLOAD_PATH=$HOME/payload
     WORKDIR $PAYLOAD_PATH
+    COPY --from=builder /go/src/github.com/openshift/microshift/scripts/devenv-builder/configure-vm.sh usr/bin/configure-vm.sh
+    RUN chmod 755 usr/bin/configure-vm.sh
     COPY oc openshift-tests usr/bin/
     RUN chmod 755 usr/bin/oc && ln -rs usr/bin/oc usr/bin/kubectl
     COPY --from=builder /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
@@ -62,7 +64,6 @@ images:
         source_path: /usr/bin/openshift-tests
   to: dependency-payload
 promotion:
-  disabled: true
   excluded_images:
   - dependency-payload
   - microshift-validate
@@ -100,72 +101,24 @@ tests:
   run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
     workflow: openshift-microshift-e2e-rpm-install
-- as: e2e-openshift-conformance-sig-api-machinery
+- as: e2e-openshift-conformance-reduced
   cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-api-machinery
-- as: e2e-openshift-conformance-sig-apps
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-apps
-- as: e2e-openshift-conformance-sig-arch
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-arch
-- as: e2e-openshift-conformance-sig-auth
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-auth
-- as: e2e-openshift-conformance-sig-cli
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-cli
-- as: e2e-openshift-conformance-sig-instrumentation
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-instrumentation
-- as: e2e-openshift-conformance-sig-network
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-network
-- as: e2e-openshift-conformance-sig-node
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-node
-- as: e2e-openshift-conformance-sig-scheduling
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-scheduling
-- as: e2e-openshift-conformance-sig-storage
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-  steps:
-    cluster_profile: gcp
-    workflow: openshift-microshift-e2e-openshift-conformance-sig-storage
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-openshift-conformance-reduced
 - as: e2e-reboot
   cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
     workflow: openshift-microshift-e2e-reboot-tests
 - as: e2e-router-smoke-test
   cluster: build02
@@ -173,6 +126,8 @@ tests:
   run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
     workflow: openshift-microshift-e2e-router-smoke-test
 zz_generated_metadata:
   branch: release-4.13

@@ -56,6 +56,11 @@ function check_pod_status() {
     done
 }
 
+if [[ ${OPENSTACK_DPDK_NETWORK} == "" ]]; then
+    echo "OPENSTACK_DPDK_NETWORK is not set, skipping the test"
+    exit 0
+fi
+
 CNF_NAMESPACE="example-cnf-dpdk"
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 

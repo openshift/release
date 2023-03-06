@@ -131,7 +131,8 @@ def add_imagestream_namespace_rbac(gendoc):
                     'resourceNames': ['release',
                                       *context.config.releases,
                                       'scos-4.12',
-                                      'scos-4.13'],
+                                      'scos-4.13',
+                                      'scos-4.14'],
                     'resources': ['imagestreams'],
                     'verbs': ['get', 'list', 'watch', 'update', 'patch']
                 },

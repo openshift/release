@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+source $SHARED_DIR/main.env
 
 export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy}" # next: ovs_qos
 export CNF_REPO="${CNF_REPO:-https://github.com/openshift-kni/cnf-features-deploy.git}"
@@ -29,6 +30,8 @@ export CNF_ORIGIN_TESTS
 
 if [[ "$T5CI_VERSION" == "4.13" ]]; then
     export CNF_BRANCH="master"
+elif [[ "$T5CI_VERSION" == "4.14" ]]; then
+    export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
@@ -39,6 +42,9 @@ cd "$cnf_dir" || exit 1
 echo "running on branch ${CNF_BRANCH}"
 git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
+if [[ "$T5CI_VERSION" == "4.13" ]] || [[ "$T5CI_VERSION" == "4.14" ]]; then
+    git checkout d69cbf9b
+fi
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 
 status=0

@@ -1,0 +1,38 @@
+binary_build_commands: make build build-vgmanager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+canonical_go_repository: github.com/openshift/lvm-operator
+promotion:
+  name: lvm-operator-4.10-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.10-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.10-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  go mod vendor
+  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+  mkdir /.local && chmod 777 /.local
+tests:
+- as: unit-test
+  commands: make test
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: release-4.10
+  org: openshift-priv
+  repo: lvm-operator
