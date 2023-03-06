@@ -42,6 +42,7 @@ fi
 
 echo "$(date -u --rfc-3339=seconds) - Checking if RHCOS OVA needs to be downloaded from ${ova_url}..."
 
+vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
 for i in "${!DATACENTERS[@]}"; do
     DATACENTER=$(echo -n ${DATACENTERS[$i]} |  tr -d '\n')
     export GOVC_DATACENTER=$DATACENTER
@@ -104,6 +105,9 @@ EOF
     fi
 
     hw_versions=(15 17 18 19)
+    if [[ ${vsphere_version} -eq 8 ]]; then
+        hw_versions=(20)
+    fi
     for hw_version in "${hw_versions[@]}"; do
         if [[ "$(govc vm.info "${vm_template}-hw${hw_version}" | wc -c)" -eq 0 ]]
         then
