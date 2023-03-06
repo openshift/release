@@ -44,5 +44,5 @@ sed -i "/,${CLUSTER_NAME},/d" /etc/vips_reserved
 echo "Releasing lock $LOCK_FD ($LOCK)"
 flock -u $LOCK_FD
 # TODO normalize and sanitize paths
-# rm -rf /{var/builds,root/install,var/www/html/agent}/${CLUSTER_NAME}
+rm -rf /{var/builds,root/install,var/www/html/agent}/${CLUSTER_NAME}
 EOF

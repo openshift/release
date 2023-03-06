@@ -149,10 +149,6 @@ echo "Copying inventory file from local to AUX HOST"
 
 scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/agent-install-inventory"
 
-V4_LOOKUP=ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" <<EOF
-/usr/local/bin/ip_lookup_v4.sh >> "${REMOTE_INVENTORY}"
-EOF
-
 
 if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
     echo "DEPLOYMENT_TYPE is NOT sno, running ip lookup scripts on AUX HOST "
