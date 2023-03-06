@@ -44,78 +44,25 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
-    - as: maistra-envoy-build-binary-2-3
+    - as: maistra-envoy-unit-2-3
       cli: latest
       commands: |
+        # WIP workaround
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c "sed -i 's/--local_cpu_resources=6/--local_cpu_resources=4/g' ./maistra/bazelrc"
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           sh -c \
           "export CI=true; \
-          cd maistra; \
-          export BUILD_SCM_REVISION=\"Maistra PR #${PULL_NUMBER:-undefined}\"; \
-          export BUILD_SCM_STATUS=\"SHA=${PULL_PULL_SHA:-undefined}\"; \
-          source ./common.sh; \
-          time bazel build \
-            ${COMMON_FLAGS} \
-            //source/exe:envoy-static; \
-          echo \"Build succeeded. Binary generated:\"; \
-          bazel-bin/source/exe/envoy-static --version;"
+          ./maistra/run-ci.sh"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       from: src
       resources:
         requests:
-          cpu: "6"
-          memory: 18Gi
-      timeout: 4h0m0s
-    - as: maistra-envoy-build-test-2-3
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c \
-          "export CI=true; \
-          cd maistra; \
-          export BUILD_SCM_REVISION=\"Maistra PR #${PULL_NUMBER:-undefined}\"; \
-          export BUILD_SCM_STATUS=\"SHA=${PULL_PULL_SHA:-undefined}\"; \
-          source ./common.sh; \
-          time bazel build \
-            ${COMMON_FLAGS} \
-              --build_tests_only \
-              //test/...; \
-          echo \"Build tests succeeded.\";"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "6"
-          memory: 18Gi
-      timeout: 4h0m0s
-    - as: maistra-envoy-run-test-2-3
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c \
-          "export CI=true; \
-          cd maistra; \
-          export BUILD_SCM_REVISION=\"Maistra PR #${PULL_NUMBER:-undefined}\"; \
-          export BUILD_SCM_STATUS=\"SHA=${PULL_PULL_SHA:-undefined}\"; \
-          source ./common.sh; \
-          time bazel test \
-            ${COMMON_FLAGS} \
-            --build_tests_only \
-            //test/...; \
-          echo \"Run tests succeeded.\";"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "6"
-          memory: 18Gi
-      timeout: 4h0m0s
+          cpu: "16"
+          memory: 64Gi
+      timeout: 8h0m0s
     workflow: servicemesh-envoy-e2e-aws
   timeout: 8h0m0s
 zz_generated_metadata:
