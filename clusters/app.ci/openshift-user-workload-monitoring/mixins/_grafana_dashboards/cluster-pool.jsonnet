@@ -102,7 +102,6 @@ dashboard.new(
         legend_current=true,
         legend_sortDesc=true,
         min='0',
-        stack=true,
     ) + legendConfig)
     .addTarget(prometheus.target(
         'sum(increase(hive_install_errors{owner="openshift-ci"}[1h])) by (reason)',
