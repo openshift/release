@@ -38,8 +38,8 @@ echo "Acquiring lock $LOCK_FD ($LOCK) (waiting up to 10 minutes)"
 flock -w 600 $LOCK_FD
 echo "Lock acquired $LOCK_FD ($LOCK)"
 
-sed -i "/,${CLUSTER_NAME},ci-op,/d" /etc/hosts_pool_reserved
-sed -i "/,${CLUSTER_NAME},ci-op,/d" /etc/vips_reserved
+sed -i "/,${CLUSTER_NAME},/d" /etc/hosts_pool_reserved
+sed -i "/,${CLUSTER_NAME},/d" /etc/vips_reserved
 
 echo "Releasing lock $LOCK_FD ($LOCK)"
 flock -u $LOCK_FD
