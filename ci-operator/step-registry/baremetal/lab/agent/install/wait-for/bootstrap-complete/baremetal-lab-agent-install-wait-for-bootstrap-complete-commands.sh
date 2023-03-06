@@ -18,6 +18,6 @@ echo "Wait for Bootstrap complete"
 
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" <<EOF
-/root/install/"${NAMESPACE}"/openshift-install agent wait-for bootstrap-complete --log-level debug
+/root/install/"${NAMESPACE}"/openshift-install agent wait-for bootstrap-complete --log-level debug --dir /root/install/"${NAMESPACE}"/
 EOF
 

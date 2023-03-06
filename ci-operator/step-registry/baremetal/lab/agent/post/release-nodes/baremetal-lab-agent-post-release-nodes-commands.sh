@@ -13,7 +13,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
   -o LogLevel=ERROR
   -i "${CLUSTER_PROFILE_DIR}/ssh-key")
 
-CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
+CLUSTER_NAME=${NAMESPACE}
 
 echo "Sanitizing install for ${CLUSTER_NAME}"
 
