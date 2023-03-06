@@ -22,7 +22,7 @@ SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.
 
 
 #PULL_SECRET=$(< "${CLUSTER_PROFILE_DIR}"/pull-secret jq -c)
-PULL_SECRET=\"$(<"${CLUSTER_PROFILE_DIR}"/pull-secret )\"
+PULL_SECRET=\'$(<"${CLUSTER_PROFILE_DIR}"/pull-secret )\'
 
 #echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
 
