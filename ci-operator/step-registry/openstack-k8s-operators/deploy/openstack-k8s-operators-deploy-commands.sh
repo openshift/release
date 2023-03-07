@@ -69,6 +69,9 @@ until [ "$n" -ge "$retries" ]; do
     sleep 10
 done
 
+## debug
+sleep 7200
+
 # Check if all deployments are available
 INSTALLED_CSV=$(oc get subscription openstack-operator -o jsonpath='{.status.installedCSV}')
 oc get csv ${INSTALLED_CSV} -o jsonpath='{.spec.install.spec.deployments[*].name}' | \

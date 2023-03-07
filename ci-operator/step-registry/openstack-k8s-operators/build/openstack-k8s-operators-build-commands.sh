@@ -40,6 +40,11 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
 fi
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 
+# override to test/debug
+PR_REPO_NAME=ci-framework/placement-operator
+BASE_OP=placement-operator
+IS_REHEARSAL=false
+
 function create_openstack_namespace {
   pushd ${BASE_DIR}
   if [ ! -d "./install_yamls" ]; then
@@ -96,7 +101,13 @@ function build_push_operator_images {
 
 # Begin operators build
 # Copy base operator code to base directory
-cp -r /go/src/github.com/${ORG}/${BASE_OP}/ ${BASE_DIR}
+#cp -r /go/src/github.com/${ORG}/${BASE_OP}/ ${BASE_DIR}
+pushd ${BASE_DIR}
+git clone https://github.com/ci-framework/placement-operator.git -b testing-ci
+pushd placement-operator
+PR_SHA=$(git log -n 1 --pretty=format:"%H")
+popd
+popd
 
 # Create and enable openstack namespace
 create_openstack_namespace
