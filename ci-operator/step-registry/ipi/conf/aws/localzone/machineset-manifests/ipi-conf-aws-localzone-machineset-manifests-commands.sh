@@ -73,6 +73,19 @@ spec:
             name: worker-user-data
 EOF
 
+if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
+  ip_patch=`mktemp`
+  cat <<EOF > ${ip_patch}
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          publicIp: true
+EOF
+  yq-go m -x -i "${localzone_machineset}" "${ip_patch}"
+fi
+
 if [[ "${LOCALZONE_WORKER_SCHEDULABLE}" == "no" ]]; then
   schedulable_patch=`mktemp`
   cat <<EOF > ${schedulable_patch}
