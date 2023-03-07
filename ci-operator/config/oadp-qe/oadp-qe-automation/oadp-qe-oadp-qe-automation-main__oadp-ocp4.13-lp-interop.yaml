@@ -1,0 +1,76 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: dockerfiles/testing/ginkgo/Dockerfile
+  to: mock-runner
+- dockerfile_literal: |
+    FROM src
+      COPY oc /usr/bin/oc
+      RUN ln -s /usr/bin/oc /usr/bin/kubectl
+      RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+        unzip -q awscliv2.zip && \
+        ./aws/install && \
+        rm -rf awscliv2.zip aws &&\
+        mkdir /.aws && chmod 777 /.aws
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: aws-console
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: oadp-private-scenario
+  interval: 960h
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: aws.interop.ccitredhat.com
+      BUCKET_NAME: interopoadp
+      OPERATORS: |
+        [
+          {"name": "redhat-oadp-operator", "source": "redhat-operators", "channel": "stable-1.1", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp", "operator_group":""},
+          {"name": "volsync-product", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators", "target_namespaces": "", "operator_group":"global-operators"},
+          {"name": "odf-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-storage", "target_namespaces": "openshift-storage", "operator_group":"openshift-storage"}
+        ]
+      SPOT_INSTANCES: "false"
+    post:
+    - ref: gather-aws-console
+    - ref: lp-interop-tooling-s3-delete
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
+    - ref: install-operators
+    - ref: lp-interop-tooling-s3-create
+    test:
+    - ref: oadp-execute-tests
+zz_generated_metadata:
+  branch: main
+  org: oadp-qe
+  repo: oadp-qe-automation
+  variant: oadp-ocp4.13-lp-interop
