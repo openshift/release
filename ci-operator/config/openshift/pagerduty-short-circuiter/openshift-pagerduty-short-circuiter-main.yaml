@@ -29,9 +29,23 @@ tests:
     from: src
 - as: coverage
   commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make coverage
   container:
     from: src
+  secret:
+    mount_path: /tmp/secret
+    name: pagerduty-short-circuiter-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: pagerduty-short-circuiter-codecov-token
 zz_generated_metadata:
   branch: main
   org: openshift
