@@ -27,6 +27,11 @@ PULL_SECRET=\'$(<"${CLUSTER_PROFILE_DIR}"/pull-secret )\'
 PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
 
 
+OC_PATH=$(which oc)
+
+echo "Getting oc binary path: ${OC_PATH}"
+
+
 #echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
 
 #PULL_SECRET=\'$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\'
@@ -155,6 +160,8 @@ scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/ag
 echo "Copying pull secret from local to AUX HOST"
 
 scp "${SSHOPTS[@]}" "${PULL_SECRET_PATH}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/pull_secret"
+
+scp "${SSHOPTS[@]}" "${OC_PATH}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/oc"
 
 if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
     echo "DEPLOYMENT_TYPE is NOT sno, running ip lookup scripts on AUX HOST "

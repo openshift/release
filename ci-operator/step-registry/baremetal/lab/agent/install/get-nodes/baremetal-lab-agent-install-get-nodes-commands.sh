@@ -18,6 +18,6 @@ echo "Get nodes status"
 
 # shellcheck disable=SC2087
 ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" <<EOF
-oc get nodes --kubeconfig /root/install/"${NAMESPACE}"/auth/kubeconfig
+/var/builds/${NAMESPACE}/oc get nodes --kubeconfig /root/install/"${NAMESPACE}"/auth/kubeconfig
 EOF
 
