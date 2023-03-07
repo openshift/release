@@ -44,6 +44,7 @@ operator:
   - as: loki-operator-bundle
     context_dir: operator/bundle/openshift
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/openshift-logging/loki-operator:v0.1.0
     with: pipeline:loki-operator
@@ -89,7 +90,11 @@ tests:
     - as: test
       cli: latest
       commands: |
+        echo "===${OO_BUNDLE}==="
         oc -n openshift-operators-redhat rollout status deployment loki-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: loki-operator-bundle
       from: src
       resources:
         requests:
