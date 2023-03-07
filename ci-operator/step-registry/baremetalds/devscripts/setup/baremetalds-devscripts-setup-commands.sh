@@ -11,9 +11,9 @@ echo "************ baremetalds devscripts setup command ************"
 source "${SHARED_DIR}/packet-conf.sh"
 
 # Get dev-scripts logs and other configuration
-sleep infinity
 finished()
 {
+  sleep infinity
   # Remember dev-scripts setup exit code
   retval=$?
 
