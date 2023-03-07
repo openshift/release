@@ -354,6 +354,37 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-aws
+- as: hco-e2e-image-index-fbc-aws
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+  steps:
+    cluster_profile: aws-virtualization
+    dependencies:
+      OO_BUNDLE: hco-bundle
+    env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+      OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: deploy-cr
+      commands: |
+        KVM_EMULATION=true make deploy_cr
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
+        make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
+      from: hco-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-file-based-aws
 - as: hco-e2e-image-index-gcp
   run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
