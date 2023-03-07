@@ -11,6 +11,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: tests
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
@@ -63,12 +67,53 @@ images:
       - destination_dir: .
         source_path: /usr/bin/openshift-tests
   to: dependency-payload
+- dockerfile_literal: |
+    # build
+    FROM ubi-minimal
+    ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
+    ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
+    RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
+        if ! (curl -Ls "${YQ_URL}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt &>/dev/null); then \
+          echo "ERROR: Expected file at ${YQ_URL} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)" ; \
+          exit 1 ; \
+        fi ; \
+        chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
+  from: ubi-minimal
+  to: yq-cli
+- dockerfile_literal: |
+    FROM src
+    COPY yq /usr/bin/yq
+    RUN yum install -y --nodocs python3-devel && \
+        pip3 install pygithub GitPython && \
+        dnf clean all && \
+        rm -rf /var/cache/dnf/*
+  from: src
+  inputs:
+    yq-cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/yq
+  to: microshift-rebase
 promotion:
   excluded_images:
   - dependency-payload
   - microshift-validate
+  - yq-cli
+  - microshift-rebase
   name: "4.13"
   namespace: ocp
+releases:
+  nightly-amd64:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+  nightly-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -121,6 +166,10 @@ tests:
     env:
       GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
     workflow: openshift-microshift-e2e-router-smoke-test
+- as: rebase-on-nightlies
+  cron: 0 5 * * 1-5
+  steps:
+    workflow: openshift-microshift-rebase
 zz_generated_metadata:
   branch: release-4.13
   org: openshift
