@@ -473,6 +473,7 @@ do
   wait "$!"
   ret="$?"
   echo "Installer exit with code $ret"
+  cp ${dir}/auth/kubeconfig ${ARTIFACT_DIR}
 
   tries=$((tries+1))
 done
