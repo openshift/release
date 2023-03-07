@@ -3,9 +3,17 @@
 set -o errexit
 set -o pipefail
 
+cd /tmp
+pwd
+
+# install kubectl
+curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+chmod +x kubectl
+
 SECRET_DIR="/tmp/vault/powervs-rhr-creds"
 PRIVATE_KEY_FILE="${SECRET_DIR}/PRIVATE_KEY_FILE"
 
+# https://docs.ci.openshift.org/docs/architecture/step-registry/#sharing-data-between-steps
 KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 
 SSH_KEY_PATH="/tmp/id_rsa"
@@ -19,4 +27,4 @@ chmod 400 $SSH_KEY_PATH
 # acquire a ocp cluster
 ssh $SSH_ARGS root@cluster.pool.synergyonpower.com "$SSH_CMD" > $KUBECONFIG_FILE
 
-KUBECONFIG="$KUBECONFIG_FILE" oc get nodes
+KUBECONFIG="$KUBECONFIG_FILE" ./kubectl get nodes
