@@ -9,8 +9,6 @@ RENDEZVOUS_IP="$(yq -r e -o=j -I=0 ".[0].ip" "${SHARED_DIR}/hosts.yaml")"
 cat > "${SHARED_DIR}/agent-config.yaml" <<EOF
 apiVersion: v1beta1
 kind: AgentConfig
-metadata:
-  name: example-agent-config
 rendezvousIP: ${RENDEZVOUS_IP}
 additionalNTPSources:
 - ${AUX_HOST}
@@ -40,9 +38,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: ${ipv4_enabled}
       ipv6:
         enabled: ${ipv6_enabled}
-        dhcp: ${ipv6_enabled}
 "
-# TODO is dhcp: false correct/needed for disabling ipv6?
 
   # split the ipi_disabled_ifaces semi-comma separated list into an array
   IFS=';' read -r -a ipi_disabled_ifaces <<< "${ipi_disabled_ifaces}"
@@ -60,7 +56,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: false
     "
   done
-  # Patch the install-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
+  # Patch the agent-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"
 done

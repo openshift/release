@@ -218,22 +218,7 @@ platform:
     - ${API_VIP}
     ingressVIPs:
     - ${INGRESS_VIP}
-    hosts: []
 "
-  # Add the hosts info
-  echo "[INFO] Processing the platform.baremetal.hosts list in the install-config.yaml..."
-  # shellcheck disable=SC2154
-  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
-    # shellcheck disable=SC1090
-    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-    ADAPTED_YAML="
-  name: ${name}
-  bootMACAddress: ${mac}
-"
-    # Patch the install-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
-    yq --inplace eval-all 'select(fileIndex == 0).platform.baremetal.hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
-      "$SHARED_DIR/install-config.yaml" - <<< "$ADAPTED_YAML"
-  done
 fi
 
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
@@ -340,7 +325,7 @@ fi
 update_image_registry &
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
-  oinst wait-for install-complete &
+  oinst agent wait-for install-complete &
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   # TODO: gather logs??
