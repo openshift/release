@@ -24,6 +24,9 @@ SSH_PUBLIC_KEY=\"$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.ssh/id_rsa.
 #PULL_SECRET=$(< "${CLUSTER_PROFILE_DIR}"/pull-secret jq -c)
 PULL_SECRET=\'$(<"${CLUSTER_PROFILE_DIR}"/pull-secret )\'
 
+PULL_SECRET_PATH=${CLUSTER_PROFILE_DIR}/pull-secret
+
+
 #echo "Connecting to ${AUX_HOST} to retrieve docker pull secret"
 
 #PULL_SECRET=\'$(ssh "${SSHOPTS[@]}" root@"${AUX_HOST}" cat /root/.docker/config.json | jq -c)\'
@@ -149,6 +152,9 @@ echo "Copying inventory file from local to AUX HOST"
 
 scp "${SSHOPTS[@]}" "${INVENTORY}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/agent-install-inventory"
 
+echo "Copying pull secret from local to AUX HOST"
+
+scp "${SSHOPTS[@]}" "${PULL_SECRET_PATH}" "root@${AUX_HOST}:/var/builds/${NAMESPACE}/pull_secret"
 
 if [ "${DEPLOYMENT_TYPE}" != "sno" ]; then
     echo "DEPLOYMENT_TYPE is NOT sno, running ip lookup scripts on AUX HOST "
