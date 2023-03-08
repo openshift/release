@@ -81,8 +81,6 @@ if [ -n "${is_dev_version:-}" ]; then
     echo "The SR-IOV will be installed from Github using release-${oc_version} branch."
     git clone --branch release-${oc_version} https://github.com/openshift/sriov-network-operator /tmp/sriov-network-operator
     pushd /tmp/sriov-network-operator
-    # Until https://github.com/openshift/sriov-network-operator/pull/613 merges
-    cp manifests/stable/supported-nic-ids_v1_configmap.yaml deploy/configmap.yaml
 
     # We need to skip the bits where it tries to install Skopeo
     export SKIP_VAR_SET=1

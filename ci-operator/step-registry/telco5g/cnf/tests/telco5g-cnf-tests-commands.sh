@@ -106,6 +106,8 @@ function get_skip_tests {
     echo "${skip_list}"
 }
 
+source $SHARED_DIR/main.env
+
 export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy}" # next: ovs_qos
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
@@ -134,6 +136,8 @@ export CNF_ORIGIN_TESTS
 
 if [[ "$T5CI_VERSION" == "4.13" ]]; then
     export CNF_BRANCH="master"
+elif [[ "$T5CI_VERSION" == "4.14" ]]; then
+    export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
@@ -157,7 +161,7 @@ fi
 if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
     create_tests_temp_skip_list_12
 fi
-if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_13
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"

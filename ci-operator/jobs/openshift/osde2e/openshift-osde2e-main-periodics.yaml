@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -80,7 +80,125 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
+  cron: 0 */12 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "false"
+  name: osde2e-osd-stage-rosa-e2e-machine-type-enablement-c6a-random
+  spec:
+    containers:
+    - args:
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
+      command:
+      - /osde2e
+      env:
+      - name: CONFIGS
+        value: rosa,stage,e2e-suite,region-random
+      - name: OCM_COMPUTE_MACHINE_TYPE
+        value: random
+      - name: OCM_COMPUTE_MACHINE_TYPE_REGEX
+        value: c6a
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
+      - name: UseExistingCluster
+        value: "false"
+      image: quay.io/app-sre/osde2e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+      - mountPath: /usr/local/osde2e-rosa-staging
+        name: osde2e-rosa-staging
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+    - name: osde2e-rosa-staging
+      secret:
+        secretName: osde2e-rosa-staging
+- agent: kubernetes
+  cluster: build02
+  cron: 0 */12 * * *
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    pj-rehearse.openshift.io/can-be-rehearsed: "false"
+  name: osde2e-osd-stage-rosa-e2e-machine-type-enablement-hpc6a-48xlarge
+  spec:
+    containers:
+    - args:
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
+      command:
+      - /osde2e
+      env:
+      - name: CONFIGS
+        value: rosa,stage,e2e-suite,region-random
+      - name: OCM_COMPUTE_MACHINE_TYPE
+        value: hpc6a.48xlarge
+      - name: OCM_COMPUTE_MACHINE_TYPE_REGEX
+        value: hpc6a
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-staging
+      - name: UseExistingCluster
+        value: "false"
+      image: quay.io/app-sre/osde2e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        readOnly: true
+      - mountPath: /usr/local/osde2e-rosa-staging
+        name: osde2e-rosa-staging
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-credentials
+      secret:
+        secretName: osde2e-credentials
+    - name: osde2e-rosa-staging
+      secret:
+        secretName: osde2e-rosa-staging
+- agent: kubernetes
+  cluster: build02
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -113,7 +231,7 @@ periodics:
       secret:
         secretName: osde2e-rosa-production
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 4 * * *
   decorate: true
   extra_refs:
@@ -146,7 +264,7 @@ periodics:
       secret:
         secretName: osde2e-rosa-staging
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 14 * * 0
   decorate: true
   extra_refs:
@@ -215,7 +333,7 @@ periodics:
       secret:
         secretName: osde2e-rosa-stage
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 3 * * *
   decorate: true
   extra_refs:
@@ -276,7 +394,7 @@ periodics:
       secret:
         secretName: osde2e-common
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 5 * * 1-5
   decorate: true
   extra_refs:
@@ -327,7 +445,7 @@ periodics:
       - name: ROSA_ENV
         value: stage
       - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/rhoc-osde2e-secret
+        value: /usr/local/osde2e-common,/usr/local/rhoc-osde2e-secret,/usr/local/rhoc-credentials-secret
       image: quay.io/app-sre/osde2e
       imagePullPolicy: Always
       name: ""
@@ -338,6 +456,9 @@ periodics:
       - mountPath: /usr/local/osde2e-common
         name: osde2e-common
         readOnly: true
+      - mountPath: /usr/local/rhoc-credentials-secret
+        name: rhoc-credentials-secret
+        readOnly: true
       - mountPath: /usr/local/rhoc-osde2e-secret
         name: rhoc-osde2e-secret
         readOnly: true
@@ -346,11 +467,14 @@ periodics:
     - name: osde2e-common
       secret:
         secretName: osde2e-common
+    - name: rhoc-credentials-secret
+      secret:
+        secretName: rhoc-credentials-secret
     - name: rhoc-osde2e-secret
       secret:
         secretName: rhoc-osde2e-secret
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -417,7 +541,7 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 22 * * 1,4
   decorate: true
   extra_refs:
@@ -485,7 +609,7 @@ periodics:
       secret:
         secretName: osde2e-common
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 22 * * 0
   decorate: true
   extra_refs:
@@ -550,7 +674,7 @@ periodics:
       secret:
         secretName: osde2e-common
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -624,7 +748,7 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -689,68 +813,7 @@ periodics:
       secret:
         secretName: reference-addon-creds
 - agent: kubernetes
-  cluster: build03
-  cron: 0 */3 * * 1-5
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "false"
-  name: osde2e-stage-aws-addon-smart-events-operator
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: ADDON_IDS
-        value: smart-events-operator
-      - name: ADDON_TEST_HARNESSES
-        value: quay.io/5733d9e2be6485d52ffa08870cabdee0/shard-operator-test-harness
-      - name: CHANNEL
-        value: stable
-      - name: CONFIGS
-        value: aws,stage,addon-suite
-      - name: OCM_CCS
-        value: "true"
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/smart-events-osde2e-secret
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /usr/local/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /usr/local/smart-events-osde2e-secret
-        name: smart-events-osde2e-secret
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: smart-events-osde2e-secret
-      secret:
-        secretName: smart-events-osde2e-secret
-- agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */12 * * *
   decorate: true
   extra_refs:
@@ -830,7 +893,7 @@ periodics:
       secret:
         secretName: osde2e-credentials
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 0 3 * *
   decorate: true
   decoration_config:
@@ -876,7 +939,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: '@midnight'
   decorate: true
   decoration_config:
@@ -922,7 +985,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 0 9 * * *
   decorate: true
   decoration_config:
@@ -968,7 +1031,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 45 * * * *
   decorate: true
   decoration_config:
@@ -1028,7 +1091,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1088,7 +1151,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1148,7 +1211,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1208,7 +1271,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1268,7 +1331,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1328,7 +1391,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1388,7 +1451,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1466,7 +1529,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1533,7 +1596,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1601,7 +1664,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 19 * * 0,2,4
   decorate: true
   decoration_config:
@@ -1668,7 +1731,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 5 * * 1
   decorate: true
   decoration_config:
@@ -1735,7 +1798,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1802,7 +1865,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build02
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:

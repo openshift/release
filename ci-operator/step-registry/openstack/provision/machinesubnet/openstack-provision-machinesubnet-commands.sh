@@ -8,7 +8,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "$CONFIG_TYPE" != "proxy" ]]; then
+if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
     if [[ "$ZONES_COUNT" != "0" ]]; then
       echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'proxy'."
       exit 1
@@ -85,9 +85,22 @@ else
   echo "Created subnet for OpenShift machines: ${MACHINES_SUBNET_ID}"
   echo ${MACHINES_SUBNET_ID}>${SHARED_DIR}/MACHINES_SUBNET_ID
   echo ${SUBNET_RANGE}>${SHARED_DIR}/MACHINES_SUBNET_RANGE
+
+  # This block only works if the subnet range is a /24
+  if [[ ${SUBNET_RANGE} != *"/24" ]]; then
+      echo "ERROR: The subnet range must be a /24"
+      exit 1
+  fi
+  ALLOCATION_POOL_COMMON=$(echo ${ALLOCATION_POOL_START} | cut -d '.' -f 1-3)
+  ALLOCATION_POOL_START_LAST_OCTET=$(echo ${ALLOCATION_POOL_START} | cut -d '.' -f 4)
+  ALLOCATION_POOL_END_LAST_OCTET=$(echo ${ALLOCATION_POOL_END} | cut -d '.' -f 4)
+  for i in $(seq $ALLOCATION_POOL_START_LAST_OCTET $ALLOCATION_POOL_END_LAST_OCTET); do
+      echo "$ALLOCATION_POOL_COMMON.$i" >> ${SHARED_DIR}/MASTER_IPS
+  done
+  cp ${SHARED_DIR}/MASTER_IPS ${SHARED_DIR}/WORKER_IPS
 fi
 
-if [[ "${CONFIG_TYPE}" == "proxy" || ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
+if [[ "${CONFIG_TYPE}" == *"proxy"* || ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
   BASTION_NET_ID="$(openstack network create --format value --column id \
     --description "Bastion network for ${CLUSTER_NAME}-${CONFIG_TYPE}" \
     "${CLUSTER_NAME}-${CONFIG_TYPE}-bastion-network")"

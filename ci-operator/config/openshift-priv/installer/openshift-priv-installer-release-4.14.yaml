@@ -34,7 +34,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.46.0
+    tag: v1.48.0
   ocp_4.10_cli:
     name: 4.14-priv
     namespace: ocp-private
@@ -140,6 +140,7 @@ images:
         source_path: /usr/bin/oc
   to: src-oc
 promotion:
+  disabled: true
   excluded_images:
   - src-oc
   name: 4.14-priv
@@ -484,6 +485,14 @@ tests:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-proxy
   timeout: 6h0m0s
+- as: e2e-openstack-externallb-techpreview
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    env:
+      OPENSTACK_TEST_SKIPS: \[sig-installer\]\[Suite:openshift\/openstack\]\[lb\]
+    workflow: openshift-e2e-openstack-external-lb
+  timeout: 6h0m0s
 - as: openstack-manifests
   run_if_changed: openstack
   steps:
@@ -504,13 +513,14 @@ tests:
   timeout: 6h0m0s
 - as: e2e-vsphere-upi-zones
   optional: true
+  run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
 - as: e2e-vsphere-zones
   optional: true
-  run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
+  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-zones

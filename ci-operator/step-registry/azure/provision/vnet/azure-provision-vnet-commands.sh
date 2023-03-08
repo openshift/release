@@ -32,7 +32,9 @@ function create_disconnected_network() {
     local nsg rg="$1" subnet_nsgs="$2"
     for nsg in $subnet_nsgs; do
         run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'DenyInternet' --priority 1010 --access Deny --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'Internet' --destination-port-ranges '*' --direction Outbound"
-        run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'AllowAzureCloud' --priority 1009 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
+        if [[ "${CLUSTER_TYPE}" != "azurestack" ]]; then
+            run_command "az network nsg rule create -g ${rg} --nsg-name '${nsg}' -n 'AllowAzureCloud' --priority 1009 --access Allow --source-port-ranges '*' --source-address-prefixes 'VirtualNetwork' --destination-address-prefixes 'AzureCloud' --destination-port-ranges '*' --direction Outbound"
+        fi
     done
     return 0
 }
@@ -50,11 +52,31 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 # log in with az
 if [[ "${CLUSTER_TYPE}" == "azuremag" ]]; then
     az cloud set --name AzureUSGovernment
+elif [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+    if [ ! -f "${CLUSTER_PROFILE_DIR}/cloud_name" ]; then
+        echo "Unable to get specific ASH cloud name!"
+        exit 1
+    fi
+    cloud_name=$(< "${CLUSTER_PROFILE_DIR}/cloud_name")
+
+    AZURESTACK_ENDPOINT=$(cat "${SHARED_DIR}"/AZURESTACK_ENDPOINT)
+    SUFFIX_ENDPOINT=$(cat "${SHARED_DIR}"/SUFFIX_ENDPOINT)
+
+    if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+        cp "${CLUSTER_PROFILE_DIR}/ca.pem" /tmp/ca.pem
+        cat /usr/lib64/az/lib/python*/site-packages/certifi/cacert.pem >> /tmp/ca.pem
+        export REQUESTS_CA_BUNDLE=/tmp/ca.pem
+    fi
+    az cloud register \
+        -n ${cloud_name} \
+        --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
+        --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
+    az cloud set --name ${cloud_name}
+    az cloud update --profile 2019-03-01-hybrid
 else
     az cloud set --name AzureCloud
 fi
 az login --service-principal -u "${AZURE_AUTH_CLIENT_ID}" -p "${AZURE_AUTH_CLIENT_SECRET}" --tenant "${AZURE_AUTH_TENANT_ID}" --output none
-
 
 rg_file="${SHARED_DIR}/resourcegroup"
 if [ -f "${rg_file}" ]; then
@@ -73,8 +95,12 @@ fi
 VNET_BASE_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
 
 # create vnet
-vnet_arm_template_file="/tmp/01_vnet.json"
-run_command "curl -L https://raw.githubusercontent.com/openshift/installer/master/upi/azure/01_vnet.json -o ${vnet_arm_template_file}"
+if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
+    arm_template_folder_name="azurestack"
+else
+    arm_template_folder_name="azure"
+fi
+vnet_arm_template_file="/var/lib/openshift-install/upi/${arm_template_folder_name}/01_vnet.json"
 run_command "az deployment group create --name ${VNET_BASE_NAME} -g ${RESOURCE_GROUP} --template-file '${vnet_arm_template_file}' --parameters baseName='${VNET_BASE_NAME}'"
 
 #Due to sometime frequent vnet list will return empty, so save vnet list output into a local file
@@ -89,6 +115,8 @@ computeSubnet=$(cat "${vnet_info_file}" | jq -r ".[].subnets[].name" | grep "wor
 #workaround for BZ#1822903
 clusterSubnetSNG="${VNET_BASE_NAME}-nsg"
 run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'worker-allow' --priority 1000 --access Allow --source-port-ranges '*' --destination-port-ranges 80 443" || exit 3
+#Add port 22 to debug easily and to gather bootstrap log
+run_command "az network nsg rule create -g ${RESOURCE_GROUP} --nsg-name '${clusterSubnetSNG}' -n 'ssh-allow' --priority 1001 --access Allow --source-port-ranges '*' --destination-port-ranges 22" || exit 3
 
 if [ X"${RESTRICTED_NETWORK}" == X"yes" ]; then
     echo "Remove outbound internet access from the Network Security groups used for master and worker subnets"

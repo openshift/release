@@ -408,7 +408,7 @@ do
   echo "${non_imported_imagestreams}"
 
   count=$((count+1))
-  if (( count > 20 )); then
+  if (( count > 30 )); then
     echo "Failed while waiting on imagestream import"
     exit 1
   fi

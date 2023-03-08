@@ -4,10 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "${CONTROL_PLANE_DISK_ENCRYPTION}" != "yes" ]] && [[ "${COMPUTE_DISK_ENCRYPTION}" != "yes" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - OS disk custom encryption is not enabled, so nothing to do." && exit 0
-fi
-
 if [[ "${KMS_KEY_RING}" == "" ]] || [[ "${KMS_KEY_RING_LOCATION}" == "" ]] || [[ "${KMS_KEY_NAME}" == "" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Invalid OS disk custom encryption settings, abort." && exit 1
 fi
@@ -43,46 +39,42 @@ echo "$(date -u --rfc-3339=seconds) - the expected kmsKeyServiceAccount '${expec
 ## Try the validation
 ret=0
 
-if [[ "${CONTROL_PLANE_DISK_ENCRYPTION}" == "yes" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Checking OS disk custom encryption of control-plane nodes..."
-  readarray -t control_plane_disks < <(gcloud compute disks list --filter="${CLUSTER_NAME}" --format="table(name,zone)" | grep master)
-  for line in "${control_plane_disks[@]}"; do
-    disk_name="${line%% *}"
-    disk_zone="${line##* }"
-    gcloud compute disks describe "${disk_name}" --zone "${disk_zone}" --format json > disk.json
-    kmsKeyName=$(jq -r .diskEncryptionKey.kmsKeyName disk.json)
-    if [[ "${kmsKeyName}" != "${expected_kmsKeyName}" ]]; then
-      echo "$(date -u --rfc-3339=seconds) - Unexpected .diskEncryptionKey.kmsKeyName '${kmsKeyName}' for '${disk_name}'."
-      ret=1
-    else
-      echo "$(date -u --rfc-3339=seconds) - Matched .diskEncryptionKey.kmsKeyName '${kmsKeyName}' for '${disk_name}'."
-    fi
-  done
-fi
+echo "$(date -u --rfc-3339=seconds) - Checking OS disk custom encryption of control-plane nodes..."
+readarray -t control_plane_disks < <(gcloud compute disks list --filter="${CLUSTER_NAME}" --format="table(name,zone)" | grep master)
+for line in "${control_plane_disks[@]}"; do
+  disk_name="${line%% *}"
+  disk_zone="${line##* }"
+  gcloud compute disks describe "${disk_name}" --zone "${disk_zone}" --format json > disk.json
+  kmsKeyName=$(jq -r .diskEncryptionKey.kmsKeyName disk.json)
+  if [[ "${kmsKeyName}" != "${expected_kmsKeyName}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Unexpected .diskEncryptionKey.kmsKeyName '${kmsKeyName}' for '${disk_name}'."
+    ret=1
+  else
+    echo "$(date -u --rfc-3339=seconds) - Matched .diskEncryptionKey.kmsKeyName '${kmsKeyName}' for '${disk_name}'."
+  fi
+done
 
-if [[ "${COMPUTE_DISK_ENCRYPTION}" == "yes" ]]; then
-  echo "$(date -u --rfc-3339=seconds) - Checking OS disk custom encryption of compute nodes..."
-  readarray -t compute_disks < <(gcloud compute disks list --filter="${CLUSTER_NAME}" --format="table(name,zone)" | grep worker)
-  for line in "${compute_disks[@]}"; do
-    disk_name="${line%% *}"
-    disk_zone="${line##* }"
-    gcloud compute disks describe "${disk_name}" --zone "${disk_zone}" --format json > disk.json
-    kmsKeyName=$(jq -r .diskEncryptionKey.kmsKeyName disk.json)
-    kmsKeyServiceAccount=$(jq -r .diskEncryptionKey.kmsKeyServiceAccount disk.json)
-    if [[ "${kmsKeyName}" != "${expected_kmsKeyName}" ]]; then
-      echo "$(date -u --rfc-3339=seconds) - Unexpected .diskEncryptionKey.kmsKeyName '${kmsKeyName}' for '${disk_name}'."
-      ret=1
-    else
+echo "$(date -u --rfc-3339=seconds) - Checking OS disk custom encryption of compute nodes..."
+readarray -t compute_disks < <(gcloud compute disks list --filter="${CLUSTER_NAME}" --format="table(name,zone)" | grep worker)
+for line in "${compute_disks[@]}"; do
+  disk_name="${line%% *}"
+  disk_zone="${line##* }"
+  gcloud compute disks describe "${disk_name}" --zone "${disk_zone}" --format json > disk.json
+  kmsKeyName=$(jq -r .diskEncryptionKey.kmsKeyName disk.json)
+  kmsKeyServiceAccount=$(jq -r .diskEncryptionKey.kmsKeyServiceAccount disk.json)
+  if [[ "${kmsKeyName}" != "${expected_kmsKeyName}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Unexpected .diskEncryptionKey.kmsKeyName '${kmsKeyName}' for '${disk_name}'."
+    ret=1
+  else
       echo "$(date -u --rfc-3339=seconds) - Matched .diskEncryptionKey.kmsKeyName '${kmsKeyName}' for '${disk_name}'."
-    fi
-    if [[ "${kmsKeyServiceAccount}" != "${expected_kmsKeyServiceAccount}" ]]; then
-      echo "$(date -u --rfc-3339=seconds) - Unexpected .diskEncryptionKey.kmsKeyServiceAccount '${kmsKeyServiceAccount}' for '${disk_name}'."
-      ret=1
-    else
-      echo "$(date -u --rfc-3339=seconds) - Matched .diskEncryptionKey.kmsKeyServiceAccount '${kmsKeyServiceAccount}' for '${disk_name}'."
-    fi
-  done
-fi
+  fi
+  if [[ "${kmsKeyServiceAccount}" != "${expected_kmsKeyServiceAccount}" ]]; then
+    echo "$(date -u --rfc-3339=seconds) - Unexpected .diskEncryptionKey.kmsKeyServiceAccount '${kmsKeyServiceAccount}' for '${disk_name}'."
+    ret=1
+  else
+    echo "$(date -u --rfc-3339=seconds) - Matched .diskEncryptionKey.kmsKeyServiceAccount '${kmsKeyServiceAccount}' for '${disk_name}'."
+  fi
+done
 
 popd
 exit ${ret}
