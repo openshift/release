@@ -109,7 +109,7 @@ CONFIG = {
         'default': 40,
     },
     'fleet-manager-qe-quota-slice': {
-        'default': 3,
+        'ap-northeast-1': 3,
     },
     'gcp-qe-quota-slice': {
         'us-central1': 30,
