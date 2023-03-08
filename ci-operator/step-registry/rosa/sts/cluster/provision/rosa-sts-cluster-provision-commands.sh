@@ -21,6 +21,7 @@ ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
 HOSTED_CP=${HOSTED_CP:-false}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
 
@@ -180,7 +181,6 @@ ${HYPERSHIFT_SWITCH}
 
 mkdir -p "${SHARED_DIR}"
 CLUSTER_ID_FILE="${SHARED_DIR}/cluster-id"
-CLUSTER_NAME_FILE="${SHARED_DIR}/cluster-name"
 CLUSTER_INFO="${ARTIFACT_DIR}/cluster.txt"
 CLUSTER_INSTALL_LOG="${ARTIFACT_DIR}/.install.log"
 
@@ -207,7 +207,11 @@ rosa create cluster -y \
 CLUSTER_ID=$(cat "${CLUSTER_INFO}" | grep '^ID:' | tr -d '[:space:]' | cut -d ':' -f 2)
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${CLUSTER_ID_FILE}"
-echo "${CLUSTER_NAME}" > "${CLUSTER_NAME_FILE}"
+
+sleep 9600
+
+# Watch the install log
+rosa logs install -c ${CLUSTER_ID} --watch
 
 echo "Waiting for cluster ready..."
 start_time=$(date +"%s")
