@@ -10,8 +10,8 @@ TARGET_URL="http://mtr-mtr.$(cat ${SHARED_DIR}/cluster_url)"
 # Installing Cypress
 # This needs to happen in this script rather than the Dockerfile because
 # of some issues with permissions in the container caused by OpenShift
-echo "Installing Cypress"
-npx cypress install
+#echo "Installing Cypress"
+#npx cypress install
 
 # Execute Cypress
 echo "Executing Cypress tests..."
