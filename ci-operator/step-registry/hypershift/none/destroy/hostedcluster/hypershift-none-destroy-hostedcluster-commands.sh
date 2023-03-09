@@ -1,0 +1,1 @@
+# TO DO : Finish the destruction of HC. If this script is not needed, discard.
