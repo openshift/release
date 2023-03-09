@@ -182,7 +182,7 @@ do
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
-if [ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY}" == "true" ]; then
+if [ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-}" == "true" ]; then
 	echo "Cluster will be created with public subnets only"
 fi
 
