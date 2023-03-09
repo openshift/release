@@ -254,16 +254,20 @@ case "${TEST_TYPE}" in
 upgrade-conformance)
     upgrade
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
+    sleep infinity
     ;;
 upgrade)
     upgrade
+    sleep infinity
     ;;
 suite-conformance)
     suite
     TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite
+    sleep infinity
     ;;
 suite)
     suite
+    sleep infinity
     ;;
 *)
     echo >&2 "Unsupported test type '${TEST_TYPE}'"
