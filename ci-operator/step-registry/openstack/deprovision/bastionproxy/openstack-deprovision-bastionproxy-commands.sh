@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "$CONFIG_TYPE" != "proxy" ]]; then
+if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
     echo "Skipping step due to CONFIG_TYPE not being proxy."
     exit 0
 fi
@@ -36,13 +36,22 @@ if [[ -f ${SHARED_DIR}"/BASTION_FIP" ]]; then
   
   >&2 echo "Collecting squid logs from 'bastionproxy-$CLUSTER_NAME'"
   $SSH_CMD bash - <<EOF
-  mkdir -p /tmp/squid-logs
-  sudo cp /var/log/squid/access.log /tmp/squid-logs || true
-  sudo cp /var/log/squid/cache.log /tmp/squid-logs || true
-  sudo chown -R ${BASTION_USER}: /tmp/squid-logs || true
-  tar -czC "/tmp" -f "/tmp/squid-logs.tar.gz" squid-logs/
+  mkdir -p /tmp/bastion-logs
+  sudo cp /var/log/squid/access.log /tmp/bastion-logs/squid-access.log || true
+  sudo cp /var/log/squid/cache.log /tmp/bastion-logs/squid-cache.log || true
+  if [ -f /etc/haproxy/haproxy.cfg ]; then
+    sudo journalctl -u haproxy --no-pager > /tmp/bastion-logs/haproxy.log
+  fi
+  if [ -f /etc/systemd/system/vips.service ]; then
+    sudo journalctl -u vips --no-pager > /tmp/bastion-logs/vips.log
+  fi
+  ip a > /tmp/bastion-logs/ip-a.txt
+  ip r > /tmp/bastion-logs/ip-r.txt
+  sudo chown -R ${BASTION_USER}: /tmp/bastion-logs || true
+  tar -czC "/tmp" -f "/tmp/bastion-logs.tar.gz" bastion-logs/
 EOF
-  $SCP_CMD ${BASTION_USER}@${BASTION_FIP}:/tmp/squid-logs.tar.gz ${ARTIFACT_DIR}
+  $SCP_CMD ${BASTION_USER}@${BASTION_FIP}:/tmp/bastion-logs.tar.gz ${ARTIFACT_DIR}
+  echo "Bastion proxy logs collected in ${ARTIFACT_DIR}/bastion-logs.tar.gz"
 
   openstack floating ip delete ${BASTION_FIP} || >&2 echo "Failed to delete floating IP ${BASTION_FIP}"
 fi

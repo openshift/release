@@ -1,12 +1,16 @@
 base_images:
   base:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.14
 binary_build_commands: make build BUILD_TAGS=clusterapi
 build_root:
   from_repository: true
@@ -18,6 +22,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: cluster-autoscaler
 - context_dir: vertical-pod-autoscaler
   dockerfile_path: Dockerfile.rhel
@@ -28,7 +35,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: vertical-pod-autoscaler
 promotion:
-  name: 4.13-priv
+  name: 4.14-priv
   namespace: ocp-private
 releases:
   hosted-ocp-previous:
@@ -39,12 +46,12 @@ releases:
       version: "4.12"
   initial:
     integration:
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
 resources:
   '*':
@@ -138,7 +145,6 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-hypershift
-  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     workflow: hypershift-aws-e2e-external

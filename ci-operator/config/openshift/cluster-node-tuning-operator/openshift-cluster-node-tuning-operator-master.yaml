@@ -1,15 +1,29 @@
 base_images:
   base:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: base
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
 build_root:
   from_repository: true
 images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: cluster-node-tuning-operator-us-tuned
 - dockerfile_path: Dockerfile.rhel8
   from: base
   inputs:
@@ -18,17 +32,19 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: cluster-node-tuning-operator
 promotion:
-  name: "4.13"
+  excluded_images:
+  - cluster-node-tuning-operator-us-tuned
+  name: "4.14"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -106,8 +122,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-      timeout: 5h0m0s
+      timeout: 4h0m0s
     workflow: ipi-gcp
+  timeout: 5h0m0s
 - as: e2e-upgrade
   steps:
     cluster_profile: aws

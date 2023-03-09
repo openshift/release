@@ -1,0 +1,39 @@
+base_images:
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+binary_build_commands: make linux-amd64
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: provider-certification-tool-vsphere-upi-platform-external
+  cron: 0 0 * * 2
+  steps:
+    cluster_profile: vsphere
+    workflow: provider-certification-tool-vsphere-upi-platform-external
+zz_generated_metadata:
+  branch: main
+  org: redhat-openshift-ecosystem
+  repo: provider-certification-tool
+  variant: "4.13"

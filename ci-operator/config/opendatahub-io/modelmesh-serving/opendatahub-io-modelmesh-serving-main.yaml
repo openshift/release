@@ -1,12 +1,20 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  project_image:
+    dockerfile_path: Dockerfile.develop
 images:
-- context_dir: tests/
+- build_args:
+  - name: COMMIT_SHA
+    value: ci-sha
+  - name: IMAGE_VERSION
+    value: ci-test-img
+  context_dir: .
   dockerfile_path: Dockerfile
-  to: modelmesh-serving-tests
+  from: src
+  inputs:
+    root:
+      as:
+      - ${DEV_IMAGE}
+  to: modelmesh-serving
 promotion:
   namespace: opendatahub-io
   tag: latest
@@ -15,7 +23,7 @@ releases:
     release:
       architecture: amd64
       channel: stable
-      version: "4.10"
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -24,20 +32,42 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: modelmesh-serving-e2e
+- as: modelmesh-serving-unit
+  commands: |
+    export HOME=/go
+    make test
+  container:
+    from: src
+  run_if_changed: ^(controllers/.*)
+- as: modelmesh-serving-fvt
   steps:
     cluster_profile: gcp
     env:
       COMPUTE_NODE_TYPE: n2-standard-8
     test:
-    - as: e2e
-      commands: $HOME/peak/installandtest.sh
-      from: modelmesh-serving-tests
+    - as: fvt
+      commands: |
+        export HOME=/go
+        export NAMESPACE=modelmesh-serving
+        export MODELMESH_SERVING_IMAGE=${PR_MODELMESH_SERVING_IMAGE}
+        cat  ./config/internal/base/deployment.yaml.tmpl
+        make e2e-test
+      dependencies:
+      - env: PR_MODELMESH_SERVING_IMAGE
+        name: modelmesh-serving
+      from: src
       resources:
         requests:
           cpu: 2000m
           memory: 3Gi
     workflow: ipi-gcp
+- as: modelmesh-serving-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: modelmesh-serving
+    env:
+      IMAGE_REPO: modelmesh-controller
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: main
   org: opendatahub-io

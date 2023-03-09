@@ -30,6 +30,7 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 # GPC instance config script
 export LD_PRELOAD=/usr/lib64/libnss_wrapper.so
+
 cat <<EOF > "${PAYLOAD_PATH}"/usr/bin/pre_rpm_install.sh
 #! /bin/bash
 set -xeuo pipefail
@@ -41,29 +42,14 @@ subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
 
-tee /etc/yum.repos.d/rhocp-4.12-el8-beta-$(uname -i)-rpms.repo >/dev/null <<EOF2
-[rhocp-4.12-el8-beta-$(uname -i)-rpms]
-name=Beta rhocp-4.12 RPMs for RHEL8
-baseurl=https://mirror.openshift.com/pub/openshift-v4/\\\$basearch/dependencies/rpms/4.12-el8-beta/
-enabled=1
-gpgcheck=0
-skip_if_unavailable=1
-EOF2
+sed -i '2i set -x' /usr/bin/configure-vm.sh
 
-subscription-manager repos \
-  --enable "fast-datapath-for-rhel-8-$(uname -i)-rpms"
-#  --enable "rhocp-4.12-for-rhel-8-$(uname -i)-rpms" \
+sudo useradd -m -G wheel microshift
+sudo echo -e 'microshift\tALL=(ALL)\tNOPASSWD: ALL' > /etc/sudoers.d/microshift
+cd /home/microshift && sudo -nu microshift configure-vm.sh --no-build /etc/crio/openshift-pull-secret
 
 dnf install jq firewalld -y
-dnf install -y /packages/*.rpm
-systemctl enable --now crio.service firewalld
-
-firewall-cmd --zone=trusted --add-source=10.42.0.0/16 --permanent
-firewall-cmd --zone=public --add-port=80/tcp --permanent
-firewall-cmd --zone=public --add-port=443/tcp --permanent
-firewall-cmd --zone=public --add-port=5353/udp --permanent
-firewall-cmd --zone=public --add-port=6443/tcp --permanent
-firewall-cmd --reload
+dnf localinstall -y /packages/*.rpm
 EOF
 chmod +x usr/bin/pre_rpm_install.sh
 

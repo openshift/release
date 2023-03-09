@@ -79,6 +79,7 @@ done
 
 annotate "origin" "release" "okd-4.y-stable.json"
 annotate "origin" "release-scos" "okd-scos-4.y-stable.json"
+annotate "origin" "release-scos-next" "okd-scos-4.y-next.json"
 annotate "ocp" "release" "ocp-4.y-stable.json"
 annotate "ocp-s390x" "release-s390x" "ocp-4.y-stable-s390x.json"
 annotate "ocp-ppc64le" "release-ppc64le" "ocp-4.y-stable-ppc64le.json"

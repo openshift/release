@@ -69,17 +69,7 @@ ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
 
 vm_template="${ova_url##*/}"
 
-
-# select a hardware version for testing
-hw_versions=(15 17 18 19)
-hw_available_versions=${#hw_versions[@]}
-selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
-target_hw_version=${hw_versions[$selected_hw_version_index]}
-echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
-vm_template=${vm_template}-hw${target_hw_version}
-
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
-echo "export target_hw_version=${target_hw_version}" >> ${SHARED_DIR}/vsphere_context.sh
 # shellcheck source=/dev/null
 declare vsphere_datacenter
 declare vsphere_datastore
@@ -91,6 +81,19 @@ source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+# select a hardware version for testing
+vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
+hw_versions=(15 17 18 19)
+if [[ ${vsphere_version} -eq 8 ]]; then
+    hw_versions=(20)
+fi
+hw_available_versions=${#hw_versions[@]}
+selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
+target_hw_version=${hw_versions[$selected_hw_version_index]}
+echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_version}"
+vm_template=${vm_template}-hw${target_hw_version}
+
+echo "export target_hw_version=${target_hw_version}" >> ${SHARED_DIR}/vsphere_context.sh
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 
 # If platform none is present in the install-config, extension is skipped.

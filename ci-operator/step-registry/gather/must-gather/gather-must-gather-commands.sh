@@ -176,9 +176,11 @@ fi
 
 createInstallJunit
 
+MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
+
 echo "Running must-gather..."
 mkdir -p ${ARTIFACT_DIR}/must-gather
-oc --insecure-skip-tls-verify adm must-gather $MUST_GATHER_IMAGE --dest-dir ${ARTIFACT_DIR}/must-gather > ${ARTIFACT_DIR}/must-gather/must-gather.log
+oc --insecure-skip-tls-verify adm must-gather $MUST_GATHER_IMAGE --timeout=$MUST_GATHER_TIMEOUT --dest-dir ${ARTIFACT_DIR}/must-gather > ${ARTIFACT_DIR}/must-gather/must-gather.log
 [ -f "${ARTIFACT_DIR}/must-gather/event-filter.html" ] && cp "${ARTIFACT_DIR}/must-gather/event-filter.html" "${ARTIFACT_DIR}/event-filter.html"
 installCamgi
 /tmp/camgi "${ARTIFACT_DIR}/must-gather" > "${ARTIFACT_DIR}/must-gather/camgi.html"

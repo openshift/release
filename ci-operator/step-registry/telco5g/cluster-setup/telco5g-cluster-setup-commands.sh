@@ -17,7 +17,7 @@ HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 # Cluster to use for cnf-tests, and to exclude from selection in other jobs
-PREPARED_CLUSTER="cnfdc5"
+PREPARED_CLUSTER="cnfdu1"
 
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
@@ -25,6 +25,11 @@ echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
+# Run cnftests job on Upstream cluster
+if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
+    INTERNAL=false
+    INTERNAL_ONLY=false
+fi
 # Whether to use the bastion environment
 BASTION_ENV=true
 # Environment - US lab, DS lab or any

@@ -37,8 +37,8 @@ spec:
     spec:
       metadata:
         labels:
-          location: local-zone
-          zone_group: ${localzone_az_name::-1}
+          machine.openshift.io/zone-type: local-zone
+          machine.openshift.io/zone-group: ${localzone_az_name::-1}
           node-role.kubernetes.io/edge: ""
       providerSpec:
         value:

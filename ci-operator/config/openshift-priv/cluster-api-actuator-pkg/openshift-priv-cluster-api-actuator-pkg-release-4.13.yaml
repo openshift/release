@@ -9,7 +9,6 @@ canonical_go_repository: github.com/openshift/cluster-api-actuator-pkg
 promotion:
   additional_images:
     cluster-api-actuator-pkg: src
-  disabled: true
   name: 4.13-priv
   namespace: ocp-private
 releases:
@@ -104,6 +103,20 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-aws-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.13
   org: openshift-priv

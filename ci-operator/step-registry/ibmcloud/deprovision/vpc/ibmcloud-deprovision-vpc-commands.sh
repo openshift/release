@@ -105,8 +105,16 @@ echo "Using region: ${region}  resource_group: ${resource_group} vpc: ${vpc_name
 
 "${IBMCLOUD_CLI}" target -g ${resource_group} -r ${region}
 
-echo "DEBUG" "Removing the vpc ${vpc_name}"
+echo "DEBUG" "Removing the vpc ${vpc_name} ..."
 delete_vpc "${vpc_name}"
 
+echo "DEBUG" "Removing the resource reclamations ..."
+if [[ $("${IBMCLOUD_CLI}" resource reclamations -q) == "No reclamation found" ]]; then
+  echo "No reclamation found"
+else
+  ${IBMCLOUD_CLI} resource reclamations -q |  awk '(NR>1) {print $1}' | xargs -n1 ibmcloud resource reclamation-delete -f
+fi
+
+echo "DEBUG" "Removing the resource group ${resource_group}"
 delCmd="${IBMCLOUD_CLI} resource group-delete -f ${resource_group}"
 run_command_with_retries "${delCmd}" 20 20

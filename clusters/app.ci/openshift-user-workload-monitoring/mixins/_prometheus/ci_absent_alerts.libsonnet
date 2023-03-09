@@ -5,7 +5,7 @@
         name: 'ci-absent',
         rules: [
           {
-            alert: '%sDown' % name,
+            alert: '%s-Down' % name,
             expr: |||
               absent(up{job="%s"} == 1)
             ||| % name,
@@ -17,14 +17,10 @@
               message: 'The service %s has been down for 5 minutes.' % name,
             },
           }
-          for name in ['deck', 'deck-internal', 'qe-private-deck', 'hook-apps', 'jenkins-operator', 'kata-jenkins-operator', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", "crier", "pod-scaler-producer", "pod-scaler-ui", 'retester', 'pj-rehearse-plugin']
-        ],
-      },
-      {
-        name: 'ci-absent-ghproxy',
-        rules: [
+          for name in ['deck', 'deck-internal', 'qe-private-deck', 'hook-apps', "pod-scaler-ui", 'pj-rehearse-plugin']
+        ]+[
           {
-            alert: '%sDown' % name,
+            alert: '%s-Singleton-Down' % name,
             expr: |||
               absent(up{job="%s"} == 1)
             ||| % name,
@@ -36,7 +32,7 @@
               message: 'The service %s has been down for 10 minutes.' % name,
             },
           }
-          for name in ['ghproxy']
+          for name in ["crier", 'ghproxy', 'jenkins-operator', 'kata-jenkins-operator', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", "pod-scaler-producer", 'retester']
         ],
       },
     ],

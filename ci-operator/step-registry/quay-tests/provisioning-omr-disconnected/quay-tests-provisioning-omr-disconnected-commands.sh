@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
 #Check podman and skopeo version
 podman -v
 skopeo -v
@@ -27,7 +26,7 @@ echo "PublicSubnet: $PublicSubnet"
 REGION="${LEASED_RESOURCE}"
 ####################
 
-cat >> omr-ami-images.json << EOF
+cat >>omr-ami-images.json <<EOF
 {
   "images": {
     "aws": {
@@ -54,11 +53,11 @@ cat >> omr-ami-images.json << EOF
 }
 EOF
 
-ami_id=$(jq -r .images.aws.regions[\"${REGION}\"].image < omr-ami-images.json)
+ami_id=$(jq -r .images.aws.regions[\"${REGION}\"].image <omr-ami-images.json)
 
 mkdir -p terraform_omr && cd terraform_omr
 
-cat >> variables.tf << EOF
+cat >>variables.tf <<EOF
 variable "quay_build_worker_key" {
 }
 variable "quay_build_worker_security_group" {
@@ -67,7 +66,7 @@ variable "quay_build_instance_name" {
 }
 EOF
 
-cat >> create_aws_ec2.tf << EOF
+cat >>create_aws_ec2.tf <<EOF
 provider "aws" {
   region = "${REGION}"
   access_key = "${OMR_AWS_ACCESS_KEY}"
@@ -112,7 +111,7 @@ resource "aws_instance" "quaybuilder" {
       "sudo yum install podman openssl -y",
       "curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz",
       "tar -xzvf mirror-registry.tar.gz",
-      "sudo ./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
+      "./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
     ]
   }
   connection {
@@ -131,7 +130,7 @@ output "instance_public_dns" {
 EOF
 
 cp /var/run/quay-qe-omr-secret/quaybuilder . && cp /var/run/quay-qe-omr-secret/quaybuilder.pub .
-chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >> quaybuilder
+chmod 600 ./quaybuilder && chmod 600 ./quaybuilder.pub && echo "" >>quaybuilder
 
 export TF_VAR_quay_build_instance_name="${OMR_CI_NAME}"
 export TF_VAR_quay_build_worker_key="${OMR_CI_NAME}"
@@ -147,11 +146,11 @@ cp terraform.tgz ${SHARED_DIR}
 OMR_HOST_NAME=$(terraform output instance_public_dns | tr -d '"')
 echo "OMR HOST NAME is $OMR_HOST_NAME"
 
-echo "${OMR_HOST_NAME}" > ${SHARED_DIR}/OMR_HOST_NAME
-echo "${OMR_CI_NAME}" > ${SHARED_DIR}/OMR_CI_NAME
+echo "${OMR_HOST_NAME}" >${SHARED_DIR}/OMR_HOST_NAME
+echo "${OMR_CI_NAME}" >${SHARED_DIR}/OMR_CI_NAME
 
 #Share the CA Cert of Quay OMR
-scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/ssh_known_hosts -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@"${OMR_HOST_NAME}":/etc/quay-install/quay-rootCA/rootCA.pem ${SHARED_DIR} || true
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/tmp/ssh_known_hosts -o VerifyHostKeyDNS=no -o ConnectionAttempts=3 -i quaybuilder ec2-user@"${OMR_HOST_NAME}":/home/ec2-user/quay-install/quay-rootCA/rootCA.pem ${SHARED_DIR} || true
 
 #Test OMR by push image
 skopeo copy docker://docker.io/fedora@sha256:895cdfba5eb6a009a26576cb2a8bc199823ca7158519e36e4d9effcc8b951b47 docker://"${OMR_HOST_NAME}":8443/quaytest/test:latest --dest-tls-verify=false --dest-creds quay:password || true

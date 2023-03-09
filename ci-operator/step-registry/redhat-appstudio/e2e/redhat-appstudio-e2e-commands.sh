@@ -7,10 +7,11 @@ set -o pipefail
 export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
-export GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD
+export GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING
 
-GITHUB_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-user)
-GITHUB_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
+GITHUB_USER=""
+GITHUB_TOKEN=""
 QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
 QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-user)
 QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token)
@@ -18,9 +19,30 @@ QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/
 QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
+PREVIOUS_RATE_REMAINING=0
+
+# user stored: username:token,username:token
+IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github_accounts)"
+for account in "${GITHUB_ACCOUNTS_ARRAY[@]}"
+do :
+    IFS=':' read -r -a GITHUB_USERNAME_ARRAY <<< "$account"
+
+    GH_RATE_REMAINING=$(curl -s \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${GITHUB_USERNAME_ARRAY[1]}"\
+    https://api.github.com/rate_limit | jq ".rate.remaining")
+
+    echo -e "[INFO ] user: ${GITHUB_USERNAME_ARRAY[0]} with rate limit remaining $GH_RATE_REMAINING"
+    if [[ "${GH_RATE_REMAINING}" -ge "${PREVIOUS_RATE_REMAINING}" ]];then
+        GITHUB_USER="${GITHUB_USERNAME_ARRAY[0]}"
+        GITHUB_TOKEN="${GITHUB_USERNAME_ARRAY[1]}"
+    fi
+    PREVIOUS_RATE_REMAINING="${GH_RATE_REMAINING}"
+done
+
+echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
 
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
-
 if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
     OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
 elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then

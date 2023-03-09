@@ -25,8 +25,15 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
+TECH_PREVIEW_NO_UPGRADE=""
+if [[ "$JOB_NAME" == *"4.12-e2e-vsphere-zones"* ]]; then
+  echo "$(date -u --rfc-3339=seconds) - setting tech preview feature gate for 4.12 zonal install"
+  TECH_PREVIEW_NO_UPGRADE="featureSet: TechPreviewNoUpgrade"
+fi
+
 cat >> "${CONFIG}" << EOF
 baseDomain: $base_domain
+${TECH_PREVIEW_NO_UPGRADE}
 controlPlane:
   name: "master"
   replicas: 3

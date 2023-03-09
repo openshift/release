@@ -2,36 +2,10 @@ workflow:
   as: stackrox-automation-flavors-powervs-e2e
   steps:
     pre:
-    - as: powervs-create
-      commands: stackrox-automation-flavors-powervs-e2e-commands.sh create
-      credentials:
-      - mount_path: /tmp/vault/powervs-rhr-creds
-        name: powervs-rhr-creds
-        namespace: test-credentials
-      from_image:
-        namespace: origin
-        name: centos
-        tag: '8'
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
+    - ref: stackrox-automation-flavors-powervs-e2e-cluster-create
     test:
     - ref: stackrox-e2e
     post:
-    - as: powervs-destroy
-      commands: stackrox-automation-flavors-powervs-e2e-commands.sh destroy
-      credentials:
-      - mount_path: /tmp/vault/powervs-rhr-creds
-        name: powervs-rhr-creds
-        namespace: test-credentials
-      from_image:
-        namespace: origin
-        name: centos
-        tag: '8'
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 4000Mi
+    - ref: stackrox-automation-flavors-powervs-e2e-cluster-destroy
   documentation: |-
     A stackrox workflow to execute e2e QA tests in a PowerVS OCP cluster.

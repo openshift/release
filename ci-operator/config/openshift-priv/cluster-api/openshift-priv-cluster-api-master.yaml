@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
@@ -20,17 +20,23 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: cluster-capi-controllers
 promotion:
-  name: 4.13-priv
+  name: 4.14-priv
   namespace: ocp-private
 releases:
+  hosted-ocp-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.13"
   initial:
     integration:
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
 resources:
   '*':
@@ -55,6 +61,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-serial
+- as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: master
   org: openshift-priv

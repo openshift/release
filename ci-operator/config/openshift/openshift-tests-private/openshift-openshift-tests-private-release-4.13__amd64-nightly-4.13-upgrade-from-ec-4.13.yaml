@@ -60,6 +60,28 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: alibaba-ipi-fips-p2-f14
+  cron: 29 0 6,22 * *
+  steps:
+    cluster_profile: alibabacloud-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @alibaba-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @alibaba-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-alibabacloud-ipi-fips
+- as: alibaba-ipi-private-p2-f14
+  cron: 42 1 11,27 * *
+  steps:
+    cluster_profile: alibabacloud-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @alibaba-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @alibaba-ipi and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
 - as: aws-ipi-byo-iam-role-p2-f14
   cron: 24 18 3,19 * *
   steps:
@@ -96,7 +118,7 @@ tests:
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-with-ep-sts-ec2-elb
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
 - as: aws-ipi-disconnected-cco-manual-sts-p2-f14
   cron: 59 23 13,29 * *
   steps:

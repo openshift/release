@@ -51,7 +51,8 @@ fi
 v411="baremetal marketplace openshift-samples"
 # shellcheck disable=SC2034
 v412=" ${v411} Console Insights Storage CSISnapshot"
-latest_defined="v412"
+v413=" ${v412} NodeTuning"
+latest_defined="v413"
 always_default="${!latest_defined}"
 
 # Determine vCurrent
@@ -79,6 +80,9 @@ case ${BASELINE_CAPABILITY_SET} in
   ;;
 "v4.12")
   enabled_operators="${v412}"
+  ;;
+"v4.13")
+  enabled_operators="${v413}"
   ;;
 "vCurrent")
   enabled_operators="${vCurrent}"

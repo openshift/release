@@ -43,4 +43,7 @@ echo "Releasing lock $LOCK_FD ($LOCK)"
 flock -u $LOCK_FD
 # TODO normalize and sanitize paths
 rm -rf /{var/builds,opt/html,opt/tftpboot,opt/nfs}/${CLUSTER_NAME}
+# Delete agent-installer images, if any
+rm -f /opt/html/${CLUSTER_NAME}.*.iso
+
 EOF

@@ -42,7 +42,7 @@ timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
     tar -xzvf assisted.tar.gz -C "\${REPO_DIR}"
     chown -R root:root "\${REPO_DIR}"
 
-    docker buildx create --name mybuilder --platform linux/amd64,linux/arm64
+    docker buildx create --name mybuilder --platform linux/amd64,linux/arm64,linux/ppc64le
     docker buildx inspect mybuilder --bootstrap
     docker buildx use mybuilder
     docker run --rm --privileged multiarch/qemu-user-static --reset -p yes

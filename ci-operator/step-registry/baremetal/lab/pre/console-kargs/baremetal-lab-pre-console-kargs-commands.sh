@@ -60,6 +60,17 @@ systemd:
         --delete-karg console=ttyS0,115200n8 $(join_by_semicolon "${console_kargs}" "--append-karg console=" "") \
         --ignition-url ${base_url%%*(/)}/${role}.ign \
         --insecure-ignition --copy-network
+      # Some servers' firmware push any new detected boot options to the tail of the boot order.
+      # When other boot options are present and bootable, such a server will boot from them instead of the new one.
+      # As a (temporary?) workaround, we manually add the boot option.
+      # NOTE: it's assumed that old OSes boot options are removed from the boot options list during the wipe operations.
+      # xrefs: https://bugzilla.redhat.com/show_bug.cgi?id=1997805
+      #        https://github.com/coreos/fedora-coreos-tracker/issues/946
+      #        https://github.com/coreos/fedora-coreos-tracker/issues/947
+      ExecStart=/usr/bin/bash -c ' \
+        ARCH=\$(uname -m | sed "s/x86_64/x64/;s/aarch64/aa64/"); \
+        /usr/sbin/efibootmgr -c -d "$root_device" -p 2 -c -L "Red Hat CoreOS" -l "\\\\EFI\\\\redhat\\\\shim\$ARCH.efi" \
+      '
       ExecStart=/usr/bin/systemctl --no-block reboot
       StandardOutput=kmsg+console
       StandardError=kmsg+console

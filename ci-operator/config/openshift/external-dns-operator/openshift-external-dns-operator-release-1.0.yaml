@@ -1,0 +1,138 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.9
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  to: external-dns-operator
+operator:
+  bundles:
+  - as: external-dns-operator-bundle
+    base_index: operator-index
+    dockerfile_path: Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/openshift/origin-external-dns-operator:latest
+    with: pipeline:external-dns-operator
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify
+  commands: |
+    export GOLANGCI_LINT_CACHE=$(mktemp -d)
+    make verify
+  container:
+    from: src
+- as: unit
+  commands: |
+    export XDG_CACHE_HOME=$(mktemp -d)
+    make test
+  container:
+    from: src
+- as: e2e-aws-ovn-operator
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-external-dns-operator-bundle
+    env:
+      OO_CHANNEL: stable-v1.0
+      OO_INSTALL_NAMESPACE: external-dns-operator
+      OO_PACKAGE: external-dns-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-aws
+- as: e2e-gcp-ovn-operator
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index-external-dns-operator-bundle
+    env:
+      OO_CHANNEL: stable-v1.0
+      OO_INSTALL_NAMESPACE: external-dns-operator
+      OO_PACKAGE: external-dns-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-gcp
+- as: e2e-azure-ovn-operator
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-external-dns-operator-bundle
+    env:
+      OO_CHANNEL: stable-v1.0
+      OO_INSTALL_NAMESPACE: external-dns-operator
+      OO_PACKAGE: external-dns-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-azure
+- as: e2e-azure-ovn-infoblox-operator
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index-external-dns-operator-bundle
+    env:
+      OO_CHANNEL: stable-v1.0
+      OO_INSTALL_NAMESPACE: external-dns-operator
+      OO_PACKAGE: external-dns-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export DNS_PROVIDER=INFOBLOX
+        export INFOBLOX_CONFIG_DIR=/var/run/infoblox-credentials
+        make test-e2e
+      credentials:
+      - mount_path: /var/run/infoblox-credentials
+        name: infoblox-credentials
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-azure
+zz_generated_metadata:
+  branch: release-1.0
+  org: openshift
+  repo: external-dns-operator

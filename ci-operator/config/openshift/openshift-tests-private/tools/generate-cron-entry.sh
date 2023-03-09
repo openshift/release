@@ -4,11 +4,11 @@ DEBUG='false'
 
 function display_usage() {
 	echo "This script generates a cron entry, based on provided test_name and yaml_file_name."
-	echo "Usage: $0 test_name yaml_file_name"
+	echo "Usage: $0 <test_name> <yaml_file_name> [--force]"
 	echo "  e.g, $0 aws-c2s-ipi-disconnected-private-p2-f7 openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml"
 }
 
-if [[ $# -ne 2 ]] ; then
+if [[ $# -lt 2 ]] ; then
 	display_usage
 	exit 1
 fi
@@ -20,6 +20,14 @@ fi
 
 TEST_NAME="$1"    # aws-c2s-ipi-disconnected-private-p2-f7
 YAML_FILE="$2"    # openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml
+
+if [[ "${TEST_NAME}" == *baremetal-* ]] && [[ "$@" != *\ --force* ]]; then
+    echo "The test config ${TEST_NAME} should not get changes in the cron entry as
+      the schedule rotation scheme is different than the other tests.
+      Use --force to skip this check."
+    exit 0
+fi
+
 if [[ $DEBUG = "true" ]] ; then
 	echo "TEST_NAME: $TEST_NAME"
 	echo "YAML_FILE: $YAML_FILE"
@@ -69,13 +77,14 @@ case "$FN" in
 		DAY_OF_MONTH_FINAL=$(echo $DAY_OF_MONTH_TMP | sed 's/,/\n/g' | sort -n | paste -s -d ',' -)
 		echo "$MINUTE $HOUR $DAY_OF_MONTH_FINAL * *"
 		;;
-	32|33|34|35|36|37|38|39|40|41|42|43|44|45|46|47|48|49|50|51|52|53|54|55|56|57|58|59|60)
-		let MONTH_FINAL=$MONTH%2
-		if [[ $MONTH_FINAL -eq 1 ]] ; then
-			echo "$MINUTE $HOUR $DAY_OF_MONTH 1,3,5,7,9,11 *"
-		else
-			echo "$MINUTE $HOUR $DAY_OF_MONTH 2,4,6,8,10,12 *"
-		fi
+	60|90|120|180|360)
+		let MONTH_TMP=MONTH
+		for ((i=1 ; i<365/FN; ++i)) ; do
+			let TMP=(i*FN/30+MONTH-1)%12+1
+			MONTH_TMP+=",$TMP"
+		done
+		MONTH_FINAL=$(echo $MONTH_TMP | sed 's/,/\n/g' | sort -n | paste -s -d ',' -)
+		echo "$MINUTE $HOUR $DAY_OF_MONTH $MONTH_FINAL *"
 		;;
 	*)
 		echo "to be implemented"

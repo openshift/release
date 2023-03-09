@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: base
 build_root:
@@ -9,17 +9,17 @@ canonical_go_repository: github.com/openshift/cluster-api-actuator-pkg
 promotion:
   additional_images:
     cluster-api-actuator-pkg: src
-  name: 4.13-priv
+  name: 4.14-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
 resources:
   '*':
@@ -103,6 +103,20 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-openstack-ipi
+- always_run: false
+  as: e2e-aws-periodic-pre
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e-periodic
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift-priv

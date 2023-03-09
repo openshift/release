@@ -1,0 +1,36 @@
+chain:
+  as: cucushift-installer-rehearse-azure-stack-ipi-proxy-provision
+  steps:
+  - chain: ipi-conf-azurestack
+  - ref: azure-provision-resourcegroup
+  - ref: azure-provision-vnet
+  - chain: azure-provision-bastionhost
+  - ref: ipi-conf-proxy
+  - ref: ipi-conf-azurestack-creds
+  - ref: ipi-conf-osimage-azure
+  - ref: ipi-conf-additional-ca-azurestack
+  - ref: ipi-conf-azure-provisionednetwork
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  env:
+  - name: RESTRICTED_NETWORK
+    default:  "yes"
+  - name: AZURESTACK_ENDPOINT
+    default: 'https://management.mtcazs.wwtatc.com'
+    documentation: |-
+      The Azure Stack Hub Endpoint to connect to.
+  - name: SUFFIX_ENDPOINT
+    default: "mtcazs.wwtatc.com"
+    documentation: |-
+      The endpoint suffix for storage accounts.
+  - name: CLUSTER_OS_IMAGE
+    default: "https://vhdsa.blob.mtcazs.wwtatc.com/vhd/rhcos-410.84.202112040202-0-azurestack.x86_64.vhd"
+    documentation: |-
+      on-prem platform, override the default OS image provided in rhcos.json for cluster nodes
+      Azure stack hub platform, the url of a storage blob in the Azure Stack environment containing an RHCOS VHD
+  - name: BASTION_VHD_URI
+    default: "https://vhdsa.blob.mtcazs.wwtatc.com/vhd/rhcos-410.84.202112040202-0-azurestack.x86_64.vhd"
+    documentation: |-
+      BYO azure VHD for bastion host. The default rhcos image value is gotten from 4.12.0-rc.8 installer.
+  documentation: |-
+    Create an IPI cluster behind proxy on Azure Stack Hub for QE e2e tests.

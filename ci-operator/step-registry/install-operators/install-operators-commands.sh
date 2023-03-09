@@ -1,0 +1,132 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+# Read each operator in the JSON provided to an item in a BASH array.
+readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
+
+# Iterate through each operator.
+for operator_obj in "${OPERATOR_ARRAY[@]}"; do
+    # Set variables for this operator.
+    operator_name=$(jq --raw-output '.name' <<< "$operator_obj")
+    operator_source=$(jq --raw-output '.source' <<< "$operator_obj")
+    operator_channel=$(jq --raw-output '.channel' <<< "$operator_obj")
+    operator_group=$(jq --raw-output '.operator_group' <<< "$operator_obj")
+    operator_install_namespace=$(jq --raw-output '.install_namespace' <<< "$operator_obj")
+    operator_target_namespaces=$(jq --raw-output '.target_namespaces' <<< "$operator_obj")
+
+    # If operator_group not defined, use default value.
+    if [[ -z "${operator_group}" ]]; then
+        operator_group="${operator_install_namespace}-operator-group"
+    fi
+
+    # If install_namespace not defined, exit.
+    if [[ -z "${operator_install_namespace}" ]]; then
+        echo "ERROR: install_namespace is not defined"
+        exit 1
+    fi
+
+    # If name not defined, exit.
+    if [[ -z "${operator_name}" ]]; then
+        echo "ERROR: name is not defined"
+        exit 1
+    fi
+
+    # If channel is not defined, exit.
+    if [[ -z "${operator_channel}" ]]; then
+        echo "ERROR: channel is not defined"
+        exit 1
+    fi
+
+    # If the channel is "!default", find the default channel of the operator
+    if [[ "${operator_channel}" == "!default" ]]; then
+        operator_channel=$(oc get packagemanifest "${operator_name}" -o jsonpath='{.status.defaultChannel}')
+        if [[ -z "${operator_channel}" ]]; then
+            echo "ERROR: Default channel not found."
+            exit 1
+        else
+            echo "INFO: Default channel is ${operator_channel}"
+        fi
+    fi
+
+    # If "!install" in target_namespaces, use the install namespace
+    if [[ "${operator_target_namespaces}" == "!install" ]]; then
+        operator_target_namespaces="${operator_install_namespace}"
+    fi
+    
+    echo "Installing ${operator_name} from ${operator_source} channel ${operator_channel} into ${operator_install_namespace}, targeting ${operator_target_namespaces}"
+
+    # Create the install namespace
+    oc apply -f - <<EOF
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+        name: "${operator_install_namespace}"
+EOF
+
+    # Deploy new operator group
+    oc apply -f - <<EOF
+    apiVersion: operators.coreos.com/v1
+    kind: OperatorGroup
+    metadata:
+        name: "${operator_group}"
+        namespace: "${operator_install_namespace}"
+    spec:
+        targetNamespaces:
+        - $(echo \"${operator_target_namespaces}\" | sed "s|,|\"\n  - \"|g")
+EOF
+
+    # Subscribe to the operator
+    cat <<EOF | oc apply -f -
+    apiVersion: operators.coreos.com/v1alpha1
+    kind: Subscription
+    metadata:
+        name: "${operator_name}"
+        namespace: "${operator_install_namespace}"
+    spec:
+        channel: "${operator_channel}"
+        installPlanApproval: Automatic
+        name: "${operator_name}"
+        source: "${operator_source}"
+        sourceNamespace: openshift-marketplace
+EOF
+
+    # Need to allow some time before checking if the operator is installed.
+    sleep 60
+
+    RETRIES=30
+    CSV=
+    for i in $(seq "${RETRIES}"); do
+        if [[ -z "${CSV}" ]]; then
+            CSV=$(oc get subscription -n "${operator_install_namespace}" "${operator_name}" -o jsonpath='{.status.installedCSV}')
+        fi
+
+        if [[ -z "${CSV}" ]]; then
+            echo "Try ${i}/${RETRIES}: can't get the ${operator_name} yet. Checking again in 30 seconds"
+            sleep 30
+        fi
+
+        if [[ $(oc get csv -n ${operator_install_namespace} ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
+            echo "${operator_name} is deployed"
+            break
+        else
+            echo "Try ${i}/${RETRIES}: ${operator_name} is not deployed yet. Checking again in 30 seconds"
+            sleep 30
+        fi
+    done
+
+    if [[ $(oc get csv -n "${operator_install_namespace}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
+        echo "Error: Failed to deploy ${operator_name}"
+        echo "CSV ${CSV} YAML"
+        oc get CSV "${CSV}" -n "${operator_install_namespace}" -o yaml
+        echo
+        echo "CSV ${CSV} Describe"
+        oc describe CSV "${CSV}" -n "${operator_install_namespace}"
+        exit 1
+    fi
+
+    echo "Successfully installed ${operator_name}"
+
+done

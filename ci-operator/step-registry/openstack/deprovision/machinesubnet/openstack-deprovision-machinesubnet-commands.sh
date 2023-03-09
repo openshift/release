@@ -6,7 +6,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "$CONFIG_TYPE" != "proxy" ]]; then
+if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
     echo "Skipping step due to CONFIG_TYPE not being proxy."
     exit 0
 fi
@@ -25,8 +25,8 @@ if [[ -f ${SHARED_DIR}"/BASTION_ROUTER_ID" ]]; then
   # We want to remove the machines subnet from the router when:
   # * there is a machine subnet that was created
   # * we don't use a provider network for the machines since this network isn't connected to a neutron router
-  # * when the network is not isolated, like it's the case in "proxy" CONFIG_TYPE
-  if [[ -f ${SHARED_DIR}"/MACHINES_SUBNET_ID" && ${OPENSTACK_PROVIDER_NETWORK} == "" && ${CONFIG_TYPE} != "proxy" ]]; then
+  # * when the network is not isolated, like it's the case in *"proxy"* CONFIG_TYPE
+  if [[ -f ${SHARED_DIR}"/MACHINES_SUBNET_ID" && ${OPENSTACK_PROVIDER_NETWORK} == "" && ${CONFIG_TYPE} != *"proxy"* ]]; then
     MACHINES_SUBNET_ID=$(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)
     openstack router remove subnet ${BASTION_ROUTER_ID} ${MACHINES_SUBNET_ID} || >&2 echo "Failed to delete machines subnet ${MACHINES_SUBNET_ID} from bastion router ${BASTION_ROUTER_ID}"
   fi

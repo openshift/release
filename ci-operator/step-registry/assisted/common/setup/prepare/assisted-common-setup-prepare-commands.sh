@@ -36,12 +36,17 @@ cat > packing-test-infra.yaml <<-EOF
       ansible.builtin.file:
         path: "{{ SHARED_DIR }}/platform-conf.sh"
         state: touch
-    - name: Create ansible inventory
+    - name: Check if ansible inventory exists
+      stat:
+        path: "{{ SHARED_DIR }}/inventory"
+      register: inventory
+    - name: Create default ansible inventory
       ansible.builtin.copy:
         dest: "{{ SHARED_DIR }}/inventory"
         content: |
-          [all]
-          {{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+          [primary]
+          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+      when: not inventory.stat.exists
     - name: Create ssh config file
       ansible.builtin.copy:
         dest: "{{ SHARED_DIR }}/ssh_config"
@@ -54,15 +59,20 @@ cat > packing-test-infra.yaml <<-EOF
             ServerAliveInterval 90
             LogLevel ERROR
             IdentityFile {{ lookup('env', 'SSH_KEY_FILE') }}
+    - name: Create ansible configuration
+      ansible.builtin.copy:
+        dest: "{{ SHARED_DIR }}/ansible.cfg"
+        content: |
+          [defaults]
+          callback_whitelist = profile_tasks
+          host_key_checking = False
+          verbosity = 2
 EOF
 
 ansible-playbook packing-test-infra.yaml
 
 # shellcheck disable=SC2034
 export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
-
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
 
 echo "********** ${ASSISTED_CONFIG} ************* "
 
@@ -131,7 +141,7 @@ EOF
 
 cat > run_test_playbook.yaml <<-"EOF"
 - name: Prepare remote host
-  hosts: all
+  hosts: primary
   vars:
     PLATFORM: "{{ lookup('env', 'PLATFORM') }}"
     PULL_PULL_SHA: "{{ lookup('env', 'PULL_PULL_SHA') | default('master', True) }}"
@@ -322,4 +332,5 @@ cat > run_test_playbook.yaml <<-"EOF"
           echo "Finish running post installation script"
 EOF
 
+export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
 ansible-playbook run_test_playbook.yaml -i "${SHARED_DIR}/inventory"

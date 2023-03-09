@@ -26,7 +26,19 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="/tmp/install-config-provisioned-des.yaml.patch"
 
 # create a patch with existing des
-cat > "${PATCH}" << EOF
+if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
+  cat > "${PATCH}" << EOF
+platform:
+  azure:
+    defaultMachinePlatform:
+      encryptionAtHost: true
+      osDisk:
+        diskEncryptionSet:
+          resourceGroup: ${rg}
+          name: ${des}
+EOF
+else
+  cat > "${PATCH}" << EOF
 compute:
 - platform:
     azure:
@@ -44,6 +56,7 @@ controlPlane:
           resourceGroup: ${rg}
           name: ${des}
 EOF
+fi
 
 # apply patch to install-config
 yq-go m -x -i "${CONFIG}" "${PATCH}"
