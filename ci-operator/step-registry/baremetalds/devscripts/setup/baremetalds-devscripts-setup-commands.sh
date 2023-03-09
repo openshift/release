@@ -13,7 +13,7 @@ source "${SHARED_DIR}/packet-conf.sh"
 # Get dev-scripts logs and other configuration
 finished()
 {
-  sleep infinity
+  # sleep infinity
   # Remember dev-scripts setup exit code
   retval=$?
 
