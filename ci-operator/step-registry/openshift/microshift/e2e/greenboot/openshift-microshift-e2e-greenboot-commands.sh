@@ -35,93 +35,38 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 gcloud compute firewall-rules update "${INSTANCE_PREFIX}" --allow tcp:22,icmp,tcp:80
 
-cat <<'EOF' > "${HOME}"/deploy.sh
+cat <<'EOF' > "${HOME}"/greenboot_check.sh
 #!/usr/bin/env bash
 
 set -euo pipefail
 IFS=$'\n\t'
 set -x
 
-mkdir -p ~/.kube
-sudo cat /var/lib/microshift/resources/kubeadmin/kubeconfig > ~/.kube/config
+#
+# See https://github.com/openshift/microshift/blob/main/docs/greenboot_dev.md#user-workload-health
+#
+SCRIPT_FILE=/etc/greenboot/check/required.d/50_busybox_running_check.sh
+sudo curl -s https://raw.githubusercontent.com/openshift/microshift/main/docs/config/busybox_running_check.sh -o \${SCRIPT_FILE}
+sudo chmod 755 \${SCRIPT_FILE}
 
-echo "
-kind: Pod
-apiVersion: v1
-metadata:
-  name: hello-microshift
-  labels:
-    name: hello-microshift
-spec:
-  containers: 
-  - name: hello-microshift
-    image: openshift/hello-openshift
-    ports:
-    - containerPort: 8080
-      protocol: TCP
-    securityContext:
-      allowPrivilegeEscalation: false
-      capabilities:
-        drop:
-        - ALL
-      runAsNonRoot: true
-      seccompProfile:
-        type: RuntimeDefault" | oc create -f -
+sudo systemctl restart microshift
 
-oc expose pod hello-microshift
-oc expose svc hello-microshift --hostname hello-microshift.cluster.local
-
-oc wait pods -l name=hello-microshift --for condition=Ready --timeout=300s
+for check_script in $(find /etc/greenboot/check/ -name \*.sh | sort) ; do
+  echo Running \${check_script}...
+  \${check_script}
+done
 EOF
 
-chmod +x "${HOME}/deploy.sh"
+chmod +x "${HOME}/greenboot_check.sh"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}/deploy.sh" "rhel8user@${INSTANCE_PREFIX}:~/deploy.sh"
+  --recurse "${HOME}/greenboot_check.sh" "rhel8user@${INSTANCE_PREFIX}:~/greenboot_check.sh"
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   "rhel8user@${INSTANCE_PREFIX}" \
-  --command "bash ~/deploy.sh"
-
-
-IP=$(LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances describe "${INSTANCE_PREFIX}" --format='value(networkInterfaces.accessConfigs[0].natIP)')
-
-set +ex
-retries=3
-backoff=3s
-
-for try in $(seq 1 "${retries}"); do
-  echo "Attempt: ${try}"
-  echo "Running: curl -vk http://hello-microshift.cluster.local --resolve \"hello-microshift.cluster.local:80:${IP}\""
-  RESPONSE=$(curl -vk http://hello-microshift.cluster.local --resolve "hello-microshift.cluster.local:80:${IP}" 2>&1)
-  RESULT=$?
-  echo "Exit code: ${RESULT}"
-  echo -e "Response: \n${RESPONSE}\n\n"
-  if [ $RESULT -eq 0 ] && echo "${RESPONSE}" | grep -q -E "HTTP.*200 OK"; then
-    echo "Request fulfilled conditions to be successful (exit code = 0, response contains 'HTTP.*200 OK')"
-    exit 0
-  fi
-  echo -e "Waiting ${backoff} before next retry\n\n"
-  sleep "${backoff}"
-done
-
-set -x
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /tmp/validate-microshift "rhel8user@${INSTANCE_PREFIX}:~/validate-microshift"
-
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  "rhel8user@${INSTANCE_PREFIX}" \
-  --command "bash ~/validate-microshift/cluster-debug-info.sh"
-
-exit 1
+  --command "bash ~/greenboot_check.sh"
