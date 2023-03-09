@@ -157,12 +157,17 @@ create_tests_skip_list_file
 # Skiplist according to each release
 if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
     create_tests_temp_skip_list_11
+    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+
 fi
 if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
     create_tests_temp_skip_list_12
+    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+
 fi
 if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_13
+    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
@@ -196,7 +201,6 @@ status=0
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
-export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
 FEATURES_ENVIRONMENT="ci" make functests-on-ci || status=$?
 cd -
 
