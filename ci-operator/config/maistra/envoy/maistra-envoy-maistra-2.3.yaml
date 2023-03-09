@@ -44,27 +44,6 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
-    - as: maistra-envoy-unit-2-3-build-binary
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c \
-          "export CC=clang CXX=clang++ ARCH=x86_64 DIR=/work/maistra; \
-          export 'BUILD_SCM_REVISION=Maistra PR #undefined'; \
-          export BUILD_SCM_STATUS=SHA=undefined; \
-          cd /work/maistra; \
-          time bazel build \
-            --config=x86_64 --define crypto=system --config=ci-config \
-            //source/exe:envoy-static"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 4h0m0s
     - as: maistra-envoy-unit-2-3-build-tests
       cli: latest
       commands: |
@@ -75,28 +54,6 @@ tests:
           export BUILD_SCM_STATUS=SHA=undefined; \
           cd /work/maistra; \
           time bazel build \
-            --config=x86_64 --define crypto=system --config=ci-config \
-            --build_tests_only \
-            //test/..."
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 4h0m0s
-    - as: maistra-envoy-unit-2-3-run-tests
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c \
-          "export CC=clang CXX=clang++ ARCH=x86_64 DIR=/work/maistra; \
-          export 'BUILD_SCM_REVISION=Maistra PR #undefined'; \
-          export BUILD_SCM_STATUS=SHA=undefined; \
-          cd /work/maistra; \
-          time bazel test \
             --config=x86_64 --define crypto=system --config=ci-config \
             --build_tests_only \
             //test/..."
