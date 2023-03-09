@@ -6,59 +6,8 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/gofmt
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openstack-k8s-operators-infra-operator-master-gofmt
-    rerun_command: /test gofmt
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=gofmt
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )gofmt,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build01
     context: ci/prow/golangci
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -104,22 +53,20 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/golint
+    context: ci/prow/images
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openstack-k8s-operators-infra-operator-master-golint
-    rerun_command: /test golint
+    name: pull-ci-openstack-k8s-operators-infra-operator-master-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=golint
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -146,29 +93,28 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )golint,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
     cluster: build01
-    context: ci/prow/govet
+    context: ci/prow/precommit-check
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openstack-k8s-operators-infra-operator-master-govet
-    rerun_command: /test govet
+    name: pull-ci-openstack-k8s-operators-infra-operator-master-precommit-check
+    optional: true
+    rerun_command: /test precommit-check
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=govet
+        - --target=precommit-check
         command:
         - ci-operator
         image: ci-operator:latest
@@ -195,7 +141,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )govet,?($|\s.*)
+    trigger: (?m)^/test( | .* )precommit-check,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -204,8 +150,6 @@ presubmits:
     cluster: build01
     context: ci/prow/unit
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
