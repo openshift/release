@@ -33,7 +33,14 @@ SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${SERVICE_NAME}-operator
 export ${SERVICE_NAME^^}_IMG=${IMAGE_TAG_BASE}-index:${PR_SHA}
 export ${SERVICE_NAME^^}_KUTTL_CONF=/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml
-export ${SERVICE_NAME^^}_KUTTL_DIR=/go/src/github.com/${ORG}/${BASE_OP}/tests/kuttl/tests
+if [ -d  /go/src/github.com/${ORG}/${BASE_OP}/tests ]; then
+    export ${SERVICE_NAME^^}_KUTTL_DIR=/go/src/github.com/${ORG}/${BASE_OP}/tests/kuttl/tests
+else
+    # some projects (like neutron) had a test folder before adding the kuttl
+    # tests, so they were added there to avoid having both 'test' and 'tests'
+    # folders
+    export ${SERVICE_NAME^^}_KUTTL_DIR=/go/src/github.com/${ORG}/${BASE_OP}/test/kuttl/tests
+fi
 # make sure that the operator_deploy steps use the PR code (needed to test CR
 # changes in the PR)
 export ${SERVICE_NAME^^}_REPO=/go/src/github.com/${ORG}/${BASE_OP}
