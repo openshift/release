@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.8"
+    name: "4.10"
     namespace: ocp
     tag: base
   cli:
-    name: "4.8"
+    name: "4.10"
     namespace: ocp
     tag: cli
   openshift_eventing-kafka-broker-src_knative-v1.7:
@@ -28,7 +28,7 @@ base_images:
     namespace: openshift
     tag: golang-1.18
   opm:
-    name: "4.8"
+    name: "4.10"
     namespace: origin
     tag: operator-registry
 build_root:
@@ -106,7 +106,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.8"
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -115,14 +115,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: operator-e2e-aws-ocp-48
+- as: operator-e2e-aws-ocp-410
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   steps:
     allow_skip_on_success: true
     test:
@@ -143,14 +143,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: upstream-e2e-aws-ocp-48
+- as: upstream-e2e-aws-ocp-410
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -172,14 +172,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: upstream-e2e-kafka-aws-ocp-48
+- as: upstream-e2e-kafka-aws-ocp-410
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -201,14 +201,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-aws-ocp-48-continuous
+- as: e2e-aws-ocp-410-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   cron: 0 0,12 * * *
   steps:
     test:
@@ -229,14 +229,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: upstream-e2e-kafka-aws-ocp-48-continuous
+- as: upstream-e2e-kafka-aws-ocp-410-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   cron: 0 4,16 * * *
   steps:
     test:
@@ -257,14 +257,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: upgrade-tests-aws-ocp-48-continuous
+- as: upgrade-tests-aws-ocp-410-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   cron: 0 2,14 * * *
   steps:
     test:
@@ -285,14 +285,14 @@ tests:
           cpu: "4"
           memory: 6Gi
     workflow: generic-claim
-- as: upgrade-tests-aws-ocp-48
+- as: upgrade-tests-aws-ocp-410
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -314,14 +314,42 @@ tests:
           cpu: "4"
           memory: 6Gi
     workflow: generic-claim
-- as: upstream-e2e-mesh-aws-ocp-48
+- as: e2e-mesh-ocp-410-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
+  cron: 0 4,16 * * *
+  steps:
+    test:
+    - as: serverless-e2e
+      commands: make test-upstream-e2e-mesh
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: upstream-e2e-mesh-aws-ocp-410
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.10"
   optional: true
   steps:
     allow_skip_on_success: true
@@ -350,7 +378,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   run_if_changed: test/ui
   steps:
     test:
@@ -378,7 +406,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   cron: 0 6,18 * * *
   steps:
     test:
@@ -399,14 +427,14 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: e2e-kitchensink-ocp-48-continuous
+- as: e2e-kitchensink-ocp-410-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   cron: 0 8,20 * * *
   steps:
     test:
@@ -428,14 +456,14 @@ tests:
           memory: 200Mi
       timeout: 3h0m0s
     workflow: generic-claim
-- as: upgrade-kitchensink-ocp-48-continuous
+- as: upgrade-kitchensink-ocp-410-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 2h0m0s
-    version: "4.8"
+    version: "4.10"
   cron: 0 10,22 * * *
   steps:
     test:
@@ -461,4 +489,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: "4.8"
+  variant: "4.10"
