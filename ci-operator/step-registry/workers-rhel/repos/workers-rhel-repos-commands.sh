@@ -77,7 +77,7 @@ EOF
 cat > rhel-7-server-ose-devel-rpms.repo.j2 <<-'EOF'
 [rhel-7-server-ose-{{ release_version }}-devel-rpms]
 name = A repository of dependencies for Atomic OpenShift {{ release_version }}
-baseurl = https://mirror2.openshift.com/enterprise/reposync/{{ release_version }}/rhel-server-ose-rpms/
+baseurl = https://mirror.openshift.com/enterprise/reposync/{{ release_version }}/rhel-server-ose-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 failovermethod = priority
@@ -89,7 +89,7 @@ EOF
 cat > rhel-7-server-rpms.repo.j2 <<-'EOF'
 [rhel-7-server-rpms]
 name = Red Hat Enterprise Linux 7 Server (RPMs)
-baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-server-rpms/
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-server-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 failovermethod = priority
@@ -99,7 +99,7 @@ enabled = 1
 
 [rhel-7-server-optional-rpms]
 name = Red Hat Enterprise Linux 7 Server - Optional (RPMs)
-baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-server-optional-rpms/
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-server-optional-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 failovermethod = priority
@@ -109,7 +109,7 @@ enabled = 1
 
 [rhel-7-server-extras-rpms]
 name = Red Hat Enterprise Linux 7 Server - Extras (RPMs)
-baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-server-extras-rpms/
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-server-extras-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 failovermethod = priority
@@ -119,7 +119,7 @@ enabled = 1
 
 [rhel-7-fast-datapath-rpms]
 name = Red Hat Enterprise Linux 7 Server - Fast Datapath (RPMs)
-baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-fast-datapath-rpms/
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-fast-datapath-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 failovermethod = priority
@@ -131,7 +131,7 @@ EOF
 cat > rhel-8-server-ose-devel-rpms.repo.j2 <<-'EOF'
 [rhel-8-server-ose-{{ release_version }}-devel-rpms]
 name = A repository of dependencies for OpenShift Container Platform {{ release_version }}
-baseurl = https://mirror2.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-server-ose-rpms/
+baseurl = https://mirror.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-server-ose-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 failovermethod = priority
@@ -142,7 +142,7 @@ module_hotfixes = 1
 
 [rhel-8-fast-datapath-{{ release_version }}-devel-rpms]
 name = A repository of dependencies for OpenShift Container Platform {{ release_version }}
-baseurl = https://mirror2.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-fast-datapath-rpms/
+baseurl = https://mirror.openshift.com/enterprise/reposync/{{ release_version }}/rhel-8-fast-datapath-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 failovermethod = priority
@@ -155,7 +155,7 @@ EOF
 cat > rhel-8-server-rpms.repo.j2 <<-'EOF'
 [rhel-8-for-x86_64-baseos-rpms]
 name = Red Hat Enterprise Linux 8 for x86_64 - BaseOS (RPMs)
-baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-8-baseos-rpms/
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-8-baseos-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 gpgcheck = 0
@@ -167,7 +167,7 @@ module_hotfixes = 1
 
 [rhel-8-for-x86_64-appstream-rpms]
 name = Red Hat Enterprise Linux 8 for x86_64 - AppStream (RPMs)
-baseurl = https://mirror2.openshift.com/enterprise/reposync/ci-deps/rhel-8-appstream-rpms/
+baseurl = https://mirror.openshift.com/enterprise/reposync/ci-deps/rhel-8-appstream-rpms/
 username = {{ mirror_username }}
 password = {{ mirror_password }}
 gpgcheck = 0

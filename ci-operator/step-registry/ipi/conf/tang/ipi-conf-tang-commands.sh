@@ -24,7 +24,7 @@ BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
 BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
 
 #Download butane
-curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/butane" --output /tmp/butane && chmod +x /tmp/butane
+curl -sSL "https://mirror.openshift.com/pub/openshift-v4/clients/butane/latest/butane" --output /tmp/butane && chmod +x /tmp/butane
 
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
