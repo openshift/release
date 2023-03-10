@@ -12,7 +12,7 @@ base_images:
     namespace: ocp
     tag: tests
   ubi-minimal:
-    name: ubi-minimal
+    name: ubi
     namespace: ocp
     tag: "8"
 build_root:
@@ -68,8 +68,8 @@ images:
         source_path: /usr/bin/openshift-tests
   to: dependency-payload
 - dockerfile_literal: |
-    # build
-    FROM ubi-minimal
+    FROM ubi
+
     ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
     ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
     RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
@@ -78,21 +78,21 @@ images:
           exit 1 ; \
         fi ; \
         chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
-  from: ubi-minimal
-  to: yq-cli
-- dockerfile_literal: |
-    FROM src
-    COPY yq /usr/bin/yq
-    RUN yum install -y --nodocs python3-devel && \
+
+    RUN dnf install -y --nodocs python3-devel make gcc jq && \
         pip3 install pygithub GitPython && \
+        ln -s /usr/bin/python3 /usr/bin/python && \
         dnf clean all && \
         rm -rf /var/cache/dnf/*
-  from: src
+
+    COPY microshift $HOME/microshift
+    WORKDIR $HOME/microshift
+  from: ubi-minimal
   inputs:
-    yq-cli:
+    src:
       paths:
       - destination_dir: .
-        source_path: /usr/bin/yq
+        source_path: /go/src/github.com/openshift/microshift/
   to: microshift-rebase
 promotion:
   excluded_images:
@@ -121,6 +121,7 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+rpm_build_commands: make rpm srpm
 tag_specification:
   name: "4.14"
   namespace: ocp
