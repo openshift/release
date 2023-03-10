@@ -64,6 +64,11 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   done
 
   make ${SERVICE_NAME}_kuttl
+  if [ -f "kuttl-test-${SERVICE_NAME}.json" ]; then
+      cp "kuttl-test-${SERVICE_NAME}.json" ${ARTIFACT_DIR}
+  else
+      echo "Report kuttl-test-${SERVICE_NAME}.json not found"
+  fi
 else
   echo "File /go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml not found. Skipping script."
 fi
