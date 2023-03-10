@@ -7,6 +7,22 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: cli
+  openshift_eventing-kafka-broker-src_knative-v1.7:
+    name: eventing-kafka-broker-src
+    namespace: openshift
+    tag: knative-v1.7
+  openshift_knative-eventing-src_knative-v1.7:
+    name: knative-eventing-src
+    namespace: openshift
+    tag: knative-v1.7
+  openshift_knative-v1.1.0_knative-eventing-kafka-src:
+    name: knative-v1.1.0
+    namespace: openshift
+    tag: knative-eventing-kafka-src
+  openshift_knative-v1.7.0_knative-serving-src:
+    name: knative-v1.7.0
+    namespace: openshift
+    tag: knative-serving-src
   openshift_release_golang-1.18:
     name: release
     namespace: openshift
@@ -83,7 +99,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -92,14 +108,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: operator-e2e-interop-aws-310
+- as: operator-e2e-interop-aws-ocp310
   cron: 0 1 * * 1
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: aws.interop.ccitredhat.com
-      SPOT_INSTANCES: "true"
     test:
     - as: serverless-install
       commands: make install-all
