@@ -81,6 +81,14 @@ spec:
         add: ["IPC_LOCK","SYS_ADMIN"]
       privileged: true
       runAsUser: 0
+    volumeMounts:
+    - mountPath: /home/user/.cache/bazel
+      name: bazelcache
+      readOnly: false
+  volumes:
+  - name: bazelcache
+    emptyDir:
+      sizeLimit: 80Gi
 EOF
 }
 
