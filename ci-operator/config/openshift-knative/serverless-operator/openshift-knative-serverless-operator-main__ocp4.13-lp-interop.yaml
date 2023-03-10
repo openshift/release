@@ -1,10 +1,6 @@
 base_images:
-  base:
-    name: "4.12"
-    namespace: ocp
-    tag: base
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: cli
   openshift_eventing-kafka-broker-src_knative-v1.7:
@@ -125,6 +121,33 @@ tests:
         name: knative-operator
       - env: OPENSHIFT_KNATIVE_OPERATOR
         name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: serverless-e2e
+      commands: make test-e2e-with-kafka-testonly
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: knative-serving-eventing-e2e
+      commands: make test-upstream-e2e-no-upgrade-testonly
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: knative-eventing-kafka-broker-e2e
+      commands: make test-upstream-e2e-kafka-no-upgrade-testonly
       from: serverless-operator-src
       resources:
         limits:
