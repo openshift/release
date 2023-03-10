@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.12"
+    name: "4.13"
     namespace: origin
-    tag: base
+    tag: base-rhel9
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: origin
     tag: cli
   hco-index:
@@ -22,9 +22,9 @@ base_images:
 binary_build_commands: make install
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: rhel-8-release-golang-1.19-openshift-4.12
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.19-openshift-4.13
 images:
 - dockerfile_path: build/Dockerfile.okd
   from: base
@@ -51,7 +51,11 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
   to: hyperconverged-cluster-functest
-- dockerfile_path: deploy/Dockerfile.src.ci
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y jq && dnf clean all
   from: src
   inputs:
     cli:
@@ -84,12 +88,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.13"
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.13"
       namespace: origin
 resources:
   '*':
@@ -132,6 +136,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-gcp
 - as: hco-e2e-image-index-aws
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: aws-virtualization
     dependencies:
@@ -166,6 +171,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-aws
 - as: hco-e2e-upgrade-index-aws
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: aws-virtualization
     dependencies:
@@ -186,6 +192,7 @@ tests:
           memory: 1Gi
     workflow: optional-operators-ci-aws
 - as: hco-e2e-upgrade-index-gcp
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp-virtualization
     dependencies:
