@@ -424,6 +424,10 @@ echo "install-config.yaml"
 echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
+if [ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-}" == "true" ]; then
+	echo "Cluster will be created with public subnets only"
+fi
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 export TF_LOG_PATH="${dir}/terraform.txt"
 
