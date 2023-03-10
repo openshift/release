@@ -70,7 +70,7 @@ spec:
     node.kubernetes.io/instance-type: "m5.4xlarge"
   containers:
   - name: testpmd
-    command: ["sleep", "99999"]
+    command: ["tail", "-f", "/dev/null"]
     image: ${MAISTRA_BUILDER_IMAGE}
     resources:
       requests:
@@ -82,13 +82,12 @@ spec:
       privileged: true
       runAsUser: 0
     volumeMounts:
-    - mountPath: /home/user/.cache/bazel
+    - mountPath: /bazel-root
       name: bazelcache
       readOnly: false
   volumes:
   - name: bazelcache
-    emptyDir:
-      sizeLimit: 80Gi
+    emptyDir: {}
 EOF
 }
 

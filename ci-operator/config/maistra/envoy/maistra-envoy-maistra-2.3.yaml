@@ -35,8 +35,6 @@ tests:
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
         oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c "whoami; df -h /home/$(whoami)"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -46,37 +44,31 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
-    - as: maistra-envoy-unit-2-3-build-binary
+    - as: maistra-envoy-unit-2-3-run-ci
       cli: latest
       commands: |
+        # TBD workaround
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c "sed -i 's/--local_cpu_resources=6/--local_cpu_resources=14/g' ./maistra/bazelrc;"
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c "sed -i 's/--local_ram_resources=12288/--local_ram_resources=30720/g' ./maistra/bazelrc;"
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c "sed -i 's/--jobs=3/--jobs=7/g' ./maistra/bazelrc;"
+
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           sh -c \
           "export CC=clang CXX=clang++ ARCH=x86_64 DIR=/work/maistra; \
           export 'BUILD_SCM_REVISION=Maistra PR #undefined'; \
           export BUILD_SCM_STATUS=SHA=undefined; \
           cd /work/maistra; \
-          time bazel build \
+          time bazel --output_base=/bazel-root build \
             --config=x86_64 --define crypto=system --config=ci-config \
-            //source/exe:envoy-static"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 4h0m0s
-    - as: maistra-envoy-unit-2-3-build-tests
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c \
-          "export CC=clang CXX=clang++ ARCH=x86_64 DIR=/work/maistra; \
-          export 'BUILD_SCM_REVISION=Maistra PR #undefined'; \
-          export BUILD_SCM_STATUS=SHA=undefined; \
-          cd /work/maistra; \
-          time bazel build \
+            //source/exe:envoy-static; \
+          time bazel --output_base=/bazel-root build \
+            --config=x86_64 --define crypto=system --config=ci-config \
+            --build_tests_only \
+            //test/...; \
+          time bazel --output_base=/bazel-root test \
             --config=x86_64 --define crypto=system --config=ci-config \
             --build_tests_only \
             //test/..."
@@ -89,28 +81,6 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 8h0m0s
-    - as: maistra-envoy-unit-2-3-run-tests
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c \
-          "export CC=clang CXX=clang++ ARCH=x86_64 DIR=/work/maistra; \
-          export 'BUILD_SCM_REVISION=Maistra PR #undefined'; \
-          export BUILD_SCM_STATUS=SHA=undefined; \
-          cd /work/maistra; \
-          time bazel test \
-            --config=x86_64 --define crypto=system --config=ci-config \
-            --build_tests_only \
-            //test/..."
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 4h0m0s
     workflow: servicemesh-envoy-e2e-aws
   timeout: 8h0m0s
 zz_generated_metadata:
