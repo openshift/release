@@ -1,33 +1,34 @@
 periodics:
 - agent: kubernetes
   cluster: build05
+  cron: 0 1 * * 1
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: master
-    org: rhpit
-    repo: interop-tests
-  interval: 960h
+  - base_ref: main
+    org: ascerra
+    repo: clc-ui-e2e
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
-    ci-operator.openshift.io/variant: installer-rehearse-4.12
+    ci-operator.openshift.io/variant: acm-ocp4.12-lp-interop
     ci.openshift.io/generator: prowgen
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rhpit-interop-tests-master-installer-rehearse-4.12-installer-rehearse-aws
+  name: periodic-ci-ascerra-clc-ui-e2e-main-acm-ocp4.12-lp-interop-acm-interop-aws
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --lease-server-credentials-file=/etc/boskos/credentials
+      - --oauth-token-path=/usr/local/github-credentials/oauth
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/installer-rehearse-aws-cluster-profile
-      - --target=installer-rehearse-aws
-      - --variant=installer-rehearse-4.12
+      - --secret-dir=/usr/local/acm-interop-aws-cluster-profile
+      - --target=acm-interop-aws
+      - --variant=acm-ocp4.12-lp-interop
       command:
       - ci-operator
       image: ci-operator:latest
@@ -43,10 +44,13 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/installer-rehearse-aws-cluster-profile
+      - mountPath: /usr/local/acm-interop-aws-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /usr/local/github-credentials
+        name: github-credentials-openshift-ci-robot-private-git-cloner
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -68,6 +72,9 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-aws-cspi-qe
+    - name: github-credentials-openshift-ci-robot-private-git-cloner
+      secret:
+        secretName: github-credentials-openshift-ci-robot-private-git-cloner
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
