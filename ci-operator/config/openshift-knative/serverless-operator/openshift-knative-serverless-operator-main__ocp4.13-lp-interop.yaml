@@ -101,9 +101,16 @@ tests:
       BASE_DOMAIN: aws.interop.ccitredhat.com
       SPOT_INSTANCES: "true"
     test:
-    - as: unit-test
-      commands: make test-unit
-      from: src
+    - as: serverless-install
+      commands: make install-all
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
       resources:
         limits:
           memory: 6Gi
