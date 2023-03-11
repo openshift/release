@@ -7,9 +7,9 @@ set -x
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
-GOOGLE_PROJECT_ID=$(< "${CLUSTER_PROFILE_DIR}/openshift_gcp_project")
+GOOGLE_PROJECT_ID=$(<"${CLUSTER_PROFILE_DIR}/openshift_gcp_project")
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-GOOGLE_COMPUTE_ZONE=$(< "${SHARED_DIR}/openshift_gcp_compute_zone")
+GOOGLE_COMPUTE_ZONE=$(<"${SHARED_DIR}/openshift_gcp_compute_zone")
 if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
   exit 1
@@ -45,17 +45,19 @@ set -x
 mkdir -p ~/.kube
 sudo cat /var/lib/microshift/resources/kubeadmin/kubeconfig > ~/.kube/config
 
-echo "
+echo '
 kind: Pod
 apiVersion: v1
 metadata:
   name: hello-microshift
   labels:
-    name: hello-microshift
+    app: hello-microshift
 spec:
   containers:
   - name: hello-microshift
-    image: openshift/hello-openshift
+    image: busybox:1.35
+    command: ["/bin/sh"]
+    args: ["-c", "while true; do echo -ne \"HTTP/1.0 200 OK\r\nContent-Length: 16\r\n\r\nHello MicroShift\" | nc -l -p 8080 ; done"]
     ports:
     - containerPort: 8080
       protocol: TCP
@@ -65,8 +67,10 @@ spec:
         drop:
         - ALL
       runAsNonRoot: true
+      runAsUser: 1001
+      runAsGroup: 1001
       seccompProfile:
-        type: RuntimeDefault" | oc create -f -
+        type: RuntimeDefault' | oc create -f -
 
 oc expose pod hello-microshift
 oc expose svc hello-microshift --hostname hello-microshift.cluster.local
