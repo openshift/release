@@ -53,7 +53,7 @@ metadata:
   labels:
     name: hello-microshift
 spec:
-  containers: 
+  containers:
   - name: hello-microshift
     image: openshift/hello-openshift
     ports:
@@ -82,19 +82,18 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}/deploy.sh" "rhel8user@${INSTANCE_PREFIX}:~/deploy.sh"
 
+set +e
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   "rhel8user@${INSTANCE_PREFIX}" \
   --command "bash ~/deploy.sh"
 
-
 IP=$(LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances describe "${INSTANCE_PREFIX}" --format='value(networkInterfaces.accessConfigs[0].natIP)')
 
-set +ex
+set +x
 retries=3
 backoff=3s
-
 for try in $(seq 1 "${retries}"); do
   echo "Attempt: ${try}"
   echo "Running: curl -vk http://hello-microshift.cluster.local --resolve \"hello-microshift.cluster.local:80:${IP}\""
@@ -109,7 +108,6 @@ for try in $(seq 1 "${retries}"); do
   echo -e "Waiting ${backoff} before next retry\n\n"
   sleep "${backoff}"
 done
-
 set -x
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
