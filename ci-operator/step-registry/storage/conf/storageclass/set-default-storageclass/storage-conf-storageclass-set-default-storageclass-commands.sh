@@ -29,47 +29,16 @@ function get_default_sc() {
 }
 
 function remove_all_default_sc_annotations () {
-  if [ -z "${CURRENT_DEFAULT_SC}" ]
-  then
-      echo "Currently no default storageclass is set, no need to remove"
-  else
-      for SC in ${CURRENT_DEFAULT_SC}
-      do
-        oc annotate sc "${SC}" "storageclass.kubernetes.io/is-default-class=false" --overwrite
-      done
-  fi
+  run_command "oc annotate sc storageclass.kubernetes.io/is-default-class=false --all --overwrite"
 }
 
-function set_cluster_csi_driver_sc_state_unmanaged () {
-  local ret=0
-  local provisioner=""
-  run_command "oc get sc ${EXPECTED_DEFAULT_STORAGECLASS}" || ret=$?
-  if [[ ! $ret -eq 0 ]]; then
-      echo "Storageclass ${EXPECTED_DEFAULT_STORAGECLASS} is not exist, skip set its clustercsidriver 'storageClassState' as 'Unmanaged' state."
-  else
-      provisioner=$(oc get sc/"${EXPECTED_DEFAULT_STORAGECLASS}" -ojsonpath='{.provisioner}')
-      run_command "oc get clustercsidriver ${provisioner}" || ret=$?
-      if [[ ! $ret -eq 0 ]]; then
-        echo "clustercsidriver/${provisioner} is not exist, skip set 'storageClassState' as 'Unmanaged' state."
-      else
-          oc patch clustercsidriver "${provisioner}" -p '[{"op":"replace","path":"/spec/storageClassState","value":"Unmanaged"}]'  --type json
-      fi  
-  fi
-}
-
-function set_expected_sc_as_default () {
-  ret=0
-  run_command "oc get sc ${EXPECTED_DEFAULT_STORAGECLASS}" || ret=$?
-  if [[ ! $ret -eq 0 ]]; then
-      echo "Storageclass ${EXPECTED_DEFAULT_STORAGECLASS} is not exist, skip setting."
-  else
-      oc annotate sc "${EXPECTED_DEFAULT_STORAGECLASS}" "storageclass.kubernetes.io/is-default-class=true" --overwrite
-  fi
+function set_required_sc_as_default () {
+  run_command "oc annotate sc ${REQUIRED_DEFAULT_STORAGECLASS} storageclass.kubernetes.io/is-default-class=true --overwrite"
 }
 
 set_proxy
 get_default_sc
-set_cluster_csi_driver_sc_state_unmanaged
 remove_all_default_sc_annotations
-set_expected_sc_as_default
+set_required_sc_as_default
+# For debugging
 get_current_sc
