@@ -221,11 +221,6 @@ platform:
 "
 fi
 
-# if [ "${DISCONNECTED}" == "true" ]; then
-#   echo 'Disconnected install, patching install-config.yaml'
-#   cat "$SHARED_DIR/install-config-icsp.yaml.patch" >> "$SHARED_DIR/install-config.yaml"
-# fi
-
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
 cp "${SHARED_DIR}/agent-config.yaml" "${INSTALL_DIR}/"
 
