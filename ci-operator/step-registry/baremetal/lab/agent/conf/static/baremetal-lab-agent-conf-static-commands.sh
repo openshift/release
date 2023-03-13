@@ -72,7 +72,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         - destination: 0.0.0.0/0
           next-hop-address: ${INTERNAL_NET_IP}
           next-hop-interface: ${baremetal_iface}
-          table-id: 254
   "
   # Patch the agent-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
