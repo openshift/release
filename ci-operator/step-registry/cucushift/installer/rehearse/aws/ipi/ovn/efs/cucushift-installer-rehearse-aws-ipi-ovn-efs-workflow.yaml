@@ -1,0 +1,20 @@
+workflow:
+  as: cucushift-installer-rehearse-aws-ipi-ovn-efs
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-provision
+    - ref: storage-create-csi-aws-efs-install-operator
+    - ref: storage-create-csi-aws-efs
+    - ref: storage-conf-wait-for-csi-driver
+    - ref: cucushift-hypershift-extended-debug
+    test:
+    - ref: cucushift-installer-check
+    post:
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    env:
+      TEST_CSI_DRIVER_MANIFEST: manifest-aws-efs.yaml
+      # FIXME after reading proper expected
+      TRUECONDITIONS: AWSEFSDriverControllerServiceControllerAvailable AWSEFSDriverNodeServiceControllerAvailable
+      CLUSTERCSIDRIVER: efs.csi.aws.com
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow
