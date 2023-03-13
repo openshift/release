@@ -38,7 +38,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: false
         address:
             - ip: ${ip}
-              prefix-length: 23
+              prefix-length: ${INTERNAL_NET_CIDR##*/}
       ipv6:
         enabled: ${ipv6_enabled}
 "
