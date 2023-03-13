@@ -7,6 +7,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
+  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.11
   operator-sdk:
     name: "4.13"
     namespace: origin
@@ -22,13 +26,25 @@ images:
   - name: TARGET
     value: manager
   dockerfile_path: Dockerfile
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: kernel-module-management-operator
 - build_args:
   - name: TARGET
     value: manager-hub
   dockerfile_path: Dockerfile
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: kernel-module-management-operator-hub
 - dockerfile_path: Dockerfile.signimage
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
