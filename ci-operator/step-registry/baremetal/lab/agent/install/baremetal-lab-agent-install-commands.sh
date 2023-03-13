@@ -173,7 +173,9 @@ OPENSHIFT_INSTALL_RELEASE=$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
 
 if [ "${DISCONNECTED}" == "true" ]; then
   OCP_RELEASE=$( oc adm release -a "$PULL_SECRET_PATH" info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o template --template='{{.metadata.version}}' )
-  OPENSHIFT_INSTALL_RELEASE="${AUX_HOST}:5000/${OCP_REPO}:${OCP_RELEASE}"
+  #Follow mirror-image output step
+  #Update image:  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:5000/ci-op-6sxtv7mh/release:4.13.0-0.nightly-2023-03-11-033820
+  OPENSHIFT_INSTALL_RELEASE="${AUX_HOST}:5000/${NAMESPACE}/release:${OCP_RELEASE}"
 fi
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE}"
