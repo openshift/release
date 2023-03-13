@@ -180,7 +180,7 @@ fi
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE}"
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE}" \
-   --command=openshift-install --to=/tmp
+   --command=openshift-install --to=/tmp --insecure=true
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
