@@ -31,11 +31,24 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 done
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${IP_ARRAY[@]}" << 'EOF'
+  "${IP_ARRAY[@]}" "${INTERNAL_NET_CIDR}" << 'EOF'
   set -o nounset
   set -o errexit
   IP_ARRAY=("$@")
+  INTERNAL_NET_CIDR="${2}"
   for ip in "${IP_ARRAY[@]}"; do
-    iptables -I FORWARD -s ${ip} ! -d ${INTERNAL_NET} -j DROP
+    iptables -I FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
 EOF
+
+# mirror-images-by-oc-adm will run if a specific file is found, see code below
+
+# private mirror registry host
+# <public_dns>:<port>
+# MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
+# if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
+#     echo "File ${SHARED_DIR}/mirror_registry_url does not exist."
+#     exit 1
+# fi
+MIRROR_REGISTRY_URL="${AUX_HOST}:5000"
+echo "${MIRROR_REGISTRY_URL}" > "${SHARED_DIR}/mirror_registry_url"

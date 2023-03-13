@@ -169,8 +169,15 @@ API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
 INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
-echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+OPENSHIFT_INSTALL_RELEASE=$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+
+if [ "${DISCONNECTED}" == "true" ]; then
+  OCP_RELEASE=$( oc adm release -a "$PULL_SECRET_PATH" info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o template --template='{{.metadata.version}}' )
+  OPENSHIFT_INSTALL_RELEASE="${AUX_HOST}:5000/${OCP_REPO}:${OCP_RELEASE}"
+fi
+
+echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE}"
+oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE}" \
    --command=openshift-install --to=/tmp
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
