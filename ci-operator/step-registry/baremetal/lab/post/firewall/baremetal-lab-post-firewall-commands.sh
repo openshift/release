@@ -30,10 +30,11 @@ done
 
 echo 'Deprovisioning firewall configuration'
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${IP_ARRAY[@]}" << 'EOF'
+  "${IP_ARRAY[@]}" "${INTERNAL_NET_CIDR}" << 'EOF'
   set -o nounset
   IP_ARRAY=("$@")
+  INTERNAL_NET_CIDR="${2}"
   for ip in "${IP_ARRAY[@]}"; do
-    iptables -D FORWARD -s ${ip} ! -d ${INTERNAL_NET} -j DROP
+    iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
 EOF
