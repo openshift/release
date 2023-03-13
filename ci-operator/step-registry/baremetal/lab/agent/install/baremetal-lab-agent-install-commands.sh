@@ -178,8 +178,12 @@ if [ "${DISCONNECTED}" == "true" ]; then
   OPENSHIFT_INSTALL_RELEASE="${AUX_HOST}:5000/${NAMESPACE}/release:${OCP_RELEASE}"
 fi
 
+new_pull_secret="${SHARED_DIR}/new_pull_secret"
+registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
+
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE}"
-oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE}" \
+oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE}" \
    --command=openshift-install --to=/tmp --insecure=true
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
