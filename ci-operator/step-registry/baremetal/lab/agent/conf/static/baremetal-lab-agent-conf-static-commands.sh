@@ -60,8 +60,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     "
   done
   
-  # Take care of the indentation when adding the routes to the above yaml
-  # TODO check what happens with multiple baremetal_ifaces, we are not looping here
+  # Take care of the indentation when adding the dns and routes to the above yaml
   ADAPTED_YAML+="
     dns-resolver:
           config:
