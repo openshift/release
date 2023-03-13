@@ -2,25 +2,27 @@
 
 set -exuo pipefail
 
-rg_name="$IC_INFRA_NAME-rg"
-ssh_key_name="$IC_INFRA_NAME-key"
-vpc_name="$IC_INFRA_NAME-vpc"
-sn_name="$IC_INFRA_NAME-sn"
-rhel_vsi_name="$IC_INFRA_NAME-bastion"
-zvsi_name="$IC_INFRA_NAME-compute"
-hc_name="$PROW_JOB_ID-z-hc"
+infra_name="hypershift-z-$(echo -n $PROW_JOB_ID|cut -c-8)"
+rg_name="$infra_name-rg"
+ssh_key_name="$infra_name-key"
+vpc_name="$infra_name-vpc"
+sn_name="$infra_name-sn"
+rhel_vsi_name="$infra_name-bastion"
+zvsi_name="$infra_name-compute"
+hc_name="z-hc-$(echo -n $PROW_JOB_ID|cut -c-8)"
 hc_ns="$hc_name-clusters"
-dns_name="$IC_INFRA_NAME-$PROW_JOB_ID"
+dns_name="$infra_name-dns"
 dns_zone="$BASE_DOMAIN"
-
+bucket_name="$infra_name"
 
 # Login to the IBM Cloud
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
 ibmcloud login --apikey $IC_APIKEY
 ibmcloud target -r $IC_REGION
+echo "Installing the vpc-infrastructure,cloud-object-storage and cloud-dns-services plugins."
+ibmcloud plugin install vpc-infrastructure cloud-object-storage cloud-dns-services
 
-
-# Create cloud infrastructure resources
+# Create resource group
 echo "Creating a resource group in the region $IC_REGION"
 ibmcloud resource group-create $rg_name
 rg_state=$(ibmcloud resource group $rg_name | awk '/State/{print $2}')
@@ -31,6 +33,7 @@ else
   echo "Resource Group $rg_name is created successfully in the $IC_REGION region."
 fi
 
+# Create SSH key
 echo "Creating an SSH key in the resource group $rg_name"
 ibmcloud is key-create $ssh_key_name @$HOME/.ssh/id_rsa.pub --resource-group-name $rg_name
 key_exists=$(ibmcloud is keys --resource-group-name $rg_name | grep -i $ssh_key_name | wc -l)
@@ -41,6 +44,7 @@ else
   echo "SSH Key $ssh_key_name created successfully in the $rg_name resource group."
 fi
 
+# Create VPC
 echo "Creating a VPC in the resource group $rg_name"
 ibmcloud is vpc-create $vpc_name --resource-group-name $rg_name
 vpc_status=$(ibmcloud is vpc $vpc_name | awk '/Status/{print $2}')
@@ -52,6 +56,7 @@ else
 fi
 vpc_crn=$(ibmcloud is vpc $vpc_name | awk '/CRN/{print $2}')
 
+# Create subnet
 echo "Creating a subnet in the VPC $vpc_name"
 ibmcloud is subnet-create $sn_name $vpc_name --ipv4-address-count 16 --zone "$IC_REGION-1" --resource-group-name $rg_name
 sn_status=$(ibmcloud is subnet $sn_name | awk '/Status/{print $2}')
@@ -63,9 +68,31 @@ else
 fi
 set +e
 
-echo "Creating the s390x ibmcloud custom image for the zVSI creation."
-# TO DO : Finish the creation of custom image
-
+# Create zVSI custom image
+echo "Initaiting the s390x ibmcloud custom image creation for the zVSI compute node."
+zvsi_image="rhcos-$ZVSI_IMAGE_VERSION-ibmcloud.s390x.qcow2.gz"
+wget -P $HOME/ "https://art-rhcos-ci.s3.amazonaws.com/prod/streams/$OCP_VERSION/builds/$ZVSI_IMAGE_VERSION/s390x/$zvsi_image"
+yum install gzip -y
+gzip $HOME/$zvsi_image
+echo "Creating a service instance $bucket_name-si in the resource group $rg_name."
+service_instance_id=$(ibmcloud resource service-instance-create "$bucket_name-si" cloud-object-storage standard global -g $rg_name | awk '/GUID:/{print $2}')
+echo "Creating an IAM authorization policy for the service instance."
+ibmcloud iam authorization-policy-create is --source-resource-type image cloud-object-storage Reader --target-service-instance-id "$service_instance_id"
+echo "Creating a cloud-object-storage(COS) bucket $bucket_name in the service instance $bucket_name-si."
+ibmcloud cos create-bucket --bucket $bucket_name --ibm-service-instance-id $service_instance_id
+echo "Uploading the $zvsi_image image to the cos bucket $bucket_name."
+ibmcloud cos upload --bucket="$bucket_name" --key="$zvsi_image" --file="$HOME/$zvsi_image"
+image=${zvsi_image:0:-6} 
+zvsi_image_name=${image//[._]/-}
+echo "Creating the custom image out of $zvsi_image present in the cos bucket $bucket_name."
+zvsi_image_id=$(ibmcloud is image-create $zvsi_image_name --file "cos://$IC_REGION/$bucket_name/$zvsi_image" --os-name $ZVSI_OS --resource-group-name $rg_name | awk '/ID/{print $2}')
+sleep 30
+image_status=$(ibmcloud is image $zvsi_image_id -q | awk '/Status/{print $2}')
+if [ $image_status != "available" ]; then
+  echo "Successfully created the zVSI image $zvsi_image_name in the resource group $rg_name."
+else 
+  echo "Error: Failure in creating the zVSI image $zvsi_image_name using image file present in the $bucket_name."
+fi
 
 # Create x86 RHEL VSI to use as bastion
 echo "Triggering the $rhel_vsi_name Bastion RHEL VSI creation"
@@ -82,7 +109,6 @@ echo "Assigning the Floating IP for the bastion"
 ibmcloud is in-nic-ipc $rhel_vsi_name $nic_name floating-ip-default-rawhide
 rhel_vsi_fip=$(ibmcloud is in-nic-ips $rhel_vsi_name $nic_name -q | grep -v ID | awk '{print $2}')
 rhel_vsi_rip=$(ibmcloud is in-nic-rips $rhel_vsi_name $nic_name -q | grep -v ID | awk '{print $3}')
-
 
 # Configure bastion to host the ignition file
 echo "Transferring the management cluster kubeconfig to the bastion - RHEL VSI"
@@ -170,13 +196,12 @@ curl -s -k -H "Authorization: Bearer $ignition_token" https://$ignition_endpoint
 EOF
 ssh root@$rhel_vsi_fip 'bash -s' < $HOME/bastion.sh
 
-
 # Create zVSI compute node
 echo "Triggering the $zvsi_name zVSI creation on IBM Cloud in the VPC $vpc_name"
 cat << EOF >> $HOME/$zvsi_name.ign
 {"ignition":{"config":{"merge":[{"source":"http://$rhel_vsi_rip:80/zvsi-compute.ign"}]},"version":"3.3.0"}}
 EOF
-ibmcloud is instance-create $zvsi_name $vpc_name $IC_REGION $ZVSI_PROFILE $sn_name --image $IMAGE --keys $ssh_key_name --resource-group-name $rg_name --user-data @$zvsi_name.ign
+ibmcloud is instance-create $zvsi_name $vpc_name $IC_REGION $ZVSI_PROFILE $sn_name --image $zvsi_image_id --keys $ssh_key_name --resource-group-name $rg_name --user-data @$zvsi_name.ign
 zvsi_state=$(ibmcloud is instance $zvsi_name | awk '/Status/{print $2}')
 if [ $zvsi_state != "running" ]; then
   echo "Error: Instance $zvsi_name is not created properly in the $vpc_name VPC."
@@ -189,8 +214,7 @@ echo "Assigning the Floating IP for the zVSI"
 ibmcloud is in-nic-ipc $zvsi_name $nic_name floating-ip-default-rawhide
 zvsi_fip=$(ibmcloud is in-nic-ips $zvsi_name $nic_name -q | grep -v ID | awk '{print $2}')
 
-
-# Creating DNS service to successfully attach the zVSI
+# Creating DNS service
 echo "Installing the JSON Querier(jq)."
 yum install jq -y
 echo "Triggering the DNS Service creation on IBM Cloud in the resource group $rg_name"
@@ -229,7 +253,6 @@ else
   echo "A record addition is not successful."
 fi
 
-
 # Checking if the compute node is attached
 echo "Checking if the $zvsi_name compute node is attached to the hosted control plane"
 echo "Extracting the hosted cluster kubeconfig"
@@ -250,7 +273,6 @@ while true; do
   fi
 done
 
-
 # Checking if cluster operators are in true state
 echo "Checking the cluster operators status in the hosted control plane"
 co_names=$(oc get co --kubeconfig=$hc_name-kubeconfig | grep -v NAME | awk '{print $1}')
@@ -266,7 +288,6 @@ if [ -n "$co_false_list" ]; then
 else 
   echo "All the cluster operators are in True state and are available"
 fi
-
 
 # Checking if the hosted cluster is in complete state
 echo "Checking the Hosted Cluster status"

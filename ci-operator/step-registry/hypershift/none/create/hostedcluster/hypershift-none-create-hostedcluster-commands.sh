@@ -2,7 +2,7 @@
 
 set -exuo pipefail
 
-$hc_name="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-z-hc"
+hc_name="z-hc-$(echo -n $PROW_JOB_ID|cut -c-8)"
 echo "$(date) Creating a new namespace clusters-$hc_name for the hosted cluster."
 oc new-project "clusters-$hc_name"
 release_image=${HYPERSHIFT_HC_RELEASE_IMAGE:-$OCP_IMAGE_MULTI}

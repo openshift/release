@@ -1,6 +1,19 @@
 ref:
   as: hypershift-none-create-hostedcluster
+  documentation: |-
+    This steps is used to create a none based hosted cluster on the AWS management cluster.
   cli: latest
+  from_image:
+    namespace: ocp
+    name: "4.13"
+    tag: hypershift-operator
+  credentials:
+    - mount_path: /etc/ci-pull-credentials
+      name: ci-pull-credentials
+      namespace: test-credentials
+  dependencies:
+    - env: OCP_IMAGE_MULTI
+      name: release:multi-latest
   env:
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
       default: ""
@@ -9,22 +22,9 @@ ref:
       default: "hypershiftzci.com"
       documentation: "Base domain used for creating the hosted cluster."
   commands: hypershift-none-create-hostedcluster-commands.sh
-  from_image:
-    namespace: ocp
-    name: "4.13"
-    tag: hypershift-operator
   grace_period: 5m0s
   resources:
     requests:
       cpu: 100m
       memory: 100Mi
   timeout: 45m0s
-  credentials:
-    - mount_path: /etc/ci-pull-credentials
-      name: ci-pull-credentials
-      namespace: test-credentials
-  dependencies:
-    - env: OCP_IMAGE_MULTI
-      name: release:multi-latest
-  documentation: |-
-    This steps is used to create a none based hosted cluster on the AWS management cluster.
