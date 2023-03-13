@@ -7,6 +7,9 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+images:
+  - from: quay.io/strimzi-qe/strimzi-tests:release-0.32.x
+    to: test-image
 releases:
   initial:
     candidate:
@@ -24,36 +27,18 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-  - as: latest
+  - as: amq-streams-2.3
     cron: 0 1 * * 1
     steps:
       cluster_profile: aws-cspi-qe
       test:
-        - as: strimzi-tests-2.3
-          from: quay.io/strimzi-qe/strimzi-tests:release-0.32.x
-          ref: strimzi-run-tests
+        - ref: strimzi-run-tests
       env:
         BASE_DOMAIN: aws.interop.ccitredhat.com
         SPOT_INSTANCES: "true"
         GROUPS: acceptance
         OLM_OPERATOR_VERSION: 2.3.0-1
         OLM_OPERATOR_CHANNEL: stable
-      workflow: ipi-aws
-  - as: lts-2-2
-    cron: 0 1 * * 1
-    steps:
-      cluster_profile: aws-cspi-qe
-      test:
-        - as: strimzi-tests-2.2
-          from: quay.io/strimzi-qe/strimzi-tests:release-0.29.x
-          ref: strimzi-run-tests
-      env:
-        BASE_DOMAIN: aws.interop.ccitredhat.com
-        SPOT_INSTANCES: "true"
-        GROUPS: acceptance
-        OLM_OPERATOR_VERSION: 2.2.0-5
-        OLM_OPERATOR_CHANNEL: amq-streams-2.2.x
-      from: quay.io/strimzi-qe/strimzi-tests:release-0.29.x
       workflow: ipi-aws
 zz_generated_metadata:
   branch: main
