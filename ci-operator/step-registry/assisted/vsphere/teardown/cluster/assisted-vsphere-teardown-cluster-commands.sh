@@ -11,7 +11,11 @@ ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" bash - << EOF |& sed -e 's/.*a
 set -xeuo pipefail
 source /root/config.sh
 cd /home/assisted
-# Use minikube instead of spoke cluster
-unset KUBECONFIG
-make destroy_vsphere
+# Use minikube kubeconfig instead of spoke cluster unless kube API is used
+if [[ -z "\${KUBE_API+z}" ]]; then
+  unset KUBECONFIG
+  make destroy_vsphere
+else
+  for DIR in /home/assisted-test-infra/build/cluster/*; do (skipper run "cd \$DIR; terraform apply -destroy -input=false -auto-approve"); done
+fi
 EOF
