@@ -8,7 +8,7 @@ export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
 export GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT
 
 GITHUB_USER=""
 GITHUB_TOKEN=""
@@ -17,6 +17,8 @@ QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-user)
 QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token)
 QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-source)
 QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
+PYXIS_STAGE_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-key)
+PYXIS_STAGE_CERT=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-cert)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
