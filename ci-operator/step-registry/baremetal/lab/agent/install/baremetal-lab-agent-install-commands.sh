@@ -175,7 +175,9 @@ if [ "${DISCONNECTED}" == "true" ]; then
   #Update image:  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:5000/ci-op-6sxtv7mh/release:4.13.0-0.nightly-2023-03-11-033820
   OPENSHIFT_INSTALL_RELEASE="${AUX_HOST}:5000/${NAMESPACE}/release:${OCP_RELEASE}"
   new_pull_secret="${SHARED_DIR}/new_pull_secret"
-  yq -r .pullSecret "$SHARED_DIR/install-config.yaml" > "${new_pull_secret}"
+  registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
+  MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+  jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
   echo "Disconnected env, installing from initial release ${OPENSHIFT_INSTALL_RELEASE}"
   oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE}" \
    --command=openshift-install --to=/tmp --insecure=true
