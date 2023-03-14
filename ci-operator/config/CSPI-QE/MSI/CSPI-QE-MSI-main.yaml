@@ -1,0 +1,39 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+images:
+- dockerfile_literal: |
+    FROM quay.io/interop_qe_ms/ms-interop-tests1:latest
+    WORKDIR /managed-services-integration-tests
+    CMD ["/bin/bash"]
+  to: ms-interop-tests
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: msi-addon-tests
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      BASE_DOMAIN: aws.interop.ccitredhat.com
+      TEST_MARKERS: rhoda
+    test:
+    - ref: msi-addon-testing
+    workflow: rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: CSPI-QE
+  repo: MSI
