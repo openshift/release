@@ -6,22 +6,23 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/addon-testing
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-CSPI-QE-MSI-main-addon-testing
-    rerun_command: /test addon-testing
+    name: pull-ci-CSPI-QE-MSI-main-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=addon-testing
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -48,4 +49,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )addon-testing,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
