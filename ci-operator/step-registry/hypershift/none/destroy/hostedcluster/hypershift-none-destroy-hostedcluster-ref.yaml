@@ -11,18 +11,7 @@ ref:
     - mount_path: /etc/ci-pull-credentials
       name: ci-pull-credentials
       namespace: test-credentials
-  commands: |-
-    set -exuo pipefail
-    
-    hc_name="z-hc-$(echo -n $PROW_JOB_ID|cut -c-8)"
-
-    echo "$(date) Triggering the hosted cluster $hc_name destruction in the namespace clusters_$hc_name"
-    /usr/bin/hypershift destroy cluster none \
-      --name $hc_name \
-      --namespace "clusters-$hc_name" \
-      --destroy-cloud-resources \
-      --cluster-grace-period 40m
-    echo "$(date) Successfully destroyed the hosted cluster $hc_name"
+  commands: hypershift-none-destroy-hostedcluster-commands.sh
   resources:
     requests:
       cpu: 100m
