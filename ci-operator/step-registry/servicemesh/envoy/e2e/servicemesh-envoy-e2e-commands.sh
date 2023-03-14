@@ -66,6 +66,8 @@ metadata:
     cpu-quota.crio.io: "disable"
     ${ANNOTATIONS:-}
 spec:
+  restartPolicy: Never
+  terminationGracePeriodSeconds: 600
   nodeSelector:
     node.kubernetes.io/instance-type: "m5.4xlarge"
   containers:
@@ -82,11 +84,16 @@ spec:
       privileged: true
       runAsUser: 0
     volumeMounts:
-    - mountPath: /bazel-root
+    - mountPath: /home/user/.cache/bazel
       name: bazelcache
+      readOnly: false
+    - mountPath: /rust/toolchains
+      name: rustchains
       readOnly: false
   volumes:
   - name: bazelcache
+    emptyDir: {}
+  - name: rustchains
     emptyDir: {}
 EOF
 }

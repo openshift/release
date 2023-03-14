@@ -53,25 +53,12 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           sh -c "sed -i 's/--local_ram_resources=12288/--local_ram_resources=30720/g' ./maistra/bazelrc;"
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c "sed -i 's/--jobs=3/--jobs=7/g' ./maistra/bazelrc;"
+          sh -c "sed -i 's/--jobs=3/--jobs=4/g' ./maistra/bazelrc;"
 
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           sh -c \
-          "export CC=clang CXX=clang++ ARCH=x86_64 DIR=/work/maistra; \
-          export 'BUILD_SCM_REVISION=Maistra PR #undefined'; \
-          export BUILD_SCM_STATUS=SHA=undefined; \
-          cd /work/maistra; \
-          time bazel --output_base=/bazel-root build \
-            --config=x86_64 --define crypto=system --config=ci-config \
-            //source/exe:envoy-static; \
-          time bazel --output_base=/bazel-root build \
-            --config=x86_64 --define crypto=system --config=ci-config \
-            --build_tests_only \
-            //test/...; \
-          time bazel --output_base=/bazel-root test \
-            --config=x86_64 --define crypto=system --config=ci-config \
-            --build_tests_only \
-            //test/..."
+          "export CI=true; \
+          ./maistra/run-ci.sh"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
