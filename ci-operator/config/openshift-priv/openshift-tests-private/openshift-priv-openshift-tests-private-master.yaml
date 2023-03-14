@@ -1,18 +1,18 @@
 base_images:
   cli:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: cli
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.19-openshift-4.14
   tools:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: tools
   upi-installer:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: upi-installer
 binary_build_commands: make all
@@ -20,15 +20,15 @@ build_root:
   image_stream_tag:
     name: builder-priv
     namespace: ocp-private
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.19-openshift-4.14
 canonical_go_repository: github.com/openshift/openshift-tests-private
 images:
 - dockerfile_path: images/Dockerfile
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: tests-private
 - dockerfile_literal: |
     FROM src
@@ -63,14 +63,14 @@ promotion:
   - tests-private-ui
   - tests-private-pr
   - tests-private-cck
-  name: 4.13-priv
+  name: 4.14-priv
   namespace: ocp-private
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -171,6 +171,20 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi-private
+- as: debug-winc-aws-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
 zz_generated_metadata:
   branch: master
   org: openshift-priv

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+set -x
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE

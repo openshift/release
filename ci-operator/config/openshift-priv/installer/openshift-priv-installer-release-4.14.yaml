@@ -47,6 +47,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.14
   origin_4.12_cli:
     name: "4.14"
     namespace: origin
@@ -68,6 +72,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
@@ -115,6 +122,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -125,6 +135,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: ovirt-installer
 - dockerfile_literal: |
     FROM src
@@ -140,6 +153,7 @@ images:
         source_path: /usr/bin/oc
   to: src-oc
 promotion:
+  disabled: true
   excluded_images:
   - src-oc
   name: 4.14-priv
@@ -488,8 +502,6 @@ tests:
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
-    env:
-      OPENSTACK_TEST_SKIPS: \[sig-installer\]\[Suite:openshift\/openstack\]\[lb\]
     workflow: openshift-e2e-openstack-external-lb
   timeout: 6h0m0s
 - as: openstack-manifests
@@ -665,6 +677,12 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-public-subnets
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-publicsubnets
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.14

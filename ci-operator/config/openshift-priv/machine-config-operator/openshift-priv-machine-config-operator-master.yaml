@@ -24,7 +24,7 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
@@ -36,9 +36,9 @@ base_images:
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
   ocp_os:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
-    tag: rhel-coreos-8
+    tag: rhel-coreos
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-config-operator
@@ -51,7 +51,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: machine-config-operator
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos-8
+    FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
     RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
         chmod +x /usr/bin/rg && \
         curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
@@ -65,7 +65,7 @@ images:
 promotion:
   excluded_images:
   - custom-os-image
-  name: 4.13-priv
+  name: 4.14-priv
   namespace: ocp-private
 releases:
   hosted-ocp-previous:
@@ -76,12 +76,12 @@ releases:
       version: "4.12"
   initial:
     integration:
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
 resources:
   '*':
@@ -313,6 +313,11 @@ tests:
     env:
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp
+- as: e2e-gcp-ovn-rt-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-upgrade-gcp-ovn-rt
 - as: e2e-gcp-single-node
   optional: true
   steps:
@@ -362,8 +367,6 @@ tests:
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
-    env:
-      OPENSTACK_TEST_SKIPS: \[sig-installer\]\[Suite:openshift\/openstack\]\[lb\]
     workflow: openshift-e2e-openstack-external-lb
 - as: e2e-hypershift
   optional: true
