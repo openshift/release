@@ -69,7 +69,7 @@ spec:
   restartPolicy: Never
   terminationGracePeriodSeconds: 600
   nodeSelector:
-    node.kubernetes.io/instance-type: "m5.4xlarge"
+    node.kubernetes.io/instance-type: "m6id.4xlarge"
   containers:
   - name: testpmd
     command: ["tail", "-f", "/dev/null"]
@@ -87,13 +87,8 @@ spec:
     - mountPath: /home/user/.cache/bazel
       name: bazelcache
       readOnly: false
-    - mountPath: /rust/toolchains
-      name: rustchains
-      readOnly: false
   volumes:
   - name: bazelcache
-    emptyDir: {}
-  - name: rustchains
     emptyDir: {}
 EOF
 }
