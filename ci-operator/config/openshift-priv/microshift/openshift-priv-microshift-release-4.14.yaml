@@ -47,7 +47,8 @@ images:
     ENV PAYLOAD_PATH=$HOME/payload
     WORKDIR $PAYLOAD_PATH
     COPY --from=builder /go/src/github.com/openshift/microshift/scripts/devenv-builder/configure-vm.sh usr/bin/configure-vm.sh
-    RUN chmod 755 usr/bin/configure-vm.sh
+    COPY --from=builder /go/src/github.com/openshift/microshift/docs/config/busybox_running_check.sh usr/bin/busybox_running_check.sh
+    RUN chmod 755 usr/bin/configure-vm.sh usr/bin/busybox_running_check.sh
     COPY oc openshift-tests usr/bin/
     RUN chmod 755 usr/bin/oc && ln -rs usr/bin/oc usr/bin/kubectl
     COPY --from=builder /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
@@ -159,6 +160,15 @@ tests:
     env:
       GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
     workflow: openshift-microshift-e2e-reboot-tests
+- as: e2e-greenboot
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|scripts/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-greenboot
 - as: e2e-router-smoke-test
   cluster: build02
   optional: true
