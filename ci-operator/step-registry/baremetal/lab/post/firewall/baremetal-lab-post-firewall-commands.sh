@@ -36,5 +36,6 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   INTERNAL_NET_CIDR="${2}"
   for ip in "${IP_ARRAY[@]}"; do
     iptables -D FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
+    iptables -D FORWARD -s ${ip} -d 172.0.0.0/24 -j ACCEPT
   done
 EOF
