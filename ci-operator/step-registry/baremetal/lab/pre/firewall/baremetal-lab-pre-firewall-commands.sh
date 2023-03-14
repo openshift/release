@@ -4,6 +4,8 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+set -x
+
 [ -z "${AUX_HOST}" ] && { echo "AUX_HOST is not filled. Failing."; exit 1; }
 
 SSHOPTS=(-o 'ConnectTimeout=5'
@@ -30,10 +32,13 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   IP_ARRAY+=( "$ip" )
 done
 
+echo "${IP_ARRAY[@]}"
+
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   "${IP_ARRAY[@]}" "${INTERNAL_NET_CIDR}" << 'EOF'
   set -o nounset
   set -o errexit
+  set -x
   IP_ARRAY=("$@")
   INTERNAL_NET_CIDR="${2}"
   for ip in "${IP_ARRAY[@]}"; do
