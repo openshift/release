@@ -7,18 +7,6 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
-  flowlogs-pipeline:
-    name: "flowlogs-pipeline"
-    namespace: ocp
-    tag: "main"
-  netobserv-ebpf-agent:
-    name: "netobserv-ebpf-agent"
-    namespace: ocp
-    tag: "main"
-  netobserv-console-plugin:
-    name: "netobserv-console-plugin"
-    namespace: ocp
-    tag: "main"
   ocp_builder_rhel-9-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -55,12 +43,6 @@ operator:
     context_dir: ./
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/netobserv/flowlogs-pipeline:v0.1.8
-    with: pipeline:flowlogs-pipeline
-  - pullspec: quay.io/netobserv/netobserv-ebpf-agent:v0.3.0
-    with: pipeline:netobserv-ebpf-agent
-  - pullspec: quay.io/netobserv/network-observability-console-plugin:v0.1.9
-    with: pipeline:netobserv-console-plugin
   - pullspec: quay.io/netobserv/network-observability-operator:main
     with: pipeline:network-observability-operator
 releases:
@@ -74,10 +56,15 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: netobserv-image-index-aws
-  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
+- as: operator-install
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
   steps:
-    cluster_profile: aws-virtualization
     dependencies:
       OO_INDEX: ci-index-netobserv-bundle
     env:
