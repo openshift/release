@@ -42,7 +42,8 @@ parameters:
   basePath: "/dynamic_provisioning"
 EOF
 
-oc -n openshift-cluster-csi-drivers wait sub/aws-efs-csi-driver-operator --for=condition=CatalogSourcesUnhealthy=False --timeout=3m
+# oc -n openshift-cluster-csi-drivers wait sub/aws-efs-csi-driver-operator --for=condition=CatalogSourcesUnhealthy=False --timeout=3m
+sleep 30s
 EFS_CSI_DRIVER_OPERATOR_CSV=$(oc -n openshift-cluster-csi-drivers get sub/aws-efs-csi-driver-operator -o=jsonpath='{.status.currentCSV}')
 echo "EFS CSI Driver Operator CurrentCSV is: ${EFS_CSI_DRIVER_OPERATOR_CSV}"
 oc -n openshift-cluster-csi-drivers wait csv/"${EFS_CSI_DRIVER_OPERATOR_CSV}" --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m
