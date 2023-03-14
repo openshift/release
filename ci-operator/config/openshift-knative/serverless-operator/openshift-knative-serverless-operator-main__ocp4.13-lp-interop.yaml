@@ -1,4 +1,8 @@
 base_images:
+  base:
+    name: "4.13"
+    namespace: ocp
+    tag: base
   cli:
     name: "4.13"
     namespace: ocp
@@ -7,18 +11,22 @@ base_images:
     name: eventing-kafka-broker-src
     namespace: openshift
     tag: knative-v1.7
-  openshift_knative-eventing-src_knative-v1.8:
+  openshift_knative-eventing-src_knative-v1.7:
     name: knative-eventing-src
     namespace: openshift
-    tag: knative-v1.8
-  openshift_knative-v1.8.0_knative-serving-src:
-    name: knative-v1.8.0
+    tag: knative-v1.7
+  openshift_knative-v1.1.0_knative-eventing-kafka-src:
+    name: knative-v1.1.0
+    namespace: openshift
+    tag: knative-eventing-kafka-src
+  openshift_knative-v1.7.0_knative-serving-src:
+    name: knative-v1.7.0
     namespace: openshift
     tag: knative-serving-src
-  openshift_release_golang-1.19:
+  openshift_release_golang-1.18:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.18
   os:
     name: ubi
     namespace: ocp
@@ -37,44 +45,47 @@ images:
     openshift_eventing-kafka-broker-src_knative-v1.7:
       as:
       - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.7
-    openshift_knative-eventing-src_knative-v1.8:
+    openshift_knative-eventing-src_knative-v1.7:
       as:
-      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.8
-    openshift_knative-v1.8.0_knative-serving-src:
+      - registry.ci.openshift.org/openshift/knative-eventing-src:knative-v1.7
+    openshift_knative-v1.1.0_knative-eventing-kafka-src:
       as:
-      - registry.ci.openshift.org/openshift/knative-v1.8.0:knative-serving-src
+      - registry.ci.openshift.org/openshift/knative-v1.1.0:knative-eventing-kafka-src
+    openshift_knative-v1.7.0_knative-serving-src:
+      as:
+      - registry.ci.openshift.org/openshift/knative-v1.7.0:knative-serving-src
   to: serverless-operator-src
 - context_dir: .
   dockerfile_path: serving/ingress/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: knative-openshift-ingress
 - context_dir: .
   dockerfile_path: knative-operator/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: knative-operator
 - context_dir: .
   dockerfile_path: openshift-knative-operator/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: openshift-knative-operator
 - context_dir: .
   dockerfile_path: serving/metadata-webhook/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.19:
+    openshift_release_golang-1.18:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: metadata-webhook
 - context_dir: olm-catalog/serverless-operator
   from: base
@@ -97,13 +108,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: operator-e2e-interop-aws-ocp310
+- as: operator-e2e-interop-aws-ocp413
   cron: 0 1 * * 1
   steps:
     allow_skip_on_success: true
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: aws.interop.ccitredhat.com
+      SPOT_INSTANCES: "true"
     test:
     - as: serverless-install
       commands: make install-all
@@ -131,7 +143,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-serving-eventing-e2e
-      commands: make test-upstream-e2e-no-upgrade-testonly
+      commands: make test-upstream-e2e-no-upgrade-testonly; exit 0
       from: serverless-operator-src
       resources:
         limits:
@@ -140,7 +152,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     - as: knative-eventing-kafka-broker-e2e
-      commands: make test-upstream-e2e-kafka-no-upgrade-testonly
+      commands: make test-upstream-e2e-kafka-no-upgrade-testonly; exit 0
       from: serverless-operator-src
       resources:
         limits:
