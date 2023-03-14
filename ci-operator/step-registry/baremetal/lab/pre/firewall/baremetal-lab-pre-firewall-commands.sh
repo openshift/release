@@ -34,17 +34,17 @@ done
 
 echo "${IP_ARRAY[@]}"
 
-timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}"  << 'EOF'
-  set -o nounset
-  set -o errexit
-  set -x
-  INTERNAL_NET_CIDR="${1}"
-  IP_ARRAY="${@:2}"
-  for ip in $IP_ARRAY; do
-    #iptables -I FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
-  done
-EOF
+# timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
+#   "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}"  << 'EOF'
+#   set -o nounset
+#   set -o errexit
+#   set -x
+#   INTERNAL_NET_CIDR="${1}"
+#   IP_ARRAY="${@:2}"
+#   for ip in $IP_ARRAY; do
+#     iptables -I FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
+#   done
+# EOF
 
 # mirror-images-by-oc-adm will run if a specific file is found, see code below
 
