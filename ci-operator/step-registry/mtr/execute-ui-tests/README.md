@@ -7,7 +7,6 @@
 - [Requirements](#requirements)
   - [Infrastructure](#infrastructure)
   - [Variables](#variables)
-  - [~~Credentials~~](#credentials)
   - [Other](#other)
 - [Custom Image - `mtr-runner`](#custom-image---mtr-runner)
 
@@ -18,11 +17,9 @@ Use to execute the `Cypress` [windup-ui-tests](https://github.com/windup/windup-
 ## Process
 
 1. Retrieves the the test cluster host URL from the `$SHARED_DIR` and uses it to construct the target URL of the MTR webpage in the test cluster.
-2. Installs Cypress
-   - **NOTE**: This needs to happen in this script rather than the Dockerfile because of some issues with permissions in the container caused by OpenShift.
-3. Executes the Cypress tests using target URL constructed earlier in the script and the `CYPRESS_SPEC` variable
-4. Uses the `npm run mergereports` command to merge all of the XML results into one file.
-5. Copies the XML file from the command in step 4 to `$SHARED_DIR/windup-ui-results.xml` to be used in the [`lp-interop-tooling-archive-results](../../lp-interop-tooling/archive-results/README.md) ref.
+2. Executes the Cypress tests using target URL constructed earlier in the script and the `CYPRESS_SPEC` variable
+3. Uses the `npm run mergereports` command to merge all of the XML results into one file.
+4. Copies the XML file from the command in step 4 to `$SHARED_DIR/windup-ui-results.xml` to be used in the [`lp-interop-tooling-archive-results](../../lp-interop-tooling/archive-results/README.md) ref.
 
 ## Requirements
 
@@ -41,8 +38,6 @@ Use to execute the `Cypress` [windup-ui-tests](https://github.com/windup/windup-
 - `CYPRESS_SPEC`
   - **Definition**: Value used for the '--spec' argument in the 'cypress run' command.
   - **If left empty**: It will use "**/*.test.ts" by default.
-
-### ~~Credentials~~
 
 ### Other
 
