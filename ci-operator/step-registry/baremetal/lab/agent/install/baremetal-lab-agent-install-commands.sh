@@ -15,6 +15,10 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function mount_virtual_media() {
   ### Sushy doesn't support NFS as TransferProtcolType, and some servers' BMCs (in particular the ones of the arm64 servers)
   ##  are not 100% compliant with the Redfish standard. Therefore, relying on the raw redfish python library.
@@ -169,33 +173,14 @@ API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
 INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
-OPENSHIFT_INSTALL_RELEASE=$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
+
+echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+oc adm release extract -a "${PULL_SECRET_PATH}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install --to=/tmp
 
 if [ "${DISCONNECTED}" == "true" ]; then
-  OCP_RELEASE=$( oc adm release -a "$PULL_SECRET_PATH" info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o template --template='{{.metadata.version}}' )
-  #Follow mirror-image output step
-  #Update image:  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:5000/ci-op-6sxtv7mh/release:4.13.0-0.nightly-2023-03-11-033820
-  OPENSHIFT_INSTALL_RELEASE="${AUX_HOST}:5000/${NAMESPACE}/release:${OCP_RELEASE}"
-  # new_pull_secret="${SHARED_DIR}/new_pull_secret"
-  # registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
-  # MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
-  # jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
-  # echo "Disconnected env, installing from initial release ${OPENSHIFT_INSTALL_RELEASE}"
-  # oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE}" \
-  #  --command=openshift-install --to=/tmp --insecure=true
-  # rm -f "${new_pull_secret}"
-
-  yq -r .pullSecret "${SHARED_DIR}/install-config.yaml" > "${PULL_SECRET_PATH}"
+  OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
-
-  echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE}"
-  oc adm release extract -a "${PULL_SECRET_PATH}" "${OPENSHIFT_INSTALL_RELEASE}" \
-   --command=openshift-install --to=/tmp --insecure=true
-
-
-
-
-
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
