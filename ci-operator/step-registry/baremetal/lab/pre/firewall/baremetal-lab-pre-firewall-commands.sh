@@ -55,5 +55,4 @@ echo "${IP_ARRAY[@]}"
 #     echo "File ${SHARED_DIR}/mirror_registry_url does not exist."
 #     exit 1
 # fi
-MIRROR_REGISTRY_URL="${AUX_HOST}:5000"
-echo "${MIRROR_REGISTRY_URL}" > "${SHARED_DIR}/mirror_registry_url"
+cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_url"

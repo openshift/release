@@ -173,7 +173,8 @@ if [ "${DISCONNECTED}" == "true" ]; then
   OCP_RELEASE=$( oc adm release -a "$PULL_SECRET_PATH" info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o template --template='{{.metadata.version}}' )
   #Follow mirror-image output step
   #Update image:  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:5000/ci-op-6sxtv7mh/release:4.13.0-0.nightly-2023-03-11-033820
-  OPENSHIFT_INSTALL_RELEASE="${AUX_HOST}:5000/${NAMESPACE}/release:${OCP_RELEASE}"
+  LOCAL_REGISTRY_MIRROR=$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")
+  OPENSHIFT_INSTALL_RELEASE="${LOCAL_REGISTRY_MIRROR}/${NAMESPACE}/release:${OCP_RELEASE}"
   new_pull_secret="${SHARED_DIR}/new_pull_secret"
   registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
   MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
