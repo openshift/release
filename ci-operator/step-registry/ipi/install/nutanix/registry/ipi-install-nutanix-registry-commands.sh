@@ -29,3 +29,21 @@ oc patch config.imageregistry.operator.openshift.io/cluster --type=merge -p '{"s
 
 echo "$(date -u --rfc-3339=seconds) - Changing management state for Image Registry Operator"
 oc patch configs.imageregistry.operator.openshift.io/cluster --type=merge -p '{"spec":{"managementState":"Managed"}}'
+
+sleep 60
+echo "$(date -u --rfc-3339=seconds) - Waiting for Image Registry to be available"
+for i in {1..3}; do
+  echo "$(date -u --rfc-3339=seconds) - Attempt ${i}"
+
+  if oc wait clusteroperators/image-registry --for=condition=Available --timeout=5m; then
+    echo "$(date -u --rfc-3339=seconds) - Image Registry is available"
+    break
+  fi
+
+  oc get events -n openshift-image-registry
+  oc get pods -n openshift-image-registry
+  oc get deploy -n openshift-image-registry
+  oc get pvc -n openshift-image-registry
+  oc describe clusteroperators/image-registry
+
+done

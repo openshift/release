@@ -132,6 +132,7 @@ allowVolumeExpansion: true
 reclaimPolicy: Delete
 EOF
 
+echo "$(date -u --rfc-3339=seconds) - Applying CSI manifests..."
 oc apply -f "${SHARED_DIR}/manifest_0000-nutanix-csi-crd-manifest.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0001-nutanix-csi-ntnx-system-namespace.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0002-nutanix-csi-ntnx-secret.yaml"
@@ -141,4 +142,22 @@ oc apply -f "${SHARED_DIR}/manifest_0005-nutanix-csi-storage.yaml"
 oc apply -f "${SHARED_DIR}/manifest_0006-nutanix-csi-storage-class.yaml"
 
 sleep 60
-oc wait --for condition=Available=True --timeout=5m deployment/nutanix-csi-controller -n ntnx-system
+
+echo "$(date -u --rfc-3339=seconds) - Checking CSI manifests..."
+oc -n ntnx-system get all
+oc -n ntnx-system describe all
+oc -n ntnx-system get events
+oc -n ntnx-system get csv
+oc -n ntnx-system describe csv -l operators.coreos.com/nutanixcsioperator.ntnx-system=
+oc -n ntnx-system get subscription
+oc -n ntnx-system describe subscription
+oc get sc
+
+echo "$(date -u --rfc-3339=seconds) - Waiting for CSI deployment..."
+for i in {1..5}; do
+  echo "$(date -u --rfc-3339=seconds) - Attempt $i: Waiting for CSI deployment..."
+  if oc wait --for condition=Available=True --timeout=5m deployment/nutanix-csi-controller -n ntnx-system; then
+    break
+  fi
+  sleep 60
+done

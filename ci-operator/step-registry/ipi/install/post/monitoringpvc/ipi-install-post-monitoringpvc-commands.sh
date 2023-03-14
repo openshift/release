@@ -65,3 +65,21 @@ yq-go w --style folded -i "${CONFIG}" 'data."config.yaml"' "${CONFIG_CONTENTS}"
 cat "${CONFIG}"
 
 oc apply -f "${CONFIG}"
+
+sleep 180
+echo "$(date -u --rfc-3339=seconds) - Waiting for monitoring operator to be ready"
+for i in {1..3}; do
+
+  echo "$(date -u --rfc-3339=seconds) - Waiting for monitoring operator to be ready, attempt ${i}"
+  if oc wait clusteroperators/monitoring --for condition=Progressing=false --timeout=5m ; then
+    echo "$(date -u --rfc-3339=seconds) - Monitoring operator is ready"
+    break
+  fi
+  
+  oc get pods -n openshift-monitoring
+  oc get pvc -n openshift-monitoring
+  oc get clusteroperators/monitoring -o yaml
+  oc get events -n openshift-monitoring
+  oc describe clusteroperators/monitoring
+
+done
