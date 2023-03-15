@@ -12,6 +12,7 @@ cd /tmp/
 git clone https://github.com/stolostron/policy-collection.git
 
 # apply the configure subscription admin policy
+# copied from https://github.com/stolostron/policy-collection/blob/main/community/CM-Configuration-Management/policy-configure-subscription-admin-hub.yaml
 oc apply -f - <<EOF
 apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
