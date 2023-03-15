@@ -55,8 +55,8 @@ load_video
 menuentry 'Install ($flavor)' {
     set gfx_payload=keep
     insmod gzio
-    linux  /${CLUSTER_NAME}/vmlinuz debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs.img ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/$mac_postfix-console-hook.ign ignition.firstboot ignition.platform.id=metal
-    initrd /${CLUSTER_NAME}/initramfs.img
+    linux  /${CLUSTER_NAME}/vmlinuz_${arch} debug nosplash ip=${baremetal_iface}:dhcp $kargs coreos.live.rootfs_url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/rootfs-${arch}.img ignition.config.url=http://${INTERNAL_NET_IP}/${CLUSTER_NAME}/$mac_postfix-console-hook.ign ignition.firstboot ignition.platform.id=metal
+    initrd /${CLUSTER_NAME}/initramfs_${arch}.img
 }
 EOF
 done
