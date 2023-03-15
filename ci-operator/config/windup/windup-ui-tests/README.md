@@ -38,8 +38,7 @@ Following the test cluster being provisioned, the following steps are executed i
 
 1. [`install-operators`](../../../step-registry/install-operators/README.md)
 2. [`mtr-deploy-windup-ref`](../../../step-registry/mtr/deploy-windup/README.md)
-3. [`mtr-execute-interop-ui-tests-chain`](../../../step-registry/mtr/execute-interop-ui-tests/README.md)
-4. [`lp-interop-tooling-archive-results-ref`](../../../step-registry/lp-interop-tooling/archive-results/README.md)
+3. [`mtr-tests-ui-ref`](../../../step-registry/mtr/tests/ui/README.md)
 
 ## Requirements
 
@@ -47,15 +46,13 @@ Following the test cluster being provisioned, the following steps are executed i
 
 - `BASE_DOMAIN`
   - **Definition**: A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
-  - **If left empty**: The [`ipi-aws` workflow](../../../step-registry/ipi/aws/ipi-aws-workflow.yaml) will fail.
-  - 
-- `RESULTS_FILE`
-  - **Definition**: The name of the file in the $SHARED_DIR that needs to be archived.
-  - **If left empty**: The [`lp-interop-archive-results`](../../../step-registry/lp-interop-tooling/archive-results/README.md) ref will fail.
-
+  - **If left empty**: The [`ipi-aws` workflow](../../../step-registry/ipi/aws/ipi-aws-workflow.yaml) will fail.\
 - `OPERATORS`
   - **Definition**: A JSON list of operators to install. Please see the [Defining `OPERATORS`](../../../step-registry/install-operators/README.md#defining-operators) section of the `install-operators` documentation for more information.
   - **If left empty**: The [`install-operators`](../../../step-registry/install-operators/README.md) ref will fail.
+- `MTR_TESTS_UI_SCOPE`
+  - **Definition**: Tag you'd like to use to execute Cypress.
+  - **If left empty**: It will use 'all' as the default value.
 
 
 ### Custom Images

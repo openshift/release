@@ -18,7 +18,23 @@ spec:
     volumeCapacity: "$WINDUP_VOLUME_CAP"
 EOF
 
-# Wait 5 minutes for Windup to fully deploy
-echo "Waiting 5 minutes for Windup to finish deploying"
-sleep 300
-echo "Windup operator installed and Windup deployed."
+# Check if Windup is deployed
+
+# Sleep for 5 seconds to wait for the resource to be created
+sleep 5
+
+RETRIES=60
+for try in $(seq "$RETRIES"); do
+    READY=$(oc get windup -n mtr -o=jsonpath='{.items[0].status.conditions[1].status}')
+    if [[ $READY == "True" ]]; then
+        echo "Windup is ready."
+        break
+    else
+        if [ $try == $RETRIES ]; then
+            echo "Error deploying Windup, exiting now"
+            exit 1
+        fi
+        echo "Try ${try}/${RETRIES}: Windup deployment is not ready. Checking again in 30 seconds"
+        sleep 30
+    fi
+done

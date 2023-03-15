@@ -1,4 +1,4 @@
-# mtr-execute-ui-tests-ref<!-- omit from toc -->
+# mtr-tests-ui-ref<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 
@@ -12,14 +12,14 @@
 
 ## Purpose
 
-Use to execute the `Cypress` [windup-ui-tests](https://github.com/windup/windup-ui-tests) using the provided arguments. All XML results will be combined into "$SHARED_DIR/windup-ui-results.xml".
+Use to execute the `Cypress` [windup-ui-tests](https://github.com/windup/windup-ui-tests) using the provided arguments. All XML results will be combined into "$ARTIFACT_DIR/windup-ui-results.xml".
 
 ## Process
 
 1. Retrieves the the test cluster host URL from the `$SHARED_DIR` and uses it to construct the target URL of the MTR webpage in the test cluster.
 2. Executes the Cypress tests using target URL constructed earlier in the script and the `CYPRESS_SPEC` variable
 3. Uses the `npm run mergereports` command to merge all of the XML results into one file.
-4. Copies the XML file from the command in step 4 to `$SHARED_DIR/windup-ui-results.xml` to be used in the [`lp-interop-tooling-archive-results](../../lp-interop-tooling/archive-results/README.md) ref.
+4. Copies the XML file from the command in step 4 to `$ARTIFACT_DIR/windup-ui-results.xml`.
 
 ## Requirements
 
@@ -32,12 +32,15 @@ Use to execute the `Cypress` [windup-ui-tests](https://github.com/windup/windup-
 
 ### Variables
 
-- `CYPRESS_INCLUDE_TAGS`
-  - **Definition**: Tag you'd like to use to execute Cypress. Should be `interop` for this chain.
-  - **If left empty**: It will use 'interop' as the default value.
+- `MTR_TESTS_UI_SCOPE`
+  - **Definition**: Tag you'd like to use to execute Cypress.
+  - **If left empty**: It will use 'all' as the default value.
 - `CYPRESS_SPEC`
   - **Definition**: Value used for the '--spec' argument in the 'cypress run' command.
   - **If left empty**: It will use "**/*.test.ts" by default.
+- `BASE_DOMAIN`
+  - **Definition**: BASE_DOMAIN value from the ipi-aws workflow. This is used to built the target URL
+  - **If left empty**: This step will fail
 
 ### Other
 

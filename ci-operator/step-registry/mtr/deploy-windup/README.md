@@ -6,7 +6,6 @@
 - [Requirements](#requirements)
   - [Infrastructure](#infrastructure)
   - [Variables](#variables)
-  - [~~Credentials~~](#credentials)
 
 ## Purpose
 
@@ -14,8 +13,7 @@ To deploy Windup in a specified namespace with a specified volume capacity. This
 
 ## Process
 
-This script is very simple. It uses `oc` to deploy Windup, the waits 5 minutes to allow Windup to finish deploying before proceeding.
-
+This script is very simple. It uses `oc` to deploy Windup, then checks continuously checks if the deployment is complete and ready. If it isn't ready 
 ## Requirements
 
 ### Infrastructure
@@ -33,4 +31,3 @@ This script is very simple. It uses `oc` to deploy Windup, the waits 5 minutes t
   - **Definition**: Windup volume capacity.
   - **If left empty**: Will use a "5Gi" volume capacity.
 
-### ~~Credentials~~
