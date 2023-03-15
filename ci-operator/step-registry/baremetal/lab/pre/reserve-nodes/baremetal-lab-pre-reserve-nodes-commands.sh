@@ -45,8 +45,8 @@ else
   IPI=true
 fi
 ARCH="${5}"
-ADDITIONAL_WORKERS="${6}"
-ADDITIONAL_WORKER_ARCHITECTURE="${7}"
+ADDITIONAL_WORKERS="${6:-}"
+ADDITIONAL_WORKER_ARCHITECTURE="${7:-}"
 
 # shellcheck disable=SC2174
 mkdir -m 755 -p {/var/builds,/opt/tftpboot,/opt/html}/${BUILD_ID}
