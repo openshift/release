@@ -4,6 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# We're using ancient fcct as glibc in installer container is 1.28
+FCCT_DOWNLOAD_URL='https://github.com/coreos/butane/releases/download/v0.7.0/fcct-x86_64-unknown-linux-gnu'
+FCCT_SHA512_SUM='dc3db60fbbc4f256cf0db80278acd551ded23ddc23c6f28b9777553893264e341ccb7ca16be2d5d5d217bb3867f5db6e35561d3edfb4a0cb326cb8ff4746f77f'
+
+YQ_DOWNLOAD_URL='https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64'
+YQ_SHA512_SUM='c767db10b0d979d4343fca39032e5aca1d106a4343732f80366a0277c6a55dbfad081f0ccdcf5d35fc2ed047aa6f617aa57599fcddc4b359dbf293f2e436256d'
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -261,8 +268,10 @@ systemd:
 EOF
 
   cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
-  # We're using ancient fcct as glibc in installer container is 1.28
-  curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-x86_64-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
+  curl -LsS "$FCCT_DOWNLOAD_URL" \
+    | tee /tmp/fcct \
+    | sha512sum -c <(printf '%s -' "$FCCT_SHA512_SUM") \
+    && chmod ug+x /tmp/fcct
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
@@ -271,7 +280,10 @@ function inject_boot_diagnostics() {
   local dir=${1}
 
   if [ ! -f /tmp/yq ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+    curl -LsS "$YQ_DOWNLOAD_URL" \
+      | tee /tmp/yq \
+      | sha512sum -c <(printf '%s -' "$YQ_SHA512_SUM") \
+      && chmod +x /tmp/yq
   fi
 
   PATCH="${SHARED_DIR}/machinesets-boot-diagnostics.yaml.patch"
@@ -296,7 +308,10 @@ function inject_spot_instance_config() {
   local dir=${1}
 
   if [ ! -f /tmp/yq ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+    curl -LsS "$YQ_DOWNLOAD_URL" \
+      | tee /tmp/yq \
+      | sha512sum -c <(printf '%s -' "$YQ_SHA512_SUM") \
+      && chmod +x /tmp/yq
   fi
 
   PATCH="${SHARED_DIR}/machinesets-spot-instances.yaml.patch"
