@@ -5,8 +5,37 @@ build_root:
     namespace: openshift
     tag: tectonic-console-builder-v23
 images:
-  - dockerfile_path: "Dockerfile"
-    context_dir: "integration-tests"
+  - dockerfile_literal: |
+      ARG NODE_VERSION='16.19.1'
+      ARG CHROME_VERSION='110.0.5481.177-1'
+
+      FROM cypress/factory
+
+      ENV OC_DOWNLOAD_URL="https://downloads-openshift-console.apps.hac-devsandbox.5unc.p1.openshiftapps.com/amd64/linux/oc.tar" \
+          CYPRESS_CACHE_FOLDER="/tmp/.cache"
+
+      RUN apt update && \
+          apt install jq python3 python3-venv xauth skopeo -y && \
+          curl -L -o /tmp/oc.tar ${OC_DOWNLOAD_URL} && \
+          tar -xf /tmp/oc.tar -C /usr/bin
+
+      RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
+          install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+
+      COPY . /tmp/e2e
+
+      RUN cd /tmp/e2e && \
+          npm i && \
+          node_modules/.bin/cypress install && \
+          mkdir -p /tmp/artifacts && \
+          chmod -R a+rwx /tmp/artifacts ${CYPRESS_CACHE_FOLDER}
+
+      WORKDIR /tmp/
+      COPY --chown=0:0 entrypoint.sh /tmp/
+
+      RUN chmod aug+rwx /tmp/entrypoint.sh
+
+      ENTRYPOINT ["/tmp/entrypoint.sh"]
     to: cypress-runner
 promotion:
   name: hac-dev
@@ -25,6 +54,9 @@ tests:
     pwd
     ls -la
     npm version
+    export CYPRESS_CACHE_FOLDER="/tmp/.cache"
+    /tmp/entrypoint.sh
+
 
     echo "Installing bonfire."
     VENV_DIR=$(mktemp -d)
