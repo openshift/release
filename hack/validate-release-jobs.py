@@ -12,7 +12,7 @@ logger = logging.getLogger('validate-release-jobs')
 logger.setLevel(logging.INFO)
 
 release_definition_path = 'core-services/release-controller/_releases'
-job_definitions_paths = ['ci-operator/jobs/openshift/release', 'ci-operator/jobs/openshift/multiarch', 'ci-operator/jobs/openshift/hypershift', 'ci-operator/jobs/openshift/microshift']
+job_definitions_paths = ['ci-operator/jobs/openshift/release', 'ci-operator/jobs/openshift/multiarch', 'ci-operator/jobs/openshift/hypershift', 'ci-operator/jobs/openshift/microshift', 'ci-operator/jobs/openshift/cluster-control-plane-machine-set-operator']
 
 
 def raise_on_duplicates(ordered_pairs):
@@ -90,6 +90,16 @@ def main(git_repo_path):
 
     for source, verification, name in missing_jobs:
         logger.error('Unable to locate job definition for: %s:%s:%s', source, verification, name)
+
+    if len(missing_jobs) > 0:
+        message = '''If you are receiving this message, then there is a discrepancy in the release-controller\'s configuration:
+    - If your PR has changes that have removed any of the aforementioned jobs, then you must also remove these jobs from the release-controller\'s configuration files under:
+        core-services/release-controller/_releases, and then run a "make release-controllers" from the root of the repo.
+    - If your PR has changes that have added any of the aforementioned jobs, then you must also ensure that these jobs have been defined in their respective location under:
+        ci-operator/jobs
+    - If you have no idea why you've received this error, then it's most likely do to another commit that introduced the problem.  Please reach out to #forum-crt in Slack.'''
+
+        logger.error(message)
 
     sys.exit(len(missing_jobs))
 

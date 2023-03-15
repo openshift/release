@@ -35,6 +35,10 @@ CONFIG = {
         'us-east-1': 10,
         'us-east-2': 10,
     },
+    'aws-managed-cspi-qe-quota-slice': {
+        'us-east-1': 10,
+        'us-east-2': 10,
+    },
     'aws-qe-quota-slice': {
         'us-east-1': 30,
     },
@@ -107,6 +111,9 @@ CONFIG = {
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
+    },
+    'fleet-manager-qe-quota-slice': {
+        'ap-northeast-1': 3,
     },
     'gcp-qe-quota-slice': {
         'us-central1': 30,
@@ -190,8 +197,7 @@ CONFIG = {
         'osa21': 1,
         'syd04': 1,
         'syd05': 1,
-        'tok04': 1,
-        'tor01': 1
+        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
@@ -224,7 +230,7 @@ CONFIG = {
         'westus': 5
     },
     'gcp-virtualization-quota-slice': {
-        'us-central1': 10,
+        'us-central1': 50,
     }
 }
 
@@ -274,10 +280,10 @@ for i in range(50,54):
 for i in range(55,56):
     CONFIG['vsphere-connected-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(151,155):
+for i in range(151,158):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(200,202):
+for i in range(200,204):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {

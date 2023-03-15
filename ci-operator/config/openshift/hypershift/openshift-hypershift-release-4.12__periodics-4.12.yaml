@@ -27,52 +27,37 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: base
+  bin:
+    name: "4.12"
+    namespace: ocp
+    tag: hypershift-operator
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-    name: builder
+  hypershift-operator:
+    name: "4.12"
     namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
-  openshift_release_golang-1.18:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
-binary_build_commands: make build
-build_root:
-  from_repository: true
-images:
-- from: base
-  inputs:
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: hypershift-operator
-- dockerfile_path: Dockerfile.control-plane
-  from: base
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-  to: hypershift
+    tag: hypershift-operator
+  test-bin:
+    name: "4.12"
+    namespace: ocp
+    tag: hypershift-tests
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
 releases:
   hosted-ocp-previous:
     candidate:
       product: ocp
       relative: 1
-      stream: nightly
+      stream: ci
       version: "4.12"
   latest:
     candidate:
       product: ocp
-      stream: nightly
-      version: "4.12"
-  multi-latest:
-    candidate:
-      architecture: multi
-      product: ocp
-      stream: nightly
+      stream: ci
       version: "4.12"
 resources:
   '*':
@@ -81,7 +66,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: make build e2e
 tests:
 - as: e2e-aws-periodic
   cron: 0 */6 * * *
@@ -102,10 +86,6 @@ tests:
   steps:
     cluster_profile: aws
     workflow: hypershift-aws-conformance-proxy
-- as: e2e-powervs-periodic
-  cron: 0 4 * * *
-  steps:
-    workflow: hypershift-powervs-e2e
 - as: e2e-ibmcloud-iks
   cron: 0 4 * * *
   steps:
@@ -138,6 +118,20 @@ tests:
     dependencies:
       INDEX_IMAGE: assisted-service-index
     workflow: hypershift-agent-conformance
+- as: e2e-conformance-kubevirt
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      CNV_PRERELEASE_VERSION: "4.12"
+    workflow: hypershift-kubevirt-conformance
+- as: conformance-mce-kubevirt
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      CNV_PRERELEASE_VERSION: "4.12"
+    workflow: hypershift-mce-kubevirt-conformance
 zz_generated_metadata:
   branch: release-4.12
   org: openshift

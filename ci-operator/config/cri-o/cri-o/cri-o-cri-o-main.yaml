@@ -23,7 +23,8 @@ images:
     # See also https://issues.redhat.com/browse/ART-4352
     FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-8
     COPY --from=build /*.rpm /
-    RUN rpm -Uvh --oldpackage /*.rpm && rm -f /*.rpm
+    # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
+    RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
   inputs:
     base-machine-with-rpms:
       as:

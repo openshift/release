@@ -3,6 +3,14 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  hypershift-operator-4.13:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -22,10 +30,45 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: kubevirt-csi-driver
+- build_args:
+  - name: ARCH
+    value: amd64
+  - name: ldflags
+  dockerfile_literal: |-
+    FROM src
+    COPY oc hypershift /usr/bin/
+    RUN mkdir -p /go/src/github.com/openshift && \
+        cd /go/src/github.com/openshift && \
+        git clone https://github.com/openshift/hypershift.git && \
+        cd hypershift/ && \
+        go mod tidy && go mod vendor && \
+        make e2e && \
+        sed -i 's|global-pull-secret.json|/tmp/global-pull-secret.json|g' ./hack/ci/install-cnv.sh
+    WORKDIR /go/src/github.com/openshift/hypershift
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    hypershift-operator-4.13:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/hypershift
+  to: hypershift-cli-e2e
 promotion:
+  disabled: true
+  excluded_images:
+  - hypershift-cli-e2e
   name: "4.14"
   namespace: ocp
 releases:
+  hosted-ocp-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.13"
   initial:
     integration:
       name: "4.14"
@@ -45,6 +88,67 @@ tests:
   commands: make test
   container:
     from: src
+- as: cluster-api-provider-kubevirt-with-hypershift
+  steps:
+    cluster_profile: aws-virtualization
+    env:
+      BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
+    test:
+    - as: deploy-cnv
+      cli: latest
+      commands: CNV_PRERELEASE_VERSION=4.12 ./hack/ci/install-cnv.sh
+      credentials:
+      - mount_path: /etc/cnv-nightly-pull-credentials
+        name: openshift-cnv-quay-credentials
+        namespace: test-credentials
+      from: hypershift-cli-e2e
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: deploy-hypershift
+      cli: latest
+      commands: |-
+        set -x
+        hypershift install
+      from: hypershift-cli-e2e
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: hypershift-e2e
+      cli: latest
+      commands: |-
+        set -ex
+        # run the test
+        bin/test-e2e \
+                  --test.v \
+                  --test.timeout=0 \
+                  --test.run='^TestCreateCluster$' \
+                  --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
+                  --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
+                  --e2e.node-pool-replicas=2 \
+                  --e2e.kubevirt-node-memory="6Gi" \
+                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
+                  --e2e.platform=KubeVirt
+      credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+      dependencies:
+      - env: OCP_IMAGE_LATEST
+        name: release:latest
+      - env: OCP_IMAGE_PREVIOUS
+        name: release:hosted-ocp-previous
+      from: hypershift-cli-e2e
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: ipi-aws-ovn
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

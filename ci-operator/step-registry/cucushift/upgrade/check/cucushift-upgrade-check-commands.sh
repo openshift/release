@@ -34,10 +34,12 @@ if [ -z "${UPGRADE_SKIP_TAGS}" ] ; then
 else
     export UPGRADE_SKIP_TAGS="${UPGRADE_SKIP_TAGS} and not @customer and not @security"
 fi
+UPGRADE_SKIP_TAGS_CLOUD="${UPGRADE_SKIP_TAGS/and not @destructive/}"
 
 cd verification-tests
 set -x
 cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and ${UPGRADE_SKIP_TAGS}" -p junit || true
+cucumber --tags "${UPGRADE_CHECK_RUN_TAGS} and ${UPGRADE_SKIP_TAGS_CLOUD} and @cloud and @destructive" -p junit || true
 set +x
 
 echo "Summarizing test result..."

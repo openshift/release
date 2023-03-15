@@ -110,7 +110,7 @@ backend ${EP_NAMES[$i]}
   default-server verify none inter 10s downinter 5s rise 2 fall 3 slowstart 60s maxconn 250 maxqueue 256 weight 100
 EOF
 
-  for ip in {10..99}; do
+  for ip in {10..127}; do
     echo "   "server ${EP_NAMES[$i]}-${ip} 192.168.${third_octet}.${ip}:${EP_PORTS[$i]} check check-ssl >> $HAPROXY_PATH
   done
 done

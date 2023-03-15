@@ -31,22 +31,39 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
+    tag: rhel-8-golang-1.19-openshift-4.13
+  ocp_os:
+    name: "4.13"
+    namespace: ocp
+    tag: rhel-coreos
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: machine-config-operator
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
+    RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
+        chmod +x /usr/bin/rg && \
+        curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
+        chmod +x /usr/bin/yq && \
+        cd /etc/yum.repos.d/ && curl -LO https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && \
+        rpm-ostree install tailscale && \
+        systemctl enable tailscaled && \
+        ostree container commit
+  from: ocp_os
+  to: custom-os-image
 promotion:
-  disabled: true
+  excluded_images:
+  - custom-os-image
   name: "4.13"
   namespace: ocp
 releases:
@@ -81,6 +98,38 @@ tests:
   steps:
     cluster_profile: alibabacloud
     workflow: openshift-e2e-alibabacloud
+- always_run: false
+  as: e2e-aws-ovn-fips-op
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- always_run: false
+  as: e2e-aws-ovn-fips
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FIPS_ENABLED: "true"
+    pre:
+    - chain: ipi-aws-pre
+    - ref: fips-check
+    test:
+    - ref: openshift-e2e-test
+    workflow: ipi-aws
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
@@ -114,6 +163,22 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
+- always_run: false
+  as: e2e-gcp-rt-op
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      RT_ENABLED: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 - as: e2e-gcp-op
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
@@ -122,6 +187,9 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      dependencies:
+      - env: OS_IMAGE_URL
+        name: pipeline:custom-os-image
       from: src
       resources:
         requests:
@@ -236,6 +304,14 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
+- always_run: false
+  as: e2e-gcp-rt
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      RT_ENABLED: "true"
+    workflow: openshift-e2e-gcp
 - as: e2e-gcp-single-node
   optional: true
   steps:
@@ -249,6 +325,9 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e-single-node
+      dependencies:
+      - env: OS_IMAGE_URL
+        name: pipeline:custom-os-image
       from: src
       resources:
         requests:
@@ -278,6 +357,11 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-externallb-techpreview
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-external-lb
 - as: e2e-hypershift
   optional: true
   steps:

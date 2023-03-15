@@ -9,12 +9,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.12"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -25,6 +25,7 @@ resources:
       memory: 200Mi
 tests:
 - as: unittests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
     test:
     - as: unittests
@@ -35,8 +36,9 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: e2e-functests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-virtualization
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
     test:
@@ -59,9 +61,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+  timeout: 8h0m0s
 - as: e2e-upgrade-functests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-virtualization
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
     test:
@@ -84,9 +88,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+  timeout: 8h0m0s
 - as: e2e-single-node-functests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-virtualization
     test:
     - as: e2e-single-node-functests
       cli: latest
@@ -108,6 +114,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp-single-node
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: master
   org: kubevirt

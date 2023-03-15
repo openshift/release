@@ -6,7 +6,7 @@
         rules: [
           {
             alert: 'prow-pod-crashlooping',
-            expr: 'increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci"}[1h]) > 10',
+            expr: 'increase(kube_pod_container_status_restarts_total{job="kube-state-metrics",namespace="ci"}[1h]) > 20',
             'for': '10m',
             labels: {
               severity: 'critical',

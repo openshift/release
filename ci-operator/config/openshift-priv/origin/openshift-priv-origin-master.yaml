@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
@@ -11,16 +11,12 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-  ocp_builder_rhel-8-golang-1.15-openshift-4.8:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.15-openshift-4.8
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
   tools:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: tools
 binary_build_commands: make build
@@ -31,9 +27,6 @@ images:
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
@@ -41,22 +34,22 @@ images:
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.15-openshift-4.8:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.8
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: hello-openshift
 promotion:
-  name: 4.13-priv
+  name: 4.14-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
 resources:
   '*':
@@ -380,6 +373,18 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-etcd-scaling
+- always_run: false
+  as: e2e-gcp-ovn-techpreview
+  optional: true
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp-techpreview
+- always_run: false
+  as: e2e-gcp-ovn-techpreview-serial
+  optional: true
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp-techpreview
 zz_generated_metadata:
   branch: master
   org: openshift-priv

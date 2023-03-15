@@ -14,22 +14,22 @@ cp $SSH_PKEY_PATH $SSH_PKEY
 chmod 600 $SSH_PKEY
 BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
-DSHVIP="$(cat /var/run/ds-hv-ip/dshvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
-KCLI_PARAM=""
-if [[ "$PROW_JOB_ID" =~ "nightly" ]]; then
-    # In case of running on nightly releases we need to figure out what release exactly to use
-    KCLI_PARAM="-P openshift_image=registry.ci.openshift.org/ocp/release:${PROW_JOB_ID/-telco5g/}"
-elif [ ! -z $JOB_NAME ]; then
-    # In case of regular periodic job
-    KCLI_PARAM="-P tag=$T5CI_VERSION -P version=nightly"
-fi
-echo "==========  Running with KCLI_PARAM=$KCLI_PARAM  =========="
+# Cluster to use for cnf-tests, and to exclude from selection in other jobs
+PREPARED_CLUSTER="cnfdu1"
+
+source $SHARED_DIR/main.env
+echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
+# Run cnftests job on Upstream cluster
+if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
+    INTERNAL=false
+    INTERNAL_ONLY=false
+fi
 # Whether to use the bastion environment
 BASTION_ENV=true
 # Environment - US lab, DS lab or any
@@ -46,6 +46,13 @@ cat << EOF > $SHARED_DIR/bastion_inventory
 ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
+ADDITIONAL_ARG=""
+if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
+  ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
+else
+  ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
+fi
+
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
 ---
 - name: Grab and run kcli to install openshift cluster
@@ -61,7 +68,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -e $CL_SEARCH
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -77,7 +84,7 @@ echo "exit" | curl telnet://${BASTION_IP}:22 && echo "SSH port is opened"|| echo
 ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.yml -vvvv
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
-IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
+IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
 PLAN_NAME="${CLUSTER_NAME}_ci"
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
@@ -106,7 +113,7 @@ else
 # Run on downstream cnfdc1 without bastion
 cat << EOF > $SHARED_DIR/inventory
 [hypervisor]
-${DSHVIP} ansible_host=${DSHVIP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
+${CLUSTER_HV_IP} ansible_host=${CLUSTER_HV_IP} ansible_ssh_user=kni ansible_ssh_common_args="${COMMON_SSH_ARGS}" ansible_ssh_private_key_file="${SSH_PKEY}"
 EOF
 
 fi
@@ -196,10 +203,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
     shell: kcli scp root@${CLUSTER_NAME}-installer:/root/ocp/auth/kubeconfig /home/kni/.kube/config_${CLUSTER_NAME}
 
   - name: Add skip-tls-verify to kubeconfig
-    lineinfile:
+    replace:
       path: /home/kni/.kube/config_${CLUSTER_NAME}
-      regexp: '    certificate-authority-data:'
-      line: '    insecure-skip-tls-verify: true'
+      regexp: '    certificate-authority-data:.*'
+      replace: '    insecure-skip-tls-verify: true'
 
   - name: Grab the kubeconfig
     fetch:
@@ -208,11 +215,12 @@ cat << EOF > ~/fetch-kubeconfig.yml
       flat: yes
 
   - name: Modify local copy of kubeconfig
-    lineinfile:
+    replace:
       path: $SHARED_DIR/kubeconfig
       regexp: '    server: https://api.*'
-      line: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
+      replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
+
 EOF
 
 cat << EOF > ~/fetch-information.yml
@@ -232,6 +240,35 @@ cat << EOF > ~/fetch-information.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer 'oc get node'
 EOF
 
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv
-ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv
+cat << EOF > $SHARED_DIR/check-cluster.yml
+---
+- name: Check if cluster is ready
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Check if cluster is available
+    shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'"
+    register: ready_check
+
+  - name: Fail when cluster is not available
+    shell: "echo Cluster ready: {{ ready_check.stdout }}"
+    failed_when: "'True' not in ready_check.stdout"
+EOF
+
+# PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
+# CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.
+# It is intentionally set to a string so that it can be evaluated as a command (either /bin/true or /bin/false)
+# in order to provide the desired return code later.
+PROCEED_AFTER_FAILURES="false"
+status=0
+if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
+    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory $SHARED_DIR/check-cluster.yml -vv
+else
+    PROCEED_AFTER_FAILURES="true"
+    ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+fi
+ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || eval $PROCEED_AFTER_FAILURES
+ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || eval $PROCEED_AFTER_FAILURES
+exit ${status}
+

@@ -70,6 +70,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/prow-jobs-scraper-codecov-token
         - --target=unit-tests
         command:
         - ci-operator
@@ -83,6 +84,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/prow-jobs-scraper-codecov-token
+          name: prow-jobs-scraper-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -91,6 +95,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: prow-jobs-scraper-codecov-token
+        secret:
+          secretName: prow-jobs-scraper-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

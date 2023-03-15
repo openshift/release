@@ -52,9 +52,17 @@ fi
 versionList=$(ocm list versions --channel-group ${CHANNEL_GROUP})
 echo -e "Available cluster versions:\n${versionList}"
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
-  OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | tail -1 || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | tail -1)
+  fi
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
-  OPENSHIFT_VERSION=$(echo "$versionList" | { grep "${OPENSHIFT_VERSION}" || true; } | tail -1)
+  if [[ "$EC_BUILD" == "true" ]]; then
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | grep -i ec |tail -1 || true)
+  else
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | tail -1 || true)
+  fi
 else
   # Match the whole line
   OPENSHIFT_VERSION=$(echo "$versionList" | { grep -x "${OPENSHIFT_VERSION}" || true; })

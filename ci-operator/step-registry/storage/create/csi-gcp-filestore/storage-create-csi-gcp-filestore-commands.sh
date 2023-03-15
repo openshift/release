@@ -52,6 +52,8 @@ SnapshotClass:
   FromName: true
 DriverInfo:
   Name: filestore.csi.storage.gke.io
+  SupportedMountOption:
+    sync: {}
   SupportedSizeRange:
     Min: 1Ti
     Max: 63.9Ti
@@ -62,6 +64,7 @@ DriverInfo:
     controllerExpansion: true
     snapshotDataSource: true
     multipods: true
+    multiplePVsSameID: true
 # Values take from https://github.com/kubernetes-sigs/gcp-filestore-csi-driver/blob/fa2463561c2f19e253a30d172e067e2f8628fa88/test/k8s-integration/driver-config.go#L32-L41
 Timeouts:
   PodStart: 15m

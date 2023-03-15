@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
@@ -11,32 +11,32 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: latest
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.19-openshift-4.14
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/insights-operator
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: insights-operator
 promotion:
-  name: 4.13-priv
+  name: 4.14-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
 resources:
   '*':
@@ -54,14 +54,17 @@ tests:
   container:
     from: src
 - as: e2e
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: gcp
     pre:
@@ -82,6 +85,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6

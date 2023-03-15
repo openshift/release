@@ -33,6 +33,11 @@ if [ ${LEASE_NUMBER} -ge 88 ] && [ ${LEASE_NUMBER} -lt 200 ]; then
   vsphere_cluster="vcs-ci-workload"
   vsphere_datastore="vsanDatastore"
 fi
+# For leases >= than 151 and < 160, pull from alternate DNS which has context
+# relevant to NSX-T segments.
+if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -lt 160 ]; then
+  dns_server="192.168.133.73"
+fi
 
 # For leases >= 200, run on the IBM Cloud vSphere 8 env
 if [ ${LEASE_NUMBER} -ge 200 ]; then

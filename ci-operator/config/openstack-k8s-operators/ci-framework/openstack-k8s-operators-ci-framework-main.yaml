@@ -1,0 +1,41 @@
+build_root:
+  project_image:
+    dockerfile_path: containerfiles/Containerfile.ci
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN make setup_molecule USE_VENV=no
+  from: src
+  to: ci-framework-image
+promotion:
+  namespace: openstack-k8s-operators
+  tag: latest
+  tag_by_commit: true
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pre-commit
+  commands: |
+    export HOME=/tmp
+    export ANSIBLE_LOCAL_TMP=/tmp
+    export ANSIBLE_REMOTE_TMP=/tmp
+    make pre_commit_nodeps
+  container:
+    from: ci-framework-image
+- as: ansible-test
+  commands: |
+    export HOME=/tmp
+    export ANSIBLE_LOCAL_TMP=/tmp
+    export ANSIBLE_REMOTE_TMP=/tmp
+    make ansible_test_nodeps USE_VENV=no
+  container:
+    from: ci-framework-image
+zz_generated_metadata:
+  branch: main
+  org: openstack-k8s-operators
+  repo: ci-framework

@@ -7,10 +7,24 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-node-tuning-operator
 images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: cluster-node-tuning-operator-us-tuned
 - dockerfile_path: Dockerfile.rhel8
   from: base
   inputs:
@@ -19,6 +33,9 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: cluster-node-tuning-operator
 promotion:
+  disabled: true
+  excluded_images:
+  - cluster-node-tuning-operator-us-tuned
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -66,6 +83,7 @@ tests:
           cpu: 100m
     workflow: ipi-aws
 - as: e2e-gcp-pao
+  cluster: build03
   steps:
     cluster_profile: gcp
     test:
@@ -77,8 +95,24 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-      timeout: 3h0m0s
+      timeout: 2h0m0s
     workflow: ipi-gcp
+- as: e2e-gcp-pao-updating-profile
+  cluster: build03
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-updating-profile
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+  timeout: 5h0m0s
 - as: e2e-upgrade
   steps:
     cluster_profile: aws

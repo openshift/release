@@ -14,11 +14,22 @@ REGION="${LEASED_RESOURCE}"
 oc registry login
 oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
 
+
+CCOCTL_OPTIONS=""
+
+if [[ "${STS_USE_PRIVATE_S3}" == "yes" ]]; then
+  CCOCTL_OPTIONS=" $CCOCTL_OPTIONS --create-private-s3-bucket "
+fi
+
 # create required credentials infrastructure and installer manifests
-ccoctl aws create-all --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
+ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
 
 # copy generated service account signing from ccoctl target directory into shared directory
 cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"
+
+echo "Cluster authentication:"
+cat "/tmp/manifests/cluster-authentication-02-config.yaml"
+echo -e "\n"
 
 # copy generated secret manifests from ccoctl target directory into shared directory
 cd "/tmp/manifests"

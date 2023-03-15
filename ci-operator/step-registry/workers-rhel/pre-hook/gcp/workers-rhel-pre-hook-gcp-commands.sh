@@ -16,13 +16,29 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
-cat > scaleup-pre-hook-gcp.yaml <<- 'EOF'
+cat > scaleup-pre-hook-gcp.yaml << EOF
 - name: Configure RHEL machine on GCP
   hosts: new_workers
   any_errors_fatal: true
-  gather_facts: false
+  gather_facts: true
 
   tasks:
+  - name: disable unnecessary repos
+    shell: |
+      {{ ansible_pkg_mgr }} config-manager --set-disabled rhui-codeready-builder-for-rhel-8-x86_64-rhui-\*
+      {{ ansible_pkg_mgr }} config-manager --set-disabled rhui-rhel-8-for-x86_64-\*-debug-\*rpms
+      {{ ansible_pkg_mgr }} config-manager --set-disabled rhui-rhel-8-for-x86_64-\*-source-\*rpms
+      {{ ansible_pkg_mgr }} repolist
+
+  - name: cache repo metadata in advance
+    shell: |
+      {{ ansible_pkg_mgr }} clean all
+      {{ ansible_pkg_mgr }} makecache
+    retries: 10
+    delay: 20
+    register: makecache_result
+    until: makecache_result.rc == 0
+
   - name: install checkpolicy
     yum: name=checkpolicy state=present
 EOF

@@ -44,8 +44,30 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
+- as: aws-ipi-byo-kms-etcd-encryption-p2-f14
+  cron: 44 9 3,18 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.11'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
+- as: aws-ipi-byo-kms-etcd-encryption-p3-f28-destructive
+  cron: 37 19 20 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@aws-ipi and @network-openshiftsdn and not @fips and @destructive'
+      TAG_VERSION: '@4.11'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
 - as: aws-ipi-disconnected-cco-manual-sts-ep-p2-f14
-  cron: 55 2 15,30 * *
+  cron: 55 2 1,16 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -56,9 +78,9 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-with-ep-sts-ec2-elb
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
 - as: aws-ipi-disconnected-cco-manual-sts-ep-p3-f28-destructive
-  cron: 54 10 21 * *
+  cron: 54 10 23 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -69,9 +91,9 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-with-ep-sts-ec2-elb
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
 - as: aws-ipi-disconnected-cco-manual-sts-p2-f14
-  cron: 4 23 22,6 * *
+  cron: 4 23 9,24 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -84,7 +106,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
 - as: aws-ipi-disconnected-cco-manual-sts-p3-f28-destructive
-  cron: 14 13 1 * *
+  cron: 14 13 4 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -97,7 +119,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
 - as: aws-ipi-ovn-p2-f14
-  cron: 57 14 13,28 * *
+  cron: 57 14 14,29 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -108,7 +130,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: aws-upi-p3-f28
-  cron: 19 15 9 * *
+  cron: 19 15 10 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -119,7 +141,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-upi
 - as: azure-ipi-ovn-p2-f7
-  cron: 26 5 12,20,27,3 * *
+  cron: 26 5 6,14,22,29 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -130,7 +152,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-ovn
 - as: azure-ipi-p2-f7
-  cron: 32 20 21,29,5,12 * *
+  cron: 32 20 1,8,15,23 * *
   steps:
     cluster_profile: azure-qe
     env:
@@ -141,7 +163,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: gcp-ipi-ovn-p2-f7
-  cron: 31 15 14,22,29,5 * *
+  cron: 31 15 7,15,23,30 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -151,7 +173,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn
 - as: vsphere-ipi-p2-f7
-  cron: 12 11 26,3,10,17 * *
+  cron: 12 11 4,11,18,26 * *
   steps:
     cluster_profile: vsphere
     env:
@@ -161,7 +183,7 @@ tests:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: vsphere-upi-p2-f7
-  cron: 37 8 23,31,7,14 * *
+  cron: 37 8 1,8,15,23 * *
   steps:
     cluster_profile: vsphere
     env:

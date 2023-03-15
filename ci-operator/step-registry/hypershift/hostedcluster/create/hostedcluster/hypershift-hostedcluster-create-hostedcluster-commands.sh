@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euox pipefail
+
+echo HyperShift CLI version
+/usr/bin/hypershift version
 
 echo Generating pull secret to current build farm
 oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
@@ -51,7 +54,11 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
   --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
   --release-image ${RELEASE_IMAGE} \
   --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
-  --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
+  --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
+  --annotations "prow.k8s.io/job=${JOB_NAME}" \
+  --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
+  --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
+  --additional-tags "prow.k8s.io/build-id=${BUILD_ID}"
 
 echo "Wait to check if release image is valid"
 n=0
@@ -71,21 +78,29 @@ done
 
 # The timeout should be much lower, this is due to https://bugzilla.redhat.com/show_bug.cgi?id=2060091
 echo "Waiting for cluster to become available"
-oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME} || {
+  echo "Cluster did not become available"
+  oc get hostedcluster --namespace=clusters -o yaml ${CLUSTER_NAME}
+  exit 1
+}
 echo "Cluster became available, creating kubeconfig"
-bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig || {
+  echo "Failed to create kubeconfig"
+  exit 1
+}
 
 # Data for cluster bot.
 # The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 2 minutes for it to become available
+echo "Retrieving kubeadmin password"
 for _ in {1..8}; do
-    if oc get secret --namespace=clusters ${CLUSTER_NAME}-kubeadmin-password --template='{{.data.password}}' | base64 -d > ${SHARED_DIR}/kubeadmin-password; then
-      echo "Successfully retrieved kubeadmin password"
-      break
-    else
-      # make sure file is non-existant if command failed
-      rm ${SHARED_DIR}/kubeadmin-password
-      sleep 15
-    fi
+  kubeadmin_pwd=`oc get secret --namespace=clusters ${CLUSTER_NAME}-kubeadmin-password --template='{{.data.password}}' | base64 -d` || true
+  if [ -z $kubeadmin_pwd ]; then
+    echo "kubeadmin password is not ready yet, waiting 15s"
+    sleep 15
+  else
+    echo $kubeadmin_pwd > ${SHARED_DIR}/kubeadmin-password
+    break
+  fi
 done
 
 if [[ ! -f ${SHARED_DIR}/kubeadmin-password ]]; then

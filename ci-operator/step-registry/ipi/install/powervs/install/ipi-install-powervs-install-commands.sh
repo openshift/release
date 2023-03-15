@@ -223,7 +223,7 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.13.0/IBM_Cloud_CLI_2.13.0_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.15.0/IBM_Cloud_CLI_2.15.0_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
@@ -332,7 +332,7 @@ function init_ibmcloud() {
     ibmcloud login --apikey "${IBMCLOUD_API_KEY}" -r ${VPCREGION}
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
   fi
-  
+
   CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
   export CIS_INSTANCE_CRN
 
@@ -434,10 +434,11 @@ function destroy_resources() {
   cat > "/tmp/ocp-test/metadata.json" << EOF
 {"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
-  
+
   #
   # Call destroy cluster on fake metadata file
   #
+  DESTROY_SUCCEEDED=false
   for i in {1..3}; do
     echo "Destroying cluster $i attempt..."
     echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
@@ -447,6 +448,7 @@ EOF
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_CLEAR_RESOURCE_END_TIME_$i"
     echo "ret=${ret}"
     if [ ${ret} -eq 0 ]; then
+      DESTROY_SUCCEEDED=true
       break
     fi
   done
@@ -461,6 +463,12 @@ EOF
       ibmcloud pi network-delete ${UUID}
     done
   ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("rdr-multiarch-'${POWERVS_ZONE}'")) | .networkID')
+
+  if ! ${DESTROY_SUCCEEDED}
+  then
+    echo "Failed to destroy cluster failed after three attempts."
+    exit 1
+  fi
 }
 
 function dump_resources() {
@@ -677,6 +685,7 @@ IBMCLOUD_APIKEY_CCM_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds
 IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_INGRESS_CREDS")
 IBMCLOUD_APIKEY_MACHINEAPI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_MACHINEAPI_CREDS")
 IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CSI_CREDS")
+IBMCLOUD_REGISTRY_INSTALLER_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_REGISTRY_INSTALLER_CREDS")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
 POWERVS_SERVICE_INSTANCE_ID=$(yq eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
@@ -806,6 +815,21 @@ stringData:
     IBMCLOUD_AUTHTYPE=iam
     IBMCLOUD_APIKEY=${IBMCLOUD_APIKEY_CSI_CREDS}
   ibmcloud_api_key: ${IBMCLOUD_APIKEY_CSI_CREDS}
+type: Opaque
+EOF
+
+cat > "${dir}/manifests/openshift-image-registry-installer-cloud-credentials-credentials.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: installer-cloud-credentials
+  namespace: openshift-image-registry
+stringData:
+  ibm-credentials.env: |-
+    IBMCLOUD_AUTHTYPE=iam
+    IBMCLOUD_APIKEY=${IBMCLOUD_REGISTRY_INSTALLER_CREDS}
+  ibmcloud_api_key: ${IBMCLOUD_REGISTRY_INSTALLER_CREDS}
 type: Opaque
 EOF
 

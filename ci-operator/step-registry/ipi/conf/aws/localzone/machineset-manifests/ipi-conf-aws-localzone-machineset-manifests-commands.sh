@@ -37,8 +37,8 @@ spec:
     spec:
       metadata:
         labels:
-          location: local-zone
-          zone_group: ${localzone_az_name::-1}
+          machine.openshift.io/zone-type: local-zone
+          machine.openshift.io/zone-group: ${localzone_az_name::-1}
           node-role.kubernetes.io/edge: ""
       providerSpec:
         value:
@@ -73,6 +73,19 @@ spec:
             name: worker-user-data
 EOF
 
+if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
+  ip_patch=`mktemp`
+  cat <<EOF > ${ip_patch}
+spec:
+  template:
+    spec:
+      providerSpec:
+        value:
+          publicIp: true
+EOF
+  yq-go m -x -i "${localzone_machineset}" "${ip_patch}"
+fi
+
 if [[ "${LOCALZONE_WORKER_SCHEDULABLE}" == "no" ]]; then
   schedulable_patch=`mktemp`
   cat <<EOF > ${schedulable_patch}
@@ -85,26 +98,25 @@ spec:
 EOF
   yq-go m -x -i "${localzone_machineset}" "${schedulable_patch}"
 fi
-
-default_ingress="${SHARED_DIR}/manifest_localzone_cluster-ingress-default-ingresscontroller.yaml"
-echo "Creating ingress manifests ... "
-cat <<EOF > "${default_ingress}"
-apiVersion: operator.openshift.io/v1
-kind: IngressController
-metadata:
-  creationTimestamp: null
-  name: default
-  namespace: openshift-ingress-operator
-spec:
-  endpointPublishingStrategy:
-    loadBalancer:
-      scope: External
-      providerParameters:
-        type: AWS
-        aws:
-          type: NLB
-    type: LoadBalancerService
-EOF
-
 cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
-cp "${default_ingress}" "${ARTIFACT_DIR}/"
+
+# default_ingress="${SHARED_DIR}/manifest_localzone_cluster-ingress-default-ingresscontroller.yaml"
+# echo "Creating ingress manifests ... "
+# cat <<EOF > "${default_ingress}"
+# apiVersion: operator.openshift.io/v1
+# kind: IngressController
+# metadata:
+#   creationTimestamp: null
+#   name: default
+#   namespace: openshift-ingress-operator
+# spec:
+#   endpointPublishingStrategy:
+#     loadBalancer:
+#       scope: External
+#       providerParameters:
+#         type: AWS
+#         aws:
+#           type: NLB
+#     type: LoadBalancerService
+# EOF
+# cp "${default_ingress}" "${ARTIFACT_DIR}/"

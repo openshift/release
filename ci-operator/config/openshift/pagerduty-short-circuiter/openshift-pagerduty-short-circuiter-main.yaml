@@ -12,10 +12,40 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: make test
+- as: lint
+  commands: |
+    make lint
   container:
     from: src
+- as: test
+  commands: |
+    make test
+  container:
+    from: src
+- as: build
+  commands: |
+    make build
+  container:
+    from: src
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: pagerduty-short-circuiter-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: pagerduty-short-circuiter-codecov-token
 zz_generated_metadata:
   branch: main
   org: openshift
