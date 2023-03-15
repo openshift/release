@@ -4,9 +4,11 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM src
+    RUN yum update -y && yum install -y python39 python39-pip
+    RUN alternatives --set python3 /usr/bin/python3.9
     RUN pip3 install pre-commit
   from: src
-  to: openstack-operator-ci-pre-commit
+  to: ci-pre-commit
 resources:
   '*':
     limits:
@@ -23,13 +25,9 @@ tests:
     git log -1
     mkdir -p ../operator && cp -r . ../operator
     cd ../operator
-    go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-    source <(setup-envtest use -p env)
-    go get golang.stackrox.io/kube-linter/cmd/kube-linter
-    GO111MODULE=on go install golang.stackrox.io/kube-linter/cmd/kube-linter
     pre-commit run --all-files --show-diff-on-failure
   container:
-    from: openstack-operator-ci-pre-commit
+    from: ci-pre-commit
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators
