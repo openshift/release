@@ -1,0 +1,88 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-9-golang-1.19-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.19-openshift-4.13
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.19-openshift-4.13
+images:
+- dockerfile_path: build/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: bin/manager
+  to: network-observability-operator
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: netobserv-oc-bin-image
+operator:
+  bundles:
+  - as: netobserv-bundle
+    context_dir: ./
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/netobserv/network-observability-operator:main
+    with: pipeline:network-observability-operator
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1Gi
+tests:
+- as: operator-install
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    dependencies:
+      OO_INDEX: ci-index-netobserv-bundle
+    env:
+      OO_CHANNEL: latest
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: netobserv-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e-test
+      commands: |
+        oc -n openshift-operators rollout status deployment netobserv-controller-manager
+      from: netobserv-oc-bin-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: netobserv-network-observability-operator-main
+  org: config
+  repo: netobserv
