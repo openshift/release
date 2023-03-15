@@ -173,30 +173,10 @@ API_VIP="$(yq ".api_vip" "${SHARED_DIR}/vips.yaml")"
 INGRESS_VIP="$(yq ".ingress_vip" "${SHARED_DIR}/vips.yaml")"
 mkdir -p "${INSTALL_DIR}"
 
-if [ "${DISCONNECTED}" == "true" ]; then
-  OCP_RELEASE=$( oc adm release -a "$PULL_SECRET_PATH" info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o template --template='{{.metadata.version}}' )
-  #Follow mirror-image output
-  #Update image:  XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX:5000/ci-op-6sxtv7mh/release:4.13.0-0.nightly-2023-03-11-033820
-  LOCAL_REGISTRY_MIRROR=$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")
-  OPENSHIFT_INSTALL_RELEASE="${LOCAL_REGISTRY_MIRROR}/${NAMESPACE}/release:${OCP_RELEASE}"
-  new_pull_secret="${SHARED_DIR}/new_pull_secret"
-  registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
-  #MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-  jq --argjson a "{\"${LOCAL_REGISTRY_MIRROR}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
-  #yq -r .pullSecret "${SHARED_DIR}/install-config.yaml" > "${new_pull_secret}"
-  #yq '.auths += "${CLUSTER_PROFILE_DIR}/pull-secret"' "${new_pull_secret}"
-  echo "Disconnected env, installing from initial release ${OPENSHIFT_INSTALL_RELEASE}"
-  oc adm release extract -a "${new_pull_secret}" "${OPENSHIFT_INSTALL_RELEASE}" \
-   --command=openshift-install --to=/tmp
-  rm -f "${new_pull_secret}"
-else
-  echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-  oc adm release extract -a "${PULL_SECRET_PATH}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-   --command=openshift-install --to=/tmp
-fi
 
-
-
+echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
+oc adm release extract -a "${PULL_SECRET_PATH}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install --to=/tmp
 
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and

@@ -15,6 +15,10 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM ERR
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 export TF_LOG=DEBUG
 
 function oinst() {
