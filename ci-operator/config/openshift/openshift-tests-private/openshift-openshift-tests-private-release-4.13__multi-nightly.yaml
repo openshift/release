@@ -95,6 +95,27 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-baselinecaps-v412
+- as: baremetal-upi-ovn-ipv4-p1-f14
+  cluster: build05
+  cron: 30 21 5,18 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKERS: "1"
+      ADDITIONAL_WORKERS_DAY2: "false"
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@baremetal-upi and @amd64 and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.13'
+      architecture: amd64
+      masters: "3"
+      workers: "1"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-upi
 zz_generated_metadata:
   branch: release-4.13
   org: openshift
