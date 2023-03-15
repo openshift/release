@@ -25,6 +25,13 @@ tests:
     git log -1
     mkdir -p ../operator && cp -r . ../operator
     cd ../operator
+    go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+    go get golang.stackrox.io/kube-linter/cmd/kube-linter
+    GO111MODULE=on go install golang.stackrox.io/kube-linter/cmd/kube-linter
+    pushd ..
+    mkdir -p $PWD/testenv
+    source <(setup-envtest use -p env --bin-dir $PWD/testenv)
+    popd
     pre-commit run --all-files --show-diff-on-failure
   container:
     from: ci-pre-commit
