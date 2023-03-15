@@ -66,6 +66,7 @@ function build_push_operator_images {
 
   # Build and push operator image
   oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
+  oc set build-secret --pull bc/${OPERATOR} ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR} --from-dir . -F
 
   # Build and push bundle image
@@ -101,9 +102,13 @@ cp -r /go/src/github.com/${ORG}/${BASE_OP}/ ${BASE_DIR}
 # Create and enable openstack namespace
 create_openstack_namespace
 
+# Secret for pulling containers from docker.io
+DOCKER_REGISTRY_SECRET=pull-docker-secret
+oc create secret generic ${DOCKER_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/docker/config.json --type=kubernetes.io/dockerconfigjson
+
 # Secret for pushing containers - openstack namespace
 REGISTRY_SECRET=push-quay-secret
-oc create secret generic ${REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/docker/config.json --type=kubernetes.io/dockerconfigjson
+oc create secret generic ${REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/rdoquay/config.json --type=kubernetes.io/dockerconfigjson
 
 # Build operator
 IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${BASE_OP}
