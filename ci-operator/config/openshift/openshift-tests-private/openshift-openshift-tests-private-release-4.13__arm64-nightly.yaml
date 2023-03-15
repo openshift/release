@@ -1465,6 +1465,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
+- as: baremetal-agent-ipv4-dhcp-p1-f14
+  cluster: build05
+  cron: 30 21 7,21 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      RESERVE_BOOTSTRAP: "false"
+      architecture: arm64
+      masters: "3" # change to 1 for sno
+      workers: "2" # change to 0 for compact/sno
+    test:
+      - ref: clusterbot-wait
+    workflow: baremetal-lab-agent-install-network-dynamic
 - as: baremetalds-ipi-ovn-ipv4-p1-f4
   cron: 36 22 1,5,10,15,19,23,27 * *
   steps:
