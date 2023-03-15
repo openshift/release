@@ -15,6 +15,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 [ -z "${masters}" ] && {  echo "\$masters is not filled. Failing."; exit 1; }
 [ -z "${workers}" ] && {  echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && {  echo "\$architecture is not filled. Failing."; exit 1; }
+[ "${ADDITIONAL_WORKERS}" -gt 0 ] && [ -z "${ADDITIONAL_WORKER_ARCHITECTURE}" ] && { echo "\$ADDITIONAL_WORKER_ARCHITECTURE is not filled. Failing."; exit 1; }
 
 gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
 
@@ -25,14 +26,14 @@ CLUSTER_NAME="${NAMESPACE}"
 
 echo "Reserving nodes for baremetal installation (${masters} masters, ${workers} workers) $([ "$RESERVE_BOOTSTRAP" == true ] && echo "+ 1 bootstrap physical node")..."
 timeout -s 9 180m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" << 'EOF'
+  "${CLUSTER_NAME}" "${masters}" "${workers}" "${RESERVE_BOOTSTRAP}" "${gnu_arch}" \
+  "${ADDITIONAL_WORKERS}" "${ADDITIONAL_WORKER_ARCHITECTURE}" << 'EOF'
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o allexport
 
-BUILD_USER=ci-op
-BUILD_ID="${1}"
+export BUILD_USER=ci-op BUILD_ID="${1}"
+
 N_MASTERS="${2}"
 N_WORKERS="${3}"
 # The IPI variable is to be deprecated in order to be more generic and better exploit the prow steps patterns for supporting
@@ -44,15 +45,23 @@ else
   IPI=true
 fi
 ARCH="${5}"
-set +o allexport
+ADDITIONAL_WORKERS="${6}"
+ADDITIONAL_WORKER_ARCHITECTURE="${7}"
 
 # shellcheck disable=SC2174
 mkdir -m 755 -p {/var/builds,/opt/tftpboot,/opt/html}/${BUILD_ID}
 mkdir -m 777 -p /opt/nfs/${BUILD_ID}
 touch /etc/{hosts_pool_reserved,vips_reserved}
+
 # The current implementation of the following scripts is different based on the auxiliary host. Keeping the script in
 # the remote aux servers temporarily.
-bash /usr/local/bin/reserve_hosts.sh
+N_MASTERS=${N_MASTERS} N_WORKERS=${N_WORKERS} \
+  IPI=${IPI} APPEND="false" ARCH="${ARCH}" bash /usr/local/bin/reserve_hosts.sh
+# If the number of requested ADDITIONAL_WORKERS is greater than 0, we need to reserve the additional workers
+if [ "${ADDITIONAL_WORKERS}" -gt 0 ]; then
+  N_WORKERS="${ADDITIONAL_WORKERS}" N_MASTERS=0 IPI=true \
+   ARCH="${ADDITIONAL_WORKER_ARCHITECTURE}" APPEND="true" bash /usr/local/bin/reserve_hosts.sh
+fi
 bash /usr/local/bin/reserve_vips.sh
 EOF
 
