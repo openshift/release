@@ -8,11 +8,11 @@ images:
   - dockerfile_literal: |
       ARG NODE_VERSION='16.19.1'
       ARG CHROME_VERSION='110.0.5481.177-1'
+      ARG CYPRESS_VERSION='12.7.0'
 
       FROM cypress/factory
 
-      ENV OC_DOWNLOAD_URL="https://downloads-openshift-console.apps.hac-devsandbox.5unc.p1.openshiftapps.com/amd64/linux/oc.tar" \
-          CYPRESS_CACHE_FOLDER="/tmp/.cache"
+      ENV OC_DOWNLOAD_URL="https://downloads-openshift-console.apps.hac-devsandbox.5unc.p1.openshiftapps.com/amd64/linux/oc.tar"
 
       RUN apt update && \
           apt install jq python3 python3-venv xauth skopeo -y && \
@@ -23,22 +23,21 @@ images:
           install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
       COPY integration-tests /tmp/e2e
-      RUN chgrp -R 0 /tmp/e2e && \
-          chmod -R g+rwX /tmp/e2e
 
-      USER 1000
       RUN cd /tmp/e2e && \
           npm i && \
-          node_modules/.bin/cypress install && \
           mkdir -p /tmp/artifacts && \
-          chmod -R a+rwx /tmp/artifacts ${CYPRESS_CACHE_FOLDER}
+          chmod -R a+rwx /tmp/artifacts /tmp/e2e && \
+          chown -R node:node /tmp/e2e/node_modules/cypress
 
       WORKDIR /tmp/
-      COPY integration-tests/entrypoint.sh /tmp/
+      COPY --chown=0:0 integration-tests/entrypoint.sh /tmp/
 
       RUN chmod aug+rwx /tmp/entrypoint.sh
 
       ENTRYPOINT ["/tmp/entrypoint.sh"]
+
+      USER node
     to: cypress-runner
 promotion:
   name: hac-dev
@@ -57,7 +56,6 @@ tests:
     pwd
     ls -la
     npm version
-    export CYPRESS_CACHE_FOLDER="/tmp/.cache"
     /tmp/entrypoint.sh
 
 
