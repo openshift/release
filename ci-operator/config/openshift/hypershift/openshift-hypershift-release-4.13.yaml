@@ -7,6 +7,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+  hypershift-operator-latest:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -38,6 +42,17 @@ promotion:
   name: "4.13"
   namespace: ocp
 releases:
+  hosted-ocp-4-12-latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.12"
+  hosted-ocp-4-12-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.12"
   hosted-ocp-previous:
     candidate:
       product: ocp
@@ -76,6 +91,19 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
+    workflow: hypershift-aws-e2e-nested
+- as: e2e-aws-4-12
+  skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    dependencies:
+      OCP_IMAGE_LATEST: release:hosted-ocp-4-12-latest
+      OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-12-previous
+    workflow: hypershift-aws-e2e-nested
+- as: e2e-aws-ho-latest
+  skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    dependencies:
+      HYPERSHIFT_RELEASE_LATEST: pipeline:hypershift-operator-latest
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-metrics
   optional: true
