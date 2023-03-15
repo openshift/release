@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: network-tester
+  namespace: openshift-e2e-network-tester
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: network-tester
+      app.kubernetes.io/instance: network-tester
+      app.kubernetes.io/name: network-tester
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: network-tester
+        app.kubernetes.io/instance: network-tester
+        app.kubernetes.io/name: network-tester
+      annotations:
+        openshift.io/scc: privileged
+    spec:
+      nodeSelector:
+        kubernetes.io/os: linux
+      volumes:
+      - hostPath:
+          path: /
+          type: Directory
+        name: host
+      serviceAccount: default
+      serviceAccountName: default
+      hostNetwork: true
+      hostPID: true
+      hostIPC: true
+      priority: 1000000000
+      priorityClassName: openshift-user-critical
+      containers:
+      - name: network-tester
+        command:
+        - /bin/bash
+        - -c
+        - |
+          #!/bin/bash
+          while true
+          do
+              set -euo pipefail
+              echo "Hello world!"
+              time
+              chroot /host /usr/sbin/conntrack -L
+              sleep 60
+          done
+        image: registry.access.redhat.com/ubi8/ubi-minimal
+        imagePullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        securityContext:
+          privileged: true
+          readOnlyRootFilesystem: true
+          runAsGroup: 0
+          runAsUser: 0
+        volumeMounts:
+        - mountPath: /host
+          name: host
+      tolerations:
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+        tolerationSeconds: 300
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
+        tolerationSeconds: 300
