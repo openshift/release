@@ -22,9 +22,11 @@ images:
       RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
           install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
-      COPY integration-tests /tmp/e2e
-      RUN chgrp -R 0 /tmp/e2e && \
-          chmod -R g+rwX /tmp/e2e
+      USER node
+
+      COPY --chown=node:root integration-tests /tmp/e2e
+      # RUN chgrp -R 0 /tmp/e2e && \
+          # chmod -R g+rwX /tmp/e2e
 
       RUN cd /tmp/e2e && \
           npm i && \
@@ -33,11 +35,9 @@ images:
           chmod -R a+rwx /tmp/artifacts ${CYPRESS_CACHE_FOLDER}
 
       WORKDIR /tmp/
-      COPY integration-tests/entrypoint.sh /tmp/
+      COPY --chown=node:root --chmod=777 integration-tests/entrypoint.sh /tmp/
 
-      RUN chmod aug+rwx /tmp/entrypoint.sh
-
-      USER 1000
+      # RUN chmod aug+rwx /tmp/entrypoint.sh
 
       ENTRYPOINT ["/tmp/entrypoint.sh"]
     to: cypress-runner
