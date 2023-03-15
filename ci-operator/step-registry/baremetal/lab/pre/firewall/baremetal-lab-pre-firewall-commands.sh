@@ -50,7 +50,7 @@ cp "${CLUSTER_PROFILE_DIR}/mirror_registry_url" "${SHARED_DIR}/mirror_registry_u
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
 export HTTP_PROXY=${proxy}:8213/
-export HTTPS_PROXY${proxy}:8213/
+export HTTPS_PROXY=${proxy}:8213/
 export NO_PROXY="static.redhat.com,redhat.io,quay.io,openshift.org,openshift.com,svc,amazonaws.com,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
 
 export http_proxy=${proxy}
