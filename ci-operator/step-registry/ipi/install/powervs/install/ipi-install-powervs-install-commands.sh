@@ -438,6 +438,7 @@ EOF
   #
   # Call destroy cluster on fake metadata file
   #
+  DESTROY_SUCCEEDED=false
   for i in {1..3}; do
     echo "Destroying cluster $i attempt..."
     echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
@@ -447,6 +448,7 @@ EOF
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_CLEAR_RESOURCE_END_TIME_$i"
     echo "ret=${ret}"
     if [ ${ret} -eq 0 ]; then
+      DESTROY_SUCCEEDED=true
       break
     fi
   done
@@ -461,6 +463,12 @@ EOF
       ibmcloud pi network-delete ${UUID}
     done
   ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("rdr-multiarch-'${POWERVS_ZONE}'")) | .networkID')
+
+  if ! ${DESTROY_SUCCEEDED}
+  then
+    echo "Failed to destroy cluster failed after three attempts."
+    exit 1
+  fi
 }
 
 function dump_resources() {
