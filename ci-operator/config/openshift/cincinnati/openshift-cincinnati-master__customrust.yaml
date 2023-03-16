@@ -47,15 +47,17 @@ images:
   to: src-rust
 - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
   inputs:
-    base:
-      as:
-      - registry.centos.org/centos/centos:7
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/cincinnati
   to: deploy
 - dockerfile_path: dist/Dockerfile.e2e/Dockerfile
   inputs:
-    base:
-      as:
-      - registry.centos.org/centos/centos:7
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/cincinnati
     openshift_release_golang-1.13:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.13
@@ -63,33 +65,15 @@ images:
 promotion:
   name: cincinnati-build-root
   namespace: cincinnati-ci
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      cat <<DOCKERFILE > /opt/Dockerfile
-      FROM centos
-      WORKDIR /go/src/github.com/openshift/cincinnati/
-      COPY . .
-      DOCKERFILE
-    from: centos
-    to: src-dockerfile
-- project_directory_image_build_step:
-    from: src
-    inputs:
-      src-dockerfile:
-        paths:
-        - destination_dir: .
-          source_path: /opt/Dockerfile
-    to: base
 releases:
   initial:
     integration:
-      name: "4.7"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.7"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
