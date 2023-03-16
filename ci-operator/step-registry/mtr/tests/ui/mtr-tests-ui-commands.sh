@@ -5,8 +5,8 @@ set -o errexit
 set -o pipefail
 
 # Set the TARGET_URL value using the $SHARED_DIR/console.url file
-URL=$(cat $SHARED_DIR/console.url)
-TARGET_URL=${URL#"https://console-openshift-console."}
+CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+TARGET_URL="http://mtr-mtr.${CONSOLE_URL#"https://console-openshift-console."}"
 
 # Set the scope
 export CYPRESS_INCLUDE_TAGS=$MTR_TESTS_UI_SCOPE
@@ -28,6 +28,8 @@ echo "Archiving /tmp/windup-ui-tests/cypress/reports/junitreport.xml to ARTIFACT
 cp /tmp/windup-ui-tests/cypress/reports/junitreport.xml $ARTIFACT_DIR/windup-ui-results.xml
 
 # Copy screenshots into $ARTIFACT_DIR/screenshots
-echo "Archiving  /tmp/windup-ui-tests/cypress/screenshots/* to ARTIFACT_DIR/screenshots"
-mkdir -p $ARTIFACTDIR/screenshots
-cp  /tmp/windup-ui-tests/cypress/screenshots/* $ARTIFACT_DIR/screenshots/
+if [ -d "/tmp/windup-ui-tests/cypress/screenshots/" ]; then
+    echo "Archiving  /tmp/windup-ui-tests/cypress/screenshots/* to ARTIFACT_DIR/screenshots"
+    mkdir -p $ARTIFACT_DIR/screenshots
+    cp  /tmp/windup-ui-tests/cypress/screenshots/* $ARTIFACT_DIR/screenshots/
+fi
