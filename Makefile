@@ -411,11 +411,3 @@ secret-config-updater:
 	--from-file=sa.config-updater.vsphere.config=$(TMPDIR)/sa.config-updater.vsphere.config \
 	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f -
 .PHONY: secret-config-updater
-
-multi-arch-gen:
-	hack/image-mirroring/supplemental_ci_images_mirror_gen.py
-.PHONY: multi-arch-gen
-
-validate-multi-arch-gen:
-	hack/image-mirroring/validate-multi-arch-image-mirror-gen.sh .
-.PHONY: validate-multi-arch-gen
