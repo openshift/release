@@ -7,9 +7,9 @@ set -x
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
-GOOGLE_PROJECT_ID=$(< "${CLUSTER_PROFILE_DIR}/openshift_gcp_project")
+GOOGLE_PROJECT_ID=$(<"${CLUSTER_PROFILE_DIR}/openshift_gcp_project")
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-GOOGLE_COMPUTE_ZONE=$(< "${SHARED_DIR}/openshift_gcp_compute_zone")
+GOOGLE_COMPUTE_ZONE=$(<"${SHARED_DIR}/openshift_gcp_compute_zone")
 if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
   exit 1
@@ -45,7 +45,7 @@ set -x
 mkdir -p ~/.kube
 sudo cat /var/lib/microshift/resources/kubeadmin/kubeconfig > ~/.kube/config
 
-echo "
+echo '
 kind: Pod
 apiVersion: v1
 metadata:
@@ -53,9 +53,11 @@ metadata:
   labels:
     app: hello-microshift
 spec:
-  containers: 
+  containers:
   - name: hello-microshift
-    image: openshift/hello-openshift
+    image: busybox:1.35
+    command: ["/bin/sh"]
+    args: ["-c", "while true; do echo -ne \"HTTP/1.0 200 OK\r\nContent-Length: 16\r\n\r\nHello MicroShift\" | nc -l -p 8080 ; done"]
     ports:
     - containerPort: 8080
       protocol: TCP
@@ -65,8 +67,10 @@ spec:
         drop:
         - ALL
       runAsNonRoot: true
+      runAsUser: 1001
+      runAsGroup: 1001
       seccompProfile:
-        type: RuntimeDefault" | oc create -f -
+        type: RuntimeDefault' | oc create -f -
 
 oc create service loadbalancer hello-microshift --tcp=5678:8080
 
@@ -81,19 +85,18 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}/deploy.sh" "rhel8user@${INSTANCE_PREFIX}:~/deploy.sh"
 
+set +e
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   "rhel8user@${INSTANCE_PREFIX}" \
   --command "bash ~/deploy.sh"
 
-
 IP=$(LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances describe "${INSTANCE_PREFIX}" --format='value(networkInterfaces.accessConfigs[0].natIP)')
 
-set +ex
+set +x
 retries=3
 backoff=3s
-
 for try in $(seq 1 "${retries}"); do
   echo "Attempt: ${try}"
   echo "Running: curl -vk ${IP}:5678"
@@ -108,7 +111,6 @@ for try in $(seq 1 "${retries}"); do
   echo -e "Waiting ${backoff} before next retry\n\n"
   sleep "${backoff}"
 done
-
 set -x
 
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
