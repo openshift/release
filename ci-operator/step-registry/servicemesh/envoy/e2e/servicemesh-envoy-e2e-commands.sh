@@ -69,7 +69,7 @@ spec:
   restartPolicy: Never
   terminationGracePeriodSeconds: 600
   nodeSelector:
-    node.kubernetes.io/instance-type: "m6id.4xlarge"
+    node.kubernetes.io/instance-type: "m5d.4xlarge"
   containers:
   - name: testpmd
     command: ["tail", "-f", "/dev/null"]
