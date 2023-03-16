@@ -33,15 +33,13 @@ done
 echo "${IP_ARRAY[@]}"
 
 timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
-  "${INTERNAL_NET_CIDR}" "${DOCKER_NET_CIDR}" "${IP_ARRAY[@]}"  << 'EOF'
+  "${INTERNAL_NET_CIDR}" "${IP_ARRAY[@]}"  << 'EOF'
   set -o nounset
   set -o errexit
   INTERNAL_NET_CIDR="${1}"
-  DOCKER_NET_CIDR="${2}"
-  IP_ARRAY="${@:3}"
+  IP_ARRAY="${@:2}"
   for ip in $IP_ARRAY; do
-    iptables -I FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
-    iptables -I FORWARD -s ${ip} -d "${DOCKER_NET_CIDR}" -j ACCEPT
+    iptables -A FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
   done
 EOF
 
