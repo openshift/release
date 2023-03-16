@@ -22,6 +22,11 @@ npx cypress run \
 echo "Merging results reports..."
 npm run mergereports
 
-# Copy combined report into $SHARED_DIR
+# Copy combined report into $ARTIFACT_DIR
 echo "Archiving /tmp/windup-ui-tests/cypress/reports/junitreport.xml to ARTIFACT_DIR/windup-ui-results.xml..."
 cp /tmp/windup-ui-tests/cypress/reports/junitreport.xml $ARTIFACT_DIR/windup-ui-results.xml
+
+# Copy screenshots into $ARTIFACT_DIR/screenshots
+echo "Archiving  /tmp/windup-ui-tests/cypress/screenshots/* to ARTIFACT_DIR/screenshots"
+mkdir -p $ARTIFACTDIR/screenshots
+cp  /tmp/windup-ui-tests/cypress/screenshots/* $ARTIFACT_DIR/screenshots/
