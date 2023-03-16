@@ -40,7 +40,7 @@ timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
   IP_ARRAY="${@:2}"
   for ip in $IP_ARRAY; do
     iptables -I FORWARD -s ${ip} ! -d "${INTERNAL_NET_CIDR}" -j DROP
-    iptables -A FORWARD -s ${ip} -j LOG --log-prefix="FORWARD: " --log-level 4
+    iptables -I FORWARD -s ${ip} -d "${DOCKER_NET_CIDR}" -j ACCEPT
   done
 EOF
 
