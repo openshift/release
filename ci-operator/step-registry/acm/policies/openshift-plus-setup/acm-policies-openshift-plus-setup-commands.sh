@@ -139,16 +139,20 @@ echo 'y' | ./deploy.sh -p 2.7/policy-sets/openshift-plus-setup -n policies -u ht
 
 sleep 60
 
-echo $(oc get policies -n policies)
+echo "$(oc get policies -n policies)"
 
 # wait for storage nodes to be ready
 RETRIES=60
-for i in $(seq "${RETRIES}"); do
+for try in $(seq "${RETRIES}"); do
   if [[ $(oc get nodes -l cluster.ocs.openshift.io/openshift-storage= | grep Ready) ]]; then
-    echo "storage worker nodes are up is Running"
+    echo "storage worker nodes Ready"
     break
   else
-    echo "Try ${i}/${RETRIES}: Storage nodes are not ready yet. Checking again in 30 seconds"
+    if [ $try == $RETRIES ]; then
+      echo "Error storage nodes failed to become Ready."
+      exit 1
+    fi
+    echo "Try ${try}/${RETRIES}: Storage nodes are not ready yet. Checking again in 30 seconds"
     sleep 30
   fi
 done

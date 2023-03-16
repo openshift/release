@@ -129,14 +129,16 @@ sleep 120
 
 # wait for policies to be compliant
 RETRIES=30
-for i in $(seq "${RETRIES}"); do
+for try in $(seq "${RETRIES}"); do
   if [[ $(oc get policies -n policies) != *"NonCompliant"* ]]; then
     echo "OPP policyset is applied and compliant"
     break
   else
-    echo "Try ${i}/${RETRIES}: Policies are not compliant. Checking again in 30 seconds"
+    if [ $try == $RETRIES ]; then
+      echo "Error policies failed to become compliant in allotted time."
+      exit 1
+    fi
+    echo "Try ${try}/${RETRIES}: Policies are not compliant. Checking again in 30 seconds"
     sleep 30
   fi
 done
-
-echo "OPP policyset is applied and compliant"
