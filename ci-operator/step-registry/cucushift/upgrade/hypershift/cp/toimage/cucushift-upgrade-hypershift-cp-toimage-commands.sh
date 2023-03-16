@@ -90,7 +90,15 @@ function check_pod() {
 function health_check() {
     #1. Check all cluster operators get stable and ready
     echo "Step #1: check all cluster operators get stable and ready"
-    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    timeout 900s bash <<EOT
+until
+  oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+  oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+  oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+do
+  sleep 30 && echo "Cluster Operator ingress Degraded=True,Progressing=True,or Available=False";
+done
+EOT
     oc wait clusterversion/version --for='condition=Available=True' --timeout=15m
 
     #2. Make sure every machine is in 'Ready' status

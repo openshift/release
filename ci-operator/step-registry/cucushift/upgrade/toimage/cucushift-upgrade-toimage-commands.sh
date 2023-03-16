@@ -187,98 +187,6 @@ function run_command_oc() {
     echo "${ret_val}"
 }
 
-function check_clusteroperators() {
-    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc null_version unavailable_operator degraded_operator
-
-    echo "Make sure every operator do not report empty column"
-    tmp_clusteroperator=$(mktemp /tmp/health_check-script.XXXXXX)
-    input="${tmp_clusteroperator}"
-    ${OC} get clusteroperator >"${tmp_clusteroperator}"
-    column=$(head -n 1 "${tmp_clusteroperator}" | awk '{print NF}')
-    last_column_name=$(head -n 1 "${tmp_clusteroperator}" | awk '{print $NF}')
-    if [[ ${last_column_name} == "MESSAGE" ]]; then
-        (( column -= 1 ))
-        tmp_clusteroperator_1=$(mktemp /tmp/health_check-script.XXXXXX)
-        awk -v end=${column} '{for(i=1;i<=end;i++) printf $i"\t"; print ""}' "${tmp_clusteroperator}" > "${tmp_clusteroperator_1}"
-        input="${tmp_clusteroperator_1}"
-    fi
-
-    while IFS= read -r line
-    do
-        rc=$(echo "${line}" | awk '{print NF}')
-        if (( rc != column )); then
-            echo >&2 "The following line have empty column"
-            echo >&2 "${line}"
-            (( tmp_ret += 1 ))
-        fi
-    done < "${input}"
-    rm -f "${tmp_clusteroperator}"
-
-    echo "Make sure every operator column reports version"
-    if null_version=$(${OC} get clusteroperator -o json | jq '.items[] | select(.status.versions == null) | .metadata.name') && [[ ${null_version} != "" ]]; then
-        echo >&2 "Null Version: ${null_version}"
-        (( tmp_ret += 1 ))
-    fi
-
-    echo "Make sure every operator reports correct version"
-    if incorrect_version=$(${OC} get clusteroperator --no-headers | awk -v var="${TARGET_VERSION}" '$2 != var') && [[ ${incorrect_version} != "" ]]; then
-        echo >&2 "Incorrect CO Version: ${incorrect_version}"
-        (( tmp_ret += 1 ))
-    fi
-
-    # In disconnected install, marketplace often get into False state, so it is better to remove it from cluster from flexy post-action
-    echo "Make sure every operator's AVAILABLE column is True"
-    if unavailable_operator=$(${OC} get clusteroperator | awk '$3 == "False"' | grep "False"); then
-        echo >&2 "Some operator's AVAILABLE is False"
-        echo >&2 "$unavailable_operator"
-        (( tmp_ret += 1 ))
-    fi
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Available") | .status' | grep -iv "True"; then
-        echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
-        (( tmp_ret += 1 ))
-    fi
-
-    # In disconnected install, openshift-sample often get into Degrade state, so it is better to remove them from cluster from flexy post-action
-    #degraded_operator=$(${OC} get clusteroperator | grep -v "openshift-sample" | awk '$5 == "True"')
-    if degraded_operator=$(${OC} get clusteroperator | awk '$5 == "True"' | grep "True"); then
-        echo >&2 "Some operator's DEGRADED is True"
-        echo >&2 "$degraded_operator"
-        (( tmp_ret += 1 ))
-    fi
-    #co_check=$(${OC} get clusteroperator -o json | jq '.items[] | select(.metadata.name != "openshift-samples") | .status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False')
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False'; then
-        echo >&2 "Some operators are Degraded, pls run 'oc get clusteroperator -o json' to check"
-        (( tmp_ret += 1 ))
-    fi
-
-    return $tmp_ret
-}
-
-function wait_clusteroperators_continous_success() {
-    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20
-    while (( try < max_retries && continous_successful_check < passed_criteria )); do
-        echo "Checking #${try}"
-        if check_clusteroperators; then
-            echo "Passed #${continous_successful_check}"
-            (( continous_successful_check += 1 ))
-        else
-            echo "cluster operators are not ready yet, wait and retry..."
-            continous_successful_check=0
-        fi
-        sleep 60
-        (( try += 1 ))
-    done
-    if (( continous_successful_check != passed_criteria )); then
-        echo >&2 "Some cluster operator does not get ready or not stable"
-        echo "Debug: current CO output is:"
-        oc get co
-        return 1
-    else
-        echo "All cluster operators status check PASSED"
-        return 0
-    fi
-}
-
 function check_latest_machineconfig_applied() {
     local role="$1" cmd latest_machineconfig applied_machineconfig_machines ready_machines
 
@@ -359,7 +267,15 @@ function health_check() {
 
     #2. Check all cluster operators get stable and ready
     echo "Step #2: check all cluster operators get stable and ready"
-    wait_clusteroperators_continous_success
+    timeout 900s bash <<EOT
+until
+  oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+  oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+  oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+do
+  sleep 30 && echo "Cluster Operator ingress Degraded=True,Progressing=True,or Available=False";
+done
+EOT
 
     #3. Make sure every machine is in 'Ready' status
     echo "Step #3: Make sure every machine is in 'Ready' status"
