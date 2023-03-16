@@ -40,6 +40,7 @@ images:
         rm -rf /var/cache/dnf/*
     RUN ls -lA
     RUN make rpm
+    RUN TARGET_ARCH=aarch64 make rpm
     FROM libvirt-installer
     USER root
     ENV HOME=/tmp/secret
@@ -151,6 +152,15 @@ tests:
     env:
       GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
     workflow: openshift-microshift-e2e-openshift-conformance-reduced
+- as: e2e-openshift-conformance-reduced-arm
+  cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
+    workflow: openshift-microshift-e2e-openshift-conformance-reduced
 - as: e2e-reboot
   cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
@@ -158,6 +168,15 @@ tests:
     cluster_profile: gcp
     env:
       GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-reboot-tests
+- as: e2e-reboot-arm
+  cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
     workflow: openshift-microshift-e2e-reboot-tests
 - as: e2e-greenboot
   cluster: build02
@@ -177,6 +196,16 @@ tests:
     env:
       GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
     workflow: openshift-microshift-e2e-router-smoke-test
+- as: e2e-router-smoke-test-arm
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
+    workflow: openshift-microshift-e2e-router-smoke-test
 - as: e2e-loadbalancer-smoke-test
   cluster: build02
   optional: true
@@ -185,6 +214,16 @@ tests:
     cluster_profile: gcp
     env:
       GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-loadbalancer-smoke-test
+- as: e2e-loadbalancer-smoke-test-arm
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
     workflow: openshift-microshift-e2e-loadbalancer-smoke-test
 zz_generated_metadata:
   branch: release-4.13
