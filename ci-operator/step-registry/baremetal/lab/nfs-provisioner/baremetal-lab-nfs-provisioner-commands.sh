@@ -3,6 +3,10 @@
 set -o errexit
 set -o pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Set the NFS_SERVER value to the same value as the AUX_HOST, unless explicitly set.
 NFS_SERVER=${NFS_SERVER:-${AUX_HOST}}
 DIR=/tmp/nfs-provisioner
