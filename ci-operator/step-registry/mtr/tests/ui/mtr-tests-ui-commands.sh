@@ -12,11 +12,12 @@ TARGET_URL=${URL#"https://console-openshift-console."}
 export CYPRESS_INCLUDE_TAGS=$MTR_TESTS_UI_SCOPE
 
 # Execute Cypress
+# Always return true, otherwise the script will fail before it is able to archive anything
 echo "Executing Cypress tests..."
 npx cypress run \
     --config video=false \
     --spec $CYPRESS_SPEC \
-    --env windupUrl=$TARGET_URL
+    --env windupUrl=$TARGET_URL || true
 
 # Combine results into one JUnit results file
 echo "Merging results reports..."
