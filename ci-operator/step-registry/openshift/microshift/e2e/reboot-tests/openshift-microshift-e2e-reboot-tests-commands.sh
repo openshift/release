@@ -5,9 +5,9 @@ set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
-GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+GOOGLE_PROJECT_ID="$(<${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-GOOGLE_COMPUTE_ZONE="$(< ${SHARED_DIR}/openshift_gcp_compute_zone)"
+GOOGLE_COMPUTE_ZONE="$(<${SHARED_DIR}/openshift_gcp_compute_zone)"
 if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
   exit 1
@@ -33,7 +33,7 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat > "${HOME}"/reboot-test.sh <<'EOF'
+cat >"${HOME}"/reboot-test.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
 
@@ -57,10 +57,23 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/reboot-test.sh rhel8user@"${INSTANCE_PREFIX}":~/reboot-test.sh
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+  --quiet \
+  --project "${GOOGLE_PROJECT_ID}" \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
+
+if ! LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ~/reboot-test.sh'
+  --command 'sudo ~/reboot-test.sh'; then
+
+  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+    --zone "${GOOGLE_COMPUTE_ZONE}" \
+    rhel8user@"${INSTANCE_PREFIX}" \
+    --command 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+  exit 1
+fi
 
 # now reboot the machine
 LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances stop "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
