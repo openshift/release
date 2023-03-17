@@ -6,7 +6,7 @@ base_images:
   eks:
     name: automation-flavors
     namespace: stackrox
-    tag: eks-0.3.1
+    tag: eks-0.6.9
   osd:
     name: automation-flavors
     namespace: stackrox
@@ -25,12 +25,6 @@ build_root:
     namespace: stackrox
     tag: stackrox-test-0.3.56
 releases:
-  ec:
-    prerelease:
-      product: ocp
-      version_bounds:
-        lower: 4.1.0
-        upper: 4.999.0
   latest:
     release:
       channel: stable
@@ -83,30 +77,6 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: ocp-next-qa-e2e-tests
-  optional: true
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
-    env:
-      TEST_SUITE: openshift-newest-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
-  timeout: 5h0m0s
-- as: weekly-ocp-next-qa-e2e-tests
-  cron: 0 5 * * 2
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
-    env:
-      TEST_SUITE: openshift-newest-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
-  timeout: 5h0m0s
 - as: gke-ui-e2e-tests
   optional: true
   steps:
@@ -118,30 +88,6 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: ocp-next-ui-e2e-tests
-  optional: true
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
-    env:
-      TEST_SUITE: ocp-ui-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
-  timeout: 5h0m0s
-- as: weekly-ocp-next-ui-e2e-tests
-  cron: 0 5 * * 2
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
-    env:
-      TEST_SUITE: ocp-ui-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
   timeout: 5h0m0s
 - as: gke-nongroovy-e2e-tests
   optional: true
@@ -228,30 +174,6 @@ tests:
       TEST_SUITE: openshift-4-operator-e2e-tests
     test:
     - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: ocp-next-operator-e2e-tests
-  optional: true
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
-    env:
-      TEST_SUITE: openshift-4-operator-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
-  timeout: 5h0m0s
-- as: weekly-ocp-next-operator-e2e-tests
-  cron: 0 5 * * 2
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ec
-    env:
-      TEST_SUITE: openshift-4-operator-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
   timeout: 5h0m0s
 - as: eks-qa-e2e-tests
   optional: true
@@ -367,6 +289,11 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: powervs-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-powervs-e2e
+  timeout: 5h0m0s
+- as: nightly-powervs-qa-e2e-tests
   cron: 0 7 * * *
   steps:
     workflow: stackrox-automation-flavors-powervs-e2e

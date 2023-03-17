@@ -73,7 +73,7 @@ case "$CONFIG_TYPE" in
 			| .platform.openstack.externalDNS = [\"1.1.1.1\", \"1.0.0.1\"]
 			| .platform.openstack.externalNetwork = \"${OPENSTACK_EXTERNAL_NETWORK}\"
 			| .platform.openstack.ingressFloatingIP = \"${INGRESS_IP}\"
-			| .platform.openstack.lbFloatingIP = \"${API_IP}\"
+			| .platform.openstack.apiFloatingIP = \"${API_IP}\"
 		" "$INSTALL_CONFIG"
 		;;
 	proxy*)

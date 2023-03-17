@@ -125,6 +125,28 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-arch-migration
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: baremetal-upi-to-multiarch-p2-f7
+  cluster: build05
+  cron: 30 21 2,14 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "2"
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      SCALE_IN_ARCHITECTURES: aarch64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @baremetal-upi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @baremetal-upi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration-upi
+    workflow: baremetal-lab-upi
 - as: azure-ipi-baselinecaps-v412-to-multiarch-p2-f14
   cron: 28 4 16,31 * *
   steps:

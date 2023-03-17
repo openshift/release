@@ -13,7 +13,17 @@ periodics:
   labels:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stackrox-stackrox-master-powervs-qa-e2e-tests
+  name: periodic-ci-stackrox-stackrox-master-nightly-powervs-qa-e2e-tests
+  reporter_config:
+    slack:
+      channel: '#acs-stackrox-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{ if eq .Status.State "success" }} :green_jenkins_circle:
+        {{ else }} :red_jenkins_circle: {{ end }} Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
+        <{{.Status.URL}}|View logs>'
   spec:
     containers:
     - args:
@@ -21,7 +31,7 @@ periodics:
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=powervs-qa-e2e-tests
+      - --target=nightly-powervs-qa-e2e-tests
       command:
       - ci-operator
       image: ci-operator:latest
@@ -68,9 +78,11 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: ocp-next
     ci.openshift.io/generator: prowgen
+    job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stackrox-stackrox-master-weekly-ocp-next-operator-e2e-tests
+  name: periodic-ci-stackrox-stackrox-master-ocp-next-weekly-operator-e2e-tests
   reporter_config:
     slack:
       channel: '#acs-stackrox-ci'
@@ -89,8 +101,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/weekly-ocp-next-operator-e2e-tests-cluster-profile
-      - --target=weekly-ocp-next-operator-e2e-tests
+      - --secret-dir=/usr/local/weekly-operator-e2e-tests-cluster-profile
+      - --target=weekly-operator-e2e-tests
+      - --variant=ocp-next
       command:
       - ci-operator
       image: ci-operator:latest
@@ -106,7 +119,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/weekly-ocp-next-operator-e2e-tests-cluster-profile
+      - mountPath: /usr/local/weekly-operator-e2e-tests-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -151,9 +164,11 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: ocp-next
     ci.openshift.io/generator: prowgen
+    job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stackrox-stackrox-master-weekly-ocp-next-qa-e2e-tests
+  name: periodic-ci-stackrox-stackrox-master-ocp-next-weekly-qa-e2e-tests
   reporter_config:
     slack:
       channel: '#acs-stackrox-ci'
@@ -172,8 +187,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/weekly-ocp-next-qa-e2e-tests-cluster-profile
-      - --target=weekly-ocp-next-qa-e2e-tests
+      - --secret-dir=/usr/local/weekly-qa-e2e-tests-cluster-profile
+      - --target=weekly-qa-e2e-tests
+      - --variant=ocp-next
       command:
       - ci-operator
       image: ci-operator:latest
@@ -189,7 +205,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/weekly-ocp-next-qa-e2e-tests-cluster-profile
+      - mountPath: /usr/local/weekly-qa-e2e-tests-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -234,9 +250,11 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: ocp-next
     ci.openshift.io/generator: prowgen
+    job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-stackrox-stackrox-master-weekly-ocp-next-ui-e2e-tests
+  name: periodic-ci-stackrox-stackrox-master-ocp-next-weekly-ui-e2e-tests
   reporter_config:
     slack:
       channel: '#acs-stackrox-ci'
@@ -255,8 +273,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/weekly-ocp-next-ui-e2e-tests-cluster-profile
-      - --target=weekly-ocp-next-ui-e2e-tests
+      - --secret-dir=/usr/local/weekly-ui-e2e-tests-cluster-profile
+      - --target=weekly-ui-e2e-tests
+      - --variant=ocp-next
       command:
       - ci-operator
       image: ci-operator:latest
@@ -272,7 +291,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/weekly-ocp-next-ui-e2e-tests-cluster-profile
+      - mountPath: /usr/local/weekly-ui-e2e-tests-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
