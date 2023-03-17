@@ -69,15 +69,11 @@ spec:
   restartPolicy: Never
   terminationGracePeriodSeconds: 600
   nodeSelector:
-    node.kubernetes.io/instance-type: "m5d.4xlarge"
+    node-role.kubernetes.io/worker: ""
   containers:
   - name: testpmd
     command: ["tail", "-f", "/dev/null"]
     image: ${MAISTRA_BUILDER_IMAGE}
-    resources:
-      requests:
-        cpu: "14"
-        memory: 32Gi
     securityContext:
       capabilities:
         add: ["IPC_LOCK","SYS_ADMIN"]
