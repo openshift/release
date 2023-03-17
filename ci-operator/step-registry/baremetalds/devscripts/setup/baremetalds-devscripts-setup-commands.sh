@@ -43,6 +43,7 @@ finished()
   else
     echo "$retval" > "${SHARED_DIR}/install-status.txt"
   fi
+  sleep inf
 }
 trap finished EXIT TERM
 
