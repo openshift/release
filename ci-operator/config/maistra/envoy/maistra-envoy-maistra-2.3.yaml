@@ -24,9 +24,12 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      CI: "true"
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_ROOTVOLUME_SIZE: "300"
       COMPUTE_NODE_TYPE: m5d.8xlarge
+      LOCAL_CPU_RESOURCES: "30"
+      LOCAL_RAM_RESOURCES: "61440"
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -48,21 +51,18 @@ tests:
     - as: maistra-envoy-unit-2-3-run-ci
       cli: latest
       commands: |
-        # TBD workaround
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c "sed -i 's/--local_cpu_resources=6/--local_cpu_resources=30/g' ./maistra/bazelrc;"
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c "sed -i 's/--local_ram_resources=12288/--local_ram_resources=60720/g' ./maistra/bazelrc;"
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          sh -c "sed -i 's/--jobs=3/--jobs=30/g' ./maistra/bazelrc;"
-
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           sh -c \
-          "export CI=true; \
+          "export CI=${CI}; \
+           export LOCAL_CPU_RESOURCES=${LOCAL_CPU_RESOURCES}; \
+           export LOCAL_RAM_RESOURCES=${LOCAL_RAM_RESOURCES}; \
           ./maistra/run-ci.sh"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
+      - name: CI
+      - name: LOCAL_CPU_RESOURCES
+      - name: LOCAL_RAM_RESOURCES
       from: src
       resources:
         requests:
