@@ -110,7 +110,7 @@ oc apply -k ${DIR}
 echo "Waiting up to 10 minutes for the nfs-provisioner pod to become ready..."
 for _ in $(seq 1 10); do
   sleep 60
-  if oc -n nfs-provisioner get pods --no-headers -l app=nfs-client-provisioner --loglevel 10 | grep -q -w Running; then
+  if oc -n nfs-provisioner get pods --no-headers -l app=nfs-client-provisioner | grep -q -w Running; then
     echo "The nfs-provisioner pod is ready. Continuing..."
     exit 0
   fi
