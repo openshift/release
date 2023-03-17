@@ -59,8 +59,7 @@ tests:
     - as: install
       cli: latest
       commands: "operator-sdk run bundle -n openshift-operators \"$OO_BUNDLE\"\noc
-        wait --for condition=Available -n openshift-operators deployment gitops-operator-control-manager
-        \n"
+        get pods -n openshift-operators \n"
       dependencies:
       - env: OO_BUNDLE
         name: gitops-operator-bundle
@@ -80,34 +79,37 @@ tests:
           memory: 6Gi
     workflow: generic-claim
 - as: kuttl-parallel
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
   steps:
-    cluster_profile: aws
-    dependencies:
-      OO_BUNDLE: ci-index-gitops-operator-bundle
-    env:
-      OO_CHANNEL: latest
-      OO_INSTALL_NAMESPACE: openshift-operators
-      OO_PACKAGE: gitops-operator
-      OO_TARGET_NAMESPACES: '!all'
     test:
+    - as: install
+      cli: latest
+      commands: "operator-sdk run bundle -n openshift-operators \"$OO_BUNDLE\"\noc
+        get pods -n openshift-operators \n"
+      dependencies:
+      - env: OO_BUNDLE
+        name: gitops-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: "2"
+          memory: 6Gi
     - as: parallel-e2e-steps
       commands: |
         scripts/openshift-CI-kuttl-tests.sh
         make e2e-tests-parallel
-      dependencies:
-      - env: OO_BUNDLE
-        name: ci-index-gitops-operator-bundle
-      env:
-      - name: OO_CHANNEL
-      - name: OO_INSTALL_NAMESPACE
-      - name: OO_PACKAGE
-      - name: OO_TARGET_NAMESPACES
       from: oc-bin-image
       resources:
         requests:
           cpu: "2"
           memory: 6Gi
-    workflow: optional-operators-ci-aws
+    workflow: generic-claim
 - as: e2e
   steps:
     cluster_profile: aws
