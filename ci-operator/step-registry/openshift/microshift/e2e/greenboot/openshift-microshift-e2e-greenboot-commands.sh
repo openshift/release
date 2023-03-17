@@ -115,7 +115,7 @@ resources:
   - busybox.yaml
 images:
   - name: BUSYBOX_IMAGE
-    newName: registry.k8s.io/busybox
+    newName: busybox:1.35
 EOF
 
 SCRIPT_FILE=/etc/greenboot/check/required.d/50_busybox_running_check.sh
