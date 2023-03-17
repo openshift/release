@@ -2,9 +2,10 @@
 
 set -o errexit
 set -o pipefail
+set -x 
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-    source "${SHARED_DIR}/proxy-conf.sh"
+    . "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 # Set the NFS_SERVER value to the same value as the AUX_HOST, unless explicitly set.
@@ -105,14 +106,23 @@ EOF
 echo "Deploying the nfs-provisioner with the following payloads:"
 more ${DIR}/*.yaml | cat
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    . "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 echo
 oc apply -k ${DIR}
 echo "Waiting up to 10 minutes for the nfs-provisioner pod to become ready..."
-proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
+
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    . "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+echo "Proxy vars: HTTP_PROXY $HTTP_PROXY HTTPS_PROXY $HTTPS_PROXY NO_PROXY $NO_PROXY http_proxy $http_proxy https_proxy $https_proxy"
+
 for _ in $(seq 1 10); do
   sleep 60
-  if http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
-  oc -n nfs-provisioner get pods --no-headers -l app=nfs-client-provisioner | grep -q -w Running; then
+  if oc -n nfs-provisioner get pods --no-headers -l app=nfs-client-provisioner | grep -q -w Running; then
     echo "The nfs-provisioner pod is ready. Continuing..."
     exit 0
   fi
