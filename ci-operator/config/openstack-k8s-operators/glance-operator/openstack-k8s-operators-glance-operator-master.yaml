@@ -1,13 +1,35 @@
 base_images:
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.46.0
+    tag: v1.48.0
+  opm-builder:
+    name: opm-builder
+    namespace: ci
+    tag: latest
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+  from_repository: true
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install python-openstackclient
+    COPY oc /usr/bin/oc
+    COPY opm /usr/bin/opm
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    opm-builder:
+      paths:
+      - destination_dir: .
+        source_path: /bin/opm
+  to: openstack-operator-ci-build-deploy
 resources:
   '*':
     limits:
@@ -41,6 +63,17 @@ tests:
   commands: make gofmt || true
   container:
     from: src
+- as: glance-operator-build-deploy
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  optional: true
+  steps:
+    workflow: openstack-k8s-operators-test-build-deploy
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators

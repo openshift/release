@@ -79,14 +79,98 @@ sh -c 'oc wait --for=condition=Available deployment {} --timeout=-1s'
 if [[ "$SERVICE_NAME" == "OPENSTACK" ]]; then
   export ${SERVICE_NAME}_CR=/go/src/github.com/${ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml
 fi
+
+make ceph TIMEOUT=90
+sleep 30
+
 # Deploy openstack services with the sample from the PR under test
-make openstack_deploy
+make openstack_deploy_prep
+
+cat <<EOF >${HOME}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ./core_v1beta1_openstackcontrolplane.yaml
+namespace: openstack
+patches:
+- patch: |-
+    - op: replace
+      path: /spec/secret
+      value: osp-secret
+    - op: replace
+      path: /spec/storageClass
+      value: "local-storage"
+    - op: add
+      path: /spec/extraMounts
+      value:
+        - name: v1
+          region: r1
+          extraVol:
+          - propagation:
+            - Glance
+            - volume1
+            - CinderBackup
+            extraVolType: Ceph
+            volumes:
+            - name: ceph
+              projected:
+                sources:
+                - secret:
+                    name: ceph-conf-files
+            mounts:
+            - name: ceph
+              mountPath: "/etc/ceph"
+              readOnly: true
+    - op: add
+      path: /spec/cinder/template/cinderVolumes/volume1/customServiceConfig
+      value: |
+            [DEFAULT]
+            enabled_backends=ceph
+            [ceph]
+            volume_backend_name=ceph
+            volume_driver=cinder.volume.drivers.rbd.RBDDriver
+            rbd_ceph_conf=/etc/ceph/ceph.conf
+            rbd_user=openstack
+            rbd_pool=volumes
+            rbd_flatten_volume_from_snapshot=False
+            report_discard_supported=True
+            backend_host=hostgroup
+            rbd_secret_uuid=FSID
+    - op: add
+      path: /spec/cinder/template/cinderBackup/customServiceConfig
+      value: |
+            [DEFAULT]
+            backup_driver = cinder.backup.drivers.ceph.CephBackupDriver
+            backup_ceph_pool = backups
+            backup_ceph_user = openstack
+    - op: add
+      path: /spec/glance/template/customServiceConfig
+      value: |
+            [DEFAULT]
+            debug = true
+            enabled_backends=default_backend:rbd
+            [glance_store]
+            default_backend=default_backend
+            [default_backend]
+            rbd_store_ceph_conf=/etc/ceph/ceph.conf
+            rbd_store_user=openstack
+            rbd_store_pool=images
+            store_description=ceph_glance_store
+  target:
+    kind: OpenStackControlPlane
+EOF
+
+FSID=$(oc get secret ceph-conf-files -o json | jq -r '.data."ceph.conf"' | base64 -d | grep fsid | awk 'BEGIN { FS = "=" } ; { print $2 }' | xargs)
+
+sed -i ${HOME}/install_yamls/out/openstack/openstack/cr/kustomization.yaml -e s/FSID/$FSID/g
+cat ${HOME}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
+
+make input
+oc kustomize ${HOME}/install_yamls/out/openstack/openstack/cr/ | oc apply -f -
 sleep 60
 
 # Waiting for all services to be ready
-# TODO(dviroel): Add cinder back to status check once ceph backend is functional
-oc get OpenStackControlPlane openstack -o json | \
-jq -r '.status.conditions[] | select(.type | test("^OpenStackControlPlane(?!Cinder)")).type' | \
+oc get OpenStackControlPlane openstack -o json | jq -r '.status.conditions[].type' | \
 timeout ${TIMEOUT_SERVICES_READY} xargs -d '\n' -I {} sh -c 'echo testing condition={}; oc wait openstackcontrolplane.core.openstack.org/openstack --for=condition={} --timeout=-1s'
 
 # Create clouds.yaml file to be used in further tests.

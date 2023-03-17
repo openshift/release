@@ -11,9 +11,6 @@ fi
 
 echo "************ baremetalds packet gather metadata command ************"
 
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
-
 cat > gather_equinix_metadata.yaml <<-EOF
 - name: Make sure inventory contains at least one host
   hosts: localhost
@@ -41,4 +38,5 @@ cat > gather_equinix_metadata.yaml <<-EOF
         dest: "{{ lookup('env', 'ARTIFACT_DIR') }}/equinix-metadata.json"
 EOF
 
-ansible-playbook gather_equinix_metadata.yaml -i ${SHARED_DIR}/inventory -vv
+export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
+ansible-playbook gather_equinix_metadata.yaml -i "${SHARED_DIR}/inventory" -vv

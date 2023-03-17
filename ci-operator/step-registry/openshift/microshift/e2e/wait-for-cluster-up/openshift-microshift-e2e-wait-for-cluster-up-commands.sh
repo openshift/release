@@ -37,8 +37,6 @@ cat > "${HOME}"/start_microshift.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
 
-trap "sudo journalctl -eu microshift" EXIT
-
 sudo systemctl enable microshift --now
 
 # If condition is true there is podman, it's not a rpm install.

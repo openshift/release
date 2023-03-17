@@ -40,40 +40,6 @@ resources:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: odh-notebook-controller-e2e
-  steps:
-    cluster_profile: gcp
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-    test:
-    - as: e2e
-      commands: |
-        unset GOFLAGS
-        pushd components/odh-notebook-controller
-        oc new-project odh-notebook-controller-system
-        IFS=':' read -r -a CTRL_IMG <<< "${ODH_NOTEBOOK_CONTROLLER_IMAGE}"
-        export IMG="${CTRL_IMG[0]}"
-        export TAG="${CTRL_IMG[1]}"
-        export K8S_NAMESPACE="odh-notebook-controller-system"
-        cp $KUBECONFIG /tmp/kubeconfig
-        chmod 644 /tmp/kubeconfig
-        export KUBECONFIG=/tmp/kubeconfig
-
-        make deploy
-
-        make e2e-test
-
-        make undeploy
-        oc delete project odh-notebook-controller-system
-      dependencies:
-      - env: ODH_NOTEBOOK_CONTROLLER_IMAGE
-        name: odh-notebook-controller
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-gcp
 - as: kf-notebook-controller-unit
   run_if_changed: ^(components/common/.*|components/notebook-controller/.*)
   steps:
@@ -152,6 +118,29 @@ tests:
       IMAGE_REPO: odh-notebook-controller
       IMAGE_TAG: latest
     workflow: opendatahub-io-ci-image-mirror
+- as: odh-notebook-controller-e2e
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        pushd components/odh-notebook-controller
+        make run-ci-e2e-tests
+      dependencies:
+      - env: ODH_NOTEBOOK_CONTROLLER_IMAGE
+        name: odh-notebook-controller
+      - env: KF_NOTEBOOK_CONTROLLER
+        name: kf-notebook-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: opendatahub-io

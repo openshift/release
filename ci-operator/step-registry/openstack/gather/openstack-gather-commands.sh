@@ -16,14 +16,9 @@ if test -f "${SHARED_DIR}/proxy-conf.sh"; then
     CREATE_FIPS=0
 fi
 
-if [[ "$CONFIG_TYPE" == "proxy" ]]; then
+if [[ "$CONFIG_TYPE" == *"proxy"* ]]; then
     BASTION_FIP=$(<"${SHARED_DIR}/BASTION_FIP")
     BASTION_USER=$(<"${SHARED_DIR}/BASTION_USER")
-else
-    if test -f "${SHARED_DIR}/proxy-conf.sh"; then
-        echo "This job uses a proxy but without a bastion, gathering is not supported yet, see CORS-2367"
-        exit 0
-    fi
 fi
 
 collect_bootstrap_logs() {
@@ -65,32 +60,36 @@ collect_bootstrap_logs() {
 			done
 			# Ideally this would be removed once the openshift-install gather bootstrap starts supporting proxy https://issues.redhat.com/browse/CORS-2367
 			SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-                        if [[ "$CONFIG_TYPE" == "proxy" ]]; then
-				# configure the local container environment to have the correct SSH configuration
-				if ! whoami &> /dev/null; then
-					if [[ -w /etc/passwd ]]; then
-						echo "${BASTION_USER}:x:$(id -u):0:${BASTION_USER} user:${HOME}:/sbin/nologin" >> /etc/passwd
-					fi
-				fi
-				SSH_ARGS="-o ConnectTimeout=10 -o StrictHostKeyChecking=no -i $SSH_PRIV_KEY_PATH"
-				SSH_CMD="ssh $SSH_ARGS $BASTION_USER@$BASTION_FIP"
-				SCP_CMD="scp $SSH_ARGS"
-				if ! $SSH_CMD uname -a; then
-					echo "ERROR: Bastion proxy is not reachable via $BASTION_FIP"
-					exit 1
-				fi
-				echo "Moving credentials and openshift binary to Bastion Proxy"
-				$SCP_CMD "$SSH_PRIV_KEY_PATH" /bin/openshift-install "${BASTION_USER}@${BASTION_FIP}:/tmp"
-				echo "Gathering bootstrap logs from Bastion Proxy"
-				$SSH_CMD bash - << EOF
+    			if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+    			    echo "This job uses a proxy but without a bastion, `openshift-install gather` is not supported yet, see CORS-2367"
+			else
+                            if [[ "$CONFIG_TYPE" == *"proxy"* ]]; then
+			    	# configure the local container environment to have the correct SSH configuration
+			    	if ! whoami &> /dev/null; then
+			    		if [[ -w /etc/passwd ]]; then
+			    			echo "${BASTION_USER}:x:$(id -u):0:${BASTION_USER} user:${HOME}:/sbin/nologin" >> /etc/passwd
+			    		fi
+			    	fi
+			    	SSH_ARGS="-o ConnectTimeout=10 -o StrictHostKeyChecking=no -i $SSH_PRIV_KEY_PATH"
+			    	SSH_CMD="ssh $SSH_ARGS $BASTION_USER@$BASTION_FIP"
+			    	SCP_CMD="scp $SSH_ARGS"
+			    	if ! $SSH_CMD uname -a; then
+			    		echo "ERROR: Bastion proxy is not reachable via $BASTION_FIP"
+			    		exit 1
+			    	fi
+			    	echo "Moving credentials and openshift binary to Bastion Proxy"
+			    	$SCP_CMD "$SSH_PRIV_KEY_PATH" /bin/openshift-install "${BASTION_USER}@${BASTION_FIP}:/tmp"
+			    	echo "Gathering bootstrap logs from Bastion Proxy"
+			    	$SSH_CMD bash - << EOF
 /tmp/openshift-install gather bootstrap --key /tmp/ssh-privatekey ${GATHER_BOOTSTRAP_ARGS[@]}
 EOF
-				echo "Copying logs"
-				$SCP_CMD "${BASTION_USER}@${BASTION_FIP}:/home/${BASTION_USER}/log-bundle-*.tar.gz" "${SHARED_DIR}/"
-			else
-				openshift-install gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
-				cp log-bundle-*.tar.gz "${ARTIFACT_DIR}"
-				echo "${FIPS[@]}" | xargs --no-run-if-empty openstack floating ip delete
+			    	echo "Copying logs"
+			    	$SCP_CMD "${BASTION_USER}@${BASTION_FIP}:/home/${BASTION_USER}/log-bundle-*.tar.gz" "${SHARED_DIR}/"
+			    else
+			    	openshift-install gather bootstrap --key "${SSH_PRIV_KEY_PATH}" "${GATHER_BOOTSTRAP_ARGS[@]}"
+			    	cp log-bundle-*.tar.gz "${ARTIFACT_DIR}"
+			    	echo "${FIPS[@]}" | xargs --no-run-if-empty openstack floating ip delete
+			    fi
 			fi
 		fi
 	fi
@@ -120,6 +119,14 @@ openstack subnet list -f json \
 for port in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json"); do
         openstack subnet show "$port" -f json
 done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_subnet_show.json"
+
+openstack floating ip list --long -f json \
+        | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Description | test($CLUSTER_NAME)))' \
+        > "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"
+
+for fip in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"); do
+        openstack floating ip show "$fip" -f json
+done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_fip_show.json"
 
 mkdir -p "${ARTIFACT_DIR}/nodes"
 
