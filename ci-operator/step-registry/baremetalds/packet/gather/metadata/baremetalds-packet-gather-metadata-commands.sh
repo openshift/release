@@ -38,4 +38,5 @@ cat > gather_equinix_metadata.yaml <<-EOF
         dest: "{{ lookup('env', 'ARTIFACT_DIR') }}/equinix-metadata.json"
 EOF
 
-ansible-playbook gather_equinix_metadata.yaml -i ${SHARED_DIR}/inventory -vv
+export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
+ansible-playbook gather_equinix_metadata.yaml -i "${SHARED_DIR}/inventory" -vv

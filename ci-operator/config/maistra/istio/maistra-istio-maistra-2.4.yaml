@@ -82,7 +82,7 @@ tests:
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
     test:
-    - as: maistra-istio-integration-copy-src
+    - as: maistra-istio-copy-src
       cli: latest
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
@@ -97,7 +97,7 @@ tests:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 30m0s
+      timeout: 20m0s
     - as: maistra-istio-integ-kube-singlecluster-2-4
       cli: latest
       commands: |
@@ -136,6 +136,69 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-aws
+- as: maistra-istio-push-image-2-4
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      BUILD_WITH_CONTAINER: "0"
+      GOBIN: /gobin
+      GOCACHE: /tmp/cache
+      GOMODCACHE: /tmp/cache
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: maistra-istio-copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: maistra-istio-push-image-2-4
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          sh -c \
+          "docker login -u='maistra-dev+prow' \
+          -p=${QUAY_PASS} quay.io; \
+          make maistra-image.push \
+          HUB=quay.io/maistra-dev TAG=PR-${PULL_NUMBER}"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: BUILD_WITH_CONTAINER
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      - name: GOCACHE
+      - name: GOBIN
+      - name: GOMODCACHE
+      from: src-test
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 40m0s
     workflow: servicemesh-istio-e2e-aws
 zz_generated_metadata:
   branch: maistra-2.4

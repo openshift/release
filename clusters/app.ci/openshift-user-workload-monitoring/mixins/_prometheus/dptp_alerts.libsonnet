@@ -55,7 +55,7 @@
               severity: 'critical',
             },
             annotations: {
-              message: 'plank jobs {{ $labels.job_name }} with infra-internal role has failures. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{ $labels.job_name }}|deck-internal>.',
+              message: 'plank jobs {{ $labels.job_name }} with infra-internal role has failures. Check on <https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job={{ $labels.job_name }}|deck-internal>. See <https://github.com/openshift/release/blob/master/docs/dptp-triage-sop/infrastructure-jobs.md#{{ $labels.job_name}}|SOP>.',
             },
           }
         ],

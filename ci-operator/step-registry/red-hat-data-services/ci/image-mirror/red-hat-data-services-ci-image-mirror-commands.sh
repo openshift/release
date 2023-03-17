@@ -54,7 +54,7 @@ if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
     case "$JOB_TYPE" in
         presubmit)
             log "INFO Building YearIndex image tag for a $JOB_TYPE job"
-            IMAGE_TAG="pr-${PULL_NUMBER}-${YEAR_INDEX}"
+            IMAGE_TAG="pr-${PULL_NUMBER}"
             if [[ -n "${RELEASE_VERSION-}" ]]; then
                 IMAGE_TAG="${RELEASE_VERSION}-${IMAGE_TAG}"
             fi

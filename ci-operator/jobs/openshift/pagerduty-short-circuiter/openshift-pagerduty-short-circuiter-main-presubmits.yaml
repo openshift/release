@@ -70,6 +70,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/pagerduty-short-circuiter-codecov-token
         - --target=coverage
         command:
         - ci-operator
@@ -83,6 +84,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/pagerduty-short-circuiter-codecov-token
+          name: pagerduty-short-circuiter-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -91,6 +95,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: pagerduty-short-circuiter-codecov-token
+        secret:
+          secretName: pagerduty-short-circuiter-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -153,22 +160,22 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/unit
+    context: ci/prow/test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-pagerduty-short-circuiter-main-unit
-    rerun_command: /test unit
+    name: pull-ci-openshift-pagerduty-short-circuiter-main-test
+    rerun_command: /test test
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=unit
+        - --target=test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -195,4 +202,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )unit,?($|\s.*)
+    trigger: (?m)^/test( | .* )test,?($|\s.*)

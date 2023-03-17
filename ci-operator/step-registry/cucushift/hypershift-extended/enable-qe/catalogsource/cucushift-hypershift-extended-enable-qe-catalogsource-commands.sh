@@ -41,6 +41,33 @@ metadata:
 EOF
 }
 
+# create ICSP for connected env.
+function create_icsp_connected () {
+    cat <<EOF | oc create -f -
+    apiVersion: operator.openshift.io/v1alpha1
+    kind: ImageContentSourcePolicy
+    metadata:
+      name: brew-registry
+    spec:
+      repositoryDigestMirrors:
+      - mirrors:
+        - brew.registry.redhat.io
+        source: registry.redhat.io
+      - mirrors:
+        - brew.registry.redhat.io
+        source: registry.stage.redhat.io
+      - mirrors:
+        - brew.registry.redhat.io
+        source: registry-proxy.engineering.redhat.com
+EOF
+    if [ $? == 0 ]; then
+        echo "create the ICSP successfully"
+    else
+        echo "!!! fail to create the ICSP"
+        return 1
+    fi
+}
+
 function create_catalog_sources() {
     # get cluster Major.Minor version
     ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
@@ -98,6 +125,11 @@ EOF
     set -e
 }
 
+if [[ $SKIP_HYPERSHIFT_PULL_SECRET_UPDATE == "true" ]]; then
+  echo "SKIP ....."
+  exit 0
+fi
+
 if [ ! -f "${SHARED_DIR}/nested_kubeconfig" ]; then
   exit 1
 fi
@@ -105,5 +137,6 @@ fi
 echo "enable qe catalogsource"
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 
+create_icsp_connected
 check_marketplace
 create_catalog_sources
