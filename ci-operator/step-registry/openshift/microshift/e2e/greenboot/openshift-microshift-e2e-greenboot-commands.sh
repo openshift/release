@@ -65,10 +65,10 @@ function check_greenboot_exit_status() {
 }
 
 #
-# Initial check must succeed (set timeout of 180s to speed up the process)
+# Initial check must succeed (set timeout of 120s to speed up the process)
 #
 tee /etc/greenboot/greenboot.conf &>/dev/null <<EOF
-MICROSHIFT_WAIT_TIMEOUT_SEC=180
+MICROSHIFT_WAIT_TIMEOUT_SEC=120
 EOF
 check_greenboot_exit_status 0 1
 
@@ -162,8 +162,20 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}/greenboot_check.sh" "rhel8user@${INSTANCE_PREFIX}:~/greenboot_check.sh"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
+if ! LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   "rhel8user@${INSTANCE_PREFIX}" \
-  --command "sudo bash ~/greenboot_check.sh"
+  --command "sudo ~/greenboot_check.sh"; then
+
+  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+    --quiet \
+    --project "${GOOGLE_PROJECT_ID}" \
+    --zone "${GOOGLE_COMPUTE_ZONE}" \
+    --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
+
+  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+    --zone "${GOOGLE_COMPUTE_ZONE}" \
+    rhel8user@"${INSTANCE_PREFIX}" \
+    --command 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+fi
