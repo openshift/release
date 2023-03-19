@@ -10,10 +10,10 @@ build_root:
     tag: golang-1.17
 images:
 - dockerfile_literal: |
-    FROM quay.io/interop_qe_ms/ms-interop-tests1:latest
-    WORKDIR /managed-services-integration-tests
+    FROM quay.io/redhat_msi/ocp-addons-operators-cli:latest
+    WORKDIR /ocp-addons-operators-cli
     CMD ["/bin/bash"]
-  to: ms-interop-tests
+  to: ocp-addons-operators-cli
 releases:
   latest:
     candidate:
@@ -33,10 +33,11 @@ tests:
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      ROSA_ENV: stage
-      TEST_MARKERS: rhoda
+      API_HOST: stage
+      ADDON_NAME: ocm-addon-test-operator
+      ADDON_PARAMETERS: has-external-resources=false, aws-cluster-test-param=false
     test:
-    - ref: msi-addon-testing
+    - ref: msi-addon-install
     workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: main
