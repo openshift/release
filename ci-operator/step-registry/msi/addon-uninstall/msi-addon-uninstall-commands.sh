@@ -14,5 +14,4 @@ addon \
     --token "$OCM_TOKEN" \
     --api-host "$API_HOST" \
     --timeout "$TIMEOUT" \
-    install \
-    --parameters "$ADDON_PARAMETERS"
+    uninstall
