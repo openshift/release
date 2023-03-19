@@ -115,7 +115,7 @@ resources:
   - busybox.yaml
 images:
   - name: BUSYBOX_IMAGE
-    newName: registry.k8s.io/busybox
+    newName: busybox:1.35
 EOF
 
 SCRIPT_FILE=/etc/greenboot/check/required.d/50_busybox_running_check.sh
@@ -162,8 +162,20 @@ LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}/greenboot_check.sh" "rhel8user@${INSTANCE_PREFIX}:~/greenboot_check.sh"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
+if ! LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   "rhel8user@${INSTANCE_PREFIX}" \
-  --command "sudo bash ~/greenboot_check.sh"
+  --command "sudo ~/greenboot_check.sh"; then
+
+  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+    --quiet \
+    --project "${GOOGLE_PROJECT_ID}" \
+    --zone "${GOOGLE_COMPUTE_ZONE}" \
+    --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
+
+  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+    --zone "${GOOGLE_COMPUTE_ZONE}" \
+    rhel8user@"${INSTANCE_PREFIX}" \
+    --command 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+fi
