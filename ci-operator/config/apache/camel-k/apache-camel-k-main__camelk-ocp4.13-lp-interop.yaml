@@ -1,0 +1,43 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: camelk-amp-interop-aws
+  cron: 0 1 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: aws.interop.ccitredhat.com
+      OPERATORS: |
+        [
+            {"name": "camel-k-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": "","operator_group": "global-operators"}
+        ]
+      SPOT_INSTANCES: "true"
+    test:
+    - ref: install-operators
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: apache
+  repo: camel-k
+  variant: camelk-ocp4.13-lp-interop
