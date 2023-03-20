@@ -7,6 +7,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  cli-ocm:
+    name: cli-ocm
+    namespace: ci
+    tag: latest
   osde2e:
     name: osde2e
     namespace: ci
@@ -16,6 +20,12 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -493,6 +503,50 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-rosa-prod
     name: osde2e-rosa-prod
+- as: osd-aws-nightly-poc
+  cron: 0 0 1 1 0
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      OCM_LOGIN_URL: staging
+    post:
+    - chain: gather
+    - chain: osd-delete
+    test:
+    - as: provision-cluster-run-tests
+      commands: |
+        export CONFIGS="aws,stage,e2e-suite"
+        export MUST_GATHER=false
+        export REPORT_DIR=${ARTIFACT_DIR}
+        export SECRET_LOCATIONS=/usr/local/sd-osd
+        /osde2e test \
+        --secret-locations ${SECRET_LOCATIONS} \
+        --configs ${CONFIGS} \
+        --skip-destroy-cluster
+      credentials:
+      - mount_path: /usr/local/sd-osd
+        name: sd-osd
+        namespace: test-credentials
+      from: osde2e
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: archive-kubeconfig
+      commands: |
+        export OCM_TOKEN=$(cat /usr/local/sd-osd/ocm-refresh-token)
+        cat ${ARTIFACT_DIR}/metadata.json | jq '."cluster-id"' > ${SHARED_DIR}/cluster-id
+        ocm login --url ${OCM_LOGIN_URL} --token ${OCM_TOKEN}
+        ocm get /api/clusters_mgmt/v1/clusters/$(cat ${SHARED_DIR}/cluster-id)/credentials | jq -r .kubeconfig > ${SHARED_DIR}/kubeconfig
+      credentials:
+      - mount_path: /usr/local/sd-osd
+        name: sd-osd
+        namespace: test-credentials
+      from: cli-ocm
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift
