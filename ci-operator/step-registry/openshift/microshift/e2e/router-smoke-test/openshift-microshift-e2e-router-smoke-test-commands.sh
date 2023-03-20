@@ -75,7 +75,7 @@ spec:
 oc expose pod hello-microshift
 oc expose svc hello-microshift --hostname hello-microshift.cluster.local
 
-oc wait pods -l name=hello-microshift --for condition=Ready --timeout=300s
+oc wait pods -l app=hello-microshift --for condition=Ready --timeout=300s
 EOF
 
 chmod +x "${HOME}/deploy.sh"
