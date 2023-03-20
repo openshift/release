@@ -107,6 +107,8 @@ function get_skip_tests {
 }
 
 source $SHARED_DIR/main.env
+export GIT_COMMITTER_NAME='CI User'
+export GIT_COMMITTER_EMAIL='cnf-devel@redhat.com'
 
 export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}" # next: ovs_qos
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
@@ -146,6 +148,8 @@ cd "$cnf_dir" || exit 1
 echo "running on branch ${CNF_BRANCH}"
 git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
+git fetch origin pull/1439/head:pull_1439
+git checkout pull_1439
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 cd -
 
