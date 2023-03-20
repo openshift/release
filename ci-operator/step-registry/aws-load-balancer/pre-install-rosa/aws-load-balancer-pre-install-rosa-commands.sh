@@ -15,30 +15,27 @@ CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 # ALBO roles have to be cleaned up, otherwise ccoctl won't create secret manifests.
 # IAM roles with the prefix below are cleaned up by rosa-sts-account-roles-delete ref.
 ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
-CR_DIR="${SHARED_DIR}"
 MANIFEST_DIR="/tmp/albo-manifests"
 E2E_INPUT_DIR="${SHARED_DIR}"
 E2E_WAFV2_WEB_ACL_NAME="echoserver-acl"
 E2E_WAF_WEB_ACL_NAME="echoserverclassicacl"
 
-echo "=> configuring aws"
 if [ -f "${AWSCRED}" ]; then
-  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
-  export AWS_DEFAULT_REGION="${REGION}"
+    echo "=> configuring aws"
+    export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+    export AWS_DEFAULT_REGION="${REGION}"
 else
-  echo "Did not find compatible cloud provider cluster_profile"; exit 1
+    echo "Did not find compatible cloud provider cluster_profile"; exit 1
 fi
 
-echo "=> logging into rosa"
 if [ ! -z "${ROSA_TOKEN}" ]; then
-  echo "Logging into staging with offline token using rosa cli $(rosa version)"
-  rosa login --env "staging" --token "${ROSA_TOKEN}" || { echo "Login failed"; exit 1; }
+    echo "Logging into staging with offline token using rosa cli $(rosa version)"
+    rosa login --env "staging" --token "${ROSA_TOKEN}" || { echo "Login failed"; exit 1; }
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"; exit 1
+    echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"; exit 1
 fi
 
 echo "=> getting identity provider name"
-rosa describe cluster --cluster="${CLUSTER_ID}"
 AWS_ACCOUNT_ID=$(rosa describe cluster --cluster="${CLUSTER_ID}" | grep 'AWS Account:' | tr -d ' ' | cut -d: -f2)
 OIDC_IDP_NAME=$(rosa describe cluster --cluster="${CLUSTER_ID}" | grep 'OIDC Endpoint URL:' | tr -d ' ' | cut -d: -f2- | cut -d/ -f3-)
 IDP_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_IDP_NAME}"
@@ -50,6 +47,10 @@ oc image extract "${CCO_IMAGE}" --registry-config=${CI_REGISTRY_PULL_SECRET} --p
 chmod 775 /tmp/albo/ccoctl
 
 echo "=> creating required iam roles"
+CR_DIR="/tmp/albo-credrequests"
+mkdir -p "${CR_DIR}"
+cp "${SHARED_DIR}/operator-credentials-request.yaml" "${CR_DIR}"
+cp "${SHARED_DIR}/controller-credentials-request.yaml" "${CR_DIR}"
 /tmp/albo/ccoctl aws create-iam-roles --name="${ACCOUNT_ROLES_PREFIX}" --region="${REGION}" --credentials-requests-dir="${CR_DIR}" --identity-provider-arn="${IDP_ARN}" --output-dir="${MANIFEST_DIR}"
 
 echo "=> creating required secrets"
@@ -70,10 +71,8 @@ oc -n openshift-config set data secret pull-secret --from-file=.dockerconfigjson
 echo "=> ensuring e2e wafv2 web acl"
 aws wafv2 create-web-acl --name "${E2E_WAFV2_WEB_ACL_NAME}" --scope REGIONAL --default-action '{"Block":{}}'  --visibility-config '{"MetricName":"echoserver","CloudWatchMetricsEnabled": false,"SampledRequestsEnabled":false}' || true
 aws wafv2 list-web-acls --scope REGIONAL --output json | grep "webacl/${E2E_WAFV2_WEB_ACL_NAME}" | cut -d: -f2- | tr -d \",' ' > ${E2E_INPUT_DIR}/wafv2-webacl
-echo "=> e2e wafv2 web acl: $(cat ${E2E_INPUT_DIR}/wafv2-webacl)"
 
 echo "=> ensuring e2e wafregional web acl"
 WAFREGIONAL_CHANGE_TOKEN=$(aws waf-regional get-change-token --output json | jq -r .ChangeToken)
 aws waf-regional create-web-acl --name "${E2E_WAF_WEB_ACL_NAME}" --metric-name "${E2E_WAF_WEB_ACL_NAME}" --default-action '{"Type":"BLOCK"}' --change-token "${WAFREGIONAL_CHANGE_TOKEN}" || true
 aws waf-regional list-web-acls --output json | grep -B1 "${E2E_WAF_WEB_ACL_NAME}" | grep WebACLId | tr -d \",' ' | cut -d: -f2 > ${E2E_INPUT_DIR}/waf-webacl
-echo "=> e2e wafregional web acl: $(cat ${E2E_INPUT_DIR}/waf-webacl)"
