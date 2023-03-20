@@ -6,8 +6,8 @@
 - [Process](#process)
   - [Cluster Provisioning and Deprovisioning: `ipi-aws`](#cluster-provisioning-and-deprovisioning-ipi-aws)
   - [Test Setup, Execution, and Reporting Results - `mtr-interop-aws`](#test-setup-execution-and-reporting-results---mtr-interop-aws)
-- [Requirements](#requirements)
-  - [Variables](#variables)
+- [Prerequisite(s)](#prerequisites)
+  - [Environment Variables](#environment-variables)
   - [Custom Images](#custom-images)
 
 ## General Information
@@ -40,19 +40,19 @@ Following the test cluster being provisioned, the following steps are executed i
 2. [`mtr-deploy-windup-ref`](../../../step-registry/mtr/deploy-windup/README.md)
 3. [`mtr-tests-ui-ref`](../../../step-registry/mtr/tests/ui/README.md)
 
-## Requirements
+## Prerequisite(s)
 
-### Variables
+### Environment Variables
 
 - `BASE_DOMAIN`
   - **Definition**: A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
-  - **If left empty**: The [`ipi-aws` workflow](../../../step-registry/ipi/aws/ipi-aws-workflow.yaml) will fail.\
+  - **If left empty**: The [`ipi-aws` workflow](../../../step-registry/ipi/aws/ipi-aws-workflow.yaml) will fail.
 - `OPERATORS`
   - **Definition**: A JSON list of operators to install. Please see the [Defining `OPERATORS`](../../../step-registry/install-operators/README.md#defining-operators) section of the `install-operators` documentation for more information.
   - **If left empty**: The [`install-operators`](../../../step-registry/install-operators/README.md) ref will fail.
 - `MTR_TESTS_UI_SCOPE`
-  - **Definition**: Tag you'd like to use to execute Cypress.
-  - **If left empty**: It will use 'all' as the default value.
+  - **Definition**: Tag you'd like to use to execute Cypress. This value will determine which set of tests to run. For example, for interop testing the value should be `interop`.
+  - **If left empty**: It will use 'all' as the default value. Meaning all ui tests will execute.
 
 
 ### Custom Images

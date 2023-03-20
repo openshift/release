@@ -4,9 +4,9 @@
 
 - [Purpose](#purpose)
 - [Process](#process)
-- [Requirements](#requirements)
+- [Prerequisite(s)](#prerequisites)
   - [Infrastructure](#infrastructure)
-  - [Variables](#variables)
+  - [Environment Variables](#environment-variables)
   - [Other](#other)
 - [Custom Image - `mtr-runner`](#custom-image---mtr-runner)
 
@@ -21,16 +21,16 @@ Use to execute the `Cypress` [windup-ui-tests](https://github.com/windup/windup-
 3. Uses the `npm run mergereports` command to merge all of the XML results into one file.
 4. Copies the XML file from the command in step 4 to `$ARTIFACT_DIR/windup-ui-results.xml`.
 
-## Requirements
+## Prerequisite(s)
 
 ### Infrastructure
 
 - A provisioned test cluster to target.
   - Should have a `mtr` namespace/project with:
-    - [The `mtr-operator` installed](../install/README.md).
+    - [The `mtr-operator` installed](../../../install-operators/README.md).
     - [Windup deployed](../deploy-windup/README.md).
 
-### Variables
+### Environment Variables
 
 - `MTR_TESTS_UI_SCOPE`
   - **Definition**: Tag you'd like to use to execute Cypress.

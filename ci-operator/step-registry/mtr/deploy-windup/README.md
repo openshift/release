@@ -5,7 +5,7 @@
 - [Process](#process)
 - [Requirements](#requirements)
   - [Infrastructure](#infrastructure)
-  - [Variables](#variables)
+  - [Environment Variables](#environment-variables)
 
 ## Purpose
 
@@ -13,8 +13,9 @@ To deploy Windup in a specified namespace with a specified volume capacity. This
 
 ## Process
 
-This script is very simple. It uses `oc` to deploy Windup, then checks continuously checks if the deployment is complete and ready. If it isn't ready 
-## Requirements
+This script is very simple. It uses `oc` to deploy Windup, then checks continuously if the deployment is complete and ready. If it isn't ready, within the specified number of retries (currently 60 retries, around 30 minutes) the script will fail.
+
+## Prerequisite(s)
 
 ### Infrastructure
 
@@ -22,7 +23,7 @@ This script is very simple. It uses `oc` to deploy Windup, then checks continuou
   - This cluster should have a namespace that matches $WINDUP_NAMESPACE or the default namespace of "mtr"
   - This cluster should have enough space to hold a volume the size of $WINDUP_VOLUME_CAP or the default of "5Gi"
 
-### Variables
+### Environment Variables
 
 - `WINDUP_NAMESPACE`
   - **Definition**: Namespace to deploy Windup in.
