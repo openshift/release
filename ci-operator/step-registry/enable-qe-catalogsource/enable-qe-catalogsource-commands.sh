@@ -115,11 +115,44 @@ EOF
     fi
 }
 
+# Create the ICSP for optional operators dynamiclly, but we don't use it here
+function create_icsp_by_olm () {
+    mirror_auths="${SHARED_DIR}/mirror_auths"
+    # Don't mirror OLM operators images, but create the ICSP for them.
+    echo "===>>> create ICSP for OLM operators"
+    # get cluster Major.Minor version
+    ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+    if [[ "${USE_STAGE_INDEX_IMAGE:-}" == "true" ]]; then
+        index_image_name="brew.registry.redhat.io/rh-osbs/iib-pub-pending:v${ocp_version}"
+    else
+        index_image_name=quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}
+    fi
+    run_command "oc adm catalog mirror -a ${mirror_auths} ${index_image_name} ${MIRROR_REGISTRY_HOST} --manifests-only --to-manifests=/tmp/olm_mirror"; ret=$?
+    if [[ $ret -eq 0 ]]; then
+        run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
+        run_command "oc create -f /tmp/olm_mirror/imageContentSourcePolicy.yaml"; ret=$?
+        if [[ $ret -eq 0 ]]; then
+            echo "create the ICSP resource successfully"
+        else
+            echo "!!! fail to create the ICSP resource"
+            return 1
+        fi
+    else
+        echo "!!! fail to generate the ICSP for OLM operators"
+        # cat ${mirror_auths}
+        return 1
+    fi
+    rm -rf /tmp/olm_mirror 
+}
+
 function create_catalog_sources()
 {
     # get cluster Major.Minor version
     ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
     index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
+    if [[ "${USE_STAGE_INDEX_IMAGE:-}" == "true" ]]; then
+      index_image="brew.registry.redhat.io/rh-osbs/iib-pub-pending:v${ocp_version}"
+    fi
 
     echo "create QE catalogsource: qe-app-registry"
     cat <<EOF | oc create -f -
@@ -209,6 +242,10 @@ run_command "oc whoami"
 run_command "oc version -o yaml"
 update_global_auth
 sleep 5
-create_icsp_connected
+if [[ "${USE_STAGE_INDEX_IMAGE:-}" == "true" ]]; then
+    create_icsp_by_olm
+else
+    create_icsp_connected
+fi
 check_marketplace
 create_catalog_sources
