@@ -3,10 +3,10 @@ base_images:
     name: stream9
     namespace: coreos
     tag: "9"
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.13:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.13
   ubi:
     name: ubi
     namespace: ocp
@@ -46,19 +46,12 @@ images:
         source_path: /go/src/github.com/openshift/cincinnati
   to: src-rust
 - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
-  inputs:
-    base:
-      as:
-      - redhat/ubi8:latest
   to: deploy
 - dockerfile_path: dist/Dockerfile.e2e/Dockerfile
   inputs:
-    base:
+    openshift_release_golang-1.13:
       as:
-      - quay.io/centos/centos:stream9
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.13
   to: e2e-test
 promotion:
   name: cincinnati-build-root
