@@ -3,6 +3,15 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: 3scale-runner
 releases:
   latest:
     candidate:
@@ -23,18 +32,22 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: aws.interop.ccitredhat.com
-      COMPUTE_NODE_REPLICAS: "3"
-      COMPUTE_NODE_TYPE: m5.xlarge
       OPERATORS: |
         [
             {"name": "3scale-operator", "source": "redhat-operators", "channel": "threescale-2.13", "install_namespace": "threescale", "target_namespaces": "threescale"}
         ]
       SPOT_INSTANCES: "true"
-    test:
+    post:
+    - ref: gather-aws-console
+    - ref: 3scale-apimanager-uninstall
+    - chain: ipi-deprovision
+    pre:
+    - chain: ipi-conf-aws
+    - chain: ipi-install
     - ref: install-operators
-    workflow: ipi-aws
+    - ref: 3scale-apimanager-install
 zz_generated_metadata:
   branch: main
   org: 3scale-qe
-  repo: 3scale-tests
+  repo: 3scale-deploy
   variant: 3scale-amp-ocp4.13-lp-interop
