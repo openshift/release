@@ -20,17 +20,5 @@ export CYPRESS_OPTIONS_HUB_PASSWORD
 
 # run the test execution script
 ./execute_clc_interop_commands.sh
-<<<<<<< HEAD
-<<<<<<< HEAD
 
-<<<<<<< HEAD
 cp -r reports/ocp_interop $ARTIFACT_DIR/
-=======
-cp -r reports $ARTIFACT_DIR/
->>>>>>> a345f75ee0c ([LPTOCPCI-58] use clc image as base image, add clc destroy step)
-=======
->>>>>>> 54958af119f (Add ascerra dir to test clc image from fork.)
-=======
-
-cp -r reports/destroy $ARTIFACT_DIR/
->>>>>>> d61847d4237 (fix mch status check, update destroy variable)

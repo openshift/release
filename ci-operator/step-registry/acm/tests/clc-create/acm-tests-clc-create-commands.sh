@@ -22,8 +22,3 @@ export CYPRESS_OPTIONS_HUB_PASSWORD
 ./execute_clc_interop_commands.sh
 
 cp -r reports $ARTIFACT_DIR/
-<<<<<<< HEAD
-=======
-#rm /tmp/clc/options.yaml
-#cp -r /tmp/clc
->>>>>>> 69cb8095462 (Set timeout to 8hrs to give PQE time to investigate.)

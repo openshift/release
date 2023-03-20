@@ -22,11 +22,7 @@ sleep 60
 
 RETRIES=30
 for try in $(seq "${RETRIES}"); do
-<<<<<<< HEAD
   if [[ $(oc get mch -n ${MCH_NAMESPACE} -o=jsonpath='{.items[0].status.phase}') == "Running" ]]; then
-=======
-  if [[ $(oc get mch -n ocm -o=jsonpath='{.items[0].status.phase}') == "Running" ]]; then
->>>>>>> d61847d4237 (fix mch status check, update destroy variable)
     echo "Success MCH is Running"
     break
   else
@@ -38,7 +34,3 @@ for try in $(seq "${RETRIES}"); do
     sleep 30
   fi
 done
-<<<<<<< HEAD
-=======
-
->>>>>>> d61847d4237 (fix mch status check, update destroy variable)
