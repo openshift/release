@@ -131,6 +131,10 @@ cnf_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$cnf_dir" || exit 1
 
 echo "running on branch ${CNF_BRANCH}"
+git config --global user.name "test cnf"
+git config --global user.email "test@example.com"
+git fetch origin pull/1439/head:pull_1439
+git checkout pull_1439
 git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
