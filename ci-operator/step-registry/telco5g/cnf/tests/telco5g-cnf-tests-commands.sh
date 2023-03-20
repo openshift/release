@@ -127,12 +127,17 @@ else
     export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
 
+git config --global user.name "CI User"
+git config --global user.email "cnf-devel@redhat.com"
+
 cnf_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$cnf_dir" || exit 1
 
 echo "running on branch ${CNF_BRANCH}"
 git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
+git fetch origin pull/1439/head:pull_1439
+git checkout pull_1439
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 cd -
 
