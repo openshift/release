@@ -15,6 +15,13 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+# check the global catalog source config, if you don't want to use the default catalog sources, you should disable it by using the `operatorhub`. Like below,
+# oc patch operatorhub cluster -p '{"spec": {"disableAllDefaultSources": true}}' --type=merge
+oc get operatorhub cluster -o yaml
+# if one of global catalog sources is not running well, it will block all subscribption. 
+oc get catalogsource -n openshift-marketplace
+oc get pods -n openshift-marketplace
+
 # In upgrade tests, the subscribe step installs the initial version of the operator, so
 # it needs to install from the INITIAL_CHANNEL
 if [ -n "${INITIAL_CHANNEL}" ]; then
