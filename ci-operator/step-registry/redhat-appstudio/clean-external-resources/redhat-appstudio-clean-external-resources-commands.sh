@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export PATH=$PATH:/tmp/bin
-mkdir -p /tmp/bin
-
 export GITHUB_USER GITHUB_TOKEN GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING CLEAN_REPOS_STATUS CLEAN_WEBHOOK_STATUS
 
 GITHUB_USER=""
@@ -34,7 +31,7 @@ do :
     PREVIOUS_RATE_REMAINING="${GH_RATE_REMAINING}"
 done
 
-echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
+echo -e "[INFO] Start cleanup with user: ${GITHUB_USER}"
 
 cd "$(mktemp -d)"
 
@@ -43,12 +40,6 @@ git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e
 make clean-gitops-repositories || CLEAN_REPOS_STATUS=$?
 make clean-github-webhooks || CLEAN_WEBHOOK_STATUS=$?
 
-if [[ "${CLEAN_REPOS_STATUS}" -ne 0 ]];then
-    echo -e "[ERROR]: Failed to clean gitops repositories"
-    exit "${CLEAN_REPOS_STATUS}"
-fi
-
-if [[ "${CLEAN_WEBHOOK_STATUS}" -ne 0 ]];then
-    echo -e "[ERROR]: Failed to clean webhooks"
-    exit "${CLEAN_WEBHOOK_STATUS}"
+if [[ "${CLEAN_REPOS_STATUS}" -ne 0 || "${CLEAN_WEBHOOK_STATUS}" -ne 0 ]]; then
+    exit 1
 fi
