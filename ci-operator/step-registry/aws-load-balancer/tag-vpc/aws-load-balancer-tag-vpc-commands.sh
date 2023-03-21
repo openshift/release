@@ -10,6 +10,7 @@ set -o pipefail
 
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 CONFIG="${SHARED_DIR}/install-config.yaml"
+VPC_TAGS="${SHARED_DIR}/vpc-tags"
 REGION="$(yq-go r "${CONFIG}" 'platform.aws.region')"
 
 if [ -f "${AWSCRED}" ]; then
@@ -28,3 +29,5 @@ INFRA_ID=$(aws ec2 describe-subnets --subnet-ids "${AWS_SUBNET}" | jq -r '.[][0]
 echo "=> Using infra id: ${INFRA_ID}"
 
 aws ec2 create-tags --resources "${VPC_ID}" --tags "Key=kubernetes.io/cluster/${INFRA_ID},Value=shared"
+
+echo "${VPC_ID}|Key=kubernetes.io/cluster/${INFRA_ID},Value=shared" > "${VPC_TAGS}"
