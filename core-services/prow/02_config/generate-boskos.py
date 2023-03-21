@@ -103,6 +103,9 @@ CONFIG = {
         'eastus2': 4,
         'northeurope': 4
     },
+    'azure-marketplace-qe-quota-slice': {
+        'westus': 6
+    },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 10
     },
@@ -269,7 +272,7 @@ for i in range(83,93):
 for i in range(94,106):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(106,109):
+for i in range(109,112):
     CONFIG['vsphere-ibm-7-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):
