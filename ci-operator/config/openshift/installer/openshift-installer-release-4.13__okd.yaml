@@ -115,7 +115,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: ovirt-installer
 promotion:
-  disabled: true
   name: "4.13"
   namespace: origin
 releases:
@@ -206,6 +205,15 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
+- as: e2e-aws-ovn-testing-stream
+  cron: 30 0 * * *
+  steps:
+    cluster_profile: aws
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-aws-fcos-ami
+    - chain: ipi-install
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

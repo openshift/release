@@ -6,7 +6,7 @@ presubmits:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-api-machinery
+    context: ci/prow/e2e-greenboot
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -16,8 +16,171 @@ presubmits:
       ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-api-machinery
-    rerun_command: /test e2e-openshift-conformance-sig-api-machinery
+    name: pull-ci-openshift-microshift-release-4.13-e2e-greenboot
+    optional: true
+    rerun_command: /test e2e-greenboot
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|scripts/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-greenboot-cluster-profile
+        - --target=e2e-greenboot
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-greenboot-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-greenboot,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build02
+    context: ci/prow/e2e-greenboot-arm
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cluster: build02
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.13-e2e-greenboot-arm
+    optional: true
+    rerun_command: /test e2e-greenboot-arm
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|scripts/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-greenboot-arm-cluster-profile
+        - --target=e2e-greenboot-arm
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-greenboot-arm-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-greenboot-arm,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build02
+    context: ci/prow/e2e-loadbalancer-smoke-test
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cluster: build02
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.13-e2e-loadbalancer-smoke-test
+    optional: true
+    rerun_command: /test e2e-loadbalancer-smoke-test
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
     spec:
       containers:
@@ -26,8 +189,9 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-api-machinery-cluster-profile
-        - --target=e2e-openshift-conformance-sig-api-machinery
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-loadbalancer-smoke-test-cluster-profile
+        - --target=e2e-loadbalancer-smoke-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -40,7 +204,10 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-api-machinery-cluster-profile
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-loadbalancer-smoke-test-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -59,6 +226,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -72,14 +242,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-api-machinery,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-loadbalancer-smoke-test,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-apps
+    context: ci/prow/e2e-loadbalancer-smoke-test-arm
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -89,9 +259,10 @@ presubmits:
       ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-apps
-    rerun_command: /test e2e-openshift-conformance-sig-apps
-    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    name: pull-ci-openshift-microshift-release-4.13-e2e-loadbalancer-smoke-test-arm
+    optional: true
+    rerun_command: /test e2e-loadbalancer-smoke-test-arm
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
     spec:
       containers:
       - args:
@@ -99,8 +270,9 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-apps-cluster-profile
-        - --target=e2e-openshift-conformance-sig-apps
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-loadbalancer-smoke-test-arm-cluster-profile
+        - --target=e2e-loadbalancer-smoke-test-arm
         command:
         - ci-operator
         image: ci-operator:latest
@@ -113,7 +285,10 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-apps-cluster-profile
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-loadbalancer-smoke-test-arm-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -132,6 +307,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -145,14 +323,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-apps,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-loadbalancer-smoke-test-arm,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-arch
+    context: ci/prow/e2e-openshift-conformance-reduced
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -162,9 +340,9 @@ presubmits:
       ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-arch
-    rerun_command: /test e2e-openshift-conformance-sig-arch
-    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-reduced
+    rerun_command: /test e2e-openshift-conformance-reduced
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
     spec:
       containers:
       - args:
@@ -172,8 +350,9 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-arch-cluster-profile
-        - --target=e2e-openshift-conformance-sig-arch
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-reduced-cluster-profile
+        - --target=e2e-openshift-conformance-reduced
         command:
         - ci-operator
         image: ci-operator:latest
@@ -186,7 +365,10 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-arch-cluster-profile
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-reduced-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -205,6 +387,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -218,14 +403,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-arch,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openshift-conformance-reduced,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-auth
+    context: ci/prow/e2e-openshift-conformance-reduced-arm
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -235,9 +420,9 @@ presubmits:
       ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-auth
-    rerun_command: /test e2e-openshift-conformance-sig-auth
-    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-reduced-arm
+    rerun_command: /test e2e-openshift-conformance-reduced-arm
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
     spec:
       containers:
       - args:
@@ -245,8 +430,9 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-auth-cluster-profile
-        - --target=e2e-openshift-conformance-sig-auth
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-openshift-conformance-reduced-arm-cluster-profile
+        - --target=e2e-openshift-conformance-reduced-arm
         command:
         - ci-operator
         image: ci-operator:latest
@@ -259,7 +445,10 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-auth-cluster-profile
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openshift-conformance-reduced-arm-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -278,6 +467,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -291,445 +483,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-auth,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-cli
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/cluster: build02
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-cli
-    rerun_command: /test e2e-openshift-conformance-sig-cli
-    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-cli-cluster-profile
-        - --target=e2e-openshift-conformance-sig-cli
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-cli-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-cli,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-instrumentation
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/cluster: build02
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-instrumentation
-    rerun_command: /test e2e-openshift-conformance-sig-instrumentation
-    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-instrumentation-cluster-profile
-        - --target=e2e-openshift-conformance-sig-instrumentation
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-instrumentation-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-instrumentation,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-network
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/cluster: build02
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-network
-    rerun_command: /test e2e-openshift-conformance-sig-network
-    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-network-cluster-profile
-        - --target=e2e-openshift-conformance-sig-network
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-network-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-network,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-node
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/cluster: build02
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-node
-    rerun_command: /test e2e-openshift-conformance-sig-node
-    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-node-cluster-profile
-        - --target=e2e-openshift-conformance-sig-node
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-node-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-node,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-scheduling
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/cluster: build02
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-scheduling
-    rerun_command: /test e2e-openshift-conformance-sig-scheduling
-    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-scheduling-cluster-profile
-        - --target=e2e-openshift-conformance-sig-scheduling
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-scheduling-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-scheduling,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.13$
-    - ^release-4\.13-
-    cluster: build02
-    context: ci/prow/e2e-openshift-conformance-sig-storage
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/cluster: build02
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-openshift-conformance-sig-storage
-    rerun_command: /test e2e-openshift-conformance-sig-storage
-    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-openshift-conformance-sig-storage-cluster-profile
-        - --target=e2e-openshift-conformance-sig-storage
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /usr/local/e2e-openshift-conformance-sig-storage-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openshift-conformance-sig-storage,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openshift-conformance-reduced-arm,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -756,6 +510,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-reboot-cluster-profile
         - --target=e2e-reboot
         command:
@@ -769,6 +524,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-reboot-cluster-profile
           name: cluster-profile
@@ -789,6 +547,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -803,6 +564,86 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-reboot,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.13$
+    - ^release-4\.13-
+    cluster: build02
+    context: ci/prow/e2e-reboot-arm
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: gcp
+      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cluster: build02
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-microshift-release-4.13-e2e-reboot-arm
+    rerun_command: /test e2e-reboot-arm
+    run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-reboot-arm-cluster-profile
+        - --target=e2e-reboot-arm
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-reboot-arm-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        projected:
+          sources:
+          - secret:
+              name: cluster-secrets-gcp
+          - configMap:
+              name: cluster-profile-gcp
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-reboot-arm,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -830,6 +671,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-router-smoke-test-cluster-profile
         - --target=e2e-router-smoke-test
         command:
@@ -843,6 +685,9 @@ presubmits:
         volumeMounts:
         - mountPath: /etc/boskos
           name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
           readOnly: true
         - mountPath: /usr/local/e2e-router-smoke-test-cluster-profile
           name: cluster-profile
@@ -863,6 +708,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -883,7 +731,7 @@ presubmits:
     - ^release-4\.13$
     - ^release-4\.13-
     cluster: build02
-    context: ci/prow/e2e-rpm-install
+    context: ci/prow/e2e-router-smoke-test-arm
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -893,8 +741,9 @@ presubmits:
       ci-operator.openshift.io/cluster: build02
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-microshift-release-4.13-e2e-rpm-install
-    rerun_command: /test e2e-rpm-install
+    name: pull-ci-openshift-microshift-release-4.13-e2e-router-smoke-test-arm
+    optional: true
+    rerun_command: /test e2e-router-smoke-test-arm
     run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
     spec:
       containers:
@@ -903,8 +752,9 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/usr/local/e2e-rpm-install-cluster-profile
-        - --target=e2e-rpm-install
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-router-smoke-test-arm-cluster-profile
+        - --target=e2e-router-smoke-test-arm
         command:
         - ci-operator
         image: ci-operator:latest
@@ -917,7 +767,10 @@ presubmits:
         - mountPath: /etc/boskos
           name: boskos
           readOnly: true
-        - mountPath: /usr/local/e2e-rpm-install-cluster-profile
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-router-smoke-test-arm-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -936,6 +789,9 @@ presubmits:
           - key: credentials
             path: credentials
           secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: cluster-profile
         projected:
           sources:
@@ -949,7 +805,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-rpm-install,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-router-smoke-test-arm,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -972,6 +828,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest

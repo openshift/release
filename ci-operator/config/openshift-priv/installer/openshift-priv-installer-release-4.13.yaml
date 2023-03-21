@@ -34,7 +34,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.46.0
+    tag: v1.48.0
   ocp_4.10_cli:
     name: 4.13-priv
     namespace: ocp-private
@@ -140,7 +140,6 @@ images:
         source_path: /usr/bin/oc
   to: src-oc
 promotion:
-  disabled: true
   excluded_images:
   - src-oc
   name: 4.13-priv
@@ -202,7 +201,10 @@ resources:
       memory: 5Gi
 tests:
 - as: unit
-  commands: go test ./pkg/...
+  commands: |
+    go test -coverprofile=/tmp/coverprofile.out ./pkg/...
+    go tool cover -o $ARTIFACT_DIR/cover.txt -func /tmp/coverprofile.out
+    go tool cover -o $ARTIFACT_DIR/cover.html -html /tmp/coverprofile.out
   container:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
@@ -283,6 +285,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
   optional: true
+  run_if_changed: gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-secureboot
@@ -470,6 +473,7 @@ tests:
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
+      NETWORK_TYPE: OpenShiftSDN
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
@@ -479,6 +483,12 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-proxy
+  timeout: 6h0m0s
+- as: e2e-openstack-externallb-techpreview
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-external-lb
   timeout: 6h0m0s
 - as: openstack-manifests
   run_if_changed: openstack
@@ -500,12 +510,14 @@ tests:
   timeout: 6h0m0s
 - as: e2e-vsphere-upi-zones
   optional: true
+  run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
 - as: e2e-vsphere-zones
   optional: true
+  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-zones

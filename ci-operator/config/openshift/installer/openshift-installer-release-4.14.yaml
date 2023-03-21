@@ -34,7 +34,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.46.0
+    tag: v1.48.0
   ocp_4.10_cli:
     name: "4.14"
     namespace: ocp
@@ -43,10 +43,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.12
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.19-openshift-4.14
   origin_4.12_cli:
     name: "4.14"
     namespace: origin
@@ -64,9 +64,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
@@ -74,9 +74,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -111,9 +111,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -121,9 +121,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: ovirt-installer
 - dockerfile_literal: |
     FROM src
@@ -139,6 +139,7 @@ images:
         source_path: /usr/bin/oc
   to: src-oc
 promotion:
+  disabled: true
   excluded_images:
   - src-oc
   name: "4.14"
@@ -200,7 +201,10 @@ resources:
       memory: 5Gi
 tests:
 - as: unit
-  commands: go test ./pkg/...
+  commands: |
+    go test -coverprofile=/tmp/coverprofile.out ./pkg/...
+    go tool cover -o $ARTIFACT_DIR/cover.txt -func /tmp/coverprofile.out
+    go tool cover -o $ARTIFACT_DIR/cover.html -html /tmp/coverprofile.out
   container:
     from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
@@ -242,6 +246,11 @@ tests:
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: aws
+    env:
+      USER_TAGS: |
+        keyA valueA
+        keyB valueB
+        keyC valueC
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - as: e2e-aws-ovn-proxy
@@ -274,13 +283,14 @@ tests:
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - as: e2e-gcp-ovn
-  run_if_changed: gcp
+  run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
   optional: true
+  run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-secureboot
@@ -300,7 +310,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-gcp-ovn-shared-vpc
   optional: true
-  run_if_changed: gcp
+  run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-sharednetwork
@@ -352,7 +362,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-gcp-ovn-xpn
   optional: true
-  run_if_changed: ^(ipi/gcp/.*)
+  run_if_changed: (gcp|google)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
@@ -468,6 +478,7 @@ tests:
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
+      NETWORK_TYPE: OpenShiftSDN
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
@@ -477,6 +488,12 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-proxy
+  timeout: 6h0m0s
+- as: e2e-openstack-externallb-techpreview
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-external-lb
   timeout: 6h0m0s
 - as: openstack-manifests
   run_if_changed: openstack
@@ -498,12 +515,14 @@ tests:
   timeout: 6h0m0s
 - as: e2e-vsphere-upi-zones
   optional: true
+  run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-upi-zones
   timeout: 6h0m0s
 - as: e2e-vsphere-zones
   optional: true
+  run_if_changed: vsphere
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-zones
@@ -649,6 +668,13 @@ tests:
         AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-public-subnets
+  optional: true
+  run_if_changed: /aws/subnet.go
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-publicsubnets
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.14

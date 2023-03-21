@@ -11,6 +11,16 @@ cat <<EOF >"${SKIP_TESTS_FILE}"
 
 # <feature> <test name>
 
+# SKIPTEST
+# bz### we can stop testing N3000
+# TESTNAME
+sriov "FPGA Programmable Acceleration Card N3000 for Networking"
+
+# SKIPTEST
+# bz### takes too much time
+# TESTNAME
+dpdk "Client should be able to forward packets"
+
 EOF
 }
 
@@ -30,27 +40,7 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
 # SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "Should be able to configure a metaplugin"
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "Webhook resource injector"
-
-# SKIPTEST
-# bz### known bug
-# TESTNAME
-sriov "pod with sysctl\\\'s on bond over sriov interfaces should start"
-
-# SKIPTEST
-# bz### this test can't run in parallel with SRIOV/VRF tests and fails often
-# TESTNAME
-sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-4194
+# bz### https://issues.redhat.com/browse/OCPBUGS-10424
 # TESTNAME
 performance "Should have the correct RPS configuration"
 
@@ -58,7 +48,16 @@ EOF
 }
 
 function create_tests_temp_skip_list_13 {
-    create_tests_temp_skip_list_12
+# List of temporarly skipped tests for 4.13
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10424
+# TESTNAME
+performance "Check RPS Mask is applied to atleast one single rx queue on all veth interface"
+
+EOF
 }
 
 function is_bm_node {
@@ -101,7 +100,9 @@ function get_skip_tests {
     echo "${skip_list}"
 }
 
-export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy}" # next: ovs_qos
+source $SHARED_DIR/main.env
+
+export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}" # next: ovs_qos
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
@@ -129,6 +130,8 @@ export CNF_ORIGIN_TESTS
 
 if [[ "$T5CI_VERSION" == "4.13" ]]; then
     export CNF_BRANCH="master"
+elif [[ "$T5CI_VERSION" == "4.14" ]]; then
+    export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
@@ -148,12 +151,17 @@ create_tests_skip_list_file
 # Skiplist according to each release
 if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
     create_tests_temp_skip_list_11
+    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+
 fi
 if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
     create_tests_temp_skip_list_12
+    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+
 fi
-if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_13
+    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 

@@ -45,17 +45,8 @@ oc set data -n kube-system secret/openstack-credentials clouds.yaml="$(<"$ALTERN
 
 sleep 5
 
-info 'Waiting for the operators to become ready...'
-# shellcheck disable=SC2046
-oc wait --timeout=5m --for=condition=Progressing=false $(oc get clusteroperator -o NAME) -o template='{{.metadata.name}} is ready
-'
-
-info 'Rebooting cloud-controller-manager: https://issues.redhat.com/browse/OCPBUGS-5036'
-for pod in $(oc -n openshift-cloud-controller-manager get pod -o NAME); do
-	oc -n openshift-cloud-controller-manager delete "$pod"
-done
-
-sleep 5
+info 'Rebooting MAPO: https://issues.redhat.com/browse/OCPBUGS-8687'
+oc -n openshift-machine-api get pods -o NAME | xargs -r oc -n openshift-machine-api delete
 
 info 'Waiting for the operators to become ready...'
 # shellcheck disable=SC2046

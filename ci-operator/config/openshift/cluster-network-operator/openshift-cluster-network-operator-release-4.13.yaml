@@ -10,11 +10,11 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.46.0
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    tag: v1.48.0
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
+    tag: rhel-8-golang-1.19-openshift-4.13
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
@@ -22,12 +22,11 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: cluster-network-operator
 promotion:
-  disabled: true
   name: "4.13"
   namespace: ocp
 releases:
@@ -177,13 +176,9 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-network-migration
+- as: e2e-aws-ovn-network-migration
   steps:
     cluster_profile: aws
-    env:
-      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
-        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
-        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-egress-ip
@@ -194,13 +189,9 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-sdn
-- as: e2e-sdn-network-migration-rollback
+- as: e2e-aws-sdn-network-migration-rollback
   steps:
     cluster_profile: aws
-    env:
-      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
-        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
-        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
     test:
     - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
     - ref: ovn-sdn-migration-feature-migration-config-egress-ip
@@ -212,6 +203,23 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-sdn-network-reverse-migration
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SKIPS: Alerts shouldn't report any unexpected alerts in firing or pending
+        state\| Prometheus \[apigroup:image.openshift.io\] when installed on the cluster
+        shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured
+    test:
+    - ref: ovn-sdn-migration-feature-migration-config-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-config-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-config-multicast
+    - ref: ovn-sdn-migration-rollback
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-firewall
+    - ref: ovn-sdn-migration-feature-migration-validate-egress-ip
+    - ref: ovn-sdn-migration-feature-migration-validate-multicast
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-aws
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:

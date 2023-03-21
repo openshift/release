@@ -10,7 +10,7 @@ base_images:
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
-    tag: latest
+    tag: "4.13"
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -26,7 +26,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: insights-operator
 promotion:
-  disabled: true
   name: 4.13-priv
   namespace: ocp-private
 releases:
@@ -55,14 +54,17 @@ tests:
   container:
     from: src
 - as: e2e
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
 - as: e2e-agnostic-upgrade
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
 - as: insights-operator-e2e-tests
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: gcp
     pre:
@@ -83,6 +85,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-metal-ipi-ovn-ipv6
   cluster: build05
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-ovn-ipv6

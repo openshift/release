@@ -186,7 +186,7 @@ spec:
       - command:
         - /usr/bin/release-controller
         - --release-namespace=ocp-priv
-        - --cluster-group=build01,build02,build03,build05
+        - --cluster-group=build01,build02,build03,build04,build05
         - --cluster-group=vsphere
         - --prow-config=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
@@ -285,6 +285,8 @@ spec:
               name: job-config-4.12
           - configMap:
               name: job-config-4.13
+          - configMap:
+              name: job-config-4.14
           - configMap:
               name: job-config-4.2
           - configMap:
@@ -390,6 +392,9 @@ spec:
         - -v=6
         - --authentication-message=Pulling these images requires <a href="https://docs.ci.openshift.org/docs/how-tos/use-registries-in-build-farm/">authenticating to the app.ci cluster</a>.
         - --art-suffix=-art-latest-priv
+        - --enable-jira
+        - --jira-endpoint=https://issues.redhat.com
+        - --jira-bearer-token-file=/etc/jira/api
         image: release-controller-api:latest
         livenessProbe:
           httpGet:
@@ -412,6 +417,9 @@ spec:
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
+        - mountPath: /etc/jira
+          name: jira
+          readOnly: true
       serviceAccountName: release-controller-ocp-priv
       volumes:
       - name: internal-tls
@@ -424,6 +432,10 @@ spec:
         secret:
           defaultMode: 420
           secretName: release-controller-kubeconfigs
+      - name: jira
+        secret:
+          defaultMode: 420
+          secretName: jira-credentials-openshift-jira-robot
 ---
 #---------------------------------------------------------------------------------
 # osd_files_cache_rbac.py added the following resource

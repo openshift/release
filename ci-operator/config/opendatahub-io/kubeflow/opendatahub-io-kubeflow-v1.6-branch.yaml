@@ -100,6 +100,29 @@ tests:
       IMAGE_REPO: odh-notebook-controller
       RELEASE_VERSION: "1.6"
     workflow: opendatahub-io-ci-image-mirror
+- as: odh-notebook-controller-e2e
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        pushd components/odh-notebook-controller
+        make run-ci-e2e-tests
+      dependencies:
+      - env: ODH_NOTEBOOK_CONTROLLER_IMAGE
+        name: odh-notebook-controller
+      - env: KF_NOTEBOOK_CONTROLLER
+        name: kf-notebook-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: v1.6-branch
   org: opendatahub-io

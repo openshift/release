@@ -23,7 +23,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -57,7 +56,7 @@ presubmits:
     - ^release-4\.14$
     - ^release-4\.14-
     cluster: build02
-    context: ci/prow/rhcos-86-build-test-metal
+    context: ci/prow/rhcos-92-build-test-metal
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -67,8 +66,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       devices.kubevirt.io/kvm: "1"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-release-4.14-rhcos-86-build-test-metal
-    rerun_command: /test rhcos-86-build-test-metal
+    name: pull-ci-openshift-os-release-4.14-rhcos-92-build-test-metal
+    rerun_command: /test rhcos-92-build-test-metal
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -76,7 +75,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhcos-86-build-test-metal
+        - --target=rhcos-92-build-test-metal
         command:
         - ci-operator
         image: ci-operator:latest
@@ -103,14 +102,14 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos-86-build-test-metal,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhcos-92-build-test-metal,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
     cluster: build02
-    context: ci/prow/rhcos-86-build-test-qemu
+    context: ci/prow/rhcos-92-build-test-qemu
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -120,8 +119,8 @@ presubmits:
       ci.openshift.io/generator: prowgen
       devices.kubevirt.io/kvm: "1"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-release-4.14-rhcos-86-build-test-qemu
-    rerun_command: /test rhcos-86-build-test-qemu
+    name: pull-ci-openshift-os-release-4.14-rhcos-92-build-test-qemu
+    rerun_command: /test rhcos-92-build-test-qemu
     skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -129,7 +128,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=rhcos-86-build-test-qemu
+        - --target=rhcos-92-build-test-qemu
         command:
         - ci-operator
         image: ci-operator:latest
@@ -156,113 +155,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos-86-build-test-qemu,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.14$
-    - ^release-4\.14-
-    cluster: build02
-    context: ci/prow/rhcos-90-build-test-metal
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 3h0m0s
-    labels:
-      ci-operator.openshift.io/cluster: build02
-      ci.openshift.io/generator: prowgen
-      devices.kubevirt.io/kvm: "1"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-release-4.14-rhcos-90-build-test-metal
-    rerun_command: /test rhcos-90-build-test-metal
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=rhcos-90-build-test-metal
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos-90-build-test-metal,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.14$
-    - ^release-4\.14-
-    cluster: build02
-    context: ci/prow/rhcos-90-build-test-qemu
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-      timeout: 3h0m0s
-    labels:
-      ci-operator.openshift.io/cluster: build02
-      ci.openshift.io/generator: prowgen
-      devices.kubevirt.io/kvm: "1"
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-os-release-4.14-rhcos-90-build-test-qemu
-    rerun_command: /test rhcos-90-build-test-qemu
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=rhcos-90-build-test-qemu
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )rhcos-90-build-test-qemu,?($|\s.*)
+    trigger: (?m)^/test( | .* )rhcos-92-build-test-qemu,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

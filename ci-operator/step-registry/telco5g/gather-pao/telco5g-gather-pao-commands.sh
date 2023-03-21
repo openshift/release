@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+source $SHARED_DIR/main.env
+
 # Check if cluster exists
 if [[ ! -e ${SHARED_DIR}/cluster_name ]]; then
     echo "Cluster doesn't exist, job failed, no need to run gather"
@@ -24,6 +26,8 @@ fi
 echo "************ telco5g gather-pao commands ************"
 
 if [[ "$T5CI_VERSION" == "4.13" ]]; then
+    export CNF_BRANCH="master"
+elif [[ "$T5CI_VERSION" == "4.14" ]]; then
     export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"

@@ -35,6 +35,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
+  ocp_os:
+    name: 4.13-priv
+    namespace: ocp-private
+    tag: rhel-coreos
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/machine-config-operator
@@ -46,8 +50,21 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: machine-config-operator
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
+    RUN curl -L 'https://github.com/BurntSushi/ripgrep/releases/download/13.0.0/ripgrep-13.0.0-x86_64-unknown-linux-musl.tar.gz' | tar -xvz -C /usr/bin --strip-components=1 ripgrep-13.0.0-x86_64-unknown-linux-musl/rg && \
+        chmod +x /usr/bin/rg && \
+        curl -Lo /usr/bin/yq 'https://github.com/mikefarah/yq/releases/download/v4.30.8/yq_linux_amd64' && \
+        chmod +x /usr/bin/yq && \
+        cd /etc/yum.repos.d/ && curl -LO https://pkgs.tailscale.com/stable/rhel/8/tailscale.repo && \
+        rpm-ostree install tailscale && \
+        systemctl enable tailscaled && \
+        ostree container commit
+  from: ocp_os
+  to: custom-os-image
 promotion:
-  disabled: true
+  excluded_images:
+  - custom-os-image
   name: 4.13-priv
   namespace: ocp-private
 releases:
@@ -82,7 +99,8 @@ tests:
   steps:
     cluster_profile: alibabacloud
     workflow: openshift-e2e-alibabacloud
-- as: e2e-aws-ovn-fips-op
+- always_run: false
+  as: e2e-aws-ovn-fips-op
   optional: true
   steps:
     cluster_profile: aws
@@ -100,7 +118,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
-- as: e2e-aws-ovn-fips
+- always_run: false
+  as: e2e-aws-ovn-fips
   optional: true
   steps:
     cluster_profile: aws
@@ -145,7 +164,8 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-upgrade-gcp
-- as: e2e-gcp-rt-op
+- always_run: false
+  as: e2e-gcp-rt-op
   optional: true
   steps:
     cluster_profile: gcp
@@ -168,6 +188,9 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e
+      dependencies:
+      - env: OS_IMAGE_URL
+        name: pipeline:custom-os-image
       from: src
       resources:
         requests:
@@ -282,7 +305,8 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
-- as: e2e-gcp-rt
+- always_run: false
+  as: e2e-gcp-rt
   optional: true
   steps:
     cluster_profile: gcp
@@ -302,6 +326,9 @@ tests:
     - as: test
       cli: latest
       commands: make test-e2e-single-node
+      dependencies:
+      - env: OS_IMAGE_URL
+        name: pipeline:custom-os-image
       from: src
       resources:
         requests:
@@ -331,6 +358,11 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-externallb-techpreview
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-central
+    workflow: openshift-e2e-openstack-external-lb
 - as: e2e-hypershift
   optional: true
   steps:

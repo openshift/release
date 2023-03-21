@@ -24,42 +24,42 @@ base_images:
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
   ocp_builder_rhel-8-golang-1.19-openshift-4.12:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.14
 build_root:
   from_repository: true
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: cluster-baremetal-operator
 promotion:
-  name: "4.13"
+  name: "4.14"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -94,7 +94,7 @@ tests:
   container:
     from: ocp_builder_rhel-8-golang-1.19-openshift-4.12
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
-- as: e2e-agnostic
+- as: e2e-agnostic-ovn
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:
     cluster_profile: azure4
@@ -164,7 +164,7 @@ tests:
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
-- as: e2e-aws
+- as: e2e-aws-ovn
   optional: true
   skip_if_only_changed: \.md$|^(DCO|LICENSE|OWNERS|PROJECT)$
   steps:

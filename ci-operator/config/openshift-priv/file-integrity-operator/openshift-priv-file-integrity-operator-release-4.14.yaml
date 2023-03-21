@@ -1,20 +1,20 @@
 base_images:
-  openshift_release_rhel-8-release-golang-1.17-openshift-4.10:
+  openshift_release_rhel-9-release-golang-1.19-openshift-4.13:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.17-openshift-4.10
+    tag: rhel-9-release-golang-1.19-openshift-4.13
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.17-openshift-4.10
+    tag: rhel-9-release-golang-1.19-openshift-4.13
 canonical_go_repository: github.com/openshift/file-integrity-operator
 images:
 - dockerfile_path: Dockerfile.ci
   inputs:
-    openshift_release_rhel-8-release-golang-1.17-openshift-4.10:
+    openshift_release_rhel-9-release-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.17-openshift-4.10
+      - registry.ci.openshift.org/openshift/release:rhel-9-release-golang-1.19-openshift-4.13
   to: file-integrity-operator
 operator:
   bundles:
@@ -22,9 +22,10 @@ operator:
     context_dir: .
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:1.0.0
+  - pullspec: quay.io/file-integrity-operator/file-integrity-operator:1.2.0
     with: pipeline:file-integrity-operator
 promotion:
+  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -101,7 +102,7 @@ tests:
     env:
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: file-integrity
-      OO_LATEST_CSV: file-integrity-operator.v1.0.0
+      OO_LATEST_CSV: file-integrity-operator.v1.2.0
       OO_PACKAGE: file-integrity-operator
       OO_TARGET_NAMESPACES: '!install'
     test:
