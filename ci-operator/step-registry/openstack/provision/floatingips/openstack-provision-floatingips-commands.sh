@@ -20,7 +20,7 @@ collect_artifacts() {
 		fi
 	done
 }
-trap collect_artifacts EXIT TERM
+trap collect_artifacts EXIT TERM INT
 
 API_FIP=$(openstack floating ip create \
 		--description "$CLUSTER_NAME.api-fip" \

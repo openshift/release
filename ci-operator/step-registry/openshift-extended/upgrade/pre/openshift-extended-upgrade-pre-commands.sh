@@ -14,7 +14,7 @@ export ENABLE_PRINT_EVENT_STDOUT=true
 
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 
 # create link for oc to kubectl
 mkdir -p "${HOME}"

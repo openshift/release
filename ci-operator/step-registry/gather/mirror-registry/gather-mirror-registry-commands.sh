@@ -3,7 +3,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 
 # collect logs from mirror registry server here
 if [ -s "${SHARED_DIR}/bastion_public_address" ]; then

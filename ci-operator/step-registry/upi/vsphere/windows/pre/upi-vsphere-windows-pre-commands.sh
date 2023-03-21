@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 
 # createWindowsInstanceFile creates the a text file in the shared dir with the
 # following naming convention:

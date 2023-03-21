@@ -21,7 +21,7 @@ collect_artifacts() {
     echo "### Fetching results"
     ssh "${SSHOPTS[@]}" "root@${IP}" tar -czf - /tmp/artifacts | tar -C "${ARTIFACT_DIR}" -xzf -
 }
-trap collect_artifacts EXIT TERM
+trap collect_artifacts EXIT TERM INT
 
 # Copy test binaries on packet server
 echo "### Copying test binaries"

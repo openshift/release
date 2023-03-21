@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 
 REMOTE_LIBVIRT_URI=$(yq r "${SHARED_DIR}/cluster-config.yaml" 'REMOTE_LIBVIRT_URI')
 # Test the possibly flakey bastion connection before tearing down

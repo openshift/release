@@ -4,9 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 #Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM INT
 export HOME=/tmp
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then

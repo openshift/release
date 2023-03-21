@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 #Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM INT
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.

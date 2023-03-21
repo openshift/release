@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 
 echo "$(date -u --rfc-3339=seconds) - deprovisioning Windows VM on vSphere..."
 

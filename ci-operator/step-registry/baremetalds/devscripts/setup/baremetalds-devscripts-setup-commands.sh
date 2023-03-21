@@ -44,7 +44,7 @@ finished()
     echo "$retval" > "${SHARED_DIR}/install-status.txt"
   fi
 }
-trap finished EXIT TERM
+trap finished EXIT TERM INT
 
 # Make sure this host hasn't been previously used
 ssh "${SSHOPTS[@]}" "root@${IP}" mkdir /root/nodesfirstuse

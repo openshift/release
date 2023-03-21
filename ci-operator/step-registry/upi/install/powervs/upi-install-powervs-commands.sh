@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 
 POWERVS_JENKINS_URL="$( cat /etc/credentials/JENKINS_URL )"
 POWERVS_JENKINS_USER="$( cat /etc/credentials/JENKINS_USER )"

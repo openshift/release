@@ -3,7 +3,7 @@
 set -o nounset
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 
 if [ "${ADDITIONAL_WORKERS}" == "0" ]; then
     echo "No additional workers requested"

@@ -60,7 +60,7 @@ function prepare_next_steps() {
 
 cd "$(mktemp -d)"
 
-trap 'prepare_next_steps' EXIT TERM
+trap 'prepare_next_steps' EXIT TERM INT
 
 # Expose the UPI playbooks to the script
 cp /var/lib/openshift-install/upi/*.yaml .

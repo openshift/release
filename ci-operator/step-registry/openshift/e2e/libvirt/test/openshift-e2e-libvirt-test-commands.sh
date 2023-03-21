@@ -338,7 +338,7 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 
 declare -a WATCHERS
 
-trap 'echo "Killing WATCHERS"; for PID in ${WATCHERS[@]}; do kill -9 ${PID} >/dev/null 2>&1 || true; done' TERM
+trap 'echo "Killing WATCHERS"; for PID in ${WATCHERS[@]}; do kill -9 ${PID} >/dev/null 2>&1 || true; done' TERM INT
 
 prometheus_var_init
 if [ -n "$TOKEN" ]; then

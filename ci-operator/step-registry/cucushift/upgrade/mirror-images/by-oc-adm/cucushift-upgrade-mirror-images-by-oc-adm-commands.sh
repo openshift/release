@@ -90,7 +90,7 @@ export PULL_SECRET="${SHARED_DIR}/new_pull_secret"
 registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${PULL_SECRET}"
 
-trap 'rm -f "${PULL_SECRET}"' ERR EXIT TERM
+trap 'rm -f "${PULL_SECRET}"' ERR EXIT TERM INT
 
 export MIRROR_OUT_FILE="${SHARED_DIR}/mirror"
 export ICSP_FILE="${SHARED_DIR}/icsp.yaml"

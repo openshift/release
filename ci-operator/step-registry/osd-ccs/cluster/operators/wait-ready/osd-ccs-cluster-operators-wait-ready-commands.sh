@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 
 # Even the cluster is shown ready on ocm side, and the cluster operators are available, some of the cluster operators are
 # still progressing. The ocp e2e test scenarios requires PROGRESSING=False for each cluster operator.

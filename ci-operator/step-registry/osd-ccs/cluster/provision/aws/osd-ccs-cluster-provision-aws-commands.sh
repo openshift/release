@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM INT
 
 suffix=$(head /dev/urandom | tr -dc a-z0-9 | head -c 4)
 CLUSTER_NAME=${CLUSTER_NAME:-"ci-osd-ccs-$suffix"}
