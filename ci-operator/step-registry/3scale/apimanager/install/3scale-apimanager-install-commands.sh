@@ -11,9 +11,6 @@ AWS_SECRET_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_acces
 # Set environment variables needed
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
-export AWS_REGION='us-east-2'
-export DEPL_PROJECT_NAME='threescale'
-export DEPL_BUCKET_NAME='3scale-apimanager-s3-bucket'
 
 echo "Deploying APIManager"
 deploy install
