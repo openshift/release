@@ -15,8 +15,6 @@ fi
 
 mkdir -p "${HOME}"/.ssh
 
-mock-nss.sh
-
 # gcloud compute will use this key rather than create a new one
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
@@ -37,7 +35,7 @@ echo "verify gcp instance ssh connectivity" >&2
 
 timeout=300
 start=$(date +"%s")
-until LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+until gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'echo Hello, CI';

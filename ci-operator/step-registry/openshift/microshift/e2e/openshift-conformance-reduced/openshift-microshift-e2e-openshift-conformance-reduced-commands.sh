@@ -15,8 +15,6 @@ fi
 
 mkdir -p "${HOME}"/.ssh
 
-mock-nss.sh
-
 # gcloud compute will use this key rather than create a new one
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
@@ -578,8 +576,7 @@ cat <<'EOF' > "${HOME}"/suite.txt
 EOF
 chmod +r "${HOME}"/suite.txt
 
-# scp and install microshift.service
-  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \

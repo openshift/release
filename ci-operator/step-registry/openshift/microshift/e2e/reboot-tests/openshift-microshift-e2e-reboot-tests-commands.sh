@@ -15,8 +15,6 @@ fi
 
 mkdir -p "${HOME}"/.ssh
 
-mock-nss.sh
-
 # gcloud compute will use this key rather than create a new one
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
@@ -51,24 +49,24 @@ echo "deployment posted ready status" >&2
 EOF
 chmod +x "${HOME}"/reboot-test.sh
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}"/reboot-test.sh rhel8user@"${INSTANCE_PREFIX}":~/reboot-test.sh
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
 
-if ! LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+if ! gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo ~/reboot-test.sh'; then
 
-  LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     rhel8user@"${INSTANCE_PREFIX}" \
     --command 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
@@ -76,4 +74,4 @@ if ! LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_
 fi
 
 # now reboot the machine
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances stop "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
+gcloud compute instances stop "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
