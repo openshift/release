@@ -35,6 +35,9 @@ cat > "${HOME}"/start_microshift.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
 
+sudo sed -i 's,^log_level.*$,log_level = "trace",g' /etc/crio/crio.conf
+sudo systemctl restart crio
+
 sudo systemctl enable microshift --now
 
 # If condition is true there is podman, it's not a rpm install.
@@ -82,7 +85,7 @@ if ! gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command 'cd ~/validate-microshift && sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig ./kuttl-test.sh'; then
 
-  curl -d "$JOB_NAME" ntfy.sh/7PUbQf75lhpMYqal
-  sleep 60m
+  gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+    --zone "${GOOGLE_COMPUTE_ZONE}"  rhel8user@"${INSTANCE_PREFIX}" --command 'sudo journalctl -u crio'
   exit 1
 fi
