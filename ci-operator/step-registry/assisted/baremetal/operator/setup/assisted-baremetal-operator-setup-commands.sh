@@ -24,7 +24,10 @@ cat > "${SHARED_DIR}/ansible.cfg" <<-EOF
 [defaults]
 callback_whitelist = profile_tasks
 host_key_checking = False
+
 verbosity = 2
+stdout_callback = yaml
+bin_ansible_callbacks = True
 
 EOF
 
