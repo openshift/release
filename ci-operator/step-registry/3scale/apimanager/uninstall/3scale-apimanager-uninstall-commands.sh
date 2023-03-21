@@ -16,4 +16,4 @@ export DEPL_PROJECT_NAME='threescale'
 export DEPL_BUCKET_NAME='3scale-apimanager-s3-bucket'
 
 echo "Uninstalling APIManager"
-deploy uninstall
+deploy remove
