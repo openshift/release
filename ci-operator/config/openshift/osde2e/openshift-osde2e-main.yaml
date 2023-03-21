@@ -513,9 +513,9 @@ tests:
     - chain: gather
     - chain: osd-delete
     test:
-    - as: provision-cluster-run-tests
+    - as: provision-cluster-health-check-run-tests
       commands: |
-        export CONFIGS="aws,stage,e2e-suite"
+        export CONFIGS="aws,stage,pr-check"
         export MUST_GATHER=false
         export REPORT_DIR=${ARTIFACT_DIR}
         export SECRET_LOCATIONS=/usr/local/sd-osd
@@ -534,21 +534,6 @@ tests:
         name: sd-osd
         namespace: test-credentials
       from: osde2e
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: archive-kubeconfig
-      commands: |
-        export OCM_TOKEN=$(cat /usr/local/sd-osd/ocm-refresh-token)
-        cat ${ARTIFACT_DIR}/metadata.json | jq '."cluster-id"' > ${SHARED_DIR}/cluster-id
-        ocm login --url ${OCM_LOGIN_URL} --token ${OCM_TOKEN}
-        ocm get /api/clusters_mgmt/v1/clusters/$(cat ${SHARED_DIR}/cluster-id)/credentials | jq -r .kubeconfig > ${SHARED_DIR}/kubeconfig
-      credentials:
-      - mount_path: /usr/local/sd-osd
-        name: sd-osd
-        namespace: test-credentials
-      from: cli-ocm
       resources:
         requests:
           cpu: 100m
