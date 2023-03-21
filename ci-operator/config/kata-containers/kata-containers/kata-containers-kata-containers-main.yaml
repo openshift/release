@@ -14,47 +14,10 @@ binary_build_commands: |
   export GOPATH=/go
   export PATH="${GOPATH}/bin:/usr/local/go/bin/:$PATH"
   source ci/lib.sh
-  destdir="$(pwd)/_out/build_install"
-  mkdir -p "$destdir"
   clone_tests_repo
-  pushd "${tests_repo_dir}"
-  # This builds Kata Containers and install on $destdir.
-  # Only QEMU is not built.
-  .ci/openshift-ci/build_install.sh "$destdir"
-
-  # This generates the Dockerfile used later in the pipeline to build QEMU.
-  .ci/openshift-ci/qemu-build-pre.sh
-  popd
 build_root:
   project_image:
     dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
-images:
-- context_dir: tools/packaging
-  dockerfile_path: ./static-build/qemu/Dockerfile.ci
-  from: qemu-builder
-  inputs:
-    bin:
-      paths:
-      - destination_dir: ./static-build/qemu
-        source_path: /go/src/github.com/kata-containers/kata-containers/tools/packaging/static-build/qemu/Dockerfile.ci
-  to: kata-qemu
-- context_dir: .
-  dockerfile_path: ./Dockerfile.installer
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/kata-containers/kata-containers/_out
-      - destination_dir: .
-        source_path: /go/src/github.com/kata-containers/tests/.ci/openshift-ci/images/Dockerfile.installer
-      - destination_dir: .
-        source_path: /go/src/github.com/kata-containers/tests/.ci/openshift-ci/images/entrypoint.sh
-    kata-qemu:
-      paths:
-      - destination_dir: .
-        source_path: /tmp/qemu-static/kata-static-qemu.tar.gz
-  to: kata-installer
 releases:
   initial:
     integration:
@@ -122,9 +85,6 @@ tests:
         # Deploy the kata-webhook so that the tests ran on next step of the
         # workflow will use the kata runtime.
         .ci/openshift-ci/cluster/deploy_webhook.sh
-      dependencies:
-      - env: KATA_INSTALLER_IMG
-        name: kata-installer
       from: pipeline:bin
       resources:
         requests:
