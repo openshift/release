@@ -11,6 +11,7 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
+binary_build_commands: make rpm; TARGET_ARCH=aarch64 make rpm
 build_root:
   project_image:
     dockerfile_literal: |
@@ -57,6 +58,10 @@ images:
     COPY ./RPMS/*/*.rpm packages/
     RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
   inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS
     cli:
       paths:
       - destination_dir: .
@@ -64,10 +69,6 @@ images:
     root:
       as:
       - root
-    rpms:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS
     src:
       paths:
       - destination_dir: .
@@ -105,7 +106,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: make rpm; TARGET_ARCH=aarch64 make rpm
 tag_specification:
   name: "4.13"
   namespace: ocp
