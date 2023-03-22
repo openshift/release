@@ -66,6 +66,7 @@ spec:
     spec:
       containers:
         - name: nfs-client-provisioner
+          image: quay.io/openshifttest/nfs-subdir-external-provisioner@sha256:3036bf6b741cdee4caf8fc30bccd049afdf662e08a52f2e6ae47b75ef52a40ac
           env:
             - name: NFS_SERVER
               value: ${NFS_SERVER}
@@ -95,7 +96,6 @@ namespace: nfs-provisioner
 resources:
   - 00-namespace.yaml
   - 01-rbac.yaml
-  - github.com/kubernetes-sigs/nfs-subdir-external-provisioner//deploy
 
 patchesStrategicMerge:
   - 10-deployment-patch.yaml
