@@ -30,6 +30,12 @@ function create_tests_temp_skip_list_11 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-8433
+# TESTNAME
+
+metallb "Correct and incorrect MetalLB resources coexist"
+
 EOF
 }
 
@@ -40,7 +46,7 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
 # SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-4194
+# bz### https://issues.redhat.com/browse/OCPBUGS-10424
 # TESTNAME
 performance "Should have the correct RPS configuration"
 
@@ -48,7 +54,16 @@ EOF
 }
 
 function create_tests_temp_skip_list_13 {
-    create_tests_temp_skip_list_12
+# List of temporarly skipped tests for 4.13
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10424
+# TESTNAME
+performance "Check RPS Mask is applied to atleast one single rx queue on all veth interface"
+
+EOF
 }
 
 function is_bm_node {
