@@ -1,30 +1,34 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
-    tag: latest
+    tag: ocm-2.7
   assisted-service-scripts:
-    name: ocm-2.8
+    name: ocm-2.7
     namespace: edge-infrastructure
     tag: assisted-service-scripts
+  base:
+    name: "4.12"
+    namespace: ocp
+    tag: base
   bin:
-    name: "4.13"
+    name: "4.12"
     namespace: ocp
     tag: hypershift-operator
   dev-scripts:
@@ -32,15 +36,15 @@ base_images:
     namespace: ocp-kni
     tag: dev-scripts
   hypershift-operator:
-    name: "4.13"
+    name: "4.12"
     namespace: ocp
     tag: hypershift-operator
   test-bin:
-    name: "4.13"
+    name: "4.12"
     namespace: ocp
     tag: hypershift-tests
   upi-installer:
-    name: "4.13"
+    name: "4.12"
     namespace: ocp
     tag: upi-installer
 releases:
@@ -49,12 +53,12 @@ releases:
       product: ocp
       relative: 1
       stream: ci
-      version: "4.13"
+      version: "4.12"
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.13"
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -63,11 +67,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-periodic
+- as: e2e-aws
   cron: 0 */6 * * *
   steps:
     workflow: hypershift-aws-e2e-metrics
-- as: e2e-aws-ovn-periodic-conformance-serial
+- as: e2e-aws-ovn-conformance-serial
   cron: 0 1 * * *
   steps:
     env:
@@ -106,8 +110,6 @@ tests:
   cron: 0 4 * * *
   steps:
     cluster_profile: aws
-    env:
-      MCE_VERSION: "2.3"
     workflow: hypershift-mce-aws-conformance
 - as: conformance-agent-ovn
   cron: 0 4 * * *
@@ -121,18 +123,17 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      CNV_PRERELEASE_VERSION: "4.13"
+      CNV_PRERELEASE_VERSION: "4.12"
     workflow: hypershift-kubevirt-conformance
 - as: conformance-mce-kubevirt
   cron: 0 4 * * *
   steps:
     cluster_profile: aws
     env:
-      CNV_PRERELEASE_VERSION: "4.13"
-      MCE_VERSION: "2.3"
+      CNV_PRERELEASE_VERSION: "4.12"
     workflow: hypershift-mce-kubevirt-conformance
 zz_generated_metadata:
-  branch: main
+  branch: release-4.12
   org: openshift
   repo: hypershift
-  variant: periodics-4.13
+  variant: periodic

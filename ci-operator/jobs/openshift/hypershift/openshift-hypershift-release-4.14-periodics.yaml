@@ -6,7 +6,7 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.14
     org: openshift
     repo: hypershift
   labels:
@@ -14,9 +14,15 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
     ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-conformance-agent-ovn
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-conformance-agent-ovn
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -75,21 +81,27 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: 0 2 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.14
     org: openshift
     repo: hypershift
   labels:
     ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-conformance-aws-ovn
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-conformance-aws-ovn
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -138,7 +150,7 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.14
     org: openshift
     repo: hypershift
   labels:
@@ -146,9 +158,15 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-conformance-aws-ovn-proxy
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-conformance-aws-ovn-proxy
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -213,7 +231,7 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.14
     org: openshift
     repo: hypershift
   labels:
@@ -221,9 +239,15 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-conformance-mce-aws-ovn
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-conformance-mce-aws-ovn
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -283,95 +307,26 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 4 * * *
-  decorate: true
-  decoration_config:
-    skip_cloning: true
-  extra_refs:
-  - base_ref: release-4.12
-    org: openshift
-    repo: hypershift
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: periodic
-    ci.openshift.io/generator: prowgen
-    job-release: "4.12"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-conformance-mce-kubevirt
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/conformance-mce-kubevirt-cluster-profile
-      - --target=conformance-mce-kubevirt
-      - --variant=periodic
-      command:
-      - ci-operator
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/conformance-mce-kubevirt-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
   cron: 0 */6 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.14
     org: openshift
     repo: hypershift
   labels:
     ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-e2e-aws
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-e2e-aws
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -414,21 +369,27 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: 0 1 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.14
     org: openshift
     repo: hypershift
   labels:
     ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-e2e-aws-ovn-conformance-serial
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-e2e-aws-ovn-conformance-serial
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -477,7 +438,7 @@ periodics:
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.14
     org: openshift
     repo: hypershift
   labels:
@@ -485,9 +446,15 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-e2e-conformance-kubevirt
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-e2e-conformance-kubevirt
+  reporter_config:
+    slack:
+      channel: '#hypershift-kubevirt-platform'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -546,21 +513,27 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: 0 4 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.14
     org: openshift
     repo: hypershift
   labels:
     ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-e2e-ibmcloud-iks
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-e2e-ibmcloud-iks
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -603,21 +576,27 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: 0 4 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: release-4.12
+  - base_ref: release-4.14
     org: openshift
     repo: hypershift
   labels:
     ci-operator.openshift.io/variant: periodic
     ci.openshift.io/generator: prowgen
-    job-release: "4.12"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-hypershift-release-4.12-periodic-e2e-ibmcloud-roks
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-e2e-ibmcloud-roks
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
   spec:
     containers:
     - args:
@@ -626,6 +605,69 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-ibmcloud-roks
+      - --variant=periodic
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 4 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-4.14
+    org: openshift
+    repo: hypershift
+  labels:
+    ci-operator.openshift.io/variant: periodic
+    ci.openshift.io/generator: prowgen
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-hypershift-release-4.14-periodic-e2e-powervs
+  reporter_config:
+    slack:
+      channel: '#project-hypershift'
+      job_states_to_report:
+      - failure
+      report_template: Job *{{.Spec.Job}}* failed. <{{.Status.URL}}|View logs>
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-powervs
       - --variant=periodic
       command:
       - ci-operator
