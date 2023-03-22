@@ -35,7 +35,7 @@ cat > "${HOME}"/start_microshift.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
 
-sudo sed -i 's,^log_level.*$,log_level = "trace",g' /etc/crio/crio.conf
+echo -e '[crio.runtime]\nlog_level = "trace"' | sudo tee /etc/crio/crio.conf.d/99-trace.conf
 sudo systemctl restart crio
 
 sudo systemctl enable microshift --now
@@ -89,3 +89,7 @@ if ! gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
     --zone "${GOOGLE_COMPUTE_ZONE}"  rhel8user@"${INSTANCE_PREFIX}" --command 'sudo journalctl -u crio'
   exit 1
 fi
+
+gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}"  rhel8user@"${INSTANCE_PREFIX}" --command 'sudo journalctl -u crio'
+exit 0
