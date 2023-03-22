@@ -48,6 +48,9 @@ EOF
 
 ADDITIONAL_ARG=""
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
+  if [[ "$T5CI_VERSION" == "4.14" ]]; then 
+    PREPARED_CLUSTER=cnfdu3
+  fi
   ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
 else
   ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
