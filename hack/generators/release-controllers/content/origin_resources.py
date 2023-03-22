@@ -200,6 +200,9 @@ def _add_origin_resources(gendoc):
                                     "--job-namespace=ci-release",
                                     "--tools-image-stream-tag=4.6:tests",
                                     "--release-architecture=amd64",
+                                    "--enable-jira",
+                                    "--jira-endpoint=https://issues.redhat.com",
+                                    "--jira-bearer-token-file=/etc/jira/api",
                                     "-v=4"
                                 ],
                                 "image": "release-controller-api:latest",
