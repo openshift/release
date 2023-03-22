@@ -30,6 +30,7 @@ presubmits:
         - --ignore=CSPI-QE
         - --ignore=redhat-openshift-ecosystem/certified-operators-prod
         - --ignore=redhat-openshift-ecosystem/preflight
+        - --ignore=redhat-openshift-ecosystem/cvp
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -712,7 +713,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20230308-7e0da97a31
+        image: gcr.io/k8s-prow/checkconfig:v20230321-1dcc1a65ba
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -953,32 +954,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )jira-lifecycle-config,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/multi-arch-gen-valid
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-multi-arch-gen-valid
-    rerun_command: /test multi-arch-gen-valid
-    run_if_changed: ^(core-services/image-mirroring)
-    spec:
-      containers:
-      - args:
-        - ./
-        command:
-        - hack/image-mirroring/validate-multi-arch-image-mirror-gen.sh
-        image: registry.ci.openshift.org/ci/python-validation
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: (?m)^/test( | .* )multi-arch-gen-valid,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

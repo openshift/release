@@ -1,0 +1,171 @@
+base_images:
+  ansible:
+    name: "4.13"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.13"
+    namespace: ocp
+    tag: hypershift-operator
+  openstack-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.13"
+  tools:
+    name: "4.13"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  arm64-latest:
+    prerelease:
+      architecture: arm64
+      product: ocp
+      version_bounds:
+        lower: 4.13.0-0
+        upper: 4.14.0-0
+  latest:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.13.0-0
+        upper: 4.14.0-0
+  target:
+    prerelease:
+      architecture: multi
+      product: ocp
+      version_bounds:
+        lower: 4.13.0-0
+        stream: 4-dev-preview
+        upper: 4.14.0-0
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: aws-ipi-ovn-ipsec-to-multiarch-p2-f14
+  cron: 51 9 12,27 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-to-multiarch-p2-f14
+  cron: 19 15 14,29 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: m6i.xlarge
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: azure-ipi-baselinecaps-v412-to-multiarch-p2-f14
+  cron: 29 1 14,29 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-azure-ipi-baselinecaps-v412
+- as: baremetal-upi-to-multiarch-p2-f7
+  cluster: build05
+  cron: 30 21 2,14 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKERS: "2"
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      SCALE_IN_ARCHITECTURES: aarch64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @baremetal-upi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @baremetal-upi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      architecture: arm64
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration-upi
+    workflow: baremetal-lab-upi
+zz_generated_metadata:
+  branch: release-4.13
+  org: openshift
+  repo: openshift-tests-private
+  variant: arm64-stable

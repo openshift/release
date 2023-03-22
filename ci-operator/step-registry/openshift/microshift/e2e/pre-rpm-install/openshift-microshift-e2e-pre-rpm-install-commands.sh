@@ -13,7 +13,6 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
 fi
 
 mkdir -p "${HOME}"/.ssh
-mock-nss.sh
 
 # gcloud compute will use this key rather than create a new one
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
@@ -27,9 +26,6 @@ gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
-
-# GPC instance config script
-export LD_PRELOAD=/usr/lib64/libnss_wrapper.so
 
 cat <<EOF > "${PAYLOAD_PATH}"/usr/bin/pre_rpm_install.sh
 #! /bin/bash
@@ -49,18 +45,17 @@ sudo echo -e 'microshift\tALL=(ALL)\tNOPASSWD: ALL' > /etc/sudoers.d/microshift
 cd /home/microshift && sudo -nu microshift configure-vm.sh --no-build /etc/crio/openshift-pull-secret
 
 dnf install jq firewalld -y
-dnf localinstall -y /packages/*.rpm
+dnf localinstall -y \$(find /packages/ -iname "*\$(uname -p)*" -or -iname '*noarch*')
 EOF
 chmod +x usr/bin/pre_rpm_install.sh
 
-BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
-
 mkdir -p "${PAYLOAD_PATH}"/etc/microshift
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 cat << EOF > "${PAYLOAD_PATH}"/etc/microshift/config.yaml
 ---
 apiServer:
   subjectAltNames:
-  - ${INSTANCE_PREFIX}.${BASE_DOMAIN}
+  - ${IP_ADDRESS}
 EOF
 
 mkdir -p "${PAYLOAD_PATH}"/etc/crio/ && cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
@@ -71,3 +66,7 @@ gcloud compute scp "${PAYLOAD_PATH}/payload.tar" rhel8user@"${INSTANCE_PREFIX}":
 gcloud compute ssh rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo tar -xhvf $HOME/payload.tar -C / && \
              sudo pre_rpm_install.sh'
+
+gcloud compute firewall-rules create "${INSTANCE_PREFIX}"-external \
+  --network "${INSTANCE_PREFIX}" \
+  --allow tcp:80,tcp:443,tcp:6443
