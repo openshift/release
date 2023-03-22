@@ -38,8 +38,23 @@ build_root:
             exit 1 ; \
           fi ; \
           chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
-  use_build_cache: true
 images:
+- dockerfile_literal: |
+    FROM src
+    RUN make rpm
+  inputs:
+    src:
+      as:
+      - src
+  to: rpm-amd64
+- dockerfile_literal: |
+    FROM src
+    RUN TARGET_ARCH=aarch64 make rpm
+  inputs:
+    src:
+      as:
+      - src
+  to: rpm-arm64
 - dockerfile_literal: |
     FROM root
     USER root
@@ -54,7 +69,7 @@ images:
     COPY busybox_running_check.sh configure-vm.sh usr/bin/
     RUN chmod 755 usr/bin/configure-vm.sh usr/bin/busybox_running_check.sh
 
-    COPY ./RPMS/*/*.rpm packages/
+    COPY ./aarch64/RPMS/*/*.rpm ./x86_64/RPMS/*/*.rpm packages/
     RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
   inputs:
     cli:
@@ -64,9 +79,13 @@ images:
     root:
       as:
       - root
-    rpms:
+    rpm-amd64:
       paths:
-      - destination_dir: .
+      - destination_dir: ./x86_64
+        source_path: /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS
+    rpm-arm64:
+      paths:
+      - destination_dir: ./aarch64
         source_path: /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS
     src:
       paths:
@@ -84,6 +103,8 @@ images:
 promotion:
   excluded_images:
   - microshift-test-payload
+  - rpm-arm64
+  - rpm-amd64
   name: "4.14"
   namespace: ocp
 releases:
@@ -105,7 +126,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: make rpm; TARGET_ARCH=aarch64 make rpm
 tag_specification:
   name: "4.14"
   namespace: ocp
