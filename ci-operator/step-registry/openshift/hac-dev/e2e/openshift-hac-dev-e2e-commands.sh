@@ -106,10 +106,11 @@ CYPRESS_PASSWORD=`echo ${B64_PASS} | base64 -d`
 CYPRESS_RP_TOKEN=${CYPRESS_RP_HAC}
 
 set +e
-TEST_RUN=0
-
 # Run Cypress Tests
-/tmp/entrypoint.sh || TEST_RUN=1
+TEST_RUN=0
+cd /tmp/e2e || { echo "/tmp/e2e doesn't exists"; exit 1; }
+npm run cy:run || TEST_RUN=1
+
 cp -a /tmp/e2e/cypress/* ${ARTIFACT_DIR}
 
 echo "Releasing bonfire namespace"
