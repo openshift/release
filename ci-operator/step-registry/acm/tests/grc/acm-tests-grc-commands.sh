@@ -6,7 +6,7 @@ set -o pipefail
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
-SECRETS_DIR="/tmp/secrets"
+# SECRETS_DIR="/tmp/secrets"
 
 
 # Set the dynamic vars based on provisioned hub cluster.
