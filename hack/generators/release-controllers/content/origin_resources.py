@@ -1,5 +1,5 @@
 
-from content.utils import get_rc_volumes, get_rc_volume_mounts, get_kubeconfig_volumes, get_kubeconfig_volume_mounts
+from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
 
 
 def _add_origin_rbac(gendoc):
@@ -207,7 +207,7 @@ def _add_origin_resources(gendoc):
                                 ],
                                 "image": "release-controller-api:latest",
                                 "name": "controller",
-                                "volumeMounts": get_kubeconfig_volume_mounts(),
+                                "volumeMounts": get_rcapi_volume_mounts(),
                                 'livenessProbe': {
                                     'httpGet': {
                                         'path': '/healthz',
@@ -228,7 +228,7 @@ def _add_origin_resources(gendoc):
                             }
                         ],
                         "serviceAccountName": "release-controller",
-                        "volumes": get_kubeconfig_volumes(context, secret_name=context.secret_name_tls_api)
+                        "volumes": get_rcapi_volumes(context, secret_name=context.secret_name_tls_api)
                     }
                 }
             }
