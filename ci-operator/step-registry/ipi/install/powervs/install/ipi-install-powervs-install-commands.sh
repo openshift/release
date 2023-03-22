@@ -639,7 +639,25 @@ function dump_resources() {
     echo
     echo "Select \"type\": \"Available\", where \"status\": \"False\" returns:"
     jq -r 'select (.type|test("Available"))' ${F_FILE}
-)
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get co 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get co
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get nodes 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get nodes -o=wide
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get pods not running nor completed 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get pods -A -o=wide | sed -e '/\(Running\|Completed\)/d'
+  )
 
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
   ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
