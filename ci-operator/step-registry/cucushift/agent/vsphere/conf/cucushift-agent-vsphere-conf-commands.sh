@@ -49,7 +49,15 @@ pull_secret=$(<"${SHARED_DIR}/pull-secrets")
 echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/cluster-name.txt
 cluster_name=$(<"${SHARED_DIR}"/cluster-name.txt)
 
-yq -i 'del(.pullSecret)' "${SHARED_DIR}/install-config.yaml"
+# Add build01 secrets if the mirror registry secrets are not available.
+if [ ! -f "${SHARED_DIR}/pull_secret_ca.yaml.patch" ]; then
+    yq -i 'del(.pullSecret)' "${SHARED_DIR}/install-config.yaml"
+    cat >> "${SHARED_DIR}/install-config.yaml" << EOF
+pullSecret: >
+  ${pull_secret}
+EOF
+fi
+
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 baseDomain: ${base_domain}
 controlPlane:
@@ -63,8 +71,6 @@ networking:
   - cidr: ${machine_cidr}
 platform:
   none: {}
-pullSecret: >
-  ${pull_secret}
 EOF
 
 # Create cluster-domain.txt
