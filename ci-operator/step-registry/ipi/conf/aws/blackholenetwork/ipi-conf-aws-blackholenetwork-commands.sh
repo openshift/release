@@ -326,6 +326,22 @@ echo "Subnets : ${subnets}"
 # save stack information to ${SHARED_DIR} for deprovision step
 echo "${STACK_NAME}" >> "${SHARED_DIR}/blackholenetworkstackname"
 
+# save vpc stack output
+aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NAME}" > "${SHARED_DIR}/vpc_stack_output"
+
+# save vpc id
+# e.g.
+#   vpc-01739b6510a152d44
+VpcId=$(jq -r '.Stacks[].Outputs[] | select(.OutputKey=="VpcId") | .OutputValue' "${SHARED_DIR}/vpc_stack_output")
+echo "$VpcId" > "${SHARED_DIR}/vpc_id"
+echo "VpcId: ${VpcId}"
+
+# save private subnets ids
+# ['subnet-priv1', 'subnet-priv2']
+PrivateSubnetIds="$(jq -c '[.Stacks[].Outputs[] | select(.OutputKey=="PrivateSubnetIds") | .OutputValue | split(",")[]]' "${SHARED_DIR}/vpc_stack_output" | sed "s/\"/'/g")"
+echo "$PrivateSubnetIds" > "${SHARED_DIR}/private_subnet_ids"
+echo "PrivateSubnetIds: ${PrivateSubnetIds}"
+
 # Generate working availability zones from the region
 mapfile -t AVAILABILITY_ZONES < <(aws --region "${REGION}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
 ZONES=("${AVAILABILITY_ZONES[@]:0:${ZONES_COUNT}}")
