@@ -40,22 +40,12 @@ build_root:
           chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
 images:
 - dockerfile_literal: |
-    FROM src
+    FROM src as rpms-amd
     RUN make rpm
-  inputs:
-    src:
-      as:
-      - src
-  to: rpm-amd64
-- dockerfile_literal: |
-    FROM src
+
+    FROM src as rpms-arm
     RUN TARGET_ARCH=aarch64 make rpm
-  inputs:
-    src:
-      as:
-      - src
-  to: rpm-arm64
-- dockerfile_literal: |
+
     FROM root
     USER root
     ENV HOME=/tmp/secret
@@ -69,7 +59,8 @@ images:
     COPY busybox_running_check.sh configure-vm.sh usr/bin/
     RUN chmod 755 usr/bin/configure-vm.sh usr/bin/busybox_running_check.sh
 
-    COPY ./aarch64/RPMS/*/*.rpm ./x86_64/RPMS/*/*.rpm packages/
+    COPY --from=rpms-amd /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
+    COPY --from=rpms-amd /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
     RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
   inputs:
     cli:
@@ -79,15 +70,9 @@ images:
     root:
       as:
       - root
-    rpm-amd64:
-      paths:
-      - destination_dir: ./x86_64
-        source_path: /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS
-    rpm-arm64:
-      paths:
-      - destination_dir: ./aarch64
-        source_path: /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS
     src:
+      as:
+      - src
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/microshift/scripts/devenv-builder/configure-vm.sh
