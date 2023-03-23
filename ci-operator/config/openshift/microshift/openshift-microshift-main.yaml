@@ -40,11 +40,8 @@ build_root:
           chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
 images:
 - dockerfile_literal: |
-    FROM src as rpms-amd
-    RUN make rpm
-
-    FROM src as rpms-arm
-    RUN TARGET_ARCH=aarch64 make rpm
+    FROM src as rpms
+    RUN make rpm && echo "now arm" && TARGET_ARCH=aarch64 make rpm
 
     FROM root
     USER root
@@ -59,8 +56,7 @@ images:
     COPY busybox_running_check.sh configure-vm.sh usr/bin/
     RUN chmod 755 usr/bin/configure-vm.sh usr/bin/busybox_running_check.sh
 
-    COPY --from=rpms-amd /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
-    COPY --from=rpms-amd /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
+    COPY --from=rpms /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
     RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
   inputs:
     cli:
