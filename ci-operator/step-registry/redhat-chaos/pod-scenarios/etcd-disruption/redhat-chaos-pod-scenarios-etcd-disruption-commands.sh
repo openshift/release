@@ -16,7 +16,10 @@ pushd krkn-hub/
 echo "kubeconfig loc $$KUBECONFIG"
 
 export KRKN_KUBE_CONFIG=$KUBECONFIG
-export NAMESPACE="^openshift-etcd$"
-export POD_LABEL="k8s-app=etcd"
+export NAMESPACE=$TARGET_NAMESPACE 
 
 ./prow/pod-scenarios/prow_run.sh
+rc=$?
+echo "Done running the test!" 
+echo "Return code: $rc"
+exit $rc
