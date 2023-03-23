@@ -17,7 +17,7 @@ operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/medik8s/fence-agents-remediation:latest
+  - pullspec: quay.io/medik8s/fence-agents-remediation-operator:latest
     with: pipeline:fence-agents-remediation
 releases:
   latest:
@@ -30,6 +30,25 @@ resources:
     requests:
       cpu: 500m
       memory: 1000Mi
+tests:
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: candidate
+      OO_INSTALL_NAMESPACE: far-install
+      OO_PACKAGE: fence-agents-remediation
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
