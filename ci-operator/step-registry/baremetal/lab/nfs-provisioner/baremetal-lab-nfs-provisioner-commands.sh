@@ -54,39 +54,6 @@ items:
 
 EOF
 
-cat > ${DIR}/05-deployment-patch.yaml <<EOF
-kind: Deployment
-apiVersion: apps/v1
-metadata:
-  name: nfs-client-provisioner
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: nfs-client-provisioner
-  strategy:
-    type: Recreate
-  template:
-    metadata:
-      labels:
-        app: nfs-client-provisioner
-    spec:
-      serviceAccountName: nfs-client-provisioner
-      containers:
-        - name: nfs-client-provisioner
-          image: quay.io/openshifttest/nfs-subdir-external-provisioner@sha256:3036bf6b741cdee4caf8fc30bccd049afdf662e08a52f2e6ae47b75ef52a40ac
-          env:
-            - name: NFS_SERVER
-              value: ${NFS_SERVER}
-            - name: NFS_PATH
-              value: /opt/nfs/${CLUSTER_NAME} 
-      volumes:
-        - name: nfs-client-root
-          nfs:
-            server: ${NFS_SERVER}
-            path: /opt/nfs/${CLUSTER_NAME}
-EOF
-
 cat > ${DIR}/10-deployment-patch.yaml <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -127,6 +94,7 @@ namespace: nfs-provisioner
 resources:
   - 00-namespace.yaml
   - 01-rbac.yaml
+  - github.com/bmanzari/nfs-subdir-external-provisioner//deploy
 
 patchesStrategicMerge:
   - 10-deployment-patch.yaml
@@ -137,15 +105,10 @@ EOF
 echo "Deploying the nfs-provisioner with the following payloads:"
 more ${DIR}/*.yaml | cat
 
-sleep 27000
-
 echo
 oc apply -k ${DIR}
 echo "Waiting up to 10 minutes for the nfs-provisioner pod to become ready..."
 
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-    . "${SHARED_DIR}/proxy-conf.sh"
-fi
 
 for _ in $(seq 1 10); do
   sleep 60
