@@ -18,8 +18,10 @@ echo "kubeconfig loc $$KUBECONFIG"
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE 
 
+echo $ENABLE_ALERTS
 ./prow/pod-scenarios/prow_run.sh
 rc=$?
 echo "Done running the test!" 
 echo "Return code: $rc"
 exit $rc
+echo $ENABLE_ALERTS
