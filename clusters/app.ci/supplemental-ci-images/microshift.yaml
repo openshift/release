@@ -1,0 +1,59 @@
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  namespace: ci
+  name: microshift-test-runtime
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: microshift-test-runtime
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: microshift-test-runtime:latest
+  source:
+    dockerfile: |
+      FROM registry.access.redhat.com/ubi8/ubi:latest
+      USER root
+      RUN echo -e '[google-cloud-sdk]\n\
+      name=Google Cloud SDK\n\
+      baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\n\
+      enabled=1\n\
+      gpgcheck=1\n\
+      repo_gpgcheck=1\n\
+      gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg\n\
+            https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg' > /etc/yum.repos.d/google-cloud-sdk.repo
+      RUN dnf update -y && \
+          dnf install --setopt=tsflags=nodocs -y gcc glibc-static google-cloud-sdk-365.0.1 jq make python3-devel rpm-build selinux-policy-devel util-linux && \
+          pip3 install \
+              pygithub GitPython && \
+          dnf clean all && rm -rf /var/cache/dnf/*
+      ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
+      ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
+      RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
+          if ! (curl -Ls "${YQ_URL}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt &>/dev/null); then \
+            echo "ERROR: Expected file at ${YQ_URL} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)" ; \
+            exit 1 ; \
+          fi ; \
+          chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: ubi:8
+        namespace: ocp
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: ubi:8
+        namespace: ocp
+    type: ImageChange
