@@ -58,7 +58,7 @@ done
 
 
 # Deploy openstack operator
-make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX}
+make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
 # Wait before start checking all deployment status
 # Not expecting to fail here, only in next deployment checks
 n=0
@@ -84,7 +84,7 @@ make ceph TIMEOUT=90
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
-make openstack_deploy_prep
+make openstack_deploy_prep NETWORK_ISOLATION=false
 
 cat <<EOF >${HOME}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
