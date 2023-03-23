@@ -54,6 +54,39 @@ items:
 
 EOF
 
+cat > ${DIR}/05-deployment-patch.yaml <<EOF
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: nfs-client-provisioner
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nfs-client-provisioner
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: nfs-client-provisioner
+    spec:
+      serviceAccountName: nfs-client-provisioner
+      containers:
+        - name: nfs-client-provisioner
+          image: quay.io/openshifttest/nfs-subdir-external-provisioner@sha256:3036bf6b741cdee4caf8fc30bccd049afdf662e08a52f2e6ae47b75ef52a40ac
+          env:
+            - name: NFS_SERVER
+              value: ${NFS_SERVER}
+            - name: NFS_PATH
+              value: /opt/nfs/${CLUSTER_NAME} 
+      volumes:
+        - name: nfs-client-root
+          nfs:
+            server: ${NFS_SERVER}
+            path: /opt/nfs/${CLUSTER_NAME}
+EOF
+
 cat > ${DIR}/10-deployment-patch.yaml <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -70,15 +103,12 @@ spec:
             - name: NFS_SERVER
               value: ${NFS_SERVER}
             - name: NFS_PATH
-              value: /opt/nfs/${CLUSTER_NAME}
-        - name: nfs-subdir-external-provisioner
-          image: quay.io/openshifttest/nfs-subdir-external-provisioner@sha256:3036bf6b741cdee4caf8fc30bccd049afdf662e08a52f2e6ae47b75ef52a40ac
+              value: /opt/nfs/${CLUSTER_NAME}          
       volumes:
         - name: nfs-client-root
           nfs:
             server: ${NFS_SERVER}
             path: /opt/nfs/${CLUSTER_NAME}
-
 EOF
 
 cat > ${DIR}/15-default-storage-class-patch.yaml <<EOF
@@ -99,7 +129,7 @@ resources:
   - 01-rbac.yaml
 
 patchesStrategicMerge:
-  - 10-deployment-patch.yaml
+  - 05-deployment-patch.yaml
   - 15-default-storage-class-patch.yaml
 
 EOF
