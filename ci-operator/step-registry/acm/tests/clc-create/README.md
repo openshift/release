@@ -10,6 +10,7 @@
 ## Purpose
 
 To test the managed cluster creation feature of ACM.
+1 AWS managed cluster with 3 master/3 worker nodes will be created as part of this step using default variables.
 
 > **IMPORTANT**
 > You must use the [acm-tests-clc-destroy-ref](../clc-destroy/README.md) as a post step when using this clc-create-ref. If you do not and succeed in running the clc-create-ref then you will leave clusters running on the ACM QE team's cloud.
@@ -35,7 +36,7 @@ To test the managed cluster creation feature of ACM.
 
 ### Infrastructure
 
-- A provisioned test cluster to target (hub).
+- An existing OpenShift cluster to act as the target Hub to deploy managed clusters onto.
 - "advanced-cluster-management" operator installed (see [`install-operators`](../../../step-registry/install-operators/README.md)).
 - MCH custom resource installed (see [acm-mch step](../mch/README.md))
 
