@@ -129,7 +129,7 @@ resources:
   - 01-rbac.yaml
 
 patchesStrategicMerge:
-  - 05-deployment-patch.yaml
+  - 10-deployment-patch.yaml
   - 15-default-storage-class-patch.yaml
 
 EOF
@@ -137,6 +137,7 @@ EOF
 echo "Deploying the nfs-provisioner with the following payloads:"
 more ${DIR}/*.yaml | cat
 
+sleep 27000
 
 echo
 oc apply -k ${DIR}
