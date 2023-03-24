@@ -95,6 +95,16 @@ fi
 
 echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: $OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
 cluster_name=$(oc get hostedclusters -n "$HYPERSHIFT_NAMESPACE" -o jsonpath='{.items[0].metadata.name}')
+
+echo "Compare MAIN version"
+TARGET_VERSION="$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" -ojsonpath='{.metadata.version}')"
+TARGET_MAIN_VERSION="$(echo "$TARGET_VERSION" | cut -d '.' -f 1-2)"
+SOURCE_MAIN_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}' | cut -d '.' -f 1-2)"
+if [ "$TARGET_MAIN_VERSION" != "$SOURCE_MAIN_VERSION" ]
+then
+    echo "TARGET_MAIN_VERSION: $TARGET_MAIN_VERSION , SOURCE_MAIN_VERSION:$SOURCE_MAIN_VERSION"
+    oc annotate hostedcluster -n "$HYPERSHIFT_NAMESPACE" "$cluster_name" "hypershift.openshift.io/force-upgrade-to=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --overwrite
+fi
 oc patch hostedcluster "$cluster_name" -n "$HYPERSHIFT_NAMESPACE" --type=merge -p '{"spec":{"release":{"image":"'"${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"'"}}}'
 
 _upgradeReady=1
