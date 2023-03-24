@@ -2,10 +2,9 @@
 
 set -o errexit
 set -o pipefail
-set -x 
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-    . "${SHARED_DIR}/proxy-conf.sh"
+    source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 # Set the NFS_SERVER value to the same value as the AUX_HOST, unless explicitly set.
@@ -71,7 +70,7 @@ spec:
             - name: NFS_SERVER
               value: ${NFS_SERVER}
             - name: NFS_PATH
-              value: /opt/nfs/${CLUSTER_NAME}          
+              value: /opt/nfs/${CLUSTER_NAME}
       volumes:
         - name: nfs-client-root
           nfs:
