@@ -1,0 +1,37 @@
+ref:
+  as: osde2e-test
+  from_image:
+    namespace: ci
+    name: osde2e
+    tag: latest
+  commands: osde2e-test-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: CONFIGS
+      default: ""
+      documentation: "Comma separated list of pre-canned configs provided out of the box by osde2e."
+    - name: MUST_GATHER
+      default: "false"
+      documentation: "Toggles on/off collecting OpenShift must gather logs."
+    - name: OCM_CCS
+      default: "false"
+      documentation: "Decides if ccs (customer cloud subscription) is used or not."
+    - name: JOB_NAME
+      default: ""
+      documentation: "The prow job name, this will be removed. Set to empty for initial test."
+    - name: SKIP_DESTROY_CLUSTER
+      default: "false"
+      documentation: "Toggles on/off whether the cluster should be destroyed at the very end of test execution."
+    - name: SECRET_LOCATIONS
+      default: "/usr/local/sd-osd"
+      documentation: "Comma separated list of directory paths within the container to have osde2e load credentials."
+  documentation: |-
+    Calls osde2e test framework used by service delivery to test all aspects of Managed OpenShift
+    Clusters (OSD, ROSA, ROSA HCP, ARO).
+  credentials:
+    - mount_path: /usr/local/sd-osd
+      name: sd-osd
+      namespace: test-credentials

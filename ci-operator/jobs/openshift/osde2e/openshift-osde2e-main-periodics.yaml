@@ -1152,7 +1152,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
+  cluster: build01
   cron: 0 */6 * * 0-5
   decorate: true
   decoration_config:
@@ -1162,6 +1162,8 @@ periodics:
     org: openshift
     repo: osde2e
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-managed-cspi-qe
     ci.openshift.io/generator: prowgen
   name: periodic-ci-openshift-osde2e-main-aws-stage-e2e-default
   spec:
@@ -1169,9 +1171,9 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/osde2e-common
-      - --secret-dir=/secrets/osde2e-credentials
+      - --secret-dir=/usr/local/aws-stage-e2e-default-cluster-profile
       - --target=aws-stage-e2e-default
       command:
       - ci-operator
@@ -1182,14 +1184,13 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/aws-stage-e2e-default-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /secrets/osde2e-credentials
-        name: osde2e-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -1199,12 +1200,15 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: osde2e-common
+    - name: boskos
       secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
       secret:
-        secretName: osde2e-credentials
+        secretName: cluster-secrets-aws-managed-cspi-qe
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -1265,6 +1269,73 @@ periodics:
     - name: osde2e-credentials
       secret:
         secretName: osde2e-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */6 * * 0-5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-managed-cspi-qe
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-aws-stage-trt-poc
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/usr/local/aws-stage-e2e-default-cluster-profile
+      - --target=aws-stage-e2e-default
+      command:
+      - ci-operator
+      env:
+      - name: INSTALL_LATEST_NIGHTLY
+        value: "4.12"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/aws-stage-e2e-default-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-managed-cspi-qe
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

@@ -357,21 +357,13 @@ tests:
   - mount_path: /usr/local/osde2e-rosa-stage
     name: osde2e-rosa-stage
 - as: aws-stage-e2e-default
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="aws,stage,e2e-suite"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
   cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      CONFIGS: aws,stage,pr-check
+      OCM_LOGIN_URL: staging
+    workflow: osde2e-osd
 - as: gcp-stage-e2e-default
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
