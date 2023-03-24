@@ -19,18 +19,18 @@ export PARAM_AWS_ACCESS_KEY_ID
 OC_HUB_CLUSTER_API_URL=$(oc whoami --show-server)
 export OC_HUB_CLUSTER_API_URL
 
-HUB_CLUSTER_NAME=
+# Get the base domain from the API URL
+left_cut=echo ${OC_HUB_CLUSTER_API_URL:12} # substring --> ${VAR:start_index:length} --> remove https://api.
+BASE_DOMAIN=$(echo $left_cut | sed "s/:6443//") # replace :6433 with empty string
+export BASE_DOMAIN
+
+HUB_CLUSTER_NAME=echo $(echo $BASE_DOMAIN | sed "s/aws.interop.ccitredhat.com//")
 export HUB_CLUSTER_NAME
 
 OC_HUB_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
 export OC_HUB_CLUSTER_PASS
 
 # Set the dynamic vars needed to execute the Observability scenarios on the managed clusters
-# Get the base domain from the API URL
-
-BASE_DOMAIN=
-export BASE_DOMAIN
-
 MANAGED_CLUSTER_NAME=$(cat $SHARED_DIR/managed.cluster.name)
 export MANAGED_CLUSTER_NAME
 
