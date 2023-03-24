@@ -36,9 +36,9 @@ cat > "${HOME}"/wait_for_deployment_ready.sh <<'EOF'
 set -xeuo pipefail
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-echo "waiting for deployment response" >&2
-oc wait --for=condition=available --timeout=120s deployment nginx
-echo "deployment posted ready status" >&2
+echo "waiting for pod response" >&2
+oc wait --for=condition=Ready --timeout=120s pod/testpod
+echo "pod posted ready status" >&2
 EOF
 chmod +x "${HOME}"/wait_for_deployment_ready.sh
 
