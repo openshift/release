@@ -10,11 +10,9 @@ trap 'FRC=$?; createUpgradeJunit; debug' EXIT TERM
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
     if (( FRC != 0 )); then
-        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
-        echo -e "Describing abnormal nodes...\n"
-        oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
-        echo -e "Describing abnormal operators...\n"
-        oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
+        oc get clusterversion/version -oyaml
+        oc get node --no-headers | awk '$2 != "Ready" {print $1}' | xargs -I{} bash -c "echo -e '\n#####oc describe node {}#####\n'; oc describe node {}"
+        oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | xargs -I{} bash -c "echo -e '\n#####oc describe co {}#####\n'; oc describe co {}"
     fi
 }
 
@@ -40,34 +38,10 @@ EOF
     fi
 }
 
-function run_command_oc() {
-    local try=0 max=40 ret_val
-
-    if [[ "$#" -lt 1 ]]; then
-        return 0
-    fi
-
-    while (( try < max )); do
-        if ret_val=$(oc "$@" 2>&1); then
-            break
-        fi
-        (( try += 1 ))
-        sleep 3
-    done
-
-    if (( try == max )); then
-        echo >&2 "Run:[oc $*]"
-        echo >&2 "Get:[$ret_val]"
-        return 255
-    fi
-
-    echo "${ret_val}"
-}
-
 function check_node() {
     local node_number ready_number
-    node_number=$(${OC} get node |grep -vc STATUS)
-    ready_number=$(${OC} get node |grep -v STATUS | awk '$2 == "Ready"' | wc -l)
+    node_number=$(oc get node --no-headers | grep -cv STATUS)
+    ready_number=$(oc get node --no-headers | awk '$2 == "Ready"' | wc -l)
     if (( node_number == ready_number )); then
         echo "All nodes status check PASSED"
         return 0
@@ -76,7 +50,7 @@ function check_node() {
             echo >&2 "No any ready node"
         else
             echo >&2 "We found failed node"
-            oc get node |grep -v STATUS | awk '$2 != "Ready"'
+            oc get node --no-headers | awk '$2 != "Ready"'
         fi
         return 1
     fi
@@ -88,17 +62,22 @@ function check_pod() {
 }
 
 function health_check() {
-    #1. Check all cluster operators get stable and ready
-    echo "Step #1: check all cluster operators get stable and ready"
-    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
+    echo "Step #1: Check all cluster operators get stable and ready"
+    timeout 900s bash <<EOT
+until
+  oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+  oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+  oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+do
+  sleep 30 && echo "Cluster Operators Degraded=True,Progressing=True,or Available=False";
+done
+EOT
     oc wait clusterversion/version --for='condition=Available=True' --timeout=15m
 
-    #2. Make sure every machine is in 'Ready' status
     echo "Step #2: Make sure every machine is in 'Ready' status"
     check_node
 
-    #3. All pods are in status running or complete
-    echo "Step #3: check all pods are in status running or complete"
+    echo "Step #3: Check all pods are in status running or complete"
     check_pod
 }
 
@@ -114,15 +93,13 @@ if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-export OC="run_command_oc"
-
 echo "OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: $OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE"
 cluster_name=$(oc get hostedclusters -n "$HYPERSHIFT_NAMESPACE" -o jsonpath='{.items[0].metadata.name}')
 oc patch hostedcluster "$cluster_name" -n "$HYPERSHIFT_NAMESPACE" --type=merge -p '{"spec":{"release":{"image":"'"${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"'"}}}'
 
 _upgradeReady=1
 for ((i=1; i<=60; i++)); do
-    count=$(oc get hostedcluster -n clusters "$cluster_name" -ojsonpath='{.status.version.history[?(@.image=="'"${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"'")].state}' | grep -c Completed || true)
+    count=$(oc get hostedcluster -n "$HYPERSHIFT_NAMESPACE" "$cluster_name" -ojsonpath='{.status.version.history[?(@.image=="'"${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"'")].state}' | grep -c Completed || true)
     if [ "$count" -eq 1 ] ; then
         echo "HyperShift HostedCluster(CP) upgrade successful"
         _upgradeReady=0
