@@ -121,6 +121,9 @@ patches:
             - name: ceph
               mountPath: "/etc/ceph"
               readOnly: true
+    - op: replace
+      path: /spec/cinder/template/cinderVolumes/volume1/replicas
+      value: 1
     - op: add
       path: /spec/cinder/template/cinderVolumes/volume1/customServiceConfig
       value: |
@@ -136,6 +139,9 @@ patches:
             report_discard_supported=True
             backend_host=hostgroup
             rbd_secret_uuid=FSID
+    - op: replace
+      path: /spec/cinder/template/cinderBackup/replicas
+      value: 1
     - op: add
       path: /spec/cinder/template/cinderBackup/customServiceConfig
       value: |
