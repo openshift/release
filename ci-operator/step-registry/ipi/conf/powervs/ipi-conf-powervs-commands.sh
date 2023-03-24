@@ -158,6 +158,15 @@ platform:
     userID: ${POWERVS_USER_ID}
     zone: ${POWERVS_ZONE}
     vpcRegion: ${VPCREGION}
+capabilities:
+  baselineCapabilitySet: None
+  additionalEnabledCapabilities:
+    - openshift-samples
+    - baremetal
+    - marketplace
+    - Console
+    - Insights
+    - NodeTuning
 publish: External
 pullSecret: >
   $(<"${CLUSTER_PROFILE_DIR}/pull-secret")
