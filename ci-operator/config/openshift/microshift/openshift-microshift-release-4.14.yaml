@@ -7,10 +7,6 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: tests
-  ubi-minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
 build_root:
   project_image:
     dockerfile_literal: |
@@ -82,6 +78,7 @@ images:
         source_path: /usr/bin/openshift-tests
   to: microshift-test-payload
 promotion:
+  disabled: true
   excluded_images:
   - microshift-test-payload
   name: "4.14"
@@ -217,22 +214,6 @@ tests:
       GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
       GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
     workflow: openshift-microshift-e2e-loadbalancer-smoke-test
-- as: nightly-conformance-parallel
-  cron: 0 0 * * 1-5
-  steps:
-    cluster_profile: gcp
-    env:
-      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-microshift-e2e-test
-- as: nightly-conformance-serial
-  cron: 0 0 * * 1-5
-  steps:
-    cluster_profile: gcp
-    env:
-      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
-      TEST_SUITE: openshift/conformance/serial
-    workflow: openshift-microshift-e2e-test
 zz_generated_metadata:
   branch: release-4.14
   org: openshift
