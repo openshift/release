@@ -11,7 +11,7 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM quay.io/modh/ods-ci:latest
-    WORKDIR /ocp-addons-operators-cli
+    WORKDIR /tmp/ods-ci
   to: rhods-addon-tests
 releases:
   latest:
@@ -26,19 +26,19 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-# TODO: interpret this to cpu + memory limits/requests
-#  replicas: 6
-#  compute_machine_type: m5.4xlarge
 tests:
 - as: rhods-tests
   cron: 0 12 * * 6
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      ADDON_NAME: reference-addon
-      API_HOST: stage
+      ADDON_NAME: rhods
     test:
-    - ref: msi-addon-rhods-install
-    - ref: msi-addon-rhods-test
-    - ref: msi-addon-rhods-uninstall
+    - ref: msi-addon-install
+    - ref: msi-addon-test-rhods
+    - ref: msi-addon-uninstall
     workflow: rosa-aws-sts
+zz_generated_metadata:
+  branch: CSPI-QE-MSI-rhods
+  org: MSI
+  repo: rhods

@@ -1,0 +1,44 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_literal: |
+    FROM quay.io/modh/ods-ci:latest
+    WORKDIR /tmp/ods-ci
+  # TODO: add entrypoint ?
+  to: rhods-addon-tests
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+# TODO: interpret this to cpu + memory limits/requests
+#  replicas: 6
+#  compute_machine_type: m5.4xlarge
+tests:
+- as: rhods-tests
+  cron: 0 12 * * 6
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      ADDON_NAME: rhods
+    test:
+    - ref: msi-addon-install
+    - ref: msi-addon-test-rhods
+    - ref: msi-addon-uninstall
+    workflow: rosa-aws-sts
