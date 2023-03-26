@@ -126,7 +126,8 @@ elif [[ "$T5CI_VERSION" == "4.14" ]]; then
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
-
+export GIT_COMMITTER_NAME='CI User'
+export GIT_COMMITTER_EMAIL='cnf-devel@redhat.com'
 git config --global user.name "CI User"
 git config --global user.email "cnf-devel@redhat.com"
 
