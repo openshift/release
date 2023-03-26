@@ -12,7 +12,6 @@ images:
 - dockerfile_literal: |
     FROM quay.io/modh/ods-ci:latest
     WORKDIR /tmp/ods-ci
-  # TODO: add entrypoint ?
   to: rhods-addon-tests
 releases:
   latest:
@@ -27,9 +26,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-# TODO: interpret this to cpu + memory limits/requests
-#  replicas: 6
-#  compute_machine_type: m5.4xlarge
 tests:
 - as: rhods-tests
   cron: 0 12 * * 6
@@ -37,8 +33,14 @@ tests:
     cluster_profile: aws-managed-cspi-qe
     env:
       ADDON_NAME: rhods
+      COMPUTE_MACHINE_TYPE: m5.4xlarge
+      REPLICAS: "6"
     test:
     - ref: msi-addon-install
     - ref: msi-addon-test-rhods
     - ref: msi-addon-uninstall
     workflow: rosa-aws-sts
+zz_generated_metadata:
+  branch: rhods
+  org: CSPI-QE
+  repo: MSI
