@@ -1,0 +1,42 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_literal: |
+    FROM quay.io/redhat_msi/ocp-addons-operators-cli:latest
+    WORKDIR /ocp-addons-operators-cli
+    ENTRYPOINT ["poetry", "run", "python", "app/cli.py"]
+  to: ocp-addons-operators-cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: odf-rehearse-aws
+  interval: 960h
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      CLUSTER_NAME: vs-rosa-test
+    workflow: rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: CSPI-QE
+  repo: MSI
+  variant: odf-rehearse-4.13
