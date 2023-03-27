@@ -69,6 +69,7 @@ echo "Node reservation concluded successfully."
 scp "${SSHOPTS[@]}" "root@${AUX_HOST}:/var/builds/${CLUSTER_NAME}/*.yaml" "${SHARED_DIR}/"
 more "${SHARED_DIR}"/*.yaml |& sed 's/pass.*$/pass ** HIDDEN **/g'
 
+echo "${AUX_HOST}" >> "${SHARED_DIR}/bastion_public_address"
 
 # Example host element from the list in the hosts.yaml file:
 # - mac: 34:73:5a:9d:eb:e1 # The mac address of the interface connected to the baremetal network
