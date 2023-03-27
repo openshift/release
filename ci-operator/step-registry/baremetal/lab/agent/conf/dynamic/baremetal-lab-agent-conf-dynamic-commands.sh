@@ -38,7 +38,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: ${ipv4_enabled}
       ipv6:
         enabled: ${ipv6_enabled}
-        dhcp: ${ipv6_enabled}
 "
 
   # split the ipi_disabled_ifaces semi-comma separated list into an array
