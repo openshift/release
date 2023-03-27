@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-aws-cidr-expansion
+  steps:
+    env:
+      CLUSTER_NETWORK_CIDR: 10.128.0.0/23
+      CLUSTER_NETWORK_HOST_PREFIX: 26
+    pre:
+      - chain: ipi-conf-aws
+      - ref: ovn-conf-custom-cidr
+      - chain: ipi-install
+    test:
+      - ref: ovn-clusternetwork-cidr-expansion
+      - ref: openshift-e2e-test
+    post:
+      - chain: gather-core-dump
+      - chain: ipi-aws-post
+  documentation: |-
+    This workflow will configure custom values for the clusterNetwork CIDR mask (/23) and the
+    hostPrefix (/26) which allows for 512 total IPs w/ 64 IPs per node resulting in 8 nodes
+    max. The clusternetwork-cidr-expansion test step will modify (expand) the total IPs and
+    scale to more worker nodes. Finally the standard e2e-test step will run
+

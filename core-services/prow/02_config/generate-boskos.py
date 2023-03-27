@@ -65,6 +65,10 @@ CONFIG = {
     'aws-interop-qe-quota-slice': {
         'us-east-2': 5,
     },
+    'aws-local-zones-quota-slice': {
+        'us-east-1': 2,
+        'us-west-2': 2
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
