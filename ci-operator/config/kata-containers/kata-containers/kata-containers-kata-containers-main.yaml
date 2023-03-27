@@ -76,14 +76,18 @@ tests:
         # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
         # which causes openshift-tests to fail.
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
+        export KATA_RUNTIME=kata-qemu
+        export GOPATH=/go
 
         KATA_WORKDIR=/go/src/github.com/kata-containers/tests
         cd $KATA_WORKDIR
         # Install Kata Containers and run a smoke test.
+        yum install -y gettext
         .ci/openshift-ci/test.sh
 
         # Deploy the kata-webhook so that the tests ran on next step of the
         # workflow will use the kata runtime.
+        yum install -y openssl
         .ci/openshift-ci/cluster/deploy_webhook.sh
       from: pipeline:bin
       resources:
