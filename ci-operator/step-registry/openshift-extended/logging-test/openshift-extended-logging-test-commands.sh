@@ -138,7 +138,7 @@ openstack*)
     source "${SHARED_DIR}/cinder_credentials.sh"
     export TEST_PROVIDER='{"type":"openstack"}';;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal)
+equinix-ocp-metal|equinix-ocp-metal-qe)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe)
     export TEST_PROVIDER='{"type":"nutanix"}';;
