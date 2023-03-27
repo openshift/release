@@ -7,10 +7,6 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: tests
-  ubi-minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
 build_root:
   project_image:
     dockerfile_literal: |
@@ -124,14 +120,14 @@ tests:
   run_if_changed: ^(rpm/*|packaging/.*|Makefile)
 - as: e2e-openshift-conformance-reduced
   cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
     env:
       GOOGLE_COMPUTE_IMAGE_NAME: rhel-8-v20230202
     workflow: openshift-microshift-e2e-openshift-conformance-reduced
 - as: e2e-reboot
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
   steps:
     cluster_profile: gcp
     env:
@@ -139,7 +135,7 @@ tests:
     workflow: openshift-microshift-e2e-reboot-tests
 - as: e2e-router-smoke-test
   optional: true
-  run_if_changed: ^(assets/.*|cmd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: gcp
     env:

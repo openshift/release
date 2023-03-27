@@ -63,12 +63,13 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 echo "Wait to check if release image is valid"
 n=0
 until [ $n -ge 60 ]; do
-    valid_image_status=$(oc -n clusters get hostedcluster ${CLUSTER_NAME} -o json | jq -r '.status.conditions[]? | select(.type == "ValidReleaseImage") | .status')
+    valid_image="$(oc -n clusters get hostedcluster "${CLUSTER_NAME}" -o json | jq '.status.conditions[]? | select(.type == "ValidReleaseImage")')"
+    valid_image_status="$(printf '%s' "${valid_image}" | jq -r .status)"
     if [[ $valid_image_status == "True" ]]; then
         break
     fi
     if [[ $valid_image_status == "False" ]]; then
-        echo "Release image is not valid"
+        printf 'Release image is not valid: %s\n' "${valid_image}"
         exit 1
     fi
     echo -n "."

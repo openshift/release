@@ -86,7 +86,12 @@ function build_push_operator_images {
   DOCKERFILE="index.Dockerfile"
   DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${DOCKERFILE}"\"\}\}\}\})
 
-  opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
+# todo: Improve include manila bundle workflow. For meta operaor only we need to add manila bundle in index and not for individual operators like keystone.
+  if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
+    opm index add --bundles "${BASE_BUNDLE}",quay.io/openstack-k8s-operators/manila-operator-bundle:latest --out-dockerfile "${DOCKERFILE}" --generate
+  else
+    opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
+  fi
 
   oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
   oc patch bc ${OPERATOR}-index -p "${DOCKERFILE_PATH_PATCH[@]}"
