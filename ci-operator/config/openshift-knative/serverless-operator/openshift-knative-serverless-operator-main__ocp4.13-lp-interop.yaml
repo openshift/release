@@ -111,45 +111,50 @@ tests:
 - as: operator-e2e-interop-aws-ocp413
   cron: 0 1 * * 1
   steps:
-    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: aws.interop.ccitredhat.com
+    post:
+    - as: knative-serving-eventing-e2e
+      best_effort: true
+      commands: make test-upstream-e2e-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h0m0s
+    - as: knative-eventing-kafka-broker-e2e
+      best_effort: true
+      commands: make test-upstream-e2e-kafka-no-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 1h0m0s
     test:
     - as: operator-e2e
-      commands: make test-e2e-with-kafka || true
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: knative-serving-eventing-e2e
-      commands: make test-upstream-e2e-no-upgrade || true
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: knative-eventing-kafka-broker-e2e
-      commands: make test-upstream-e2e-kafka-no-upgrade || true
+      commands: make test-e2e-with-kafka
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
