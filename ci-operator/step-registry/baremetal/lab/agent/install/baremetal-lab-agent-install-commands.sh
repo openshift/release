@@ -44,6 +44,17 @@ response = context.get(f"/redfish/v1/Managers/{manager}/VirtualMedia/")
 removable_disk = list(filter((lambda x: x["@odata.id"].find("CD") != -1),
                              response.dict.get("Members")))[0]["@odata.id"].split("/")[-1]
 
+### This is for AMI BMCs (currently only the arm64 servers) as they are affected by a bug that prevents the ISOs to be mounted/umounted
+### correctly. The workaround is to reset the redfish internal redis database and make it populate again from the BMC.
+if manager == "Self":
+  try:
+    response = context.post(f"/redfish/v1/Managers/{manager}/Actions/Oem/AMIManager.RedfishDBReset/",
+                            body={"RedfishDBResetType": "ResetAll"})
+    # Wait for the BMC to reset the database
+    time.sleep(60)
+  except Exception as e:
+    print("Failed to reset the BMC's redfish database. Continuing anyway...")
+
 print("Eject virtual media, if any")
 response = context.post(
     f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.EjectMedia", body={})
