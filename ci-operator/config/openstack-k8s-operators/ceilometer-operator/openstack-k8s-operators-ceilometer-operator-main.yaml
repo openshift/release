@@ -4,8 +4,6 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM src
-    RUN yum update -y && yum install -y python39 python39-pip
-    RUN alternatives --set python3 /usr/bin/python3.9
     RUN pip3 install pre-commit
   from: src
   to: ci-pre-commit
@@ -22,16 +20,10 @@ tests:
     export SKIP=no-commit-to-branch
     export GOFLAGS=
     export PRE_COMMIT_HOME=/tmp
+    export GOLANGCI_LINT_CACHE=/tmp
     git log -1
     mkdir -p ../operator && cp -r . ../operator
     cd ../operator
-    go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
-    go get golang.stackrox.io/kube-linter/cmd/kube-linter
-    GO111MODULE=on go install golang.stackrox.io/kube-linter/cmd/kube-linter
-    pushd ..
-    mkdir -p $PWD/testenv
-    source <(setup-envtest use -p env --bin-dir $PWD/testenv)
-    popd
     pre-commit run --all-files --show-diff-on-failure
   container:
     from: ci-pre-commit
