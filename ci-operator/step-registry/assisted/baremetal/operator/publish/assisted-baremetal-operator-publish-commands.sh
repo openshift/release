@@ -35,16 +35,19 @@ GITHUB_TOKEN=$(cat "$GITHUB_TOKEN_FILE")
 # Setup registry credentials
 REGISTRY_TOKEN_FILE="$SECRETS_PATH/$REGISTRY_SECRET/$REGISTRY_SECRET_FILE"
 echo "## Setting up registry credentials."
-mkdir -p "$HOME/.docker"
-config_file="$HOME/.docker/config.json"
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}/containers"
+config_file="${XDG_RUNTIME_DIR}/containers/auth.json"
 cat "$REGISTRY_TOKEN_FILE" > "$config_file" || {
     echo "ERROR Could not read registry secret file"
     echo "      From: $REGISTRY_TOKEN_FILE"
     echo "      To  : $config_file"
 }
 if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
-    echo "ERROR Registry config file not found: $REGISTRY_TOKEN_FILE"
-    echo "      Is the docker/config.json in a different location?"
+    echo "ERROR Registry authentication file not found: $REGISTRY_TOKEN_FILE"
+    echo "      Is the auth.json in a different location?"
     exit 1
 fi
 oc registry login

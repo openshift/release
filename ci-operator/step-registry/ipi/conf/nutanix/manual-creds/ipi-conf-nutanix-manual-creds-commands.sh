@@ -6,6 +6,11 @@ set -o pipefail
 
 source "${SHARED_DIR}/nutanix_context.sh"
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+
 CR_DIR="/tmp/credentials_request"
 mkdir -p "${CR_DIR}"
 
