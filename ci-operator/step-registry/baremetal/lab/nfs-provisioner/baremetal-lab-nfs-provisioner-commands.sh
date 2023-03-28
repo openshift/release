@@ -3,11 +3,19 @@
 set -o errexit
 set -o pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # Set the NFS_SERVER value to the same value as the AUX_HOST, unless explicitly set.
 NFS_SERVER=${NFS_SERVER:-${AUX_HOST}}
 DIR=/tmp/nfs-provisioner
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 mkdir -p ${DIR}
+# In a network restricted environment additional images required by the nfs provisioner cannot be pulled from the internet,
+# thus the need to have it mirrored and accessible through the proxy registry hosted on the aux host.
+# Associated PR at https://gitlab.cee.redhat.com/aosqe/tests-images/-/merge_requests/85
+NFS_CLIENT_MIRRORED_IMAGE_URL="quay.io/openshifttest/nfs-subdir-external-provisioner@sha256:3036bf6b741cdee4caf8fc30bccd049afdf662e08a52f2e6ae47b75ef52a40ac"
 
 cat > ${DIR}/00-namespace.yaml <<EOF
 apiVersion: v1
@@ -61,6 +69,7 @@ spec:
     spec:
       containers:
         - name: nfs-client-provisioner
+          image: ${NFS_CLIENT_MIRRORED_IMAGE_URL}
           env:
             - name: NFS_SERVER
               value: ${NFS_SERVER}
@@ -71,7 +80,6 @@ spec:
           nfs:
             server: ${NFS_SERVER}
             path: /opt/nfs/${CLUSTER_NAME}
-
 EOF
 
 cat > ${DIR}/15-default-storage-class-patch.yaml <<EOF
@@ -81,7 +89,6 @@ metadata:
   name: nfs-client
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
-
 EOF
 
 cat > ${DIR}/kustomization.yaml <<EOF

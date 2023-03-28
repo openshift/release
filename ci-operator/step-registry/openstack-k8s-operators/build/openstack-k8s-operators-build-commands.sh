@@ -66,6 +66,7 @@ function build_push_operator_images {
 
   # Build and push operator image
   oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
+  oc set build-secret --pull bc/${OPERATOR} ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR} --from-dir . -F
 
   # Build and push bundle image
@@ -85,7 +86,12 @@ function build_push_operator_images {
   DOCKERFILE="index.Dockerfile"
   DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${DOCKERFILE}"\"\}\}\}\})
 
-  opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
+# todo: Improve include manila bundle workflow. For meta operaor only we need to add manila bundle in index and not for individual operators like keystone.
+  if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
+    opm index add --bundles "${BASE_BUNDLE}",quay.io/openstack-k8s-operators/manila-operator-bundle:latest --out-dockerfile "${DOCKERFILE}" --generate
+  else
+    opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
+  fi
 
   oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
   oc patch bc ${OPERATOR}-index -p "${DOCKERFILE_PATH_PATCH[@]}"
@@ -101,9 +107,13 @@ cp -r /go/src/github.com/${ORG}/${BASE_OP}/ ${BASE_DIR}
 # Create and enable openstack namespace
 create_openstack_namespace
 
+# Secret for pulling containers from docker.io
+DOCKER_REGISTRY_SECRET=pull-docker-secret
+oc create secret generic ${DOCKER_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/docker/config.json --type=kubernetes.io/dockerconfigjson
+
 # Secret for pushing containers - openstack namespace
 REGISTRY_SECRET=push-quay-secret
-oc create secret generic ${REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/docker/config.json --type=kubernetes.io/dockerconfigjson
+oc create secret generic ${REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/rdoquay/config.json --type=kubernetes.io/dockerconfigjson
 
 # Build operator
 IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${BASE_OP}

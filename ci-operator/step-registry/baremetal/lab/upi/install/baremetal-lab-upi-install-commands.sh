@@ -7,16 +7,48 @@ set -o nounset
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 # Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM ERR
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function oinst() {
   /tmp/openshift-install --dir="${INSTALL_DIR}" --log-level=debug "${@}" 2>&1 | grep\
    --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+}
+
+function get_ready_nodes_count() {
+  oc get nodes \
+    -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
+    grep -c -E ",True$"
+}
+
+# wait_for_nodes_readiness loops until the number of ready nodes objects is equal to the desired one
+function wait_for_nodes_readiness()
+{
+  local expected_nodes=${1}
+  local max_retries=${2:-10}
+  local period=${3:-5}
+  for i in $(seq 1 "${max_retries}") max; do
+    if [ "${i}" == "max" ]; then
+      echo "[ERROR] Timeout reached. ${expected_nodes} ready nodes expected, found ${ready_nodes}... Failing."
+      return 1
+    fi
+    sleep "${period}m"
+    ready_nodes=$(get_ready_nodes_count)
+    if [ x"${ready_nodes}" == x"${expected_nodes}" ]; then
+        echo "[INFO] Found ${ready_nodes}/${expected_nodes} ready nodes, continuing..."
+        return 0
+    fi
+    echo "[INFO] - ${expected_nodes} ready nodes expected, found ${ready_nodes}..." \
+      "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
+  done
 }
 
 function destroy_bootstrap() {
@@ -175,8 +207,12 @@ INSTALL_DIR="/tmp/installer"
 mkdir -p "${INSTALL_DIR}"
 
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
-oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
-   --command=openshift-install --to=/tmp
+oc adm release extract -a "${PULL_SECRET_PATH}" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
+  --command=openshift-install --to=/tmp
+
+if [ "${DISCONNECTED}" == "true" ]; then
+  OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
+fi
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
@@ -245,6 +281,11 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
+  if [[ "${name}" == *-a-* ]] && [ "${ADDITIONAL_WORKERS_DAY2}" == "true" ]; then
+    # Do not power on the additional workers if we need to run them as day2 (e.g., to test single-arch clusters based
+    # on a single-arch payload migrated to a multi-arch cluster)
+    continue
+  fi
   echo "Power on ${bmc_address//.*/} (${name})..."
   reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}"
 done
@@ -271,6 +312,16 @@ if ! wait "$!"; then
   # TODO
   exit 1
 fi
+
+EXPECTED_NODES=$(( masters + workers ))
+if [ "${ADDITIONAL_WORKERS_DAY2}" == "false" ]; then
+  # If we are running additional workers as day2, we need to add them to the expected nodes count
+  EXPECTED_NODES=$(( EXPECTED_NODES + ADDITIONAL_WORKERS ))
+fi
+# Additional check to wait all the nodes to be ready. Especially important for multi-arch compute nodes clusters with
+# mixed arch nodes.
+echo -e "\nWaiting for all the nodes to be ready..."
+wait_for_nodes_readiness ${EXPECTED_NODES}
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 touch  "${SHARED_DIR}/success"

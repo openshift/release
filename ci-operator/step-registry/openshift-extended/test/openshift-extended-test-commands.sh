@@ -128,17 +128,20 @@ vsphere)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/govc.sh"
     export VSPHERE_CONF_FILE="${SHARED_DIR}/vsphere.conf"
-    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE"
-    # The test suite requires a vSphere config file with explicit user and password fields.
-    sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
-    sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    error_code=0
+    oc -n openshift-config get cm/cloud-provider-config -o jsonpath='{.data.config}' > "$VSPHERE_CONF_FILE" || error_code=$?
+    if [ "W${error_code}W" == "W0W" ]; then
+        # The test suite requires a vSphere config file with explicit user and password fields.
+        sed -i "/secret-name \=/c user = \"${GOVC_USERNAME}\"" "$VSPHERE_CONF_FILE"
+        sed -i "/secret-namespace \=/c password = \"${GOVC_PASSWORD}\"" "$VSPHERE_CONF_FILE"
+    fi
     export TEST_PROVIDER=vsphere;;
 openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
     export TEST_PROVIDER='{"type":"openstack"}';;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal)
+equinix-ocp-metal|equinix-ocp-metal-qe)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -181,12 +184,9 @@ oc get clusterversion version -o yaml || true
 # execute the cases
 function run {
     test_scenarios=""
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""
-    echo "TEST_FILTERS: \"${hardcoded_filters};${TEST_FILTERS:-}\""
-    echo "FILTERS_ADDITIONAL: \"${FILTERS_ADDITIONAL:-}\""
     echo "TEST_TIMEOUT: \"${TEST_TIMEOUT}\""
     if [[ -n "${TEST_SCENARIOS:-}" ]]; then
         readarray -t scenarios <<< "${TEST_SCENARIOS}"
@@ -226,6 +226,12 @@ function run {
     extended-platform-tests run all --dry-run | \
         grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
 
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
+    if [[ "${test_scenarios}" == *"Stagerun"* ]] && [[ "${test_scenarios}" != *"~Stagerun"* ]]; then
+        hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&"
+    fi
+    echo "TEST_FILTERS: \"${hardcoded_filters};${TEST_FILTERS:-}\""
+    echo "FILTERS_ADDITIONAL: \"${FILTERS_ADDITIONAL:-}\""
     test_filters="${hardcoded_filters};${TEST_FILTERS}"
     if [[ -n "${FILTERS_ADDITIONAL:-}" ]]; then
         echo "add FILTERS_ADDITIONAL into test_filters"
