@@ -2,14 +2,18 @@ workflow:
   as: baremetalds-e2e-ovn-ipv4
   steps:
     env:
+      CLUSTER_NETWORK_CIDR: 10.128.0.0/23
+      CLUSTER_NETWORK_HOST_PREFIX: 26
       DEVSCRIPTS_CONFIG: |
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
     pre:
+      - ref: ovn-conf-custom-cidr
       - chain: baremetalds-ipi-pre
     test:
-      - chain: baremetalds-ipi-test
       - ref: ovn-ex-gw-e2e
+      - ref: ovn-clusternetwork-cidr-expansion
+      - ref: ovn-ex-gw-e2e-2
     post:
       - chain: baremetalds-ipi-post
   documentation: |-
