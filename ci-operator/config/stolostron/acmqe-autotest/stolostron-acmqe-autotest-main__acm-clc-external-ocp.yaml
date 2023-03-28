@@ -1,0 +1,40 @@
+base_images:
+  clc-ui-e2e:
+    name: "2.7"
+    namespace: acm-qe
+    tag: clc-ui-e2e
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  fetch-managed-clusters:
+    name: autotest
+    namespace: acm-qe
+    tag: fetch-managed-clusters
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: acm-external-cluster-poc
+  cron: 0 1 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    post:
+    - ref: acm-tests-clc-destroy
+    test:
+    - ref: acm-tests-clc-create
+    - ref: acm-fetch-managed-clusters
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: acmqe-autotest
+  variant: acm-clc-external-ocp
