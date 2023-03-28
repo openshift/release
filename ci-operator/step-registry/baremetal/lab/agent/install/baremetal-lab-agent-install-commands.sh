@@ -24,7 +24,7 @@ function mount_virtual_media() {
   iso_path="${4}"
   transfer_protocol_type="${5}"
   echo "Mounting the ISO image in ${bmc_address} via virtual media..."
-  python3 - "${bmc_address}" "${bmc_username}" "${bmc_password}" \
+  python3 -u - "${bmc_address}" "${bmc_username}" "${bmc_password}" \
     "${iso_path}" "${transfer_protocol_type^^}" <<'EOF'
 import redfish
 import sys
@@ -47,6 +47,7 @@ removable_disk = list(filter((lambda x: x["@odata.id"].find("CD") != -1),
 ### This is for AMI BMCs (currently only the arm64 servers) as they are affected by a bug that prevents the ISOs to be mounted/umounted
 ### correctly. The workaround is to reset the redfish internal redis database and make it populate again from the BMC.
 if manager == "Self":
+  print("Reset BMC's redfish database...")
   try:
     response = context.post(f"/redfish/v1/Managers/{manager}/Actions/Oem/AMIManager.RedfishDBReset/",
                             body={"RedfishDBResetType": "ResetAll"})
@@ -54,15 +55,23 @@ if manager == "Self":
     time.sleep(60)
   except Exception as e:
     print("Failed to reset the BMC's redfish database. Continuing anyway...")
+  print("Reset BMC and wait for 5mins to be reachable again...")
+  try:
+    response = context.post(f"/redfish/v1/Managers/{manager}/Actions/Manager.Reset",
+                            body={"ResetType": "ForceRestart"})
+    # Wait for the BMC to reset
+    time.sleep(300)
+  except Exception as e:
+    print("Failed to reset the BMC. Continuing anyway...")
 
-print("Eject virtual media, if any")
+print("Eject virtual media, if any...")
 response = context.post(
     f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.EjectMedia", body={})
 print(response.__dict__)
 print(response.status)
 print(response.text)
-time.sleep(10)
-print("Insert new virtual media")
+time.sleep(30)
+print("Insert new virtual media...")
 
 other_options = {}
 if transfer_protocol_type == "CIFS":
