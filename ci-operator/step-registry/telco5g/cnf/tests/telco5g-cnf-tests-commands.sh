@@ -136,11 +136,10 @@ export CNF_ORIGIN_TESTS
 
 if [[ "$T5CI_VERSION" == "4.14" ]]; then
     export CNF_BRANCH="master"
-    export OPERATOR_VERSION="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
-    export OPERATOR_VERSION="release-${T5CI_VERSION}"
 fi
+export OPERATOR_VERSION="release-${T5CI_VERSION}"
 
 cnf_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$cnf_dir" || exit 1
