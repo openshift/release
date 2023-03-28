@@ -3,6 +3,7 @@ build_root:
     name: maistra-builder
     namespace: ci
     tag: "2.4"
+  use_build_cache: true
 images:
 - dockerfile_literal: |
     FROM quay.io/maistra-dev/maistra-builder:2.4
@@ -36,9 +37,9 @@ tests:
     product: ocp
     timeout: 4h0m0s
     version: "4.12"
+  cron: 00 03 * * *
   steps:
     env:
-      # variables required for servicemesh-istio-e2e-aws workflow
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
       MAISTRA_MC_POD: not-used
       MAISTRA_NAMESPACE: maistra-daily-images
@@ -58,12 +59,21 @@ tests:
     - as: build
       cli: latest
       commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        # login to quay.io in the privileged pod
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          docker login -u='maistra-dev+prow' \
+          -p=${QUAY_PASS} quay.io
         # run the scirpt in the privileged pod
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           ./create-images.sh \
           -tDAILY \
           -p
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
       from: src-test
       resources:
         requests:
@@ -71,7 +81,6 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-aws
-  cron: "00 03 * * *"  # Run at 3:00 UTC everyday
 zz_generated_metadata:
   branch: maistra-2.4
   org: maistra
