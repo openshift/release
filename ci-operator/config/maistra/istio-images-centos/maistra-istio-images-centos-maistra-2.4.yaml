@@ -3,7 +3,6 @@ build_root:
     name: maistra-builder
     namespace: ci
     tag: "2.4"
-  use_build_cache: true
 images:
 - dockerfile_literal: |
     FROM quay.io/maistra-dev/maistra-builder:2.4
@@ -29,6 +28,50 @@ tests:
     make lint
   container:
     from: src-test
+- as: istio-images-centos-daily-images-2.4
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.12"
+  steps:
+    env:
+      # variables required for servicemesh-istio-e2e-aws workflow
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_MC_POD: not-used
+      MAISTRA_NAMESPACE: maistra-daily-images
+      MAISTRA_SC_POD: maistra-daily-images-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # copy the script to privileged pod
+        oc cp create-images.sh "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: build
+      cli: latest
+      commands: |
+        # run the scirpt in the privileged pod
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          ./create-images.sh \
+          -tDAILY \
+          -p
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-aws
+  cron: "00 03 * * *"  # Run at 3:00 UTC everyday
 zz_generated_metadata:
   branch: maistra-2.4
   org: maistra
