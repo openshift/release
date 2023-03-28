@@ -403,5 +403,6 @@ sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshi
 # is not properly configured. Rerun patching
 # after cluster complete
 cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}/"
-cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}"
+cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}/"
+cp "${ARTIFACT_DIR}/installer/auth/kubeadmin-password" "${SHARED_DIR}/"
 touch /tmp/install-complete
