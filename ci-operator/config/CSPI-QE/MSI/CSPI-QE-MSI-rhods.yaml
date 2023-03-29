@@ -3,6 +3,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+  ocp-addons-operators-cli:
+    name: ocp-addons-operators-cli
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
@@ -12,6 +16,7 @@ images:
 - dockerfile_literal: |
     FROM quay.io/modh/ods-ci:latest
     WORKDIR /tmp/ods-ci
+    ENTRYPOINT ["bash"]
   to: rhods-addon-tests
 releases:
   latest:
@@ -32,13 +37,14 @@ tests:
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      ADDON_NAME: rhods
+      ADDON_NAME: managed-odh
+      ADDON_PARAMETERS: notification-email=interop-qe-ms@redhat.com
       COMPUTE_MACHINE_TYPE: m5.4xlarge
       REPLICAS: "6"
     test:
-    - ref: msi-addon-install
-    - ref: msi-addon-test-rhods
-    - ref: msi-addon-uninstall
+    - ref: addon-install
+    - ref: addon-test-rhods
+    - ref: addon-uninstall
     workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: rhods
