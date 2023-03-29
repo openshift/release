@@ -7,6 +7,34 @@ chain:
         # compile the e2e tests
         make e2e
 
+        # TODO Start
+        # remove this once the bz is resolved
+        # WORKAROUND FOR https://bugzilla.redhat.com/show_bug.cgi?id=2182453
+        export OVS_FIX_SCRIPT=/tmp/ovs-fix-script.sh
+        cat << EOF > $OVS_FIX_SCRIPT
+        #!/bin/bash
+        while true
+        do
+            echo "ovs fix script sleeping 3 minutes"
+            sleep 180
+            echo "ovs fix script awakes"
+            export GUEST_KUBECONFIG=/tmp/guest-kubeconfig
+            bin/hypershift create kubeconfig > \$GUEST_KUBECONFIG
+            for node in \$(oc --kubeconfig \$GUEST_KUBECONFIG get nodes --no-headers | awk '{print \$1}'); do
+                echo "restarting ovs-configuration service for node \$node"
+                oc --kubeconfig \$GUEST_KUBECONFIG debug node/\$node -- chroot /host /bin/bash -c "/usr/bin/systemctl start ovs-configuration.service"
+                echo "Result \$?"
+                sleep 10
+                oc --kubeconfig \$GUEST_KUBECONFIG debug node/\$node -- chroot /host /bin/bash -c "/usr/bin/systemctl status ovs-configuration.service"
+            done
+        done
+        EOF
+
+        chmod 755 $OVS_FIX_SCRIPT
+        # start this in the background as a workaround for the ovs issue
+        $OVS_FIX_SCRIPT &
+        # TODO END
+
         # run the test
         bin/test-e2e \
                   --test.v \
