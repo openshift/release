@@ -1,0 +1,134 @@
+base_images:
+  aks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aks-0.6.10
+  aro:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aro-0.3.8
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.6.9
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-0.3.6
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.3.8
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.57
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: merge-shell-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-gke-qa-e2e-tests
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-ocp-4-8-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.8"
+  postsubmit: true
+  steps:
+    env:
+      QA_TEST_TARGET: test
+      TEST_SUITE: openshift-newest-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-ui-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-postgres-ui-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: merge-gke-postgres-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: merge-gke-upgrade-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: merge-gke-version-compatibility-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: merge-gke-postgres-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-gke-postgres-upgrade-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: merge-ocp-4-8-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 5h0m0s
+    version: "4.8"
+  postsubmit: true
+  steps:
+    env:
+      TEST_SUITE: openshift-4-operator-e2e-tests
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: release-0.0
+  org: stackrox
+  repo: stackrox
