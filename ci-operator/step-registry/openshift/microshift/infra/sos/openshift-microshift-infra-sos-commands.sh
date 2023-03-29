@@ -21,7 +21,7 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network && sudo chmod +r /tmp/sosreport*"
+  --command "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network -o logs && sudo chmod +r /tmp/sosreport*"
 
 gcloud compute scp \
 --quiet \
