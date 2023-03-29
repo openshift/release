@@ -117,6 +117,13 @@ if [[ "${ZONES_COUNT}" -gt '0' ]]; then
 	" "$INSTALL_CONFIG"
 fi
 
+if [[ -f "${SHARED_DIR}/failure_domain.json" ]]; then
+	yq --yaml-output --in-place ".
+		| .controlPlane.platform.openstack += $(<"${SHARED_DIR}/failure_domain.json")
+		| .featureSet = \"TechPreviewNoUpgrade\"
+	" "$INSTALL_CONFIG"
+fi
+
 if [[ ${ADDITIONAL_WORKERS_NETWORKS:-} != "" ]]; then
 	declare -a networks
 	for network in $ADDITIONAL_WORKERS_NETWORKS; do
