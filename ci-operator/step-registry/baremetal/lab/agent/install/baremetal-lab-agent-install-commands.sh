@@ -18,11 +18,11 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 function mount_virtual_media() {
   ### Sushy doesn't support NFS as TransferProtcolType, and some servers' BMCs (in particular the ones of the arm64 servers)
   ##  are not 100% compliant with the Redfish standard. Therefore, relying on the raw redfish python library.
-  bmc_address="${1}"
-  bmc_username="${2}"
-  bmc_password="${3}"
-  iso_path="${4}"
-  transfer_protocol_type="${5}"
+  local bmc_address="${1}"
+  local bmc_username="${2}"
+  local bmc_password="${3}"
+  local iso_path="${4}"
+  local transfer_protocol_type="${5}"
   echo "Mounting the ISO image in ${bmc_address} via virtual media..."
   python3 -u - "${bmc_address}" "${bmc_username}" "${bmc_password}" \
     "${iso_path}" "${transfer_protocol_type^^}" <<'EOF'
@@ -108,7 +108,13 @@ if response.is_processing:
     print()
 
 EOF
-  return $? # Return the exit code of the python script
+  local ret=$?
+  if [ $ret -ne 0 ]; then
+    echo "Failed to mount the ISO image in ${bmc_address} via virtual media."
+    touch /tmp/virtual_media_mount_failure
+    return 1
+  fi
+  return 0
 }
 
 function oinst() {
@@ -313,13 +319,15 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # Assuming HTTP or HTTPS
     iso_path="${transfer_protocol_type}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
   fi
-  # TODO: make the next one multi-threaded
   mount_virtual_media "${bmc_address}" "${redfish_user}" "${redfish_password}" \
-   "${iso_path}" "${transfer_protocol_type}" || {
-    echo "Failed to mount the ISO image in the host ${name}"
-    exit 1
-  }
+   "${iso_path}" "${transfer_protocol_type}" &
 done
+
+wait
+if [ -f /tmp/virtual_media_mount_failed ]; then
+  echo "Failed to mount the ISO image in one or more hosts"
+  exit 1
+fi
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
