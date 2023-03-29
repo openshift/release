@@ -1,0 +1,145 @@
+base_images:
+  ansible:
+    name: "4.13"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  openstack-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.13"
+  tools:
+    name: "4.13"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    prerelease:
+      architecture: amd64
+      product: ocp
+      version_bounds:
+        lower: 4.13.0-0
+        upper: 4.14.0-0
+  target:
+    prerelease:
+      architecture: multi
+      product: ocp
+      version_bounds:
+        lower: 4.13.0-0
+        upper: 4.14.0-0
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: aws-ipi-ovn-ipsec-to-multiarch-p2-f14
+  cron: 27 8 4,19 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-to-multiarch-p2-f14
+  cron: 6 15 9,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ocm-osd-ccs-p2-f7
+  cron: 43 11 3,10,18,26 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@aws-ipi and @osd_ccs and @network-ovnkubernetes and not @fips'
+      EC_BUILD: "true"
+      OPENSHIFT_VERSION: "4.13"
+      TAG_VERSION: '@4.13'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;OSD_CCS&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: osd-ccs-aws
+- as: aws-rosa-sts-p2-f7
+  cron: 57 19 5,12,20,28 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@aws-ipi and @rosa and @network-ovnkubernetes and not @fips'
+      OPENSHIFT_VERSION: "4.13"
+      TAG_VERSION: '@4.13'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;ROSA&
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: rosa-aws-sts
+- as: azure-ipi-baselinecaps-v412-to-multiarch-p2-f14
+  cron: 6 21 15,30 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-arch-migration
+    workflow: cucushift-installer-rehearse-azure-ipi-baselinecaps-v412
+zz_generated_metadata:
+  branch: release-4.13
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-stable

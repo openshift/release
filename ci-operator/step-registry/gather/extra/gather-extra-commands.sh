@@ -166,6 +166,22 @@ echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
 FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
 done < ${output_dir}.tcpdump_listing
 
+# Gather etcd strace and pprof output if present:
+echo "INFO: Fetching debug info from etcd pods if present"
+output_dir="${ARTIFACT_DIR}/etcd-debug"
+mkdir -p "$output_dir"
+TARGET_FILES="cpu.prof"
+for pqn in $(oc get pods -n openshift-etcd -l app=etcd --no-headers -o=name); do
+	echo ${pqn}
+	pod_name=$(echo ${pqn} | cut -d '/' -f 2)
+	for file_name in $TARGET_FILES; do
+		DEST_FILE="${output_dir}/${pod_name}_${file_name}"
+		oc cp openshift-etcd/${pod_name}:/var/lib/etcd/debug/${file_name} ${DEST_FILE}
+	done
+done
+echo "INFO: done attempting to fetch etcd debug info"
+
+
 function gather_network() {
   local namespace=$1
   local selector=$2
@@ -222,7 +238,7 @@ if [[ -n "${prometheus}" ]]; then
 		FILTER=gzip queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
 		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
 		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
-		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"		
+		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
 	done
 
 	cat >> ${SHARED_DIR}/custom-links.txt <<-EOF

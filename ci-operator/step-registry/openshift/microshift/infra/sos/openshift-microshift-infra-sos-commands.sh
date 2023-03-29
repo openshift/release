@@ -18,12 +18,12 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
   --command "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network && sudo chmod +r /tmp/sosreport*"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+gcloud compute scp \
 --quiet \
 --project "${GOOGLE_PROJECT_ID}" \
 --zone "${GOOGLE_COMPUTE_ZONE}" \

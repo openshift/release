@@ -4,6 +4,8 @@ set -o errexit
 set -o pipefail
 
 
+sleep 1800
+
 # run the test execution script
 ./../execute_alc_interop_commands.sh
 

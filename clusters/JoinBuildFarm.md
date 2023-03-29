@@ -43,6 +43,8 @@ Create kubeconfig for `system:serviceaccount:ci:config-updater`:
 - It has only one context named as the claimed folder name, e.g., `vsphere`.
 - (optional but nice to have) The namespace of the context is `ci`.
 
+The token for `sa/config-updater` is populated in `secret/config-updater-token-version-<number>` and can be used to generate its kubeconfig file, e.g., with `oc login`.
+
 Contact a member of DPTP to send the `kubeconfig` file with encryption. Then DPTP will set up the `applyconfig` (presubmit for dry-run and postsubmit) jobs for the cluster. Note that the `yaml` files in the claimed folder will be applied automatically to the cluster: The presubmit is with the `dry-run` mode while the postsubmit is not, e.g, [pull-ci-openshift-release-master-vsphere-dry](https://github.com/openshift/release/blob/d3e0f9b333f74537376a8978d958b33b8b081733/ci-operator/jobs/openshift/release/openshift-release-master-presubmits.yaml#L778) and [branch-ci-openshift-release-master-vsphere-apply](https://github.com/openshift/release/blob/d3e0f9b333f74537376a8978d958b33b8b081733/ci-operator/jobs/openshift/release/openshift-release-master-postsubmits.yaml#L170).
 
 After the [service accounts](./build-clusters/vsphere1/ci) are created by `applyconfig`, DPTP will
