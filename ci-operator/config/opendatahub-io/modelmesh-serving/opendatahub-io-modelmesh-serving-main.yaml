@@ -38,8 +38,9 @@ tests:
     make test
   container:
     from: src
-  run_if_changed: ^(controllers/.*)
+  run_if_changed: ^(apis/.*|controllers/.*|pkg/.*|main\.go|go\.mod|go\.sum)
 - as: modelmesh-serving-fvt
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum)
   steps:
     cluster_profile: gcp
     env:
@@ -62,11 +63,32 @@ tests:
           memory: 3Gi
     workflow: ipi-gcp
 - as: modelmesh-serving-pr-image-mirror
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum)
   steps:
     dependencies:
       SOURCE_IMAGE_REF: modelmesh-serving
     env:
       IMAGE_REPO: modelmesh-controller
+    workflow: opendatahub-io-ci-image-mirror
+- as: modelmesh-serving-fast-image-mirror
+  postsubmit: true
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: modelmesh-serving
+    env:
+      IMAGE_REPO: modelmesh-controller
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- as: modelmesh-serving-stable-image-mirror
+  postsubmit: true
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: modelmesh-serving
+    env:
+      IMAGE_REPO: modelmesh-controller
+      RELEASE_VERSION: stable
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: main
