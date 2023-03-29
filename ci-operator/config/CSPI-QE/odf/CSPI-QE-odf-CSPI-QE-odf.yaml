@@ -10,10 +10,10 @@ build_root:
     tag: golang-1.17
 images:
 - dockerfile_literal: |
-    FROM quay.io/redhat_msi/ocp-addons-operators-cli:latest
-    WORKDIR /ocp-addons-operators-cli
-    ENTRYPOINT ["poetry", "run", "python", "app/cli.py"]
-  to: ocp-addons-operators-cli
+    FROM python:3
+    WORKDIR /usr/src/app
+    ENTRYPOINT ["echo", "PYTHON-ENTRYPOINT!"]
+  to: msi-python
 releases:
   latest:
     candidate:
@@ -28,15 +28,17 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: odf-rehearse-aws
+- as: msi-odf-install
   interval: 960h
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
       CLUSTER_NAME: vs-rosa-test
+      TEST_ENV_VAR: vshakya-env-var
+    test:
+    - ref: msi-odf-install
     workflow: rosa-aws-sts
 zz_generated_metadata:
-  branch: main
+  branch: CSPI-QE-odf
   org: CSPI-QE
-  repo: MSI
-  variant: odf-rehearse-4.13
+  repo: odf
