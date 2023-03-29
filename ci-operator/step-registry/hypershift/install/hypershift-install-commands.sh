@@ -6,6 +6,7 @@ OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 if [[ $OCP_ARCH == "arm64" ]]; then
   OPERATOR_IMAGE="quay.io/hypershift/hypershift-operator:latest-arm64"
 fi
+OPERATOR_IMAGE="registry.ci.openshift.org/ocp/release:4.14.0-0.nightly-2023-03-28-031439"
 
 bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
 --oidc-storage-provider-s3-credentials=/etc/hypershift-pool-aws-credentials/credentials \
