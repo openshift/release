@@ -67,6 +67,4 @@ gcloud compute ssh rhel8user@"${INSTANCE_PREFIX}" \
   --command 'sudo tar -xhvf $HOME/payload.tar -C / && \
              sudo pre_rpm_install.sh'
 
-gcloud compute firewall-rules create "${INSTANCE_PREFIX}"-external \
-  --network "${INSTANCE_PREFIX}" \
-  --allow tcp:80,tcp:443,tcp:6443
+gcloud compute firewall-rules update "${INSTANCE_PREFIX}" --allow tcp:22,icmp,tcp:80,tcp:443,tcp:6443
