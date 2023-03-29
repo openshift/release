@@ -141,13 +141,19 @@ elif [[ "$T5CI_VERSION" == "4.14" ]]; then
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
+export GIT_COMMITTER_NAME='CI User'
+export GIT_COMMITTER_EMAIL='cnf-devel@redhat.com'
+git config --global user.name "CI User"
+git config --global user.email "cnf-devel@redhat.com"
 
 cnf_dir=$(mktemp -d -t cnf-XXXXX)
 cd "$cnf_dir" || exit 1
 
 echo "running on branch ${CNF_BRANCH}"
-git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
+git -c user.name="CI User" -c user.email=cnf-devel@redhat.com clone "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
+git -c user.name="CI User" -c user.email=cnf-devel@redhat.com fetch origin pull/1449/head:pull_1449
+git -c user.name="CI User" -c user.email=cnf-devel@redhat.com checkout pull_1449
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 cd -
 
@@ -156,7 +162,7 @@ create_tests_skip_list_file
 
 # Skiplist according to each release
 if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
-    create_tests_temp_skip_list_11
+  #  create_tests_temp_skip_list_11
     export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
 
 fi
