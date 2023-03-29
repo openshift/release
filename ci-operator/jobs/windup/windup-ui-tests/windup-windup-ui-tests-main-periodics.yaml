@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build01
-  cron: 0 1 * * 1
+  cron: 0 6 * * 1
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -17,6 +17,17 @@ periodics:
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-windup-windup-ui-tests-main-mtr-ocp4.13-lp-interop-mtr-interop-aws
+  reporter_config:
+    slack:
+      channel: '#cspi-qe-slack-poc'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :success: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :dumpster-fire:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:

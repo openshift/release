@@ -28,7 +28,7 @@ cat > gather_logs.yaml <<-EOF
       - name: Gather sosreport from all hosts
         ansible.builtin.command: >-
           sos report --batch --tmp-dir "{{ LOGS_DIR }}" --all-logs
-            -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum
+            -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,dnf
             -k podman.all -k podman.logs
       ignore_errors: true
 

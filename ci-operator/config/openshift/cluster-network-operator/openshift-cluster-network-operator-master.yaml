@@ -11,10 +11,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.19-openshift-4.14
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
@@ -22,9 +22,9 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: cluster-network-operator
 promotion:
   name: "4.14"
@@ -220,6 +220,11 @@ tests:
     - ref: ovn-sdn-migration-feature-migration-validate-multicast
     - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-clusternetwork-cidr-expansion
+  cron: 0 3 * * 0,2,4,6
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-cidr-expansion
 - as: e2e-aws-ovn-single-node
   optional: true
   steps:
