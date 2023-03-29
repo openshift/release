@@ -41,7 +41,7 @@ COLLECTIVE_OCP_TOKEN=$(cat $SECRETS_DIR/alc/collective-ocp-token)
 export COLLECTIVE_OCP_TOKEN
 
 # run the test execution script
-./execute_alc_interop_commands.sh
+./../execute_alc_interop_commands.sh
 
 # Copy the test cases results to an external directory
 cp -r results $ARTIFACT_DIR/
