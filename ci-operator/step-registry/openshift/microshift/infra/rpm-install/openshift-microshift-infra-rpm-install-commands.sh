@@ -42,9 +42,8 @@ sed -i '2i set -x' /usr/bin/configure-vm.sh
 
 sudo useradd -m -G wheel microshift
 sudo echo -e 'microshift\tALL=(ALL)\tNOPASSWD: ALL' > /etc/sudoers.d/microshift
-cd /home/microshift && sudo -nu microshift configure-vm.sh --no-build /etc/crio/openshift-pull-secret
+cd /home/microshift && sudo -nu microshift configure-vm.sh --no-build --no-build-deps --force-firewall /etc/crio/openshift-pull-secret
 
-dnf install jq firewalld -y
 dnf localinstall -y \$(find /packages/ -iname "*\$(uname -p)*" -or -iname '*noarch*')
 EOF
 chmod +x usr/bin/pre_rpm_install.sh
