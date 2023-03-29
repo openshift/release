@@ -62,6 +62,26 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: github-token
+- as: merge-upstream-istio-2.4
+  commands: |
+    ./tools/automator-main.sh \
+    --org=maistra \
+    --repo=istio \
+    --branch=maistra-2.4 \
+    --token-path=/creds-github/token \
+    '--title=Automator: merge upstream changes to $AUTOMATOR_ORG/$AUTOMATOR_REPO@$AUTOMATOR_BRANCH' \
+    "--labels=merge strategy" \
+    --modifier=merge_upstream_istio_1_16 \
+    --merge-repository=https://github.com/istio/istio \
+    --merge-branch=release-1.16 \
+    --merge-failure-notify=@maistra/release-managers-2-4 \
+    --merge-strategy=merge
+  container:
+    from: src
+  cron: 00 05 * * 1-5
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
 zz_generated_metadata:
   branch: main
   org: maistra
