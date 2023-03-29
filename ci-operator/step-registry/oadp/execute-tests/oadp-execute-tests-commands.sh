@@ -29,15 +29,17 @@ echo "End of AWS info"
 
 
 
-echo "clone oadp-e2e-qe"
-git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-e2e-qe "${OADP_GIT_DIR}"
+echo "Extract oadp-e2e-qe"
+# git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-e2e-qe "${OADP_GIT_DIR}"
+tar -xf /oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}"
 
-echo "clone appsdeployer"
-git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${OADP_APPS_DIR}"
+echo "Extract appsdeployer"
+# git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${OADP_APPS_DIR}"
+tar -xf /oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}"
 
-echo "clone pyclient"
-git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${PYCLIENT_DIR}"
-
+echo "Extract pyclient"
+# git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${PYCLIENT_DIR}"
+tar -xf /oadp-apps-deployer.tar.gz -C "${PYCLIENT_DIR}}"
 
 cd /alabama/oadpApps
 python3 -m pip install pip --upgrade
