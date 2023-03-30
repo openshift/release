@@ -126,16 +126,15 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/verify
+    context: ci/prow/rosa-pr-check
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    max_concurrency: 5
-    name: pull-ci-openshift-osde2e-main-verify
-    rerun_command: /test verify
+    name: pull-ci-openshift-osde2e-main-rosa-pr-check
+    rerun_command: /test rosa-pr-check
     skip_if_only_changed: ^(?:docs|\.github)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
     spec:
       containers:
@@ -145,8 +144,8 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/osde2e-common
         - --secret-dir=/secrets/osde2e-credentials
-        - --secret-dir=/secrets/osde2e-rosa-prod
-        - --target=verify
+        - --secret-dir=/secrets/osde2e-rosa-stage
+        - --target=rosa-pr-check
         command:
         - ci-operator
         image: ci-operator:latest
@@ -165,8 +164,8 @@ presubmits:
         - mountPath: /secrets/osde2e-credentials
           name: osde2e-credentials
           readOnly: true
-        - mountPath: /secrets/osde2e-rosa-prod
-          name: osde2e-rosa-prod
+        - mountPath: /secrets/osde2e-rosa-stage
+          name: osde2e-rosa-stage
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -182,13 +181,13 @@ presubmits:
       - name: osde2e-credentials
         secret:
           secretName: osde2e-credentials
-      - name: osde2e-rosa-prod
+      - name: osde2e-rosa-stage
         secret:
-          secretName: osde2e-rosa-prod
+          secretName: osde2e-rosa-stage
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify,?($|\s.*)
+    trigger: (?m)^/test( | .* )rosa-pr-check,?($|\s.*)
