@@ -22,7 +22,6 @@ export GOOGLE_COMPUTE_ZONE
 
 mkdir -p "${HOME}"/.ssh
 
-# gcloud compute will use this key rather than create a new one
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
 chmod 0600 "${HOME}"/.ssh/google_compute_engine
 cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
@@ -30,13 +29,36 @@ echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
 echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
 chmod 0600 "${HOME}"/.ssh/config
 
-#cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
-
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
+firewall::open_port() {
+  local port="${1}"
+  local protocol="${2:-tcp}"
+  gcloud compute firewall-rules create "microshift-${INSTANCE_PREFIX}-${protocol}-${port}" --network "${INSTANCE_PREFIX}" --allow "${protocol}:${port}"
+}
+
+firewall::close_port() {
+  local port="$1"
+  local protocol="${2:-tcp}"
+  gcloud compute firewall-rules delete "microshift-${INSTANCE_PREFIX}-${protocol}-${port}"
+}
+
+export -f firewall::open_port
+export -f firewall::close_port
+
+IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
+
 cd /tmp
 git clone https://github.com/pmtk/microshift.git --branch merge-e2e-tests
-./microshift/e2e/main.sh
+
+KUBECONFIG=/tmp/kubeconfig \
+  USHIFT_IP="${IP_ADDRESS}" \
+  USHIFT_USER=microshift \
+  ./microshift/e2e/main.sh
