@@ -310,7 +310,7 @@ function check_latest_machineconfig_applied() {
 function wait_machineconfig_applied() {
     local role="${1}" try=0 interval=60
     num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
-    local max_retries; max_retries=$(expr $num \* 10)
+    local max_retries; max_retries=$(expr $num \* 15)
     while (( try < max_retries )); do
         echo "Checking #${try}"
         if ! check_latest_machineconfig_applied "${role}"; then
