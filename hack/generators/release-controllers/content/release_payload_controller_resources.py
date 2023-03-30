@@ -39,6 +39,11 @@ def _cluster_scoped_rbac_resources(gendoc):
                     'verbs': ['get', 'list', 'watch']
                 },
                 {
+                    'apiGroups': ['image.openshift.io'],
+                    'resources': ['imagestreams'],
+                    'verbs': ['get', 'list', 'watch']
+                },
+                {
                     'apiGroups': ['prow.k8s.io'],
                     'resources': ['prowjobs'],
                     'verbs': ['get', 'list', 'watch']
