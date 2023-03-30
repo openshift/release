@@ -1,8 +1,12 @@
 base_images:
-  coreos-centos-stream8:
-    name: stream8
-    namespace: coreos
-    tag: "8"
+  base-machine:
+    name: centos
+    namespace: openshift
+    tag: stream8
+  rhel-coreos-8-base:
+    name: "4.13"
+    namespace: ocp
+    tag: rhel-coreos-8
 build_root:
   image_stream_tag:
     name: release
@@ -13,7 +17,16 @@ releases:
     release:
       architecture: amd64
       channel: stable
-      version: "4.11"
+      version: "4.13"
+images:
+- dockerfile_literal: |
+    FROM quay.io/centos/centos:stream8 as build
+    RUN dnf -y install java-17-openjdk
+  inputs:
+    rhel-coreos-8-base:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-8
+  to: rhel-coreos-8
 resources:
   '*':
     limits:
