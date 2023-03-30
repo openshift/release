@@ -60,5 +60,5 @@ git clone https://github.com/pmtk/microshift.git --branch merge-e2e-tests
 
 KUBECONFIG=/tmp/kubeconfig \
   USHIFT_IP="${IP_ADDRESS}" \
-  USHIFT_USER=microshift \
+  USHIFT_USER=rhel8user \
   ./microshift/e2e/main.sh
