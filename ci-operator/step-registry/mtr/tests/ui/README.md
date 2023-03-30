@@ -12,14 +12,14 @@
 
 ## Purpose
 
-Use to execute the `Cypress` [windup-ui-tests](https://github.com/windup/windup-ui-tests) using the provided arguments. All XML results will be combined into "$ARTIFACT_DIR/windup-ui-results.xml".
+Use to execute the `Cypress` [windup-ui-tests](https://github.com/windup/windup-ui-tests) using the provided arguments. All XML results will be combined into "$ARTIFACT_DIR/junit_windup_ui_results.xml".
 
 ## Process
 
 1. Retrieves the the test cluster host URL from the `$SHARED_DIR` and uses it to construct the target URL of the MTR webpage in the test cluster.
 2. Executes the Cypress tests using target URL constructed earlier in the script and the `CYPRESS_SPEC` variable
 3. Uses the `npm run mergereports` command to merge all of the XML results into one file.
-4. Copies the XML file from the command in step 4 to `$ARTIFACT_DIR/windup-ui-results.xml`.
+4. Copies the XML file from the command in step 4 to `$ARTIFACT_DIR/junit_windup_ui_results.xml`.
 
 ## Prerequisite(s)
 

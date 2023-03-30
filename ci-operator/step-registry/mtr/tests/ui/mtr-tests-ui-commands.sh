@@ -24,8 +24,8 @@ echo "Merging results reports..."
 npm run mergereports
 
 # Copy combined report into $ARTIFACT_DIR
-echo "Archiving /tmp/windup-ui-tests/cypress/reports/junitreport.xml to ARTIFACT_DIR/windup-ui-results.xml..."
-cp /tmp/windup-ui-tests/cypress/reports/junitreport.xml $ARTIFACT_DIR/windup-ui-results.xml
+echo "Archiving /tmp/windup-ui-tests/cypress/reports/junitreport.xml to ARTIFACT_DIR/junit_windup_ui_results.xml..."
+cp /tmp/windup-ui-tests/cypress/reports/junitreport.xml $ARTIFACT_DIR/junit_windup_ui_results.xml
 
 # Copy screenshots into $ARTIFACT_DIR/screenshots
 if [ -d "/tmp/windup-ui-tests/cypress/screenshots/" ]; then
