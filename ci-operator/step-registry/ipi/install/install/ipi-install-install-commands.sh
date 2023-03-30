@@ -489,6 +489,14 @@ if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+elif [[ ${JOB_NAME} == *"vsphere"* ]]; then
+    # Capture OVA details to troubleshoot OVA download/verification issues
+    CACHE_DIR=/tmp/.cache/openshift-installer/image_cache
+    ls -lt ${CACHE_DIR}
+    for ova in ${CACHE_DIR}/*.ova; do
+      ls -lt ${ova}
+      sha256sum ${ova}
+    done
 fi
 
 exit "$ret"
