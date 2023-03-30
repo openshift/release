@@ -39,6 +39,28 @@ promotion:
   name: "4.14"
   namespace: ocp
 releases:
+  hosted-ocp-4-12-latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.12"
+  hosted-ocp-4-12-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.12"
+  hosted-ocp-4-13-latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
+  hosted-ocp-4-13-previous:
+    candidate:
+      product: ocp
+      relative: 1
+      stream: ci
+      version: "4.13"
   hosted-ocp-previous:
     candidate:
       product: ocp
@@ -77,6 +99,20 @@ tests:
 - as: e2e-aws
   skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
+    workflow: hypershift-aws-e2e-nested
+- as: e2e-aws-4-12
+  optional: true
+  steps:
+    dependencies:
+      OCP_IMAGE_LATEST: release:hosted-ocp-4-12-latest
+      OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-12-previous
+    workflow: hypershift-aws-e2e-nested
+- as: e2e-aws-4-13
+  optional: true
+  steps:
+    dependencies:
+      OCP_IMAGE_LATEST: release:hosted-ocp-4-13-latest
+      OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-13-previous
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-metrics
   optional: true
