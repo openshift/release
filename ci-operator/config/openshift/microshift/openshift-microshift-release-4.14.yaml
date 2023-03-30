@@ -7,37 +7,39 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: tests
+  test-runtime:
+    name: test-runtime
+    namespace: microshift
+    tag: latest
 build_root:
-  project_image:
-    dockerfile_literal: |
-      FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.13
-      USER root
-      RUN echo -e '[google-cloud-sdk]\n\
-      name=Google Cloud SDK\n\
-      baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\n\
-      enabled=1\n\
-      gpgcheck=1\n\
-      repo_gpgcheck=1\n\
-      gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg\n\
-             https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg' > /etc/yum.repos.d/google-cloud-sdk.repo
-      RUN dnf update -y && \
-          dnf install --setopt=tsflags=nodocs -y \
-              gcc glibc-static google-cloud-sdk-365.0.1 jq make python3-devel rpm-build selinux-policy-devel util-linux && \
-          pip3 install \
-              pygithub GitPython && \
-          dnf clean all && rm -rf /var/cache/dnf/*
-      ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
-      ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
-      RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.19-openshift-4.13
+images:
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install --upgrade pip && \
+      pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
+    ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
+    ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
+    RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
           if ! (curl -Ls "${YQ_URL}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt &>/dev/null); then \
             echo "ERROR: Expected file at ${YQ_URL} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)" ; \
             exit 1 ; \
           fi ; \
           chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
-  use_build_cache: true
-images:
+  inputs:
+    src:
+      as:
+      - src
+  to: rebase-payload
 - dockerfile_literal: |
-    FROM root
+    FROM src as rpms
+    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+    RUN make rpm && TARGET_ARCH=aarch64 make rpm
+
+    FROM test-runtime
     USER root
     ENV HOME=/tmp/secret
     ENV PAYLOAD_PATH=$HOME/payload
@@ -50,21 +52,16 @@ images:
     COPY busybox_running_check.sh configure-vm.sh usr/bin/
     RUN chmod 755 usr/bin/configure-vm.sh usr/bin/busybox_running_check.sh
 
-    COPY ./RPMS/*/*.rpm packages/
+    COPY --from=rpms /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
     RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
   inputs:
     cli:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    root:
-      as:
-      - root
-    rpms:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS
     src:
+      as:
+      - src
       paths:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/microshift/scripts/devenv-builder/configure-vm.sh
@@ -72,15 +69,20 @@ images:
         source_path: /go/src/github.com/openshift/microshift/validate-microshift
       - destination_dir: .
         source_path: /go/src/github.com/openshift/microshift/docs/config/busybox_running_check.sh
+      - destination_dir: ./microshift
+        source_path: /go/src/github.com/openshift/microshift
     test-bin:
       paths:
       - destination_dir: .
         source_path: /usr/bin/openshift-tests
+    test-runtime:
+      as:
+      - test-runtime
   to: microshift-test-payload
 promotion:
-  disabled: true
   excluded_images:
   - microshift-test-payload
+  - rebase-payload
   name: "4.14"
   namespace: ocp
 releases:
@@ -102,7 +104,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-rpm_build_commands: make rpm; TARGET_ARCH=aarch64 make rpm
 tag_specification:
   name: "4.14"
   namespace: ocp
