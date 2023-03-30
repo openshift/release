@@ -18,7 +18,7 @@ fi
 
 
 export PROMTAIL_IMAGE="quay.io/openshift-logging/promtail"
-export PROMTAIL_VERSION="2.7.4"
+export PROMTAIL_VERSION="v2.7.4"
 export LOKI_ENDPOINT=https://observatorium-mst.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
