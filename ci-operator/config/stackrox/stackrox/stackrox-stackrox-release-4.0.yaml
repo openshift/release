@@ -1,4 +1,8 @@
 base_images:
+  aks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aks-0.6.10
   aro:
     name: automation-flavors
     namespace: stackrox
@@ -6,7 +10,7 @@ base_images:
   eks:
     name: automation-flavors
     namespace: stackrox
-    tag: eks-0.3.1
+    tag: eks-0.6.9
   osd:
     name: automation-flavors
     namespace: stackrox
@@ -23,7 +27,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-test-0.3.56
+    tag: stackrox-test-0.3.57
 resources:
   '*':
     requests:
@@ -110,6 +114,21 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
+- as: eks-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-eks-e2e
+  timeout: 5h0m0s
+- as: osd-gcp-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-gcp-e2e
+  timeout: 5h0m0s
+- as: aro-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-aro-e2e
+  timeout: 5h0m0s
 - as: merge-shell-unit-tests
   postsubmit: true
   steps:
@@ -189,6 +208,21 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
+- as: merge-eks-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-eks-e2e
+  timeout: 5h0m0s
+- as: merge-osd-gcp-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-gcp-e2e
+  timeout: 5h0m0s
+- as: merge-aro-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-aro-e2e
+  timeout: 5h0m0s
 - as: powervs-qa-e2e-tests
   optional: true
   steps:
