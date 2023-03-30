@@ -120,6 +120,14 @@ for port in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json");
         openstack subnet show "$port" -f json
 done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_subnet_show.json"
 
+openstack floating ip list --long -f json \
+        | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Description | test($CLUSTER_NAME)))' \
+        > "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"
+
+for fip in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"); do
+        openstack floating ip show "$fip" -f json
+done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_fip_show.json"
+
 mkdir -p "${ARTIFACT_DIR}/nodes"
 
 openstack server list --name "$CLUSTER_NAME" > "${ARTIFACT_DIR}/openstack_nodes.log"

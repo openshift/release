@@ -1,0 +1,79 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.48.0
+  os:
+    name: centos
+    namespace: openshift
+    tag: "7"
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_path: ./images/dispatcher/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/dispatcher
+  to: dispatcher
+- dockerfile_path: ./images/janitor/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/janitor
+  to: janitor
+- dockerfile_path: ./images/worker/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/worker
+  to: worker
+- dockerfile_path: ./images/result-collector/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/result-collector
+  to: result-collector
+- dockerfile_path: ./images/apiserver/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/apiserver
+  to: apiserver
+promotion:
+  namespace: vega-project
+  tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make unit
+  container:
+    from: src
+- as: lint
+  commands: make lint
+  container:
+    from: golangci-lint
+zz_generated_metadata:
+  branch: master
+  org: vega-project
+  repo: ccb-operator

@@ -166,6 +166,22 @@ echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
 FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
 done < ${output_dir}.tcpdump_listing
 
+# Gather etcd strace and pprof output if present:
+echo "INFO: Fetching debug info from etcd pods if present"
+output_dir="${ARTIFACT_DIR}/etcd-debug"
+mkdir -p "$output_dir"
+TARGET_FILES="cpu.prof"
+for pqn in $(oc get pods -n openshift-etcd -l app=etcd --no-headers -o=name); do
+	echo ${pqn}
+	pod_name=$(echo ${pqn} | cut -d '/' -f 2)
+	for file_name in $TARGET_FILES; do
+		DEST_FILE="${output_dir}/${pod_name}_${file_name}"
+		oc cp openshift-etcd/${pod_name}:/var/lib/etcd/debug/${file_name} ${DEST_FILE}
+	done
+done
+echo "INFO: done attempting to fetch etcd debug info"
+
+
 function gather_network() {
   local namespace=$1
   local selector=$2
@@ -205,19 +221,25 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
 done < /tmp/containers
 
-# Snapshot the prometheus data from the replica that has the oldest
-# PVC. If persistent storage isn't enabled, it uses the last
-# prometheus instances by default to catch issues that occur when the
-# first prometheus pod upgrades.
-if [[ -n "$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found )" ]]; then
-  pvc="$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}' )"
-  prometheus="${pvc##prometheus-data-}"
-else
-  prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
-fi
+prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name )"
 if [[ -n "${prometheus}" ]]; then
-	echo "Snapshotting prometheus from ${prometheus} (may take 15s) ..."
-	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+	echo "${prometheus}" | while read prompod; do
+	  prompod=${prompod#"pod/"}
+		FILE_NAME="${prompod}"
+		# for backwards compatibility with promecious we keep the first files beginning with "prometheus"
+		if [[ "$prompod" == *-0 ]]; then
+			FILE_NAME="prometheus"
+		fi
+
+		echo "Snapshotting prometheus from ${prompod} as ${FILE_NAME} (may take 15s) ..."
+		queue "${ARTIFACT_DIR}/metrics/${FILE_NAME}.tar.gz" oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- tar cvzf - -C /prometheus .
+
+		FILTER=gzip queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
+		FILTER=gzip queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
+		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
+		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
+		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
+	done
 
 	cat >> ${SHARED_DIR}/custom-links.txt <<-EOF
 	<script>
@@ -229,12 +251,6 @@ if [[ -n "${prometheus}" ]]; then
 	document.getElementById("wrapper").append(prom);
 	</script>
 	EOF
-
-	FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
-	FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
-	queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
-	queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
-	queue ${ARTIFACT_DIR}/metrics/prometheus-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
 else
 	echo "Unable to find a Prometheus pod to snapshot."
 fi

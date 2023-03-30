@@ -1,16 +1,20 @@
 base_images:
+  go-builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.46.0
+    tag: v1.48.0
   ocp_builder_rhel-8-golang-1.18-openshift-4.11:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.18-openshift-4.11
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
+  operator-sdk:
+    name: "4.13"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
@@ -44,19 +48,14 @@ images:
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
-- dockerfile_literal: |
-    FROM src
-    # Installing the `oc` client.
-    RUN curl --retry 3 -SL https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/stable/openshift-client-linux.tar.gz \
-        | tar -xz -C /usr/local/bin
-  from: src
-  to: test-bin
 operator:
   bundles:
   - as: operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   - as: hub-operator-bundle
     dockerfile_path: bundle-hub.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-operator:latest
     with: pipeline:kernel-module-management-operator
@@ -65,11 +64,14 @@ operator:
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-signimage:latest
     with: pipeline:kernel-module-management-signimage
 promotion:
-  excluded_images:
-  - test-bin
   namespace: edge-infrastructure
   tag: release-1.0
   tag_by_commit: true
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -82,12 +84,12 @@ tests:
   commands: ci/prow/unit-tests
   container:
     clone: true
-    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
+    from: go-builder
 - as: build
   commands: ci/prow/build
   container:
     clone: true
-    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
+    from: go-builder
 - as: lint
   commands: ci/prow/lint
   container:
@@ -97,14 +99,21 @@ tests:
   commands: ci/prow/check-commits-count
   container:
     clone: true
-    from: ocp_builder_rhel-8-golang-1.18-openshift-4.12
+    from: go-builder
 - as: check-api-changes
-  commands: |
-    unset GOFLAGS
-    unset VERSION
-    ci/prow/check-api-changes
-  container:
-    from: test-bin
+  steps:
+    test:
+    - as: check-api-changes
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        unset VERSION
+        ci/prow/check-api-changes
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
 - as: e2e-in-cluster-build
   cluster_claim:
     architecture: amd64
@@ -112,22 +121,32 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.11"
+    version: "4.12"
   steps:
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-kmm
+        operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-kmm deployment kmm-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
     - as: run-test
       cli: latest
       commands: |
-        unset GOFLAGS
         oc project default
-        ./ci/prow/e2e-incluster-build
-      dependencies:
-      - env: IMG
-        name: kernel-module-management-operator
-      from: test-bin
+        SKIP_MAKE_DEPLOY=true ./ci/prow/e2e-incluster-build
+      from: src
       resources:
         requests:
-          cpu: 300m
+          cpu: 1000m
           memory: 500Mi
     workflow: generic-claim
 zz_generated_metadata:

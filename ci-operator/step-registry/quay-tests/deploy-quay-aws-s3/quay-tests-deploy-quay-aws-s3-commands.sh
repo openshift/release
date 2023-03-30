@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
 #Create AWS S3 Storage Bucket
 QUAY_OPERATOR_CHANNEL="$QUAY_OPERATOR_CHANNEL"
 QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
@@ -12,7 +11,7 @@ QUAY_AWS_S3_BUCKET="quayprowci$RANDOM"
 QUAY_AWS_ACCESS_KEY=$(cat /var/run/quay-qe-aws-secret/access_key)
 QUAY_AWS_SECRET_KEY=$(cat /var/run/quay-qe-aws-secret/secret_key)
 
-cat >> variables.tf << EOF
+cat >>variables.tf <<EOF
 variable "region" {
   default = "us-east-2"
 }
@@ -22,7 +21,7 @@ variable "aws_bucket" {
 }
 EOF
 
-cat >> create_aws_bucket.tf << EOF
+cat >>create_aws_bucket.tf <<EOF
 provider "aws" {
   region = "us-east-2"
   access_key = "${QUAY_AWS_ACCESS_KEY}"
@@ -65,7 +64,7 @@ spec:
 EOF
 
 SUB=$(
-    cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
+  cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
 metadata:
@@ -83,19 +82,19 @@ EOF
 echo "The Quay Operator subscription is $SUB"
 
 for _ in {1..60}; do
-    CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
-    if [[ -n "$CSV" ]]; then
-        if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-            echo "ClusterServiceVersion \"$CSV\" ready"
-            break
-        fi
+  CSV=$(oc -n quay-enterprise get subscription quay-operator -o jsonpath='{.status.installedCSV}' || true)
+  if [[ -n "$CSV" ]]; then
+    if [[ "$(oc -n quay-enterprise get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+      echo "ClusterServiceVersion \"$CSV\" ready"
+      break
     fi
-    sleep 10
+  fi
+  sleep 10
 done
 echo "Quay Operator is deployed successfully"
 
 #Deploy Quay, here disable monitoring component
-cat >> config.yaml << EOF
+cat >>config.yaml <<EOF
 CREATE_PRIVATE_REPO_ON_PUSH: true
 CREATE_NAMESPACE_ON_PUSH: true
 FEATURE_EXTENDED_REPOSITORY_NAMES: true
@@ -136,14 +135,16 @@ spec:
     managed: false
   - kind: monitoring
     managed: false
+  - kind: horizontalpodautoscaler
+    managed: false
 EOF
 
 for _ in {1..60}; do
-    if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
-        echo "Quay is in ready status" >&2
-        exit 0
-    fi
-    sleep 15
+  if [[ "$(oc -n quay-enterprise get quayregistry quay -o jsonpath='{.status.conditions[?(@.type=="Available")].status}' || true)" == "True" ]]; then
+    echo "Quay is in ready status" >&2
+    exit 0
+  fi
+  sleep 15
 done
 echo "Timed out waiting for Quay to become ready afer 15 mins" >&2
-oc -n quay-enterprise get quayregistries -o yaml > "$ARTIFACT_DIR/quayregistries.yaml"
+oc -n quay-enterprise get quayregistries -o yaml >"$ARTIFACT_DIR/quayregistries.yaml"

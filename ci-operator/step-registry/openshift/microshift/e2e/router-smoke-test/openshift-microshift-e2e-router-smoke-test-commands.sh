@@ -7,16 +7,15 @@ set -x
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
-GOOGLE_PROJECT_ID=$(< "${CLUSTER_PROFILE_DIR}/openshift_gcp_project")
+GOOGLE_PROJECT_ID=$(<"${CLUSTER_PROFILE_DIR}/openshift_gcp_project")
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-GOOGLE_COMPUTE_ZONE=$(< "${SHARED_DIR}/openshift_gcp_compute_zone")
+GOOGLE_COMPUTE_ZONE=$(<"${SHARED_DIR}/openshift_gcp_compute_zone")
 if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
   exit 1
 fi
 
 mkdir -p "${HOME}"/.ssh
-mock-nss.sh
 
 # gcloud compute will use this key rather than create a new one
 cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
@@ -33,9 +32,7 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-gcloud compute firewall-rules update "${INSTANCE_PREFIX}" --allow tcp:22,icmp,tcp:80
-
-cat <<'EOF' > "${HOME}"/deploy.sh
+cat <<'EOF' >"${HOME}"/deploy.sh
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -45,17 +42,19 @@ set -x
 mkdir -p ~/.kube
 sudo cat /var/lib/microshift/resources/kubeadmin/kubeconfig > ~/.kube/config
 
-echo "
+echo '
 kind: Pod
 apiVersion: v1
 metadata:
   name: hello-microshift
   labels:
-    name: hello-microshift
+    app: hello-microshift
 spec:
-  containers: 
+  containers:
   - name: hello-microshift
-    image: openshift/hello-openshift
+    image: busybox:1.35
+    command: ["/bin/sh"]
+    args: ["-c", "while true; do echo -ne \"HTTP/1.0 200 OK\r\nContent-Length: 16\r\n\r\nHello MicroShift\" | nc -l -p 8080 ; done"]
     ports:
     - containerPort: 8080
       protocol: TCP
@@ -65,36 +64,37 @@ spec:
         drop:
         - ALL
       runAsNonRoot: true
+      runAsUser: 1001
+      runAsGroup: 1001
       seccompProfile:
-        type: RuntimeDefault" | oc create -f -
+        type: RuntimeDefault' | oc create -f -
 
 oc expose pod hello-microshift
 oc expose svc hello-microshift --hostname hello-microshift.cluster.local
 
-oc wait pods -l name=hello-microshift --for condition=Ready --timeout=300s
+oc wait pods -l app=hello-microshift --for condition=Ready --timeout=300s
 EOF
 
 chmod +x "${HOME}/deploy.sh"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse "${HOME}/deploy.sh" "rhel8user@${INSTANCE_PREFIX}:~/deploy.sh"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
+set +e
+gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   "rhel8user@${INSTANCE_PREFIX}" \
   --command "bash ~/deploy.sh"
 
+IP=$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='value(networkInterfaces.accessConfigs[0].natIP)')
 
-IP=$(LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute instances describe "${INSTANCE_PREFIX}" --format='value(networkInterfaces.accessConfigs[0].natIP)')
-
-set +ex
+set +x
 retries=3
 backoff=3s
-
 for try in $(seq 1 "${retries}"); do
   echo "Attempt: ${try}"
   echo "Running: curl -vk http://hello-microshift.cluster.local --resolve \"hello-microshift.cluster.local:80:${IP}\""
@@ -109,16 +109,15 @@ for try in $(seq 1 "${retries}"); do
   echo -e "Waiting ${backoff} before next retry\n\n"
   sleep "${backoff}"
 done
-
 set -x
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
+gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /tmp/validate-microshift "rhel8user@${INSTANCE_PREFIX}:~/validate-microshift"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
+gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   "rhel8user@${INSTANCE_PREFIX}" \

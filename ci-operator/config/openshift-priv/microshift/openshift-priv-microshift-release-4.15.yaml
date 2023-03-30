@@ -1,0 +1,220 @@
+base_images:
+  cli:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: cli
+  test-bin:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: tests
+build_root:
+  project_image:
+    dockerfile_literal: |
+      FROM registry.ci.openshift.org/openshift/release:rhel-8-release-golang-1.19-openshift-4.13
+      USER root
+      RUN echo -e '[google-cloud-sdk]\n\
+      name=Google Cloud SDK\n\
+      baseurl=https://packages.cloud.google.com/yum/repos/cloud-sdk-el8-x86_64\n\
+      enabled=1\n\
+      gpgcheck=1\n\
+      repo_gpgcheck=1\n\
+      gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg\n\
+             https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg' > /etc/yum.repos.d/google-cloud-sdk.repo
+      RUN dnf update -y && \
+          dnf install --setopt=tsflags=nodocs -y \
+              gcc glibc-static google-cloud-sdk-365.0.1 jq make python3-devel rpm-build selinux-policy-devel util-linux && \
+          pip3 install \
+              pygithub GitPython && \
+          dnf clean all && rm -rf /var/cache/dnf/*
+      ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
+      ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
+      RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
+          if ! (curl -Ls "${YQ_URL}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt &>/dev/null); then \
+            echo "ERROR: Expected file at ${YQ_URL} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)" ; \
+            exit 1 ; \
+          fi ; \
+          chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
+  use_build_cache: true
+canonical_go_repository: github.com/openshift/microshift
+images:
+- dockerfile_literal: |
+    FROM root
+    USER root
+    ENV HOME=/tmp/secret
+    ENV PAYLOAD_PATH=$HOME/payload
+    WORKDIR $PAYLOAD_PATH
+
+    COPY oc openshift-tests usr/bin/
+    RUN chmod 755 usr/bin/oc && ln -rs usr/bin/oc usr/bin/kubectl
+
+    COPY validate-microshift /tmp/validate-microshift
+    COPY busybox_running_check.sh configure-vm.sh usr/bin/
+    RUN chmod 755 usr/bin/configure-vm.sh usr/bin/busybox_running_check.sh
+
+    COPY ./RPMS/*/*.rpm packages/
+    RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    root:
+      as:
+      - root
+    rpms:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/scripts/devenv-builder/configure-vm.sh
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/validate-microshift
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/microshift/docs/config/busybox_running_check.sh
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/openshift-tests
+  to: microshift-test-payload
+promotion:
+  excluded_images:
+  - microshift-test-payload
+  name: 4.15-priv
+  namespace: ocp-private
+releases:
+  nightly-amd64:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  nightly-arm64:
+    candidate:
+      architecture: arm64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+rpm_build_commands: make rpm; TARGET_ARCH=aarch64 make rpm
+tag_specification:
+  name: 4.15-priv
+  namespace: ocp-private
+tests:
+- as: verify
+  cluster: build02
+  commands: make verify
+  container:
+    from: src
+- as: test-unit
+  cluster: build02
+  commands: make test-unit
+  container:
+    from: src
+- as: test-srpm
+  cluster: build02
+  commands: make srpm
+  container:
+    from: src
+  run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+- as: e2e-openshift-conformance-reduced
+  cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-openshift-conformance-reduced
+- as: e2e-openshift-conformance-reduced-arm
+  cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
+    workflow: openshift-microshift-e2e-openshift-conformance-reduced
+- as: e2e-reboot
+  cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-reboot-tests
+- as: e2e-reboot-arm
+  cluster: build02
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
+    workflow: openshift-microshift-e2e-reboot-tests
+- as: e2e-greenboot
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|scripts/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-greenboot
+- as: e2e-greenboot-arm
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|scripts/.*|vendor/.*|go\.sum|go\.mod|Makefile)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
+    workflow: openshift-microshift-e2e-greenboot
+- as: e2e-router-smoke-test
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-router-smoke-test
+- as: e2e-router-smoke-test-arm
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
+    workflow: openshift-microshift-e2e-router-smoke-test
+- as: e2e-loadbalancer-smoke-test
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-loadbalancer-smoke-test
+- as: e2e-loadbalancer-smoke-test-arm
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
+    workflow: openshift-microshift-e2e-loadbalancer-smoke-test
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift-priv
+  repo: microshift

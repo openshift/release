@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Wait for WMCO to be up and running
+oc wait deployment windows-machine-config-operator -n openshift-windows-machine-config-operator --for condition=Available=True --timeout=5m
+
 # Ensure userDataSecret exist, fail otherwise. The userDataSecret is required and contains specific information to
 # customize the machine at first boot. For instance, the authorized public key for the SSH server to accept
 # incoming connections, firewall rules, etc.
@@ -16,7 +19,7 @@ export REGION="${LEASED_RESOURCE}"
 # get most recent AMI ID for Windows Server
 ami_id=$(aws ec2 describe-images \
   --region "${REGION}" \
-  --filters "Name=name,Values=Windows_Server-2019*English*Full*Containers*" "Name=is-public,Values=true" \
+  --filters "Name=name,Values=${WINDOWS_OS_ID}*" "Name=is-public,Values=true" \
   --query "reverse(sort_by(Images, &CreationDate))[*].{name: Name, id: ImageId}" \
   --output json | jq -r '.[0].id')
 if [ -z "$ami_id" ]; then

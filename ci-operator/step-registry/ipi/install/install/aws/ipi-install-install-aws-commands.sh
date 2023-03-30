@@ -152,14 +152,26 @@ if [ "${ADD_INGRESS_RECORDS_MANUALLY}" == "yes" ]; then
 fi
 
 if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
-  # replace PLACEHOLDER_INFRA_ID PLACEHOLDER_AMI_ID
-  echo "Local Zone is enabled, updating Infran ID and AMI ID ... "
-  localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
-  infra_id=$(jq -r '."*installconfig.ClusterID".InfraID' "${dir}/.openshift_install_state.json")
-  ami_id=$(grep ami "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" | tail -n1 | awk '{print$2}')
-  sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${localzone_machineset}
-  sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${localzone_machineset}
-  cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
+  if [[ -f "${SHARED_DIR}/manifest_localzone_machineset.yaml" ]]; then
+    # Phase 0, inject manifests
+    
+    # replace PLACEHOLDER_INFRA_ID PLACEHOLDER_AMI_ID
+    echo "Local Zone is enabled, updating Infran ID and AMI ID ... "
+    localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
+    infra_id=$(jq -r '."*installconfig.ClusterID".InfraID' "${dir}/.openshift_install_state.json")
+    ami_id=$(grep ami "${dir}/openshift/99_openshift-cluster-api_worker-machineset-0.yaml" | tail -n1 | awk '{print$2}')
+    sed -i "s/PLACEHOLDER_INFRA_ID/$infra_id/g" ${localzone_machineset}
+    sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${localzone_machineset}
+    cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
+  else
+    # Phase 1, use install-config
+
+    if [[ "${LOCALZONE_WORKER_SCHEDULABLE}" == "yes" ]]; then
+      echo 'LOCALZONE_WORKER_SCHEDULABLE is set to "yes", removing spec.template.spec.taints from 99_openshift-cluster-api_worker-machineset-1.yaml'
+      yq-go d "${dir}/openshift/99_openshift-cluster-api_worker-machineset-1.yaml" spec.template.spec.taints
+    fi
+  fi
+  
 fi
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
@@ -182,6 +194,9 @@ do
   cp "${item}" "${dir}/tls/${manifest##tls_}"
 done <   <( find "${SHARED_DIR}" \( -name "tls_*.key" -o -name "tls_*.pub" \) -print0)
 
+if [ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-}" == "true" ]; then
+	echo "Cluster will be created with public subnets only"
+fi
 
 # ---------------------------------------------------------
 # create cluster
