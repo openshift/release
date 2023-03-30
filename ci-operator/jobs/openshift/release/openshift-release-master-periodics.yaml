@@ -28257,7 +28257,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230328-15a98b0443
+      image: gcr.io/k8s-prow/commenter:v20230329-c93d79fb7d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -38718,6 +38718,74 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build05
+  cron: 31 22 */1 * 1-5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: nightly-4.11
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.11"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  max_concurrency: 1
+  name: periodic-ci-openshift-release-master-nightly-4.11-e2e-telco5g-ptp
+  reporter_config:
+    slack:
+      channel: '#cnf-ci-reports'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
+        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-telco5g-ptp
+      - --variant=nightly-4.11
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: vsphere
   cron: 0 0/12 * * *
   decorate: true
@@ -45005,6 +45073,73 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build05
+  cron: 42 03 */1 * 1-5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: nightly-4.12
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.12-e2e-telco5g-ptp
+  reporter_config:
+    slack:
+      channel: '#cnf-ci-reports'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
+        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-telco5g-ptp
+      - --variant=nightly-4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: vsphere
   cron: '@yearly'
   decorate: true
@@ -46912,6 +47047,82 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-aws-driver-toolkit-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 6h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: nightly-4.13
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.13"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.13-e2e-aws-ovn-cpu-partitioning
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ovn-cpu-partitioning-cluster-profile
+      - --target=e2e-aws-ovn-cpu-partitioning
+      - --variant=nightly-4.13
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-cpu-partitioning-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -51700,6 +51911,73 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build05
+  cron: 34 08 */1 * 1-5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: nightly-4.13
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.13"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.13-e2e-telco5g-ptp
+  reporter_config:
+    slack:
+      channel: '#cnf-ci-reports'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
+        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-telco5g-ptp
+      - --variant=nightly-4.13
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: vsphere
   cron: '@yearly'
   decorate: true
@@ -53739,6 +54017,82 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-aws-driver-toolkit-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 6h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/variant: nightly-4.14
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.14-e2e-aws-ovn-cpu-partitioning
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ovn-cpu-partitioning-cluster-profile
+      - --target=e2e-aws-ovn-cpu-partitioning
+      - --variant=nightly-4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-cpu-partitioning-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -58493,6 +58847,73 @@ periodics:
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
       - --target=e2e-telco5g-cnftests
+      - --variant=nightly-4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 37 13 */1 * 1-5
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  labels:
+    ci-operator.openshift.io/cluster: build05
+    ci-operator.openshift.io/variant: nightly-4.14
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-nightly-4.14-e2e-telco5g-ptp
+  reporter_config:
+    slack:
+      channel: '#cnf-ci-reports'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
+        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --target=e2e-telco5g-ptp
       - --variant=nightly-4.14
       command:
       - ci-operator
@@ -80135,7 +80556,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230328-15a98b0443
+      image: gcr.io/k8s-prow/commenter:v20230329-c93d79fb7d
       imagePullPolicy: Always
       name: ""
       resources:
@@ -80560,7 +80981,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230328-15a98b0443
+      image: gcr.io/k8s-prow/commenter:v20230329-c93d79fb7d
       imagePullPolicy: Always
       name: ""
       resources:
