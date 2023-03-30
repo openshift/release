@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.12"
     namespace: ocp
     tag: cli
   ocp-addons-operators-cli:
@@ -11,8 +11,8 @@ releases:
   latest:
     candidate:
       product: ocp
-      stream: nightly
-      version: "4.13"
+      stream: ci
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -21,18 +21,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: poc-tests
+- api: true
+  as: poc-tests
   cron: 0 12 * * 6
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      ADDON_NAME: reference-addon
+      ADDON1_CONFIG: nvidia-gpu-addon
       API_HOST: stage
+      CHANNEL_GROUP: candidate
+      CLUSTER_NAME: gpu-addon
+      COMPUTE_MACHINE_TYPE: g4dn.2xlarge
+      MIN_REPLICAS: "2"
+      MULTI_AZ: "false"
+      OPENSHIFT_VERSION: "4.12"
+      PARALLEL: "true"
     test:
     - ref: addon-install
     - ref: addon-uninstall
     workflow: rosa-aws-sts
 zz_generated_metadata:
-  branch: reference-addon
+  branch: nvidia-gpu-addon
   org: CSPI-QE
   repo: MSI
