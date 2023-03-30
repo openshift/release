@@ -122,6 +122,56 @@ subjects:
 # art_publish_permissions.py added the following resource
 #---------------------------------------------------------------------------------
 
+apiVersion: authorization.openshift.io/v1
+kind: Role
+metadata:
+  name: art-publish-modify-release
+  namespace: ocp-private
+rules:
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreams
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - imagestreamtags
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+  - patch
+  - delete
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: art-publish-modify-release
+  namespace: ocp-private
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: art-publish-modify-release
+subjects:
+- kind: ServiceAccount
+  name: art-publish
+  namespace: ocp
+---
+#---------------------------------------------------------------------------------
+# art_publish_permissions.py added the following resource
+#---------------------------------------------------------------------------------
+
 # Allow ART to create prowjobs in the ci namespace for running upgrade tests
 apiVersion: authorization.openshift.io/v1
 kind: Role
