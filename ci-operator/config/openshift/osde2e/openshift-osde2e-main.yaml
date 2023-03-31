@@ -31,15 +31,15 @@ tests:
     make check
   container:
     from: src
-- as: rosa-pr-check
+- as: verify
   commands: |
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="rosa,pr-check"
-    export ROSA_ENV="stage"
+    export GINKGO_SKIP="Must Gather Operator"
+    export ROSA_ENV="prod"
     export ROSA_STS="true"
-    export MUST_GATHER="false"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-prod"
 
     go mod tidy
     make build
@@ -52,8 +52,8 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-rosa-stage
-    name: osde2e-rosa-stage
+  - mount_path: /usr/local/osde2e-rosa-prod
+    name: osde2e-rosa-prod
   skip_if_only_changed: ^(?:docs|\.github)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: hypershift-pr-check
   commands: |
@@ -62,7 +62,6 @@ tests:
     export CONFIGS="hypershift"
     export CHANNEL="candidate"
     export CLUSTER_VERSION="4.12.9"
-    export MUST_GATHER="false"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
 
     go mod tidy
@@ -326,7 +325,6 @@ tests:
     export CONFIGS="hypershift"
     export CHANNEL="candidate"
     export CLUSTER_VERSION="4.12.9"
-    export MUST_GATHER="false"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
 
     /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
