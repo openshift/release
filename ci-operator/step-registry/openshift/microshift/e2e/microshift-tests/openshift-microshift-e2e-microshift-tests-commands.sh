@@ -15,24 +15,31 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
-export INSTANCE_PREFIX
-export GOOGLE_PROJECT_ID
-export GOOGLE_COMPUTE_REGION
-export GOOGLE_COMPUTE_ZONE
-
 mkdir -p "${HOME}"/.ssh
+cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" "${HOME}/.ssh/google_compute_engine"
+chmod 0600 "${HOME}/.ssh/google_compute_engine"
+cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${HOME}/.ssh/google_compute_engine.pub"
 
-cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
-cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
-echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
-echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
-chmod 0600 "${HOME}"/.ssh/config
+cat <<EOF >"${HOME}/.ssh/config"
+Host *
+    IdentityFile ~/.ssh/google_compute_engine
+    ServerAliveInterval 30
+    ServerAliveCountMax 1200
+EOF
+chmod 0600 "${HOME}/.ssh/config"
 
-gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
+gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}/gce.json"
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
+
+gcloud compute ssh \
+  --project "${GOOGLE_PROJECT_ID}" --zone "${GOOGLE_COMPUTE_ZONE}" \
+  "rhel8user@${INSTANCE_PREFIX}" --command "ls ~/.ssh/"
+
+gcloud compute ssh \
+  --project "${GOOGLE_PROJECT_ID}" --zone "${GOOGLE_COMPUTE_ZONE}" \
+  "rhel8user@${INSTANCE_PREFIX}" --command "cat ~/.ssh/*.pub" >>~/.ssh/known_hosts
 
 firewall::open_port() {
   local port="${1}"
@@ -50,10 +57,12 @@ export -f firewall::open_port
 export -f firewall::close_port
 
 IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
-gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
+# gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+#   --zone "${GOOGLE_COMPUTE_ZONE}" \
+#   rhel8user@"${INSTANCE_PREFIX}" \
+#   --command "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
+
+ssh "rhel8user@${IP_ADDRESS}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
 cd /tmp
 git clone https://github.com/pmtk/microshift.git --branch merge-e2e-tests
