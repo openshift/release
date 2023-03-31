@@ -54,6 +54,7 @@ firewall::close_port() {
 
 export -f firewall::open_port
 export -f firewall::close_port
+export INSTANCE_PREFIX
 
 ssh "rhel8user@${IP_ADDRESS}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
