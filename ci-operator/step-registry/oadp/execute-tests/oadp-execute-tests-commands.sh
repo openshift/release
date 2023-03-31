@@ -6,7 +6,7 @@ set -o pipefail
 
 # Install pip and setup virtual environment
 python3 -m pip install pip --upgrade
-python3 -m venv /venv
+python3 -m venv /alabama/venv
 source /venv/bin/activate
 pip install ansible_runner
 
