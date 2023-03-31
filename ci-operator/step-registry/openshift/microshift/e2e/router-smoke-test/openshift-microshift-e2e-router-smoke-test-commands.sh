@@ -32,15 +32,14 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat <<'EOF' >"${HOME}"/deploy.sh
-#!/usr/bin/env bash
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
-set -euo pipefail
-IFS=$'\n\t'
-set -x
-
-mkdir -p ~/.kube
-sudo cat /var/lib/microshift/resources/kubeadmin/kubeconfig > ~/.kube/config
+export PATH=${PAYLOAD_PATH}/usr/bin:$PATH
+export KUBECONFIG=/tmp/kubeconfig
 
 echo '
 kind: Pod
@@ -68,37 +67,17 @@ spec:
       runAsGroup: 1001
       seccompProfile:
         type: RuntimeDefault' | oc create -f -
-
 oc expose pod hello-microshift
 oc expose svc hello-microshift --hostname hello-microshift.cluster.local
-
 oc wait pods -l app=hello-microshift --for condition=Ready --timeout=300s
-EOF
-
-chmod +x "${HOME}/deploy.sh"
-
-gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}/deploy.sh" "rhel8user@${INSTANCE_PREFIX}:~/deploy.sh"
-
-set +e
-gcloud compute ssh \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  "rhel8user@${INSTANCE_PREFIX}" \
-  --command "bash ~/deploy.sh"
-
-IP=$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='value(networkInterfaces.accessConfigs[0].natIP)')
 
 set +x
 retries=3
 backoff=3s
 for try in $(seq 1 "${retries}"); do
   echo "Attempt: ${try}"
-  echo "Running: curl -vk http://hello-microshift.cluster.local --resolve \"hello-microshift.cluster.local:80:${IP}\""
-  RESPONSE=$(curl -vk http://hello-microshift.cluster.local --resolve "hello-microshift.cluster.local:80:${IP}" 2>&1)
+  echo "Running: curl -vk http://hello-microshift.cluster.local --resolve \"hello-microshift.cluster.local:80:${IP_ADDRESS}\""
+  RESPONSE=$(curl -vk http://hello-microshift.cluster.local --resolve "hello-microshift.cluster.local:80:${IP_ADDRESS}" 2>&1)
   RESULT=$?
   echo "Exit code: ${RESULT}"
   echo -e "Response: \n${RESPONSE}\n\n"
