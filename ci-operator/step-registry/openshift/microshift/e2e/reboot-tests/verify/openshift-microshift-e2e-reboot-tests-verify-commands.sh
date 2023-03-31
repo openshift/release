@@ -31,16 +31,14 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat > "${HOME}"/wait_for_pod_ready.sh <<'EOF'
-#!/bin/bash
-set -xeuo pipefail
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-echo "waiting for pod response" >&2
-oc wait --for=condition=Ready --timeout=120s pod/test-pod || exit 1
-echo "pod posted ready status" >&2
-EOF
-chmod +x "${HOME}"/wait_for_pod_ready.sh
+export PATH=${PAYLOAD_PATH}/usr/bin:$PATH
+export KUBECONFIG=/tmp/kubeconfig
 
 # restart the VM
 gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
@@ -62,16 +60,7 @@ do
 done
 >&2 echo "It took $timeout seconds to connect via ssh"
 
-gcloud compute scp \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/wait_for_pod_ready.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_pod_ready.sh
-
-if ! gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ~/wait_for_pod_ready.sh'; then
-
+if ! oc wait --for=condition=Ready --timeout=120s pod/test-pod; then
   gcloud compute scp \
     --quiet \
     --project "${GOOGLE_PROJECT_ID}" \
@@ -83,5 +72,6 @@ if ! gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     "rhel8user@${INSTANCE_PREFIX}" \
     --command "bash ~/validate-microshift/cluster-debug-info.sh"
+  exit 1
 
 fi

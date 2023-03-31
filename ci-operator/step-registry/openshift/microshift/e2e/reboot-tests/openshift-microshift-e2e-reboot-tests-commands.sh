@@ -31,11 +31,15 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat >"${HOME}"/reboot-test.sh <<'EOF'
-#!/bin/bash
-set -xeuo pipefail
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
+  --zone "${GOOGLE_COMPUTE_ZONE}" \
+  rhel8user@"${INSTANCE_PREFIX}" \
+  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
+export PATH=${PAYLOAD_PATH}/usr/bin:$PATH
+export KUBECONFIG=/tmp/kubeconfig
+
 # TODO: Remove the labels again once https://issues.redhat.com/browse/OCPBUGS-1969 has been fixed upstream
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"-version=v1.24"
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"=privileged"
@@ -85,30 +89,13 @@ spec:
         claimName: test-claim
 EOF_INNER
 
-set +ex
-echo "waiting for pod condition" >&2
-oc wait --for=condition=Ready --timeout=120s pod/test-pod
-echo "pod posted ready status" >&2
-
-EOF
-chmod +x "${HOME}"/reboot-test.sh
-
-gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/reboot-test.sh rhel8user@"${INSTANCE_PREFIX}":~/reboot-test.sh
-
-gcloud compute scp \
+if ! oc wait --for=condition=Ready --timeout=120s pod/test-pod; then
+  echo "Timeout when waiting for pod to be ready"
+  gcloud compute scp \
   --quiet \
   --project "${GOOGLE_PROJECT_ID}" \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
-
-if ! gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ~/reboot-test.sh'; then
 
   gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
