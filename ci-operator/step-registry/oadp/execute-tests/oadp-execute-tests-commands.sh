@@ -20,7 +20,7 @@ mkdir -p "${PYCLIENT_DIR}"
 
 
 echo "Annotate oadp namespace"
-oc annotate --overwrite namespace/openshift-adp volsync.backube/privileged-movers='true'
+# oc annotate --overwrite namespace/openshift-adp volsync.backube/privileged-movers='true'
 
 
 echo "AWS info"
