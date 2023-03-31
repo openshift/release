@@ -14,8 +14,12 @@ build_root:
     tag: golang-1.18
 images:
 - dockerfile_literal: |
-    FROM quay.io/centos/centos:stream8 as build
-    RUN dnf -y install java-17-openjdk
+    FROM registry.ci.openshift.org/openshift/release:golang-1.18 as builder
+    WORKDIR /go/src/github.com/redhat-developer/intellij-openshift-connector
+    RUN ls
+    RUN yum -y install --setopt=skip_missing_names_on_install=False \
+        java-17-openjdk
+    RUN yum clean all
   inputs:
     rhel-coreos-8-base:
       as:
