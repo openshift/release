@@ -62,6 +62,8 @@ IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='g
 #   rhel8user@"${INSTANCE_PREFIX}" \
 #   --command "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
+sleep 60m
+
 ssh "rhel8user@${IP_ADDRESS}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
 cd /tmp
