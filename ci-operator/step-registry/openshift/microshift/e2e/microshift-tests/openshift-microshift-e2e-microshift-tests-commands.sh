@@ -15,6 +15,8 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
+IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}/gce.json"
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
@@ -26,7 +28,7 @@ chmod 0600 "${HOME}/.ssh/google_compute_engine"
 cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${HOME}/.ssh/google_compute_engine.pub"
 
 cat <<EOF >"${HOME}/.ssh/config"
-Host *
+Host ${IP_ADDRESS}
     IdentityFile ~/.ssh/google_compute_engine
     ServerAliveInterval 30
     ServerAliveCountMax 1200
@@ -35,11 +37,8 @@ chmod 0600 "${HOME}/.ssh/config"
 
 gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" --zone "${GOOGLE_COMPUTE_ZONE}" \
-  "rhel8user@${INSTANCE_PREFIX}" --command "cat ~/.ssh/authorized_keys"
-PUB_KEY="$(cat "${HOME}/.ssh/google_compute_engine.pub")"
-gcloud compute ssh \
-  --project "${GOOGLE_PROJECT_ID}" --zone "${GOOGLE_COMPUTE_ZONE}" \
-  "rhel8user@${INSTANCE_PREFIX}" --command "echo $PUB_KEY >> ~/.ssh/authorized_keys"
+  "rhel8user@${INSTANCE_PREFIX}" \
+  --command "cat /etc/ssh/ssh_host_*_key.pub" | cut -d' ' -f1,2 | sed "s,^,${IP_ADDRESS} ," >>~/.ssh/known_hosts
 
 firewall::open_port() {
   local port="${1}"
@@ -55,14 +54,6 @@ firewall::close_port() {
 
 export -f firewall::open_port
 export -f firewall::close_port
-
-IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
-# gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-#   --zone "${GOOGLE_COMPUTE_ZONE}" \
-#   rhel8user@"${INSTANCE_PREFIX}" \
-#   --command "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
-
-sleep 60m
 
 ssh "rhel8user@${IP_ADDRESS}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
