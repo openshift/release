@@ -3,8 +3,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
-
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
 SECRETS_DIR="/tmp/secrets"
 
@@ -14,6 +12,8 @@ if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
     cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/kubeconfig
     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
 fi   
+
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 # Set the dynamic vars based on provisioned hub cluster.
 CYPRESS_OC_CLUSTER_URL=$(oc whoami --show-server)
