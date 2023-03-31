@@ -227,11 +227,11 @@ def _deployment_resources(gendoc):
                                 "resources": {
                                     "limits": {
                                         "cpu": "500m",
-                                        "memory": "2Gi"
+                                        "memory": "4Gi"
                                     },
                                     "requests": {
                                         "cpu": "250m",
-                                        "memory": "1Gi"
+                                        "memory": "2Gi"
                                     },
                                 },
                                 'command': [
