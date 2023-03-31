@@ -24,7 +24,7 @@ echo "Annotate oadp namespace"
 
 
 echo "AWS info"
-cp "${CLUSTER_PROFILE_DIR}/.awscred" /tmp/test-settings/aws_creds
+# cp "${CLUSTER_PROFILE_DIR}/.awscred" /tmp/test-settings/aws_creds
 echo "End of AWS info"
 
 
