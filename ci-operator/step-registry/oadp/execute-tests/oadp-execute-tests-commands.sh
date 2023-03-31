@@ -4,69 +4,48 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-SECRETS_DIR="/tmp/secrets"
-OADP_GH_PAT=$(cat ${SECRETS_DIR}/oadp/oadp-gh-pat)
-OADP_GH_USER=$(cat ${SECRETS_DIR}/oadp/oadp-gh-user)
+# Install pip and setup virtual environment
+python3 -m pip install pip --upgrade
+python3 -m venv /venv
+source /venv/bin/activate
+pip install ansible_runner
 
-
+# Create required directories
 readonly OADP_GIT_DIR="/alabama/cspi"
 readonly OADP_APPS_DIR="/alabama/oadpApps"
 readonly PYCLIENT_DIR="/alabama/pyclient"
+
 mkdir -p "${OADP_GIT_DIR}"
-mkdir -p /tmp/test-settings
-touch /tmp/test-settings/default_settings.json
 mkdir -p "${OADP_APPS_DIR}"
 mkdir -p "${PYCLIENT_DIR}"
-
+mkdir -p /tmp/test-settings
+touch /tmp/test-settings/default_settings.json
 
 echo "Annotate oadp namespace"
-# oc annotate --overwrite namespace/openshift-adp volsync.backube/privileged-movers='true'
-
+oc annotate --overwrite namespace/openshift-adp volsync.backube/privileged-movers='true'
 
 echo "AWS info"
-# cp "${CLUSTER_PROFILE_DIR}/.awscred" /tmp/test-settings/aws_creds
+cp "${CLUSTER_PROFILE_DIR}/.awscred" /tmp/test-settings/aws_creds
 echo "End of AWS info"
 
-
-
+# Extract Additional Repositories
 echo "Extract oadp-e2e-qe"
-# git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-e2e-qe "${OADP_GIT_DIR}"
 tar -xf /oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}" --strip-components 1
-
 echo "Extract appsdeployer"
-# git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${OADP_APPS_DIR}"
 tar -xf /oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}" --strip-components 1
-
 echo "Extract pyclient"
-# git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${PYCLIENT_DIR}"
 tar -xf /mtc-python-client.tar.gz -C "${PYCLIENT_DIR}" --strip-components 1
 
-cd /alabama/oadpApps
-python3 -m pip install pip --upgrade
-python3 -m venv test
-source test/bin/activate
-python3 -m pip install . --target "${OADP_GIT_DIR}/sample-applications/"
+echo "Install ${OADP_APPS_DIR}"
+python3 -m pip install "${OADP_APPS_DIR}" --target "${OADP_GIT_DIR}/sample-applications/"
 
-sleep 3600
-
-echo "pip install python-client"
-cd /alabama/pyclient
-
-python3 -m pip install . 
-
-
-echo "pip install ansible_runner"
-pip install ansible_runner
-
+echo "Install ${PYCLIENT_DIR}"
+python3 -m pip install "${PYCLIENT_DIR}"
 
 echo "chdir to OADP_GIT_DIR"
-cd /alabama/cspi
+cd $OADP_GIT_DIR
 
 export ANSIBLE_REMOTE_TMP=/tmp/
-
-
-#echo "EXPORT TMP AS HOME DIR"
-#export HOME=/tmp/
 
 echo "sleep"
 sleep 600
@@ -74,7 +53,6 @@ sleep 600
 echo "Run tests from CLI"
 NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh 
 #NAMESPACE=openshift-adp bash /alabama/cspi/test_settings/scripts/test_runner.sh 
-
 
 ls -laht /alabama/cspi/output_files
 
