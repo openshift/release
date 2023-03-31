@@ -14,6 +14,8 @@ AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
+ARO_WORKER_COUNT=${ARO_WORKER_COUNT:=""}
+ARO_WORKER_VM_SIZE=${ARO_WORKER_VM_SIZE:=""}
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
@@ -48,6 +50,16 @@ if [ -f "${SHARED_DIR}/azure_des" ]; then
     des=$(cat ${SHARED_DIR}/azure_des)
     des_id=$(az disk-encryption-set show -n ${des} -g ${RESOURCEGROUP} --query "[id]" -o tsv)
     CREATE_CMD="${CREATE_CMD} --disk-encryption-set ${des_id} --master-encryption-at-host --worker-encryption-at-host "
+fi
+
+# Change worker vm size from default
+if [[ -n ${ARO_WORKER_VM_SIZE} ]]; then
+    CREATE_CMD="${CREATE_CMD} --worker-vm-size ${ARO_WORKER_VM_SIZE}"
+fi
+
+#change number of workers from default
+if [[ -n ${ARO_WORKER_COUNT} ]]; then
+    CREATE_CMD="${CREATE_CMD} --worker-count ${ARO_WORKER_COUNT}"
 fi
 
 echo "Running ARO create command:"
