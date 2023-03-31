@@ -15,6 +15,11 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
+gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}/gce.json"
+gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
+gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
+gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
+
 mkdir -p "${HOME}"/.ssh
 cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" "${HOME}/.ssh/google_compute_engine"
 chmod 0600 "${HOME}/.ssh/google_compute_engine"
@@ -28,18 +33,13 @@ Host *
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
-gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}/gce.json"
-gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
-gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
-gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
-
 gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" --zone "${GOOGLE_COMPUTE_ZONE}" \
-  "rhel8user@${INSTANCE_PREFIX}" --command "ls ~/.ssh/"
-
+  "rhel8user@${INSTANCE_PREFIX}" --command "cat ~/.ssh/authorized_keys"
+PUB_KEY="$(cat "${HOME}/.ssh/google_compute_engine.pub")"
 gcloud compute ssh \
   --project "${GOOGLE_PROJECT_ID}" --zone "${GOOGLE_COMPUTE_ZONE}" \
-  "rhel8user@${INSTANCE_PREFIX}" --command "cat ~/.ssh/*.pub" >>~/.ssh/known_hosts
+  "rhel8user@${INSTANCE_PREFIX}" --command "echo $PUB_KEY >> ~/.ssh/authorized_keys"
 
 firewall::open_port() {
   local port="${1}"
