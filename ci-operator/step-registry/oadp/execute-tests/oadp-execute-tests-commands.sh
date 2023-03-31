@@ -9,9 +9,9 @@ OADP_GH_PAT=$(cat ${SECRETS_DIR}/oadp/oadp-gh-pat)
 OADP_GH_USER=$(cat ${SECRETS_DIR}/oadp/oadp-gh-user)
 
 
-readonly OADP_GIT_DIR="${HOME}/cspi"
-readonly OADP_APPS_DIR="${HOME}/oadpApps"
-readonly PYCLIENT_DIR="${HOME}/pyclient"
+readonly OADP_GIT_DIR="/alabama/cspi"
+readonly OADP_APPS_DIR="/alabama/oadpApps"
+readonly PYCLIENT_DIR="/alabama/pyclient"
 mkdir -p "${OADP_GIT_DIR}"
 mkdir -p /tmp/test-settings
 touch /tmp/test-settings/default_settings.json
@@ -31,23 +31,23 @@ echo "End of AWS info"
 
 echo "Extract oadp-e2e-qe"
 # git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-e2e-qe "${OADP_GIT_DIR}"
-tar -xf /oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}"
+tar -xf /oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}" --strip-components 1
 
 echo "Extract appsdeployer"
 # git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${OADP_APPS_DIR}"
-tar -xf /oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}"
+tar -xf /oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}" --strip-components 1
 
 echo "Extract pyclient"
 # git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${PYCLIENT_DIR}"
-# tar -xf /oadp-apps-deployer.tar.gz -C "${PYCLIENT_DIR}}"
-
-sleep 3600
+tar -xf /mtc-python-client.tar.gz -C "${PYCLIENT_DIR}" --strip-components 1
 
 cd /alabama/oadpApps
 python3 -m pip install pip --upgrade
 python3 -m venv test
 source test/bin/activate
 python3 -m pip install . --target "${OADP_GIT_DIR}/sample-applications/"
+
+sleep 3600
 
 echo "pip install python-client"
 cd /alabama/pyclient
