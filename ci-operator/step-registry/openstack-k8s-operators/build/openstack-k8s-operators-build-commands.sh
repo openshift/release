@@ -59,6 +59,7 @@ function build_push_operator_images {
 
   export VERSION=0.0.1
   export IMG=${IMAGE_TAG_BASE}:${IMAGE_TAG}
+  export BUNDLE_STORAGE_IMG=${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG}
 
   unset GOFLAGS
   pushd ${OP_DIR}
