@@ -39,7 +39,7 @@ tar -xf /oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}"
 
 echo "Extract pyclient"
 # git clone --branch master https://${OADP_GH_USER}:${OADP_GH_PAT}@github.com/CSPI-QE/oadp-apps-deployer "${PYCLIENT_DIR}"
-tar -xf /oadp-apps-deployer.tar.gz -C "${PYCLIENT_DIR}}"
+# tar -xf /oadp-apps-deployer.tar.gz -C "${PYCLIENT_DIR}}"
 
 sleep 3600
 
