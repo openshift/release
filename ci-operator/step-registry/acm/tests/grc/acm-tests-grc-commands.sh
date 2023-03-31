@@ -6,8 +6,14 @@ set -o pipefail
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
-# SECRETS_DIR="/tmp/secrets"
+SECRETS_DIR="/tmp/secrets"
 
+# Get the creds from ACMQE CI vault and run the automation on pre-exisiting HUB
+SKIP_OCP_DEPLOY=$(cat $SECRETS_DIR/ci/skip-ocp-deploy)
+if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
+    cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/kubeconfig
+    cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
+fi 
 
 # Set the dynamic vars based on provisioned hub cluster.
 OC_CLUSTER_URL=$(oc whoami --show-server)
