@@ -56,12 +56,7 @@ export -f firewall::open_port
 export -f firewall::close_port
 export INSTANCE_PREFIX
 
-ssh "rhel8user@${IP_ADDRESS}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
-
 cd /tmp
 git clone https://github.com/pmtk/microshift.git --branch merge-e2e-tests
 
-KUBECONFIG=/tmp/kubeconfig \
-  USHIFT_IP="${IP_ADDRESS}" \
-  USHIFT_USER=rhel8user \
-  ./microshift/e2e/main.sh
+./microshift/e2e/main.py run --host "${IP_ADDRESS}" --user rhel8user
