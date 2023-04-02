@@ -52,8 +52,8 @@ cd $OADP_GIT_DIR
 
 export ANSIBLE_REMOTE_TMP=/tmp/
 
-echo "sleep"
-sleep 3600
+# echo "sleep"
+# sleep 3600
 # Set KUBECONFIG to /tmp/kubeconfig
 export KUBECONFIG="/tmp/kubeconfig"
 # Login as kubeadmin to the test cluster
