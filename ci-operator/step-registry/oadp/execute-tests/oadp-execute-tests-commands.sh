@@ -48,7 +48,7 @@ cd $OADP_GIT_DIR
 export ANSIBLE_REMOTE_TMP=/tmp/
 
 echo "sleep"
-sleep 601
+sleep 3600
 
 echo "Run tests from CLI"
 NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh 
