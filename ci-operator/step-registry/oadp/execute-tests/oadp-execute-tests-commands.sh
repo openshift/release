@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Set the API_URL value using the $SHARED_DIR/console.url file
+CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+
 # Install pip and setup virtual environment
 python3 -m pip install pip --upgrade
 python3 -m venv /alabama/venv
@@ -20,6 +24,7 @@ mkdir -p "${OADP_APPS_DIR}"
 mkdir -p "${PYCLIENT_DIR}"
 mkdir -p /tmp/test-settings
 touch /tmp/test-settings/default_settings.json
+touch /tmp/kubeconfig
 
 echo "Annotate oadp namespace"
 oc annotate --overwrite namespace/openshift-adp volsync.backube/privileged-movers='true'
@@ -49,6 +54,10 @@ export ANSIBLE_REMOTE_TMP=/tmp/
 
 echo "sleep"
 sleep 3600
+# Set KUBECONFIG to /tmp/kubeconfig
+export KUBECONFIG="/tmp/kubeconfig"
+# Login as kubeadmin to the test cluster
+oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
 echo "Run tests from CLI"
 NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh 
