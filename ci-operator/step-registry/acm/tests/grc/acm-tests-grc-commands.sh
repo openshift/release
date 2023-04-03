@@ -22,6 +22,8 @@ CYPRESS_BASE_URL=$(oc whoami --show-console)
 export CYPRESS_BASE_URL
 OC_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
 export OC_CLUSTER_PASS
+RBAC_PASS=$(cat $SECRETS_DIR/grc/rbac-pass)
+export RBAC_PASS
 
 # run the test execution script
 ./execute_grc_interop_commands.sh
