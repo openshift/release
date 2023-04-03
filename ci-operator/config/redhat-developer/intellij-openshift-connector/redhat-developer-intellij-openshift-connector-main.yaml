@@ -1,32 +1,19 @@
-base_images:
-  base-machine:
-    name: centos
-    namespace: openshift
-    tag: stream8
-  rhel-coreos-8-base:
-    name: "4.12"
-    namespace: ocp
-    tag: rhel-coreos-8
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
-images:
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/openshift/release:golang-1.18 as builder
-    WORKDIR /go/src/github.com/redhat-developer/intellij-openshift-connector
-    RUN yum install -y java-11-openjdk-devel
-  inputs:
-    rhel-coreos-8-base:
-      as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-8
-  to: rhel-coreos-8
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi
+      RUN yum install -y java-11-openjdk-devel
+      RUN ln -s /cli/oc /usr/bin/kubectl
 releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
   latest:
-    release:
-      architecture: amd64
-      channel: stable
+    candidate:
+      product: ocp
+      stream: nightly
       version: "4.12"
 resources:
   '*':
