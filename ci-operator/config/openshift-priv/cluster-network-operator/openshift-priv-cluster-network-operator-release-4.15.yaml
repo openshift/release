@@ -11,10 +11,18 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
+  hypershift-operator:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.14
+  test-bin:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: hypershift-tests
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
@@ -31,6 +39,11 @@ promotion:
   name: 4.15-priv
   namespace: ocp-private
 releases:
+  hosted-ocp-previous:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
   initial:
     integration:
       name: 4.15-priv
@@ -227,9 +240,8 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
 - as: e2e-hypershift-ovn
-  optional: true
   steps:
-    workflow: hypershift-aws-conformance
+    workflow: hypershift-aws-e2e-nested
 - as: lint
   commands: |
     export GOCACHE=/tmp/

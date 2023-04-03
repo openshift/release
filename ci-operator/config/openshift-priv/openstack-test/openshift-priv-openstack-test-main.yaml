@@ -1,3 +1,8 @@
+base_images:
+  ocp_4.14_cli:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: cli
 binary_build_commands: go build -o /bin/openstack-tests ./cmd/openshift-tests
 build_root:
   image_stream_tag:
@@ -6,8 +11,15 @@ build_root:
     tag: golang-1.18
 canonical_go_repository: github.com/openshift/openstack-test
 images:
-- dockerfile_literal: FROM bin
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/4.14:cli AS cli
+    FROM bin
+    COPY --from=cli /usr/bin/oc /bin/oc
   from: bin
+  inputs:
+    ocp_4.14_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:cli
   to: openstack-tests
 promotion:
   additional_images:
