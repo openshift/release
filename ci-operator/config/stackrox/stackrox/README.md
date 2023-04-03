@@ -9,7 +9,5 @@ and `Pull Request checklist` therein.
 ## Release Template
 
 `stackrox-stackrox-release-x.y*.yaml` files are template YAML used by automation
-to create config for release at branch time. 
-
-*When changes are made to master or nightlies yaml consider if the changes are
-also appropriate for release branches.*
+to create config for release at branch time. Review the `Pull Request checklist`
+for changes required there.
