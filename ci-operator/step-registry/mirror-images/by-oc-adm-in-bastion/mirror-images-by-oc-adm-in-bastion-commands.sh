@@ -15,7 +15,7 @@ icsp_file="${SHARED_DIR}/local_registry_icsp_file.yaml"
 
 # private mirror registry host
 # <public_dns>:<port>
-MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
+MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
     echo "File ${SHARED_DIR}/mirror_registry_url does not exist."
     exit 1
@@ -41,7 +41,7 @@ unset KUBECONFIG
 oc registry login
 
 # combine custom registry credential and default pull secret
-registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0`
+registry_cred=$(head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base64 -w 0)
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
@@ -56,22 +56,28 @@ if ! whoami &> /dev/null; then
 fi
 
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
-BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
-
+if [ "${STATIC_BASTION_IP}" != "" ]; then
+    BASTION_IP="${STATIC_BASTION_IP}"
+    BASTION_SSH_USER="${STATIC_BASTION_USER}"
+else
+    BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
+    BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
+fi
 # scp new_pull_secret credential to bastion host
-scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" ${BASTION_SSH_USER}@${BASTION_IP}:${remote_pull_secret}
+scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" "${BASTION_SSH_USER}"@"${BASTION_IP}":${remote_pull_secret}
 
 # mirror images in bastion host, which will increase mirror upload speed
-ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
+ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${BASTION_SSH_USER}"@"${BASTION_IP}" \
 "oc adm release -a ${remote_pull_secret} mirror --insecure=true \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image}" | tee "${mirror_output}"
 
-grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
-grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
+grep -B 1 -A 10 "kind: ImageContentSourcePolicy" "${mirror_output}" > "${icsp_file}"
+grep -A 6 "imageContentSources" "${mirror_output}" > "${install_config_icsp_patch}"
 
 echo "${install_config_icsp_patch}:"
 cat "${install_config_icsp_patch}"
 rm -f "${new_pull_secret}"
+
+sleep 3600
