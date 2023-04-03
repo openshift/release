@@ -32,7 +32,7 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat << 'EOFEOF' > "${HOME}"/greenboot_check.sh
+cat << 'EOFEOF' > "${HOME}/greenboot_check.sh"
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -175,4 +175,6 @@ if ! gcloud compute ssh \
     --zone "${GOOGLE_COMPUTE_ZONE}" \
     rhel8user@"${INSTANCE_PREFIX}" \
     --command 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+
+  exit 1
 fi
