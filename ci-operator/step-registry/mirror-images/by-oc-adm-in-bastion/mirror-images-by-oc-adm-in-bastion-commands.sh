@@ -30,7 +30,6 @@ else
 fi
 
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
-echo "GGGG: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
 echo "readable_version: $readable_version"
@@ -67,11 +66,16 @@ fi
 
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
+echo "111111111111111"
+
 # scp new_pull_secret credential to bastion host
-scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" "${BASTION_SSH_USER}"@"${BASTION_IP}":${remote_pull_secret}
+echo scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" "${BASTION_SSH_USER}"@"${BASTION_IP}":${remote_pull_secret}
+
+echo "2222222222222222"
+
 
 # mirror images in bastion host, which will increase mirror upload speed
-ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${BASTION_SSH_USER}"@"${BASTION_IP}" \
+echo ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${BASTION_SSH_USER}"@"${BASTION_IP}" \
 "oc adm release -a ${remote_pull_secret} mirror --insecure=true \
  --from=${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE} \
  --to=${target_release_image_repo} \
