@@ -5,7 +5,8 @@ set -o errexit
 set -o pipefail
 
 # Create S3 Bucket to Use for Testing
-sleep 3600
+sh /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET_NAME
+
 # Set the API_URL value using the $SHARED_DIR/console.url file
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
@@ -68,3 +69,5 @@ NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /a
 ls -laht /alabama/cspi/output_files
 
 echo "finished"
+
+sh /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/destroy.sh $BUCKET_NAME
