@@ -291,6 +291,30 @@ EOF
   done
 }
 
+function inject_journal_to_console_config() {
+  mkdir -p "${dir}/openshift/"
+  cat << EOF > "${dir}/openshift/99-master-journal-console.yaml"
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-master-journal-console
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+        - contents:
+            compression: ""
+            source: data:,ForwardToConsole%3Dyes%0A
+          mode: 420
+          overwrite: true
+          path: /etc/systemd/journald.conf.d/forward.conf
+EOF
+}
+
 # inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
 function inject_spot_instance_config() {
   local dir=${1}
@@ -382,6 +406,9 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
+
+# Debugging OCPBUGS-1160
+inject_journal_to_console_config
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
