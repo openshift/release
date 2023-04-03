@@ -308,7 +308,7 @@ spec:
       files:
         - contents:
             compression: ""
-            source: data:,ForwardToConsole%3Dyes%0A
+            source: data:,%5BJournal%5D%0AForwardToConsole%3Dyes%0A
           mode: 420
           overwrite: true
           path: /etc/systemd/journald.conf.d/forward.conf
