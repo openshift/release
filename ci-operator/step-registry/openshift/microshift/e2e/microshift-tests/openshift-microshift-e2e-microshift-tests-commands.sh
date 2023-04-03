@@ -59,4 +59,4 @@ export INSTANCE_PREFIX
 cd /tmp
 git clone https://github.com/pmtk/microshift.git --branch merge-e2e-tests
 
-./microshift/e2e/main.py run --host "${IP_ADDRESS}" --user rhel8user
+USHIFT_IP="${IP_ADDRESS}" USHIFT_USER=rhel8user ./microshift/e2e/main.sh run
