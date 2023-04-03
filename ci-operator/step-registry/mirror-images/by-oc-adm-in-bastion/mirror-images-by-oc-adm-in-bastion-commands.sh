@@ -67,7 +67,7 @@ fi
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
 # scp new_pull_secret credential to bastion host
-echo scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" "${BASTION_SSH_USER}"@"${BASTION_IP}":${remote_pull_secret}
+scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" "${BASTION_SSH_USER}"@"${BASTION_IP}":${remote_pull_secret}
 
 # mirror images in bastion host, which will increase mirror upload speed
 ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${BASTION_SSH_USER}"@"${BASTION_IP}" \
