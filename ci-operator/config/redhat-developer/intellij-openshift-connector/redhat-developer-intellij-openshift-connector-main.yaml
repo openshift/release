@@ -1,14 +1,33 @@
+base_images:
+  base-machine:
+    name: centos
+    namespace: openshift
+    tag: stream8
+  rhel-coreos-8-base:
+    name: "4.12"
+    namespace: ocp
+    tag: rhel-coreos-8
 build_root:
   image_stream_tag:
-    name: ubi8-openjdk-11
+    name: release
     namespace: openshift
-    tag: "1.12"
+    tag: golang-1.18
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/openshift/release:golang-1.18 as builder
+    WORKDIR /go/src/github.com/redhat-developer/intellij-openshift-connector
+    RUN yum install -y java-11-openjdk-devel
+  inputs:
+    rhel-coreos-8-base:
+      as:
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-8
+  to: rhel-coreos-8
 releases:
   latest:
     release:
       architecture: amd64
       channel: stable
-      version: "4.11"
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -17,11 +36,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-4.11
+- as: e2e
   steps:
     cluster_profile: aws
     test:
-    - as: e2e-4.11
+    - as: e2e
       commands: ./gradlew integrationTest
       from: src
       resources:
