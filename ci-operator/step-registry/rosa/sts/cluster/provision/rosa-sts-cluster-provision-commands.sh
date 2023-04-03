@@ -59,27 +59,13 @@ if [[ ! -z "$OLD_CLUSTER" ]]; then
   exit 1
 fi
 
-# Get the ARN for each account role
-echo -e "Validate the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
-Account_Installer_Role_Name="${ACCOUNT_ROLES_PREFIX}-Installer-Role"
-Account_ControlPlane_Role_Name="${ACCOUNT_ROLES_PREFIX}-ControlPlane-Role"
-Account_Support_Role_Name="${ACCOUNT_ROLES_PREFIX}-Support-Role"
-Account_Worker_Role_Name="${ACCOUNT_ROLES_PREFIX}-Worker-Role"
-
-roleARNList=$(rosa list account-roles -o json | jq -r '.[].RoleARN')
-
-Account_Installer_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Installer_Role_Name}" || true; })
-Account_ControlPlane_Role_ARN=$(echo "$roleARNList" | { grep "${Account_ControlPlane_Role_Name}" || true; })
-Account_Support_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Support_Role_Name}" || true; })
-Account_Worker_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Worker_Role_Name}" || true; })
-if [[ -z "${Account_ControlPlane_Role_ARN}" ]] || [[ -z "${Account_Installer_Role_ARN}" ]] || [[ -z "${Account_Support_Role_ARN}" ]] || [[ -z "${Account_Worker_Role_ARN}" ]]; then
-  echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
-  exit 1
-fi
-
 # Get the openshift version
 versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq '.[].raw_id')
+if [[ "$HOSTED_CP" == "true" ]]; then
+  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq '.[].raw_id')
+fi
 echo -e "Available cluster versions:\n${versionList}"
+
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   if [[ "$EC_BUILD" == "true" ]]; then
     OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 | tr -d '"' || true)
@@ -131,26 +117,98 @@ if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]]; then
 fi
 
 HYPERSHIFT_SWITCH=""
+SUBNET_ID_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
-  PUBLIC_SUBNET_ID=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
-  PRIVATE_SUBNET_ID=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
-  if [[ -z "${PUBLIC_SUBNET_ID}" ]] || [[ -z "${PRIVATE_SUBNET_ID}" ]]; then
-    echo -e "The public_subnet_id and the the privated_subnet_id are mandatory."
+  HYPERSHIFT_SWITCH="--hosted-cp --classic-oidc-config"
+
+  PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
+  PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  if [[ -z "${PUBLIC_SUBNET_IDs}" ]] || [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
+    echo -e "The public_subnet_ids and the the privated_subnet_ids are mandatory."
     exit 1
   fi
-  HYPERSHIFT_SWITCH="--hosted-cp --subnet-ids ${PUBLIC_SUBNET_ID},${PRIVATE_SUBNET_ID}"
+  SUBNET_ID_SWITCH="--subnet-ids ${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
+fi
+
+FIPS_SWITCH=""
+if [[ "$FIPS" == "true" ]]; then
+  FIPS_SWITCH="--fips"
+fi
+
+PRIVATE_SWITCH=""
+if [[ "$PRIVATE" == "true" ]]; then
+  PRIVATE_SWITCH="--private"
+fi
+
+KMS_KEY_SWITCH=""
+if [[ "$ENABLE_CUSTOMER_MANAGED_KEY" == "true" ]]; then
+  # Get the kms keys from the previous steps, and replace the vaule here
+  KMS_KEY_ARN=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn)
+  KMS_KEY_SWITCH="--enable-customer-managed-key --kms-key-arn ${KMS_KEY_ARN}"
+fi
+
+PRIVATE_LINK_SWITCH=""
+if [[ "$PRIVATE_LINK" == "true" ]]; then
+  PRIVATE_LINK_SWITCH="--private-link"
+
+  PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  if [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
+    echo -e "The privated_subnet_ids are mandatory."
+    exit 1
+  fi
+  SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
+fi
+
+PROXY_SWITCH=""
+if [[ "$ENABLE_PROXY" == "true" ]]; then
+  # Get the proxy information from the previous steps, and replace the vaule here
+  proxy_private_url=$(< "${SHARED_DIR}/proxy_private_url")
+  TRUST_BUNDLE_FILE="bundle_file"
+  if [[ -z "${proxy_private_url}" ]] || [[ -z "${TRUST_BUNDLE_FILE}" ]]; then
+    echo -e "The http_proxy, the http_proxy and the additional_trust_bundle_file are mandatory."
+    exit 1
+  fi
+  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url} --additional-trust-bundle-file ${TRUST_BUNDLE_FILE}"
+fi
+
+DRY_RUN_SWITCH=""
+if [[ "$DRY_RUN" == "true" ]]; then
+  DRY_RUN_SWITCH="--dry-run"
+fi
+
+# Get the ARN for each account role
+echo -e "Validate the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
+Account_Installer_Role_Name="${ACCOUNT_ROLES_PREFIX}-Installer-Role"
+Account_ControlPlane_Role_Name="${ACCOUNT_ROLES_PREFIX}-ControlPlane-Role"
+Account_Support_Role_Name="${ACCOUNT_ROLES_PREFIX}-Support-Role"
+Account_Worker_Role_Name="${ACCOUNT_ROLES_PREFIX}-Worker-Role"
+
+roleARNList=$(rosa list account-roles -o json | jq -r '.[].RoleARN')
+
+Account_Installer_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Installer_Role_Name}" || true; })
+Account_ControlPlane_Role_ARN=$(echo "$roleARNList" | { grep "${Account_ControlPlane_Role_Name}" || true; })
+Account_Support_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Support_Role_Name}" || true; })
+Account_Worker_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Worker_Role_Name}" || true; })
+if [[ -z "${Account_ControlPlane_Role_ARN}" ]] || [[ -z "${Account_Installer_Role_ARN}" ]] || [[ -z "${Account_Support_Role_ARN}" ]] || [[ -z "${Account_Worker_Role_ARN}" ]]; then
+  echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
+  exit 1
 fi
 
 echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
-echo "  Enable hypershift: ${HOSTED_CP}"
+echo "  Hypershift: ${HOSTED_CP}"
 echo "  Account roles prefix: ${ACCOUNT_ROLES_PREFIX}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 echo "  Multi-az: ${MULTI_AZ}"
 echo "  Openshift version: ${OPENSHIFT_VERSION}"
 echo "  Channel group: ${CHANNEL_GROUP}"
-echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
+echo "  Fips: ${FIPS}"
+echo "  Private: ${PRIVATE}"
+echo "  Private Link: ${PRIVATE_LINK}"
+echo "  Enable proxy: ${ENABLE_PROXY}"
+echo "  Enable customer managed key: ${ENABLE_CUSTOMER_MANAGED_KEY}"
+echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
@@ -176,7 +234,14 @@ ${MULTI_AZ_SWITCH} \
 ${COMPUTE_NODES_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
-${HYPERSHIFT_SWITCH}
+${HYPERSHIFT_SWITCH} \
+${SUBNET_ID_SWITCH} \
+${FIPS_SWITCH} \
+${KMS_KEY_SWITCH} \
+${PRIVATE_SWITCH} \
+${PRIVATE_LINK_SWITCH} \
+${PROXY_SWITCH} \
+${DRY_RUN_SWITCH}
 "
 
 mkdir -p "${SHARED_DIR}"
@@ -201,6 +266,13 @@ rosa create cluster -y \
                     ${ETCD_ENCRYPTION_SWITCH} \
                     ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
                     ${HYPERSHIFT_SWITCH} \
+                    ${SUBNET_ID_SWITCH} \
+                    ${FIPS_SWITCH} \
+                    ${KMS_KEY_SWITCH} \
+                    ${PRIVATE_SWITCH} \
+                    ${PRIVATE_LINK_SWITCH} \
+                    ${PROXY_SWITCH} \
+                    ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
 
 # Store the cluster ID for the post steps and the cluster deprovision
