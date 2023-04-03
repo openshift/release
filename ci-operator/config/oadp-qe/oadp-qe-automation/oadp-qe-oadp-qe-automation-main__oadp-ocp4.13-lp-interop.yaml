@@ -33,6 +33,12 @@ images:
     COPY mtc-python-client.tar.gz /
     COPY oadp-apps-deployer.tar.gz /
     COPY oadp-e2e-qe.tar.gz /
+    RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
+        unzip -q awscliv2.zip && \
+        ./aws/install && \
+        rm -rf awscliv2.zip aws &&\
+        mkdir /.aws && chmod 777 /.aws
+    COPY . .
   from: oadp-base
   inputs:
     mtc-python-client:
@@ -48,22 +54,6 @@ images:
       - destination_dir: oadp-e2e-qe.tar.gz
         source_path: /oadp-e2e-qe.tar.gz
   to: oadp-runner
-- dockerfile_literal: |
-    FROM src
-      COPY oc /usr/bin/oc
-      RUN ln -s /usr/bin/oc /usr/bin/kubectl
-      RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
-        unzip -q awscliv2.zip && \
-        ./aws/install && \
-        rm -rf awscliv2.zip aws &&\
-        mkdir /.aws && chmod 777 /.aws
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-  to: aws-console
 releases:
   latest:
     candidate:
@@ -90,17 +80,10 @@ tests:
           {"name": "odf-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-storage", "target_namespaces": "openshift-storage", "operator_group":"openshift-storage"}
         ]
       SPOT_INSTANCES: "true"
-    post:
-    - ref: gather-aws-console
-    - ref: lp-interop-tooling-s3-delete
-    - chain: ipi-deprovision
-    pre:
-    - chain: ipi-conf-aws
-    - chain: ipi-install
-    - ref: install-operators
-    - ref: lp-interop-tooling-s3-create
     test:
+    - ref: install-operators
     - ref: oadp-execute-tests
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: oadp-qe

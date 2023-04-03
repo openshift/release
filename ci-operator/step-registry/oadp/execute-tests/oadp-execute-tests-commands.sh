@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Create S3 Bucket to Use for Testing
+sleep 3600
 # Set the API_URL value using the $SHARED_DIR/console.url file
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
