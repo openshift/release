@@ -30,6 +30,7 @@ else
 fi
 
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
+echo "GGGG: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
 echo "readable_version: $readable_version"
