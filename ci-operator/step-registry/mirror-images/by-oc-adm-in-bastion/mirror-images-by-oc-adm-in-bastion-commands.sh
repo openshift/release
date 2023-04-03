@@ -13,13 +13,22 @@ remote_pull_secret="/tmp/${pull_secret_filename}"
 install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"
 icsp_file="${SHARED_DIR}/local_registry_icsp_file.yaml"
 
-# private mirror registry host
-# <public_dns>:<port>
-MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
-if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
-    echo "File ${SHARED_DIR}/mirror_registry_url does not exist."
-    exit 1
+if [ "${STATIC_BASTION_IP}" != "" ]; then
+    BASTION_IP="${STATIC_BASTION_IP}"
+    BASTION_SSH_USER="${STATIC_BASTION_USER}"
+    MIRROR_REGISTRY_HOST="${STATIC_MIRROR_REGISTRY_HOST}"
+else
+    BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
+    BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
+    # private mirror registry host
+    # <public_dns>:<port>
+    MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
+    if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
+        echo "File ${SHARED_DIR}/mirror_registry_url does not exist."
+        exit 1
+    fi
 fi
+
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
 readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
@@ -56,13 +65,7 @@ if ! whoami &> /dev/null; then
 fi
 
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
-if [ "${STATIC_BASTION_IP}" != "" ]; then
-    BASTION_IP="${STATIC_BASTION_IP}"
-    BASTION_SSH_USER="${STATIC_BASTION_USER}"
-else
-    BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
-    BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
-fi
+
 # scp new_pull_secret credential to bastion host
 scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${new_pull_secret}" "${BASTION_SSH_USER}"@"${BASTION_IP}":${remote_pull_secret}
 
