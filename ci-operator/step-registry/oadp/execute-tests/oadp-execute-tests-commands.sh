@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 3600
+
 # Create S3 Bucket to Use for Testing
 sh /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET_NAME
 
