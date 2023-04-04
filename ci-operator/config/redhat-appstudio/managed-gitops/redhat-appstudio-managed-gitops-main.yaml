@@ -63,6 +63,31 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: managed-gitops-e2e-tests-backward-compatability
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  steps:
+    test:
+      - as: managed-gitops-e2e-tests
+        cli: latest
+        commands: |
+          export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-e2e-tests-hive-admin-kubeconfig/kubeconfig"
+          tmp_dir=$(mktemp -d -t temp-repo)
+          git clone https://github.com/redhat-appstudio/managed-gitops.git $tmp_dir  #main branch          
+          cd $tmp_dir
+          make e2e-reset
+          make install-argocd-openshift
+          make devenv-k8s
+          make download-deps
+          kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
+          make start-e2e && make check-backward-compatability
+          killall kubectl
+          killall goreman
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio
