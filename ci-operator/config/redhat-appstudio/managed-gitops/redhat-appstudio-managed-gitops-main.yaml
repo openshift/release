@@ -63,31 +63,65 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
-- as: managed-gitops-e2e-tests-backward-compatability
+- as: managed-gitops-e2e-tests-upgrade
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.11"
+    version: "4.12"
   steps:
     test:
-      - as: managed-gitops-e2e-tests
-        cli: latest
-        commands: |
-          export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-e2e-tests-hive-admin-kubeconfig/kubeconfig"
-          tmp_dir=$(mktemp -d -t temp-repo)
-          git clone https://github.com/redhat-appstudio/managed-gitops.git $tmp_dir  #main branch          
-          cd $tmp_dir
-          make e2e-reset
-          make install-argocd-openshift
-          make devenv-k8s
-          make download-deps
-          kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
-          make start-e2e && make check-backward-compatability
-          killall kubectl
-          killall goreman
+    - as: managed-gitops-e2e-tests-upgrade
+      cli: latest
+      commands: |
+        working_dir=$(pwd)
+        tmp_dir=$(mktemp -d -t temp-repo-XXXXXXXXXX)
+        chmod +x $tmp_dir
+
+        #execute test on main
+        git clone https://github.com/redhat-appstudio/managed-gitops.git $tmp_dir #main branch
+        cd $tmp_dir
+        echo "******* install argocd-openshift *********"
+        make install-argocd-openshift
+        make devenv-k8s
+        make download-deps
+        kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
+        PORT_FORWARD_PID=$!
+        make start-e2e &
+        echo "******** Waiting (30 sec) Service **********" && sleep 30
+        echo "[STARTING BACKWARD COMPATIBILITY TEST - MAIN ]"
+        make check-backward-compatibility
+        echo "End Port Forwarding"
+        kill $PORT_FORWARD_PID
+        killall kubectl || true
+        killall goreman || true
+
+        #execute test on PR branch (current)
+        cd $working_dir
+        echo "******* install argocd-openshift *********"
+        make install-argocd-openshift
+        make devenv-k8s
+        make download-deps
+        kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
+        PORT_FORWARD_PID=$!
+        make start-e2e &
+        echo "******** Waiting (30 sec) Service **********" && sleep 30
+        echo "[STARTING BACKWARD COMPATIBILITY TEST - NEW BRANCH]"
+        make check-backward-compatibility
+        echo "End Port Forwarding"
+        kill $PORT_FORWARD_PID
+        killall kubectl || true
+        killall goreman || true
+
+        #cleanup - delete temp repo
+        rm -rf $tmp_dir
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio
