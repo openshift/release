@@ -12,7 +12,8 @@ export AWS_SECRET_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secre
 
 # Create S3 Bucket to Use for Testing
 /bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET_NAME > /dev/null 2>&1
-
+mkdir -p /tmp/test-settings
+cp credentials /tmp/test-settings/aws_creds
 # Set the API_URL value using the $SHARED_DIR/console.url file
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
