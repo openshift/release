@@ -4,10 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-sleep 3600
+# Set varaibles needed to login to AWS
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+export AWS_CONFIG_FILE=$CLUSTER_PROFILE_DIR/.aws
+INTEROP_AWS_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
+INTEROP_AWS_SECRET_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
 
 # Create S3 Bucket to Use for Testing
-sh /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET_NAME
+/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET_NAME
 
 # Set the API_URL value using the $SHARED_DIR/console.url file
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
@@ -72,4 +76,4 @@ ls -laht /alabama/cspi/output_files
 
 echo "finished"
 
-sh /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/destroy.sh $BUCKET_NAME
+/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/destroy.sh $BUCKET_NAME
