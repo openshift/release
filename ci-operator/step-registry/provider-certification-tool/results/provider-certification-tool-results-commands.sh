@@ -4,13 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
+# shellcheck source=/dev/null
 source "${SHARED_DIR}/install-env"
-
-echo "Downloading OPCT binary from $BIN_URL"
-curl -o "${OPCT_EXEC}" -LJO "${BIN_URL}"
-chmod u+x "${OPCT_EXEC}"
-test -x "${OPCT_EXEC}" && echo "OPCT binary ${OPCT_EXEC} found and ready to be used on the version $LATEST_VERSION"
-
+extract_opct
 
 # Retrieve after successful execution
 mkdir -p "${ARTIFACT_DIR}/certification-results"
@@ -52,19 +50,20 @@ then
 fi
 
 # install newest oc
-export PATH=$PATH:/tmp/bin
-mkdir /tmp/bin
-curl -L --fail https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
-chmod ug+x /tmp/bin/oc
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
-VERSION=$(oc get clusterversion version -o=jsonpath='{.status.desired.version}')
+# export PATH=$PATH:/tmp/bin
+# mkdir /tmp/bin
+# curl -L --fail https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz | tar xvzf - -C /tmp/bin/ oc
+# chmod ug+x /tmp/bin/oc
+# export KUBECONFIG=${SHARED_DIR}/kubeconfig
+OCP_VERSION=$(oc get clusterversion version -o=jsonpath='{.status.desired.version}')
 
 # upload to AWS S3
 DATE=$(date +%Y%m%d)
 
-echo "s3://openshift-provider-certification/${LATEST_VERSION}/${VERSION}-${DATE}.tar.gz"
+# shellcheck disable=SC2153 # OPCT_VERSION is defined on ${SHARED_DIR}/install-env
+echo "s3://openshift-provider-certification/${OPCT_VERSION}/${OCP_VERSION}-${DATE}.tar.gz"
 echo '{"platform-type":"'"${CLUSTER_TYPE}"'"}'
 
 aws s3 cp "${ARTIFACT_DIR}"/certification-results/*.tar.gz \
-  "s3://openshift-provider-certification/${LATEST_VERSION}/${VERSION}-${DATE}.tar.gz" \
+  "s3://openshift-provider-certification/${OPCT_VERSION}/${OCP_VERSION}-${DATE}.tar.gz" \
   --metadata '{"platform-type":"'"${CLUSTER_TYPE}"'"}'
