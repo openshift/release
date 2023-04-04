@@ -201,8 +201,17 @@ CONFIG = {
         'default': 15,
     },
     'powervs-quota-slice': {
+        'old-mon01': 1,
+        'old-osa21': 1,
+        'old-syd04': 1,
+        'old-syd05': 1,
+        'old-tok04': 1
+    },
+    'powervs-1-quota-slice': {
         'mon01': 1,
         'osa21': 1,
+    },
+    'powervs-2-quota-slice': {
         'syd04': 1,
         'syd05': 1,
         'tok04': 1

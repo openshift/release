@@ -1,3 +1,8 @@
+base_images:
+  origin_4.1_cli:
+    name: "4.1"
+    namespace: origin
+    tag: cli
 binary_build_commands: |
   cat > /bin/openstack-tests <<EOF
   #!/usr/bin/env bash
@@ -11,8 +16,15 @@ build_root:
     tag: golang-1.16
 canonical_go_repository: github.com/openshift/openstack-test
 images:
-- dockerfile_literal: FROM bin
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/origin/4.1:cli AS cli
+    FROM bin
+    COPY --from=cli /usr/bin/oc /bin/oc
   from: bin
+  inputs:
+    origin_4.1_cli:
+      as:
+      - registry.ci.openshift.org/origin/4.1:cli
   to: openstack-tests
 promotion:
   additional_images:

@@ -4,12 +4,14 @@ set -o nounset
 set -o pipefail
 
 date -u "+%Y-%m-%dT%H:%M:%SZ"
-
+array=("aescbc" "aesgcm")
 counter=0
 while [ $counter -lt 10 ]
 do
+  encryption=${array[$(($RANDOM % ${#array[@]}))]}
+  echo "INFO - Using encryption type $encryption"
   #Fix specially for SNO
-  oc patch apiserver/cluster -p '{"spec":{"encryption":{"type":"aescbc"}}}' --type merge
+  oc patch apiserver/cluster -p '{"spec":{"encryption":{"type":"'${encryption}'"}}}' --type merge
   if [ $? -eq 0 ]; then
     echo "INFO - Etcd encryption request has been executed successfully!"
     break
@@ -20,8 +22,8 @@ done
 KUBEAPISERVER_ENCRYPTED=""
 # Due to bug 1943804, etcd encryption on AWS takes much longer time, especially UPI install
 # The total cost time of etcd encrytpion depends on many factors, including storage performance, data size, so give a bigger enough waiting time here.
-echo "WARN - Below need wait about 1h (max) for the encryption to complete. First, sleeping long 16m ..."
-sleep 16m
+echo "WARN - Below need wait about 1h (max) for the encryption to complete. First, sleeping long 20m ..."
+sleep 20m
 echo "INFO - Then querying 22 times (max) ..."
 N=0
 while [ $N -lt 22 ]
