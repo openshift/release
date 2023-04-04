@@ -22,7 +22,7 @@ function populate_artifact_dir() {
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
   case "${CLUSTER_TYPE}" in
-    powervs)
+    powervs*)
       # We don't want debugging in this section
       unset TF_LOG_PROVIDER
       unset TF_LOG
@@ -740,10 +740,13 @@ init_ibmcloud
 destroy_resources
 
 case "${CLUSTER_TYPE}" in
-powervs)
+powervs*)
     export IBMCLOUD_API_KEY
     ;;
-*) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
+*)
+    >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
+    exit 1
+    ;;
 esac
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
