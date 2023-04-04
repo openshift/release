@@ -1,0 +1,235 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+- description: The session secret for the component.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+- description: "The namespace."
+  name: NAMESPACE
+  value: ci
+objects:
+- apiVersion: v1
+  kind: Route
+  metadata:
+    namespace: ${NAMESPACE}
+    name: gangway
+    annotations:
+      haproxy.router.openshift.io/timeout: "90s"
+  spec:
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: Reencrypt
+    to:
+      kind: Service
+      name: gangway
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ${NAMESPACE}
+    name: gangway
+    labels:
+      app: prow
+      component: gangway
+    annotations:
+      service.alpha.openshift.io/serving-cert-secret-name: gangway-tls
+  spec:
+    selector:
+      app: prow
+      component: gangway
+    ports:
+    - name: main
+      port: 443
+      targetPort: 8443
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ${NAMESPACE}
+    name: gangway
+    labels:
+      app: prow
+      component: gangway
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: prow
+        component: gangway
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: gangway
+      spec:
+        serviceAccountName: gangway
+        containers:
+        - name: oauth-proxy
+          image: quay.io/openshift/origin-oauth-proxy:4.9
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 8443
+            name: web
+          args:
+          - -provider=openshift
+          - -https-address=:8443
+          - -http-address=
+          - -email-domain=*
+          - -upstream=http://localhost:8080
+          - -client-id=system:serviceaccount:ci:gangway
+          - -openshift-ca=/etc/pki/tls/cert.pem
+          - -openshift-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          - '-openshift-sar={"resource": "namespaces", "verb": "get"}'
+          - '-openshift-delegate-urls={"/": {"resource": "namespaces", "verb": "get"}}'
+          - -client-secret-file=/var/run/secrets/kubernetes.io/serviceaccount/token
+          - -cookie-secret-file=/etc/proxy/secrets/session_secret
+          - -cookie-samesite=none
+          - -tls-cert=/etc/tls/private/tls.crt
+          - -tls-key=/etc/tls/private/tls.key
+          volumeMounts:
+          - mountPath: /etc/tls/private
+            name: gangway-tls
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+        - name: gangway
+          image: gcr.io/k8s-prow/gangway:v20230329-c93d79fb7d
+          args:
+          - --config-path=/etc/config/config.yaml
+          - --supplemental-prow-config-dir=/etc/config
+          - --cookie-secret=/etc/cookie/cookie
+          - --github-oauth-config-file=/etc/oauth/config.json
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --grace-period=110s
+          - --dry-run=false
+          env:
+          # When cloning from an inrepoconfig repo, don't bother verifying certs.
+          # This allows us to use "https://..." addresses to fakegitserver.
+          - name: GIT_SSL_NO_VERIFY
+            value: "1"
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
+          ports:
+            - name: http
+              containerPort: 8080
+            - name: metrics
+              containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 600
+          volumeMounts:
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
+          - name: service-account-token
+            mountPath: /var/sa-token
+          - mountPath: /etc/proxy/secrets
+            name: session-secret
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: oauth-config
+            mountPath: /etc/oauth
+            readOnly: true
+          - name: job-config
+            mountPath: /etc/job-config
+            readOnly: true
+          resources:
+            requests:
+              memory: "2Gi"
+              cpu: "1"
+        volumes:
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+        - name: config
+          configMap:
+            name: config
+        - name: oauth-config
+          secret:
+            secretName: github-app-credentials-private
+        - name: session-secret
+          secret:
+            secretName: gangway-session-secret
+        - name: gangway-tls
+          secret:
+            secretName: gangway-tls
+        - name: job-config
+          projected:
+            sources:
+            - configMap:
+                name: job-config-misc
+            - configMap:
+                name: job-config-master-periodics
+            - configMap:
+                name: job-config-master-postsubmits
+            - configMap:
+                name: job-config-master-presubmits
+            - configMap:
+                name: job-config-1.x
+            - configMap:
+                name: job-config-2.x
+            - configMap:
+                name: job-config-3.x
+            - configMap:
+                name: job-config-4.1
+            - configMap:
+                name: job-config-4.2
+            - configMap:
+                name: job-config-4.3
+            - configMap:
+                name: job-config-4.4
+            - configMap:
+                name: job-config-4.5
+            - configMap:
+                name: job-config-4.6
+            - configMap:
+                name: job-config-4.7
+            - configMap:
+                name: job-config-4.8
+            - configMap:
+                name: job-config-4.9
+            - configMap:
+                name: job-config-4.10
+            - configMap:
+                name: job-config-4.11
+            - configMap:
+                name: job-config-4.12
+            - configMap:
+                name: job-config-4.13
+            - configMap:
+                name: job-config-4.14
+            - configMap:
+                name: job-config-4.15
+- apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: ${NAMESPACE}
+    name: gangway-session-secret
+  stringData:
+    session_secret: "${SESSION_SECRET}="
