@@ -72,13 +72,13 @@ tests:
     make test-yaml-consistency
   container:
     from: base-tests
-- as: e2e-tests-namespace-scope
+- as: e2e-tests
   steps:
     cluster_profile: gcp-virtualization
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
     test:
-    - as: namespace-scope-test
+    - as: e2e-test
       cli: latest
       commands: |
         # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
@@ -91,54 +91,6 @@ tests:
         fi
         automation/build-test.sh
         export PATH=$PATH:$(pwd)/go/bin
-        SCOPE=namespace \
-        NUM_NODES=4 \
-          make e2e-tests
-      dependencies:
-      - env: CREATE_VM_IMAGE
-        name: tekton-task-create-vm
-      - env: COPY_TEMPLATE_IMAGE
-        name: tekton-task-copy-template
-      - env: EXECUTE_IN_VM_IMAGE
-        name: tekton-task-execute-in-vm
-      - env: GENERATE_SSH_KEYS_IMAGE
-        name: tekton-task-generate-ssh-keys
-      - env: DISK_VIRT_CUSTOMIZE_IMAGE
-        name: tekton-task-disk-virt-customize
-      - env: DISK_VIRT_SYSPREP_IMAGE
-        name: tekton-task-disk-virt-sysprep
-      - env: WAIT_FOR_VMI_STATUS_IMAGE
-        name: tekton-task-wait-for-vmi-status
-      - env: MODIFY_VM_TEMPLATE_IMAGE
-        name: tekton-task-modify-vm-template
-      - env: MODIFY_DATA_OBJECT_IMAGE
-        name: tekton-task-modify-data-object
-      from: base-tests
-      resources:
-        requests:
-          cpu: "4"
-          memory: 4Gi
-    workflow: ipi-gcp
-- as: e2e-tests-cluster-scope
-  steps:
-    cluster_profile: gcp-virtualization
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-4
-    test:
-    - as: cluster-scope-test
-      cli: latest
-      commands: |
-        # KUBECONFIG is mounted from a secret, so its immutable. We have to copy it to some writable location.
-        cp -L "${KUBECONFIG}" /tmp/kubeconfig && export KUBECONFIG=/tmp/kubeconfig
-
-        if ! hash kubectl 2>/dev/null; then
-          pushd $(dirname $(which oc))
-          ln -s oc kubectl
-          popd
-        fi
-        automation/build-test.sh
-        export PATH=$PATH:$(pwd)/go/bin
-        SCOPE=cluster \
         NUM_NODES=4 \
           make e2e-tests
       dependencies:
