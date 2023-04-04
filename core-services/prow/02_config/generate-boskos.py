@@ -200,13 +200,6 @@ CONFIG = {
     'hypershift-quota-slice': {
         'default': 15,
     },
-    'powervs-quota-slice': {
-        'old-mon01': 1,
-        'old-osa21': 1,
-        'old-syd04': 1,
-        'old-syd05': 1,
-        'old-tok04': 1
-    },
     'powervs-1-quota-slice': {
         'mon01': 1,
         'osa21': 1,
