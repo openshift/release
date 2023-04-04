@@ -1,7 +1,8 @@
 #!/bin/bash
-if [[ "$JOB_TYPE" == "periodic" ]]; then
-  exit 1
-fi
+# to disable periodic job uncomment below
+#if [[ "$JOB_TYPE" == "periodic" ]]; then
+#  exit 1
+#fi
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -64,7 +65,74 @@ cat << EOF > ~/ocp-install.yml
     file:
       path: /home/kni/us_${CLUSTER_NAME}_ready.txt
       state: absent
+  - name: Create disable NTP manifest
+    copy:
+      dest: /home/kni/kcli-openshift4-baremetal/manifests/99-disable_chronyd.yaml
+      content: |
+        ---
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: worker
+          name: 99-disable-chronyd
+        spec:
+          config:
+            ignition:
+              version: 3.2.0
+            systemd:
+              units:
+                - contents: |
+                    [Unit]
+                    Description=NTP client/server
+                    Documentation=man:chronyd(8) man:chrony.conf(5)
+                    After=ntpdate.service sntp.service ntpd.service
+                    Conflicts=ntpd.service systemd-timesyncd.service
+                    ConditionCapability=CAP_SYS_TIME
+                    [Service]
+                    Type=forking
+                    PIDFile=/run/chrony/chronyd.pid
+                    EnvironmentFile=-/etc/sysconfig/chronyd
+                    ExecStart=/usr/sbin/chronyd \$OPTIONS
+                    ExecStartPost=/usr/libexec/chrony-helper update-daemon
+                    PrivateTmp=yes
+                    ProtectHome=yes
+                    ProtectSystem=full
+                    [Install]
+                    WantedBy=multi-user.target
+                  enabled: false
+                  name: "chronyd.service"
 
+  - name: Create run NTP once manifest
+    copy:
+      dest: /home/kni/kcli-openshift4-baremetal/manifests/99-sync-time-once-worker.yaml
+      content: |
+        ---
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: worker
+          name: 99-sync-time-once-worker
+        spec:
+          config:
+            ignition:
+              version: 3.2.0
+            systemd:
+              units:
+                - contents: |
+                    [Unit]
+                    Description=Sync time once
+                    After=network.service
+                    [Service]
+                    Type=oneshot
+                    TimeoutStartSec=300
+                    ExecStart=/usr/sbin/chronyd -n -f /etc/chrony.conf -q
+                    RemainAfterExit=yes
+                    [Install]
+                    WantedBy=multi-user.target
+                  enabled: true
+                  name: sync-time-once.service
   - name: Run deployment
     shell: kcli create plan --force --paramfile /home/kni/params_${CLUSTER_NAME}.yaml ${PLAN_NAME} $KCLI_PARAM
     args:
@@ -170,4 +238,5 @@ status=0
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
+
 exit ${status}
