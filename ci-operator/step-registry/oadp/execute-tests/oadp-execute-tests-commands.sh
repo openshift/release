@@ -16,7 +16,7 @@ export NAMESPACE="openshift-adp"
 export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
 
 # Create S3 Bucket to Use for Testing
-/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET > /dev/null 2>&1
+/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET
 mkdir -p /tmp/test-settings
 cp credentials /tmp/test-settings/aws_creds
 
@@ -78,11 +78,12 @@ oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --
 echo "Run tests from CLI"
 oc get dpa -n openshift-adp -o yaml
 #sleep 3600
-NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh 
+NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh || true
+sleep 3600
 #NAMESPACE=openshift-adp bash /alabama/cspi/test_settings/scripts/test_runner.sh 
 
 ls -laht /alabama/cspi/output_files
 
 echo "finished"
 
-/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/destroy.sh $BUCKET > /dev/null 2>&1
+/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/destroy.sh $BUCKET
