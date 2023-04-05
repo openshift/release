@@ -84,7 +84,6 @@ spec:
         claimName: test-claim
 EOF_INNER
 
-set +ex
 echo "waiting for pod condition" >&2
 oc wait --for=condition=Ready --timeout=120s pod/test-pod
 echo "pod posted ready status" >&2
