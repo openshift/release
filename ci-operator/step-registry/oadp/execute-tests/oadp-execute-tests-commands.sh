@@ -11,8 +11,6 @@ export AWS_ACCESS_KEY_ID=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_ke
 export AWS_SECRET_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
 export OADP_CREDS_FILE="/tmp/test-settings/aws_creds"
 
-oc get dpa -n openshift-adp -o yaml
-
 # Create S3 Bucket to Use for Testing
 /bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET_NAME > /dev/null 2>&1
 mkdir -p /tmp/test-settings
@@ -74,6 +72,8 @@ export KUBECONFIG="/tmp/kubeconfig"
 oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
 echo "Run tests from CLI"
+oc get dpa -n openshift-adp -o yaml
+sleep 3600
 NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh 
 #NAMESPACE=openshift-adp bash /alabama/cspi/test_settings/scripts/test_runner.sh 
 
