@@ -5,6 +5,8 @@ set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
+sleep 28800
+
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
 SECRETS_DIR="/tmp/secrets"
 
