@@ -10,9 +10,10 @@ export AWS_CONFIG_FILE=$CLUSTER_PROFILE_DIR/.aws
 export AWS_ACCESS_KEY_ID=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
 export AWS_SECRET_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
 export OADP_CREDS_FILE="/tmp/test-settings/aws_creds"
+export PROVIDER="aws"
 
 # Create S3 Bucket to Use for Testing
-/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET_NAME > /dev/null 2>&1
+/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh "${NAMESPACE}-${BUCKET_NAME}" > /dev/null 2>&1
 mkdir -p /tmp/test-settings
 cp credentials /tmp/test-settings/aws_creds
 
@@ -62,7 +63,7 @@ python3 -m pip install "${PYCLIENT_DIR}"
 echo "chdir to OADP_GIT_DIR"
 cd $OADP_GIT_DIR
 
-export ANSIBLE_REMOTE_TMP=/tmp/
+export ANSIBLE_REMOTE_TMP="/tmp/"
 
 # echo "sleep"
 # sleep 3600
@@ -81,4 +82,4 @@ ls -laht /alabama/cspi/output_files
 
 echo "finished"
 
-/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/destroy.sh $BUCKET_NAME > /dev/null 2>&1
+/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/destroy.sh "${NAMESPACE}-${BUCKET_NAME}" > /dev/null 2>&1
