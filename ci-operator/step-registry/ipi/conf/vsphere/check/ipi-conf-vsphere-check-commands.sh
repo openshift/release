@@ -86,6 +86,15 @@ EOF
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
+DATACENTERS=("$GOVC_DATACENTER")
+# If testing a zonal install, there are multiple datacenters that will need to be cleaned up
+if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -le 154 ]; then
+  DATACENTERS=(
+    "IBMCloud"
+    "datacenter-2"
+  )
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED_RESOURCE} and destroy"
 
 # 1. Get the OpaqueNetwork (NSX-T port group) which is listed in LEASED_RESOURCE.
@@ -94,11 +103,15 @@ echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED
 # 4. skip the templates with ova
 # 5. Power off and delete the virtual machine
 
-govc ls -json "/${vsphere_datacenter}/network/${LEASED_RESOURCE}" |\
-    jq '.elements[]?.Object.Vm[]?.Value' |\
-    xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |\
-    jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |\
-    xargs -I {} --no-run-if-empty govc vm.destroy {}
+for i in "${!DATACENTERS[@]}"; do
+  echo "Checking for leftover VMs in ${DATACENTERS[$i]} for LEASED_RESOURCE ${LEASED_RESOURCE}"
+  DATACENTER=$(echo -n ${DATACENTERS[$i]} |  tr -d '\n')
+  govc ls -json "/${DATACENTER}/network/${LEASED_RESOURCE}" |\
+      jq '.elements[]?.Object.Vm[]?.Value' |\
+      xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |\
+      jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |\
+      xargs -I {} --no-run-if-empty govc vm.destroy {}
+done
 
 
 # The release controller starts four CI jobs concurrently: UPI, IPI, parallel and serial
