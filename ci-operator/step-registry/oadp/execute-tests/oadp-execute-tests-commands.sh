@@ -9,11 +9,15 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_CONFIG_FILE=$CLUSTER_PROFILE_DIR/.aws
 export AWS_ACCESS_KEY_ID=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
 export AWS_SECRET_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
+export OADP_CREDS_FILE="/tmp/test-settings/aws_creds"
+
+oc get dpa -n openshift-adp -o yaml
 
 # Create S3 Bucket to Use for Testing
 /bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET_NAME > /dev/null 2>&1
 mkdir -p /tmp/test-settings
 cp credentials /tmp/test-settings/aws_creds
+
 # Set the API_URL value using the $SHARED_DIR/console.url file
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
