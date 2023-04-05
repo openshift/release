@@ -833,6 +833,30 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build02
+    context: ci/prow/feature-branches
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-feature-branches
+    rerun_command: /test feature-branches
+    run_if_changed: ^(ci-operator/config/.*\.yaml)
+    spec:
+      containers:
+      - command:
+        - hack/invalidate-feature-branch-config-files.sh
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: (?m)^/test( | .* )feature-branches,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build02
     context: ci/prow/generated-config
     decorate: true
     labels:
