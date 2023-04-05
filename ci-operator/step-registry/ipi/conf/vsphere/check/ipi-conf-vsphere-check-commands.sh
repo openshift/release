@@ -88,14 +88,12 @@ source "${SHARED_DIR}/govc.sh"
 
 DATACENTERS=("$GOVC_DATACENTER")
 # If testing a zonal install, there are multiple datacenters that will need to be cleaned up
-if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -le 154 ]; then
+if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -le 157 ]; then
   DATACENTERS=(
     "IBMCloud"
     "datacenter-2"
   )
 fi
-
-echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED_RESOURCE} and destroy"
 
 # 1. Get the OpaqueNetwork (NSX-T port group) which is listed in LEASED_RESOURCE.
 # 2. Select the virtual machines attached to network
@@ -104,7 +102,7 @@ echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED
 # 5. Power off and delete the virtual machine
 
 for i in "${!DATACENTERS[@]}"; do
-  echo "Checking for leftover VMs in ${DATACENTERS[$i]} for LEASED_RESOURCE ${LEASED_RESOURCE}"
+  echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED_RESOURCE} in DC ${DATACENTERS[$i]} and destroy"
   DATACENTER=$(echo -n ${DATACENTERS[$i]} |  tr -d '\n')
   govc ls -json "/${DATACENTER}/network/${LEASED_RESOURCE}" |\
       jq '.elements[]?.Object.Vm[]?.Value' |\
