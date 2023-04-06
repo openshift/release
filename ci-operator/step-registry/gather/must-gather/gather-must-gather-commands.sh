@@ -4,6 +4,45 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# This junit attempts to get the scope of OCPBUGS-11160, so we can see
+# on install failures whether it's because a machine never became
+# running.
+function createMachinesJunit() {
+  set +o errexit
+  set +o nounset
+  oc get clusterversion
+  ret=$?
+  if [[ -z "$KUBECONFIG" || "$ret" != 0 ]];
+  then
+    echo "Skipping machine readiness junit..."
+    return 0
+  fi
+  NON_RUNNING_MACHINES=$(oc get machines -n openshift-machine-api -o json | jq -r '.items[] | select(.status.phase!="Running") | .metadata.name')
+  NON_RUNNING_MACHINES_COUNT=$(echo -n "$NON_RUNNING_MACHINES" | wc -l)
+  if [[ $NON_RUNNING_MACHINES_COUNT -gt 0 ]];
+  then
+      cat >"${ARTIFACT_DIR}/junit_machines.xml" <<EOF
+      <testsuite name="cluster machines" tests="1" failures="1">
+        <testcase name="all machines should be running">
+          <failure message="">
+            The following machines were not running:
+            $NON_RUNNING_MACHINES
+          </failure>
+        </testcase>
+      </testsuite>
+EOF
+  else
+      cat >"${ARTIFACT_DIR}/junit_machines.xml" <<EOF
+      <testsuite name="cluster machines" tests="1" failures="0">
+        <testcase name="all machines should be running"/>
+      </testsuite>
+EOF
+  fi
+  set -o errexit
+  set -o nounset
+}
+
+
 function createInstallJunit() {
   EXIT_CODE_CONFIG=3
   EXIT_CODE_INFRA=4
@@ -175,6 +214,7 @@ else
 fi
 
 createInstallJunit
+createMachinesJunit
 
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
 
