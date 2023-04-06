@@ -59,6 +59,7 @@ function build_push_operator_images {
 
   export VERSION=0.0.1
   export IMG=${IMAGE_TAG_BASE}:${IMAGE_TAG}
+  export BUNDLE_STORAGE_IMG=${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG}
 
   unset GOFLAGS
   pushd ${OP_DIR}
@@ -74,6 +75,9 @@ function build_push_operator_images {
   if [[ -f storage-bundle.Dockerfile ]]; then
     DOCKERFILE=storage-bundle.Dockerfile /bin/bash hack/pin-custom-bundle-dockerfile.sh
     oc new-build --binary --strategy=docker --name ${OPERATOR}-storage-bundle --to=${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
+    DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\"storage-bundle.Dockerfile.pinned\"\}\}\}\})
+    oc patch bc ${OPERATOR}-storage-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
+    oc set build-secret --pull bc/${OPERATOR}-storage-bundle ${DOCKER_REGISTRY_SECRET}
     oc start-build ${OPERATOR}-storage-bundle --from-dir . -F
     STORAGE_BUNDLE_EXISTS=1
   fi
@@ -89,6 +93,7 @@ function build_push_operator_images {
   DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${DOCKERFILE}"\"\}\}\}\})
 
   oc patch bc ${OPERATOR}-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
+  oc set build-secret --pull bc/${OPERATOR}-bundle ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR}-bundle --from-dir . -F
 
   BASE_BUNDLE=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG}

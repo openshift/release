@@ -29,8 +29,17 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
 fi
 
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
-
 export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${SERVICE_NAME}-operator
+export KUTTL_REPORT=kuttl-test-${SERVICE_NAME}.json
+if [ ${SERVICE_NAME} == "openstack-ansibleee" ]; then
+    # the service_name needs to be different to use in the image url than in
+    # the environment variables
+    export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/openstack-ansibleee-operator
+    export KUTTL_REPORT=kuttl-test-openstack-ansibleee.json
+    SERVICE_NAME=ansibleee
+fi
+
+
 export ${SERVICE_NAME^^}_IMG=${IMAGE_TAG_BASE}-index:${PR_SHA}
 export ${SERVICE_NAME^^}_KUTTL_CONF=/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml
 if [ -d  /go/src/github.com/${ORG}/${BASE_OP}/tests ]; then
@@ -71,10 +80,10 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   done
 
   make ${SERVICE_NAME}_kuttl
-  if [ -f "kuttl-test-${SERVICE_NAME}.json" ]; then
-      cp "kuttl-test-${SERVICE_NAME}.json" ${ARTIFACT_DIR}
+  if [ -f "$KUTTL_REPORT" ]; then
+      cp "${KUTTL_REPORT}" ${ARTIFACT_DIR}
   else
-      echo "Report kuttl-test-${SERVICE_NAME}.json not found"
+      echo "Report ${KUTTL_REPORT} not found"
   fi
 else
   echo "File /go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml not found. Skipping script."
