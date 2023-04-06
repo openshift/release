@@ -227,20 +227,72 @@ presubmits:
     branches:
     - ^main$
     - ^main-
+    cluster: build05
+    context: ci/prow/4.13-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.13"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.13"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.13-images
+    rerun_command: /test 4.13-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.13
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.13-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
     cluster: build03
-    context: ci/prow/4.12-nvidia-gpu-operator-e2e
+    context: ci/prow/4.13-nvidia-gpu-operator-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: "4.12"
+      ci-operator.openshift.io/variant: "4.13"
       ci.openshift.io/generator: prowgen
-      job-release: "4.12"
+      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.12-nvidia-gpu-operator-e2e
-    rerun_command: /test 4.12-nvidia-gpu-operator-e2e
+    name: pull-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.13-nvidia-gpu-operator-e2e
+    rerun_command: /test 4.13-nvidia-gpu-operator-e2e
     spec:
       containers:
       - args:
@@ -251,7 +303,7 @@ presubmits:
         - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-cluster-profile
         - --target=nvidia-gpu-operator-e2e
-        - --variant=4.12
+        - --variant=4.13
         command:
         - ci-operator
         image: ci-operator:latest
@@ -298,7 +350,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.12-nvidia-gpu-operator-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.13-nvidia-gpu-operator-e2e,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -759,3 +811,66 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )nvidia-gpu-operator-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
+    context: ci/prow/test-commit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-test-commit
+    rerun_command: /test test-commit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-commit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )test-commit,?($|\s.*)

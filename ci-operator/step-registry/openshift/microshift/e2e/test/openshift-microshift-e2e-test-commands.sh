@@ -4,7 +4,6 @@ set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-BASE_DOMAIN="$(cat ${CLUSTER_PROFILE_DIR}/public_hosted_zone)"
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
@@ -24,7 +23,6 @@ echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
 echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
 chmod 0600 "${HOME}"/.ssh/config
 
-# Copy pull secret to user home
 cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
 
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
@@ -32,9 +30,10 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   rhel8user@"${INSTANCE_PREFIX}" \
-  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${INSTANCE_PREFIX}.${BASE_DOMAIN}/kubeconfig" > /tmp/kubeconfig
+  --command "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
 PATH=${PAYLOAD_PATH}/usr/bin:$PATH KUBECONFIG=/tmp/kubeconfig ${PAYLOAD_PATH}/usr/bin/openshift-tests run "${TEST_SUITE}" -v 2 --provider=none -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit

@@ -60,7 +60,7 @@ collect_bootstrap_logs() {
 			done
 			# Ideally this would be removed once the openshift-install gather bootstrap starts supporting proxy https://issues.redhat.com/browse/CORS-2367
 			SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-    			if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+    			if test -f "${SHARED_DIR}/squid-credentials.txt"; then
     			    echo "This job uses a proxy but without a bastion, `openshift-install gather` is not supported yet, see CORS-2367"
 			else
                             if [[ "$CONFIG_TYPE" == *"proxy"* ]]; then

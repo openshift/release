@@ -1,40 +1,34 @@
 base_images:
   base:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.19-openshift-4.14
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |-
-    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13 AS builder
-    WORKDIR /go/src/github.com/openshift/agent-installer-utils
-    COPY . .
-    RUN dnf install -y gcc nmstate-devel nmstate-libs git && dnf clean all
-    RUN ./hack/build.sh
-    FROM registry.ci.openshift.org/ocp/4.13:base
-    RUN dnf install -y nmstate-libs && dnf clean all
-    COPY --from=builder /go/src/github.com/openshift/agent-installer-utils/bin/agent-tui /usr/bin/agent-tui
-    #LABEL io.openshift.release.operator=true
+- dockerfile_path: images/Dockerfile.ocp
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: agent-installer-utils
+promotion:
+  name: "4.14"
+  namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':

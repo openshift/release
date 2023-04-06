@@ -1,0 +1,96 @@
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.develop
+images:
+- build_args:
+  - name: COMMIT_SHA
+    value: ci-sha
+  - name: IMAGE_VERSION
+    value: ci-test-img
+  context_dir: .
+  dockerfile_path: Dockerfile
+  from: src
+  inputs:
+    root:
+      as:
+      - ${DEV_IMAGE}
+  to: modelmesh-serving
+promotion:
+  namespace: opendatahub-io
+  tag: v0.11.0-alpha
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: modelmesh-serving-unit
+  commands: |
+    export HOME=/go
+    make test
+  container:
+    from: src
+  run_if_changed: ^(apis/.*|controllers/.*|pkg/.*|main\.go|Dockerfile|go\.mod|go\.sum)
+- as: modelmesh-serving-fvt
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum)
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: fvt
+      commands: |
+        export HOME=/go
+        export NAMESPACE=modelmesh-serving
+        export MODELMESH_SERVING_IMAGE=${PR_MODELMESH_SERVING_IMAGE}
+        cat  ./config/internal/base/deployment.yaml.tmpl
+        make e2e-test
+      dependencies:
+      - env: PR_MODELMESH_SERVING_IMAGE
+        name: modelmesh-serving
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: ipi-gcp
+- as: modelmesh-serving-pr-image-mirror
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|version|go\.mod|go\.sum)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: modelmesh-serving
+    env:
+      IMAGE_REPO: modelmesh-controller
+    workflow: opendatahub-io-ci-image-mirror
+- as: modelmesh-serving-stable-image-mirror
+  postsubmit: true
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|version|go\.mod|go\.sum)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: modelmesh-serving
+    env:
+      IMAGE_REPO: modelmesh-controller
+      RELEASE_VERSION: stable
+    workflow: opendatahub-io-ci-image-mirror
+- as: modelmesh-serving-upstream-version-image-mirror
+  postsubmit: true
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|version|go\.mod|go\.sum)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: modelmesh-serving
+    env:
+      IMAGE_REPO: modelmesh-controller
+      IMAGE_TAG: v0.11.0-alpha
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: release-v0.11.0-alpha
+  org: opendatahub-io
+  repo: modelmesh-serving
