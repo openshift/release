@@ -73,6 +73,7 @@ operator:
   bundles:
   - as: cluster-logging-operator-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/openshift-logging/cluster-logging-operator:latest
     with: pipeline:cluster-logging-operator
@@ -111,6 +112,11 @@ tests:
 - as: e2e-target
   steps:
     cluster_profile: gcp
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: openshift-operators-redhat
+      OO_PACKAGE: loki-operator
+      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: test
       cli: latest
@@ -145,12 +151,14 @@ tests:
         name: pipeline:logging-eventrouter
       - env: IMAGE_LOG_FILE_METRIC_EXPORTER
         name: pipeline:log-file-metric-exporter
+      - env: OO_BUNDLE
+        name: cluster-logging-operator-bundle
       from: pipeline:cluster-logging-operator-e2e
       resources:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: openshift-e2e-gcp
+    workflow: optional-operators-ci-generic-claim
   timeout: 5h0m0s
 - as: e2e-ocp-target-minus-one
   cluster_claim:

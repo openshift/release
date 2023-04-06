@@ -19,7 +19,7 @@ fi
 # configure cucushift runtime environment variables
 hosts=$(grep server "${KUBECONFIG}" | cut -d '/' -f 3 | cut -d ':' -f 1)
 api_port=$(grep server "${KUBECONFIG}" | cut -d '/' -f 3 | cut -d ':' -f 2)
-ver_cli=$(oc version --client | cut -d ' ' -f 3 | cut -d '.' -f1,2)
+ver_cli=$(oc version --client | grep -i client | cut -d ' ' -f 3 | cut -d '.' -f1,2)
 
 runtime_env=${SHARED_DIR}/runtime_env
 if [ -f "${runtime_env}" ] ; then

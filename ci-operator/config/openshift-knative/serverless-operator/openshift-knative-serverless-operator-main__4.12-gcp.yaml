@@ -7,6 +7,10 @@ base_images:
     name: "4.12"
     namespace: ocp
     tag: cli
+  openshift_eventing-istio-src_knative-v1.8:
+    name: eventing-istio-src
+    namespace: openshift
+    tag: knative-v1.8
   openshift_eventing-kafka-broker-src_knative-v1.7:
     name: eventing-kafka-broker-src
     namespace: openshift
@@ -23,10 +27,10 @@ base_images:
     name: knative-v1.8.0
     namespace: openshift
     tag: knative-serving-src
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.19:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -38,6 +42,9 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
+    openshift_eventing-istio-src_knative-v1.8:
+      as:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.8
     openshift_eventing-kafka-broker-src_knative-v1.7:
       as:
       - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.7
@@ -55,33 +62,33 @@ images:
   dockerfile_path: serving/ingress/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-openshift-ingress
 - context_dir: .
   dockerfile_path: knative-operator/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-operator
 - context_dir: .
   dockerfile_path: openshift-knative-operator/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: openshift-knative-operator
 - context_dir: .
   dockerfile_path: serving/metadata-webhook/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: metadata-webhook
 - context_dir: olm-catalog/serverless-operator
   from: base

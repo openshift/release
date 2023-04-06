@@ -7,6 +7,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: cli
+  openshift_eventing-istio-src_knative-v1.8:
+    name: eventing-istio-src
+    namespace: openshift
+    tag: knative-v1.8
   openshift_eventing-kafka-broker-src_knative-v1.7:
     name: eventing-kafka-broker-src
     namespace: openshift
@@ -23,10 +27,10 @@ base_images:
     name: knative-v1.8.0
     namespace: openshift
     tag: knative-serving-src
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.19:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
   opm:
     name: "4.10"
     namespace: origin
@@ -42,6 +46,9 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
+    openshift_eventing-istio-src_knative-v1.8:
+      as:
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.8
     openshift_eventing-kafka-broker-src_knative-v1.7:
       as:
       - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.7
@@ -59,33 +66,33 @@ images:
   dockerfile_path: serving/ingress/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-openshift-ingress
 - context_dir: .
   dockerfile_path: knative-operator/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-operator
 - context_dir: .
   dockerfile_path: openshift-knative-operator/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: openshift-knative-operator
 - context_dir: .
   dockerfile_path: serving/metadata-webhook/Dockerfile
   from: base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: metadata-webhook
 - context_dir: olm-catalog/serverless-operator
   from: base
@@ -484,6 +491,64 @@ tests:
           cpu: 100m
           memory: 200Mi
       timeout: 3h0m0s
+    workflow: generic-claim
+- as: e2e-kitchensink-ocp-410
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.10"
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    test:
+    - as: serverless-e2e
+      commands: make test-kitchensink-e2e
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "4"
+          memory: 6Gi
+    workflow: generic-claim
+- as: upgrade-kitchensink-ocp-410
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.10"
+  optional: true
+  steps:
+    allow_skip_on_success: true
+    test:
+    - as: serverless-e2e
+      commands: make test-kitchensink-upgrade
+      dependencies:
+      - env: KNATIVE_OPENSHIFT_INGRESS
+        name: knative-openshift-ingress
+      - env: KNATIVE_OPERATOR
+        name: knative-operator
+      - env: OPENSHIFT_KNATIVE_OPERATOR
+        name: openshift-knative-operator
+      from: serverless-operator-src
+      resources:
+        limits:
+          memory: 6Gi
+        requests:
+          cpu: "4"
+          memory: 6Gi
     workflow: generic-claim
 zz_generated_metadata:
   branch: main

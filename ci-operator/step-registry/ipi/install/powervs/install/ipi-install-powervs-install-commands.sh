@@ -22,7 +22,7 @@ function populate_artifact_dir() {
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
   case "${CLUSTER_TYPE}" in
-    powervs)
+    powervs*)
       # We don't want debugging in this section
       unset TF_LOG_PROVIDER
       unset TF_LOG
@@ -740,10 +740,13 @@ init_ibmcloud
 destroy_resources
 
 case "${CLUSTER_TYPE}" in
-powervs)
+powervs*)
     export IBMCLOUD_API_KEY
     ;;
-*) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
+*)
+    >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
+    exit 1
+    ;;
 esac
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
@@ -755,11 +758,6 @@ date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
-
-# @BEGIN TEMPORARY-FIX
-export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="rhcos-powervs-images-${VPCREGION}/rhcos-412-86-202208090152-0-ppc64le-powervs.ova.gz"
-echo "OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE=${OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE}"
-# @END TEMPORARY-FIX
 
 openshift-install version
 

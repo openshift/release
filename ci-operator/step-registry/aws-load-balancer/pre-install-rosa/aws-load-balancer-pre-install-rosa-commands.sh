@@ -37,7 +37,7 @@ fi
 
 echo "=> getting identity provider name"
 AWS_ACCOUNT_ID=$(rosa describe cluster --cluster="${CLUSTER_ID}" | grep 'AWS Account:' | tr -d ' ' | cut -d: -f2)
-OIDC_IDP_NAME=$(rosa describe cluster --cluster="${CLUSTER_ID}" | grep 'OIDC Endpoint URL:' | tr -d ' ' | cut -d: -f2- | cut -d/ -f3-)
+OIDC_IDP_NAME=$(rosa describe cluster --cluster="${CLUSTER_ID}" --output json | jq -r .aws.sts.oidc_endpoint_url | cut -d/ -f3-)
 IDP_ARN="arn:aws:iam::${AWS_ACCOUNT_ID}:oidc-provider/${OIDC_IDP_NAME}"
 
 echo "=> extracting ccoctl binary from cco image"

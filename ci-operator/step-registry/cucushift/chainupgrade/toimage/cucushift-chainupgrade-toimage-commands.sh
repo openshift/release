@@ -485,12 +485,9 @@ echo "Upgrade targets are ${TARGET_RELEASES[*]}"
 export OC="run_command_oc"
 
 # Target version oc will be extract in the /tmp/client directory, use it first
-mkdir -p /tmp/client /tmp/jq
+mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
-export JQ_DIR="/tmp/jq"
-export PATH=${OC_DIR}:${JQ_DIR}:$PATH
-
-curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o ${JQ_DIR}/jq && chmod +x ${JQ_DIR}/jq
+export PATH=${OC_DIR}:$PATH
 
 FINAL_TARGET="${TARGET_RELEASES[-1]}"
 unset 'TARGET_RELEASES[-1]'

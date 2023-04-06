@@ -30,6 +30,11 @@ images:
       - destination_dir: .
         source_path: /bin/opm
   to: openstack-operator-ci-build-deploy
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install pre-commit
+  from: src
+  to: openstack-operator-ci-pre-commit
 - build_args:
   - name: KUTTL_VERSION
     value: v0.15.0
@@ -97,6 +102,17 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy-kuttl
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export GOFLAGS=
+    export PRE_COMMIT_HOME=/tmp
+    export GOLANGCI_LINT_CACHE=/tmp
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    pre-commit run --all-files --show-diff-on-failure
+  container:
+    from: openstack-operator-ci-pre-commit
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators
