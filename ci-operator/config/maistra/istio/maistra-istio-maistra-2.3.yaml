@@ -4,18 +4,6 @@ build_root:
     namespace: ci
     tag: "2.3"
   use_build_cache: true
-images:
-- dockerfile_literal: |
-    FROM quay.io/maistra-dev/maistra-builder:2.3
-    # Git checks if the user that owns the files on the filesystem match the
-    # current user.  We need to disable this check because tests in Prow are
-    # running with a random user.
-    RUN git config --system --add safe.directory '*'
-  inputs:
-    src:
-      as:
-      - quay.io/maistra-dev/maistra-builder:2.3
-  to: src-test
 resources:
   '*':
     limits:
@@ -35,7 +23,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
-    from: src-test
+    from: src
   timeout: 4h0m0s
 - as: istio-lint-2-3
   commands: |
@@ -48,7 +36,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
-    from: src-test
+    from: src
 - as: istio-gencheck-2-3
   commands: |
     make gen-check \
@@ -60,7 +48,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
-    from: src-test
+    from: src
 - as: maistra-istio-integ-aws-2-3
   cluster_claim:
     architecture: amd64
@@ -86,7 +74,7 @@ tests:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_MC_POD
       - name: MAISTRA_SC_POD
-      from: src-test
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -106,7 +94,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src-test
+      from: src
       resources:
         requests:
           cpu: "2"
@@ -124,7 +112,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_MC_POD
-      from: src-test
+      from: src
       resources:
         requests:
           cpu: "2"
@@ -158,7 +146,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src-test
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -187,7 +175,7 @@ tests:
       - name: GOCACHE
       - name: GOBIN
       - name: GOMODCACHE
-      from: src-test
+      from: src
       resources:
         requests:
           cpu: "2"
