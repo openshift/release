@@ -76,8 +76,7 @@ export KUBECONFIG="/tmp/kubeconfig"
 oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
 echo "Run tests from CLI"
-oc get dpa -n openshift-adp -o yaml
-#sleep 3600
+sleep 3600
 NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh
 #NAMESPACE=openshift-adp bash /alabama/cspi/test_settings/scripts/test_runner.sh 
 
