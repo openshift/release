@@ -86,6 +86,12 @@ EOF
   fi
 fi
 
+printf '%s' "${USER_TAGS:-}" | while read -r TAG VALUE
+do
+  printf 'Setting user tag %s: %s\n' "${TAG}" "${VALUE}"
+  yq-go write -i "${CONFIG}" "platform.azure.userTags.${TAG}" "${VALUE}"
+done
+
 version=$(getVersion)
 echo "get ocp version: ${version}"
 REQUIRED_OCP_VERSION="4.12"
