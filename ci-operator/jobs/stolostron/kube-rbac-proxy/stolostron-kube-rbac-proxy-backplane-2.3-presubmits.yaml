@@ -1,59 +1,10 @@
 presubmits:
-  stolostron/prometheus:
+  stolostron/kube-rbac-proxy:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.6$
-    - ^release-2\.6-
-    cluster: build01
-    context: ci/prow/common-test
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-prometheus-release-2.6-common-test
-    rerun_command: /test common-test
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=common-test
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )common-test,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.6$
-    - ^release-2\.6-
+    - ^backplane-2\.3$
+    - ^backplane-2\.3-
     cluster: build01
     context: ci/prow/images
     decorate: true
@@ -62,7 +13,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-prometheus-release-2.6-images
+    name: pull-ci-stolostron-kube-rbac-proxy-backplane-2.3-images
     rerun_command: /test images
     spec:
       containers:
@@ -101,25 +52,25 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.6$
-    - ^release-2\.6-
+    - ^backplane-2\.3$
+    - ^backplane-2\.3-
     cluster: build01
-    context: ci/prow/pr-image-mirror
+    context: ci/prow/pr-image-mirror-mce
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-prometheus-release-2.6-pr-image-mirror
-    rerun_command: /test pr-image-mirror
+    name: pull-ci-stolostron-kube-rbac-proxy-backplane-2.3-pr-image-mirror-mce
+    rerun_command: /test pr-image-mirror-mce
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=pr-image-mirror
+        - --target=pr-image-mirror-mce
         command:
         - ci-operator
         image: ci-operator:latest
@@ -146,61 +97,12 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
+    trigger: (?m)^/test( | .* )pr-image-mirror-mce,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.6$
-    - ^release-2\.6-
-    cluster: build01
-    context: ci/prow/react-app-test
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-prometheus-release-2.6-react-app-test
-    rerun_command: /test react-app-test
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=react-app-test
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )react-app-test,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-2\.6$
-    - ^release-2\.6-
+    - ^backplane-2\.3$
+    - ^backplane-2\.3-
     cluster: build01
     context: ci/prow/sonar-pre-submit
     decorate: true
@@ -209,7 +111,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-prometheus-release-2.6-sonar-pre-submit
+    name: pull-ci-stolostron-kube-rbac-proxy-backplane-2.3-sonar-pre-submit
     rerun_command: /test sonar-pre-submit
     spec:
       containers:
@@ -255,8 +157,57 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-2\.6$
-    - ^release-2\.6-
+    - ^backplane-2\.3$
+    - ^backplane-2\.3-
+    cluster: build01
+    context: ci/prow/test-unit
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-stolostron-kube-rbac-proxy-backplane-2.3-test-unit
+    rerun_command: /test test-unit
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=test-unit
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )test-unit,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^backplane-2\.3$
+    - ^backplane-2\.3-
     cluster: build01
     context: ci/prow/vendor
     decorate: true
@@ -265,7 +216,7 @@ presubmits:
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-prometheus-release-2.6-vendor
+    name: pull-ci-stolostron-kube-rbac-proxy-backplane-2.3-vendor
     rerun_command: /test vendor
     spec:
       containers:
