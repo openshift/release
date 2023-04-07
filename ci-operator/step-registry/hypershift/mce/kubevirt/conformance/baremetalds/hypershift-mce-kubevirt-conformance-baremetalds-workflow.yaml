@@ -1,0 +1,22 @@
+workflow:
+  as: hypershift-mce-kubevirt-conformance-baremetalds
+  documentation: |-
+    The HyperShift mce kubevirt conformance workflow executes tests against a new ephemeral
+  steps:
+    pre:
+    - chain: baremetalds-ipi-pre
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-mce-install
+    - chain: hypershift-mce-kubevirt-create
+    test:
+    - chain: hypershift-conformance
+    post:
+    - ref: wait
+    - chain: gather-core-dump
+    - chain: hypershift-mce-kubevirt-destroy
+    - chain: baremetalds-ipi-post
+    env:
+      SLEEP_DURATION: 24h
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
