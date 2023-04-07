@@ -48,16 +48,13 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
 if [ "${JOB_NAME_SAFE}" = "launch" ]; then
-  # If this is a `launch` and we are in the multi-zone range, we also
+  # If this is a `launch` and we are in IBM, point to the load balancer in IBM
   # 
-  if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 151 ]; then
-    if [ $((${LEASED_RESOURCE//[!0-9]/})) -le 154 ]; then
-    # Configure DNS direct to respective VIP
+  if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 88 ]; then
     api_dns_target='"TTL": 60,
       "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.48.190.22"}]'
     apps_dns_target='"TTL": 60,
-      "ResourceRecords": [{"Value": "'${vips[1]}'"}, {"Value": "169.48.190.22"}]'
-    fi
+      "ResourceRecords": [{"Value": "169.48.190.22"}]'
   else   
     # Configure DNS target as previously configured NLB
     nlb_arn=$(<"${SHARED_DIR}"/nlb_arn.txt)
