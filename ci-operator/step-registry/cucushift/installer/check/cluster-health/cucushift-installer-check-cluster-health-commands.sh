@@ -208,6 +208,14 @@ function check_history() {
 }
 
 ###Main###
+if [ -f "${SHARED_DIR}/cluster-type" ] ; then
+    CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
+    if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]] || [[ "$CLUSTER_TYPE" == "hypershift-guest" ]]; then
+        echo "Skip the step. The Managed clusters perform health checks by themselves"
+        exit 0
+    fi
+fi
+
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
