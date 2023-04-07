@@ -188,8 +188,9 @@ function run_command_oc() {
 }
 
 function check_clusteroperators() {
-    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc null_version unavailable_operator degraded_operator
+    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc null_version unavailable_operator degraded_operator skip_operator
 
+    skip_operator="aro" # ARO operator versioned but based on RP git commit ID not cluster version
     echo "Make sure every operator do not report empty column"
     tmp_clusteroperator=$(mktemp /tmp/health_check-script.XXXXXX)
     input="${tmp_clusteroperator}"
@@ -216,12 +217,12 @@ function check_clusteroperators() {
 
     echo "Make sure every operator column reports version"
     if null_version=$(${OC} get clusteroperator -o json | jq '.items[] | select(.status.versions == null) | .metadata.name') && [[ ${null_version} != "" ]]; then
-        echo >&2 "Null Version: ${null_version}"
-        (( tmp_ret += 1 ))
+      echo >&2 "Null Version: ${null_version}"
+      (( tmp_ret += 1 ))
     fi
 
     echo "Make sure every operator reports correct version"
-    if incorrect_version=$(${OC} get clusteroperator --no-headers | awk -v var="${TARGET_VERSION}" '$2 != var') && [[ ${incorrect_version} != "" ]]; then
+    if incorrect_version=$(${OC} get clusteroperator --no-headers | grep -v ${skip_operator} | awk -v var="${TARGET_VERSION}" '$2 != var') && [[ ${incorrect_version} != "" ]]; then
         echo >&2 "Incorrect CO Version: ${incorrect_version}"
         (( tmp_ret += 1 ))
     fi
@@ -309,7 +310,7 @@ function check_latest_machineconfig_applied() {
 function wait_machineconfig_applied() {
     local role="${1}" try=0 interval=60
     num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
-    local max_retries; max_retries=$(expr $num \* 10)
+    local max_retries; max_retries=$(expr $num \* 15)
     while (( try < max_retries )); do
         echo "Checking #${try}"
         if ! check_latest_machineconfig_applied "${role}"; then
@@ -529,3 +530,4 @@ do
     fi
     health_check
 done
+

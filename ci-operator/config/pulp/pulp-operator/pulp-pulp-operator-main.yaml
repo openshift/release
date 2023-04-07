@@ -1,26 +1,42 @@
 base_images:
-  ansible-operator:
-    name: "4.10"
+  base:
+    name: "4.12"
     namespace: ocp
-    tag: ansible-operator
+    tag: base
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
 build_root:
-  project_image:
-    dockerfile_path: .ci/prow/Dockerfile.ci-operator
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
 images:
 - dockerfile_path: Dockerfile
-  from: ansible-operator
+  from: base
   to: pulp-operator
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+  to: src-oc
 operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/pulp/pulp-operator:devel
-    with: pulp-operator
+    with: pipeline:pulp-operator
 releases:
   latest:
     release:
       channel: stable
-      version: "4.10"
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -36,7 +52,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: alpha
+      OO_CHANNEL: beta
       OO_INSTALL_NAMESPACE: pulpci
       OO_PACKAGE: pulp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -44,8 +60,9 @@ tests:
     - as: deploy-pulp
       commands: |
         oc project pulpci
+        unset GOFLAGS
         .ci/prow/openshift-test.sh
-      from: src
+      from: src-oc
       resources:
         requests:
           cpu: 1000m
@@ -58,7 +75,7 @@ tests:
     dependencies:
       OO_INDEX: ci-index
     env:
-      OO_CHANNEL: alpha
+      OO_CHANNEL: beta
       OO_INSTALL_NAMESPACE: pulpci
       OO_PACKAGE: pulp-operator
       OO_TARGET_NAMESPACES: '!install'
@@ -66,8 +83,9 @@ tests:
     - as: deploy-galaxy
       commands: |
         oc project pulpci
+        unset GOFLAGS
         CI_TEST=galaxy API_ROOT="/api/galaxy/pulp/" .ci/prow/openshift-test.sh
-      from: src
+      from: src-oc
       resources:
         requests:
           cpu: 1000m

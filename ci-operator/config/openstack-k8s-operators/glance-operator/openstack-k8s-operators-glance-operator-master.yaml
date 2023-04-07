@@ -6,7 +6,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.46.0
+    tag: v1.48.0
   opm-builder:
     name: opm-builder
     namespace: ci
@@ -14,6 +14,11 @@ base_images:
 build_root:
   from_repository: true
 images:
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install pre-commit
+  from: src
+  to: openstack-operator-ci-pre-commit
 - dockerfile_literal: |
     FROM src
     RUN pip3 install python-openstackclient
@@ -74,6 +79,21 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export PRE_COMMIT_HOME=/tmp
+    export GOFLAGS=
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    export GOLANGCI_LINT_CACHE=/tmp
+    mkdir -p ../operator/ && cp -r . ../operator
+    cd ../operator
+    pre-commit run -a --show-diff-on-failure
+  container:
+    from: openstack-operator-ci-pre-commit
+  optional: true
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators

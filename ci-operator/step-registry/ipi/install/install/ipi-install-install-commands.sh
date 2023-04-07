@@ -291,6 +291,36 @@ EOF
   done
 }
 
+# Configured systemd journald to forward logs to the console. AWS only
+# shows the last few lines of a console log, but at least on early boot
+# failures we'll be able to capture a snippet.
+function inject_journal_to_console_config() {
+  local dir=$1
+  local role=$2
+
+  mkdir -p "${dir}/openshift/"
+  cat << EOF > "${dir}/openshift/99-$role-journal-console.yaml"
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: $role
+  name: 99-$role-journal-console
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    storage:
+      files:
+        - contents:
+            compression: ""
+            source: data:,%5BJournal%5D%0AForwardToConsole%3Dyes%0A
+          mode: 420
+          overwrite: true
+          path: /etc/systemd/journald.conf.d/forward.conf
+EOF
+}
+
 # inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
 function inject_spot_instance_config() {
   local dir=${1}
@@ -318,7 +348,7 @@ EOF
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-trap 'prepare_next_steps' EXIT TERM
+trap 'prepare_next_steps' EXIT TERM INT
 
 if [[ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]]; then
   echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
@@ -383,6 +413,12 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
 
+if [[ "$JOB_NAME" == *"4.14"* ]]
+then
+  inject_journal_to_console_config $dir worker
+  inject_journal_to_console_config $dir master
+fi
+
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
 azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
@@ -423,6 +459,10 @@ fi
 echo "install-config.yaml"
 echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+
+if [ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-}" == "true" ]; then
+	echo "Cluster will be created with public subnets only"
+fi
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 export TF_LOG_PATH="${dir}/terraform.txt"
@@ -485,53 +525,6 @@ if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
-
-  echo "Collecting cluster data for analysis..."
-  set +o errexit
-  set +o pipefail
-  if [ ! -f /tmp/jq ]; then
-    curl -L https://stedolan.github.io/jq/download/linux64/jq -o /tmp/jq && chmod +x /tmp/jq
-  fi
-  if ! pip -V; then
-    echo "pip is not installed: installing"
-    if python -c "import sys; assert(sys.version_info >= (3,0))"; then
-      python -m ensurepip --user || easy_install --user 'pip'
-    else
-      echo "python < 3, installing pip<21"
-      python -m ensurepip --user || easy_install --user 'pip<21'
-    fi
-  fi
-  echo "Installing python modules: json"
-  python3 -c "import json" || pip3 install --user pyjson
-  PLATFORM="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get infrastructure/cluster -o json|/tmp/jq '.status.platform')"
-  TOPOLOGY="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get infrastructure/cluster -o json|/tmp/jq '.status.infrastructureTopology')"
-  NETWORKTYPE="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get network.operator cluster -o json|/tmp/jq '.spec.defaultNetwork.type')"
-  if [[ "$(env KUBECONFIG=${dir}/auth/kubeconfig oc get network.operator cluster -o json|/tmp/jq '.spec.clusterNetwork[0].cidr')" =~ .*":".*  ]]; then
-    NETWORKSTACK="IPv6"
-  else
-    NETWORKSTACK="IPv4"
-  fi
-  CLOUDREGION="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get node -o json|/tmp/jq '.items[]|.metadata.labels'|grep topology.kubernetes.io/region|cut -d : -f 2| head -1| sed 's/,//g')"
-  CLOUDZONE="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get node -o json|/tmp/jq '.items[]|.metadata.labels'|grep topology.kubernetes.io/zone|cut -d : -f 2| sort -u)"
-  CLUSTERVERSIONHISTORY="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get clusterversion -o json|/tmp/jq '.items[]|.status.history'|grep version|cut -d : -f 2)"
-  CLOUDZONE="$(echo $CLOUDZONE | tr -d \")"
-  CLUSTERVERSIONHISTORY="$(echo $CLUSTERVERSIONHISTORY | tr -d \")"
-  python3 -c '
-import json;
-dictionary = {
-    "Platform": '$PLATFORM',
-    "Topology": '$TOPOLOGY',
-    "NetworkType": '$NETWORKTYPE',
-    "NetworkStack": "'$NETWORKSTACK'",
-    "CloudRegion": '"$CLOUDREGION"',
-    "CloudZone": "'"$CLOUDZONE"'".split(),
-    "ClusterVersionHistory": "'"$CLUSTERVERSIONHISTORY"'".split()
-}
-with open("'${ARTIFACT_DIR}/cluster-data.json'", "w") as outfile:
-    json.dump(dictionary, outfile)'
-  set -o errexit
-  set -o pipefail
-  echo "Done collecting cluster data for analysis!"
 fi
 
 exit "$ret"

@@ -11,10 +11,22 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
   tools:
     name: "4.13"
     namespace: ocp
     tag: tools
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
 releases:
   intermediate48:
     release:
@@ -59,9 +71,12 @@ resources:
       memory: 200Mi
 tests:
 - as: gcp-ipi-p1-f30
-  cron: 43 15 18 * *
+  cron: 43 15 19 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @gcp-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @gcp-ipi and not @fips'
     post:
     - chain: cucushift-installer-rehearse-gcp-ipi-deprovision
     pre:
@@ -89,8 +104,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - ref: cucushift-upgrade-healthcheck
-    - ref: cucushift-upgrade-toimage
+    - ref: cucushift-installer-check
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

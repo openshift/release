@@ -32,8 +32,10 @@ else
   exit 1
 fi
 
-
-CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
+CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id" || true)
+if [[ -z "$CLUSTER_ID" ]]; then
+  CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-name")
+fi
 
 echo "Deleting cluster-id: ${CLUSTER_ID}"
 rosa delete cluster -c "${CLUSTER_ID}" -y

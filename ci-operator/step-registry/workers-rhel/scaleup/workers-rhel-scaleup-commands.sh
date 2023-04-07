@@ -48,7 +48,7 @@ fi
 echo "$(date -u --rfc-3339=seconds) - Waiting for CoreOS nodes to be removed"
 oc wait node \
     --for=delete \
-    --timeout=20m \
+    --timeout=40m \
     --selector node.openshift.io/os_id=rhcos,node-role.kubernetes.io/worker \
     || true
 
