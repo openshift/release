@@ -8,6 +8,7 @@ SECRETS_DIR="/tmp/secrets"
 
 # Get the creds from ACMQE CI vault and run the automation on pre-exisiting HUB
 <<<<<<< HEAD
+<<<<<<< HEAD
 # SKIP_OCP_DEPLOY=$(cat $SECRETS_DIR/ci/skip-ocp-deploy)
 # if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
 #     echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
@@ -15,13 +16,26 @@ SECRETS_DIR="/tmp/secrets"
 #     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
 # fi 
 =======
+=======
+>>>>>>> 9e5dae003f9 (Complete component ref creation)
 SKIP_OCP_DEPLOY="false"
 if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
     echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
     cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/kubeconfig
     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
 fi 
+<<<<<<< HEAD
 >>>>>>> 95a2a3367bd (Vboulos add step rigistry for grc (#37587))
+=======
+=======
+# SKIP_OCP_DEPLOY=$(cat $SECRETS_DIR/ci/skip-ocp-deploy)
+# if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
+#     echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
+#     cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/kubeconfig
+#     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
+# fi 
+>>>>>>> 5a5c8458267 (Complete component ref creation)
+>>>>>>> 9e5dae003f9 (Complete component ref creation)
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
