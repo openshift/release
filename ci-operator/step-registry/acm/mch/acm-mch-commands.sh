@@ -34,5 +34,3 @@ for try in $(seq "${RETRIES}"); do
     sleep 30
   fi
 done
-
-sleep 28800
