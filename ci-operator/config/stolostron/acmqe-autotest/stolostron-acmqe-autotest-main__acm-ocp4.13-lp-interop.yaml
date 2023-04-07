@@ -1,4 +1,12 @@
 base_images:
+  acmqe-grc-test:
+    name: "2.7"
+    namespace: acm-qe
+    tag: acmqe-grc-test
+  application-ui-test:
+    name: "2.7"
+    namespace: acm-qe
+    tag: application-ui-test
   clc-ui-e2e:
     name: "2.7"
     namespace: acm-qe
@@ -11,11 +19,16 @@ base_images:
     name: autotest
     namespace: acm-qe
     tag: fetch-managed-clusters
+  observability-core-automation:
+    name: "2.7"
+    namespace: acm-qe
+    tag: observability-core-automation
 releases:
   latest:
-    release:
-      channel: stable
-      version: "4.12"
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
 resources:
   '*':
     requests:
@@ -38,7 +51,7 @@ tests:
           {"name": "oadp-operator", "source": "community-operators", "channel": "stable", "install_namespace": "openshift-adp", "target_namespaces": "openshift-adp"},
           {"name": "container-security-operator", "source": "redhat-operators", "channel": "stable-3.6", "install_namespace": "openshift-operators", "target_namespaces": "", "operator_group": "global-operators"}
         ]
-      ZONES_COUNT: "4"
+      ZONES_COUNT: "6"
     post:
     - ref: acm-tests-clc-destroy
     - ref: gather-aws-console
@@ -49,6 +62,10 @@ tests:
     test:
     - ref: install-operators
     - ref: acm-mch
+    - ref: acm-tests-clc-create
+    - ref: acm-fetch-managed-clusters
+    - ref: acm-tests-alc
+    - ref: acm-tests-grc
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
