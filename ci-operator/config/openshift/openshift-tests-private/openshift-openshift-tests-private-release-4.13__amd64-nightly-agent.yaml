@@ -1,0 +1,90 @@
+base_images:
+  ansible:
+    name: "4.13"
+    namespace: ocp
+    tag: ansible
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.13"
+    namespace: ocp
+    tag: hypershift-operator
+  openstack-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: openstack-installer
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-ui:
+    name: tests-private-ui
+    namespace: ci
+    tag: "4.13"
+  tools:
+    name: "4.13"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: ci
+      version: "4.13"
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: ci
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: abi-libvirt-ha-ipv4-bond
+  cluster: build05
+  interval: 960h
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
+        IP_STACK=v4
+        PROVISIONING_NETWORK_PROFILE=Disabled
+        NETWORK_TYPE=OpenShiftSDN
+        BOND_PRIMARY_INTERFACE=true
+        NETWORK_CONFIG_FOLDER=./network-configs/bond
+    workflow: agent-e2e-compact-ipv4
+zz_generated_metadata:
+  branch: release-4.13
+  org: openshift
+  repo: openshift-tests-private
+  variant: amd64-nightly-agent
