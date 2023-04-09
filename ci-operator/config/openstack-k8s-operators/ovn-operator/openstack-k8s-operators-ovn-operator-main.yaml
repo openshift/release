@@ -42,6 +42,11 @@ images:
     RUN yum install -y skopeo
   from: openstack-operator-ci-build-deploy
   to: openstack-operator-ci-build-deploy-kuttl
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install pre-commit
+  from: src
+  to: openstack-operator-ci-pre-commit
 resources:
   '*':
     limits:
@@ -97,6 +102,18 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy-kuttl
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export GOFLAGS=
+    export PRE_COMMIT_HOME=/tmp
+    export GOLANGCI_LINT_CACHE=/tmp
+    git log -1
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    pre-commit run --all-files --show-diff-on-failure
+  container:
+    from: openstack-operator-ci-pre-commit
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators

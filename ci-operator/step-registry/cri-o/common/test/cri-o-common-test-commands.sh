@@ -10,6 +10,11 @@ ${SHARED_DIR}/login_script.sh
 
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 
+# Print the git branch 
+branch=$(git rev-parse --abbrev-ref HEAD)
+echo "Printing the current branch of cri-o: $branch"
+
+# Trying to copy the content from /src
 tar -czf - . | gcloud compute ssh --zone="${ZONE}" ${instance_name} -- "cat > \${HOME}/cri-o.tar.gz"
 timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
     export GOROOT=/usr/local/go
