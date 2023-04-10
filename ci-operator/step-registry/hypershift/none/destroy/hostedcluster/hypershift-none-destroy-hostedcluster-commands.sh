@@ -2,14 +2,14 @@
 
 set -exuo pipefail
     
-hc_name="z-hc-$(echo -n $PROW_JOB_ID|cut -c-8)"
+hc_name="hc-$(echo -n $PROW_JOB_ID|cut -c-8)"
 
-echo "$(date) Triggering the hosted cluster $hc_name destruction in the namespace clusters_$hc_name"
+echo "$(date +%H:%M:%S) Triggering the hosted cluster $hc_name destruction in the namespace hcp-s390x"
 
-/usr/bin/hypershift destroy cluster none \
+hypershift destroy cluster none \
     --name $hc_name \
-    --namespace "clusters-$hc_name" \
+    --namespace "hcp-s390x" \
     --destroy-cloud-resources \
     --cluster-grace-period 40m
 
-echo "$(date) Successfully destroyed the hosted cluster $hc_name"
+echo "$(date +%H:%M:%S) Successfully destroyed the hosted cluster $hc_name"
