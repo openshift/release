@@ -17,28 +17,26 @@ images:
         source_path: /usr/bin/oc
   to: oc-bin-image
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
 resources:
   '*':
     requests:
       cpu: 800m
       memory: 6Gi
 tests:
-- as: integration-e2e-periodic
-  cron: 0 0 * * *
+- as: odo-lp-interop-aws
+  cron: 0 1 * * 1
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
     test:
-    - as: integration-e2e-periodic-steps
-      commands: scripts/openshiftci-periodic-tests.sh
+    - as: odo-lp-interop-steps
+      commands: scripts/openshiftci-presubmit-all-tests.sh
       from: oc-bin-image
       resources:
         requests:
@@ -50,4 +48,4 @@ zz_generated_metadata:
   branch: main
   org: redhat-developer
   repo: odo
-  variant: v4.13
+  variant: odo-ocp4.13-lp-interop
