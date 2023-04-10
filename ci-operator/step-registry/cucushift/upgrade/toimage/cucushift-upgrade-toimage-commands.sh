@@ -127,7 +127,7 @@ function rhel_upgrade(){
     echo "Validating parsed Ansible inventory"
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     echo "Running RHEL worker upgrade"
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" playbooks/upgrade.yml -vvv
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
 
     echo "Check K8s version on the RHEL node"
     master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
