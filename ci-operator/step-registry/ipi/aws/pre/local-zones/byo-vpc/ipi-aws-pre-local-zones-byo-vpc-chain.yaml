@@ -1,18 +1,20 @@
 chain:
-  as: ipi-aws-pre-localzone
+  as: ipi-aws-pre-local-zones-byo-vpc
   steps:
   - ref: ipi-install-rbac
   - ref: openshift-cluster-bot-rbac
   - ref: aws-provision-vpc-shared
-  - ref: aws-provision-localzone
+  - ref: aws-provision-vpc-local-zone-subnet
   - ref: ipi-conf
   - ref: ipi-conf-telemetry
-  - ref: ipi-conf-aws-localzone-byo-vpc
+  - ref: ipi-conf-aws-local-zones-byo-vpc
   - ref: ipi-conf-aws
   - ref: ipi-install-monitoringpvc
   - ref: ipi-install-install-aws
   - ref: ipi-install-times-collection
   - ref: aws-provision-tags-for-byo-vpc
+  # Can we comment this line and let the installer choose it?
+  # this is only BYO VPC
   env:
   - name: CONTROL_PLANE_INSTANCE_TYPE
     default: "m6i.xlarge"
@@ -21,5 +23,6 @@ chain:
     default: "m6i.xlarge"
     documentation: "Instance type for compute nodes"
   documentation: |-
-    Create an IPI cluster on AWS for e2e tests.
-    Additional worker nodes will be created in Local Zone with taints:NoSchedule
+    Create an IPI cluster installing in existing VPC, with AWS Local Zone subnets,
+    allowing installer to create edge compute pools for e2e tests.
+    The edge worker nodes is created in AWS Local Zone with taints:NoSchedule

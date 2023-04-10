@@ -122,41 +122,62 @@ if [[ "$vpc_id" == "" ]] || [[ "$vpc_id" == "null" ]]; then
     exit 1
 fi
 
-# Choosing randomly the AZ withing the Region (best choice to test any AZ - and detect possible errors)
-zone_name=$(aws ec2 describe-availability-zones \
-  --region "$REGION" \
-  --filters Name=opt-in-status,Values=opted-in Name=zone-type,Values=local-zone \
-  | jq -r .AvailabilityZones[].ZoneName | shuf | head -n1)
+#
+# Local Zone discovery options:
+# 1) 'random' zone [default]: Pick one zone randomly from API (more coverage)
+# 2) 'parent' zone: Pick the zone based on the parent zone
+#
 
-zone_group=$(aws ec2 describe-availability-zones \
-  --region "$REGION" \
-  --filters Name=zone-name,Values="${zone_name}" \
-  | jq -r .AvailabilityZones[].GroupName)
+if [[ "${LOCAL_ZONE_SELECTION:-}" == "parent" ]]; then
+  if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
+    localzone_parent_subnet=$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')
+  else
+    localzone_parent_subnet=$(yq-go r "${SHARED_DIR}/private_subnet_ids" '[0]')
+  fi
+  az_name=$(aws --region $REGION ec2 describe-subnets --subnet-ids $localzone_parent_subnet | jq -r '.Subnets[0].AvailabilityZone')
+  zone_name=$(aws --region $REGION ec2 describe-availability-zones --filters Name=opt-in-status,Values=opted-in Name=zone-type,Values=local-zone | jq -r --arg z $az_name '[.AvailabilityZones[] | select (.ParentZoneName==$z)] | .[0].ZoneName')
+  route_table_id=$(aws --region $REGION ec2 describe-route-tables --filter Name=association.subnet-id,Values=$localzone_parent_subnet | jq -r .RouteTables[].RouteTableId)
 
-if [[ ${PUBLIC_ZONE} == true ]]; then
-  route_table_id=$(head -n 1 "${SHARED_DIR}/public_route_table_id")
 else
-  route_table_id=$(head -n 1 "${SHARED_DIR}/private_route_table_ids")
-fi
+  # LOCAL_ZONE_SELECTION=random
+  # Choose the Local Zone randomly within the Region
+  zone_name=$(aws ec2 describe-availability-zones \
+    --region "$REGION" \
+    --filters Name=opt-in-status,Values=opted-in Name=zone-type,Values=local-zone \
+    | jq -r .AvailabilityZones[].ZoneName | shuf | head -n1)
 
-if [[ "$route_table_id" == "" ]] || [[ "$route_table_id" == "null" ]]; then
-    echo "ERROR: Can not find Route Table ID, exit now."
-    exit 1
-fi
+  zone_group=$(aws ec2 describe-availability-zones \
+    --region "$REGION" \
+    --filters Name=zone-name,Values="${zone_name}" \
+    | jq -r .AvailabilityZones[].GroupName)
 
-if [[ "$zone_name" == "" ]] || [[ "$zone_group" == "" ]] || [[ "$route_table_id" == "" ]]\
-   || [[ "$zone_name" == "null" ]] || [[ "$zone_group" == "null" ]] || [[ "$route_table_id" == "null" ]]; then
-    echo "ERROR: zone_name or zone_group or route_table_id is empty."
-    exit 1
-fi
+  if [[ ${PUBLIC_ZONE} == true ]]; then
+    route_table_id=$(head -n 1 "${SHARED_DIR}/public_route_table_id")
+  else
+    route_table_id=$(head -n 1 "${SHARED_DIR}/private_route_table_ids")
+  fi
 
-echo "Modifying zone group $zone_group to opt-in Local Zone name $zone_name ..."
-aws ec2 modify-availability-zone-group \
-    --region "${REGION}" \
-    --group-name "${zone_group}" \
-    --opt-in-status opted-in
+  if [[ "$route_table_id" == "" ]] || [[ "$route_table_id" == "null" ]]; then
+      echo "ERROR: Can not find Route Table ID, exit now."
+      exit 1
+  fi
+
+  if [[ "$zone_name" == "" ]] || [[ "$zone_group" == "" ]] || [[ "$route_table_id" == "" ]]\
+    || [[ "$zone_name" == "null" ]] || [[ "$zone_group" == "null" ]] || [[ "$route_table_id" == "null" ]]; then
+      echo "ERROR: zone_name or zone_group or route_table_id is empty."
+      exit 1
+  fi
+
+  echo "Modifying zone group $zone_group to opt-in Local Zone name $zone_name ..."
+  aws ec2 modify-availability-zone-group \
+      --region "${REGION}" \
+      --group-name "${zone_group}" \
+      --opt-in-status opted-in
+
+fi
 
 STACK_NAME="${NAMESPACE}-${JOB_NAME_HASH}-localzone"
+
 # save stack information to ${SHARED_DIR} for deprovision step
 echo "${STACK_NAME}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 extra_options=" "
@@ -205,10 +226,10 @@ cp -vf "${ARTIFACT_DIR}/subnet_ids_with_localzones" "${SHARED_DIR}/subnet_ids"
 subnet_ids_region=$(tr "'" "\"" < "${subnet_ids_region_file}" | jq -r '.[]' | tr '\n' ' ')
 mapfile -t ZONES_REGION < <(aws ec2 describe-subnets --region "${REGION}" --subnet-ids $subnet_ids_region \
   | jq -r .Subnets[].AvailabilityZone | sort -u)
+
 ZONES_REGION_STR="[ $(join_by , "${ZONES_REGION[@]}") ]"
 
 echo -n "${ZONES_REGION_STR}" > "${SHARED_DIR}/zone_names_region"
-
 
 echo "---
 zone_name : $zone_name
@@ -222,4 +243,4 @@ aws --region "${REGION}" cloudformation describe-stacks --stack-name "${STACK_NA
 
 cp "${SHARED_DIR}/localzone_subnet_id" "${ARTIFACT_DIR}/"
 cp "${SHARED_DIR}/localzone_az_name" "${ARTIFACT_DIR}/"
-cp "${SHARED_DIR}/zone_names_region" "${ARTIFACT_DIR}/zone_names_region"
+cp "${SHARED_DIR}/zone_names_region" "${ARTIFACT_DIR}/"
