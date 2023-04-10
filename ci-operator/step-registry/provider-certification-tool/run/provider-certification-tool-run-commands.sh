@@ -10,4 +10,4 @@ extract_opct
 
 # Run the tool in dedicated mode with watch flag set.
 echo "Running OPCT with regular mode"
-${OPCT_EXEC} run --watch --dev-count=10
+${OPCT_EXEC} run --watch
