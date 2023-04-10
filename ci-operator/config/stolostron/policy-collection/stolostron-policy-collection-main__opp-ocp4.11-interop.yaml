@@ -1,0 +1,52 @@
+base_images:
+  cli:
+    name: "4.11"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- dockerfile_literal: |
+    FROM this-is-ignored
+    RUN dnf install -y git
+  from: cli
+  to: cli-with-git
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.11"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: opp-interop-aws
+  interval: 960h
+  steps:
+    cluster_profile: aws-interop-qe
+    env:
+      BASE_DOMAIN: release-ci.cnv-qe.rhood.us
+      SUB_CHANNEL: release-2.6
+      SUB_INSTALL_NAMESPACE: open-cluster-management
+      SUB_PACKAGE: advanced-cluster-management
+      SUB_SOURCE: redhat-operators
+      SUB_TARGET_NAMESPACES: open-cluster-management
+    test:
+    - chain: layered-product-opp
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: policy-collection
+  variant: opp-ocp4.11-interop
