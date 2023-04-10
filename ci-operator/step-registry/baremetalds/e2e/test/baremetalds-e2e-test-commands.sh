@@ -61,16 +61,16 @@ oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
   --to=\${MIRRORED_RELEASE_IMAGE} \
   --to-release-image=\${MIRRORED_RELEASE_IMAGE}:\${RELEASE_TAG}  2>&1 | tee \${MIRROR_RESULT_LOG}
 
-echo "Create ImageContentSourcePolicy to use mirrored registry in upgrade"
-UPGRADE_ICS=\$(cat \${MIRROR_RESULT_LOG} | sed -n '/repositoryDigestMirrors/,//p')
+echo "Create ImageDigestMirrorSet to use mirrored registry in upgrade"
+UPGRADE_IDMS=\$(cat \${MIRROR_RESULT_LOG} | sed -n '/imageDigestMirrors/,//p')
 
 cat <<EOF1 | oc apply -f -
-apiVersion: operator.openshift.io/v1alpha1
-kind: ImageContentSourcePolicy
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
 metadata:
-  name: disconnected-upgrade-ics
+  name: disconnected-upgrade-idms
 spec:
-\${UPGRADE_ICS}
+\${UPGRADE_IDMS}
 EOF1
 EOF
 

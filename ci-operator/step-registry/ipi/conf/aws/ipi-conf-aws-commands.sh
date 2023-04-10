@@ -244,7 +244,7 @@ if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
 
   PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
   cat > "${PATCH}" << EOF
-imageContentSources:
+imageDigestSources:
 - mirrors:
   - quayio-pull-through-cache-${MIRROR_REGION}-ci.apps.ci.l2s4.p1.openshiftapps.com
   source: quay.io

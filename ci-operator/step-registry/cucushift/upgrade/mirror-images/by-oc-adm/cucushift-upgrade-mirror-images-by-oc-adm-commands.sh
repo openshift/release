@@ -57,18 +57,18 @@ function apply_signature(){
     fi
 }
 
-function update_icsp(){
+function update_idms(){
     local source_release_image_repo
     source_release_image_repo="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"
     source_release_image_repo="${source_release_image_repo%@sha256*}"
-    if [[ "${source_release_image_repo}" != "${MIRROR_RELEASE_IMAGE_REPO}" ]] && ! oc get ImageContentSourcePolicy example -oyaml; then
-        echo "Target image has different repo with source image and icsp example is not present, creating icsp"
+    if [[ "${source_release_image_repo}" != "${MIRROR_RELEASE_IMAGE_REPO}" ]] && ! oc get ImageDigestMirrorSet example -oyaml; then
+        echo "Target image has different repo with source image and idms example is not present, creating idms"
         if [[ ! -f "${MIRROR_OUT_FILE}" ]]; then
             echo >&2 "${MIRROR_OUT_FILE} not found" && return 1
         fi
-        sed -n '/To use the new mirrored repository for upgrades, use the following to create an ImageContentSourcePolicy:/,/configmap.*/{//!p;}' "${MIRROR_OUT_FILE}"  | grep -v '^$' > "${ICSP_FILE}"
-        run_command "cat ${ICSP_FILE}"
-        run_command "oc create -f ${ICSP_FILE}"
+        sed -n '/To use the new mirrored repository for upgrades, use the following to create an ImageDigestMirrorSet:/,/configmap\/sha256.*/{//!p;}' "${MIRROR_OUT_FILE}"  | grep -v '^$' > "${IDMS_FILE}"
+        run_command "cat ${IDMS_FILE}"    
+        run_command "oc create -f ${IDMS_FILE}"
     fi
 }
 
@@ -108,7 +108,7 @@ jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '
 trap 'rm -f "${PULL_SECRET}"' ERR EXIT TERM
 
 export MIRROR_OUT_FILE="${SHARED_DIR}/mirror"
-export ICSP_FILE="${SHARED_DIR}/icsp.yaml"
+export IDMS_FILE="${SHARED_DIR}/idms.yaml"
 
 for target in "${TARGET_RELEASES[@]}"
 do
@@ -126,6 +126,6 @@ do
     mirror_image
     set_proxy_env
     apply_signature
-    update_icsp
-    rm -f "${MIRROR_OUT_FILE}" "${ICSP_FILE}"
+    update_idms
+    rm -f "${MIRROR_OUT_FILE}" "${IDMS_FILE}"
 done

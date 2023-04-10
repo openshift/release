@@ -7,13 +7,13 @@ set -o pipefail
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # mirror registry
-install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"
-if [ ! -f "${install_config_icsp_patch}" ]; then
-    echo "File ${install_config_icsp_patch} does not exist."
+install_config_idms_patch="${SHARED_DIR}/install-config-idms.yaml.patch"
+if [ ! -f "${install_config_idms_patch}" ]; then
+    echo "File ${install_config_idms_patch} does not exist."
     exit 1
 fi
 
-echo -e "image registry:\n$(cat ${install_config_icsp_patch})"
+echo -e "image registry:\n$(cat ${install_config_idms_patch})"
 
 # mirror registry credential
 OMR_HOST_NAME=$(cat ${SHARED_DIR}/OMR_HOST_NAME)
@@ -40,7 +40,7 @@ additionalTrustBundle: |
 EOF
 yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
 
-# imageContentSources patch
-yq-go m -x -i "${CONFIG}" "${install_config_icsp_patch}"
+# imageDigestSources patch
+yq-go m -x -i "${CONFIG}" "${install_config_idms_patch}"
 
 rm -f "${mirror_registry_pull_secret}"

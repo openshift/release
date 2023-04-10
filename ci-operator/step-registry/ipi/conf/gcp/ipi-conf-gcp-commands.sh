@@ -77,9 +77,9 @@ rm /tmp/pull-secret
 
 if (( ocp_minor_version > 10 || ocp_major_version > 4 )); then
   SERVICE="quayio-pull-through-cache-gcs-ci.apps.ci.l2s4.p1.openshiftapps.com"
-  PATCH="${SHARED_DIR}/install-config-image-content-sources.yaml.patch"
+  PATCH="${SHARED_DIR}/install-config-image-digest-sources.yaml.patch"
   cat > "${PATCH}" << EOF
-imageContentSources:
+imageDigestSources:
 - mirrors:
   - ${SERVICE}
   source: quay.io

@@ -8,8 +8,8 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 mirror_output="${SHARED_DIR}/mirror_output"
 new_pull_secret="${SHARED_DIR}/new_pull_secret"
-install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"
-icsp_file="${SHARED_DIR}/local_registry_icsp_file.yaml"
+install_config_idms_patch="${SHARED_DIR}/install-config-idms.yaml.patch"
+idms_file="${SHARED_DIR}/local_registry_idms_file.yaml"
 
 # private mirror registry host
 # <public_dns>:<port>
@@ -50,9 +50,9 @@ oc adm release -a "${new_pull_secret}" mirror --insecure=true \
  --to=${target_release_image_repo} \
  --to-release-image=${target_release_image} | tee "${mirror_output}"
 
-grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
-grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
+grep -B 1 -A 10 "kind: ImageDigestMirrorSet" ${mirror_output} > "${idms_file}"
+grep -A 6 "imageDigestSources" ${mirror_output} > "${install_config_idms_patch}"
 
-echo "${install_config_icsp_patch}:"
-cat "${install_config_icsp_patch}"
+echo "${install_config_idms_patch}:"
+cat "${install_config_idms_patch}"
 rm -f "${new_pull_secret}"

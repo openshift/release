@@ -216,7 +216,7 @@ sudo mv openshift-baremetal-install /usr/local/bin/openshift-install
 oc adm release extract -a ~/pull-secret --command oc "${LOCAL_REG}/${LOCAL_REPO}:${OCP_RELEASE}"
 sudo mv oc /usr/local/bin/oc
 
-# The install-config includes the ImageContentSources for the local registry
+# The install-config includes the ImageDigestSources for the local registry
 cat > "${CLUSTER_DIR}/install-config.yaml" << EOF
 apiVersion: v1
 baseDomain: "${BASE_DOMAIN}"
@@ -256,7 +256,7 @@ additionalTrustBundle: |
   -----BEGIN CERTIFICATE-----
   $(echo "${CA}")
   -----END CERTIFICATE-----
-imageContentSources:
+imageDigestSources:
 - mirrors:
   - ${HOSTNAME}:5000/ocp4/openshift4
   source: quay.io/openshift-release-dev/ocp-release-nightly

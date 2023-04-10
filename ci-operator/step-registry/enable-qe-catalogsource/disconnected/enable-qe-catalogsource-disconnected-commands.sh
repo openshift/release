@@ -170,7 +170,7 @@ function mirror_optional_images () {
     if [[ $ret -eq 0 ]]; then
         echo "mirror optional operators' images successfully"
     else
-        run_command "cat /tmp/olm_mirror/imageContentSourcePolicy.yaml"
+        run_command "cat /tmp/olm_mirror/imageDigestMirrorSet.yaml"
         run_command "cat /tmp/olm_mirror/mapping.txt"
         return 1
     fi
@@ -221,15 +221,15 @@ function set_CA_for_nodes () {
     fi
 }
 
-# Create the fixed ICSP for optional operators
-function create_settled_icsp () {
+# Create the fixed IDMS for optional operators
+function create_settled_idms () {
     cat <<EOF | oc create -f -
-    apiVersion: operator.openshift.io/v1alpha1
-    kind: ImageContentSourcePolicy
+    apiVersion: config.openshift.io/v1
+    kind: ImageDigestMirrorSet
     metadata:
-      name: image-policy-aosqe
+      name: image-digest-mirror-aosqe
     spec:
-      repositoryDigestMirrors:
+      imageDigestMirrors:
       - mirrors:
         - ${MIRROR_PROXY_REGISTRY_QUAY}/openshifttest
         source: quay.io/openshifttest
@@ -253,9 +253,9 @@ function create_settled_icsp () {
         source: registry-proxy.engineering.redhat.com
 EOF
     if [ $? == 0 ]; then
-        echo "create the ICSP successfully" 
+        echo "create the IDMS successfully" 
     else
-        echo "!!! fail to create the ICSP"
+        echo "!!! fail to create the IDMS"
         return 1
     fi
 }
@@ -409,7 +409,7 @@ else
     set_cluster_auth
 fi 
 
-create_settled_icsp
+create_settled_idms
 check_marketplace
 # No need to disable the default OperatorHub when marketplace disabled as default.
 if [ $marketplace -eq 0 ]; then

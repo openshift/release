@@ -95,7 +95,7 @@ registry_cred=`head -n 1 "/var/run/vault/mirror-registry/registry_creds" | base6
 jq --argjson a "{\"${MIRROR_REGISTRY_HOST}\": {\"auth\": \"$registry_cred\"}}" '.auths |= . + $a' "${CLUSTER_PROFILE_DIR}/pull-secret" > "${new_pull_secret}"
 
 # MIRROR IMAGES
-# Creating ICSP for quay.io/openshiftteste is in enable-qe-catalogsource-disconnected step
+# Creating IDMS for quay.io/openshiftteste is in enable-qe-catalogsource-disconnected step
 # Set Node CA for Mirror Registry is in enable-qe-catalogsource-disconnected step
 sed -i "s/MIRROR_REGISTRY_PLACEHOLDER/${MIRROR_REGISTRY_HOST}/g" "/tmp/mirror-images-list.yaml" 
 

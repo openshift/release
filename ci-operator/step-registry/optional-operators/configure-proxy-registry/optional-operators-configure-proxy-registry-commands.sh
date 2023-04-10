@@ -12,16 +12,16 @@ set -o pipefail
 BREW_DOCKERCONFIGJSON=${BREW_DOCKERCONFIGJSON:-'/var/run/brew-pullsecret/.dockerconfigjson'}
 oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=$BREW_DOCKERCONFIGJSON
 
-# 1. Apply the ICSP to the cluster 
+# 1. Apply the IDMS to the cluster 
 echo "Creating new proxy registry record on cluster"
 OO_CONFIGURE_PROXY_REGISTRY=$(
     oc create -f - -o jsonpath='{.metadata.name}' <<EOF
-apiVersion: operator.openshift.io/v1alpha1
-kind: ImageContentSourcePolicy
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
 metadata:
   name: brew-registry
 spec:
-  repositoryDigestMirrors:
+  imageDigestMirrors:
   - mirrors:
     - brew.registry.redhat.io
     source: registry.redhat.io
