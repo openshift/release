@@ -63,16 +63,18 @@ tests:
     workflow: openshift-e2e-aws
 - as: e2e-aws-operator
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
     test:
     - as: test
       cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
+      commands: oc get node && JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
       from: stable:cluster-api-actuator-pkg
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: hypershift-hostedcluster-workflow
 - as: e2e-upgrade
   steps:
     cluster_profile: aws
