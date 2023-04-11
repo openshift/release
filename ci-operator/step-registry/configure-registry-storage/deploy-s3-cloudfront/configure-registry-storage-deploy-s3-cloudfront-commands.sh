@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# This script will deploy an aws s3 bucket and cloudfront distribution.
+# It need deploy against aws platform.
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     echo "Setting proxy"
     source "${SHARED_DIR}/proxy-conf.sh"
@@ -11,21 +14,26 @@ fi
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
-if [[ -f "${AWSCRED}" ]]; then
-  AWS_ACCESS_KEY_ID=$(cat "${AWSCRED}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2) && export AWS_ACCESS_KEY_ID
-  AWS_SECRET_ACCESS_KEY=$(cat "${AWSCRED}" | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2) && export AWS_SECRET_ACCESS_KEY
-else
-  echo "Did not find compatible cloud provider cluster_profile"
+case "${CLUSTER_TYPE}" in
+aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
+aws-c2s|aws-sc2s) export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_temp_creds;;
+*) echo "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
+esac
+
+AWS_ACCESS_KEY_ID=$(cat "${AWS_SHARED_CREDENTIALS_FILE}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2) && export AWS_ACCESS_KEY_ID
+AWS_SECRET_ACCESS_KEY=$(cat "${AWS_SHARED_CREDENTIALS_FILE}" | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2) && export AWS_SECRET_ACCESS_KEY
+
+if [[ ${AWS_ACCESS_KEY_ID} == "" ]] || [[ ${AWS_SECRET_ACCESS_KEY} == "" ]]; then
+  echo "Did not find AWS credential, exit now"
   exit 1
 fi
 
 # get region to deploy new bucket
-AWS_REGION=$(oc get -o jsonpath='{.status.platformStatus.aws.region}' infrastructure cluster) && export AWS_REGION
+AWS_REGION=${LEASED_RESOURCE} && export AWS_REGION
 NEW_BUCKET=$(head /dev/urandom | tr -dc a-z | head -c 10) && export NEW_BUCKET
 
 # create file to deploy cloudfront using new bucket
-cat >>"${SHARED_DIR}/create_aws_bucket.tf" <<EOF
+cat >>"${SHARED_DIR}/create_s3_bucket_for_registry_storage.tf" <<EOF
 provider "aws" {
   region = "${AWS_REGION}"
   access_key = "${AWS_ACCESS_KEY_ID}"
@@ -119,7 +127,7 @@ output "cloudfront_domain_name" {
 EOF
 
 # deploy s3 new bucket and link it to cloudfront
-cp "${SHARED_DIR}/create_aws_bucket.tf" /tmp && cd /tmp
+cp "${SHARED_DIR}/create_s3_bucket_for_registry_storage.tf" /tmp && cd /tmp
 terraform init
 terraform apply -auto-approve
 TF_OUTPUT=$(terraform output)
@@ -149,10 +157,12 @@ check_imageregistry_back_ready(){
     (( iter -- ))
   done
   if [ "${result}" != "TrueFalse" ] ; then
+    echo "Image registry failed to re-configure cloudfront, please check the below resources"
     oc describe pods -l docker-registry=default -n openshift-image-registry
     oc get config.image/cluster -o yaml
     return 1
   else
+    echo "Image registry configured cloudfront successfully"
     return 0
   fi
 }
