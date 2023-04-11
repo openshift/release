@@ -52,11 +52,18 @@ spec:
 EOF
 }
 
+function get_csv_info() {
+  oc get subscription jaeger-product -n openshift-operators -o yaml | grep currentCSV
+  oc get subscription kiali-ossm -n openshift-operators -o yaml | grep currentCSV
+  oc get subscription servicemeshoperator -n openshift-operators -o yaml | grep currentCSV
+}
+
 function main() {
   deploy_jaeger
   deploy_kiali_operator
   deploy_servicemesh_operator
   sleep 180
+  get_csv_info
 }
 
 main
