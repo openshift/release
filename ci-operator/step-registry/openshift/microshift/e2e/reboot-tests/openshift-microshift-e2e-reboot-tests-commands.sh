@@ -59,19 +59,19 @@ metadata:
   name: test-pod
   namespace: default
 spec:
-  securityContext:
-    runAsNonRoot: true
-    privileged: false
-    capabilities:
-      drop:
-      - 'ALL'
-    allowPrivilegeEscalation: false
-    seccompProfile:
-      type: RuntimeDefault
-      runAsUser: 1001
-      runAsGroup: 1001
   containers:
     - name: test-container
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        privileged: false
+        capabilities:
+          drop:
+          - 'ALL'
+        allowPrivilegeEscalation: false
+        seccompProfile:
+          type: RuntimeDefault
       image: nginx
       command:
         - sh
