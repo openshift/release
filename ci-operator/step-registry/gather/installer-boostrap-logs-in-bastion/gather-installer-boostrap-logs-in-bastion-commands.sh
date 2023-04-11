@@ -77,7 +77,8 @@ else
     exit 0
 fi
 
-ssh_key=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+ssh_key_file_name="ssh-privatekey"
+ssh_key=${CLUSTER_PROFILE_DIR}/${ssh_key_file_name}
 bastion_dns=$(head -n 1 "${SHARED_DIR}/bastion_public_address")
 bastion_user=$(head -n 1 "${SHARED_DIR}/bastion_ssh_user")
 
@@ -111,10 +112,11 @@ sudo chown -R \${usr}:\${grp} /tmp/installer/
 EOF
 run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/chownership.sh" "/tmp/"
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "chmod +x /tmp/chownership.sh ; /tmp/chownership.sh"
+run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "${ssh_key}" "/tmp/"
 
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "rm -f /tmp/installer/metadata.json"
 
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/openshift-install gather bootstrap --dir /tmp/installer --log-level debug 2> /tmp/gather.log"
+run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/openshift-install gather bootstrap --dir /tmp/installer --key /tmp/${ssh_key_file_name} --log-level debug 2> /tmp/gather.log; rm -f /tmp/${ssh_key_file_name}"
 
 run_scp_from_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/gather.log" "${ARTIFACT_DIR}/"
 run_scp_from_remote "${ssh_key}" ${bastion_user} ${bastion_dns} "/tmp/installer/log-bundle-*.tar.gz" "${ARTIFACT_DIR}/"

@@ -16,6 +16,11 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM src
+    RUN pip3 install pre-commit
+  from: src
+  to: openstack-operator-ci-pre-commit
+- dockerfile_literal: |
+    FROM src
     RUN pip3 install python-openstackclient
     COPY oc /usr/bin/oc
     COPY opm /usr/bin/opm
@@ -97,6 +102,19 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy-kuttl
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export GOFLAGS=
+    export PRE_COMMIT_HOME=/tmp
+    export GOLANGCI_LINT_CACHE=/tmp
+    # see tradeoff between speed and memory usage at https://golangci-lint.run/usage/performance/
+    export GOGC=10
+    mkdir -p ../operator/ && cp -r . ../operator
+    cd ../operator
+    pre-commit run -a --show-diff-on-failure
+  container:
+    from: openstack-operator-ci-pre-commit
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators
