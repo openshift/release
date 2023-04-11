@@ -68,6 +68,8 @@ spec:
     allowPrivilegeEscalation: false
     seccompProfile:
       type: RuntimeDefault
+      runAsUser: 1001
+      runAsGroup: 1001
   containers:
     - name: test-container
       image: nginx
