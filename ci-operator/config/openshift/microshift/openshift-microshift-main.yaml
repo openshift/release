@@ -15,7 +15,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.19-openshift-4.13
+    tag: rhel-9-release-golang-1.19-openshift-4.13
 images:
 - dockerfile_literal: |
     FROM src
@@ -36,7 +36,7 @@ images:
   to: rebase-payload
 - dockerfile_literal: |
     FROM src as rpms
-    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
+    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel rpmbuild
     RUN make rpm && TARGET_ARCH=aarch64 make rpm
 
     FROM test-runtime
@@ -219,6 +219,25 @@ tests:
       GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
       GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
     workflow: openshift-microshift-e2e-loadbalancer-smoke-test
+- as: e2e-microshift-tests
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-v20230203
+    workflow: openshift-microshift-e2e-microshift-tests
+- as: e2e-microshift-tests-arm
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: gcp
+    env:
+      GOOGLE_COMPUTE_IMAGE_NAME: rhel-9-arm64-v20230306
+      GOOGLE_COMPUTE_MACHINE_TYPE: t2a-standard-4
+    workflow: openshift-microshift-e2e-microshift-tests
 zz_generated_metadata:
   branch: main
   org: openshift
