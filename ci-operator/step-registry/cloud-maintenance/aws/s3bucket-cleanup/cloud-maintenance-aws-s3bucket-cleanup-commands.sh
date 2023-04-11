@@ -43,7 +43,7 @@ while read -r bucket; do
             break
         fi
     done
-    if [ "$excluded" = true ]; then
+    if $excluded; then
         continue
     fi
 
