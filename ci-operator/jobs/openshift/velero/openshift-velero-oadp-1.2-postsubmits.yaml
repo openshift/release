@@ -1,10 +1,10 @@
 postsubmits:
-  oadp-qe/oadp-e2e-qe:
+  openshift/velero:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build05
+    - ^oadp-1\.2$
+    cluster: build02
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -12,17 +12,18 @@ postsubmits:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-oadp-qe-oadp-e2e-qe-master-images
+    name: branch-ci-openshift-velero-oadp-1.2-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=velero-oadp-1.2
+        - --target=velero-restore-helper-oadp-1.2
         command:
         - ci-operator
         image: ci-operator:latest
@@ -35,9 +36,6 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -49,9 +47,6 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: github-credentials-openshift-ci-robot-private-git-cloner
-        secret:
-          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
