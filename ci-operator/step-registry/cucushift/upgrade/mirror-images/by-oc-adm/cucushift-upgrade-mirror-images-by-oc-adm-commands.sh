@@ -18,6 +18,15 @@ function check_signed() {
     fi
 }
 
+function set_proxy_env(){
+    # Setup proxy if it's present in the shared dir
+    if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] 
+    then
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/proxy-conf.sh"
+    fi
+}
+
 function mirror_image(){
     local mirror_release_image target_version
     mirror_release_image="${MIRROR_REGISTRY_HOST}/${TARGET#*/}"
@@ -37,6 +46,7 @@ function mirror_image(){
 
 function update_icsp(){
     local source_release_image_repo
+    set_proxy_env
     source_release_image_repo="${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE%:*}"
     source_release_image_repo="${source_release_image_repo%@sha256*}"
     if [[ "${source_release_image_repo}" != "${MIRROR_RELEASE_IMAGE_REPO}" ]] && ! oc get ImageContentSourcePolicy example -oyaml; then
@@ -52,13 +62,6 @@ function update_icsp(){
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
-fi
-
-# Setup proxy if it's present in the shared dir
-if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] 
-then
-    # shellcheck disable=SC1091
-    source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 # Get the target upgrades release, by default, OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is the target release
