@@ -40,7 +40,9 @@ CONFIG = {
         'us-east-2': 10,
     },
     'aws-qe-quota-slice': {
-        'us-east-1': 30,
+        'us-east-1': 20,
+        'us-east-2': 5,
+        'ap-northeast-1': 5,
     },
     'aws-sd-qe-quota-slice': {
         'us-west-2': 3,
@@ -139,6 +141,7 @@ CONFIG = {
     },
     'nutanix-quota-slice': {},
     'nutanix-qe-quota-slice': {},
+    'nutanix-qe-dis-quota-slice': {},
     'openstack-osuosl-quota-slice': {},
     'openstack-quota-slice': {
         'default': 7,
@@ -200,13 +203,6 @@ CONFIG = {
     'hypershift-quota-slice': {
         'default': 15,
     },
-    'powervs-quota-slice': {
-        'old-mon01': 1,
-        'old-osa21': 1,
-        'old-syd04': 1,
-        'old-syd05': 1,
-        'old-tok04': 1
-    },
     'powervs-1-quota-slice': {
         'mon01': 1,
         'osa21': 1,
@@ -266,6 +262,9 @@ for i in range(3):
 
 for i in range(3):
     CONFIG['nutanix-qe-quota-slice']['nutanix-qe-segment-{0:0>2}'.format(i)] = 1
+
+for i in range(3):
+    CONFIG['nutanix-qe-dis-quota-slice']['nutanix-qe-dis-segment-{0:0>2}'.format(i)] = 1
 
 for i in range(2):
     CONFIG['openstack-osuosl-quota-slice']['openstack-osuosl-{0:0>2}'.format(i)] = 1

@@ -93,7 +93,7 @@ function rhel_repo(){
     export SOURCE_REPO_VERSION
     export TARGET_REPO_VERSION
 
-    cat > repo.yaml <<-'EOF'
+    cat > /tmp/repo.yaml <<-'EOF'
 ---
 - name: Update repo Playbook
   hosts: workers
@@ -118,7 +118,7 @@ function rhel_repo(){
 EOF
 
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" repo.yaml -vvv
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
 }
 
 # Upgrade RHEL node
