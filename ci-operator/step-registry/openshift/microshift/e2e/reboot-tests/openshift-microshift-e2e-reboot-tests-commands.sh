@@ -35,9 +35,7 @@ chmod 0600 "${HOME}"/.ssh/config
 cat >"${HOME}"/reboot-test.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
-
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-stat $KUBECONFIG
 # TODO: Remove the labels again once https://issues.redhat.com/browse/OCPBUGS-1969 has been fixed upstream
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"-version=v1.24"
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"=privileged"
@@ -63,6 +61,11 @@ metadata:
   name: test-pod
   namespace: default
 spec:
+  securityContext:
+    runAsNonRoot: true
+    privileged: false
+    seccompProfile:
+      type: RuntimeDefault
   containers:
     - name: test-container
       securityContext:
