@@ -56,7 +56,4 @@ export -f firewall::open_port
 export -f firewall::close_port
 export INSTANCE_PREFIX
 
-cd /tmp
-git clone https://github.com/pmtk/microshift.git --branch merge-e2e-tests
-
 USHIFT_IP="${IP_ADDRESS}" USHIFT_USER=rhel8user ./microshift/e2e/main.sh run
