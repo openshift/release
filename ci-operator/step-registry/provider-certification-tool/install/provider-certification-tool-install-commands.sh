@@ -88,7 +88,7 @@ show_msg "Extracting OPCT_VERSION..."
 $OPCT_EXEC version | tee "${ARTIFACT_DIR}/opct-version"
 
 OPCT_VERSION=$($OPCT_EXEC version | grep ^OpenShift | grep -Po '(v\d+.\d+.\d+)')
-
+OPCT_MODE="${OPCT_RUN_MODE:-default}"
 
 # Populate env var required by OPCT_VERSION
 #
@@ -100,6 +100,59 @@ OCP_VERSION=$(oc get clusterversion version -o=jsonpath='{.status.desired.versio
 OCP_PLAT=$(oc get infrastructures cluster -o jsonpath='{.status.platform}')
 OCP_TOPOLOGY=$(oc get infrastructures cluster -o jsonpath='{.status.controlPlaneTopology}')
 
+# Run the tool with watch flag set.
+if [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
+  pushd ${WORKDIR}
+  cmd_jq="$(which yq 2>/dev/null || true)"
+  if [ ! -x "${cmd_jq}" ]; then
+      cmd_jq="${WORKDIR}/yq"
+      echo "# jq not found, installing on $cmd_jq..."
+      wget --quiet https://github.com/mikefarah/yq/releases/download/v4.33.3/yq_linux_amd64 \
+          -O $cmd_jq
+
+      echo "# granting exec permissions"
+      chmod +x $cmd_jq
+  fi
+
+  UPGRADE_TO_CHANNEL_TYPE="${UPGRADE_TO_CHANNEL_TYPE:-stable}"
+  CURRENT_VERSION_X=$(echo "$OCP_VERSION" | awk -F'.' '{ print$1 }')
+  CURRENT_VERSION_Y=$(echo "$OCP_VERSION" | awk -F'.' '{ print$2 }')
+  TARGET_VERSION_Y=$(( CURRENT_VERSION_Y + 1 ))
+  TARGET_VERSION_XY="${CURRENT_VERSION_X}.${TARGET_VERSION_Y}"
+  UPGRADE_TO_CHANNEL="${UPGRADE_TO_CHANNEL_TYPE}-${CURRENT_VERSION_X}.${TARGET_VERSION_Y}"
+
+  cat <<EOF > "${ARTIFACT_DIR}/release-versions"
+UPGRADE_TO_CHANNEL_TYPE=$UPGRADE_TO_CHANNEL_TYPE
+CURRENT_VERSION_X=$CURRENT_VERSION_X
+CURRENT_VERSION_Y=$CURRENT_VERSION_Y
+TARGET_VERSION_Y=$TARGET_VERSION_Y
+TARGET_VERSION_XY=$TARGET_VERSION_XY
+UPGRADE_TO_CHANNEL=$UPGRADE_TO_CHANNEL
+EOF
+
+  echo "Downloading upgrade graph data..."
+  curl -L -o "${WORKDIR}/cincinnati-graph-data.tar.gz" \
+    https://api.openshift.com/api/upgrades_info/graph-data
+
+  tar xvzf "${WORKDIR}/cincinnati-graph-data.tar.gz" "channels/${UPGRADE_TO_CHANNEL}.yaml" -C "${WORKDIR}" || true
+  if [ ! -f "${WORKDIR}/channels/${UPGRADE_TO_CHANNEL}.yaml" ]; then
+    echo "ERROR: Unable to extract/find the channels file from cincinnati: ${WORKDIR}/channels/${UPGRADE_TO_CHANNEL}.yaml
+$(cat "${ARTIFACT_DIR}"/release-versions)
+
+# files on ${WORKDIR}/channels
+$(ls ${WORKDIR}/channels/)
+"
+    exit 1
+  fi
+
+  echo "Looking for target version..."
+  target_release="$($cmd_jq -r .versions[] "${WORKDIR}/channels/${UPGRADE_TO_CHANNEL}.yaml" | grep "${TARGET_VERSION_XY}." | tail -n1)"
+
+  echo "Found target version [${target_release}], getting Digest..."
+  TARGET_RELEASE_IMAGE=$(oc adm release info "${target_release}" -o jsonpath='{.image}')
+  popd
+fi
+
 # Examples:
 # OPCT_VERSION/OCP_VERSION-DATE_TS-controlPlaneTopology-provider-platform.tar.gz
 # v0.3.0/4.13.0-20230406-HighlyAvailable-vsphere-None.tar.gz
@@ -108,8 +161,8 @@ OCP_TOPOLOGY=$(oc get infrastructures cluster -o jsonpath='{.status.controlPlane
 # v0.3.0/4.13.0-20230406-HighlyAvailable-oci-External.tar.gz
 # v0.3.0/4.13.0-20230406-HighlyAvailable-oci-Baremetal.tar.gz
 # v0.3.0/4.13.0-20230406-SingleReplica-aws-None.tar.gz
-OBJECT_PATH="${OPCT_VERSION}/${OCP_VERSION}-${DATE_TS}-${OCP_TOPOLOGY}-${CLUSTER_TYPE}-${OCP_PLAT}.tar.gz"
-OBJECT_META="OPCT_VERSION=${OPCT_VERSION},OCP=${OCP_VERSION},Topology=${OCP_TOPOLOGY},Provider=${CLUSTER_TYPE},Platform=${OCP_PLAT}"
+OBJECT_PATH="${OPCT_VERSION}/${OPCT_MODE}/${OCP_VERSION}-${DATE_TS}-${OCP_TOPOLOGY}-${CLUSTER_TYPE}-${OCP_PLAT}.tar.gz"
+OBJECT_META="OPCT_VERSION=${OPCT_VERSION},OPCT_MODE=${OPCT_MODE},OCP=${OCP_VERSION},Topology=${OCP_TOPOLOGY},Provider=${CLUSTER_TYPE},Platform=${OCP_PLAT}"
 
 # Update install-env script
 
@@ -119,6 +172,7 @@ cat <<EOF >> "${SHARED_DIR}/install-env"
 export OPCT_VERSION=${OPCT_VERSION}
 export OBJECT_PATH="${OBJECT_PATH}"
 export OBJECT_META="${OBJECT_META}"
+export TARGET_RELEASE_IMAGE="${TARGET_RELEASE_IMAGE:-}"
 EOF
 
 cp "${SHARED_DIR}/install-env" "${ARTIFACT_DIR}/install-env"
