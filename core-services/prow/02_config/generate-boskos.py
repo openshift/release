@@ -40,7 +40,9 @@ CONFIG = {
         'us-east-2': 10,
     },
     'aws-qe-quota-slice': {
-        'us-east-1': 30,
+        'us-east-1': 20,
+        'us-east-2': 5,
+        'ap-northeast-1': 5,
     },
     'aws-sd-qe-quota-slice': {
         'us-west-2': 3,
