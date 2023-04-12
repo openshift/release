@@ -18,13 +18,19 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network -o logs && sudo chmod +r /tmp/sosreport*"
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 
-gcloud compute scp \
---quiet \
---project "${GOOGLE_PROJECT_ID}" \
---zone "${GOOGLE_COMPUTE_ZONE}" \
-rhel8user@"${INSTANCE_PREFIX}":/tmp/sosreport* ${ARTIFACT_DIR}/
+mkdir -p "${HOME}"/.ssh
+cat << EOF > "${HOME}"/.ssh/config
+Host ${INSTANCE_PREFIX}
+  User rhel8user
+  HostName ${IP_ADDRESS}
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+EOF
+chmod 0600 "${HOME}"/.ssh/config
+
+ssh "${INSTANCE_PREFIX}" \
+  "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network -o logs && sudo chmod +r /tmp/sosreport*"
+
+scp "${INSTANCE_PREFIX}":/tmp/sosreport* ${ARTIFACT_DIR}/
