@@ -1,27 +1,30 @@
 base_images:
-  base:
+  cli:
     name: "4.12"
-    namespace: ocp
-    tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+    namespace: origin
+    tag: cli
 build_root:
-  project_image:
-    dockerfile_literal: |
-      RUN yum install -y java-11-openjdk-devel git
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
 images:
-- dockerfile_path: Dockerfile
-  from: base
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/origin/4.12:cli
+    RUN yum install -y java-11-openjdk-devel git
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    cli:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+      - registry.ci.openshift.org/origin/4.12:cli
+    src:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: intellij-openshift-connector
-promotion:
-  name: "4.12"
-  namespace: ocp
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
