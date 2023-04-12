@@ -1,0 +1,62 @@
+base_images:
+  base:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.14
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/agent-installer-utils
+images:
+- dockerfile_path: images/Dockerfile.ocp
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+  to: agent-installer-utils
+promotion:
+  disabled: true
+  name: 4.14-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.14-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.14-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: dnf install -y nmstate-devel
+tests:
+- as: gofmt
+  commands: IS_CONTAINER=TRUE ./hack/go-fmt.sh .
+  container:
+    from: test-bin
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: govet
+  commands: IS_CONTAINER=TRUE ./hack/go-vet.sh ./...
+  container:
+    from: test-bin
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: verify-vendor
+  commands: IS_CONTAINER=TRUE ./hack/verify-vendor.sh
+  container:
+    from: src
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-priv
+  repo: agent-installer-utils

@@ -15,16 +15,20 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 function mount_virtual_media() {
   ### Sushy doesn't support NFS as TransferProtcolType, and some servers' BMCs (in particular the ones of the arm64 servers)
   ##  are not 100% compliant with the Redfish standard. Therefore, relying on the raw redfish python library.
-  bmc_address="${1}"
-  bmc_username="${2}"
-  bmc_password="${3}"
-  iso_path="${4}"
-  transfer_protocol_type="${5}"
+  local bmc_address="${1}"
+  local bmc_username="${2}"
+  local bmc_password="${3}"
+  local iso_path="${4}"
+  local transfer_protocol_type="${5}"
   echo "Mounting the ISO image in ${bmc_address} via virtual media..."
-  python3 - "${bmc_address}" "${bmc_username}" "${bmc_password}" \
+  python3 -u - "${bmc_address}" "${bmc_username}" "${bmc_password}" \
     "${iso_path}" "${transfer_protocol_type^^}" <<'EOF'
 import redfish
 import sys
@@ -44,14 +48,34 @@ response = context.get(f"/redfish/v1/Managers/{manager}/VirtualMedia/")
 removable_disk = list(filter((lambda x: x["@odata.id"].find("CD") != -1),
                              response.dict.get("Members")))[0]["@odata.id"].split("/")[-1]
 
-print("Eject virtual media, if any")
+### This is for AMI BMCs (currently only the arm64 servers) as they are affected by a bug that prevents the ISOs to be mounted/umounted
+### correctly. The workaround is to reset the redfish internal redis database and make it populate again from the BMC.
+if manager == "Self":
+  print("Reset BMC's redfish database...")
+  try:
+    response = context.post(f"/redfish/v1/Managers/{manager}/Actions/Oem/AMIManager.RedfishDBReset/",
+                            body={"RedfishDBResetType": "ResetAll"})
+    # Wait for the BMC to reset the database
+    time.sleep(60)
+  except Exception as e:
+    print("Failed to reset the BMC's redfish database. Continuing anyway...")
+  print("Reset BMC and wait for 5mins to be reachable again...")
+  try:
+    response = context.post(f"/redfish/v1/Managers/{manager}/Actions/Manager.Reset",
+                            body={"ResetType": "ForceRestart"})
+    # Wait for the BMC to reset
+    time.sleep(300)
+  except Exception as e:
+    print("Failed to reset the BMC. Continuing anyway...")
+
+print("Eject virtual media, if any...")
 response = context.post(
     f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.EjectMedia", body={})
 print(response.__dict__)
 print(response.status)
 print(response.text)
-time.sleep(10)
-print("Insert new virtual media")
+time.sleep(30)
+print("Insert new virtual media...")
 
 other_options = {}
 if transfer_protocol_type == "CIFS":
@@ -88,7 +112,13 @@ if response.is_processing:
     print()
 
 EOF
-  return $? # Return the exit code of the python script
+  local ret=$?
+  if [ $ret -ne 0 ]; then
+    echo "Failed to mount the ISO image in ${bmc_address} via virtual media."
+    touch /tmp/virtual_media_mount_failure
+    return 1
+  fi
+  return 0
 }
 
 function oinst() {
@@ -172,6 +202,10 @@ mkdir -p "${INSTALL_DIR}"
 echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=openshift-install --to=/tmp
+
+if [ "${DISCONNECTED}" == "true" ]; then
+  OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
+fi
 
 # Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
@@ -293,14 +327,17 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     # Assuming HTTP or HTTPS
     iso_path="${transfer_protocol_type}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
   fi
-  # TODO: make the next one multi-threaded
   mount_virtual_media "${bmc_address}" "${redfish_user}" "${redfish_password}" \
-   "${iso_path}" "${transfer_protocol_type}" || {
-    echo "Failed to mount the ISO image in the host ${name}"
-    exit 1
-  }
+   "${iso_path}" "${transfer_protocol_type}" &
 done
 
+wait
+if [ -f /tmp/virtual_media_mount_failed ]; then
+  echo "Failed to mount the ISO image in one or more hosts"
+  exit 1
+fi
+
+# shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
@@ -309,6 +346,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
+echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
+sleep 900
 echo "Launching 'wait-for bootstrap-complete' installation step....."
 # The installer uses the rendezvous IP for checking the bootstrap phase.
 # The rendezvous IP is in the internal net in our lab.

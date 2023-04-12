@@ -44,13 +44,21 @@ resources:
       memory: 200Mi
 test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
 tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: addon-manager
+    env:
+      IMAGE_REPO: addon-manager
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: pr-merge-image-mirror
   postsubmit: true
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: addon-framework
+      SOURCE_IMAGE_REF: addon-manager
     env:
-      IMAGE_REPO: addon-framework
+      IMAGE_REPO: addon-manager
       IMAGE_TAG: main
       REGISTRY_ORG: stolostron
     workflow: ocm-ci-image-mirror

@@ -59,6 +59,7 @@ function build_push_operator_images {
 
   export VERSION=0.0.1
   export IMG=${IMAGE_TAG_BASE}:${IMAGE_TAG}
+  export BUNDLE_STORAGE_IMG=${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG}
 
   unset GOFLAGS
   pushd ${OP_DIR}
@@ -68,6 +69,18 @@ function build_push_operator_images {
   oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
   oc set build-secret --pull bc/${OPERATOR} ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR} --from-dir . -F
+
+  # if it is the metaoperator and any extra dependant bundles exist build and push them here
+  local STORAGE_BUNDLE_EXISTS=0
+  if [[ -f storage-bundle.Dockerfile ]]; then
+    DOCKERFILE=storage-bundle.Dockerfile /bin/bash hack/pin-custom-bundle-dockerfile.sh
+    oc new-build --binary --strategy=docker --name ${OPERATOR}-storage-bundle --to=${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
+    DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\"storage-bundle.Dockerfile.pinned\"\}\}\}\})
+    oc patch bc ${OPERATOR}-storage-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
+    oc set build-secret --pull bc/${OPERATOR}-storage-bundle ${DOCKER_REGISTRY_SECRET}
+    oc start-build ${OPERATOR}-storage-bundle --from-dir . -F
+    STORAGE_BUNDLE_EXISTS=1
+  fi
 
   # Build and push bundle image
   oc new-build --binary --strategy=docker --name ${OPERATOR}-bundle --to=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
@@ -80,13 +93,24 @@ function build_push_operator_images {
   DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${DOCKERFILE}"\"\}\}\}\})
 
   oc patch bc ${OPERATOR}-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
+  oc set build-secret --pull bc/${OPERATOR}-bundle ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR}-bundle --from-dir . -F
 
   BASE_BUNDLE=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG}
   DOCKERFILE="index.Dockerfile"
   DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\""${DOCKERFILE}"\"\}\}\}\})
 
-  opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
+# todo: Improve include manila bundle workflow. For meta operaor only we need to add manila bundle in index and not for individual operators like keystone.
+  if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
+    if [[ "$STORAGE_BUNDLE_EXISTS" == "1" ]]; then
+      opm index add --bundles "${BASE_BUNDLE}",${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG} --out-dockerfile "${DOCKERFILE}" --generate
+    else
+      # FIXME: we can drop manila here once ${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG} lands
+      opm index add --bundles "${BASE_BUNDLE}",quay.io/openstack-k8s-operators/manila-operator-bundle:latest --out-dockerfile "${DOCKERFILE}" --generate
+    fi
+  else
+    opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
+  fi
 
   oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
   oc patch bc ${OPERATOR}-index -p "${DOCKERFILE_PATH_PATCH[@]}"

@@ -15,27 +15,24 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
-mkdir -p "${HOME}"/.ssh
-mock-nss.sh
-
-# gcloud compute will use this key rather than create a new one
-cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
-cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
-echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
-echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
-chmod 0600 "${HOME}"/.ssh/config
-
-cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
-
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-gcloud compute firewall-rules update "${INSTANCE_PREFIX}" --allow tcp:22,icmp,tcp:80
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 
-cat << 'EOFEOF' > "${HOME}"/greenboot_check.sh
+mkdir -p "${HOME}"/.ssh
+cat << EOF > "${HOME}"/.ssh/config
+Host ${INSTANCE_PREFIX}
+  User rhel8user
+  HostName ${IP_ADDRESS}
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+EOF
+chmod 0600 "${HOME}"/.ssh/config
+
+cat << 'EOFEOF' > "${HOME}/greenboot_check.sh"
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -65,10 +62,10 @@ function check_greenboot_exit_status() {
 }
 
 #
-# Initial check must succeed (set timeout of 120s to speed up the process)
+# Initial check must succeed (set timeout of 180s to speed up the process)
 #
 tee /etc/greenboot/greenboot.conf &>/dev/null <<EOF
-MICROSHIFT_WAIT_TIMEOUT_SEC=120
+MICROSHIFT_WAIT_TIMEOUT_SEC=180
 EOF
 check_greenboot_exit_status 0 1
 
@@ -115,7 +112,7 @@ resources:
   - busybox.yaml
 images:
   - name: BUSYBOX_IMAGE
-    newName: registry.k8s.io/busybox
+    newName: busybox:1.35
 EOF
 
 SCRIPT_FILE=/etc/greenboot/check/required.d/50_busybox_running_check.sh
@@ -156,14 +153,10 @@ EOFEOF
 
 chmod +x "${HOME}/greenboot_check.sh"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}/greenboot_check.sh" "rhel8user@${INSTANCE_PREFIX}:~/greenboot_check.sh"
+scp "${HOME}/greenboot_check.sh" "${INSTANCE_PREFIX}:~/greenboot_check.sh"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute ssh \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  "rhel8user@${INSTANCE_PREFIX}" \
-  --command "sudo bash ~/greenboot_check.sh"
+if ! ssh "${INSTANCE_PREFIX}" "sudo ~/greenboot_check.sh"; then
+  scp -r /tmp/validate-microshift "${INSTANCE_PREFIX}":~/validate-microshift
+  ssh "${INSTANCE_PREFIX}" 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+  exit 1
+fi

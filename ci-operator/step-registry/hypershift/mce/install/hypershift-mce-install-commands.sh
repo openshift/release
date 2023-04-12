@@ -90,7 +90,7 @@ spec:
 EOF
 
 CSVName=""
-for ((i=1; i<=10; i++)); do
+for ((i=1; i<=60; i++)); do
   output=$(oc get sub multicluster-engine -n multicluster-engine -o jsonpath='{.status.currentCSV}' >> /dev/null && echo "exists" || echo "not found")
   if [ "$output" != "exists" ]; then
     sleep 2

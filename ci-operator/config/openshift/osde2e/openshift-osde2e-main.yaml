@@ -31,15 +31,17 @@ tests:
     make check
   container:
     from: src
-- as: verify
+- as: rosa-pr-check
   commands: |
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="rosa,pr-check"
-    export GINKGO_SKIP="Must Gather Operator"
-    export ROSA_ENV="prod"
+    export ROSA_ENV="stage"
     export ROSA_STS="true"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-prod"
+    export MUST_GATHER="false"
+    export CHANNEL="candidate"
+    export INSTALL_LATEST_XY="4.12"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
 
     go mod tidy
     make build
@@ -52,17 +54,17 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-rosa-prod
-    name: osde2e-rosa-prod
+  - mount_path: /usr/local/osde2e-rosa-stage
+    name: osde2e-rosa-stage
   skip_if_only_changed: ^(?:docs|\.github)|\.md$|^(?:\.gitignore|.golang-ci.yml|OWNERS|LICENSE)$
 - as: hypershift-pr-check
   commands: |
     export GOFLAGS=""
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="hypershift"
-    export CHANNEL="stable"
-    export CLUSTER_VERSION="4.12.1"
-    export HYPERSHIFT_IGNORE_INVALID_CERT="true"
+    export CHANNEL="candidate"
+    export INSTALL_LATEST_XY="4.12"
+    export MUST_GATHER="false"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
 
     go mod tidy
@@ -244,6 +246,8 @@ tests:
     export ROSA_ENV="stage"
     export USE_EXISTING_CLUSTER="false"
     export USE_PROXY_FOR_INSTALL="true"
+    export USE_LATEST_VERSION_FOR_INSTALL="true"
+    export CHANNEL="candidate"
     export CONFIGS="rosa,e2e-suite"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-rosa-stage"
 
@@ -266,6 +270,8 @@ tests:
     export HIBERNATE_AFTER_USE="false"
     export ROSA_ENV="stage"
     export USE_EXISTING_CLUSTER="false"
+    export USE_LATEST_VERSION_FOR_INSTALL="true"
+    export CHANNEL="candidate"
     export CONFIGS="rosa,proxy-suite"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-static-byo-vpc,/usr/local/osde2e-rosa-stage"
 
@@ -302,6 +308,8 @@ tests:
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="rosa,e2e-suite"
     export ROSA_ENV="stage"
+    export CHANNEL="candidate"
+    export USE_LATEST_VERSION_FOR_INSTALL="true"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
 
     /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
@@ -320,8 +328,9 @@ tests:
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
     export CONFIGS="hypershift"
-    export CHANNEL="stable"
-    export CLUSTER_VERSION="4.12.1"
+    export CHANNEL="candidate"
+    export INSTALL_LATEST_XY="4.12"
+    export MUST_GATHER="false"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-hypershift-byovpc"
 
     /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
@@ -342,6 +351,8 @@ tests:
     export CONFIGS="rosa,e2e-suite"
     export ROSA_ENV="stage"
     export ROSA_STS="true"
+    export CHANNEL="candidate"
+    export INSTALL_LATEST_XY="4.12"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage"
 
     /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
@@ -356,66 +367,19 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-rosa-stage
     name: osde2e-rosa-stage
-- as: aws-stage-e2e-default
+- as: aws-stage-informing-default
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="aws,stage,e2e-suite"
+    export CONFIGS="aws,stage,informing-suite"
+    export CHANNEL="candidate"
+    export USE_LATEST_VERSION_FOR_INSTALL="true"
     export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
 
     /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
   container:
     clone: true
     from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-- as: gcp-stage-e2e-default
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="gcp,stage,e2e-suite"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-- as: aws-prod-e2e-default
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="aws,prod,e2e-suite"
-    export ENABLE_ALERTS="true"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-- as: aws-prod-informing-default
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="aws,prod,informing-suite"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
+  cron: 0 */12 * * 0-5
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
@@ -437,62 +401,6 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
-- as: gcp-prod-e2e-default
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="gcp,prod,e2e-suite"
-    export ENABLE_ALERTS="true"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-- as: rosa-prod-e2e-default
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="rosa,e2e-suite"
-    export ROSA_ENV="prod"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-prod"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-rosa-prod
-    name: osde2e-rosa-prod
-- as: rosa-prod-e2e-sts
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="rosa,e2e-suite"
-    export ROSA_ENV="prod"
-    export ROSA_STS="true"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-prod"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-rosa-prod
-    name: osde2e-rosa-prod
 zz_generated_metadata:
   branch: main
   org: openshift

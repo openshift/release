@@ -60,17 +60,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: alibaba-ipi-fips-p2-f14
-  cron: 1 20 2,17 * *
-  steps:
-    cluster_profile: alibabacloud-qe
-    env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.11 and @alibaba-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.11 and @alibaba-ipi'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi-fips
 - as: aws-c2s-ipi-disconnected-private-p2-f14
   cron: 15 20 14,29 * *
   steps:
@@ -159,6 +148,18 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: aws-ipi-imdsv2-p2-f14
+  cron: 12 15 6,21 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.11 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.11 and @aws-ipi and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-imdsv2
 - as: aws-ipi-ovn-fips-p2-f14
   cron: 25 8 4,19 * *
   steps:
@@ -315,10 +316,10 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-ovn
-- as: azure-ipi-private-p2-f7
-  cron: 29 22 4,12,19,26 * *
+- as: azure-ipi-private-workers-marketimage-p2-f7
+  cron: 36 12 3,10,17,25 * *
   steps:
-    cluster_profile: azure-qe
+    cluster_profile: azure-marketplace-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.11 and @azure-ipi and not @fips'
@@ -326,19 +327,7 @@ tests:
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-private
-- as: azure-ipi-proxy-techpreview-p2-f14
-  cron: 37 0 1,16 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.11 and @azure-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.11 and @azure-ipi and not @fips'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi-proxy-techpreview
+    workflow: cucushift-installer-rehearse-azure-ipi-private-workers-marketimage
 - as: azure-ipi-proxy-workers-rhcos-rhel8-p2-f7
   cron: 29 20 8,16,23,30 * *
   steps:
@@ -444,6 +433,31 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-upi
+- as: ibmcloud-ipi-p2-f7
+  cron: 16 0 2,10,17,24 * *
+  steps:
+    cluster_profile: ibmcloud-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.11 and @ibmcloud-ipi and not
+        @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.11 and @ibmcloud-ipi and not
+        @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi
+- as: nutanix-ipi-p2-f7
+  cluster: build01
+  cron: 15 22 6,13,20,28 * *
+  steps:
+    cluster_profile: nutanix-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.11 and @nutanix-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.11 and @nutanix-ipi and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-nutanix-ipi
 - as: vsphere-ipi-disconnected-registry-pvc-p2-f14
   cron: 36 19 13,28 * *
   steps:
@@ -501,17 +515,6 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-workers-rhel8
-- as: vsphere-ipi-zones-techpreview-p2-f14
-  cron: 32 13 10,25 * *
-  steps:
-    cluster_profile: vsphere-multizone
-    env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.11 and @vsphere-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.11 and @vsphere-ipi and not @fips'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-zones-techpreview
 - as: vsphere-upi-disconnected-secureboot-p2-f14
   cron: 54 21 8,23 * *
   steps:
