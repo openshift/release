@@ -1,0 +1,36 @@
+workflow:
+  as: hypershift-kubevirt-conformance-baremetalds
+  documentation: |-
+    The HyperShift KubeVirt conformance workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    The control plane is hosted on a dedicated standalone OCP cluster running
+    HyperShift in Azure account and is destroyed after tests complete.
+
+    The HyperShift launch capability is currently supported by the HyperShift
+    team.
+
+    Learn more about HyperShift here: https://github.com/openshift/hypershift
+
+    Track HyperShift's development here: https://issues.redhat.com/projects/HOSTEDCP
+  steps:
+    pre:
+    - chain: baremetalds-ipi-pre
+    - ref: hypershift-kubevirt-install
+    - ref: hypershift-install
+    - chain: hypershift-kubevirt-create
+    test:
+    - chain: hypershift-conformance
+    post:
+    - chain: hypershift-dump
+    - chain: gather-core-dump
+    - chain: hypershift-kubevirt-destroy
+    - chain: baremetalds-ipi-post
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OVNKubernetes
