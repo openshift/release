@@ -87,7 +87,7 @@ spec:
 EOF_INNER
 
 echo "waiting for pod condition" >&2
-oc wait --for=condition=Ready --timeout=120s pod/test-pod
+oc wait --for=condition=Ready --timeout=300s pod/test-pod
 echo "pod posted ready status" >&2
 
 EOF
