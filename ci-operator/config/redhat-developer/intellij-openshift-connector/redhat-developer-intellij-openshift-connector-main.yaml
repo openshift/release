@@ -1,25 +1,17 @@
 base_images:
   cli:
     name: "4.12"
-    namespace: origin
+    namespace: ocp
     tag: cli
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
-images:
-- dockerfile_literal: |
-    FROM registry.ci.openshift.org/origin/4.12:cli
-    RUN yum install -y java-11-openjdk-devel git
-  inputs:
-    cli:
-      as:
-      - registry.ci.openshift.org/origin/4.12:cli
-    src:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
-  to: intellij-openshift-connector
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8
+      RUN yum install -y java-11-openjdk-devel git
 releases:
   latest:
     release:
@@ -33,7 +25,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e
+- as: e2e-openshift
   steps:
     cluster_profile: aws
     test:
