@@ -92,6 +92,37 @@ subjects:
   kind: Group
   name: openshift-cluster-bot-developers
 ---
+kind: Role
+apiVersion: authorization.openshift.io/v1
+metadata:
+  name: ci-chat-bot-secret
+  namespace: ci
+rules:
+- apiGroups: [""]
+  resources:
+  - secrets
+  verbs:
+  - get
+  - create
+  - update
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-chat-bot-binding-secret
+  namespace: ci
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: ci-chat-bot-secret
+subjects:
+- kind: ServiceAccount
+  namespace: ci
+  name: ci-chat-bot
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: openshift-cluster-bot-developers
+---
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -222,6 +253,24 @@ spec:
           items:
             - key: jira-token
               path: jira-token
+      - name: subnet-ids
+        secret:
+          secretName: ci-chat-bot-slack-app
+          items:
+            - key: subnet-ids
+              path: subnet-ids
+      - name: awscred
+        secret:
+          secretName: ci-chat-bot-slack-app
+          items:
+            - key: rosa-admin-aws
+              path: rosa-admin-aws
+      - name: ocmcred
+        secret:
+          secretName: ci-chat-bot-slack-app
+          items:
+            - key: rosa-admin-ocm
+              path: rosa-admin-ocm
       containers:
       - name: bot
         image: ci-chat-bot:latest
@@ -244,6 +293,15 @@ spec:
         - mountPath: /etc/jira
           name: jira
           readOnly: true
+        - mountPath: /etc/awscred
+          name: awscred
+          readOnly: true
+        - mountPath: /etc/ocmcred
+          name: ocmcred
+          readOnly: true
+        - mountPath: /etc/subnet-ids
+          name: subnet-ids
+          readOnly: true
         env:
         - name: BOT_TOKEN
           valueFrom:
@@ -260,6 +318,10 @@ spec:
             secretKeyRef:
               name: ci-chat-bot-slack-app
               key: slack-app-bot-signing-secret
+        - name: AWS_SHARED_CREDENTIALS_FILE
+          value: /etc/awscred
+        - name: OCM_CONFIG
+          value: /etc/ocmcred
         command:
         - /usr/bin/ci-chat-bot
         - --prow-config=/etc/config/config.yaml
