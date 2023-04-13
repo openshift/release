@@ -6,72 +6,6 @@ presubmits:
     - ^release-v1\.8$
     - ^release-v1\.8-
     cluster: build04
-    context: ci/prow/410-e2e-aws-ocp-410
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "410"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.8-410-e2e-aws-ocp-410
-    path_alias: knative.dev/serving
-    rerun_command: /test 410-e2e-aws-ocp-410
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ocp-410
-        - --variant=410
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /secrets/hive-hive-credentials
-          name: hive-hive-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: hive-hive-credentials
-        secret:
-          secretName: hive-hive-credentials
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )410-e2e-aws-ocp-410,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-v1\.8$
-    - ^release-v1\.8-
-    cluster: build04
     context: ci/prow/410-images
     decorate: true
     decoration_config:
@@ -81,7 +15,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-serving-release-v1.8-410-images
-    path_alias: knative.dev/serving
     rerun_command: /test 410-images
     spec:
       containers:
@@ -125,17 +58,16 @@ presubmits:
     - ^release-v1\.8$
     - ^release-v1\.8-
     cluster: build04
-    context: ci/prow/411-e2e-aws-ocp-411
+    context: ci/prow/410-test-e2e-aws-ocp-410
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "411"
+      ci-operator.openshift.io/variant: "410"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.8-411-e2e-aws-ocp-411
-    path_alias: knative.dev/serving
-    rerun_command: /test 411-e2e-aws-ocp-411
+    name: pull-ci-openshift-knative-serving-release-v1.8-410-test-e2e-aws-ocp-410
+    rerun_command: /test 410-test-e2e-aws-ocp-410
     spec:
       containers:
       - args:
@@ -144,8 +76,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ocp-411
-        - --variant=411
+        - --target=test-e2e-aws-ocp-410
+        - --variant=410
         command:
         - ci-operator
         image: ci-operator:latest
@@ -184,77 +116,23 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )411-e2e-aws-ocp-411,?($|\s.*)
+    trigger: (?m)^/test( | .* )410-test-e2e-aws-ocp-410,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^release-v1\.8$
     - ^release-v1\.8-
     cluster: build04
-    context: ci/prow/411-images
+    context: ci/prow/410-test-e2e-tls-aws-ocp-410
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/variant: "411"
+      ci-operator.openshift.io/variant: "410"
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.8-411-images
-    path_alias: knative.dev/serving
-    rerun_command: /test 411-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=src
-        - --variant=411
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )411-images,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-v1\.8$
-    - ^release-v1\.8-
-    cluster: build04
-    context: ci/prow/412-e2e-aws-ocp-412
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/variant: "412"
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-knative-serving-release-v1.8-412-e2e-aws-ocp-412
-    path_alias: knative.dev/serving
-    rerun_command: /test 412-e2e-aws-ocp-412
+    name: pull-ci-openshift-knative-serving-release-v1.8-410-test-e2e-tls-aws-ocp-410
+    rerun_command: /test 410-test-e2e-tls-aws-ocp-410
     spec:
       containers:
       - args:
@@ -263,8 +141,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-aws-ocp-412
-        - --variant=412
+        - --target=test-e2e-tls-aws-ocp-410
+        - --variant=410
         command:
         - ci-operator
         image: ci-operator:latest
@@ -303,7 +181,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )412-e2e-aws-ocp-412,?($|\s.*)
+    trigger: (?m)^/test( | .* )410-test-e2e-tls-aws-ocp-410,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -319,7 +197,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-knative-serving-release-v1.8-412-images
-    path_alias: knative.dev/serving
     rerun_command: /test 412-images
     spec:
       containers:
@@ -357,3 +234,133 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )412-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-v1\.8$
+    - ^release-v1\.8-
+    cluster: build04
+    context: ci/prow/412-test-e2e-aws-ocp-412
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "412"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serving-release-v1.8-412-test-e2e-aws-ocp-412
+    rerun_command: /test 412-test-e2e-aws-ocp-412
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-e2e-aws-ocp-412
+        - --variant=412
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )412-test-e2e-aws-ocp-412,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-v1\.8$
+    - ^release-v1\.8-
+    cluster: build04
+    context: ci/prow/412-test-e2e-tls-aws-ocp-412
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "412"
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serving-release-v1.8-412-test-e2e-tls-aws-ocp-412
+    rerun_command: /test 412-test-e2e-tls-aws-ocp-412
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=test-e2e-tls-aws-ocp-412
+        - --variant=412
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )412-test-e2e-tls-aws-ocp-412,?($|\s.*)
