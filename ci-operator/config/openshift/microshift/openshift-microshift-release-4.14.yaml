@@ -111,9 +111,18 @@ tag_specification:
 tests:
 - as: verify
   cluster: build02
-  commands: make verify
-  container:
-    from: src
+  steps:
+    test:
+    - as: verify
+      commands: make verify
+      env:
+      - default: /tmp/
+        name: GOLANGCI_LINT_CACHE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: test-unit
   cluster: build02
   commands: make test-unit
