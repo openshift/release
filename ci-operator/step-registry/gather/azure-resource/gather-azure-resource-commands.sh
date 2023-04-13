@@ -78,6 +78,16 @@ function getResourceGroup() {
     export RESOURCE_GROUP
 }
 
+function gahter_master_serial_log() {
+    local master_nodes
+
+    echo "$(date -u --rfc-3339=seconds) - Gather serial log on master nodes..."
+    master_nodes=$(az vm list -g ${RESOURCE_GROUP} --query '[].name' -otsv | grep master)
+    for node in ${master_nodes}; do
+        run_command "az vm boot-diagnostics get-boot-log -n ${node} -g ${RESOURCE_GROUP} > ${OUTPUT_DIR}/${node}-serial-log"
+    done
+}
+
 cli_Login
 
 OUTPUT_DIR="${ARTIFACT_DIR}"
@@ -90,3 +100,4 @@ run_command "az vm list --resource-group $RESOURCE_GROUP -o tsv"
 run_command "az resource list --resource-group $RESOURCE_GROUP -o tsv"
 
 gatherLBs
+gahter_master_serial_log
