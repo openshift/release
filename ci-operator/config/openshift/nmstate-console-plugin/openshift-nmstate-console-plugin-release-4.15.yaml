@@ -1,13 +1,12 @@
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v24
 images:
 - dockerfile_path: Dockerfile
-  to: jenkins
+  to: nmstate-console-plugin
 promotion:
-  additional_images:
-    jenkins-sync-plugin-e2e: src
-  excluded_images:
-  - jenkins
   name: "4.15"
   namespace: ocp
 releases:
@@ -22,21 +21,27 @@ releases:
       namespace: ocp
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-jenkins-sync-plugin
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+- as: e2e-tests
   steps:
     cluster_profile: aws
     test:
-    - as: test
+    - as: e2e-tests
       cli: latest
-      commands: make test-e2e
+      commands: |
+        ./test-prow-e2e.sh ${NMSTATE_UI_PLUGIN_IMG_NAME};
+      credentials:
+      - mount_path: /var/run/operator-secret
+        name: operator-secret
+        namespace: test-credentials
       dependencies:
-      - env: JENKINS_IMAGE
-        name: pipeline:jenkins
+      - env: NMSTATE_UI_PLUGIN_IMG_NAME
+        name: nmstate-console-plugin
       from: src
       resources:
         requests:
@@ -45,4 +50,4 @@ tests:
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
-  repo: jenkins-sync-plugin
+  repo: nmstate-console-plugin
