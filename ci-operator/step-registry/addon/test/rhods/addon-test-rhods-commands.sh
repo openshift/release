@@ -24,7 +24,7 @@ export RUN_SCRIPT_ARGS
 mkdir $ARTIFACT_DIR/results
 echo -e "cluster name: $CLUSTER_NAME\napi url: $OC_HOST\napi host: $API_HOST\ntest marker: $TEST_MARKER"
 
+sleep 2h
+
 # running RHODS tests
 ./build/run.sh
-
-sleep 1h
