@@ -413,11 +413,11 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
 
-if [[ "$JOB_NAME" == *"4.14"* ]]
-then
-  inject_journal_to_console_config $dir worker
-  inject_journal_to_console_config $dir master
-fi
+#if [[ "$JOB_NAME" == *"4.14"* ]]
+#then
+#  inject_journal_to_console_config $dir worker
+#  inject_journal_to_console_config $dir master
+#fi
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
