@@ -33,7 +33,7 @@ tests:
     - as: prepare
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods run_notebook_scale_test_on_private prepare
+        run notebooks run_notebook_scale_test_on_private prepare
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -47,7 +47,7 @@ tests:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods run_notebook_scale_test_on_private
+        run notebooks run_notebook_scale_test_on_private
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -65,7 +65,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h30m0s
-    version: "4.11"
+    version: "4.12"
   steps:
     pre:
     - as: prepare
@@ -75,7 +75,7 @@ tests:
         cp "$KUBECONFIG" "${SHARED_DIR}/sutest_kubeconfig"
 
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_scale_test prepare_ci
+        run notebooks scale_test prepare_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -89,7 +89,7 @@ tests:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_scale_test test_ci
+        run notebooks scale_test test_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -106,7 +106,7 @@ tests:
     - as: destroy-clusters
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods clusters destroy
+        run notebooks clusters destroy
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -120,7 +120,7 @@ tests:
     - as: create-clusters
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods clusters create
+        run notebooks clusters create
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -133,7 +133,7 @@ tests:
     - as: prepare
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_scale_test prepare_ci
+        run notebooks scale_test prepare_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -147,7 +147,7 @@ tests:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_scale_test test_ci
+        run notebooks scale_test test_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -161,7 +161,7 @@ tests:
   steps:
     test:
     - as: test
-      commands: run ods notebook_scale_test generate_plots_from_pr_args
+      commands: run notebooks scale_test generate_plots_from_pr_args
       from: ci-artifacts
       resources:
         requests:
@@ -173,7 +173,7 @@ tests:
     - as: destroy-clusters
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods clusters destroy
+        run notebooks clusters destroy
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -187,7 +187,7 @@ tests:
     - as: create-clusters
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods clusters create
+        run notebooks clusters create
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -200,7 +200,7 @@ tests:
     - as: prepare
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_scale_test prepare_ci
+        run notebooks notebook_scale_test prepare_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -214,7 +214,7 @@ tests:
     - as: test
       commands: |
         export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
-        run ods notebook_scale_test test_ci
+        run notebooks notebook_scale_test test_ci
       credentials:
       - mount_path: /var/run/psap-ods-secret-1
         name: psap-ods-secret-1
@@ -226,6 +226,115 @@ tests:
           memory: 500Mi
       timeout: 5h0m0s
   timeout: 7h0m0s
+- as: pipelines-light
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.12"
+  steps:
+    pre:
+    - as: prepare
+      commands: |
+        # running with a CI-provided cluster, set up the files as for a 'single' config
+        cp "$KUBECONFIG" "${SHARED_DIR}/driver_kubeconfig"
+        cp "$KUBECONFIG" "${SHARED_DIR}/sutest_kubeconfig"
+
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run pipelines scale_test prepare_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run pipelines scale_test test_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: pipelines
+  steps:
+    post:
+    - as: destroy-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run pipelines clusters destroy
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    pre:
+    - as: create-clusters
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run pipelines clusters create
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: prepare
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run pipelines scale_test prepare_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    test:
+    - as: test
+      commands: |
+        export PSAP_ODS_SECRET_PATH=/var/run/psap-ods-secret-1
+        run pipelines scale_test test_ci
+      credentials:
+      - mount_path: /var/run/psap-ods-secret-1
+        name: psap-ods-secret-1
+        namespace: test-credentials
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+- as: pipelines-plot
+  steps:
+    test:
+    - as: test
+      commands: run pipelines scale_test generate_plots_from_pr_args
+      from: ci-artifacts
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 1Gi
 - as: cleanup-velero-buckets
   cron: 0 6 * * *
   steps:

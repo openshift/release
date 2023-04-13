@@ -30,8 +30,18 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
 fi
 SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g')
 
-export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${OPENSTACK_OPERATOR}
-export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
+# Copy base operator code to home directory
+cp -r /go/src/github.com/${ORG}/${BASE_OP}/ ${HOME}
+
+if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
+  # when testing install_yamls patch, we can skip build process and
+  #  validate using latest openstack-operator tag
+  export IMAGE_TAG_BASE=quay.io/${ORG}/${OPENSTACK_OPERATOR}
+  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:latest
+else
+  export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${OPENSTACK_OPERATOR}
+  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
+fi
 
 if [ ! -d "${HOME}/install_yamls" ]; then
   cd ${HOME}
