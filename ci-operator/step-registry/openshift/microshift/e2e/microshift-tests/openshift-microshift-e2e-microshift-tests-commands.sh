@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
-IFS=$'\n\t'
-set -x
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -22,23 +20,16 @@ gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
 IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 
-mkdir -p "${HOME}"/.ssh
-cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" "${HOME}/.ssh/google_compute_engine"
-chmod 0600 "${HOME}/.ssh/google_compute_engine"
-cp "${CLUSTER_PROFILE_DIR}/ssh-publickey" "${HOME}/.ssh/google_compute_engine.pub"
-
+mkdir -p "${HOME}/.ssh"
 cat <<EOF >"${HOME}/.ssh/config"
 Host ${IP_ADDRESS}
-    IdentityFile ~/.ssh/google_compute_engine
-    ServerAliveInterval 30
-    ServerAliveCountMax 1200
+  User rhel8user
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+  ServerAliveInterval 30
+  ServerAliveCountMax 1200
 EOF
 chmod 0600 "${HOME}/.ssh/config"
-
-gcloud compute ssh \
-  --project "${GOOGLE_PROJECT_ID}" --zone "${GOOGLE_COMPUTE_ZONE}" \
-  "rhel8user@${INSTANCE_PREFIX}" \
-  --command "cat /etc/ssh/ssh_host_*_key.pub" | cut -d' ' -f1,2 | sed "s,^,${IP_ADDRESS} ," >>~/.ssh/known_hosts
 
 firewall::open_port() {
   local port="${1}"
@@ -56,4 +47,4 @@ export -f firewall::open_port
 export -f firewall::close_port
 export INSTANCE_PREFIX
 
-USHIFT_IP="${IP_ADDRESS}" USHIFT_USER=rhel8user ./microshift/e2e/main.sh run
+USHIFT_IP="${IP_ADDRESS}" USHIFT_USER=rhel8user /microshift/e2e/main.sh run

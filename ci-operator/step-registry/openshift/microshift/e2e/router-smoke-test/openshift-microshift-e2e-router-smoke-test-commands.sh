@@ -101,6 +101,5 @@ for try in $(seq 1 "${retries}"); do
 done
 set -x
 
-scp /tmp/validate-microshift "${INSTANCE_PREFIX}:~/validate-microshift"
-ssh "${INSTANCE_PREFIX}" "bash ~/validate-microshift/cluster-debug-info.sh"
+ssh "${INSTANCE_PREFIX}" "sudo bash -s" < /microshift/validate-microshift/cluster-debug-info.sh
 exit 1

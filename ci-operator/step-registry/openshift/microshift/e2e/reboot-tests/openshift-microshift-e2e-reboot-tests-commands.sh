@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -48,7 +48,7 @@ metadata:
   name: test-claim
 spec:
   accessModes:
-    - ReadWriteOnce
+  - ReadWriteOnce
   storageClassName: topolvm-provisioner
   resources:
     requests:
@@ -82,9 +82,10 @@ spec:
         - mountPath: /vol
           name: test-vol
   volumes:
-    - name: test-vol
-      persistentVolumeClaim:
-        claimName: test-claim
+  - name: test-vol
+    persistentVolumeClaim:
+      claimName: test-claim
+
 EOF_INNER
 
 echo "waiting for pod condition" >&2
@@ -95,8 +96,7 @@ chmod +x "${HOME}"/reboot-test.sh
 scp "${HOME}"/reboot-test.sh "${INSTANCE_PREFIX}":~/reboot-test.sh
 
 if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/reboot-test.sh'; then
-  scp -r /tmp/validate-microshift "${INSTANCE_PREFIX}":~/validate-microshift
-  ssh "${INSTANCE_PREFIX}" 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo -E ~/validate-microshift/cluster-debug-info.sh'
+  ssh "${INSTANCE_PREFIX}" "sudo bash -s" < /microshift/validate-microshift/cluster-debug-info.sh
   exit 1
 fi
 
