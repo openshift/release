@@ -89,8 +89,6 @@ EOF_INNER
 
 echo "waiting for pod condition" >&2
 oc wait --for=condition=Ready --timeout=120s pod/test-pod
-echo "pod posted ready status" >&2
-oc get node,pod,pvc -A
 EOF
 chmod +x "${HOME}"/reboot-test.sh
 
@@ -98,7 +96,7 @@ scp "${HOME}"/reboot-test.sh "${INSTANCE_PREFIX}":~/reboot-test.sh
 
 if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/reboot-test.sh'; then
   scp -r /tmp/validate-microshift "${INSTANCE_PREFIX}":~/validate-microshift
-  ssh "${INSTANCE_PREFIX}" 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+  ssh "${INSTANCE_PREFIX}" 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo -E ~/validate-microshift/cluster-debug-info.sh'
   exit 1
 fi
 
