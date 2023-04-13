@@ -35,6 +35,7 @@ cat >"${HOME}"/reboot-test.sh <<'EOF'
 set -xeuo pipefail
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
+stat $KUBECONFIG
 # TODO: Remove the labels again once https://issues.redhat.com/browse/OCPBUGS-1969 has been fixed upstream
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"-version=v1.24"
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"=privileged"
@@ -87,9 +88,9 @@ spec:
 EOF_INNER
 
 echo "waiting for pod condition" >&2
-oc wait --for=condition=Ready --timeout=300s pod/test-pod
+oc wait --for=condition=Ready --timeout=120s pod/test-pod
 echo "pod posted ready status" >&2
-
+oc get node,pod,pvc -A
 EOF
 chmod +x "${HOME}"/reboot-test.sh
 
