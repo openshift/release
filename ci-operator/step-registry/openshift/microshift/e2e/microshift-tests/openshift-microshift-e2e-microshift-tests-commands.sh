@@ -47,4 +47,18 @@ export -f firewall::open_port
 export -f firewall::close_port
 export INSTANCE_PREFIX
 
-USHIFT_IP="${IP_ADDRESS}" USHIFT_USER=rhel8user /microshift/e2e/main.sh run
+cd /tmp
+git clone https://github.com/pmtk/microshift.git --branch robot-framework
+
+mkdir -p /tmp/microshift/_output/
+python3 -m venv /tmp/microshift/_output/.venv
+
+cd /tmp/microshift/e2e-robot/
+/tmp/microshift/_output/.venv/bin/python3 -m pip install -r requirements.txt
+
+/tmp/microshift/_output/.venv/bin/robot \
+  -v "USHIFT_IP:${IP_ADDRESS}" \
+  -v USHIFT_USER:rhel8user \
+  --outputdir "${ARTIFACT_DIR}/" \
+  -x "junit_e2e_$(date +'%Y%m%d-%H%M%S').xml" \
+  ./tests/microshift.robot

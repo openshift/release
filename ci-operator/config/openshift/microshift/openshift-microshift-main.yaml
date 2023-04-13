@@ -40,7 +40,9 @@ images:
     RUN make rpm && TARGET_ARCH=aarch64 make rpm
     RUN tar cvf /rpms.tar -C _output/rpmbuild/RPMS/ .
 
-    FROM test-runtime
+    FROM quay.io/pmatusza/hm-test:docker-test-runtime-ubi9
+
+    RUN dnf install --setopt=tsflags=nodocs -y python3 python3-pip
 
     COPY oc openshift-tests /usr/bin/
     RUN ln -rs /usr/bin/oc /usr/bin/kubectl
@@ -62,9 +64,6 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/openshift-tests
-    test-runtime:
-      as:
-      - test-runtime
   to: microshift-test-payload
 promotion:
   excluded_images:
