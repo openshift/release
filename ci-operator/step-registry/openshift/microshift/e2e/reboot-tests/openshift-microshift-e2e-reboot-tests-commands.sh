@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -47,7 +47,7 @@ metadata:
   name: test-claim
 spec:
   accessModes:
-    - ReadWriteOnce
+  - ReadWriteOnce
   storageClassName: topolvm-provisioner
   resources:
     requests:
@@ -62,41 +62,39 @@ spec:
   securityContext:
     runAsNonRoot: true
     privileged: false
-    capabilities:
-      drop:
-      - 'ALL'
-    allowPrivilegeEscalation: false
     seccompProfile:
       type: RuntimeDefault
   containers:
-    - name: test-container
-      image: nginx
-      command:
-        - sh
-        - -c
-        - sleep 1d
-      volumeMounts:
-        - mountPath: /vol
-          name: test-vol
+  - name: test-container
+    image: nginxinc/nginx-unprivileged:latest
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+    command:
+    - sh
+    - -c
+    - sleep 1d
+    volumeMounts:
+    - mountPath: /vol
+      name: test-vol
   volumes:
-    - name: test-vol
-      persistentVolumeClaim:
-        claimName: test-claim
+  - name: test-vol
+    persistentVolumeClaim:
+      claimName: test-claim
+
 EOF_INNER
 
-set +ex
 echo "waiting for pod condition" >&2
 oc wait --for=condition=Ready --timeout=120s pod/test-pod
-echo "pod posted ready status" >&2
-
 EOF
 chmod +x "${HOME}"/reboot-test.sh
 
 scp "${HOME}"/reboot-test.sh "${INSTANCE_PREFIX}":~/reboot-test.sh
 
 if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/reboot-test.sh'; then
-  scp -r /tmp/validate-microshift "${INSTANCE_PREFIX}":~/validate-microshift
-  ssh "${INSTANCE_PREFIX}" 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+  ssh "${INSTANCE_PREFIX}" "sudo bash -s" < /microshift/validate-microshift/cluster-debug-info.sh
   exit 1
 fi
 
