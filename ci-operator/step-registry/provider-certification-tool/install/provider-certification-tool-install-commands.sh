@@ -100,7 +100,10 @@ OCP_VERSION=$(oc get clusterversion version -o=jsonpath='{.status.desired.versio
 OCP_PLAT=$(oc get infrastructures cluster -o jsonpath='{.status.platform}')
 OCP_TOPOLOGY=$(oc get infrastructures cluster -o jsonpath='{.status.controlPlaneTopology}')
 
-# Run the tool with watch flag set.
+# Populate the required variables to run conformance upgrade
+# The steps below will discovers the stable 4.y+1 based on the
+# cincinnati graph data, then extract the Image Digest and set it as
+# env var consumed by the 'run' step.
 if [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
   pushd ${WORKDIR}
   cmd_jq="$(which yq 2>/dev/null || true)"
@@ -115,28 +118,28 @@ if [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
   fi
 
   UPGRADE_TO_CHANNEL_TYPE="${UPGRADE_TO_CHANNEL_TYPE:-stable}"
-  CURRENT_VERSION_X=$(echo "$OCP_VERSION" | awk -F'.' '{ print$1 }')
-  CURRENT_VERSION_Y=$(echo "$OCP_VERSION" | awk -F'.' '{ print$2 }')
-  TARGET_VERSION_Y=$(( CURRENT_VERSION_Y + 1 ))
-  TARGET_VERSION_XY="${CURRENT_VERSION_X}.${TARGET_VERSION_Y}"
-  UPGRADE_TO_CHANNEL="${UPGRADE_TO_CHANNEL_TYPE}-${CURRENT_VERSION_X}.${TARGET_VERSION_Y}"
+  current_version_x=$(echo "$OCP_VERSION" | awk -F'.' '{ print$1 }')
+  current_version_y=$(echo "$OCP_VERSION" | awk -F'.' '{ print$2 }')
+  target_version_y=$(( current_version_y + 1 ))
+  target_version_xy="${current_version_x}.${target_version_y}"
+  upgrade_to_channel="${UPGRADE_TO_CHANNEL_TYPE}-${current_version_x}.${target_version_y}"
 
   cat <<EOF > "${ARTIFACT_DIR}/release-versions"
 UPGRADE_TO_CHANNEL_TYPE=$UPGRADE_TO_CHANNEL_TYPE
-CURRENT_VERSION_X=$CURRENT_VERSION_X
-CURRENT_VERSION_Y=$CURRENT_VERSION_Y
-TARGET_VERSION_Y=$TARGET_VERSION_Y
-TARGET_VERSION_XY=$TARGET_VERSION_XY
-UPGRADE_TO_CHANNEL=$UPGRADE_TO_CHANNEL
+current_version_x=$current_version_x
+current_version_y=$current_version_y
+target_version_y=$target_version_y
+target_version_xy=$target_version_xy
+upgrade_to_channel=$upgrade_to_channel
 EOF
 
   echo "Downloading upgrade graph data..."
   curl -L -o "${WORKDIR}/cincinnati-graph-data.tar.gz" \
     https://api.openshift.com/api/upgrades_info/graph-data
 
-  tar xvzf "${WORKDIR}/cincinnati-graph-data.tar.gz" "channels/${UPGRADE_TO_CHANNEL}.yaml" -C "${WORKDIR}" || true
-  if [ ! -f "${WORKDIR}/channels/${UPGRADE_TO_CHANNEL}.yaml" ]; then
-    echo "ERROR: Unable to extract/find the channels file from cincinnati: ${WORKDIR}/channels/${UPGRADE_TO_CHANNEL}.yaml
+  tar xvzf "${WORKDIR}/cincinnati-graph-data.tar.gz" "channels/${upgrade_to_channel}.yaml" -C "${WORKDIR}" || true
+  if [ ! -f "${WORKDIR}/channels/${upgrade_to_channel}.yaml" ]; then
+    echo "ERROR: Unable to extract/find the channels file from cincinnati: ${WORKDIR}/channels/${upgrade_to_channel}.yaml
 $(cat "${ARTIFACT_DIR}"/release-versions)
 
 # files on ${WORKDIR}/channels
@@ -146,21 +149,23 @@ $(ls ${WORKDIR}/channels/)
   fi
 
   echo "Looking for target version..."
-  target_release="$($cmd_jq -r .versions[] "${WORKDIR}/channels/${UPGRADE_TO_CHANNEL}.yaml" | grep "${TARGET_VERSION_XY}." | tail -n1)"
+  target_release="$($cmd_jq -r .versions[] "${WORKDIR}/channels/${upgrade_to_channel}.yaml" | grep "${target_version_xy}." | tail -n1)"
 
   echo "Found target version [${target_release}], getting Digest..."
   TARGET_RELEASE_IMAGE=$(oc adm release info "${target_release}" -o jsonpath='{.image}')
   popd
 fi
 
-# Examples:
-# OPCT_VERSION/OCP_VERSION-DATE_TS-controlPlaneTopology-provider-platform.tar.gz
-# v0.3.0/4.13.0-20230406-HighlyAvailable-vsphere-None.tar.gz
-# v0.3.0/4.13.0-20230406-HighlyAvailable-aws-None.tar.gz
-# v0.3.0/4.13.0-20230406-HighlyAvailable-aws-AWS.tar.gz
-# v0.3.0/4.13.0-20230406-HighlyAvailable-oci-External.tar.gz
-# v0.3.0/4.13.0-20230406-HighlyAvailable-oci-Baremetal.tar.gz
-# v0.3.0/4.13.0-20230406-SingleReplica-aws-None.tar.gz
+# Object path examples:
+# OPCT_VERSION/OPCT_RUN_MODE/OCP_VERSION-DATE_TS-controlPlaneTopology-provider-platform.tar.gz
+# v0.3.0/default/4.13.0-20230406-HighlyAvailable-vsphere-None.tar.gz
+# v0.3.0/upgrade/4.13.0-20230406-HighlyAvailable-vsphere-None.tar.gz
+# v0.3.0/default/4.13.0-20230406-HighlyAvailable-aws-None.tar.gz
+# v0.3.0/default/4.13.0-20230406-HighlyAvailable-aws-AWS.tar.gz
+# v0.3.0/default/4.13.0-20230406-HighlyAvailable-oci-External.tar.gz
+# v0.3.0/default/4.13.0-20230406-HighlyAvailable-oci-Baremetal.tar.gz
+# v0.3.0/default/4.13.0-20230406-SingleReplica-aws-None.tar.gz
+# v0.3.0/default/4.13.0-20230406-SingleReplica-aws-None.tar.gz
 OBJECT_PATH="${OPCT_VERSION}/${OPCT_MODE}/${OCP_VERSION}-${DATE_TS}-${OCP_TOPOLOGY}-${CLUSTER_TYPE}-${OCP_PLAT}.tar.gz"
 OBJECT_META="OPCT_VERSION=${OPCT_VERSION},OPCT_MODE=${OPCT_MODE},OCP=${OCP_VERSION},Topology=${OCP_TOPOLOGY},Provider=${CLUSTER_TYPE},Platform=${OCP_PLAT}"
 
