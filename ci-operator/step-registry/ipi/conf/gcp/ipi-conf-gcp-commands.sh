@@ -19,13 +19,13 @@ fi
 
 # Do not change the default family type without consulting with cloud financial operations as their may
 # be active savings plans targeting this machine class.
-master_type=e2-standard-4
+master_type=n2-standard-16
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  master_type=e2-standard-32
+  master_type=n2-standard-32
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  master_type=e2-standard-16
+  master_type=n2-standard-16
 elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  master_type=e2-standard-8
+  master_type=n2-standard-16
 fi
 
 cat >> "${CONFIG}" << EOF
