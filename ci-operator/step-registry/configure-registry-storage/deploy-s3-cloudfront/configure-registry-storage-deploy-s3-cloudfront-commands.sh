@@ -45,9 +45,12 @@ resource "aws_s3_bucket" "ir_s3" {
   force_destroy = true
 }
 
-resource "aws_s3_bucket_acl" "ir_bucket_acl" {
+resource "aws_s3_bucket_public_access_block" "ir_s3" {
   bucket = aws_s3_bucket.ir_s3.id
-  acl    = "private"
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
 }
 
 resource "aws_s3_bucket_policy" "ir_s3_policy" {
@@ -80,7 +83,7 @@ locals {
 
 resource "aws_cloudfront_distribution" "ir_s3_distribution" {
   origin {
-    domain_name = aws_s3_bucket.ir_s3.bucket_domain_name
+    domain_name = aws_s3_bucket.ir_s3.bucket_regional_domain_name
     origin_id   = local.s3_origin_id
 
   }
@@ -131,6 +134,7 @@ cp "${SHARED_DIR}/create_s3_bucket_for_registry_storage.tf" /tmp && cd /tmp
 terraform init
 terraform apply -auto-approve
 TF_OUTPUT=$(terraform output)
+rm -rf /tmp/create_s3_bucket_for_registry_storage.tf || exit 1
 CLOUDFRONT_DOMAIN_NAME=$(echo "${TF_OUTPUT}" | grep cloudfront_domain_name | tr -d ' ' | cut -d '"' -f 2) && export CLOUDFRONT_DOMAIN_NAME
 
 # save terraform state file to destroy s3 bucket and cloudfront
@@ -139,14 +143,14 @@ tar -Jcf "${SHARED_DIR}/s3_cloudfront_terraform_state.tar.xz" terraform.tfstate
 # create secert using private key for cloudfront
 CLOUDFRONT_PRIVATE_KEY="${CLUSTER_PROFILE_DIR}/cloudfront-key"
 if [[ -f "${CLOUDFRONT_PRIVATE_KEY}" ]]; then
-  oc create secret generic mysecret --from-file=${CLOUDFRONT_PRIVATE_KEY} -n openshift-image-registry
+  oc create secret generic cloudfront-secret --from-file=${CLOUDFRONT_PRIVATE_KEY} -n openshift-image-registry
 else
   echo "Did not find compatible cloud provider cloudfront-key"
   exit 1
 fi
 
 # configure image registry to use cloudfront
-oc patch configs.imageregistry.operator.openshift.io/cluster --type merge -p '{"spec":{"storage":{"managementState":"Unmanaged","s3":{"bucket":"'"${NEW_BUCKET}"'","region":"'"${AWS_REGION}"'","cloudFront":{"baseURL":"https://'"${CLOUDFRONT_DOMAIN_NAME}"'","duration": "300s","keypairID":"K3FZYAKDQYAWWP","privateKey":{"key":"cloudfront-key","name":"mysecret"}}}}}}'
+oc patch configs.imageregistry.operator.openshift.io/cluster --type merge -p '{"spec":{"storage":{"managementState":"Unmanaged","s3":{"bucket":"'"${NEW_BUCKET}"'","region":"'"${AWS_REGION}"'","cloudFront":{"baseURL":"https://'"${CLOUDFRONT_DOMAIN_NAME}"'","duration": "300s","keypairID":"K3FZYAKDQYAWWP","privateKey":{"key":"cloudfront-key","name":"cloudfront-secret"}}}}}}'
 
 # wait image registry to redeploy with cloudfront
 check_imageregistry_back_ready(){
