@@ -27,6 +27,10 @@ ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
+if [[ "$HOSTED_CP" == "true" ]] && [[ ! -z "$REGION" ]]; then
+  CLOUD_PROVIDER_REGION="${REGION}"
+fi
+
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
@@ -60,27 +64,27 @@ if [[ ! -z "$OLD_CLUSTER" ]]; then
 fi
 
 # Get the openshift version
-versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq '.[].raw_id')
+versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} -o json | jq -r '.[].raw_id')
 if [[ "$HOSTED_CP" == "true" ]]; then
-  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq '.[].raw_id')
+  versionList=$(rosa list versions --channel-group ${CHANNEL_GROUP} --hosted-cp -o json | jq -r '.[].raw_id')
 fi
 echo -e "Available cluster versions:\n${versionList}"
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
   if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 | tr -d '"' || true)
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -i ec | head -1 || true)
   else
-    OPENSHIFT_VERSION=$(echo "$versionList" | head -1 | tr -d '"')
+    OPENSHIFT_VERSION=$(echo "$versionList" | head -1)
   fi
 elif [[ $OPENSHIFT_VERSION =~ ^[0-9]+\.[0-9]+$ ]]; then
   if [[ "$EC_BUILD" == "true" ]]; then
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | grep -i ec | head -1 | tr -d "'" || true)
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | grep -i ec | head -1 || true)
   else
-    OPENSHIFT_VERSION=$(echo "$versionList" | grep "${OPENSHIFT_VERSION}" | head -1 | tr -d '"' || true)
+    OPENSHIFT_VERSION=$(echo "$versionList" | grep -E "^${OPENSHIFT_VERSION}" | head -1 || true)
   fi
 else
   # Match the whole line
-  OPENSHIFT_VERSION=$(echo "$versionList" | { grep -x "\"${OPENSHIFT_VERSION}\"" || true; } | tr -d '"')
+  OPENSHIFT_VERSION=$(echo "$versionList" | grep -x "${OPENSHIFT_VERSION}" || true)
 fi
 
 if [[ -z "$OPENSHIFT_VERSION" ]]; then
@@ -120,6 +124,15 @@ HYPERSHIFT_SWITCH=""
 SUBNET_ID_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   HYPERSHIFT_SWITCH="--hosted-cp --classic-oidc-config"
+  if [[ "$ENABLE_SECTOR" == "true" ]]; then
+    PROVISION_SHARD_ID=$(cat ${SHARED_DIR}/provision_shard_ids | head -n 1)
+    if [[ -z "$PROVISION_SHARD_ID" ]]; then
+      echo -e "No available provision shard."
+      exit 1
+    fi
+
+    HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
+  fi  
 
   PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
   PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
