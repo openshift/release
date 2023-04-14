@@ -56,6 +56,8 @@ export MANAGED_CLUSTER_PASS
 MANAGED_CLUSTER_API_URL=$(cat $SHARED_DIR/managed.cluster.api.url)
 export MANAGED_CLUSTER_API_URL
 
+# Copy Kubeconfig file to the directory where Obs is looking it up
+cp ${SHARED_DIR}/kubeconfig ~/.kube/config
 
 # run the test execution script
 bash +x ./execute_obs_interop_commands.sh
