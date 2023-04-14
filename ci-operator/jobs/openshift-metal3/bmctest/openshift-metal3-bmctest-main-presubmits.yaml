@@ -6,57 +6,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build05
-    context: ci/prow/test
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cluster: build05
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-metal3-bmctest-main-test
-    rerun_command: /test test
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=test
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/test-on-hw
+    context: ci/prow/servercheck-test-on-hw
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -64,10 +14,11 @@ presubmits:
       ci-operator.openshift.io/cloud: equinix-ocp-metal
       ci-operator.openshift.io/cloud-cluster-profile: equinix-ocp-metal
       ci-operator.openshift.io/cluster: build05
+      ci-operator.openshift.io/variant: servercheck
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-metal3-bmctest-main-test-on-hw
-    rerun_command: /test test-on-hw
+    name: pull-ci-openshift-metal3-bmctest-main-servercheck-test-on-hw
+    rerun_command: /test servercheck-test-on-hw
     spec:
       containers:
       - args:
@@ -77,6 +28,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/usr/local/test-on-hw-cluster-profile
         - --target=test-on-hw
+        - --variant=servercheck
         command:
         - ci-operator
         image: ci-operator:latest
@@ -117,4 +69,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )test-on-hw,?($|\s.*)
+    trigger: (?m)^/test( | .* )servercheck-test-on-hw,?($|\s.*)

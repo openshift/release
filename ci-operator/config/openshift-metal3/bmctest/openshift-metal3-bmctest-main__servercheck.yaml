@@ -13,22 +13,25 @@ tests:
   cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
+    post:
+    - ref: baremetalds-packet-teardown
     pre:
-      - ref: baremetalds-packet-setup
+    - ref: baremetalds-packet-setup
     test:
     - as: test
-      cluster: build05
-      container:
-        from: src
       commands: |
         SERVER_IP="$(cat /run/secrets/ci.openshift.io/multi-stage/server-ip)
         SSH_KEY="/run/secrets/ci.openshift.io/cluster-profile/packet-ssh-key"
         SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i $SSH_KEY)
         SSHCMD="git clone https://github.com/openshift-metal3/bmctest; cd bmctest; ./ocpbmctest -c servers.yaml"
         ssh ${SSHOPTS[@]} centos@${IP} ${SSHCMD}
-    post:
-      - ref: baremetalds-packet-teardown
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
 zz_generated_metadata:
   branch: main
   org: openshift-metal3
   repo: bmctest
+  variant: servercheck
