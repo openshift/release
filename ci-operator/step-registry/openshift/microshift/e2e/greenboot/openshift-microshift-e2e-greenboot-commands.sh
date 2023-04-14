@@ -157,6 +157,6 @@ scp "${HOME}/greenboot_check.sh" "${INSTANCE_PREFIX}:~/greenboot_check.sh"
 
 if ! ssh "${INSTANCE_PREFIX}" "sudo ~/greenboot_check.sh"; then
   scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
-  ssh "${INSTANCE_PREFIX}" 'sudo ~/cluster-debug-info.sh'
+  ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
   exit 1
 fi

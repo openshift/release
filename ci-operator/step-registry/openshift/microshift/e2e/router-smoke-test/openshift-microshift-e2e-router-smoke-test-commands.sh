@@ -102,5 +102,5 @@ done
 set -x
 
 scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
-ssh "${INSTANCE_PREFIX}" 'sudo ~/cluster-debug-info.sh'
+ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
 exit 1
