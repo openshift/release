@@ -94,7 +94,8 @@ chmod +x "${HOME}"/reboot-test.sh
 scp "${HOME}"/reboot-test.sh "${INSTANCE_PREFIX}":~/reboot-test.sh
 
 if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/reboot-test.sh'; then
-  ssh "${INSTANCE_PREFIX}" "sudo bash -s" < /microshift/validate-microshift/cluster-debug-info.sh
+  scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
+  ssh "${INSTANCE_PREFIX}" 'sudo ~/cluster-debug-info.sh'
   exit 1
 fi
 
