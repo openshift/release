@@ -416,7 +416,7 @@ wait "$!"
 if [[ "$JOB_NAME" == *"4.14"* ]]
 then
   #inject_journal_to_console_config $dir worker
-  inject_journal_to_console_config $dir master
+  #inject_journal_to_console_config $dir master
 fi
 
 # Platform specific manifests adjustments
