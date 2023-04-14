@@ -46,6 +46,7 @@ ssh "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" 
 
 # 180s to accomodate for slow kubelet actions with topolvm pvc after reboot
 if ! KUBECONFIG=/tmp/kubeconfig oc wait --for=condition=Ready --timeout=180s pod/test-pod; then
-  ssh "${INSTANCE_PREFIX}" "sudo bash -s" < /microshift/validate-microshift/cluster-debug-info.sh
+  scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
+  ssh "${INSTANCE_PREFIX}" 'sudo ~/cluster-debug-info.sh'
   exit 1
 fi
