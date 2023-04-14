@@ -14,9 +14,9 @@ fi
 
 export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
 if [ -z "${E2E_SKIP_TAGS}" ] ; then
-    export E2E_SKIP_TAGS="not @customer and not @security"
+    export E2E_SKIP_TAGS="not @customer and not @security and not @long-duration"
 else
-    export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not @customer and not @security"
+    export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not @customer and not @security and not @long-duration"
 fi
 
 cd verification-tests
