@@ -33,7 +33,16 @@ resource "aws_s3_bucket" "quayaws" {
   force_destroy = true
 }
 
+resource "aws_s3_bucket_ownership_controls" "quayaws" {
+  bucket = aws_s3_bucket.quayaws.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
 resource "aws_s3_bucket_acl" "quayaws_bucket_acl" {
+  depends_on = [aws_s3_bucket_ownership_controls.quayaws]
+
   bucket = aws_s3_bucket.quayaws.id
   acl    = "private"
 }
