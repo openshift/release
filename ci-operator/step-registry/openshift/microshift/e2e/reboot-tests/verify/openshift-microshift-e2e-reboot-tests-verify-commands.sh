@@ -42,7 +42,7 @@ until ssh "${INSTANCE_PREFIX}" 'true'; do
 done
 >&2 echo "It took $timeout seconds to connect via ssh"
 
-ssh "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
+ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
 # 180s to accomodate for slow kubelet actions with topolvm pvc after reboot
 if ! KUBECONFIG=/tmp/kubeconfig oc wait --for=condition=Ready --timeout=180s pod/test-pod; then
