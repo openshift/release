@@ -18,6 +18,8 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
+gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
+
 IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 
 mkdir -p "${HOME}"/.ssh
@@ -29,8 +31,6 @@ Host ${INSTANCE_PREFIX}
   StrictHostKeyChecking accept-new
 EOF
 chmod 0600 "${HOME}"/.ssh/config
-
-gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
 
 timeout=1200 # 20 minute wait.  
 start=$(date +"%s")
