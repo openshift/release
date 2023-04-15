@@ -27,6 +27,8 @@ Host ${INSTANCE_PREFIX}
   HostName ${IP_ADDRESS}
   IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
   StrictHostKeyChecking accept-new
+  ServerAliveInterval 30
+  ServerAliveCountMax 1200
 EOF
 chmod 0600 "${HOME}"/.ssh/config
 
