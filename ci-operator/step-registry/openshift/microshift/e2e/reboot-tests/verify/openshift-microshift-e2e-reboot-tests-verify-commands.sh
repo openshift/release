@@ -44,10 +44,17 @@ until ssh "${INSTANCE_PREFIX}" 'true'; do
 done
 >&2 echo "It took $timeout seconds to connect via ssh"
 
-ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
-
+cat > "${HOME}"/wait_for_pod_ready.sh <<'EOF'
+#!/bin/bash
+set -xeuo pipefail
+export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
 # 180s to accomodate for slow kubelet actions with topolvm pvc after reboot
-if ! KUBECONFIG=/tmp/kubeconfig oc wait --for=condition=Ready --timeout=180s pod/test-pod; then
+oc wait --for=condition=Ready --timeout=120s pod/test-pod
+EOF
+chmod +x "${HOME}"/wait_for_pod_ready.sh
+scp "${HOME}"/wait_for_pod_ready.sh "${INSTANCE_PREFIX}":~/wait_for_pod_ready.sh
+
+if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/wait_for_pod_ready.sh'; then
   scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
   ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
   exit 1
