@@ -40,6 +40,7 @@ mkdir -p "${OADP_APPS_DIR}"
 mkdir -p "${PYCLIENT_DIR}"
 mkdir -p /tmp/test-settings
 touch /tmp/test-settings/default_settings.json
+mkdir -p /home/jenkins/.kube
 touch /home/jenkins/.kube/config
 
 echo "Annotate oadp namespace"
