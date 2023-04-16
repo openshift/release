@@ -93,6 +93,8 @@ EOF_INNER
 
 echo "waiting for pod condition" >&2
 oc wait --for=condition=Ready --timeout=120s pod/test-pod
+
+reboot now
 EOF
 chmod +x "${HOME}"/reboot-test.sh
 
@@ -103,6 +105,3 @@ if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/reboot-test.sh'; then
   ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
   exit 1
 fi
-
-# now reboot the machine
-gcloud compute instances stop "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"

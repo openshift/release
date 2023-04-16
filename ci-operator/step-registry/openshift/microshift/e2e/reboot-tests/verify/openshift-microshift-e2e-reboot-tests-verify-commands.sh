@@ -18,8 +18,6 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
-
 IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 
 mkdir -p "${HOME}"/.ssh
@@ -42,14 +40,20 @@ until ssh "${INSTANCE_PREFIX}" 'true'; do
     exit 1
   fi
 done
->&2 echo "It took $timeout seconds to connect via ssh"
+>&2 echo "It took $(( $(date +"%s") - start)) seconds to connect via ssh"
 
 cat > "${HOME}"/wait_for_pod_ready.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
+
+# block until microshift is ready (according to systemd)
+# give extra time for api server to update status of the pods
+# (immediatelly after reboot, it thinks they're all Running, but it's out of date)
+systemctl start microshift
+
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
 # 180s to accomodate for slow kubelet actions with topolvm pvc after reboot
-oc wait --for=condition=Ready --timeout=120s pod/test-pod
+oc wait --for=condition=Ready --timeout=180s pod/test-pod
 EOF
 chmod +x "${HOME}"/wait_for_pod_ready.sh
 scp "${HOME}"/wait_for_pod_ready.sh "${INSTANCE_PREFIX}":~/wait_for_pod_ready.sh
