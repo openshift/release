@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ -z "${LO_SUB_INSTALL_NAMESPACE}" ]]; then
+if [[ -z "${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1
 fi
@@ -19,11 +19,7 @@ if [[ -z "${METALLB_OPERATOR_SUB_CHANNEL}" ]]; then
   exit 1
 fi
 
-if [[ "${METALLB_OPERATOR_SUB_TARGET_NAMESPACES}" == "!install" ]]; then
-  METALLB_OPERATOR_SUB_TARGET_NAMESPACES="${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}"
-fi
-
-echo "Installing ${METALLB_OPERATOR_SUB_PACKAGE} from ${METALLB_OPERATOR_SUB_CHANNEL} into ${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}, targeting ${METALLB_OPERATOR_SUB_TARGET_NAMESPACES}"
+echo "Installing ${METALLB_OPERATOR_SUB_PACKAGE} from ${METALLB_OPERATOR_SUB_CHANNEL} into ${METALLB_OPERATOR_SUB_INSTALL_NAMESPACE}"
 
 # create the install namespace
 oc apply -f - <<EOF
