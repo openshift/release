@@ -40,7 +40,7 @@ mkdir -p "${OADP_APPS_DIR}"
 mkdir -p "${PYCLIENT_DIR}"
 mkdir -p /tmp/test-settings
 touch /tmp/test-settings/default_settings.json
-touch /tmp/kubeconfig
+touch /home/jenkins/.kube/config
 
 echo "Annotate oadp namespace"
 oc annotate --overwrite namespace/openshift-adp volsync.backube/privileged-movers='true'
@@ -70,8 +70,8 @@ export ANSIBLE_REMOTE_TMP="/tmp/"
 
 # echo "sleep"
 # sleep 3600
-# Set KUBECONFIG to /tmp/kubeconfig
-export KUBECONFIG="/tmp/kubeconfig"
+# Set KUBECONFIG to /home/jenkins/.kube/config
+export KUBECONFIG="/home/jenkins/.kube/config"
 # Login as kubeadmin to the test cluster
 oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
