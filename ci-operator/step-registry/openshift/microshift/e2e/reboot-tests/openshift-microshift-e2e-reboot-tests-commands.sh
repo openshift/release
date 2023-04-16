@@ -88,13 +88,9 @@ spec:
   # - name: test-vol
   #   persistentVolumeClaim:
   #     claimName: test-claim
-
 EOF_INNER
 
-echo "waiting for pod condition" >&2
 oc wait --for=condition=Ready --timeout=120s pod/test-pod
-
-reboot now
 EOF
 chmod +x "${HOME}"/reboot-test.sh
 
@@ -104,4 +100,16 @@ if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/reboot-test.sh'; then
   scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
   ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
   exit 1
+fi
+
+set +e
+ssh "${INSTANCE_PREFIX}" 'sudo reboot now'
+res=$?
+set -e
+
+# Don't fail on exit code 255 which is ssh's for things like
+# "connection closed by remote host"
+# which are expected when rebooting via ssh
+if [ "${res}" -ne 0 ] && [ "${res}" -ne 255 ]; then
+    exit 1
 fi

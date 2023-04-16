@@ -40,19 +40,20 @@ until ssh "${INSTANCE_PREFIX}" 'true'; do
     exit 1
   fi
 done
->&2 echo "It took $(( $(date +"%s") - start)) seconds to connect via ssh"
+>&2 echo "It took $(( $(date +'%s') - start)) seconds to connect via ssh"
 
 cat > "${HOME}"/wait_for_pod_ready.sh <<'EOF'
 #!/bin/bash
-set -xeuo pipefail
+set -euo pipefail
 
-# block until microshift is ready (according to systemd)
-# give extra time for api server to update status of the pods
-# (immediatelly after reboot, it thinks they're all Running, but it's out of date)
+echo "block until microshift is ready (according to systemd)"
+echo "give extra time for api server to update status of the pods"
+echo "(immediatelly after reboot, it thinks they're all Running, but it's out of date)"
+set -x
 systemctl start microshift
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-# 180s to accomodate for slow kubelet actions with topolvm pvc after reboot
+echo "waiting 180s to accomodate for slow kubelet actions with topolvm pvc after reboot"
 oc wait --for=condition=Ready --timeout=180s pod/test-pod
 EOF
 chmod +x "${HOME}"/wait_for_pod_ready.sh
