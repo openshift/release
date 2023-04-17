@@ -23,7 +23,6 @@ export LOKI_ENDPOINT=https://observatorium-mst.api.openshift.com/api/logs/v1/dpt
 export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
-GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
 
 cat >> "${SHARED_DIR}/manifest_01_ns.yml" << EOF
@@ -299,15 +298,6 @@ data:
   client-id: "$(cat /var/run/loki-prod-secret/client-id | base64 -w 0)"
   client-secret: "$(cat /var/run/loki-prod-secret/client-secret | base64 -w 0)"
 EOF
-cat >> "${SHARED_DIR}/manifest_grafanacom_creds.yml" << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: promtail-grafanacom-creds
-  namespace: openshift-e2e-loki
-data:
-  password: "$(cat /var/run/loki-grafanacloud-secret/client-secret | base64 -w 0)"
-EOF
 cat >> "${SHARED_DIR}/manifest_ds.yml" << EOF
 apiVersion: apps/v1
 kind: DaemonSet
@@ -380,8 +370,6 @@ spec:
         volumeMounts:
         - mountPath: "/etc/promtail"
           name: config
-        - mountPath: "/etc/promtail-grafanacom-secrets"
-          name: grafanacom-secrets
         - mountPath: "/run/promtail"
           name: run
         - mountPath: "/var/lib/docker/containers"
@@ -461,9 +449,6 @@ spec:
       - configMap:
           name: loki-promtail
         name: config
-      - secret:
-          secretName: promtail-grafanacom-creds
-        name: grafanacom-secrets
       - hostPath:
           path: "/run/promtail"
         name: run
