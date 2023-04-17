@@ -35,6 +35,7 @@ cat >"${HOME}"/reboot-test.sh <<'EOF'
 set -xeuo pipefail
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
+stat $KUBECONFIG
 # TODO: Remove the labels again once https://issues.redhat.com/browse/OCPBUGS-1969 has been fixed upstream
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"-version=v1.24"
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"=privileged"
@@ -59,17 +60,19 @@ metadata:
   name: test-pod
   namespace: default
 spec:
-  securityContext:
-    runAsNonRoot: true
-    privileged: false
-    capabilities:
-      drop:
-      - 'ALL'
-    allowPrivilegeEscalation: false
-    seccompProfile:
-      type: RuntimeDefault
   containers:
     - name: test-container
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        privileged: false
+        capabilities:
+          drop:
+          - 'ALL'
+        allowPrivilegeEscalation: false
+        seccompProfile:
+          type: RuntimeDefault
       image: nginx
       command:
         - sh
@@ -84,11 +87,8 @@ spec:
         claimName: test-claim
 EOF_INNER
 
-set +ex
 echo "waiting for pod condition" >&2
 oc wait --for=condition=Ready --timeout=120s pod/test-pod
-echo "pod posted ready status" >&2
-
 EOF
 chmod +x "${HOME}"/reboot-test.sh
 
@@ -96,7 +96,7 @@ scp "${HOME}"/reboot-test.sh "${INSTANCE_PREFIX}":~/reboot-test.sh
 
 if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/reboot-test.sh'; then
   scp -r /tmp/validate-microshift "${INSTANCE_PREFIX}":~/validate-microshift
-  ssh "${INSTANCE_PREFIX}" 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+  ssh "${INSTANCE_PREFIX}" 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo -E ~/validate-microshift/cluster-debug-info.sh'
   exit 1
 fi
 
