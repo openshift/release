@@ -1,8 +1,8 @@
 workflow:
-  as: hypershift-kubevirt-e2e
+  as: hypershift-kubevirt-csi-e2e
   documentation: |-
     Sets up all the mgmt/infra cluster prerequisites necessary for hypershift kubevirt guest clusters.
-    Then runs basic hypershift e2e tests.
+    Then runs kubevirt csi e2e tests.
 
     Learn more about HyperShift here: https://github.com/openshift/hypershift
 
@@ -12,14 +12,16 @@ workflow:
       COMPUTE_NODE_TYPE: c5n.metal
       COMPUTE_NODE_REPLICAS: "1"
       CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
+      TEST_CSI_DRIVER_MANIFEST: kubevirt-driver.yaml
     pre:
     - chain: ipi-aws-ovn-pre
     - chain: ipi-install
+    - ref: storage-conf-csi-kubevirt 
     - ref: hypershift-kubevirt-deploy-odf
     - ref: hypershift-kubevirt-install
     - ref: hypershift-install
     test:
-    - chain: hypershift-kubevirt-run-e2e
+    - chain: hypershift-kubevirt-run-csi-e2e
     post:
     - chain: gather-core-dump
     - chain: ipi-aws-post

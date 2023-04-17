@@ -126,6 +126,12 @@ metadata:
   name: kubevirt-hyperconverged
   namespace: openshift-cnv
 spec:
+  workloads:
+    nodePlacement:
+      nodeSelector:
+        beta.kubernetes.io/instance-type: c5n.metal
+  featureGates:
+    enableCommonBootImageImport: false
   logVerbosityConfig:
     kubevirt:
       virtLauncher: 8
