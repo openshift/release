@@ -30,26 +30,6 @@ bugzilla:
       - status: ASSIGNED
       - status: ON_DEV
       - status: POST
-    agent-installer:
-      add_external_link: true
-      allowed_groups:
-      - redhat
-      - qe_staff
-      - nec
-      exclude_defaults: true
-      is_open: true
-      state_after_close:
-        status: NEW
-      state_after_merge:
-        status: MODIFIED
-      state_after_validation:
-        status: POST
-      target_release: 4.13.0
-      valid_states:
-      - status: NEW
-      - status: ASSIGNED
-      - status: ON_DEV
-      - status: POST
     fcos:
       validate_by_default: false
     main:
@@ -362,12 +342,6 @@ config_updater:
       - arm01
   gzip: false
   maps:
-    ci-operator/config/**/*-agent-installer.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
     ci-operator/config/**/*-fcos.yaml:
       clusters:
         app.ci:
@@ -848,6 +822,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/CSPI-QE/**/CSPI-QE-MSI*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/Intersmash/intersmash/Intersmash-intersmash-openshift-ci*.yaml:
       clusters:
         app.ci:
@@ -945,6 +925,12 @@ config_updater:
       gzip: true
       name: ci-operator-2.x-configs
     ci-operator/config/maistra/**/*maistra-*.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/migtools/velero-plugin-for-vsm/migtools-velero-plugin-for-vsm-oadp-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1321,12 +1307,6 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/jobs/**/*-agent-installer-presubmits.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
     ci-operator/jobs/**/*-branch-openshift-*.yaml:
       clusters:
         app.ci:
@@ -1849,6 +1829,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/CSPI-QE/**/CSPI-QE-MSI*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/Intersmash/intersmash/Intersmash-intersmash-openshift-ci*.yaml:
       clusters:
         app.ci:
@@ -1940,6 +1926,12 @@ config_updater:
       gzip: true
       name: job-config-misc
     ci-operator/jobs/maistra/**/*maistra-*.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/migtools/velero-plugin-for-vsm/migtools-velero-plugin-for-vsm-oadp-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -2596,10 +2588,12 @@ label:
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
+      - openshift-release-oversight
       label: cherry-pick-approved
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
+      - openshift-release-oversight
       label: backport-risk-assessed
     - allowed_teams:
       - openshift-patch-managers
@@ -2608,10 +2602,12 @@ label:
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
+      - openshift-release-oversight
       label: jira/valid-bug
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
+      - openshift-release-oversight
       label: bugzilla/valid-bug
     - allowed_teams:
       - openshift-release-oversight
@@ -2702,8 +2698,7 @@ repo_milestone:
     maintainers_team: odo-maintainers
 require_matching_label:
 - grace_period: 5s
-  missing_comment: Please specify area/hypershift-operator, area/control-plane-operator
-    or both
+  missing_comment: Please specify an area label
   missing_label: do-not-merge/needs-area
   org: openshift
   prs: true

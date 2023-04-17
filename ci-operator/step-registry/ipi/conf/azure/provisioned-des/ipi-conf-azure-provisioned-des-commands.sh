@@ -6,6 +6,8 @@ set -o pipefail
 
 provisioned_rg_file="${SHARED_DIR}/resourcegroup"
 provisioned_des_file="${SHARED_DIR}/azure_des"
+subscription_id="$(<"${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" jq -r .subscriptionId)"
+
 if [ ! -f "${provisioned_rg_file}" ]; then
     echo "${provisioned_rg_file} is not found, exiting..."
     exit 1
@@ -36,6 +38,7 @@ platform:
         diskEncryptionSet:
           resourceGroup: ${rg}
           name: ${des}
+          subscriptionId: ${subscription_id}
 EOF
 else
   cat > "${PATCH}" << EOF
@@ -47,6 +50,7 @@ compute:
         diskEncryptionSet:
           resourceGroup: ${rg}
           name: ${des}
+          subscriptionId: ${subscription_id}
 controlPlane:
   platform:
     azure:
@@ -55,6 +59,7 @@ controlPlane:
         diskEncryptionSet:
           resourceGroup: ${rg}
           name: ${des}
+          subscriptionId: ${subscription_id}
 EOF
 fi
 
