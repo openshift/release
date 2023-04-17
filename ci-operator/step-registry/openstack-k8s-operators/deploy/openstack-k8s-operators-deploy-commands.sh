@@ -117,6 +117,7 @@ patches:
           region: r1
           extraVol:
           - propagation:
+            - Manila
             - Glance
             - volume1
             - CinderBackup
@@ -172,6 +173,30 @@ patches:
             rbd_store_user=openstack
             rbd_store_pool=images
             store_description=ceph_glance_store
+$(if [[ "${SERVICE_NAME}" == "MANILA" ]]; then
+  cat <<MANILA_EOF
+    - op: add
+      path: /spec/manila/enabled
+      value: true
+    - op: add
+      path: /spec/manila/template/customServiceConfig
+      value: |
+            [DEFAULT]
+            enabled_share_backends=cephfs
+            enabled_share_protocols=cephfs
+            [cephfs]
+            driver_handles_share_servers=False
+            share_backend_name=cephfs
+            share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+            cephfs_conf_path=/etc/ceph/ceph.conf
+            cephfs_auth_id=openstack
+            cephfs_cluster_name=ceph
+            cephfs_enable_snapshots=True
+            cephfs_ganesha_server_is_remote=False
+            cephfs_volume_mode=0755
+            cephfs_protocol_helper_type=CEPHFS
+MANILA_EOF
+fi)
   target:
     kind: OpenStackControlPlane
 EOF
