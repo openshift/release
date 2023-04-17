@@ -9,16 +9,15 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export AWS_CONFIG_FILE=$CLUSTER_PROFILE_DIR/.aws
 export AWS_ACCESS_KEY_ID=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
 export AWS_SECRET_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
-export OADP_CREDS_FILE="/tmp/test-settings/aws_creds"
+export OADP_CREDS_FILE="/tmp/test-settings/credentials"
 export PROVIDER="aws"
 export PROW_NAMESPACE=$NAMESPACE
 export NAMESPACE="openshift-adp"
 export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
 
-# Create S3 Bucket to Use for Testing
-/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET
+# Copy credentials file for s3 bucket from shared directory to /tmp/test-settings/aws_creds
 mkdir -p /tmp/test-settings
-cp credentials /tmp/test-settings/aws_creds
+cp $SHARED_DIR/credentials /tmp/test-settings
 
 # Set the API_URL value using the $SHARED_DIR/console.url file
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
@@ -86,4 +85,3 @@ ls -laht /alabama/cspi/output_files
 
 echo "finished"
 
-/bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/destroy.sh $BUCKET
