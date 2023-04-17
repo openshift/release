@@ -11,7 +11,7 @@ export AWS_ACCESS_KEY_ID=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_access_ke
 export AWS_SECRET_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
 
 # Set BUCKET variable to a unique value
-export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
+export BUCKET="${NAMESPACE}-${BUCKET_NAME}"
 
 # Create S3 Bucket to Use for Testing
 /bin/bash /home/jenkins/oadp-qe-automation/backup-locations/aws-s3/deploy.sh $BUCKET
