@@ -19,7 +19,7 @@ fi
 
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
-export LOKI_ENDPOINT=https://observatorium-mst.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+export LOKI_ENDPOINT=https://observatorium-mst.api.openshift.com/api/logs/v1/dptp/loki/api/v1
 export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
@@ -99,11 +99,9 @@ data:
           min_period: 1s
         batchsize: 102400
         batchwait: 10s
-        basic_auth:
-          username: ${GRAFANACLOUND_USERNAME}
-          password_file: /etc/promtail-grafanacom-secrets/password
+        bearer_token_file: /tmp/shared/prod_bearer_token
         timeout: 10s
-        url: https://logs-prod3.grafana.net/api/prom/push
+        url: ${LOKI_PROD_ENDPOINT}/push
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
@@ -291,15 +289,15 @@ data:
     target_config:
       sync_period: 10s
 EOF
-cat >> "${SHARED_DIR}/manifest_creds.yml" << EOF
+cat >> "${SHARED_DIR}/manifest_prod_creds.yml" << EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: promtail-creds
+  name: promtail-prod-creds
   namespace: openshift-e2e-loki
 data:
-  client-id: "$(cat /var/run/loki-secret/client-id | base64 -w 0)"
-  client-secret: "$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
+  client-id: "$(cat /var/run/loki-prod-secret/client-id | base64 -w 0)"
+  client-secret: "$(cat /var/run/loki-prod-secret/client-secret | base64 -w 0)"
 EOF
 cat >> "${SHARED_DIR}/manifest_grafanacom_creds.yml" << EOF
 apiVersion: v1
@@ -432,6 +430,28 @@ spec:
           name: proxy-tls
         - mountPath: /etc/tls/cookie-secret
           name: cookie-secret
+      - args:
+        - --oidc.client-id=\$(CLIENT_ID)
+        - --oidc.client-secret=\$(CLIENT_SECRET)
+        - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
+        - --margin=10m
+        - --file=/tmp/shared/prod_bearer_token
+        name: prod-bearer-token
+        env:
+          - name: CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: client-id
+          - name: CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: client-secret
+        volumeMounts:
+        - mountPath: "/tmp/shared"
+          name: shared-data
+        image: quay.io/observatorium/token-refresher
       serviceAccountName: loki-promtail
       terminationGracePeriodSeconds: 180
       tolerations:
