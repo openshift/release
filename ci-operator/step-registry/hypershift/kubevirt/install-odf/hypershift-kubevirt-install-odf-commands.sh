@@ -55,7 +55,7 @@ EOF
 
 RETRIES=60
 echo "Waiting for CSV to be available from operator group"
-for i in {1..$RETRIES}; do
+for ((i=1; i <= $RETRIES; i++)); do
     CSV=$(oc -n "$ODF_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
     if [[ -n "$CSV" ]]; then
         if [[ "$(oc -n "$ODF_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
@@ -69,7 +69,7 @@ for i in {1..$RETRIES}; do
 done
 
 echo "Waiting for noobaa-operator"
-for i in {1..$RETRIES}; do
+for ((i=1; i <= $RETRIES; i++)); do
     NOOBAA=$(oc -n "$ODF_INSTALL_NAMESPACE" get deployment noobaa-operator --ignore-not-found)
     if [[ -n "$NOOBAA" ]]; then
        echo "Found noobaa operator"
