@@ -1,0 +1,53 @@
+chain:
+  as: hypershift-kubevirt-run-csi-e2e
+  steps:
+  - as: conformance-tests
+    from: tests
+    commands: |-
+      CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+      export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
+      export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(echo -n clusters-${CLUSTER_NAME}|sed 's#\.#-#g')"
+      export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+      [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+      export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+      export TEST_PROVIDER='{"type":"kubevirt"}i
+      openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" > /tmp/tests_hs_kv
+      TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests_hs_kv"
+
+      if [[ -n "${TEST_SKIPS}" ]]; then
+          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+          echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+          echo "Skipping tests:"
+          echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+          TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+      fi
+
+      openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit"
+    credentials:
+    - mount_path: /etc/hypershift-pool-aws-credentials
+      name: hypershift-pool-aws-credentials
+      namespace: test-credentials
+    timeout: 14400s
+    env:
+    - name: TEST_ARGS
+      default: ""
+      documentation: |-
+        Additional arguments to be passed to 'openshift-test'
+    - name: TEST_SUITE
+      default: openshift/conformance/parallel
+      documentation: |-
+        The test suite to run. Defaults to openshift/conformance/parallel
+    - name: TEST_SKIPS
+      default: ""
+      documentation: |
+        Regular expression (POSIX basic regular expression) of tests to skip.
+        It is suggested to test the regex to make sure that it matches with the available tests.
+        Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
+        that are printed in Prow won't exactly match the list returned by openshift-tests.
+    resources:
+      requests:
+        cpu: "3"
+        memory: 600Mi
