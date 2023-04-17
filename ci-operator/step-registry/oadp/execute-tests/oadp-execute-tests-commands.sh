@@ -76,7 +76,10 @@ export KUBECONFIG="/home/jenkins/.kube/config"
 oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
 echo "Run tests from CLI"
+
 oc create namespace cassandra-ns
+oc policy add-role-to-group edit system:serviceaccounts -n cassandra-ns
+
 NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh
 sleep 3600
 #NAMESPACE=openshift-adp bash /alabama/cspi/test_settings/scripts/test_runner.sh 
