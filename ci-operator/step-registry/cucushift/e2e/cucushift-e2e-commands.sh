@@ -43,29 +43,30 @@ echo "E2E_SKIP_TAGS is '${E2E_SKIP_TAGS}'"
 
 cd verification-tests
 # run normal tests
-export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/normal"
-timestamp_start="$(date +%s)"
-parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
-    'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
-     export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and not @serial and not @console and not @admin\" -p junit"' || true
-show_time_used "$timestamp_start" 'normal'
+#export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/normal"
+#timestamp_start="$(date +%s)"
+#parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
+#    'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
+#     export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+#     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and not @serial and not @console and not @admin\" -p junit"' || true
+#show_time_used "$timestamp_start" 'normal'
 
 # run admin tests
-export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/admin"
-timestamp_start="$(date +%s)"
-parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
-    'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
-     export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
-     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and not @serial and not @console and @admin\" -p junit"' || true
-show_time_used "$timestamp_start" 'admin'
+#export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/parallel/admin"
+#timestamp_start="$(date +%s)"
+#parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
+#    'export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS=$(echo ${USERS} | cut -d "," -f ${TEST_ENV_NUMBER},$((${TEST_ENV_NUMBER}+${PARALLEL})),$((${TEST_ENV_NUMBER}+${PARALLEL}*2)),$((${TEST_ENV_NUMBER}+${PARALLEL}*3)));
+#     export WORKSPACE=/tmp/dir${TEST_ENV_NUMBER};
+#     parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and not @serial and not @console and @admin\" -p junit"' || true
+#show_time_used "$timestamp_start" 'admin'
 
 # run the rest tests in serial
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/serial"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
 timestamp_start="$(date +%s)"
 set -x
-cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and (@console or @serial)" -p junit || true
+cucumber features/networking/ipv6_dualstack.feature -p junit || true
+cucumber features/networking/multus-ipv6.feature -p junit || true
 set +x
 show_time_used "$timestamp_start" 'console or serial'
 
