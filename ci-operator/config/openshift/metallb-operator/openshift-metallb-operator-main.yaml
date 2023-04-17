@@ -15,10 +15,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: metallb-frr
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.20-openshift-4.14
   redhat-operator-index:
     name: redhat-operator-index
     namespace: ci
@@ -27,14 +27,14 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.20
 images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: metallb-operator
 operator:
   bundles:
@@ -44,11 +44,11 @@ operator:
     dockerfile_path: bundleci.Dockerfile
     update_graph: semver
   substitutions:
-  - pullspec: quay.io/openshift/origin-metallb:4.12
+  - pullspec: quay.io/openshift/origin-metallb:4.14
     with: pipeline:metallb
-  - pullspec: quay.io/openshift/origin-metallb-operator:4.12
+  - pullspec: quay.io/openshift/origin-metallb-operator:4.14
     with: pipeline:metallb-operator
-  - pullspec: quay.io/openshift/origin-metallb-frr:4.12
+  - pullspec: quay.io/openshift/origin-metallb-frr:4.14
     with: pipeline:metallb-frr
 promotion:
   name: "4.14"
@@ -99,10 +99,10 @@ tests:
     dependencies:
       OO_INDEX: ci-index-upgrade-bundle
     env:
-      INITIAL_CHANNEL: "4.10"
+      INITIAL_CHANNEL: "4.13"
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-metallb-operator
-      OO_LATEST_CSV: metallb-operator.v4.12.0
+      OO_LATEST_CSV: metallb-operator.v4.14.0
       OO_PACKAGE: metallb-operator
       OO_TARGET_NAMESPACES: '!all'
     test:
