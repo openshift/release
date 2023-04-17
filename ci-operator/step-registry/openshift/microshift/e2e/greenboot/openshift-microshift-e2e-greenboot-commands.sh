@@ -15,22 +15,22 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
-mkdir -p "${HOME}"/.ssh
-
-# gcloud compute will use this key rather than create a new one
-cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
-cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
-echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
-echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
-chmod 0600 "${HOME}"/.ssh/config
-
-cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
-
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
+
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+
+mkdir -p "${HOME}"/.ssh
+cat << EOF > "${HOME}"/.ssh/config
+Host ${INSTANCE_PREFIX}
+  User rhel8user
+  HostName ${IP_ADDRESS}
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+EOF
+chmod 0600 "${HOME}"/.ssh/config
 
 cat << 'EOFEOF' > "${HOME}/greenboot_check.sh"
 #!/usr/bin/env bash
@@ -153,28 +153,10 @@ EOFEOF
 
 chmod +x "${HOME}/greenboot_check.sh"
 
-gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}/greenboot_check.sh" "rhel8user@${INSTANCE_PREFIX}:~/greenboot_check.sh"
+scp "${HOME}/greenboot_check.sh" "${INSTANCE_PREFIX}:~/greenboot_check.sh"
 
-if ! gcloud compute ssh \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  "rhel8user@${INSTANCE_PREFIX}" \
-  --command "sudo ~/greenboot_check.sh"; then
-
-  gcloud compute scp \
-    --quiet \
-    --project "${GOOGLE_PROJECT_ID}" \
-    --zone "${GOOGLE_COMPUTE_ZONE}" \
-    --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
-
-  gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-    --zone "${GOOGLE_COMPUTE_ZONE}" \
-    rhel8user@"${INSTANCE_PREFIX}" \
-    --command 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
-
+if ! ssh "${INSTANCE_PREFIX}" "sudo ~/greenboot_check.sh"; then
+  scp -r /tmp/validate-microshift "${INSTANCE_PREFIX}":~/validate-microshift
+  ssh "${INSTANCE_PREFIX}" 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
   exit 1
 fi

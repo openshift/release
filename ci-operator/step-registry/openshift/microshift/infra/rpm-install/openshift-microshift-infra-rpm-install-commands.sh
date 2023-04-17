@@ -12,20 +12,22 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
-mkdir -p "${HOME}"/.ssh
-
-# gcloud compute will use this key rather than create a new one
-cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
-cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
-echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
-echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
-chmod 0600 "${HOME}"/.ssh/config
-
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
+
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+
+mkdir -p "${HOME}"/.ssh
+cat << EOF > "${HOME}"/.ssh/config
+Host ${INSTANCE_PREFIX}
+  User rhel8user
+  HostName ${IP_ADDRESS}
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+EOF
+chmod 0600 "${HOME}"/.ssh/config
 
 cat <<EOF > "${PAYLOAD_PATH}"/usr/bin/pre_rpm_install.sh
 #! /bin/bash
@@ -62,9 +64,9 @@ mkdir -p "${PAYLOAD_PATH}"/etc/crio/ && cp "${CLUSTER_PROFILE_DIR}"/pull-secret 
 chmod 600 "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
 tar -uvf $PAYLOAD_PATH/payload.tar .
 
-gcloud compute scp "${PAYLOAD_PATH}/payload.tar" rhel8user@"${INSTANCE_PREFIX}":~
-gcloud compute ssh rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo tar -xhvf $HOME/payload.tar -C / && \
-             sudo pre_rpm_install.sh'
+scp "${PAYLOAD_PATH}/payload.tar" "${INSTANCE_PREFIX}":~
+ssh "${INSTANCE_PREFIX}" \
+  'sudo tar -xhvf $HOME/payload.tar -C / && \
+   sudo pre_rpm_install.sh'
 
 gcloud compute firewall-rules update "${INSTANCE_PREFIX}" --allow tcp:22,icmp,tcp:80,tcp:443,tcp:6443
