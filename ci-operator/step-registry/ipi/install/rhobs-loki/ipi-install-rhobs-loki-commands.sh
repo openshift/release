@@ -390,6 +390,8 @@ spec:
         - mountPath: "/var/log/journal"
           name: journal
           readOnly: true
+        - mountPath: "/tmp/shared"
+          name: shared-data
       - args:
         - --https-address=:9001
         - --provider=openshift
@@ -478,6 +480,8 @@ spec:
         secret:
           defaultMode: 420
           secretName: cookie-secret
+      - name: shared-data
+        emptyDir: {}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
