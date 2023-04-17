@@ -10,6 +10,7 @@ GITHUB_USER=""
 GITHUB_TOKEN=""
 CLEAN_REPOS_STATUS=0
 CLEAN_WEBHOOK_STATUS=0
+CLEAN_QUAY_STATUS=0
 PREVIOUS_RATE_REMAINING=0
 
 # user stored: username:token,username:token
@@ -39,7 +40,8 @@ git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e
 
 make clean-gitops-repositories || CLEAN_REPOS_STATUS=$?
 make clean-github-webhooks || CLEAN_WEBHOOK_STATUS=$?
+make clean-quay || CLEAN_QUAY_STATUS=$?
 
-if [[ "${CLEAN_REPOS_STATUS}" -ne 0 || "${CLEAN_WEBHOOK_STATUS}" -ne 0 ]]; then
+if [[ "${CLEAN_REPOS_STATUS}" -ne 0 || "${CLEAN_WEBHOOK_STATUS}" -ne 0 || "${CLEAN_REPOS_STATUS}" -ne 0 ]]; then
     exit 1
 fi
