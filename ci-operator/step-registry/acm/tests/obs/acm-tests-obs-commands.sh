@@ -57,7 +57,7 @@ MANAGED_CLUSTER_API_URL=$(cat $SHARED_DIR/managed.cluster.api.url)
 export MANAGED_CLUSTER_API_URL
 
 # Create a .kube directory inside the alabama dir
-mkdir /alabama/.kube
+mkdir -p /alabama/.kube
 
 # Copy Kubeconfig file to the directory where Obs is looking it up
 cp ${SHARED_DIR}/kubeconfig ~/.kube/config
