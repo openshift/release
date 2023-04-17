@@ -50,6 +50,21 @@ function create_openstack_namespace {
   popd
 }
 
+# Check if build didn't fail
+function check_build_result {
+  local build_name
+  local build_status
+
+  build_name="$1"
+  # At this moment, we don't expect more than one build per build-config
+  build_status=$(oc get builds -l buildconfig="${build_name}" -o json | jq -r '.items[0].status.phase')
+  if [[ "$build_status" != "Complete" ]]; then
+    echo "Build ${build_name} failed with status ${build_status}"
+    exit 1
+  fi
+}
+
+
 # Builds and push operator image
 function build_push_operator_images {
   OPERATOR="$1"
@@ -69,6 +84,7 @@ function build_push_operator_images {
   oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
   oc set build-secret --pull bc/${OPERATOR} ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR} --from-dir . -F
+  check_build_result ${OPERATOR}
 
   # if it is the metaoperator and any extra dependant bundles exist build and push them here
   local STORAGE_BUNDLE_EXISTS=0
@@ -79,6 +95,7 @@ function build_push_operator_images {
     oc patch bc ${OPERATOR}-storage-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
     oc set build-secret --pull bc/${OPERATOR}-storage-bundle ${DOCKER_REGISTRY_SECRET}
     oc start-build ${OPERATOR}-storage-bundle --from-dir . -F
+    check_build_result ${OPERATOR}-storage-bundle
     STORAGE_BUNDLE_EXISTS=1
   fi
 
@@ -95,6 +112,7 @@ function build_push_operator_images {
   oc patch bc ${OPERATOR}-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
   oc set build-secret --pull bc/${OPERATOR}-bundle ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR}-bundle --from-dir . -F
+  check_build_result ${OPERATOR}-bundle
 
   BASE_BUNDLE=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG}
   DOCKERFILE="index.Dockerfile"
@@ -115,6 +133,7 @@ function build_push_operator_images {
   oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
   oc patch bc ${OPERATOR}-index -p "${DOCKERFILE_PATH_PATCH[@]}"
   oc start-build ${OPERATOR}-index --from-dir . -F
+  check_build_result ${OPERATOR}-index
 
   popd
 }
