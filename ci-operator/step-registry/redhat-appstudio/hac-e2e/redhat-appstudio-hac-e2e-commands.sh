@@ -1,0 +1,127 @@
+#!/bin/bash
+
+set -o nounset
+set -o errexit
+set -o pipefail
+
+export PATH=$PATH:/tmp/bin
+mkdir -p /tmp/bin
+
+export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN
+
+DEFAULT_QUAY_ORG=redhat-appstudio-qe
+DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
+GITHUB_USER=""
+GITHUB_TOKEN=""
+QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
+QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-user)
+QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token)
+QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-source)
+QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
+PYXIS_STAGE_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-key)
+PYXIS_STAGE_CERT=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-cert)
+OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
+OPENSHIFT_USERNAME="kubeadmin"
+PREVIOUS_RATE_REMAINING=0
+
+# user stored: username:token,username:token
+IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github_accounts)"
+for account in "${GITHUB_ACCOUNTS_ARRAY[@]}"
+do :
+    IFS=':' read -r -a GITHUB_USERNAME_ARRAY <<< "$account"
+
+    GH_RATE_REMAINING=$(curl -s \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${GITHUB_USERNAME_ARRAY[1]}"\
+    https://api.github.com/rate_limit | jq ".rate.remaining")
+
+    echo -e "[INFO ] user: ${GITHUB_USERNAME_ARRAY[0]} with rate limit remaining $GH_RATE_REMAINING"
+    if [[ "${GH_RATE_REMAINING}" -ge "${PREVIOUS_RATE_REMAINING}" ]];then
+        GITHUB_USER="${GITHUB_USERNAME_ARRAY[0]}"
+        GITHUB_TOKEN="${GITHUB_USERNAME_ARRAY[1]}"
+    fi
+    PREVIOUS_RATE_REMAINING="${GH_RATE_REMAINING}"
+done
+
+echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
+export HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
+
+yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
+if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
+    OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
+elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then
+    # Recommendation from hypershift qe team in slack channel..
+    OPENSHIFT_PASSWORD="$(cat ${SHARED_DIR}/kubeadmin-password)"
+else
+    echo "Kubeadmin password file is empty... Aborting job"
+    exit 1
+fi
+
+timeout --foreground 5m bash  <<- "EOF"
+    while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
+            sleep 20
+    done
+EOF
+  if [ $? -ne 0 ]; then
+	  echo "Timed out waiting for login"
+	  exit 1
+  fi
+
+git config --global user.name "redhat-appstudio-qe-bot"
+git config --global user.email redhat-appstudio-qe-bot@redhat.com
+
+mkdir -p "${HOME}/creds"
+GIT_CREDS_PATH="${HOME}/creds/file"
+git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
+echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
+
+cd "$(mktemp -d)"
+
+git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appsutio/e2e-tests.git" .
+make ci/prepare/e2e-branch
+./mage -v bootstrapCluster
+
+
+set -x
+export QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
+export QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
+export QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
+curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/main/hack/hac/installHac.sh -o installHac.sh
+chmod +x installHac.sh
+HAC_KUBECONFIG=/tmp/hac.kubeconfig
+oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
+echo "=== INSTALLING HAC ==="
+HAC_NAMESPACE=$(./installHac.sh -ehk $HAC_KUBECONFIG -sk $KUBECONFIG |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
+# CYPRESS_HAC_BASE_URL=$(echo $INSTALL_OUTPUT | grep "Stonesoup URL:" |sed "s/Stonesoup URL: //g")
+# HAC_NAMESPACE=$(echo $INSTALL_OUTPUT |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
+echo "=== HAC INSTALLED ==="
+echo "HAC NAMESPACE: $HAC_NAMESPACE"
+export CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/hac/stonesoup"
+echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
+export CYPRESS_USERNAME=user1
+export CYPRESS_PASSWORD=user1
+export CYPRESS_PERIODIC_RUN=true
+cd /tmp/e2e
+oc apply -f - <<EOF
+apiVersion: toolchain.dev.openshift.com/v1alpha1
+kind: UserSignup
+metadata:
+    name: user1
+    namespace: toolchain-host-operator
+    labels:
+    toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
+    annotations:
+    toolchain.dev.openshift.com/user-email: user1@user.us
+spec:
+    username: user1
+    userid: user1
+    approved: true
+EOF
+
+sleep 5
+oc get UserSignup -n toolchain-host-operator
+npm run cy:run -- --spec ./tests/basic-happy-path.spec.ts || TEST_RUN=1
+cp -a /tmp/e2e/cypress/* ${ARTIFACT_DIR}
+KUBECONFIG=$HAC_KUBECONFIG bonfire namespace release $HAC_NAMESPACE
+exit $TEST_RUN
