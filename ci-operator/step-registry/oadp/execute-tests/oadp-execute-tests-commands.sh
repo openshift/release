@@ -26,6 +26,7 @@ OADP_APPS_DIR="/alabama/oadpApps"
 PYCLIENT_DIR="/alabama/pyclient"
 
 # Extract additional repository archives
+ls -ltr /alabama
 mkdir -p "${OADP_GIT_DIR}"
 mkdir -p "${OADP_APPS_DIR}"
 mkdir -p "${PYCLIENT_DIR}"
