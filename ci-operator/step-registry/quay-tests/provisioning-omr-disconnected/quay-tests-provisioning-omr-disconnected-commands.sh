@@ -32,7 +32,7 @@ cat >>omr-ami-images.json <<EOF
     "aws": {
       "regions": {
         "us-east-1": {
-          "release": "RHEL_HA-8.4.0_HVM-20210504-x86_64-2-Hourly2-GP20",
+          "release": "RHEL_HA-8.4.0_HVM-20210504-x86_64-2-Hourly2-GP2",
           "image": "ami-02e0bb36c61bb9715"
         },
         "us-east-2": {
@@ -46,6 +46,26 @@ cat >>omr-ami-images.json <<EOF
         "us-west-2": {
           "release": "RHEL_HA-8.4.0_HVM-20210504-x86_64-2-Hourly2-GP2",
           "image": "ami-0b28dfc7adc325ef4"
+        },
+        "ap-northeast-1": {
+          "release": "RHEL_HA-8.4.0_HVM-20210504-x86_64-2-Hourly2-GP2",
+          "image": "ami-0cf31bd68732fb0e2"
+        },
+        "ap-southeast-2": {
+          "release": "RHEL_HA-8.4.0_HVM-20210504-x86_64-2-Hourly2-GP2",
+          "image": "ami-016461ac55b16fd05"
+        },
+        "ap-northeast-3": {
+          "release": "RHEL_HA-8.4.0_HVM-20210504-x86_64-2-Hourly2-GP2",
+          "image": "ami-08daa4649f61b8684"
+        },
+        "ap-southeast-1": {
+          "release": "RHEL_HA-8.4.0_HVM-20210504-x86_64-2-Hourly2-GP2",
+          "image": "ami-0d6ba217f554f6137"
+        },
+        "ap-northeast-2": {
+          "release": "RHEL_HA-8.4.0_HVM-20210504-x86_64-2-Hourly2-GP2",
+          "image": "ami-0bb1758bf5a69ca5c"
         }
       }
     }
