@@ -906,6 +906,15 @@ if [ ${ret} -gt 0 ]; then
   echo "8<--------8<--------8<--------8<-------- END: wait-for install-complete 8<--------8<--------8<--------8<--------"
 fi
 
+if [ ${ret} -gt 0 ]; then
+  echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
+  echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
+  openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+  ret=${PIPESTATUS[0]}
+  echo "ret=${ret}"
+  echo "8<--------8<--------8<--------8<-------- END: wait-for install-complete 8<--------8<--------8<--------8<--------"
+fi
+
 date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_END_TIME"
 
