@@ -3,6 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  libvirt-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: libvirt-installer
   test-bin:
     name: "4.14"
     namespace: ocp
@@ -161,6 +165,15 @@ tests:
   cron: 0 5 * * 1-5
   steps:
     workflow: openshift-microshift-rebase
+- as: e2e-upgrade-test
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-07f5ac8ddbcfbb96e
+    workflow: openshift-microshift-e2e-upgrade
 zz_generated_metadata:
   branch: main
   org: openshift
