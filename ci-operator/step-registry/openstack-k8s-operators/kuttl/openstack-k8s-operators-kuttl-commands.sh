@@ -85,6 +85,11 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   else
       echo "Report ${KUTTL_REPORT} not found"
   fi
+  # Run storage cleanup otherwise we can hit random issue during deploy step where
+  # mariadb pod will use the same pv which have a db already and fails because
+  # The init job assumed that the DB was just created and had an empty root password,
+  # which would not be the case.
+  make crc_storage_cleanup
 else
   echo "File /go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml not found. Skipping script."
 fi
