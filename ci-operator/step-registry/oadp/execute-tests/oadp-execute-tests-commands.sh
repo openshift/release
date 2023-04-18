@@ -26,8 +26,14 @@ OADP_APPS_DIR="/alabama/oadpApps"
 PYCLIENT_DIR="/alabama/pyclient"
 
 # Extract additional repository archives
+mkdir -p "${OADP_GIT_DIR}"
+mkdir -p "${OADP_APPS_DIR}"
+mkdir -p "${PYCLIENT_DIR}"
+echo "Extract /home/jenkins/oadp-e2e-qe.tar.gz"
 tar -xf /home/jenkins/oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}" --strip-components 1
+echo "Extract /home/jenkins/oadp-apps-deployer.tar.gz"
 tar -xf /home/jenkins/oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}" --strip-components 1
+echo "Extract /home/jenkins/mtc-python-client.tar.gz"
 tar -xf /home/jenkins/mtc-python-client.tar.gz -C "${PYCLIENT_DIR}" --strip-components 1
 
 # Setup /tmp/test-settings
