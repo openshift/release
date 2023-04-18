@@ -336,6 +336,9 @@ echo "${REGION}" >> "${SHARED_DIR}/proxyregion"
 
 # create the s3 bucket to push to
 aws --region "${REGION}" s3 mb "s3://${PROXY_NAME}"
+aws --region "${REGION}" s3api put-public-access-block \
+  --bucket "${PROXY_NAME}"\
+  --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
 aws --region "${REGION}" s3api put-bucket-acl --bucket "${PROXY_NAME}" --acl public-read
 
 # push the generated ignition to the s3 bucket

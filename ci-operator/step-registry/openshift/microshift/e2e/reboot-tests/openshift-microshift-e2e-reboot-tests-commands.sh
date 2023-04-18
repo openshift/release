@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -13,109 +13,103 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
-mkdir -p "${HOME}"/.ssh
-
-# gcloud compute will use this key rather than create a new one
-cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
-cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
-echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
-echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
-chmod 0600 "${HOME}"/.ssh/config
-
-# Copy pull secret to user home
-cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
-
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
+
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+
+mkdir -p "${HOME}"/.ssh
+cat << EOF > "${HOME}"/.ssh/config
+Host ${INSTANCE_PREFIX}
+  User rhel8user
+  HostName ${IP_ADDRESS}
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+  ServerAliveInterval 30
+  ServerAliveCountMax 1200
+EOF
+chmod 0600 "${HOME}"/.ssh/config
 
 cat >"${HOME}"/reboot-test.sh <<'EOF'
 #!/bin/bash
 set -xeuo pipefail
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
+stat $KUBECONFIG
 # TODO: Remove the labels again once https://issues.redhat.com/browse/OCPBUGS-1969 has been fixed upstream
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"-version=v1.24"
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"=privileged"
 cat <<EOF_INNER | oc create -f -
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  namespace: default
-  name: test-claim
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: topolvm-provisioner
-  resources:
-    requests:
-      storage: 1Gi
----
+# TODO: Fix 4.12 lvmd's "spare-gb"
+# ---
+# kind: PersistentVolumeClaim
+# apiVersion: v1
+# metadata:
+#   namespace: default
+#   name: test-claim
+# spec:
+#   accessModes:
+#   - ReadWriteOnce
+#   storageClassName: topolvm-provisioner
+#   resources:
+#     requests:
+#       storage: 1Gi
+# ---
 kind: Pod
 apiVersion: v1
 metadata:
   name: test-pod
   namespace: default
 spec:
-  securityContext:
-    runAsNonRoot: true
-    privileged: false
-    capabilities:
-      drop:
-      - 'ALL'
-    allowPrivilegeEscalation: false
-    seccompProfile:
-      type: RuntimeDefault
   containers:
     - name: test-container
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        privileged: false
+        capabilities:
+          drop:
+          - 'ALL'
+        allowPrivilegeEscalation: false
+        seccompProfile:
+          type: RuntimeDefault
       image: nginx
       command:
         - sh
         - -c
         - sleep 1d
-      volumeMounts:
-        - mountPath: /vol
-          name: test-vol
-  volumes:
-    - name: test-vol
-      persistentVolumeClaim:
-        claimName: test-claim
+  #     volumeMounts:
+  #       - mountPath: /vol
+  #         name: test-vol
+  # volumes:
+  # - name: test-vol
+  #   persistentVolumeClaim:
+  #     claimName: test-claim
 EOF_INNER
 
-set +ex
-echo "waiting for pod condition" >&2
 oc wait --for=condition=Ready --timeout=120s pod/test-pod
-echo "pod posted ready status" >&2
-
 EOF
 chmod +x "${HOME}"/reboot-test.sh
 
-gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/reboot-test.sh rhel8user@"${INSTANCE_PREFIX}":~/reboot-test.sh
+scp "${HOME}"/reboot-test.sh "${INSTANCE_PREFIX}":~/reboot-test.sh
 
-gcloud compute scp \
-  --quiet \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse /tmp/validate-microshift rhel8user@"${INSTANCE_PREFIX}":~/validate-microshift
-
-if ! gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ~/reboot-test.sh'; then
-
-  gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-    --zone "${GOOGLE_COMPUTE_ZONE}" \
-    rhel8user@"${INSTANCE_PREFIX}" \
-    --command 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/reboot-test.sh'; then
+  scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
+  ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
   exit 1
 fi
 
-# now reboot the machine
-gcloud compute instances stop "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
+set +e
+ssh "${INSTANCE_PREFIX}" 'sudo reboot now'
+res=$?
+set -e
+
+# Don't fail on exit code 255 which is ssh's for things like
+# "connection closed by remote host"
+# which are expected when rebooting via ssh
+if [ "${res}" -ne 0 ] && [ "${res}" -ne 255 ]; then
+    exit 1
+fi
