@@ -18,7 +18,7 @@ gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 
 mkdir -p "${HOME}"/.ssh
 cat << EOF > "${HOME}"/.ssh/config
@@ -27,44 +27,28 @@ Host ${INSTANCE_PREFIX}
   HostName ${IP_ADDRESS}
   IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
   StrictHostKeyChecking accept-new
-EOF
-chmod 0600 "${HOME}"/.ssh/config
-
-cat > "${HOME}"/wait_for_pod_ready.sh <<'EOF'
-#!/bin/bash
-set -xeuo pipefail
-
-mkdir -p "${HOME}"/.ssh
-cat << EOF > "${HOME}"/.ssh/config
-Host ${INSTANCE_PREFIX}
-  User rhel8user
-  HostName ${IP_ADDRESS}
-  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
-  StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
 EOF
 chmod 0600 "${HOME}"/.ssh/config
 
 # Steps may not be used more than once in a test, so this block duplicates the behavior of wait-for-ssh for reboot tests.
-timeout=600 # 10 minute wait.
+timeout=300 # 5 minute wait.
 >&2 echo "Polling ssh connectivity before proceeding.  Timeout=$timeout second"
 start=$(date +"%s")
-until ssh "${INSTANCE_PREFIX}" 'echo Hello, CI';
+until ssh "${INSTANCE_PREFIX}" 'sudo systemctl start microshift';
 do
   if (( $(date +"%s") - $start >= $timeout )); then
-    echo "timed out out waiting for ssh connection" >&2
+    echo "timed out out waiting for MicroShift to start" >&2
     exit 1
   fi
-  echo "waiting for ssh connection"
+  echo "waiting for MicroShift to start"
   sleep 5
 done
 >&2 echo "It took $(( $(date +'%s') - start)) seconds to connect via ssh"
 
-scp "${HOME}"/wait_for_pod_ready.sh "${INSTANCE_PREFIX}":~/wait_for_pod_ready.sh
+ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
-if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/wait_for_pod_ready.sh'; then
-  scp /tmp/validate-microshift "${INSTANCE_PREFIX}:~/validate-microshift"
-  ssh "${INSTANCE_PREFIX}" "bash ~/validate-microshift/cluster-debug-info.sh"
+if ! oc wait --kubeconfig=/tmp/kubeconfig --for=condition=Ready --timeout=120s pod/test-pod; then
+  scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
+  ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
   exit 1
 fi
