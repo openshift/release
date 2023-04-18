@@ -1,0 +1,102 @@
+presubmits:
+  opendatahub-io/org-management:
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: app.ci
+    context: ci/prow/org-management-peribolos
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: presubmits-org-management-peribolos
+    rerun_command: /test org-management-peribolos
+    run_if_changed: ^(config/opendatahub-io/org.yaml)
+    spec:
+      containers:
+      - args:
+        - --config-path=./config/opendatahub-io/org.yaml
+        - --confirm=false
+        - --github-token-path=/etc/github/oauth
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --fix-org
+        - --fix-org-members
+        - --fix-teams
+        - --fix-team-members
+        - --fix-team-repos
+        - --fix-repos
+        - --github-hourly-tokens=600
+        - --github-allowed-burst=600
+        command:
+        - /ko-app/peribolos
+        image: gcr.io/k8s-prow/peribolos:v20230405-46d7922c2a
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+        volumeMounts:
+        - mountPath: /etc/github
+          name: token
+          readOnly: true
+      volumes:
+      - name: token
+        secret:
+          secretName: github-credentials-openshift-merge-robot
+    trigger: (?m)^/test( | .* )org-management-peribolos,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
+    context: ci/prow/unit-tests
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-opendatahub-io-org-management-main-unit-tests
+    rerun_command: /test unit-tests
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=unit-tests
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )unit-tests,?($|\s.*)
