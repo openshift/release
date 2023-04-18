@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+info() {
+	>&2 printf '%s: %s\n' "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" "$*"
+}
+
 CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
 
 clouds_yaml="$(mktemp)"
@@ -21,14 +25,12 @@ is_openshift_version_gte() {
 	declare release_image ocp_version
 	release_image="$(openshift-install version | sed -n 's/^release image\s\+\(.*\)$/\1/p' | tr -d '\n')"
 	ocp_version="$(oc adm release info "$release_image" -o json | jq -r '.metadata.version' | tr -d '\n')"
-	echo "Detected OCP version: ${ocp_version}"
+	info "Detected OCP version: ${ocp_version}"
 	printf '%s\n%s' "$1" "$ocp_version" | sort -C -V
 }
 
 # new_application_credentials creates a new application credential set and
-# merges it to the provided clouds.yaml. All the credentials created here have
-# an expiration; expired application credentials are pruned by the periodic
-# cleanup job running on all OpenStack clouds.
+# merges it to the provided clouds.yaml.
 new_application_credentials() {
 	declare OS_CLIENT_CONFIG_FILE appcred_json
 	OS_CLIENT_CONFIG_FILE="$1"
@@ -69,37 +71,35 @@ fi
 # Skip application credentials when testing old OpenShift versions, as appcreds
 # are only supported in OCP v4.12+.
 if ! is_openshift_version_gte "4.12"; then
-	echo 'The detected version does not support application credentials.'
+	info 'The detected version does not support application credentials.'
 	OPENSTACK_AUTHENTICATION_METHOD='password'
 fi
 
-echo "The environment variable OPENSTACK_AUTHENTICATION_METHOD is set to '${OPENSTACK_AUTHENTICATION_METHOD}'."
+info "The environment variable OPENSTACK_AUTHENTICATION_METHOD is set to '${OPENSTACK_AUTHENTICATION_METHOD}'."
 case "$OPENSTACK_AUTHENTICATION_METHOD" in
 	"application-credentials")
 		new_application_credentials "$clouds_yaml" > "${SHARED_DIR}/clouds.yaml"
-		declare appcreds_id
-		appcreds_id="$(yq -r ".clouds.\"${OS_CLOUD}\".auth.application_credential_id" "${SHARED_DIR}/clouds.yaml")"
-		echo "Generated application credentials with ID ${appcreds_id}"
-		if [[ -n "$ROTATE_CLOUD_CREDENTIALS" ]]; then
-			echo 'Environment variable ROTATE_CLOUD_CREDENTIALS detected. Generating a set of application credentials for the rotation.'
-			new_application_credentials "$clouds_yaml" > "${SHARED_DIR}/clouds2.yaml"
-			new_application_credentials "$clouds_yaml" --unrestricted > "${SHARED_DIR}/clouds-unrestricted.yaml"
+		info "Generated application credentials with ID $(yq -r ".clouds.\"${OS_CLOUD}\".auth.application_credential_id" "${SHARED_DIR}/clouds.yaml")"
 
-			declare appcreds_id
-			appcreds_id="$(yq -r ".clouds.\"${OS_CLOUD}\".auth.application_credential_id" "${SHARED_DIR}/clouds2.yaml")"
-			echo "Generated additional application credentials with ID ${appcreds_id}"
+		new_application_credentials "$clouds_yaml" --unrestricted > "${SHARED_DIR}/clouds-unrestricted.yaml"
+		info "Generated unrestricted application credentials with ID $(yq -r ".clouds.\"${OS_CLOUD}\".auth.application_credential_id" "${SHARED_DIR}/clouds-unrestricted.yaml")"
+
+		if [[ -n "$ROTATE_CLOUD_CREDENTIALS" ]]; then
+			info 'Environment variable ROTATE_CLOUD_CREDENTIALS detected. Generating a set of application credentials for the rotation...'
+			new_application_credentials "$clouds_yaml" > "${SHARED_DIR}/clouds2.yaml"
+			info "Generated application credentials with ID $(yq -r ".clouds.\"${OS_CLOUD}\".auth.application_credential_id" "${SHARED_DIR}/clouds2.yaml")"
 		fi
+
 		;;
 	"password")
 		if [[ "$(yq -r ".clouds.\"${OS_CLOUD}\".auth_type" "$clouds_yaml")" == 'v3applicationcredential' ]]; then
-			echo 'The original clouds.yaml does not contain a password. Exiting.'
+			info 'The original clouds.yaml does not contain a password. Exiting.'
 			exit 1
 		fi
-		echo 'Using password authentication with the original clouds.yaml'
+		info 'Using password authentication with the original clouds.yaml'
 
 		cp "$clouds_yaml" "${SHARED_DIR}/clouds.yaml"
 		;;
 	*)
-		echo "Unknown authentication method '${OPENSTACK_AUTHENTICATION_METHOD}'."; exit 1 ;;
+		info "Unknown authentication method '${OPENSTACK_AUTHENTICATION_METHOD}'."; exit 1 ;;
 esac
-
