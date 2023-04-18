@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 
 # Extract additional repository archives
-# mkdir -p {$OADP_GIT_DIR,$OADP_APPS_DIR,$PYCLIENT_DIR}
+mkdir -p {$OADP_GIT_DIR,$OADP_APPS_DIR,$PYCLIENT_DIR}
 ls -ltr /alabama
 ls -ltr $OADP_AUTOMATION_DIR
 
