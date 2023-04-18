@@ -9,7 +9,9 @@ set -o pipefail
 #PYCLIENT_DIR="/alabama/pyclient"
 
 # Extract additional repository archives
+mkdir -p {$OADP_GIT_DIR,$OADP_APPS_DIR,$PYCLIENT_DIR}
 ls -ltr /alabama
+ls -ltr $OADP_AUTOMATION_DIR
 
 echo "Extract /home/jenkins/oadp-e2e-qe.tar.gz"
 tar -xf /home/jenkins/oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}" --strip-components 1
