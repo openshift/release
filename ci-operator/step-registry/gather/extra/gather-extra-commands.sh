@@ -402,7 +402,7 @@ ${t_test}    cluster:usage:memory:kube_apiserver:test:avg    avg(sum(rate(contai
 
 ${t_all}     cluster:usage:memory:etcd:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip-.*", namespace="openshift-etcd"}[${d_all}])) by (pod))
 ${t_install} cluster:usage:memory:etcd:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip.*", namespace="openshift-etcd"}[${d_install}])) by (pod))
-${t_test}    cluster:usage:memory:etcd:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip.*", namespace"openshift-etcd"}[${d_test}])) by (pod))
+${t_test}    cluster:usage:memory:etcd:test:avg    avg(sum(rate(container_memory_working_set_bytes{pod=~"etcd-ip.*", namespace="openshift-etcd"}[${d_test}])) by (pod))
 
 ${t_all}     cluster:usage:memory:openshift_apiserver:total:avg   avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_all}])) by (pod))
 ${t_install} cluster:usage:memory:openshift_apiserver:install:avg avg(sum(rate(container_memory_working_set_bytes{pod=~"apiserver-.*", namespace="openshift-apiserver"}[${d_install}])) by (pod))
