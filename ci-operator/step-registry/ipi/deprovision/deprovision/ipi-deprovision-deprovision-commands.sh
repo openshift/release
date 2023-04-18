@@ -41,6 +41,11 @@ fi
 
 echo ${SHARED_DIR}/metadata.json
 
+if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
+    echo "Setting AZURE credential with minimal permissions for installer"
+    export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure_minimal_permission
+fi
+
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
   export AZURE_AUTH_LOCATION=$SHARED_DIR/osServicePrincipal.json
   if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then

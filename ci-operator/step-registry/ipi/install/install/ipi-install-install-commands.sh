@@ -380,7 +380,14 @@ aws|aws-arm64|aws-usgov)
         export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
     fi
     ;;
-azure4|azuremag|azure-arm64) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
+azure4|azuremag|azure-arm64)
+    if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
+        echo "Setting AZURE credential with minimal permissions for installer"
+        export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure_minimal_permission
+    else
+        export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+    fi
+    ;;
 azurestack)
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
     if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
