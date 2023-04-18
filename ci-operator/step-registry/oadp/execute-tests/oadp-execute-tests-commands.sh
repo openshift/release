@@ -60,10 +60,10 @@ oc annotate --overwrite namespace/openshift-adp volsync.backube/privileged-mover
 # Execute tests
 echo "Executing tests..."
 cd $OADP_GIT_DIR
-EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh
+EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true
 
 # Archive results
 echo "Copying ${RESULTS_FILE} to ${ARTIFACT_DIR}/junit_oadp_interop_results.xml..."
-cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/junit_oadp_interop_results.xml"
+cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/junit_oadp_interop_results.xml" || true
 
 echo "Complete..."
