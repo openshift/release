@@ -50,6 +50,12 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 performance "Should have the correct RPS configuration"
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-8433
+# TESTNAME
+
+metallb "Correct and incorrect MetalLB resources coexist"
+
 EOF
 }
 
