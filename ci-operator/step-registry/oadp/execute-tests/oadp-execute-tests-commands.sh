@@ -22,6 +22,7 @@ cp $SHARED_DIR/credentials /tmp/test-settings
 # Set the API_URL value using the $SHARED_DIR/console.url file
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+RESULTS_FILE="/alabama/cspi/output_files/api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443/junit_report.xml"
 
 # Install pip and setup virtual environment
 python3 -m pip install pip --upgrade
@@ -34,10 +35,6 @@ readonly OADP_GIT_DIR="/alabama/cspi"
 readonly OADP_APPS_DIR="/alabama/oadpApps"
 readonly PYCLIENT_DIR="/alabama/pyclient"
 
-mkdir -p "${OADP_GIT_DIR}"
-mkdir -p "${OADP_APPS_DIR}"
-mkdir -p "${PYCLIENT_DIR}"
-mkdir -p /tmp/test-settings
 touch /tmp/test-settings/default_settings.json
 mkdir -p /home/jenkins/.kube
 touch /home/jenkins/.kube/config
@@ -49,13 +46,6 @@ echo "AWS info"
 cp "${CLUSTER_PROFILE_DIR}/.awscred" /tmp/test-settings/aws_creds
 echo "End of AWS info"
 
-# Extract Additional Repositories
-echo "Extract oadp-e2e-qe"
-tar -xf /oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}" --strip-components 1
-echo "Extract appsdeployer"
-tar -xf /oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}" --strip-components 1
-echo "Extract pyclient"
-tar -xf /mtc-python-client.tar.gz -C "${PYCLIENT_DIR}" --strip-components 1
 
 echo "Install ${OADP_APPS_DIR}"
 python3 -m pip install "${OADP_APPS_DIR}" --target "${OADP_GIT_DIR}/sample-applications/"
@@ -68,22 +58,15 @@ cd $OADP_GIT_DIR
 
 export ANSIBLE_REMOTE_TMP="/tmp/"
 
-# echo "sleep"
-# sleep 3600
 # Set KUBECONFIG to /home/jenkins/.kube/config
 export KUBECONFIG="/home/jenkins/.kube/config"
 # Login as kubeadmin to the test cluster
 oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
 echo "Run tests from CLI"
-
-#oc create namespace cassandra-ns
-#oc policy add-role-to-group admin system:serviceaccounts -n cassandra-ns
-
 NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh
-#NAMESPACE=openshift-adp bash /alabama/cspi/test_settings/scripts/test_runner.sh 
 
-ls -laht /alabama/cspi/output_files
+cp $RESULTS_FILE $ARTIFACT_DIR/junit_oadp_interop_results.xml
 
 echo "finished"
 
