@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -x
 
 export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
@@ -85,8 +86,6 @@ git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appsutio/e2e-
 make ci/prepare/e2e-branch
 ./mage -v bootstrapCluster
 
-
-set -x
 export QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
 export QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
 export QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
