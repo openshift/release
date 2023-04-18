@@ -62,6 +62,8 @@ echo "Executing tests..."
 cd $OADP_GIT_DIR
 EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true
 
+sleep 3600
+
 # Archive results
 echo "Copying ${RESULTS_FILE} to ${ARTIFACT_DIR}/junit_oadp_interop_results.xml..."
 cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/junit_oadp_interop_results.xml" || true
