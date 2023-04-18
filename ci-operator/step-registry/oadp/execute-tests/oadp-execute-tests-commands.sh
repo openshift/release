@@ -80,7 +80,6 @@ echo "Run tests from CLI"
 #oc create namespace cassandra-ns
 #oc policy add-role-to-group admin system:serviceaccounts -n cassandra-ns
 
-sleep 1800
 NAMESPACE=openshift-adp EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_settings/scripts/test_runner.sh
 #NAMESPACE=openshift-adp bash /alabama/cspi/test_settings/scripts/test_runner.sh 
 
