@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euox pipefail
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -29,8 +29,8 @@ Host ${INSTANCE_PREFIX}
 EOF
 chmod 0600 "${HOME}"/.ssh/config
 
-cat <<EOF > "${PAYLOAD_PATH}"/usr/bin/pre_rpm_install.sh
-#! /bin/bash
+cat <<EOF > /tmp/install.sh
+#!/bin/bash
 set -xeuo pipefail
 
 rpm --rebuilddb
@@ -40,33 +40,41 @@ subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
 
-sed -i '2i set -x' /usr/bin/configure-vm.sh
-
-sudo useradd -m -G wheel microshift
-sudo echo -e 'microshift\tALL=(ALL)\tNOPASSWD: ALL' > /etc/sudoers.d/microshift
-cd /home/microshift && sudo -nu microshift configure-vm.sh --no-build /etc/crio/openshift-pull-secret
-
-dnf install jq firewalld -y
-dnf localinstall -y \$(find /packages/ -iname "*\$(uname -p)*" -or -iname '*noarch*')
-EOF
-chmod +x usr/bin/pre_rpm_install.sh
-
-mkdir -p "${PAYLOAD_PATH}"/etc/microshift
-IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
-cat << EOF > "${PAYLOAD_PATH}"/etc/microshift/config.yaml
----
+mkdir -p /etc/microshift
+cat << EOF2 > /etc/microshift/config.yaml
 apiServer:
   subjectAltNames:
   - ${IP_ADDRESS}
+EOF2
+
+useradd -m -G wheel microshift
+echo -e 'microshift\tALL=(ALL)\tNOPASSWD: ALL' > /etc/sudoers.d/microshift
+
+OPTS=""
+if grep "\-\-no-build-deps" /tmp/configure-vm.sh; then
+  OPTS="--no-build-deps --force-firewall"
+fi
+cd /home/microshift && sudo -nu microshift bash -x /tmp/configure-vm.sh --no-build \${OPTS} /tmp/pull-secret
+
+mkdir -p /tmp/rpms
+tar -xhvf /tmp/rpms.tar --strip-components 2 -C /tmp/rpms
+dnf localinstall -y \$(find /tmp/rpms/ -iname "*\$(uname -p)*" -or -iname '*noarch*')
+
+# 4.12 and 4.13 don't set up cri-o pull secret in case of --no-build
+if [ ! -e /etc/crio/openshift-pull-secret ]; then
+    cp /tmp/pull-secret /etc/crio/openshift-pull-secret
+    chmod 600 /etc/crio/openshift-pull-secret
+fi
 EOF
+chmod +x /tmp/install.sh
 
-mkdir -p "${PAYLOAD_PATH}"/etc/crio/ && cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
-chmod 600 "${PAYLOAD_PATH}"/etc/crio/openshift-pull-secret
-tar -uvf $PAYLOAD_PATH/payload.tar .
+scp \
+  /rpms.tar \
+  /tmp/install.sh \
+  /microshift/scripts/devenv-builder/configure-vm.sh \
+  "${CLUSTER_PROFILE_DIR}/pull-secret" \
+  "${INSTANCE_PREFIX}:/tmp"
 
-scp "${PAYLOAD_PATH}/payload.tar" "${INSTANCE_PREFIX}":~
-ssh "${INSTANCE_PREFIX}" \
-  'sudo tar -xhvf $HOME/payload.tar -C / && \
-   sudo pre_rpm_install.sh'
+ssh "${INSTANCE_PREFIX}" "sudo /tmp/install.sh"
 
 gcloud compute firewall-rules update "${INSTANCE_PREFIX}" --allow tcp:22,icmp,tcp:80,tcp:443,tcp:6443

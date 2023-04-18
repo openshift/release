@@ -5,83 +5,62 @@ set -xeuo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
-GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
+GOOGLE_PROJECT_ID="$(<${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-GOOGLE_COMPUTE_ZONE="$(< ${SHARED_DIR}/openshift_gcp_compute_zone)"
+GOOGLE_COMPUTE_ZONE="$(<${SHARED_DIR}/openshift_gcp_compute_zone)"
 if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
   exit 1
 fi
-
-mkdir -p "${HOME}"/.ssh
-
-# gcloud compute will use this key rather than create a new one
-cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
-cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
-echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
-echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
-chmod 0600 "${HOME}"/.ssh/config
-
-# Copy pull secret to user home
-cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
 
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
-cat > "${HOME}"/wait_for_pod_ready.sh <<'EOF'
-#!/bin/bash
-set -xeuo pipefail
+IP_ADDRESS="$(gcloud compute instances describe "${INSTANCE_PREFIX}" --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
 
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-echo "waiting for pod response" >&2
-oc wait --for=condition=Ready --timeout=120s pod/test-pod || exit 1
-echo "pod posted ready status" >&2
+mkdir -p "${HOME}"/.ssh
+cat << EOF > "${HOME}"/.ssh/config
+Host ${INSTANCE_PREFIX}
+  User rhel8user
+  HostName ${IP_ADDRESS}
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+  ServerAliveInterval 30
+  ServerAliveCountMax 1200
 EOF
-chmod +x "${HOME}"/wait_for_pod_ready.sh
+chmod 0600 "${HOME}"/.ssh/config
 
-# restart the VM
-gcloud compute instances start "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
-
-# Steps may not be used more than once in a test, so this block duplicates the behavior of wait-for-ssh for reboot tests.
 timeout=1200 # 20 minute wait.  
->&2 echo "Polling ssh connectivity before proceeding.  Timeout=$timeout second"
 start=$(date +"%s")
-until gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'echo Hello, CI';
-do
-  if (( $(date +"%s") - $start >= $timeout )); then
+until ssh "${INSTANCE_PREFIX}" 'true'; do
+  if (( $(date +"%s") - start >= timeout )); then
     echo "timed out out waiting for ssh connection" >&2
     exit 1
   fi
-  echo "waiting for ssh connection"
 done
->&2 echo "It took $timeout seconds to connect via ssh"
+>&2 echo "It took $(( $(date +'%s') - start)) seconds to connect via ssh"
 
-gcloud compute scp \
-  --project "${GOOGLE_PROJECT_ID}" \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  --recurse "${HOME}"/wait_for_pod_ready.sh rhel8user@"${INSTANCE_PREFIX}":~/wait_for_pod_ready.sh
+cat > "${HOME}"/wait_for_pod_ready.sh <<'EOF'
+#!/bin/bash
+set -euo pipefail
 
-if ! gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'sudo ~/wait_for_pod_ready.sh'; then
+echo "block until microshift is ready (according to systemd)"
+echo "give extra time for api server to update status of the pods"
+echo "(immediatelly after reboot, it thinks they're all Running, but it's out of date)"
+set -x
+systemctl start microshift
 
-  gcloud compute scp \
-    --quiet \
-    --project "${GOOGLE_PROJECT_ID}" \
-    --zone "${GOOGLE_COMPUTE_ZONE}" \
-    --recurse /tmp/validate-microshift "rhel8user@${INSTANCE_PREFIX}:~/validate-microshift"
+export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
+echo "waiting 180s to accomodate for slow kubelet actions with topolvm pvc after reboot"
+oc wait --for=condition=Ready --timeout=180s pod/test-pod
+EOF
+chmod +x "${HOME}"/wait_for_pod_ready.sh
+scp "${HOME}"/wait_for_pod_ready.sh "${INSTANCE_PREFIX}":~/wait_for_pod_ready.sh
 
-  gcloud compute ssh \
-    --project "${GOOGLE_PROJECT_ID}" \
-    --zone "${GOOGLE_COMPUTE_ZONE}" \
-    "rhel8user@${INSTANCE_PREFIX}" \
-    --command "bash ~/validate-microshift/cluster-debug-info.sh"
-
+if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/wait_for_pod_ready.sh'; then
+  scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
+  ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
+  exit 1
 fi

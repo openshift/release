@@ -101,6 +101,6 @@ for try in $(seq 1 "${retries}"); do
 done
 set -x
 
-scp /tmp/validate-microshift "${INSTANCE_PREFIX}:~/validate-microshift"
-ssh "${INSTANCE_PREFIX}" "bash ~/validate-microshift/cluster-debug-info.sh"
+scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
+ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
 exit 1
