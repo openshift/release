@@ -25,10 +25,15 @@ OADP_GIT_DIR="/alabama/cspi"
 OADP_APPS_DIR="/alabama/oadpApps"
 PYCLIENT_DIR="/alabama/pyclient"
 
+# Extract additional repository archives
+tar -xf /home/jenkins/oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}" --strip-components 1
+tar -xf /home/jenkins/oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}" --strip-components 1
+tar -xf /home/jenkins/mtc-python-client.tar.gz -C "${PYCLIENT_DIR}" --strip-components 1
+
 # Setup /tmp/test-settings
 echo "Create and populate /tmp/test-settings..."
 mkdir -p /tmp/test-settings
-cp ${SHARED_DIR}/credentials /tmp/test-settings
+cp "${SHARED_DIR}/credentials" /tmp/test-settings
 cp "${CLUSTER_PROFILE_DIR}/.awscred" /tmp/test-settings/aws_creds
 touch /tmp/test-settings/default_settings.json
 
@@ -57,6 +62,6 @@ EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream bash /alabama/cspi/test_setting
 
 # Archive results
 echo "Copying ${RESULTS_FILE} to ${ARTIFACT_DIR}/junit_oadp_interop_results.xml..."
-cp $RESULTS_FILE $ARTIFACT_DIR/junit_oadp_interop_results.xml
+cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/junit_oadp_interop_results.xml"
 
 echo "Complete..."
