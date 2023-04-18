@@ -129,7 +129,7 @@ resource "aws_instance" "quaybuilder" {
   provisioner "remote-exec" {
     inline = [
       "sudo yum install podman openssl -y",
-      "curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz --retry 12 --retry-all-errors",
+      "curl -L -o mirror-registry.tar.gz https://developers.redhat.com/content-gateway/rest/mirror/pub/openshift-v4/clients/mirror-registry/latest/mirror-registry.tar.gz --retry 12",
       "tar -xzvf mirror-registry.tar.gz",
       "./mirror-registry install --quayHostname \${aws_instance.quaybuilder.public_dns} --initPassword password --initUser quay -v"
     ]
