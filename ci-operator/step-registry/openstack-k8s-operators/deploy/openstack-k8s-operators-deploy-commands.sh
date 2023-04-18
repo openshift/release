@@ -192,8 +192,6 @@ $(if [[ "${SERVICE_NAME}" == "MANILA" ]]; then
             cephfs_conf_path=/etc/ceph/ceph.conf
             cephfs_auth_id=openstack
             cephfs_cluster_name=ceph
-            cephfs_enable_snapshots=True
-            cephfs_ganesha_server_is_remote=False
             cephfs_volume_mode=0755
             cephfs_protocol_helper_type=CEPHFS
 MANILA_EOF
