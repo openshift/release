@@ -21,20 +21,15 @@ export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
 RESULTS_FILE="/alabama/cspi/output_files/api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443/junit_report.xml"
-OADP_GIT_DIR="/alabama/cspi"
-OADP_APPS_DIR="/alabama/oadpApps"
-PYCLIENT_DIR="/alabama/pyclient"
 
 # Extract additional repository archives
-ls -ltr /alabama
-mkdir -p "${OADP_GIT_DIR}"
-mkdir -p "${OADP_APPS_DIR}"
-mkdir -p "${PYCLIENT_DIR}"
-echo "Extract /home/jenkins/oadp-e2e-qe.tar.gz"
+mkdir -p {$OADP_GIT_DIR,$OADP_APPS_DIR,$PYCLIENT_DIR}
+
+echo "Extract /home/jenkins/oadp-e2e-qe.tar.gz to ${OADP_GIT_DIR}"
 tar -xf /home/jenkins/oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}" --strip-components 1
-echo "Extract /home/jenkins/oadp-apps-deployer.tar.gz"
+echo "Extract /home/jenkins/oadp-apps-deployer.tar.gz to ${OADP_APPS_DIR}"
 tar -xf /home/jenkins/oadp-apps-deployer.tar.gz -C "${OADP_APPS_DIR}" --strip-components 1
-echo "Extract /home/jenkins/mtc-python-client.tar.gz"
+echo "Extract /home/jenkins/mtc-python-client.tar.gz to ${PYCLIENT_DIR}"
 tar -xf /home/jenkins/mtc-python-client.tar.gz -C "${PYCLIENT_DIR}" --strip-components 1
 
 # Setup /tmp/test-settings
