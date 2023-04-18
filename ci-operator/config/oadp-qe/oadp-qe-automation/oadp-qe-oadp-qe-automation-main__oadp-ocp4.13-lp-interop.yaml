@@ -30,15 +30,19 @@ images:
   to: oadp-base
 - dockerfile_literal: |
     FROM oadp-base
+    ENV OADP_GIT_DIR=/alabama/cspi
+    ENV OADP_APPS_DIR=/alabama/oadpApps
+    ENV PYCLIENT_DIR=/alabama/pyclient
+    ENV OADP_AUTOMATION_DIR=/home/jenkins/oadp-qe-automation
     RUN python3 -m pip install pip --upgrade
     RUN curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
         unzip -q awscliv2.zip && \
         ./aws/install && \
         rm -rf awscliv2.zip aws &&\
         mkdir /.aws && chmod 777 /.aws
-    RUN  mkdir -p /home/jenkins/oadp-qe-automation && mkdir /alabama
+    RUN mkdir -p {$OADP_GIT_DIR,$OADP_APPS_DIR,$PYCLIENT_DIR,$OADP_AUTOMATION_DIR}
     COPY *.tar.gz /home/jenkins
-    COPY . /home/jenkins/oadp-qe-automation
+    COPY . $OADP_AUTOMATION_DIR
     RUN chgrp -R 0 /home/jenkins && \
         chmod -R g=u /home/jenkins
     RUN chgrp -R 0 /alabama && \

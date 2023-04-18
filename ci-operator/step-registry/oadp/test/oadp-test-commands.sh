@@ -4,15 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-OADP_GIT_DIR="/alabama/cspi"
-OADP_APPS_DIR="/alabama/oadpApps"
-PYCLIENT_DIR="/alabama/pyclient"
+#OADP_GIT_DIR="/alabama/cspi"
+#OADP_APPS_DIR="/alabama/oadpApps"
+#PYCLIENT_DIR="/alabama/pyclient"
 
 # Extract additional repository archives
 ls -ltr /alabama
-mkdir -p "${OADP_GIT_DIR}"
-mkdir -p "${OADP_APPS_DIR}"
-mkdir -p "${PYCLIENT_DIR}"
+
 echo "Extract /home/jenkins/oadp-e2e-qe.tar.gz"
 tar -xf /home/jenkins/oadp-e2e-qe.tar.gz -C "${OADP_GIT_DIR}" --strip-components 1
 echo "Extract /home/jenkins/oadp-apps-deployer.tar.gz"
