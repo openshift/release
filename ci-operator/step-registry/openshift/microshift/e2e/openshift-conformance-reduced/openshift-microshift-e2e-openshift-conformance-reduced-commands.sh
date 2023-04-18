@@ -570,8 +570,8 @@ cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-storage] Subpath Container restart should verify that container can restart successfully after configmaps modified [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] Volumes ConfigMap should be mountable [Skipped:NoOptionalCapabilities] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 EOF
-chmod +r "${HOME}"/suite.txt
+chmod +r "${HOME}/suite.txt"
 
 ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
-PATH=${PAYLOAD_PATH}/usr/bin:$PATH KUBECONFIG=/tmp/kubeconfig ${PAYLOAD_PATH}/usr/bin/openshift-tests run -v 2 --provider=none -f "${HOME}"/suite.txt -o ${ARTIFACT_DIR}/e2e.log --junit-dir ${ARTIFACT_DIR}/junit
+KUBECONFIG=/tmp/kubeconfig openshift-tests run -v 2 --provider=none -f "${HOME}/suite.txt" -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
