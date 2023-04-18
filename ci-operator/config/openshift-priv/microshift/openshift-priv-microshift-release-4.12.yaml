@@ -39,22 +39,15 @@ images:
     FROM src as rpms
     RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
     RUN make rpm
+    RUN tar cvf /rpms.tar -C _output/rpmbuild/RPMS/ .
 
     FROM test-runtime
-    USER root
-    ENV HOME=/tmp/secret
-    ENV PAYLOAD_PATH=$HOME/payload
-    WORKDIR $PAYLOAD_PATH
 
-    COPY oc openshift-tests usr/bin/
-    RUN chmod 755 usr/bin/oc && ln -rs usr/bin/oc usr/bin/kubectl
+    COPY oc openshift-tests /usr/bin/
+    RUN ln -rs /usr/bin/oc /usr/bin/kubectl
 
-    COPY validate-microshift /tmp/validate-microshift
-    COPY configure-vm.sh usr/bin/
-    RUN chmod 755 usr/bin/configure-vm.sh
-
-    COPY --from=rpms /go/src/github.com/openshift/microshift/_output/rpmbuild/RPMS/*/*.rpm packages/
-    RUN tar -cvf payload.tar . && chmod -R a+rw "${HOME}"
+    COPY microshift /microshift
+    COPY --from=rpms /rpms.tar /rpms.tar
   inputs:
     cli:
       paths:
@@ -65,10 +58,6 @@ images:
       - src
       paths:
       - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift/scripts/devenv-builder/configure-vm.sh
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift/validate-microshift
-      - destination_dir: ./microshift
         source_path: /go/src/github.com/openshift/microshift
     test-bin:
       paths:
