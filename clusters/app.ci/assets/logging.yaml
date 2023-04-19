@@ -114,6 +114,23 @@ data:
       region = "us-east-1"
       stream_name = "{{ kubernetes.pod_name }}"
       encoding.codec = "text"
+
+    # ci-chat-bot logs
+    [transforms.clusterbot]
+      type = "filter"
+      inputs = ["kubernetes"]
+      condition.type = "check_fields"
+      condition."kubernetes.pod_namespace.eq" = "ci"
+      condition."kubernetes.pod_name.starts_with" = "ci-chat-bot-"
+      condition."kubernetes.container_name.eq" = ["bot"]
+
+    [sinks.rc_aws_cloudwatch_logs]
+      type = "aws_cloudwatch_logs"
+      inputs = ["clusterbot"]
+      group_name = "app-ci-logs/{{ kubernetes.pod_labels.app }}"
+      region = "us-east-1"
+      stream_name = "{{ kubernetes.pod_name }}"
+      encoding.codec = "text"
 ---
 # Vector agent on each node where it collects logs from pods.
 apiVersion: apps/v1
