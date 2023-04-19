@@ -53,10 +53,6 @@ python3 -m pip install ansible_runner
 python3 -m pip install "${OADP_APPS_DIR}" --target "${OADP_GIT_DIR}/sample-applications/"
 python3 -m pip install "${PYCLIENT_DIR}"
 
-# Annotate the OADP namespace
-echo "Annotate the openshift-adp namespace in the test cluster..."
-oc annotate --overwrite namespace/openshift-adp volsync.backube/privileged-movers='true'
-
 # Execute tests
 echo "Executing tests..."
 cd $OADP_GIT_DIR
