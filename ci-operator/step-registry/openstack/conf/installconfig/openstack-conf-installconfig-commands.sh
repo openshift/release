@@ -11,7 +11,6 @@ OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPEN
 OPENSTACK_CONTROLPLANE_FLAVOR="${OPENSTACK_CONTROLPLANE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")}"
 OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
 ZONES="${ZONES:-$(<"${SHARED_DIR}/ZONES")}"
-ZONES_COUNT="${ZONES_COUNT:-0}"
 WORKER_REPLICAS="${WORKER_REPLICAS:-3}"
 
 API_IP=$(<"${SHARED_DIR}/API_IP")
@@ -21,19 +20,7 @@ PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
 IFS=' ' read -ra ZONES <<< "$ZONES"
-MAX_ZONES_COUNT=${#ZONES[@]}
-
-if [ "${ZONES_COUNT}" -gt 1 ]; then
-	# For now, we only support a cluster within a single AZ.
-	# This will change in the future.
-	echo "Wrong ZONE_COUNT: can only be 0 or 1, got ${ZONES_COUNT}"
-	exit 1
-fi
-if [ "${ZONES_COUNT}" -gt "${MAX_ZONES_COUNT}" ]; then
-	echo "Too many zones were requested: ${ZONES_COUNT}; only ${MAX_ZONES_COUNT} are available: ${ZONES[*]}"
-	exit 1
-fi
-
+ZONES_COUNT=${#ZONES[@]}
 ZONES_JSON="$(echo -n "${ZONES[@]:0:${ZONES_COUNT}}" | jq -cRs '(. / " ")')"
 echo "OpenStack Availability Zones: '${ZONES_JSON}'"
 
@@ -163,15 +150,3 @@ if "proxy" in data:
     data["proxy"] = "redacted"
 print(yaml.dump(data))
 ' "$INSTALL_CONFIG" > "${ARTIFACT_DIR}/install-config.yaml"
-
-# Remove the ports created in openstack-provision-machinesubnet-commands.sh
-# since the installer will create them again, based on install-config.yaml.
-if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
-	echo "Provider network detected: cleaning up reserved ports"
-	for p in api ingress; do
-		if openstack port show "${CLUSTER_NAME}-${CONFIG_TYPE}-${p}" >/dev/null; then
-			echo "Port exists for ${CLUSTER_NAME}-${CONFIG_TYPE}-${p}: removing it"
-			openstack port delete "${CLUSTER_NAME}-${CONFIG_TYPE}-${p}"
-		fi
-	done
-fi
