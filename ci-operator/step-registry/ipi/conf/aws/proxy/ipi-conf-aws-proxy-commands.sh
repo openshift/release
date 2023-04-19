@@ -336,14 +336,9 @@ echo "${REGION}" >> "${SHARED_DIR}/proxyregion"
 
 # create the s3 bucket to push to
 aws --region "${REGION}" s3 mb "s3://${PROXY_NAME}"
-aws --region "${REGION}" s3api put-public-access-block \
-  --bucket "${PROXY_NAME}"\
-  --public-access-block-configuration "BlockPublicAcls=false,IgnorePublicAcls=false,BlockPublicPolicy=false,RestrictPublicBuckets=false"
-aws --region "${REGION}" s3api put-bucket-acl --bucket "${PROXY_NAME}" --acl public-read
 
 # push the generated ignition to the s3 bucket
 aws --region "${REGION}" s3 cp /tmp/proxy.ign "${PROXY_URI}"
-aws --region "${REGION}" s3api put-object-acl --bucket "${PROXY_NAME}" --key "proxy.ign" --acl public-read
 
 aws --region "${REGION}" cloudformation create-stack \
   --stack-name "${PROXY_NAME}-proxy" \
