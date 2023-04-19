@@ -34,32 +34,10 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/openshift/jenkins/slave-base/.
   to: jenkins-agent-base
-- context_dir: agent-maven
-  dockerfile_path: Dockerfile.rhel8
-  from: jenkins-agent-base
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/agent-maven/.
-  to: jenkins-agent-maven
-- context_dir: agent-nodejs-12
-  dockerfile_path: Dockerfile.rhel8
-  from: jenkins-agent-base
-  inputs:
-    src:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/jenkins/agent-nodejs-12/.
-  to: jenkins-agent-nodejs
 promotion:
   name: "4.13"
   namespace: ocp
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
     integration:
       include_built_images: true
@@ -83,11 +61,13 @@ tests:
     clone: true
     from: ocp_builder_rhel-8-golang-1.19-openshift-4.13
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-aws
+- as: e2e-aws-jenkins
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws
+    test:
+    - ref: jenkins-jenkins-e2e
+    workflow: ipi-aws
 - as: e2e-aws-jenkins-sync-plugin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

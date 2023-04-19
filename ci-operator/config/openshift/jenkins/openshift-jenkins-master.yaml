@@ -3,10 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.19-openshift-4.14
 build_root:
   from_repository: true
 images:
@@ -14,9 +14,9 @@ images:
   dockerfile_path: Dockerfile.rhel8
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
     src:
       paths:
       - destination_dir: .
@@ -26,9 +26,9 @@ images:
   dockerfile_path: Dockerfile.rhel8
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
     src:
       paths:
       - destination_dir: .
@@ -38,10 +38,6 @@ promotion:
   name: "4.14"
   namespace: ocp
 releases:
-  initial:
-    integration:
-      name: "4.14"
-      namespace: ocp
   latest:
     integration:
       include_built_images: true
@@ -57,19 +53,21 @@ tests:
   commands: hack/check-plugins-supply-chain-change.sh
   container:
     clone: true
-    from: ocp_builder_rhel-8-golang-1.19-openshift-4.13
+    from: ocp_builder_rhel-8-golang-1.19-openshift-4.14
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: e2e-jenkins-image-tests
   commands: IMAGE_NAME=stable:jenkins make smoke
   container:
     clone: true
-    from: ocp_builder_rhel-8-golang-1.19-openshift-4.13
+    from: ocp_builder_rhel-8-golang-1.19-openshift-4.14
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-aws
+- as: e2e-aws-jenkins
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws
+    test:
+    - ref: jenkins-jenkins-e2e
+    workflow: ipi-aws
 - as: e2e-aws-jenkins-sync-plugin
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
