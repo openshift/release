@@ -264,7 +264,7 @@ networking:
   machineNetwork:
   - cidr: ${INTERNAL_NET_CIDR_V6}
 EOF
-  yq m -x -i "$SHARED_DIR/install-config.yaml" "${IPV6_PATCH}"
+  yq ea '. as $item ireduce ({}; . *+ $item )' -i "$SHARED_DIR/install-config.yaml" "${IPV6_PATCH}"
   if [ "${masters}" -gt 1 ]; then
   cat > "${IPV6_PATCH}" << EOF
 platform:
@@ -274,8 +274,8 @@ platform:
     ingressVIPs:
     - fd00:1101:${API_VIP##*.}::${INGRESS_VIP##*.}
 EOF
-    yq m -x -i "$SHARED_DIR/install-config.yaml" "${IPV6_PATCH}"
-    fi
+  yq ea '. as $item ireduce ({}; . *+ $item )' -i "$SHARED_DIR/install-config.yaml" "${IPV6_PATCH}"
+  fi
 fi
 
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
