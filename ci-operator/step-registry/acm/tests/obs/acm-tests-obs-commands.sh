@@ -12,6 +12,7 @@ if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
     echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
     cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/kubeconfig
     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
+    cp ${SECRETS_DIR}/ci/metadata $SHARED_DIR/metadata.json
 fi 
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
@@ -28,13 +29,13 @@ OC_HUB_CLUSTER_API_URL=$(oc whoami --show-server)
 export OC_HUB_CLUSTER_API_URL
 
 # Get the base domain from the API URL
-left_cut=${OC_HUB_CLUSTER_API_URL:12} # substring --> ${VAR:start_index:length} --> remove https://api.
-BASE_DOMAIN=${left_cut/:6443/} # replace :6433 with empty string
-# BASE_DOMAIN=$(cat $SHARED_DIR/metadata.json |jq -r '.aws.clusterDomain')
+# left_cut=${OC_HUB_CLUSTER_API_URL:12} # substring --> ${VAR:start_index:length} --> remove https://api.
+# BASE_DOMAIN=${left_cut/:6443/} # replace :6433 with empty string
+BASE_DOMAIN=$(cat $SHARED_DIR/metadata.json |jq -r '.aws.clusterDomain')
 export BASE_DOMAIN
 
-HUB_CLUSTER_NAME=${BASE_DOMAIN/.cspilp.interop.ccitredhat.com/}
-# HUB_CLUSTER_NAME=$(cat $SHARED_DIR/metadata.json |jq -r '.clusterName') 
+# HUB_CLUSTER_NAME=${BASE_DOMAIN/.cspilp.interop.ccitredhat.com/}
+HUB_CLUSTER_NAME=$(cat $SHARED_DIR/metadata.json |jq -r '.clusterName') 
 export HUB_CLUSTER_NAME
 
 OC_HUB_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
