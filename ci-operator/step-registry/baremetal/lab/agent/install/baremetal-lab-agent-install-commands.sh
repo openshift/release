@@ -261,8 +261,17 @@ if [ "${ipv6_enabled}" == "true" ]; then
   IPV6_PATCH="${SHARED_DIR}/dual_stack_ipv6.yaml.patch"
   cat > "${IPV6_PATCH}" << EOF
 networking:
+  clusterNetwork:
+    - cidr: 10.128.0.0/14
+      hostPrefix: 23
+    - cidr: fd01::/48
+      hostPrefix: 64
   machineNetwork:
-  - cidr: ${INTERNAL_NET_CIDR_V6}
+    - cidr: ${INTERNAL_NET_CIDR_V6}
+  networkType: OVNKubernetes
+  serviceNetwork:
+    - 172.30.0.0/16
+    - fd02::/112
 EOF
   yq ea '. as $item ireduce ({}; . *+ $item )' -i "$SHARED_DIR/install-config.yaml" "${IPV6_PATCH}"
   if [ "${masters}" -gt 1 ]; then
