@@ -1,0 +1,50 @@
+chain:
+  as: hypershift-kubevirt-run-e2e-external
+  steps:
+  - as: run-e2e-external
+    cli: latest
+    commands: |-
+        if [ "${RUN_EXTERNAL_INFRA_TEST}" == "false" ]
+        then
+          echo "External infra test suite is not supported in this version and skipped."
+          exit 0
+        fi
+        # run (pseudo) external infra e2e test
+        oc create ns guest-infra-ns
+        bin/test-e2e \
+                  --test.v \
+                  --test.timeout=0 \
+                  --test.run='^TestCreateCluster$' \
+                  --e2e.node-pool-replicas=2 \
+                  --e2e.kubevirt-node-memory="6Gi" \
+                  --e2e.platform="KubeVirt" \
+                  --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
+                  --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
+                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
+                  --e2e.kubevirt-infra-kubeconfig=/tmp/secret/kubeconfig \
+                  --e2e.kubevirt-infra-namespace=guest-infra-ns
+
+    credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+    dependencies:
+      - env: OCP_IMAGE_LATEST
+        name: release:latest
+      - env: OCP_IMAGE_PREVIOUS
+        name: release:hosted-ocp-previous
+      - env: CI_HYPERSHIFT_OPERATOR
+        name: pipeline:hypershift-operator
+    env:
+      - default: ${SHARED_DIR}/management_cluster_kubeconfig
+        name: KUBECONFIG
+      - default: "true"
+        name: RUN_EXTERNAL_INFRA_TEST
+    from: test-bin
+    grace_period: 30m0s
+    resources:
+      requests:
+        cpu: 100m
+        memory: 100Mi
+    timeout: 1h0m0s
+
