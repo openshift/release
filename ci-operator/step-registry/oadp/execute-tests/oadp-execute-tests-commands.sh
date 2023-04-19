@@ -20,7 +20,7 @@ export KUBECONFIG="/home/jenkins/.kube/config"
 export ANSIBLE_REMOTE_TMP="/tmp/"
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-RESULTS_FILE="/alabama/cspi/output_files/api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443/junit_report.xml"
+RESULTS_FILE="/alabama/cspi/e2e/junit_report.xml"
 
 # Extract additional repository archives
 mkdir -p {$OADP_GIT_DIR,$OADP_APPS_DIR,$PYCLIENT_DIR}
@@ -61,8 +61,6 @@ oc annotate --overwrite namespace/openshift-adp volsync.backube/privileged-mover
 echo "Executing tests..."
 cd $OADP_GIT_DIR
 EXTRA_GINKGO_PARAMS=--ginkgo.focus=test-upstream /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh || true
-
-sleep 3600
 
 # Archive results
 echo "Copying ${RESULTS_FILE} to ${ARTIFACT_DIR}/junit_oadp_interop_results.xml..."
