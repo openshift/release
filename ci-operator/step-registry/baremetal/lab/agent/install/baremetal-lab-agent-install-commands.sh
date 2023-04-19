@@ -14,6 +14,8 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
+[ -z "${ipv6_enabled}" ] && { echo "\$ipv6_enabled is not filled. Failing."; exit 1; }
+
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
@@ -253,6 +255,27 @@ platform:
     ingressVIPs:
     - ${INGRESS_VIP}
 "
+fi
+
+if [ "${ipv6_enabled}" == "true" ]; then
+  IPV6_PATCH="${SHARED_DIR}/dual_stack_ipv6.yaml.patch"
+  cat > "${IPV6_PATCH}" << EOF
+networking:
+  machineNetwork:
+  - cidr: ${INTERNAL_NET_CIDR_V6}
+EOF
+  yq m -x -i "$SHARED_DIR/install-config.yaml" "${IPV6_PATCH}"
+  if [ "${masters}" -gt 1 ]; then
+  cat > "${IPV6_PATCH}" << EOF
+platform:
+  baremetal:
+    apiVIPs:
+    - fd00:1101:${API_VIP##*.}::${API_VIP##*.}
+    ingressVIPs:
+    - fd00:1101:${API_VIP##*.}::${INGRESS_VIP##*.}
+EOF
+    yq m -x -i "$SHARED_DIR/install-config.yaml" "${IPV6_PATCH}"
+    fi
 fi
 
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
