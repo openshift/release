@@ -114,6 +114,69 @@ tests:
           memory: 2Gi
       timeout: 20m0s
     workflow: servicemesh-istio-e2e-aws
+- as: nightly-images-3-0
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.12"
+  cron: 00 03 * * *
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
+      MAISTRA_MC_POD: not-used
+      MAISTRA_NAMESPACE: maistra-nightly-images
+      MAISTRA_SC_POD: maistra-nightly-images-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # copy the script to privileged pod
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: build
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        # login to quay.io in the privileged pod
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          docker login -u='maistra-dev+prow' \
+          -p=${QUAY_PASS} quay.io
+        # build and push images
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          sh -c ' \
+          export REPO=quay.io/maistra-dev/istio-ubi9-operator; \
+          export IMAGE=$REPO:3.0-latest; \
+          make -e COMMUNITY=false clean image; \
+          docker tag $IMAGE $REPO:3.0-nightly-`date -I`; \
+          docker push $IMAGE; \
+          docker push $REPO:3.0-nightly-`date -I`'
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-aws
 zz_generated_metadata:
   branch: maistra-3.0
   org: maistra
