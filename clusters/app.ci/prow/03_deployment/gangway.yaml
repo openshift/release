@@ -98,7 +98,7 @@ objects:
         - name: envoyproxy
           image: registry.ci.openshift.org/ci/envoyproxy:latest
         - name: gangway
-          image: gcr.io/k8s-prow/gangway:v20230405-46d7922c2a
+          image: gcr.io/k8s-prow/gangway:v20230418-23b5d25059
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -107,6 +107,7 @@ objects:
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
+          - --job-config-path=/etc/job-config
           - --grace-period=110s
           - --dry-run=false
           env:
@@ -227,3 +228,26 @@ objects:
     name: gangway-session-secret
   stringData:
     session_secret: "${SESSION_SECRET}="
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRole
+  metadata:
+    name: cluster-gangway-submit
+  rules:
+  - apiGroups:
+    - ""
+    resources:
+    - namespaces
+    verbs:
+    - get
+- apiVersion: rbac.authorization.k8s.io/v1
+  kind: ClusterRoleBinding
+  metadata:
+    name: cluster-gangway-submit
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: cluster-gangway-submit
+  subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: msi-qe

@@ -49,30 +49,27 @@ tests:
     ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
     from: src
-- as: maistra-istio-integ-aws-2-3
+- as: integ-helm-2-3
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 4h0m0s
+    timeout: 1h0m0s
     version: "4.10"
   steps:
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
-      MAISTRA_MC_POD: maistra-e2e-test-mc-pod
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
     test:
-    - as: maistra-istio-copy-src
+    - as: copy-src
       cli: latest
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
         oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":/work/
       env:
       - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_MC_POD
       - name: MAISTRA_SC_POD
       from: src
       resources:
@@ -80,16 +77,192 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
-    - as: maistra-istio-integ-kube-singlecluster-2-3
+    - as: integ-helm-2-3
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           prow/integ-suite-kind.sh \
-          test.integration.helm.kube.presubmit \
-          test.integration.security.kube.presubmit \
-          test.integration.pilot.kube.presubmit \
-          test.integration.servicemesh.kube.presubmit \
+          test.integration.helm.kube.presubmit
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-aws
+- as: integ-security-2-3
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-security-2-3
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.security.kube.presubmit
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-aws
+- as: integ-pilot-2-3
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-pilot-2-3
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.pilot.kube.presubmit
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-aws
+- as: integ-servicemesh-2-3
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-servicemesh-2-3
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.servicemesh.kube.presubmit
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-aws
+- as: integ-telemetry-2-3
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-telemetry-2-3
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          prow/integ-suite-kind.sh \
           test.integration.telemetry.kube.presubmit
       env:
       - name: MAISTRA_NAMESPACE
@@ -99,8 +272,37 @@ tests:
         requests:
           cpu: "2"
           memory: 2Gi
-      timeout: 2h0m0s
-    - as: maistra-istio-integ-servicemesh-kube-multicluster-2-3
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-aws
+- as: integ-servicemesh-multicluster-2-3
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
+      MAISTRA_MC_POD: maistra-e2e-test-mc-pod
+      MAISTRA_NAMESPACE: maistra-e2e-test
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_MC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-servicemesh-multicluster-2-3
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" \
