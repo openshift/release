@@ -394,6 +394,25 @@ tests:
     - ref: cucushift-helper-service-build-info
     - ref: openshift-extended-test
     workflow: rosa-aws-sts-hypershift
+- as: aws-rosa-sts-hypershift-prod-guest-p1-f7
+  cron: 8 3 2,10,17,24 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CHANNEL_GROUP: stable
+      E2E_RUN_TAGS: '@aws-ipi and @rosa and @network-ovnkubernetes and @hypershift-hosted
+        and @critical and not @fips'
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-east-1
+      ROSA_LOGIN_ENV: production
+      TAG_VERSION: '@4.12'
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift
 - as: aws-sc2s-ipi-disconnected-private-p2-f14
   cron: 22 19 8,23 * *
   steps:

@@ -2,7 +2,7 @@
 
 set -ex
 
-ORG="openstack-k8s-operators"
+DEFAULT_ORG="openstack-k8s-operators"
 META_OPERATOR="openstack-operator"
 BASE_DIR=${HOME:-"/alabama"}
 
@@ -26,13 +26,13 @@ PR_REPO_NAME=$(curl -s  -X GET -H \
 # Gets base repo name
 BASE_OP=${REF_REPO}
 IS_REHEARSAL=false
-if [[ "$REF_ORG" != "$ORG" ]]; then
-    echo "Not a ${ORG} job. Checking if isn't a rehearsal job..."
+if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
+    echo "Not a ${DEFAULT_ORG} job. Checking if isn't a rehearsal job..."
     EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
     EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
     #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
-    if [[ "$EXTRA_REF_ORG" != "$ORG" ]]; then
-      echo "Failing since this step supports only ${ORG} changes."
+    if [[ "$EXTRA_REF_ORG" != "$DEFAULT_ORG" ]]; then
+      echo "Failing since this step supports only ${DEFAULT_ORG} changes."
       exit 1
     fi
     IS_REHEARSAL=true
@@ -66,7 +66,7 @@ function build_push_operator_images {
   GOWORK='' make build bundle
 
   # Build and push operator image
-  oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
+  oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
   oc set build-secret --pull bc/${OPERATOR} ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR} --from-dir . -F
 
@@ -74,7 +74,7 @@ function build_push_operator_images {
   local STORAGE_BUNDLE_EXISTS=0
   if [[ -f storage-bundle.Dockerfile ]]; then
     DOCKERFILE=storage-bundle.Dockerfile /bin/bash hack/pin-custom-bundle-dockerfile.sh
-    oc new-build --binary --strategy=docker --name ${OPERATOR}-storage-bundle --to=${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
+    oc new-build --binary --strategy=docker --name ${OPERATOR}-storage-bundle --to=${IMAGE_TAG_BASE}-storage-bundle:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
     DOCKERFILE_PATH_PATCH=(\{\"spec\":\{\"strategy\":\{\"dockerStrategy\":\{\"dockerfilePath\":\"storage-bundle.Dockerfile.pinned\"\}\}\}\})
     oc patch bc ${OPERATOR}-storage-bundle -p "${DOCKERFILE_PATH_PATCH[@]}"
     oc set build-secret --pull bc/${OPERATOR}-storage-bundle ${DOCKER_REGISTRY_SECRET}
@@ -83,7 +83,7 @@ function build_push_operator_images {
   fi
 
   # Build and push bundle image
-  oc new-build --binary --strategy=docker --name ${OPERATOR}-bundle --to=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
+  oc new-build --binary --strategy=docker --name ${OPERATOR}-bundle --to=${IMAGE_TAG_BASE}-bundle:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
 
   if [[ "$OPERATOR" == "$META_OPERATOR" ]]; then
     DOCKERFILE="custom-bundle.Dockerfile.pinned"
@@ -112,7 +112,7 @@ function build_push_operator_images {
     opm index add --bundles "${BASE_BUNDLE}" --out-dockerfile "${DOCKERFILE}" --generate
   fi
 
-  oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${REGISTRY_SECRET} --to-docker=true
+  oc new-build --binary --strategy=docker --name ${OPERATOR}-index --to=${IMAGE_TAG_BASE}-index:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
   oc patch bc ${OPERATOR}-index -p "${DOCKERFILE_PATH_PATCH[@]}"
   oc start-build ${OPERATOR}-index --from-dir . -F
 
@@ -121,7 +121,7 @@ function build_push_operator_images {
 
 # Begin operators build
 # Copy base operator code to base directory
-cp -r /go/src/github.com/${ORG}/${BASE_OP}/ ${BASE_DIR}
+cp -r /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/ ${BASE_DIR}
 
 # Create and enable openstack namespace
 create_openstack_namespace
@@ -131,11 +131,11 @@ DOCKER_REGISTRY_SECRET=pull-docker-secret
 oc create secret generic ${DOCKER_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/docker/config.json --type=kubernetes.io/dockerconfigjson
 
 # Secret for pushing containers - openstack namespace
-REGISTRY_SECRET=push-quay-secret
-oc create secret generic ${REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/rdoquay/config.json --type=kubernetes.io/dockerconfigjson
+PUSH_REGISTRY_SECRET=push-quay-secret
+oc create secret generic ${PUSH_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/rdoquay/config.json --type=kubernetes.io/dockerconfigjson
 
 # Build operator
-IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${BASE_OP}
+IMAGE_TAG_BASE=${PUSH_REGISTRY}/${PUSH_ORGANIZATION}/${BASE_OP}
 build_push_operator_images "${BASE_OP}" "${BASE_DIR}/${BASE_OP}" "${IMAGE_TAG_BASE}" "${PR_SHA}"
 
 # If operator being tested is not meta-operator, we need to build openstack-operator
@@ -146,32 +146,32 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
   fi
   pushd openstack-operator
 
-  # If is rehearsal job, we need to point to $ORG repo and commit
+  # If is rehearsal job, we need to point to $DEFAULT_ORG repo and commit
   if [[ "$IS_REHEARSAL" == true ]]; then
     pushd ${BASE_DIR}/${BASE_OP}
     API_SHA=$(git log -n 1 --pretty=format:"%H")
     popd
-    REPO_NAME="${ORG}/${BASE_OP}"
+    REPO_NAME="${DEFAULT_ORG}/${BASE_OP}"
   else
     API_SHA=${PR_SHA}
     REPO_NAME=${PR_REPO_NAME}
     # NOTE(dviroel): We need to replace registry in bundle only when testing
     #  a PR against operator's repo. When testing rehearsal jobs, we consume
     #  from latest commit.
-    export IMAGENAMESPACE=${ORGANIZATION}
-    export IMAGEREGISTRY=${REGISTRY}
+    export IMAGENAMESPACE=${PUSH_ORGANIZATION}
+    export IMAGEREGISTRY=${PUSH_REGISTRY}
     export IMAGEBASE=${SERVICE_NAME}
   fi
 
-  go mod edit -replace github.com/${ORG}/${BASE_OP}/api=github.com/${REPO_NAME}/api@${API_SHA}
+  go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/api=github.com/${REPO_NAME}/api@${API_SHA}
   go mod tidy
   pushd ./apis/
-  go mod edit -replace github.com/${ORG}/${BASE_OP}/api=github.com/${REPO_NAME}/api@${API_SHA}
+  go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/api=github.com/${REPO_NAME}/api@${API_SHA}
   go mod tidy
   popd
 
   # Build openstack-operator bundle and index
-  IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}
+  IMAGE_TAG_BASE=${PUSH_REGISTRY}/${PUSH_ORGANIZATION}/${META_OPERATOR}
   build_push_operator_images "${META_OPERATOR}" "${BASE_DIR}/${META_OPERATOR}" "${IMAGE_TAG_BASE}" "${PR_SHA}"
 
   popd
