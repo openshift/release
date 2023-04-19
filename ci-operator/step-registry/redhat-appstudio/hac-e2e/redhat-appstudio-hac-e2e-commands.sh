@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -x
 
 export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
@@ -87,8 +86,6 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 cd "$(mktemp -d)"
 
 git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
-# ./mage -v ci:prepareE2Ebranch
-# ./mage -v bootstrapCluster
 
 export QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
 export QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
@@ -116,9 +113,9 @@ metadata:
     name: user1
     namespace: toolchain-host-operator
     labels:
-    toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
+        toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
     annotations:
-    toolchain.dev.openshift.com/user-email: user1@user.us
+        toolchain.dev.openshift.com/user-email: user1@user.us
 spec:
     username: user1
     userid: user1
@@ -129,5 +126,13 @@ sleep 5
 oc get UserSignup -n toolchain-host-operator
 npm run cy:run -- --spec ./tests/basic-happy-path.spec.ts || TEST_RUN=1
 cp -a /tmp/e2e/cypress/* ${ARTIFACT_DIR}
-KUBECONFIG=$HAC_KUBECONFIG bonfire namespace release $HAC_NAMESPACE
+
+## Release bonfire namespace
+oc patch --kubeconfig=$HAC_KUBECONFIG NamespaceReservations/$(oc get --kubeconfig=$HAC_KUBECONFIG NamespaceReservations -o jsonpath="{.items[?(@.status.namespace==\"$HAC_NAMESPACE\")].metadata.name}") --type=merge --patch-file=/dev/stdin <<-EOF
+{
+    "spec": {
+        "duration": "0s"
+    }
+}
+EOF
 exit $TEST_RUN
