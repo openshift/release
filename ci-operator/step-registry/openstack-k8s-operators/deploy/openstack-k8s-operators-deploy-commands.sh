@@ -174,6 +174,13 @@ patches:
             rbd_store_user=openstack
             rbd_store_pool=images
             store_description=ceph_glance_store
+$(if [[ "${SERVICE_NAME}" == "IRONIC" ]]; then
+  cat <<IRONIC_EOF
+    - op: add
+      path: /spec/ironic/enabled
+      value: true
+IRONIC_EOF
+fi)
 $(if [[ "${SERVICE_NAME}" == "MANILA" ]]; then
   cat <<MANILA_EOF
     - op: add
