@@ -26,7 +26,7 @@ yq --arg name "${RESOURCE_GROUP}" -i -y '.platform.azure.resourceGroupName=$name
 
 # Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
 chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
-${SHARED_DIR}/azurestack-login-script.sh
+source ${SHARED_DIR}/azurestack-login-script.sh
 
 az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
 
@@ -55,7 +55,9 @@ do
       continue
   fi
 
-  filename=manifest_${SECRET_NAMESPACE}_secret.yml
+  # secret file name must be unique
+  # to avoid only one secret take effect if putting multiple secrets under same namespace into one file
+  filename=manifest_${SECRET_NAMESPACE}_${SECRET_NAME}_secret.yml
   cat >> "${SHARED_DIR}/${filename}" << EOF
 apiVersion: v1
 kind: Secret
