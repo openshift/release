@@ -318,7 +318,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/image-hack-force-propagation-oadp-e2e-qe
+    context: ci/prow/image-hack-force-propagation-oadp-e2e-qe-v1.0
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -327,15 +327,15 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rhpit-interop-tests-main-image-hack-force-propagation-oadp-e2e-qe
-    rerun_command: /test image-hack-force-propagation-oadp-e2e-qe
+    name: pull-ci-rhpit-interop-tests-main-image-hack-force-propagation-oadp-e2e-qe-v1.0
+    rerun_command: /test image-hack-force-propagation-oadp-e2e-qe-v1.0
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=force-propagation-oadp-e2e-qe
+        - --target=force-propagation-oadp-e2e-qe-v1.0
         - --variant=image-hack
         command:
         - ci-operator
@@ -363,7 +363,59 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )image-hack-force-propagation-oadp-e2e-qe,?($|\s.*)
+    trigger: (?m)^/test( | .* )image-hack-force-propagation-oadp-e2e-qe-v1.0,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/image-hack-force-propagation-oadp-e2e-qe-v1.1
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: image-hack
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rhpit-interop-tests-main-image-hack-force-propagation-oadp-e2e-qe-v1.1
+    rerun_command: /test image-hack-force-propagation-oadp-e2e-qe-v1.1
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=force-propagation-oadp-e2e-qe-v1.1
+        - --variant=image-hack
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )image-hack-force-propagation-oadp-e2e-qe-v1.1,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
