@@ -62,17 +62,20 @@ new_application_credentials() {
 # Setting a default authentication method based on version number
 if [[ "$OPENSTACK_AUTHENTICATION_METHOD" == "version-default" ]]; then
 	if is_openshift_version_gte "4.13"; then
+		info 'Detected version gte 4.13: setting application credentials authentication.'
 		OPENSTACK_AUTHENTICATION_METHOD='application-credentials'
 	else
+		info 'Detected version lt 4.13: setting password authentication.'
 		OPENSTACK_AUTHENTICATION_METHOD='password'
 	fi
 fi
 
-# Skip application credentials when testing old OpenShift versions, as appcreds
-# are only supported in OCP v4.12+.
-if ! is_openshift_version_gte "4.12"; then
-	info 'The detected version does not support application credentials.'
-	OPENSTACK_AUTHENTICATION_METHOD='password'
+# Setting a default authentication method based on version number
+if [[ "$OPENSTACK_AUTHENTICATION_METHOD" == "application-credentials" ]]; then
+	if ! is_openshift_version_gte "4.12"; then
+		info 'Detected OPENSTACK_AUTHENTICATION_METHOD=application-credentials in combination with an incompatible OCP version: exiting with an error.'
+		exit 1
+	fi
 fi
 
 info "The environment variable OPENSTACK_AUTHENTICATION_METHOD is set to '${OPENSTACK_AUTHENTICATION_METHOD}'."
