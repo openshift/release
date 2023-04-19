@@ -87,47 +87,5 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 cd "$(mktemp -d)"
 
 git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
-# ./mage -v ci:prepareE2Ebranch
-# ./mage -v bootstrapCluster
-
-export QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
-export QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
-export QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
-curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/main/hack/hac/installHac.sh -o installHac.sh
-chmod +x installHac.sh
-HAC_KUBECONFIG=/tmp/hac.kubeconfig
-oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
-echo "=== INSTALLING HAC ==="
-HAC_NAMESPACE=$(./installHac.sh -ehk $HAC_KUBECONFIG -sk $KUBECONFIG |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
-# CYPRESS_HAC_BASE_URL=$(echo $INSTALL_OUTPUT | grep "Stonesoup URL:" |sed "s/Stonesoup URL: //g")
-# HAC_NAMESPACE=$(echo $INSTALL_OUTPUT |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
-echo "=== HAC INSTALLED ==="
-echo "HAC NAMESPACE: $HAC_NAMESPACE"
-export CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/hac/stonesoup"
-echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
-export CYPRESS_USERNAME=user1
-export CYPRESS_PASSWORD=user1
-export CYPRESS_PERIODIC_RUN=true
-cd /tmp/e2e
-oc apply -f - <<EOF
-apiVersion: toolchain.dev.openshift.com/v1alpha1
-kind: UserSignup
-metadata:
-    name: user1
-    namespace: toolchain-host-operator
-    labels:
-    toolchain.dev.openshift.com/email-hash: 826df0a2f0f2152550b0d9ee11099d85
-    annotations:
-    toolchain.dev.openshift.com/user-email: user1@user.us
-spec:
-    username: user1
-    userid: user1
-    approved: true
-EOF
-
-sleep 5
-oc get UserSignup -n toolchain-host-operator
-npm run cy:run -- --spec ./tests/basic-happy-path.spec.ts || TEST_RUN=1
-cp -a /tmp/e2e/cypress/* ${ARTIFACT_DIR}
-KUBECONFIG=$HAC_KUBECONFIG bonfire namespace release $HAC_NAMESPACE
-exit $TEST_RUN
+./mage -v ci:prepareE2Ebranch
+./mage -v bootstrapCluster
