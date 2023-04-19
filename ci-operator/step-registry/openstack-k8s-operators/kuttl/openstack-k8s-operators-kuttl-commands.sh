@@ -89,7 +89,16 @@ if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   # mariadb pod will use the same pv which have a db already and fails because
   # The init job assumed that the DB was just created and had an empty root password,
   # which would not be the case.
-  make crc_storage_cleanup
+  n=0
+  retries=3
+  while (( n < retries )); do
+    if make crc_storage_cleanup; then
+      break
+    fi
+    n=$((n+1))
+    echo "Failed to run 'make crc_storage_cleanup' target (attempt $n of $retries)"
+    sleep 10
+  done
 else
   echo "File /go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml not found. Skipping script."
 fi
