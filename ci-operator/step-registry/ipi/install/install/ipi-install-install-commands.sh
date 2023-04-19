@@ -394,7 +394,13 @@ azurestack)
         export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
     fi
     ;;
-gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
+gcp)
+    export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json
+    if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
+    fi
+    ;;
 ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
