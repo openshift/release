@@ -59,7 +59,12 @@ echo $APP_ID >> ${SHARED_DIR}/APP_ID
 
 # Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
 chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
-${SHARED_DIR}/azurestack-login-script.sh
+source ${SHARED_DIR}/azurestack-login-script.sh
+
+#Avoid x509 error thown out from installer when get azurestack wwt endpoint
+if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+fi
 
 export AZURE_AUTH_LOCATION="${SHARED_DIR}/osServicePrincipal.json"
 
@@ -148,10 +153,9 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/01_vnet.json" \
   --parameters baseName="$INFRA_ID"
 
-VHD_BLOB_URL="https://rhcossa.blob.ppe3.stackpoc.com/vhd/rhcos-49-84-202108221651.vhd"
 az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/02_storage.json" \
-  --parameters vhdBlobURL="$VHD_BLOB_URL" \
+  --parameters vhdBlobURL="${CLUSTER_OS_IMAGE}" \
   --parameters baseName="$INFRA_ID"
 
 az deployment group create -g "$RESOURCE_GROUP" \
@@ -165,7 +169,12 @@ az network dns record-set a add-record -g "$RESOURCE_GROUP" -z "${CLUSTER_NAME}.
 az network dns record-set a add-record -g "$RESOURCE_GROUP" -z "${CLUSTER_NAME}.${BASE_DOMAIN}" -n api-int -a "$PRIVATE_IP" --ttl 60
 
 BOOTSTRAP_URL=$(az storage blob url --account-name "${ACCOUNT_NAME}" --account-key "$ACCOUNT_KEY" -c "files" -n "bootstrap.ign" -o tsv)
-BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "3.2.0" --arg url "$BOOTSTRAP_URL" '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 | tr -d '\n')
+if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+    CA="data:text/plain;charset=utf-8;base64,$(cat "${CLUSTER_PROFILE_DIR}/ca.pem" | base64 |tr -d '\n')"
+    BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "3.2.0" --arg url "$BOOTSTRAP_URL" --arg cert "$CA" '{ignition:{version:$v,security:{tls:{certificateAuthorities:[{source:$cert}]}},config:{replace:{source:$url}}}}' | base64 | tr -d '\n')
+else
+    BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "3.2.0" --arg url "$BOOTSTRAP_URL" '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 | tr -d '\n')
+fi
 
 az deployment group create --verbose -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/04_bootstrap.json" \
