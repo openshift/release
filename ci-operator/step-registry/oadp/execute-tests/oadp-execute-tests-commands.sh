@@ -13,6 +13,7 @@ export AWS_SECRET_ACCESS_KEY=$(cat $AWS_SHARED_CREDENTIALS_FILE | grep aws_secre
 # Set variables needed for test execution
 export OADP_CREDS_FILE="/tmp/test-settings/credentials"
 export PROVIDER="aws"
+export BACKUP_LOCATION="aws"
 export PROW_NAMESPACE=$NAMESPACE
 export NAMESPACE="openshift-adp"
 export BUCKET="${PROW_NAMESPACE}-${BUCKET_NAME}"
