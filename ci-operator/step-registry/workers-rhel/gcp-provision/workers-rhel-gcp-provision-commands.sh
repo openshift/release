@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "RHEL_IMAGE: '${RHEL_IMAGE}'"
+
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
