@@ -1,3 +1,8 @@
+base_images:
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.37.1
 build_root:
   image_stream_tag:
     name: release
@@ -19,6 +24,18 @@ tests:
   commands: make unit-test
   container:
     from: assisted-events-stream-build
+- as: lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    export GOPROXY=https://proxy.golang.org
+    go mod tidy
+    go mod vendor
+    make lint
+  container:
+    clone: true
+    from: golangci-lint
+  skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 zz_generated_metadata:
   branch: master
   org: openshift-assisted
