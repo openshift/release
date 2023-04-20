@@ -19,7 +19,7 @@ chmod 600 $SSH_PKEY
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
 #Set cluster variables
-CLUSTER_NAME="hv11"
+CLUSTER_NAME="ptpcimno"
 PLAN_NAME="${CLUSTER_NAME}_ci"
 CLUSTER_API_IP="10.8.34.117"
 CLUSTER_API_PORT="6443"
