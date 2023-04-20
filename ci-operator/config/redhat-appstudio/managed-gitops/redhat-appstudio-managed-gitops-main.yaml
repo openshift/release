@@ -29,15 +29,33 @@ tests:
       cli: latest
       commands: |
         export WORKLOAD_KUBECONFIG="/secrets/managed-gitops-e2e-tests-hive-admin-kubeconfig/kubeconfig"
+        LOOP_PID=""
+
+        function finish {
+          echo CLEANING!
+          [ -n "${LOOP_PID}" ] && kill $LOOP_PID && echo "process with pid $LOOP_PID killed successfully"
+          killall kubectl || true
+          killall goreman || true
+          exit
+        }
+
+        trap finish INT EXIT
+        sleep 2
+
         make install-argocd-openshift
         make devenv-k8s
         make download-deps
-        kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 &
+
+        echo "starting port-forward loop"
+        while true; do kubectl port-forward --namespace gitops svc/gitops-postgresql-staging 5432:5432 ; done&
+        LOOP_PID=$!
+        sleep 2
+
         make start-e2e &
         make test-e2e
-        killall kubectl
-        killall goreman
+        sleep 5
       from: src
+      grace_period: 15s
       resources:
         requests:
           cpu: 100m
