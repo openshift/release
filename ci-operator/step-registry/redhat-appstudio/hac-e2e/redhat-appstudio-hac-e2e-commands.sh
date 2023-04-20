@@ -12,47 +12,20 @@ curl -Lso /tmp/bin/yq https://github.com/mikefarah/yq/releases/download/v4.25.2/
 curl -Lso /tmp/go.tar.gz https://go.dev/dl/go1.20.3.linux-amd64.tar.gz && tar -C /tmp -xzf /tmp/go.tar.gz
 PATH=$PATH:/tmp/go/bin
 
-export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN
+export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
+     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN
 
-DEFAULT_QUAY_ORG=redhat-appstudio-qe
-DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
-GITHUB_USER=""
-GITHUB_TOKEN=""
-QUAY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-token)
-QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-user)
-QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token)
-QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-source)
-QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
-PYXIS_STAGE_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-key)
-PYXIS_STAGE_CERT=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-cert)
+export QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
+export QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
+export QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
+export CYPRESS_USERNAME=user1
+export CYPRESS_PASSWORD=user1
+export CYPRESS_PERIODIC_RUN=true
+export HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
 
-PATH=$PATH:/tmp/bin
-
-# user stored: username:token,username:token
-IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github_accounts)"
-for account in "${GITHUB_ACCOUNTS_ARRAY[@]}"
-do :
-    IFS=':' read -r -a GITHUB_USERNAME_ARRAY <<< "$account"
-
-    GH_RATE_REMAINING=$(curl -s \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${GITHUB_USERNAME_ARRAY[1]}"\
-    https://api.github.com/rate_limit | jq ".rate.remaining")
-
-    echo -e "[INFO ] user: ${GITHUB_USERNAME_ARRAY[0]} with rate limit remaining $GH_RATE_REMAINING"
-    if [[ "${GH_RATE_REMAINING}" -ge "${PREVIOUS_RATE_REMAINING}" ]];then
-        GITHUB_USER="${GITHUB_USERNAME_ARRAY[0]}"
-        GITHUB_TOKEN="${GITHUB_USERNAME_ARRAY[1]}"
-    fi
-    PREVIOUS_RATE_REMAINING="${GH_RATE_REMAINING}"
-done
-
-echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
-export HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
 if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
@@ -75,21 +48,6 @@ EOF
 	  exit 1
   fi
 
-git config --global user.name "redhat-appstudio-qe-bot"
-git config --global user.email redhat-appstudio-qe-bot@redhat.com
-
-mkdir -p "${HOME}/creds"
-GIT_CREDS_PATH="${HOME}/creds/file"
-git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
-echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
-
-cd "$(mktemp -d)"
-
-git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
-
-export QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
-export QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
-export QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
 curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/main/hack/hac/installHac.sh -o installHac.sh
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
@@ -102,9 +60,8 @@ echo "=== HAC INSTALLED ==="
 echo "HAC NAMESPACE: $HAC_NAMESPACE"
 export CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/hac/stonesoup"
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
-export CYPRESS_USERNAME=user1
-export CYPRESS_PASSWORD=user1
-export CYPRESS_PERIODIC_RUN=true
+
+
 cd /tmp/e2e
 oc apply -f - <<EOF
 apiVersion: toolchain.dev.openshift.com/v1alpha1
@@ -124,6 +81,7 @@ EOF
 
 sleep 5
 oc get UserSignup -n toolchain-host-operator
+TEST_RUN=0
 npm run cy:run -- --spec ./tests/basic-happy-path.spec.ts || TEST_RUN=1
 cp -a /tmp/e2e/cypress/* ${ARTIFACT_DIR}
 
