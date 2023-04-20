@@ -3,6 +3,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+  test-image:
+    name: 3scale-interop-tests
+    namespace: ci
+    tag: v2.13
 build_root:
   image_stream_tag:
     name: release
@@ -35,11 +39,11 @@ tests:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       DEPL_BUCKET_NAME: 3scale-apimanager-s3-bucket
       DEPL_PROJECT_NAME: threescale
+      NAMESPACE: threescale
       OPERATORS: |
         [
             {"name": "3scale-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "threescale", "target_namespaces": "threescale"}
         ]
-      SLEEP_DURATION: 2h
       SPOT_INSTANCES: "true"
     post:
     - ref: 3scale-apimanager-uninstall
@@ -51,7 +55,7 @@ tests:
     test:
     - ref: install-operators
     - ref: 3scale-apimanager-install
-    - ref: wait
+    - ref: 3scale-interop-tests
 zz_generated_metadata:
   branch: main
   org: 3scale-qe
