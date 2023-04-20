@@ -284,6 +284,37 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-hypershift-control-plane
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-ovn-hypershift-worker-node-inplace-p1-f7
+  cron: 27 23 4,11,18,26 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @aws-ipi and @hypershift-hosted
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @aws-ipi and @hypershift-hosted
+        and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-hypershift-worker-node
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-ovn-hypershift-worker-node-replace-p1-f7
+  cron: 38 21 3,10,18,26 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @aws-ipi and @hypershift-hosted
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @aws-ipi and @hypershift-hosted
+        and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-hypershift-worker-node
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-ipsec-p1-f14
   cron: 19 4 5,20 * *
   steps:
