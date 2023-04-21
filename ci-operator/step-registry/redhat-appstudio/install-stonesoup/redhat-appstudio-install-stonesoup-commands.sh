@@ -5,16 +5,10 @@ set -o errexit
 set -o pipefail
 set -x
 
-export PATH=$PATH:/tmp/bin
-mkdir -p /tmp/bin
-
-curl -Lso /tmp/bin/yq https://github.com/mikefarah/yq/releases/download/v4.25.2/yq_linux_amd64 && chmod +x /tmp/bin/yq
-
-curl -Lso /tmp/go.tar.gz https://go.dev/dl/go1.20.3.linux-amd64.tar.gz && tar -C /tmp -xzf /tmp/go.tar.gz
-PATH=$PATH:/tmp/go/bin
+# Setup necessary env variables
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
@@ -25,14 +19,11 @@ QUAY_OAUTH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-user)
 QUAY_OAUTH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token)
 QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-source)
 QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
-PYXIS_STAGE_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-key)
-PYXIS_STAGE_CERT=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-cert)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
 
-PATH=$PATH:/tmp/bin
-
+# Chose github user with greatest rate limit remaining
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github_accounts)"
 for account in "${GITHUB_ACCOUNTS_ARRAY[@]}"
@@ -53,8 +44,8 @@ do :
 done
 
 echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
-export HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 
+## Login to the (hypershift) cluster
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
 if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
     OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
@@ -76,6 +67,7 @@ EOF
 	  exit 1
   fi
 
+# Clone e2e-tests repo and install cluster
 git config --global user.name "redhat-appstudio-qe-bot"
 git config --global user.email redhat-appstudio-qe-bot@redhat.com
 

@@ -7,10 +7,13 @@ set -o pipefail
 export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
-curl -Lso /tmp/bin/yq https://github.com/mikefarah/yq/releases/download/v4.25.2/yq_linux_amd64 && chmod +x /tmp/bin/yq
+# Install yq and go which is not present in used image (cypress/factory)
 
+curl -Lso /tmp/bin/yq https://github.com/mikefarah/yq/releases/download/v4.25.2/yq_linux_amd64 && chmod +x /tmp/bin/yq
 curl -Lso /tmp/go.tar.gz https://go.dev/dl/go1.20.3.linux-amd64.tar.gz && tar -C /tmp -xzf /tmp/go.tar.gz
 PATH=$PATH:/tmp/go/bin
+
+#  Setup env variables
 
 export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
      QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN
@@ -24,8 +27,8 @@ export CYPRESS_PERIODIC_RUN=true
 export HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
-PREVIOUS_RATE_REMAINING=0
 
+# Login to (hypershift) cluster
 
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
 if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
@@ -48,19 +51,20 @@ EOF
 	  exit 1
   fi
 
+# Install HAC in ephemeral cluster
+
 curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/main/hack/hac/installHac.sh -o installHac.sh
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
 oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
 echo "=== INSTALLING HAC ==="
 HAC_NAMESPACE=$(./installHac.sh -ehk $HAC_KUBECONFIG -sk $KUBECONFIG |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
-# CYPRESS_HAC_BASE_URL=$(echo $INSTALL_OUTPUT | grep "Stonesoup URL:" |sed "s/Stonesoup URL: //g")
-# HAC_NAMESPACE=$(echo $INSTALL_OUTPUT |grep "Eph cluster namespace: " | sed "s/Eph cluster namespace: //g")
 echo "=== HAC INSTALLED ==="
 echo "HAC NAMESPACE: $HAC_NAMESPACE"
 export CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/hac/stonesoup"
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
 
+# Register user `user1`
 
 cd /tmp/e2e
 oc apply -f - <<EOF
@@ -78,14 +82,17 @@ spec:
     userid: user1
     approved: true
 EOF
-
 sleep 5
 oc get UserSignup -n toolchain-host-operator
+
+# Run tests
+
 TEST_RUN=0
 npm run cy:run -- --spec ./tests/basic-happy-path.spec.ts || TEST_RUN=1
 cp -a /tmp/e2e/cypress/* ${ARTIFACT_DIR}
 
 ## Release bonfire namespace
+
 oc patch --kubeconfig=$HAC_KUBECONFIG NamespaceReservations/$(oc get --kubeconfig=$HAC_KUBECONFIG NamespaceReservations -o jsonpath="{.items[?(@.status.namespace==\"$HAC_NAMESPACE\")].metadata.name}") --type=merge --patch-file=/dev/stdin <<-EOF
 {
     "spec": {
