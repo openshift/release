@@ -13,23 +13,23 @@ document for detailed information about how to contribute to this repository.
 Configuration files for CI workflows live under [`ci-operator/`](./ci-operator/)
 and are split into the following categories:
 
- - [`ci-operator/config`](./ci-operator/config/) contains configuration for the
-   `ci-operator`, detailing builds and tests for component repositories.
- - [`ci-operator/jobs`](./ci-operator/jobs/) contains configuration for `prow`,
-   detailing job triggers. In almost all cases, this configuration is
-   generated automatically from the `ci-operator` config. For manual edits, see
-   [this section](https://docs.ci.openshift.org/docs/how-tos/contributing-openshift-release/#component-ci-configuration)
-   of the contribution document and the [upstream configuration document](https://github.com/kubernetes/test-infra/blob/master/prow/README.md#how-to-add-new-jobs). Prefer the `ci-operator` config whenever possible.
- - [`ci-operator/step-registry`](./ci-operator/step-registry/) contains the
-   registry of reusable test steps and workflows. See the documentation for
-   this content [here](https://docs.ci.openshift.org/docs/architecture/step-registry/).
- - **[LEGACY]** [`ci-operator/templates`](./ci-operator/templates/) contains black-box test
-   workflows for use by the `ci-operator`. The parent directory's
-   [README](./ci-operator#end-to-end-tests) documents how to use them. See the
-   [template document](https://github.com/openshift/ci-tools/blob/2c9c111a2350ef92a366e6d86e66b82d13d7e704/TEMPLATES.md)
-   for general information on template tests. Templates are legacy and new
-   ones should not be added. Multi-stage tests using steps from the shared
-   registry should be used instead.
+- [`ci-operator/config`](./ci-operator/config/) contains configuration for the
+  `ci-operator`, detailing builds and tests for component repositories.
+- [`ci-operator/jobs`](./ci-operator/jobs/) contains configuration for `prow`,
+  detailing job triggers. In almost all cases, this configuration is
+  generated automatically from the `ci-operator` config. For manual edits, see
+  [this section](https://docs.ci.openshift.org/docs/how-tos/contributing-openshift-release/#component-ci-configuration)
+  of the contribution document and the [upstream configuration document](https://docs.prow.k8s.io/docs/jobs/#how-to-configure-new-jobs). Prefer the `ci-operator` config whenever possible.
+- [`ci-operator/step-registry`](./ci-operator/step-registry/) contains the
+  registry of reusable test steps and workflows. See the documentation for
+  this content [here](https://docs.ci.openshift.org/docs/architecture/step-registry/).
+- **[LEGACY]** [`ci-operator/templates`](./ci-operator/templates/) contains black-box test
+  workflows for use by the `ci-operator`. The parent directory's
+  [README](./ci-operator#end-to-end-tests) documents how to use them. See the
+  [template document](https://github.com/openshift/ci-tools/blob/2c9c111a2350ef92a366e6d86e66b82d13d7e704/TEMPLATES.md)
+  for general information on template tests. Templates are legacy and new
+  ones should not be added. Multi-stage tests using steps from the shared
+  registry should be used instead.
 
 ## Cluster and Service Configuration Manifests
 
