@@ -7,7 +7,7 @@ set -o pipefail
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 # create image pull secret for MCH
-oc create secret generic multiclusterhub-operator-pull-secret -n ${MCH_NAMESPACE} --from-file=.dockerconfigjson=$CLUSTER_PROFILE_DIR/pull-secret --type=kubernetes.io/dockerconfigjson
+oc create secret generic ${IMAGE_PULL_SECRET} -n ${MCH_NAMESPACE} --from-file=.dockerconfigjson=$CLUSTER_PROFILE_DIR/pull-secret --type=kubernetes.io/dockerconfigjson
 
 echo "Apply multiclusterhub"
 # apply MultiClusterHub crd
@@ -18,7 +18,7 @@ metadata:
   name: multiclusterhub
   namespace: ${MCH_NAMESPACE}
 spec:
-  imagePullSecret: multiclusterhub-operator-pull-secret
+  imagePullSecret: ${IMAGE_PULL_SECRET}
 EOF
 
 # Need to sleep a bit before start watching
