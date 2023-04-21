@@ -105,7 +105,6 @@ fi
 
 ${platform_required} && cat >> "${install_config}" << EOF
 baseDomain: $base_domain
-featureSet: TechPreviewNoUpgrade
 controlPlane:
   name: "master"
   replicas: 3
