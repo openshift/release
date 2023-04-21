@@ -15,6 +15,10 @@ base_images:
     name: "4.13"
     namespace: origin
     tag: operator-sdk
+  ubi8-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
@@ -45,6 +49,9 @@ images:
     ocp_builder_rhel-8-golang-1.18-openshift-4.11:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+    ubi8-minimal-entitled:
+      as:
+      - registry.access.redhat.com/ubi8/ubi-minimal:8.7-1085
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
@@ -67,6 +74,13 @@ promotion:
   namespace: edge-infrastructure
   tag: latest
   tag_by_commit: true
+raw_steps:
+- pipeline_image_cache_step:
+    commands: |
+      rm -rf /etc/yum.repos.d/*
+      curl http://base-4-12-rhel8.ocp.svc > /etc/yum.repos.d/base-4-12-rhel8.repo
+    from: ubi8-minimal
+    to: ubi8-minimal-entitled
 releases:
   latest:
     release:
