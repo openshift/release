@@ -61,7 +61,9 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-CONFIG_PLATFORM="  platform: {}"
+# https://www.gnu.org/software/bash/manual/html_node/ANSI_002dC-Quoting.html#ANSI_002dC-Quoting
+CONFIG_PLATFORM_COMPUTE=$'  platform:\n    powervs:\n      processors: 2\n      memoryGiB: 64'
+CONFIG_PLATFORM_CONTROL=$'  platform:\n    powervs:\n      processors: 1\n      memoryGiB: 32'
 POWERVS_ZONE=${LEASED_RESOURCE}
 case "${LEASED_RESOURCE}" in
    "lon04")
@@ -79,7 +81,8 @@ case "${LEASED_RESOURCE}" in
       POWERVS_REGION=osa
       VPCREGION=jp-osa
       # https://www.gnu.org/software/bash/manual/html_node/ANSI_002dC-Quoting.html#ANSI_002dC-Quoting
-      CONFIG_PLATFORM=$'  platform:\n    powervs:\n      sysType: e980'
+      CONFIG_PLATFORM_COMPUTE=$'  platform:\n    powervs:\n      processors: 2\n      memoryGiB: 64\n      sysType: e980'
+      CONFIG_PLATFORM_CONTROL=$'  platform:\n    powervs:\n      processors: 1\n      memoryGiB: 32\n      sysType: e980'
    ;;
    "sao01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")
@@ -133,13 +136,13 @@ compute:
 - architecture: ppc64le
   hyperthreading: Enabled
   name: worker
-${CONFIG_PLATFORM}
+${CONFIG_PLATFORM_COMPUTE}
   replicas: 2
 controlPlane:
   architecture: ppc64le
   hyperthreading: Enabled
   name: master
-${CONFIG_PLATFORM}
+${CONFIG_PLATFORM_CONTROL}
   replicas: 3
 networking:
   clusterNetwork:
