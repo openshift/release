@@ -885,6 +885,10 @@ ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
 
+# @TODO - remove this hack!
+# This is a potential work around for the following problem:
+# kube-controller-manager                    4.13.0-0.nightly-ppc64le-2023-04-14-180814   True        True          True       91m     MissingStaticPodControllerDegraded: static pod lifecycle failure - static pod: "kube-controller-manager" in namespace: "openshift-kube-controller-manager" for revision: 8 on node: "rdr-multiarch-XXX01-msc22-master-0" didn't show up, waited: 3m0s...
+#
 if [ ${ret} -gt 0 ]; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: hack-for-kube-controller-manager 8<--------8<--------8<--------8<--------"
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
