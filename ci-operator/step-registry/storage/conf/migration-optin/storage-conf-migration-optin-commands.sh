@@ -25,3 +25,4 @@ function wait_for_migration_completion() {
 }
 
 wait_for_migration_completion
+exit 0
