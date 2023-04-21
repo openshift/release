@@ -4,6 +4,16 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "(jiwei-debug-1) -----------------------"
+pip3 install --upgrade pip --user; pip3 -V
+echo "(jiwei-debug-2) -----------------------"
+python3 -m pip install pyOpenSSL --user
+echo "(jiwei-debug-3) -----------------------"
+pip3 list
+echo "(jiwei-debug-4) -----------------------"
+export CLOUDSDK_PYTHON=/usr/bin/python3
+echo "(jiwei-debug-4) -----------------------"
+
 if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN VPC..." && exit 0
 fi
