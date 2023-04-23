@@ -320,6 +320,7 @@ while true; do
 done
 rosa logs install -c ${CLUSTER_ID} > "${CLUSTER_INSTALL_LOG}"
 rosa describe cluster -c ${CLUSTER_ID} -o json
+ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/hypershift
 
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
