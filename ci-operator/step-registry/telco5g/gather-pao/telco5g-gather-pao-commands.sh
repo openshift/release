@@ -27,7 +27,7 @@ toolbox sos report --batch --label cijob
 exit
 EOF
     # Now copy the sosreport from the node to the artifact dir
-    oc debug node/${wrknode} -- bash -c 'cat /host/var/tmp/sosreport*cijob*tar.xz' > ${ARTIFACT_DIR}/sosreport-${wrknode}.tar.xz || true
+    oc debug node/${wrknode} -- bash -c 'cat /host/var/tmp/sosreport*cijob*tar.xz' > ${ARTIFACT_DIR}/sosreport-${wrknode}.tar.xz
 
 }
 
@@ -56,7 +56,7 @@ echo "Gather sosreport from nodes"
 # get_sos_report from all nodes with "cnf" in the name
 for node in $(oc get node -oname | grep cnf); do
   echo "Collecting sosreport for ${node##*/}"
-  get_sos_report ${node##*/}
+  get_sos_report ${node##*/} || true
 done
 
 echo "Running gather-pao for T5CI_VERSION=${T5CI_VERSION}"
