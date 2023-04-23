@@ -37,14 +37,27 @@ tests:
     env:
       ADDON1_CONFIG: managed-odh|notification-email=interop-qe-ms@redhat.com
       COMPUTE_MACHINE_TYPE: m5.4xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
       ENABLE_AUTOSCALING: "false"
+      ETCD_ENCRYPTION: "true"
+      MAX_REPLICAS: "6"
+      MIN_REPLICAS: "3"
+      MULTI_AZ: "true"
       REPLICAS: "6"
       TIMEOUT: "7200"
-    test:
-    - ref: addon-install
-    - ref: addon-test-rhods
+    post:
     - ref: addon-uninstall
-    workflow: rosa-aws-sts
+    - ref: rosa-sts-cluster-deprovision
+    - ref: rosa-sts-account-roles-delete
+    pre:
+    - ref: rosa-sts-account-roles-create
+    - ref: rosa-sts-cluster-provision
+    - ref: rosa-conf-idp-htpasswd
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-operators-wait-ready
+    - ref: addon-install
+    test:
+    - ref: addon-test-rhods
 zz_generated_metadata:
   branch: rhods
   org: CSPI-QE
