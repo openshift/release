@@ -112,7 +112,7 @@ for the_zone in "${nat_gateway_avail_zones[@]}"; do
 
     echo "$(date -u --rfc-3339=seconds) - AllocateEipAddress"
     ${ALIYUN_BIN} vpc AllocateEipAddress --RegionId "${REGION}" --InternetChargeType "PayByTraffic" \
-      --endpoint "${aliyun_vpc_endpoint}" > out.json
+    --Bandwidth 200 --endpoint "${aliyun_vpc_endpoint}" > out.json
     eip_id=$(jq -r '.AllocationId' out.json)
     eip_addr=$(jq -r '.EipAddress' out.json)
 
