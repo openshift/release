@@ -416,6 +416,7 @@ function send_to_project_in_pr {
   REPORT_PORTAL_URL=https://reportportal-openshift.apps.ocp-c1.prod.psi.redhat.com/api/v1/heli_personal/launch/import
 
   # find report
+  echo "push reportportal"
   ls ${ARTIFACT_DIR}/junit/
 #  if [ ! -d "${ARTIFACT_DIR}/junit" ]; then
 #      echo "${ARTIFACT_DIR}/junit not found error"
@@ -423,8 +424,8 @@ function send_to_project_in_pr {
 #  fi
 
   # zip the junit file
-  zip junit-ginkgo.zip ${ARTIFACT_DIR}/junit/*.xml
-  curl --silent --location --request POST "${REPORT_PORTAL_URL}" --header 'Content-Type: application/json'  --header "Authorization: Bearer ${TEST_BEARER_TOKEN}" -F "file=@junit.zip;type=application/zip"
+  zip -j junit-ginkgo.zip ${ARTIFACT_DIR}/junit/*.xml
+  curl --silent --location --request POST "${REPORT_PORTAL_URL}" --header 'Content-Type: application/json'  --header "Authorization: Bearer ${TEST_BEARER_TOKEN}" -F "file=@junit-ginkgo.zip;type=application/zip" -v
 }
 
 run
