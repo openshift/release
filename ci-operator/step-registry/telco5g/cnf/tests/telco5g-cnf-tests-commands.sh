@@ -67,6 +67,34 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 performance "Check RPS Mask is applied to atleast one single rx queue on all veth interface"
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-11750
+# TESTNAME
+tuningcni "sysctl allowlist update should start a pod with custom sysctl only after adding sysctl to allowlist"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+}
+
+function create_tests_temp_skip_list_14 {
+# List of temporarly skipped tests for 4.14
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-11046
+# TESTNAME
+tuningcni "sysctl allowlist update should start a pod with custom sysctl only after adding sysctl to allowlist"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
 EOF
 }
 
@@ -167,8 +195,12 @@ if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
     export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
 
 fi
-if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
     create_tests_temp_skip_list_13
+    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
+fi
+if [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+    create_tests_temp_skip_list_14
     export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
