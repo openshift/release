@@ -134,3 +134,31 @@ presubmits:
             cpu: 500m
       serviceAccountName: ci-operator
     trigger: (?m)^/test( | .* )impacts,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
+    context: ci/prow/vector-config
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-continuous-release-jobs-master-vector-config
+    rerun_command: /test vector-config
+    spec:
+      containers:
+      - command:
+        - ./hack/verify-vector-config.sh
+        image: registry.ci.openshift.org/continuous-release-jobs/continuous-release-jobs:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+      serviceAccountName: ci-operator
+    trigger: (?m)^/test( | .* )vector-config,?($|\s.*)
