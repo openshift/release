@@ -1,29 +1,29 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
-  cron: 45 1 * * *
+  cluster: build01
+  cron: 43 22 */1 * 1-5
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
-  - base_ref: master
+  - base_ref: release-ocm-2.8
     org: openshift
-    repo: assisted-installer
+    repo: assisted-test-infra
   labels:
-    ci-operator.openshift.io/variant: edge
+    ci-operator.openshift.io/cloud: packet-edge
+    ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci.openshift.io/generator: prowgen
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-installer-master-edge-mirror-nightly-image
+  name: periodic-ci-openshift-assisted-test-infra-release-ocm-2.8-e2e-metal-assisted-kube-api-net-suite-periodic
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=mirror-nightly-image
-      - --variant=edge
+      - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-net-suite-periodic-cluster-profile
+      - --target=e2e-metal-assisted-kube-api-net-suite-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -33,9 +33,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
+      - mountPath: /usr/local/e2e-metal-assisted-kube-api-net-suite-periodic-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -47,9 +52,18 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-packet-assisted
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -57,30 +71,30 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 58 2 * * *
+  cluster: vsphere
+  cron: 00 00 */1 * 0-5
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
-  - base_ref: master
+  - base_ref: release-ocm-2.8
     org: openshift
-    repo: assisted-installer
+    repo: assisted-test-infra
   labels:
-    ci-operator.openshift.io/variant: edge
+    ci-operator.openshift.io/cloud: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere
     ci.openshift.io/generator: prowgen
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-assisted-installer-master-edge-mirror-nightly-image-controller
+  name: periodic-ci-openshift-assisted-test-infra-release-ocm-2.8-e2e-vsphere-assisted-kube-api-periodic
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=mirror-nightly-image-controller
-      - --variant=edge
+      - --secret-dir=/usr/local/e2e-vsphere-assisted-kube-api-periodic-cluster-profile
+      - --target=e2e-vsphere-assisted-kube-api-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -90,9 +104,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
+      - mountPath: /usr/local/e2e-vsphere-assisted-kube-api-periodic-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -104,9 +123,18 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-vsphere
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
