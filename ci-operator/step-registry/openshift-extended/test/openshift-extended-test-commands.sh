@@ -270,6 +270,7 @@ function run {
     rm -fr ./case_selected
     echo "try to handle result"
     handle_result
+    send_to_project_in_pr
     echo "done to handle result"
     if [ "W${ret_value}W" == "W0W" ]; then
         echo "success"
@@ -409,4 +410,21 @@ function check_case_selected {
         echo "do not find case"
     fi
 }
+
+function send_to_project_in_pr {
+  TEST_BEARER_TOKEN="55a6a7da-2faa-46cc-bb78-04eda767bc5f"
+  REPORT_PORTAL_URL=https://reportportal-openshift.apps.ocp-c1.prod.psi.redhat.com/api/v1/heli_personal/launch/import
+
+  # find report
+  ls ${ARTIFACT_DIR}/junit/
+#  if [ ! -d "${ARTIFACT_DIR}/junit" ]; then
+#      echo "${ARTIFACT_DIR}/junit not found error"
+#      exit 1
+#  fi
+
+  # zip the junit file
+  zip junit-ginkgo.zip ${ARTIFACT_DIR}/junit/*.xml
+  curl --silent --location --request POST "${REPORT_PORTAL_URL}" --header 'Content-Type: application/json'  --header "Authorization: Bearer ${TEST_BEARER_TOKEN}" -F "file=@junit.zip;type=application/zip"
+}
+
 run

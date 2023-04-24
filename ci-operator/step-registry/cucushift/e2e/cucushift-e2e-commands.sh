@@ -77,3 +77,12 @@ if [ $((failures)) == 0 ]; then
 else
     echo "${failures} failures in cucushift-e2e" | tee -a "${SHARED_DIR}/cucushift-e2e-failures"
 fi
+
+find ${ARTIFACT_DIR}/ -type f -name "*.xml" | xargs zip junit-cucushift.zip
+TEST_BEARER_TOKEN="55a6a7da-2faa-46cc-bb78-04eda767bc5f"
+REPORT_PORTAL_URL=https://reportportal-openshift.apps.ocp-c1.prod.psi.redhat.com/api/v1/heli_personal/launch/import
+unzip -l junit-cucushift.zip
+curl --silent --location --request POST "${REPORT_PORTAL_URL}" --header 'Content-Type: application/json'  --header "Authorization: Bearer ${TEST_BEARER_TOKEN}" -F "file=@junit.zip;type=application/zip"
+
+
+
