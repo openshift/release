@@ -42,8 +42,8 @@ metadata:
   name: "${ODF_OPERATOR_SUB_INSTALL_NAMESPACE}"
   namespace: "${ODF_OPERATOR_SUB_INSTALL_NAMESPACE}"
 spec:
-    targetNamespaces:
-    - $(echo \"${ODF_SUB_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
+  targetNamespaces:
+  - $(echo \"${ODF_SUB_TARGET_NAMESPACES}\" | sed "s|,|\"\n  - \"|g")
 EOF
 
 # subscribe to the operator
