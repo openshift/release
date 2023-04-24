@@ -291,36 +291,6 @@ EOF
   done
 }
 
-# Configured systemd journald to forward logs to the console. AWS only
-# shows the last few lines of a console log, but at least on early boot
-# failures we'll be able to capture a snippet.
-function inject_journal_to_console_config() {
-  local dir=$1
-  local role=$2
-
-  mkdir -p "${dir}/openshift/"
-  cat << EOF > "${dir}/openshift/99-$role-journal-console.yaml"
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  labels:
-    machineconfiguration.openshift.io/role: $role
-  name: 99-$role-journal-console
-spec:
-  config:
-    ignition:
-      version: 3.2.0
-    storage:
-      files:
-        - contents:
-            compression: ""
-            source: data:,%5BJournal%5D%0AForwardToConsole%3Dyes%0A
-          mode: 420
-          overwrite: true
-          path: /etc/systemd/journald.conf.d/forward.conf
-EOF
-}
-
 # inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
 function inject_spot_instance_config() {
   local dir=${1}
@@ -432,12 +402,6 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
-
-if [[ "$JOB_NAME" == *"4.14"* ]]
-then
-  inject_journal_to_console_config $dir worker
-  inject_journal_to_console_config $dir master
-fi
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
