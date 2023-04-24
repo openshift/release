@@ -6,33 +6,12 @@ build_root:
 images:
 - dockerfile_path: automation/generatetasks/build/Dockerfile
   to: base-tests
-- context_dir: modules/create-vm/
-  dockerfile_path: build/create-vm/Dockerfile
-  to: tekton-task-create-vm
-- context_dir: modules/copy-template/
-  dockerfile_path: build/copy-template/Dockerfile
-  to: tekton-task-copy-template
-- context_dir: modules/execute-in-vm/
-  dockerfile_path: build/execute-in-vm/Dockerfile
-  to: tekton-task-execute-in-vm
-- context_dir: modules/generate-ssh-keys/
-  dockerfile_path: build/generate-ssh-keys/Dockerfile
-  to: tekton-task-generate-ssh-keys
-- context_dir: modules/disk-virt-customize/
-  dockerfile_path: build/disk-virt-customize/Dockerfile
-  to: tekton-task-disk-virt-customize
-- context_dir: modules/disk-virt-sysprep/
-  dockerfile_path: build/disk-virt-sysprep/Dockerfile
-  to: tekton-task-disk-virt-sysprep
-- context_dir: modules/wait-for-vmi-status/
-  dockerfile_path: build/wait-for-vmi-status/Dockerfile
-  to: tekton-task-wait-for-vmi-status
-- context_dir: modules/modify-vm-template/
-  dockerfile_path: build/modify-vm-template/Dockerfile
-  to: tekton-task-modify-vm-template
-- context_dir: modules/modify-data-object
-  dockerfile_path: build/modify-data-object/Dockerfile
-  to: tekton-task-modify-data-object
+- context_dir: build
+  dockerfile_path: Dockerfile
+  to: tekton-tasks
+- context_dir: build
+  dockerfile_path: Dockerfile.DiskVirt
+  to: tekton-task-disk-virt
 releases:
   initial:
     integration:
@@ -94,24 +73,10 @@ tests:
         NUM_NODES=4 \
           make e2e-tests
       dependencies:
-      - env: CREATE_VM_IMAGE
-        name: tekton-task-create-vm
-      - env: COPY_TEMPLATE_IMAGE
-        name: tekton-task-copy-template
-      - env: EXECUTE_IN_VM_IMAGE
-        name: tekton-task-execute-in-vm
-      - env: GENERATE_SSH_KEYS_IMAGE
-        name: tekton-task-generate-ssh-keys
-      - env: DISK_VIRT_CUSTOMIZE_IMAGE
-        name: tekton-task-disk-virt-customize
-      - env: DISK_VIRT_SYSPREP_IMAGE
-        name: tekton-task-disk-virt-sysprep
-      - env: WAIT_FOR_VMI_STATUS_IMAGE
-        name: tekton-task-wait-for-vmi-status
-      - env: MODIFY_VM_TEMPLATE_IMAGE
-        name: tekton-task-modify-vm-template
-      - env: MODIFY_DATA_OBJECT_IMAGE
-        name: tekton-task-modify-data-object
+      - env: TEKTON_TASKS_IMAGE
+        name: tekton-tasks
+      - env: TEKTON_TASKS_DISK_VIRT_IMAGE
+        name: tekton-task-disk-virt
       from: base-tests
       resources:
         requests:
