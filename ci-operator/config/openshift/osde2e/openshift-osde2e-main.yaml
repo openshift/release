@@ -289,22 +289,6 @@ tests:
     name: osde2e-rosa-stage
   - mount_path: /usr/local/osde2e-static-byo-vpc
     name: osde2e-static-byo-vpc
-- as: aws-stage-e2e-upgrade-to-latest
-  commands: |
-    export REPORT_DIR="$ARTIFACT_DIR"
-    export CONFIGS="aws,stage,e2e-suite,upgrade-to-latest"
-    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
-
-    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
-  container:
-    clone: true
-    from: osde2e
-  cron: 0 */6 * * 0-5
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
 - as: hypershift-stage-e2e-default
   commands: |
     export REPORT_DIR="$ARTIFACT_DIR"
@@ -377,6 +361,81 @@ tests:
     clone: true
     from: osde2e
   cron: 45 * * * *
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osd-aws-upgrade-latest-default-z-minus-1-to-latest-default-z
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,stage,e2e-suite"
+    export CHANNEL="candidate"
+    export INSTALL_LATEST_Z_FROM_DELTA="-1"
+    export UPGRADE_TO_LATEST_Z="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 12 * * 1,5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osd-aws-upgrade-latest-default-y-minus-1-to-latest-default-y
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,stage,e2e-suite"
+    export CHANNEL="candidate"
+    export INSTALL_LATEST_Y_FROM_DELTA="-1"
+    export UPGRADE_TO_LATEST_Y="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 12 * * 1,5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osd-aws-upgrade-latest-default-y-to-latest-y-plus-1
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,stage,e2e-suite"
+    export CHANNEL="candidate"
+    export UPGRADE_TO_LATEST_Y="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 12 * * 1,5
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+- as: osd-aws-upgrade-latest-default-y-plus-1-to-latest-y
+  commands: |
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export CONFIGS="aws,stage,e2e-suite"
+    export CHANNEL="candidate"
+    export LATEST_Y_RELEASE_AFTER_PROD_DEFAULT="true"
+    export UPGRADE_TO_LATEST_Y="true"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials"
+
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 12 * * 1,5
   secrets:
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
