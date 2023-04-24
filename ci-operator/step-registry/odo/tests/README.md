@@ -1,7 +1,7 @@
 # odo-tests-ref<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
-
+- [General Information](#general-information)
 - [Purpose](#purpose)
 - [Process](#process)
 - [Prerequisite(s)](#prerequisites)
@@ -9,6 +9,11 @@
   - [Environment Variables](#environment-variables)
   - [Other](#other)
 - [Custom Image - `oc-bin-image`](#custom-image---oc-bin-image)
+
+## General Information
+
+- **Repository**: [redhat-developer/odo](https://github.com/redhat-developer/odo)
+- **Operator Tested**: [ODO (Developers CLI for OpenShift and Kubernetes)](https://developers.redhat.com/products/odo/overview)
 
 ## Purpose
 
