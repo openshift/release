@@ -125,8 +125,8 @@ if [[ "$node_role" == "master" ]]; then
 fi
 
 
-echo "waiting for mcp/${node_role} condition=Updated timeout=30m"
-oc wait mcp/${node_role} --for condition=Updated --timeout=30m
+echo "waiting for mcp/${node_role} condition=Updated timeout=40m"
+oc wait mcp/${node_role} --for condition=Updated --timeout=40m
 
 seconds=120
 echo "waiting $seconds seconds to give some delay before collecting metrics"
