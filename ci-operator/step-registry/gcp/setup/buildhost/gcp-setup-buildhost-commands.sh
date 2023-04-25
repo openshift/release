@@ -9,6 +9,8 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
 NETWORK=${NETWORK:-}
 IMAGE_ARGS=""
+METADATA_ARGS=()
+
 python3 --version 
 export CLOUDSDK_PYTHON=python3
 
@@ -23,6 +25,20 @@ fi
 if [[ -z "${IMAGE_ARGS}" ]]; then
   echo "image info not correct"
   exit 1 
+fi
+
+if [[ -z ${TEST_CGROUP_V2} ]]; then
+  METADATA_SCRIPT=$(cat <<EOF
+#!/bin/bash
+set -xeuo pipefail
+touch /etc/default/grub
+echo "GRUB_CMDLINE_LINUX=\"$(sed "s/\"/\\\\\"/g" /etc/default/grub | grep -E "^GRUB_CMDLINE_LINUX=" | sed "s/^GRUB_CMDLINE_LINUX=\"//;s/\"$//") cgroup_enable=memory systemd.unified_cgroup_hierarchy=0\"" > /etc/default/grub
+grub2-mkconfig -o /boot/grub2/grub.cfg
+EOF
+)
+  METADATA_FILE='google-container-manifest=/dev/null'
+  METADATA_ARGS+=("--metadata" "startup-script=${METADATA_SCRIPT}" "--metadata-from-file" "${METADATA_FILE}")
+  echo "cgroupv1 is enabled"
 fi
 
 #####################################
@@ -97,6 +113,7 @@ server_name="${CLUSTER_NAME}-buildhost"
 MACHINE_TYPE="n2-standard-8"
 gcloud compute instances create "${server_name}" \
   ${IMAGE_ARGS} \
+  "${METADATA_ARGS[@]+"${METADATA_ARGS[@]}"}" \
   --image-project=openshift-gce-devel-ci \
   --boot-disk-type pd-ssd \
   --boot-disk-size=200GB \
@@ -145,3 +162,7 @@ echo "export ZONE=${ZONE_0}" >> "${SHARED_DIR}/env"
 cat <<EOF >> "${SHARED_DIR}/env"
 export SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/ssh-privatekey")
 EOF
+
+if [[ -z ${TEST_CGROUP_V2} ]]; then
+    gcloud compute instances reset "${server_name}" --zones=${ZONE_0}
+fi
