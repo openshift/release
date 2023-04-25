@@ -84,6 +84,6 @@ TEST_BEARER_TOKEN="55a6a7da-2faa-46cc-bb78-04eda767bc5f"
 REPORT_PORTAL_URL=https://reportportal-openshift.apps.ocp-c1.prod.psi.redhat.com/api/v1/heli_personal/launch/import
 unzip -l ${zipfile}
 curl --silent --location --request POST "${REPORT_PORTAL_URL}" --header 'Content-Type: application/json'  --header "Authorization: Bearer ${TEST_BEARER_TOKEN}" -F "file=@${zipfile};type=application/zip" -v
-
+sleep 2h
 
 
