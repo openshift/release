@@ -1,8 +1,16 @@
 base_images:
+  clc-ui-e2e:
+    name: "2.7"
+    namespace: acm-qe
+    tag: clc-ui-e2e
   cli:
     name: "4.12"
     namespace: ocp
     tag: cli
+  fetch-managed-clusters:
+    name: autotest
+    namespace: acm-qe
+    tag: fetch-managed-clusters
 build_root:
   image_stream_tag:
     name: release
@@ -40,6 +48,7 @@ tests:
         ]
       ZONES_COUNT: "3"
     post:
+    - ref: acm-tests-clc-destroy
     - ref: gather-aws-console
     - chain: ipi-deprovision
     pre:
@@ -54,6 +63,8 @@ tests:
     - ref: acm-mch
     - ref: acm-policies-openshift-plus-setup
     - ref: acm-policies-openshift-plus
+    - ref: acm-tests-clc-create
+    - ref: acm-fetch-managed-clusters
     - chain: cucushift-installer-check-cluster-health
     - ref: quay-tests-quay-interop-test
 zz_generated_metadata:
