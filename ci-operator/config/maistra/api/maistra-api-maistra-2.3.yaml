@@ -32,17 +32,18 @@ tests:
     from: src
 - as: api-update-istio-2.3
   commands: |
+    BUILD_WITH_CONTAINER=0 \
+    GOCACHE="/tmp/cache" \
     ./maistra/run-test-infra-script.sh ./tools/automator.sh \
     -o maistra \
-    -f /creds-github/github-token \
+    -f /creds-github/token \
     -r istio \
-    -c UPDATE_BRANCH=$AUTOMATOR_SHA bin/update_maistra_deps.sh \
+    -c bin/update_maistra_deps.sh \
     '-t Automator: Update maistra/api dependency' \
     -m update_api_istio \
     -b maistra-2.3
   container:
     from: src
-  postsubmit: true
   secrets:
   - mount_path: /creds-github
     name: github-token
