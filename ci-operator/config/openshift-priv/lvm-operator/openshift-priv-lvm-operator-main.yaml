@@ -18,9 +18,9 @@ base_images:
 binary_build_commands: make build build-vgmanager
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-8-golang-1.20-openshift-4.14
 canonical_go_repository: github.com/openshift/lvm-operator
 images:
 - dockerfile_path: Dockerfile
@@ -91,6 +91,10 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
   mkdir /.local && chmod 777 /.local
 tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
 - as: unit-test
   commands: make test
   container:
