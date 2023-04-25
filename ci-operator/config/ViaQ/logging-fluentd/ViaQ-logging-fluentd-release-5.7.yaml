@@ -1,8 +1,4 @@
 base_images:
-  builder:
-    name: ubi
-    namespace: ocp
-    tag: "8"
   cluster-logging-operator:
     name: "5.7"
     namespace: logging
@@ -39,32 +35,33 @@ base_images:
     name: 5.y
     namespace: logging
     tag: logging-eventrouter
-  logging-fluentd:
-    name: v1.14.x
-    namespace: logging
-    tag: logging-fluentd
   logging-kibana6:
     name: 5.y
     namespace: logging
     tag: logging-kibana6
   oauth-proxy:
-    name: "4.9"
+    name: "4.12"
     namespace: ocp
     tag: oauth-proxy
+  ubi8-ruby27:
+    name: ubi-ruby-27
+    namespace: ocp
+    tag: "8"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.15
+    tag: rhel-8-release-openshift-4.6
 images:
-- dockerfile_path: Dockerfile
-  from: builder
-  to: vector
 - dockerfile_path: Dockerfile.unit
-  from: builder
-  to: logging-vector-test-unit
+  from: ubi8-ruby27
+  to: test-unit-fluentd
+- context_dir: fluentd
+  dockerfile_path: Dockerfile
+  from: ubi8-ruby27
+  to: logging-fluentd
 promotion:
-  name: v0.21-rh
+  name: "5.7"
   namespace: logging
 releases:
   latest:
@@ -73,25 +70,18 @@ releases:
       version: "4.12"
 resources:
   '*':
-    limits:
-      memory: 20Gi
+    requests:
+      cpu: "1"
+      memory: 200Mi
+  src:
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: make test
+- as: lint
+  commands: make lint
   container:
-    from: logging-vector-test-unit
-- as: cargo-deny-check-bans
-  commands: cargo deny --no-default-features --features ocp-logging --offline check
-    bans
-  container:
-    from: logging-vector-test-unit
-- as: ldd-openssl
-  commands: ldd /usr/bin/vector | egrep 'libcrypto|libssl'
-  container:
-    from: vector
+    from: src
 - as: cluster-logging-operator-e2e
   cluster_claim:
     architecture: amd64
@@ -104,7 +94,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: export GINKGO_OPTS="-ginkgo.skip fluentd"; FAKE_HOME_DIR=/tmp/home
+      commands: export GINKGO_OPTS="-ginkgo.skip vector"; FAKE_HOME_DIR=/tmp/home
         LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
         make test-e2e-olm
       dependencies:
@@ -120,8 +110,6 @@ tests:
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
-      - env: IMAGE_LOGGING_VECTOR
-        name: pipeline:vector
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -138,7 +126,6 @@ tests:
           cpu: 100m
       timeout: 3h0m0s
     workflow: generic-claim
-  timeout: 5h0m0s
 - as: clo-functional
   cluster_claim:
     architecture: amd64
@@ -152,7 +139,7 @@ tests:
     - as: test
       cli: latest
       commands: FAKE_HOME_DIR=/tmp/home LOG_DIR=${ARTIFACT_DIR}/logging-logs ARTIFACT_DIR=${ARTIFACT_DIR}/logging-artifacts
-        make test-functional-vector
+        make test-functional
       dependencies:
       - env: IMAGE_CLUSTER_LOGGING_OPERATOR_REGISTRY
         name: pipeline:cluster-logging-operator-registry
@@ -162,8 +149,6 @@ tests:
         name: pipeline:oauth-proxy
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
-      - env: IMAGE_LOGGING_VECTOR
-        name: pipeline:vector
       - env: IMAGE_ELASTICSEARCH_OPERATOR
         name: pipeline:elasticsearch-operator
       - env: IMAGE_ELASTICSEARCH_PROXY
@@ -182,6 +167,6 @@ tests:
           cpu: 100m
     workflow: generic-claim
 zz_generated_metadata:
-  branch: v0.21-rh
+  branch: release-5.7
   org: ViaQ
-  repo: vector
+  repo: logging-fluentd
