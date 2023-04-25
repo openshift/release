@@ -7,10 +7,6 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
-  ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
   operator-sdk:
     name: "4.13"
     namespace: origin
@@ -26,28 +22,25 @@ images:
   - name: TARGET
     value: manager
   dockerfile_path: Dockerfile
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: kernel-module-management-operator
 - build_args:
   - name: TARGET
     value: manager-hub
   dockerfile_path: Dockerfile
-  inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
   to: kernel-module-management-operator-hub
 - dockerfile_path: Dockerfile.signimage
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.11:
+    ubi8-minimal-entitled:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11
+      - registry.access.redhat.com/ubi8/ubi-minimal:8.7-1085
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
+- dockerfile_literal: |
+    FROM ubi8-minimal
+    RUN rm -rf /etc/yum.repos.d/*
+    RUN curl http://base-4-12-rhel8.ocp.svc > /etc/yum.repos.d/base-4-12-rhel8.repo
+  to: ubi8-minimal-entitled
 operator:
   bundles:
   - as: operator-bundle
@@ -64,6 +57,8 @@ operator:
   - pullspec: quay.io/edge-infrastructure/kernel-module-management-signimage:latest
     with: pipeline:kernel-module-management-signimage
 promotion:
+  excluded_images:
+  - ubi8-minimal-entitled
   namespace: edge-infrastructure
   tag: latest
   tag_by_commit: true

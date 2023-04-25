@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+python3 --version 
+export CLOUDSDK_PYTHON=python3
+
 if [[ -s "${SHARED_DIR}/xpn.json" ]]; then
   echo "$(date -u --rfc-3339=seconds) - Using pre-existing XPN VPC..." && exit 0
 fi
