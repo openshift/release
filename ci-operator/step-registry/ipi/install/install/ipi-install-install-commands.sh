@@ -291,36 +291,6 @@ EOF
   done
 }
 
-# Configured systemd journald to forward logs to the console. AWS only
-# shows the last few lines of a console log, but at least on early boot
-# failures we'll be able to capture a snippet.
-function inject_journal_to_console_config() {
-  local dir=$1
-  local role=$2
-
-  mkdir -p "${dir}/openshift/"
-  cat << EOF > "${dir}/openshift/99-$role-journal-console.yaml"
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-  labels:
-    machineconfiguration.openshift.io/role: $role
-  name: 99-$role-journal-console
-spec:
-  config:
-    ignition:
-      version: 3.2.0
-    storage:
-      files:
-        - contents:
-            compression: ""
-            source: data:,%5BJournal%5D%0AForwardToConsole%3Dyes%0A
-          mode: 420
-          overwrite: true
-          path: /etc/systemd/journald.conf.d/forward.conf
-EOF
-}
-
 # inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
 function inject_spot_instance_config() {
   local dir=${1}
@@ -372,15 +342,35 @@ then
 fi
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
-azure4|azuremag|azure-arm64) export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json;;
+aws|aws-arm64|aws-usgov)
+    if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
+        echo "Setting AWS credential with minimal permision for installer"
+        export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
+    else
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+    fi
+    ;;
+azure4|azuremag|azure-arm64)
+    if [[ -f "${SHARED_DIR}/azure_minimal_permission" ]]; then
+        echo "Setting AZURE credential with minimal permissions for installer"
+        export AZURE_AUTH_LOCATION=${SHARED_DIR}/azure_minimal_permission
+    else
+        export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
+    fi
+    ;;
 azurestack)
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
     if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
         export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
     fi
     ;;
-gcp) export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json;;
+gcp)
+    export GOOGLE_CLOUD_KEYFILE_JSON=${CLUSTER_PROFILE_DIR}/gce.json
+    if [ -f "${SHARED_DIR}/gcp_min_permissions.json" ]; then
+      echo "$(date -u --rfc-3339=seconds) - Using the IAM service account for the minimum permissions testing on GCP..."
+      export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
+    fi
+    ;;
 ibmcloud)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
@@ -412,12 +402,6 @@ echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 openshift-install --dir="${dir}" create manifests &
 wait "$!"
-
-if [[ "$JOB_NAME" == *"4.14"* ]]
-then
-  inject_journal_to_console_config $dir worker
-  inject_journal_to_console_config $dir master
-fi
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in

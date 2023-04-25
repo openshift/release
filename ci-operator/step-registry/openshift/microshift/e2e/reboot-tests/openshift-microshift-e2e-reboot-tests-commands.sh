@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -euo pipefail
+set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -27,6 +27,8 @@ Host ${INSTANCE_PREFIX}
   HostName ${IP_ADDRESS}
   IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
   StrictHostKeyChecking accept-new
+  ServerAliveInterval 30
+  ServerAliveCountMax 1200
 EOF
 chmod 0600 "${HOME}"/.ssh/config
 
@@ -35,70 +37,79 @@ cat >"${HOME}"/reboot-test.sh <<'EOF'
 set -xeuo pipefail
 
 export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
+stat $KUBECONFIG
 # TODO: Remove the labels again once https://issues.redhat.com/browse/OCPBUGS-1969 has been fixed upstream
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"-version=v1.24"
 oc label namespaces default "pod-security.kubernetes.io/"{enforce,audit,warn}"=privileged"
 cat <<EOF_INNER | oc create -f -
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  namespace: default
-  name: test-claim
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: topolvm-provisioner
-  resources:
-    requests:
-      storage: 1Gi
----
+# TODO: Fix 4.12 lvmd's "spare-gb"
+# ---
+# kind: PersistentVolumeClaim
+# apiVersion: v1
+# metadata:
+#   namespace: default
+#   name: test-claim
+# spec:
+#   accessModes:
+#   - ReadWriteOnce
+#   storageClassName: topolvm-provisioner
+#   resources:
+#     requests:
+#       storage: 1Gi
+# ---
 kind: Pod
 apiVersion: v1
 metadata:
   name: test-pod
   namespace: default
 spec:
-  securityContext:
-    runAsNonRoot: true
-    privileged: false
-    capabilities:
-      drop:
-      - 'ALL'
-    allowPrivilegeEscalation: false
-    seccompProfile:
-      type: RuntimeDefault
   containers:
     - name: test-container
+      securityContext:
+        runAsUser: 1001
+        runAsGroup: 1001
+        runAsNonRoot: true
+        privileged: false
+        capabilities:
+          drop:
+          - 'ALL'
+        allowPrivilegeEscalation: false
+        seccompProfile:
+          type: RuntimeDefault
       image: nginx
       command:
         - sh
         - -c
         - sleep 1d
-      volumeMounts:
-        - mountPath: /vol
-          name: test-vol
-  volumes:
-    - name: test-vol
-      persistentVolumeClaim:
-        claimName: test-claim
+  #     volumeMounts:
+  #       - mountPath: /vol
+  #         name: test-vol
+  # volumes:
+  # - name: test-vol
+  #   persistentVolumeClaim:
+  #     claimName: test-claim
 EOF_INNER
 
-set +ex
-echo "waiting for pod condition" >&2
 oc wait --for=condition=Ready --timeout=120s pod/test-pod
-echo "pod posted ready status" >&2
-
 EOF
 chmod +x "${HOME}"/reboot-test.sh
 
 scp "${HOME}"/reboot-test.sh "${INSTANCE_PREFIX}":~/reboot-test.sh
 
 if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/reboot-test.sh'; then
-  scp -r /tmp/validate-microshift "${INSTANCE_PREFIX}":~/validate-microshift
-  ssh "${INSTANCE_PREFIX}" 'chmod +x ~/validate-microshift/cluster-debug-info.sh && sudo ~/validate-microshift/cluster-debug-info.sh'
+  scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
+  ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
   exit 1
 fi
 
-# now reboot the machine
-gcloud compute instances stop "${INSTANCE_PREFIX}" --zone "${GOOGLE_COMPUTE_ZONE}"
+set +e
+ssh "${INSTANCE_PREFIX}" 'sudo reboot now'
+res=$?
+set -e
+
+# Don't fail on exit code 255 which is ssh's for things like
+# "connection closed by remote host"
+# which are expected when rebooting via ssh
+if [ "${res}" -ne 0 ] && [ "${res}" -ne 255 ]; then
+    exit 1
+fi
