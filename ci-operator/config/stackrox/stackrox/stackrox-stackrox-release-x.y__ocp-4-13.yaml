@@ -26,55 +26,50 @@ tests:
 - as: qa-e2e-tests
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
     env:
       TEST_SUITE: ocp-qa-e2e-tests
     test:
     - ref: stackrox-e2e
-    workflow: ipi-aws
-  timeout: 5h0m0s
-- as: weekly-qa-e2e-tests
-  cron: 0 5 * * 2
-  steps:
-    cluster_profile: aws
-    env:
-      TEST_SUITE: ocp-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
-  timeout: 5h0m0s
-- as: ui-e2e-tests
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      TEST_SUITE: ocp-ui-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
-  timeout: 5h0m0s
-- as: weekly-ui-e2e-tests
-  cron: 0 5 * * 2
-  steps:
-    cluster_profile: aws
-    env:
-      TEST_SUITE: ocp-ui-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: ipi-gcp
   timeout: 5h0m0s
 - as: operator-e2e-tests
   optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
     env:
       TEST_SUITE: ocp-operator-e2e-tests
     test:
     - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: ipi-gcp
   timeout: 5h0m0s
-- as: weekly-operator-e2e-tests
-  cron: 0 5 * * 2
+- as: ui-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-gcp
+  timeout: 5h0m0s
+- as: fips-qa-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+      QA_TEST_TARGET: test
+      TEST_SUITE: ocp-qa-e2e-tests
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-gcp
+  timeout: 5h0m0s
+- as: merge-operator-e2e-tests
+  postsubmit: true
   steps:
     cluster_profile: aws
     env:
@@ -84,7 +79,7 @@ tests:
     workflow: ipi-aws
   timeout: 5h0m0s
 zz_generated_metadata:
-  branch: master
+  branch: release-x.y
   org: stackrox
   repo: stackrox
-  variant: ocp-next
+  variant: ocp-4-13
