@@ -31,4 +31,14 @@ firewall::close_port() {
 export -f firewall::open_port
 export -f firewall::close_port
 
-USHIFT_IP="${IP_ADDRESS}" USHIFT_USER="${HOST_USER}" /microshift/e2e/main.sh run
+USHIFT_IP="${IP_ADDRESS}" USHIFT_USER=${HOST_USER} /microshift/e2e/main.sh run
+
+cat << EOF >${ARTIFACT_DIR}/config.yaml
+USHIFT_HOST: ${IP_ADDRESS}
+USHIFT_USER: ${HOST_USER}
+SSH_PRIV_KEY: ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+EOF
+
+git clone https://github.com/pacevedom/microshift -b USHIFT-1119 /tmp/microshift
+cd /tmp/microshift/test
+OUTPUT_DIR=${ARTIFACT_DIR} RF_VARIABLES=${ARTIFACT_DIR}/config.yaml make setup all

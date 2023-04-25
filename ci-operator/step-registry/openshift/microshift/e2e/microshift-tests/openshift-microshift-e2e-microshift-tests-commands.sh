@@ -47,4 +47,12 @@ export -f firewall::open_port
 export -f firewall::close_port
 export INSTANCE_PREFIX
 
-USHIFT_IP="${IP_ADDRESS}" USHIFT_USER=rhel8user /microshift/e2e/main.sh run
+#USHIFT_IP="${IP_ADDRESS}" USHIFT_USER=rhel8user /microshift/e2e/main.sh run
+#TODO temp stuff
+git clone https://github.com/pacevedom/microshift -b USHIFT-1119 /tmp/microshift
+cd /tmp/microshift/test
+set +e
+USHIFT_HOST="${IP_ADDRESS}" USHIFT_USER=rhel8user make setup all
+cp /tmp/microshift/_output/e2e*/xunit.xml ${ARTIFACT_DIR}/junit
+
+
