@@ -140,6 +140,20 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- as: e2e-openstack-operator
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
+  steps:
+    cluster_profile: openstack-vexxhost
+    test:
+    - as: test
+      commands: |
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
 - as: e2e-aws-ovn-etcd-scaling
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
