@@ -31,7 +31,8 @@ tempest init openshift
 
 pushd ~/tempest/openshift
 
-discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create identity.v3_endpoint_type public
+TEMPEST_CONF_OVERRIDES=${TEMPEST_CONF_OVERRIDES:-}
+discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create identity.v3_endpoint_type public ${TEMPEST_CONF_OVERRIDES}
 
 # Generate skiplist and allow list
 ORG="openstack-k8s-operators"
@@ -90,5 +91,9 @@ if [ -f etc/tempest.conf ]; then
 fi
 if [ -f stestr_results.html ]; then
     cp stestr_results.html ${ARTIFACT_DIR}
+fi
+
+if [ -f tempest.log ]; then
+    cp tempest.log ${ARTIFACT_DIR}
 fi
 exit $EXIT_CODE
