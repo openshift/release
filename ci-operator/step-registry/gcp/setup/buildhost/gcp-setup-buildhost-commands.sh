@@ -28,17 +28,24 @@ if [[ -z "${IMAGE_ARGS}" ]]; then
 fi
 
 if [[ -z ${TEST_CGROUP_V2} ]]; then
-  METADATA_SCRIPT=$(cat <<EOF
-#!/bin/bash
-set -xeuo pipefail
-touch /etc/default/grub
-echo "GRUB_CMDLINE_LINUX=\"$(sed "s/\"/\\\\\"/g" /etc/default/grub | grep -E "^GRUB_CMDLINE_LINUX=" | sed "s/^GRUB_CMDLINE_LINUX=\"//;s/\"$//") cgroup_enable=memory systemd.unified_cgroup_hierarchy=0\"" > /etc/default/grub
-grub2-mkconfig -o /boot/grub2/grub.cfg
+  METADATA_SCRIPT=$(cat <<'EOF'
+    #!/bin/bash
+    # Check if cgroupv1 is already enabled
+    if grep -q "^GRUB_CMDLINE_LINUX=.*systemd.unified_cgroup_hierarchy=0" /etc/default/grub; then
+      echo "cgroupv1 is already enabled via GRUB_CMDLINE_LINUX."
+    else
+      # Append the required parameters to the GRUB_CMDLINE_LINUX parameter
+      sed -i 's/^\(GRUB_CMDLINE_LINUX=".*\)"$/\1 systemd.unified_cgroup_hierarchy=0"/' /etc/default/grub
+
+      # Update the grub configuration
+      grub2-mkconfig -o /boot/grub2/grub.cfg
+
+      echo "cgroupv1 enabled successfully."
+    fi
 EOF
 )
   METADATA_FILE='google-container-manifest=/dev/null'
   METADATA_ARGS+=("--metadata" "startup-script=${METADATA_SCRIPT}" "--metadata-from-file" "${METADATA_FILE}")
-  echo "cgroupv1 is enabled"
 fi
 
 #####################################
@@ -163,6 +170,7 @@ cat <<EOF >> "${SHARED_DIR}/env"
 export SSHOPTS=(-o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR -i "\${CLUSTER_PROFILE_DIR}/ssh-privatekey")
 EOF
 
-if [[ -z ${TEST_CGROUP_V2} ]]; then
-    gcloud compute instances reset "${server_name}" --zone=${ZONE_0}
-fi
+# if [[ -z ${TEST_CGROUP_V2} ]]; then
+#    echo "rebooting the system"
+#    gcloud compute instances reset "${server_name}" --zone=${ZONE_0}
+# fi
