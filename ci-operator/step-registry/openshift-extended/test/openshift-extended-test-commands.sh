@@ -76,7 +76,6 @@ then
     export TEST_ROSA_TOKEN
 fi
 
-sleep 3600
 # configure enviroment for different cluster
 echo "CLUSTER_TYPE is ${CLUSTER_TYPE}"
 case "${CLUSTER_TYPE}" in
@@ -411,3 +410,4 @@ function check_case_selected {
     fi
 }
 run
+sleep 3600
