@@ -59,6 +59,11 @@ if test -f "${SHARED_DIR}/bastion_ssh_user"
 then
     QE_BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
 fi
+if ! whoami &> /dev/null; then
+    if [[ -w /etc/passwd ]]; then
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+    fi
+fi
 mkdir -p ~/.ssh
 cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
 chmod 0600 ~/.ssh/ssh-privatekey || true
