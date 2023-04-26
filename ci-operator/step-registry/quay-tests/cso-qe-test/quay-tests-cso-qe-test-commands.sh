@@ -42,10 +42,13 @@ kind: Namespace
 metadata:
   name: test-cso
 EOF
+sleep 2
 
 ##create a pull secret
 oc -n test-cso create secret docker-registry cso-private --docker-server=quay.io --docker-username="quay-qetest+testcso" --docker-password="G7KF0G57BX4F8G23LOZHJQR9QZAHHEPI3WI4FPFQAJM5UER82M6TNKOMHHKVGRUO"
+sleep 2
 oc -n test-cso secrets link default cso-private --for=pull
+sleep 2
 
 ##deploy pod by deployment
 cat <<EOF | oc apply -f -
