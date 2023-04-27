@@ -87,8 +87,8 @@ retries=3
 backoff=3s
 for try in $(seq 1 "${retries}"); do
   echo "Attempt: ${try}"
-  echo "Running: curl -vk http://hello-microshift.cluster.local --resolve \"hello-microshift.cluster.local:80:${IP_ADDRESS}\""
-  RESPONSE=$(curl -vk http://hello-microshift.cluster.local --resolve "hello-microshift.cluster.local:80:${IP_ADDRESS}" 2>&1)
+  echo "Running: curl -vk http://hello-microshift.cluster.local --connect-to \"hello-microshift.cluster.local:80:${IP_ADDRESS}:80\""
+  RESPONSE=$(curl -vk http://hello-microshift.cluster.local --connect-to "hello-microshift.cluster.local:80:${IP_ADDRESS}:80" 2>&1)
   RESULT=$?
   echo "Exit code: ${RESULT}"
   echo -e "Response: \n${RESPONSE}\n\n"
