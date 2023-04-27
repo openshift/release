@@ -6,6 +6,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
 HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
+INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
 
 echo "Using Host $IP_ADDRESS"
 
