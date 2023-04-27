@@ -147,6 +147,8 @@ spec:
   components:
   - kind: monitoring
     managed: false
+  - kind: horizontalpodautoscaler
+    managed: false
 EOF
 
 for _ in {1..60}; do
