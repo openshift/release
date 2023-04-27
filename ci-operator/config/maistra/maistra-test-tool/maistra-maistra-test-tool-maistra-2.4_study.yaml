@@ -1,0 +1,56 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: maistra-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: servicemesh-interop-aws
+  cron: 0 1 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators-redhat", "target_namespaces": "openshift-operators-redhat"},
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-distributed-tracing", "target_namespaces": "openshift-distributed-tracing"},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": "openshift-operators"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators", "target_namespaces": "openshift-operators"}
+        ]
+      SMCP_VERSION: 2.3
+      TEST_GROUP: interop
+    test:
+    - ref: install-operators
+    - ref: servicemesh-maistra-test-tool-execute
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: maistra-2.4
+  org: maistra
+  repo: maistra-test-tool
+  variant: servicemesh-ocp4.13-lp-interop
