@@ -111,6 +111,9 @@ spec:
   - name: bazelcache
     emptyDir: {}
 EOF
+
+  # create ARTIFACT_DIR
+  oc exec -n "${MAISTRA_NAMESPACE}" $1 -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
 }
 
 create_namespace "${MAISTRA_NAMESPACE}"

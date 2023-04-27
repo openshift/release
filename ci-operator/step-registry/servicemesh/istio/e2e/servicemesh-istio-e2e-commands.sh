@@ -135,6 +135,9 @@ spec:
   - emptyDir: {}
     name: varlibdocker
 EOF
+
+  # create ARTIFACT_DIR
+  oc exec -n "${MAISTRA_NAMESPACE}" $1 -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
 }
 
 create_namespace "${MAISTRA_NAMESPACE}"
