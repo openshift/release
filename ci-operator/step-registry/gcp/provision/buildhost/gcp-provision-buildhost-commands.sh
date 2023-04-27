@@ -9,6 +9,9 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
 NETWORK=${NETWORK:-}
 IMAGE_ARGS=""
+python3 --version 
+export CLOUDSDK_PYTHON=python3
+
 if [[ -z "${IMAGE_FAMILY}" ]] && [[ ! -z "${IMAGE_NAME}" ]] ; then
    IMAGE_ARGS="--image=${IMAGE_NAME}"
 fi
