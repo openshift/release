@@ -3,6 +3,17 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_literal: |-
+    FROM alpine:latest
+    RUN apt-get update
+    RUN apt-get install -y iputils-ping
+  to: honeycomb-poc-image
 releases:
   latest:
     candidate:
@@ -17,9 +28,9 @@ resources:
 tests:
 - as: honeycomb-poc
   commands: |
-    dnf install iputils -y && sleep 3600
+    ping -c 10.19.26.5 && sleep 3600
   container:
-    from: cli
+    from: honeycomb-poc-image
 zz_generated_metadata:
   branch: main
   org: rhpit
