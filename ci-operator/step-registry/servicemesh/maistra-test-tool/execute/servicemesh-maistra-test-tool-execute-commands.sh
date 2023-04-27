@@ -5,9 +5,13 @@ set -o errexit
 set -o pipefail
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
-export OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
-export OCP_CRED_USR="kubeadmin"
-export OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+OCP_CRED_USR="kubeadmin"
+OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+
+export OCP_API_URL
+export OCP_CRED_USR
+export OCP_CRED_PSW
 
 make test
 
