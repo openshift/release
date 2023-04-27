@@ -74,6 +74,35 @@ spec:
   - name: testpmd
     command: ["tail", "-f", "/dev/null"]
     image: ${MAISTRA_BUILDER_IMAGE}
+    env:
+    - name: CI
+      value: "${CI:-}"
+    - name: ARTIFACTS
+      value: "${ARTIFACTS:-}"
+    - name: JOB_NAME
+      value: "${JOB_NAME:-}"
+    - name: JOB_TYPE
+      value: "${JOB_TYPE:-}"
+    - name: BUILD_ID
+      value: "${BUILD_ID:-}"
+    - name: PROW_JOB_ID
+      value: "${PROW_JOB_ID:-}"
+    - name: REPO_OWNER
+      value: "${REPO_OWNER:-}"
+    - name: REPO_NAME
+      value: "${REPO_NAME:-}"
+    - name: PULL_BASE_REF
+      value: "${PULL_BASE_REF:-}"
+    - name: PULL_BASE_SHA
+      value: "${PULL_BASE_SHA:-}"
+    - name: PULL_REFS
+      value: "${PULL_REFS:-}"
+    - name: PULL_NUMBER
+      value: "${PULL_NUMBER:-}"
+    - name: PULL_PULL_SHA
+      value: "${PULL_PULL_SHA:-}"
+    - name: PULL_HEAD_REF
+      value: "${PULL_HEAD_REF:-}"
     volumeMounts:
     - mountPath: /home/user/.cache/bazel
       name: bazelcache
