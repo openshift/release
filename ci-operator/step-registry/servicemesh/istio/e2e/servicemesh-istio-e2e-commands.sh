@@ -79,7 +79,7 @@ spec:
     - name: CI
       value: "${CI:-}"
     - name: ARTIFACTS
-      value: "${ARTIFACTS:-}"
+      value: "${ARTIFACT_DIR:-}"
     - name: JOB_NAME
       value: "${JOB_NAME:-}"
     - name: JOB_TYPE
