@@ -2,5 +2,5 @@
 
 set -o pipefail
 
-sh scripts/openshift-Interop-kuttl-tests.sh
+scripts/openshift-interop-kuttl-tests.sh
 make e2e-tests-sequential
