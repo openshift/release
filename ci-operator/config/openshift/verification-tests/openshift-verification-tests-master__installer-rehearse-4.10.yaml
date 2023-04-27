@@ -3,6 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.10"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -33,36 +37,48 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-provision
 - as: installer-rehearse-aws
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-workers-rhcos-rhel8
 - as: installer-rehearse-aws-usgov
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: aws-usgov-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
 - as: installer-rehearse-azure
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-azure-ipi-private-ovn
 - as: installer-rehearse-azure-mag
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: azuremag-qe
     env:
       BASE_DOMAIN: qemag.azure.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-azure-mag-ipi
 - as: installer-rehearse-azure-aro
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: azure-qe
     env:
@@ -70,22 +86,22 @@ tests:
       ARO_WORKER_VM_SIZE: Standard_D8s_v3
     workflow: cucushift-installer-rehearse-azure-aro
 - as: installer-rehearse-alibabacloud
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: alibabacloud-qe
     workflow: cucushift-installer-rehearse-alibabacloud-ipi
 - as: installer-rehearse-gcp
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-workers-rhel8-fips
 - as: installer-rehearse-vsphere
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: vsphere
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-local-to-shared-gateway-mode-migration
 - as: installer-rehearse-vsphere-discon
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: vsphere-discon
     workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected-techpreview
