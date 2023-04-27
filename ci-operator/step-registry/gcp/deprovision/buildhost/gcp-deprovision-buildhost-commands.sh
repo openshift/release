@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+python3 --version 
+export CLOUDSDK_PYTHON=python3
+
 if [ ! -f "${SHARED_DIR}/destroy.sh" ]; then
   echo "No 'destroy.sh' found, aborted." && exit 0
 fi
