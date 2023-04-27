@@ -111,13 +111,12 @@ spec:
   - name: bazelcache
     emptyDir: {}
 EOF
-
-  # create ARTIFACT_DIR
-  oc exec -n "${MAISTRA_NAMESPACE}" $1 -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
 }
 
 create_namespace "${MAISTRA_NAMESPACE}"
 create_pod "${MAISTRA_SC_POD}"
 check_pod_status "${MAISTRA_SC_POD}"
+# create ARTIFACT_DIR
+oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
 
 echo "Successfully created maistra istio builder pods"
