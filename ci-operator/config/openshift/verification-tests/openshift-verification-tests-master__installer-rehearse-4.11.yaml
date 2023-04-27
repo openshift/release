@@ -3,6 +3,10 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.11"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -33,22 +37,34 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-provision
 - as: installer-rehearse-aws
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-aws-upi
 - as: installer-rehearse-aws-c2s
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: aws-c2s-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: installer-rehearse-aws-sc2s
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: aws-sc2s-qe
     env:
@@ -56,25 +72,25 @@ tests:
     workflow: cucushift-installer-rehearse-aws-sc2s-ipi-disconnected-private
 - as: installer-rehearse-gcp
   cluster: build05
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-workers-rhel8
 - as: installer-rehearse-azure
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-azure-ipi-proxy-techpreview
 - as: installer-rehearse-vsphere
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: vsphere
     workflow: cucushift-installer-rehearse-vsphere-upi-disconnecting-network
 - as: installer-rehearse-nutanix
   cluster: build01
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: nutanix-qe
     workflow: cucushift-installer-rehearse-nutanix-ipi
