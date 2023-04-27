@@ -6,6 +6,8 @@ set -o pipefail
 
 provisioned_rg_file="${SHARED_DIR}/resourcegroup"
 provisioned_des_file="${SHARED_DIR}/azure_des"
+subscription_id="$(<"${CLUSTER_PROFILE_DIR}/osServicePrincipal.json" jq -r .subscriptionId)"
+
 if [ ! -f "${provisioned_rg_file}" ]; then
     echo "${provisioned_rg_file} is not found, exiting..."
     exit 1
@@ -26,7 +28,20 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="/tmp/install-config-provisioned-des.yaml.patch"
 
 # create a patch with existing des
-cat > "${PATCH}" << EOF
+if [[ "${ENABLE_DES_DEFAULT_MACHINE}" == "true" ]]; then
+  cat > "${PATCH}" << EOF
+platform:
+  azure:
+    defaultMachinePlatform:
+      encryptionAtHost: true
+      osDisk:
+        diskEncryptionSet:
+          resourceGroup: ${rg}
+          name: ${des}
+          subscriptionId: ${subscription_id}
+EOF
+else
+  cat > "${PATCH}" << EOF
 compute:
 - platform:
     azure:
@@ -35,6 +50,7 @@ compute:
         diskEncryptionSet:
           resourceGroup: ${rg}
           name: ${des}
+          subscriptionId: ${subscription_id}
 controlPlane:
   platform:
     azure:
@@ -43,7 +59,9 @@ controlPlane:
         diskEncryptionSet:
           resourceGroup: ${rg}
           name: ${des}
+          subscriptionId: ${subscription_id}
 EOF
+fi
 
 # apply patch to install-config
 yq-go m -x -i "${CONFIG}" "${PATCH}"

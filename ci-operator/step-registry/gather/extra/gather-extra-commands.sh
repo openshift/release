@@ -60,6 +60,8 @@ FILTER=gzip queue ${ARTIFACT_DIR}/daemonsets.json.gz oc --insecure-skip-tls-veri
 queue ${ARTIFACT_DIR}/oc_cmds/daemonsets oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o wide
 queue ${ARTIFACT_DIR}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/events oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces
+queue ${ARTIFACT_DIR}/featuregate.json oc --insecure-skip-tls-verify --request-timeout=5s get featuregate -o json
+queue ${ARTIFACT_DIR}/oc_cmds/featuregate oc --insecure-skip-tls-verify --request-timeout=5s get featuregate
 queue ${ARTIFACT_DIR}/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
 queue ${ARTIFACT_DIR}/oc_cmds/kubeapiserver oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver
 queue ${ARTIFACT_DIR}/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
@@ -166,6 +168,22 @@ echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
 FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
 done < ${output_dir}.tcpdump_listing
 
+# Gather etcd strace and pprof output if present:
+echo "INFO: Fetching debug info from etcd pods if present"
+output_dir="${ARTIFACT_DIR}/etcd-debug"
+mkdir -p "$output_dir"
+TARGET_FILES="cpu.prof"
+for pqn in $(oc get pods -n openshift-etcd -l app=etcd --no-headers -o=name); do
+	echo ${pqn}
+	pod_name=$(echo ${pqn} | cut -d '/' -f 2)
+	for file_name in $TARGET_FILES; do
+		DEST_FILE="${output_dir}/${pod_name}_${file_name}"
+		oc cp openshift-etcd/${pod_name}:/var/lib/etcd/debug/${file_name} ${DEST_FILE}
+	done
+done
+echo "INFO: done attempting to fetch etcd debug info"
+
+
 function gather_network() {
   local namespace=$1
   local selector=$2
@@ -205,19 +223,25 @@ while IFS= read -r i; do
   FILTER=gzip queue ${ARTIFACT_DIR}/pods/${file}_previous.log.gz oc --insecure-skip-tls-verify logs --request-timeout=20s -p $i
 done < /tmp/containers
 
-# Snapshot the prometheus data from the replica that has the oldest
-# PVC. If persistent storage isn't enabled, it uses the last
-# prometheus instances by default to catch issues that occur when the
-# first prometheus pod upgrades.
-if [[ -n "$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found )" ]]; then
-  pvc="$( oc --insecure-skip-tls-verify --request-timeout=20s get pvc -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp -o jsonpath='{.items[0].metadata.name}' )"
-  prometheus="${pvc##prometheus-data-}"
-else
-  prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --sort-by=.metadata.creationTimestamp --ignore-not-found -o jsonpath='{.items[0].metadata.name}')"
-fi
+prometheus="$( oc --insecure-skip-tls-verify --request-timeout=20s get pods -n openshift-monitoring -l app.kubernetes.io/name=prometheus --ignore-not-found -o name )"
 if [[ -n "${prometheus}" ]]; then
-	echo "Snapshotting prometheus from ${prometheus} (may take 15s) ..."
-	queue ${ARTIFACT_DIR}/metrics/prometheus.tar.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- tar cvzf - -C /prometheus .
+	echo "${prometheus}" | while read prompod; do
+	  prompod=${prompod#"pod/"}
+		FILE_NAME="${prompod}"
+		# for backwards compatibility with promecious we keep the first files beginning with "prometheus"
+		if [[ "$prompod" == *-0 ]]; then
+			FILE_NAME="prometheus"
+		fi
+
+		echo "Snapshotting prometheus from ${prompod} as ${FILE_NAME} (may take 15s) ..."
+		queue "${ARTIFACT_DIR}/metrics/${FILE_NAME}.tar.gz" oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- tar cvzf - -C /prometheus .
+
+		FILTER=gzip queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
+		FILTER=gzip queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
+		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
+		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
+		queue ${ARTIFACT_DIR}/metrics/${FILE_NAME}-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prompod}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
+	done
 
 	cat >> ${SHARED_DIR}/custom-links.txt <<-EOF
 	<script>
@@ -229,12 +253,6 @@ if [[ -n "${prometheus}" ]]; then
 	document.getElementById("wrapper").append(prom);
 	</script>
 	EOF
-
-	FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-target-metadata.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets/metadata --data-urlencode 'match_target={instance!=\"\"}'"
-	FILTER=gzip queue ${ARTIFACT_DIR}/metrics/prometheus-config.json.gz oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/config"
-	queue ${ARTIFACT_DIR}/metrics/prometheus-tsdb-status.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/tsdb"
-	queue ${ARTIFACT_DIR}/metrics/prometheus-runtimeinfo.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/status/runtimeinfo"
-	queue ${ARTIFACT_DIR}/metrics/prometheus-targets.json oc --insecure-skip-tls-verify exec -n openshift-monitoring "${prometheus}" -- /bin/bash -c "curl -G http://localhost:9090/api/v1/targets"
 else
 	echo "Unable to find a Prometheus pod to snapshot."
 fi
@@ -471,17 +489,17 @@ ${t_all}     cluster:promtail:failed_targets   sum by (pod) (promtail_targets_fa
 ${t_all}     cluster:promtail:dropped_entries  sum by (pod) (promtail_dropped_entries_total)
 ${t_all}     cluster:promtail:request:duration sum by (status_code) (rate(promtail_request_duration_seconds_count[${d_all}]))
 
-${t_all}     cluster:rest:client:requests:latency:total:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://api-int.*"},"type","load_balancer","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url!~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_all}:30s])) by (le,type)))
-${t_install} cluster:rest:client:requests:latency:install:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://api-int.*"},"type","load_balancer","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url!~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_install}:30s])) by (le,type)))
-${t_test}    cluster:rest:client:requests:latency:test:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://api-int.*"},"type","load_balancer","","")[${d_test}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url!~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_test}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_test}:30s])) by (le,type)))
+${t_all}     cluster:rest:client:requests:latency:total:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"api-int.*"},"type","load_balancer","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_all}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_all}:30s])) by (le,type)))
+${t_install} cluster:rest:client:requests:latency:install:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"api-int.*"},"type","load_balancer","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_install}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_install}:30s])) by (le,type)))
+${t_test}    cluster:rest:client:requests:latency:test:quantile sum by(type) (histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"api-int.*"},"type","load_balancer","","")[${d_test}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","service","","")[${d_test}:30s])) by (le,type)) or histogram_quantile(0.99, sum(rate(label_replace(rest_client_request_duration_seconds_bucket{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"},"type","pod","","")[${d_test}:30s])) by (le,type)))
 
-${t_all}     cluster:rest:client:requests:latency:total:avg sum by(type) (label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://api-int.*"}[${d_all}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://api-int.*"}[${d_all}:30s])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])) /sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])),"type","service","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])),"type","pod","",""))
-${t_install} cluster:rest:client:requests:latency:install:avg sum by(type) (label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://api-int.*"}[${d_install}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://api-int.*"}[${d_install}:30s])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])) /sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])),"type","service","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])),"type","pod","",""))
-${t_test}    cluster:rest:client:requests:latency:test:avg sum by(type) (label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://api-int.*"}[${d_test}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://api-int.*"}[${d_test}:30s])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])) /sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])),"type","service","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",url=~"https?://(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])),"type","pod","",""))
+${t_all}     cluster:rest:client:requests:latency:total:avg sum by(type) (label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",host=~"api-int.*"}[${d_all}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",host=~"api-int.*"}[${d_all}:30s])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",host=~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])) /sum(rate(rest_client_request_duration_seconds_count{verb="GET",host=~"api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])),"type","service","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}:30s])),"type","pod","",""))
+${t_install} cluster:rest:client:requests:latency:install:avg sum by(type) (label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",host=~"api-int.*"}[${d_install}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",host=~"api-int.*"}[${d_install}:30s])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",host=~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])) /sum(rate(rest_client_request_duration_seconds_count{verb="GET",host=~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])),"type","service","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}:30s])),"type","pod","",""))
+${t_test}    cluster:rest:client:requests:latency:test:avg sum by(type) (label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",host=~"api-int.*"}[${d_test}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",host=~"api-int.*"}[${d_test}:30s])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",host=~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])) /sum(rate(rest_client_request_duration_seconds_count{verb="GET",host=~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])),"type","service","","") or label_replace(sum(rate(rest_client_request_duration_seconds_sum{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])) / sum(rate(rest_client_request_duration_seconds_count{verb="GET",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}:30s])),"type","pod","",""))
 
-${t_all}     cluster:rest:client:requests:error:total:rate sum by(type) (label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"api-int.*"}[${d_all}])) / sum(rate(rest_client_requests_total{host=~"api-int.*"}[${d_all}])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])) / sum(rate(rest_client_requests_total{host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])),"type","service","","") orlabel_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])) / sum(rate(rest_client_requests_total{host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])),"type","pod","",""))
-${t_install} cluster:rest:client:requests:error:install:rate sum by(type) (label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"api-int.*"}[${d_install}])) / sum(rate(rest_client_requests_total{host=~"api-int.*"}[${d_install}])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])) / sum(rate(rest_client_requests_total{host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])),"type","service","","") orlabel_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])) / sum(rate(rest_client_requests_total{host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])),"type","pod","",""))
-${t_test}    cluster:rest:client:requests:error:test:rate sum by(type) (label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"api-int.*"}[${d_test}])) / sum(rate(rest_client_requests_total{host=~"api-int.*"}[${d_test}])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])) / sum(rate(rest_client_requests_total{host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])),"type","service","","") orlabel_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])) / sum(rate(rest_client_requests_total{host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])),"type","pod","",""))
+${t_all}     cluster:rest:client:requests:error:total:rate sum by(type) (label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"api-int.*"}[${d_all}])) / sum(rate(rest_client_requests_total{host=~"api-int.*"}[${d_all}])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])) / sum(rate(rest_client_requests_total{host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])),"type","service","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])) / sum(rate(rest_client_requests_total{host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_all}])),"type","pod","",""))
+${t_install} cluster:rest:client:requests:error:install:rate sum by(type) (label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"api-int.*"}[${d_install}])) / sum(rate(rest_client_requests_total{host=~"api-int.*"}[${d_install}])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])) / sum(rate(rest_client_requests_total{host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])),"type","service","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])) / sum(rate(rest_client_requests_total{host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_install}])),"type","pod","",""))
+${t_test}    cluster:rest:client:requests:error:test:rate sum by(type) (label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"api-int.*"}[${d_test}])) / sum(rate(rest_client_requests_total{host=~"api-int.*"}[${d_test}])),"type","load_balancer","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])) / sum(rate(rest_client_requests_total{host!~"(api-int|\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])),"type","service","","") or label_replace(sum(rate(rest_client_requests_total{code="<error>",host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])) / sum(rate(rest_client_requests_total{host=~"(\\[::1\\]|127\\.0\\.0\\.1|localhost).*"}[${d_test}])),"type","pod","",""))
 
 END
 
@@ -614,4 +632,3 @@ cat >> ${REPORT} << EOF
 </body>
 </html>
 EOF
-

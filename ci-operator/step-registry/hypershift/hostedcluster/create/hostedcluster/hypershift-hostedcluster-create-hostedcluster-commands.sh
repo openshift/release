@@ -14,9 +14,11 @@ if [[ ! -f "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" ]]; then
   echo "AWS credentials file ${AWS_GUEST_INFRA_CREDENTIALS_FILE} not found"
   exit 1
 fi
-DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-""}
+[[ ! -z "$BASE_DOMAIN" ]] && DOMAIN=${BASE_DOMAIN}
+[[ ! -z "$HYPERSHIFT_BASE_DOMAIN" ]] && DOMAIN=${HYPERSHIFT_BASE_DOMAIN}
+echo "DOMAIN is ${DOMAIN}"
 if [[ -z "${DOMAIN}" ]]; then
-  echo "HYPERSHIFT_BASE_DOMAIN must be set"
+  >&2 echo "ERROR: Failed to determine the base domain."
   exit 1
 fi
 
@@ -63,12 +65,13 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 echo "Wait to check if release image is valid"
 n=0
 until [ $n -ge 60 ]; do
-    valid_image_status=$(oc -n clusters get hostedcluster ${CLUSTER_NAME} -o json | jq -r '.status.conditions[]? | select(.type == "ValidReleaseImage") | .status')
+    valid_image="$(oc -n clusters get hostedcluster "${CLUSTER_NAME}" -o json | jq '.status.conditions[]? | select(.type == "ValidReleaseImage")')"
+    valid_image_status="$(printf '%s' "${valid_image}" | jq -r .status)"
     if [[ $valid_image_status == "True" ]]; then
         break
     fi
     if [[ $valid_image_status == "False" ]]; then
-        echo "Release image is not valid"
+        printf 'Release image is not valid: %s\n' "${valid_image}"
         exit 1
     fi
     echo -n "."

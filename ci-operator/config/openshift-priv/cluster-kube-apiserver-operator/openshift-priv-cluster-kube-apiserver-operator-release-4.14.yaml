@@ -11,10 +11,10 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
+    tag: rhel-8-golang-1.19-openshift-4.14
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -23,9 +23,9 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
   to: cluster-kube-apiserver-operator
 promotion:
   disabled: true
@@ -91,6 +91,7 @@ tests:
       timeout: 4h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-operator-encryption-aescbc
+  optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
     cluster_profile: gcp
@@ -120,12 +121,13 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-gcp
+    workflow: ipi-gcp-techpreview
 - as: e2e-aws-ovn-upgrade
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
 - as: e2e-gcp-operator-encryption-rotation-aescbc
+  optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
     cluster_profile: gcp
@@ -155,8 +157,9 @@ tests:
         requests:
           cpu: 100m
       timeout: 4h0m0s
-    workflow: ipi-gcp
+    workflow: ipi-gcp-techpreview
 - as: e2e-gcp-operator-encryption-perf-aescbc
+  optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
     cluster_profile: gcp
@@ -184,7 +187,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-gcp
+    workflow: ipi-gcp-techpreview
 - as: e2e-aws-ovn-serial
   steps:
     cluster_profile: aws
@@ -276,6 +279,11 @@ tests:
         requests:
           cpu: 100m
     workflow: openshift-e2e-gcp-single-node
+- as: e2e-azure-ovn
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

@@ -15,6 +15,8 @@ echo "export DEBUG_PROW_JOB_ID=${PROW_JOB_ID}" >> $MAINENV
 echo "export DEBUG_JOB_NAME=${JOB_NAME}" >> $MAINENV
 echo "export DEBUG_JOB_TYPE=${JOB_TYPE}" >> $MAINENV
 echo "export DEBUG_RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST-}" >> $MAINENV
+echo "export GIT_COMMITTER_NAME='CI User'" >> $MAINENV
+echo "export GIT_COMMITTER_EMAIL='cnf-devel@redhat.com'" >> $MAINENV
 echo "#######################################################" >> $MAINENV
 
 if [[ "$PROW_JOB_ID" = *"nightly"* ]] && [[ "$JOB_TYPE" == "periodic" ]]; then

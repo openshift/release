@@ -60,7 +60,7 @@ collect_bootstrap_logs() {
 			done
 			# Ideally this would be removed once the openshift-install gather bootstrap starts supporting proxy https://issues.redhat.com/browse/CORS-2367
 			SSH_PRIV_KEY_PATH="${CLUSTER_PROFILE_DIR}/ssh-privatekey"
-    			if test -f "${SHARED_DIR}/proxy-conf.sh"; then
+    			if test -f "${SHARED_DIR}/squid-credentials.txt"; then
     			    echo "This job uses a proxy but without a bastion, `openshift-install gather` is not supported yet, see CORS-2367"
 			else
                             if [[ "$CONFIG_TYPE" == *"proxy"* ]]; then
@@ -119,6 +119,14 @@ openstack subnet list -f json \
 for port in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_subnet_list.json"); do
         openstack subnet show "$port" -f json
 done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_subnet_show.json"
+
+openstack floating ip list --long -f json \
+        | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Description | test($CLUSTER_NAME)))' \
+        > "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"
+
+for fip in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_fip_list.json"); do
+        openstack floating ip show "$fip" -f json
+done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_fip_show.json"
 
 mkdir -p "${ARTIFACT_DIR}/nodes"
 

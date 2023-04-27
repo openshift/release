@@ -23,6 +23,12 @@ devices=(eth1.br-ext eth2.br-int eth1.br-int)
 for dev in "${devices[@]}"; do
   interface=${dev%%.*}
   bridge=${dev##*.}
+  echo "Sending release dhcp lease for $interface in haproxy-$CLUSTER_NAME"
+  nsenter -m -u -n -i -p -t "$(docker inspect -f '{{ .State.Pid }}' "haproxy-$CLUSTER_NAME")" \
+    /sbin/dhclient -r \
+    -pf "/var/run/dhclient.$interface.pid" \
+    -lf "/var/lib/dhcp/dhclient.$interface.lease" "$interface" || echo "No lease for $interface"
+  echo "Removing $interface from $bridge in haproxy-$CLUSTER_NAME"
   /usr/local/bin/ovs-docker del-port "$bridge" "$interface" "haproxy-$CLUSTER_NAME" || echo \
     "No $interface on $bridge for container haproxy-$CLUSTER_NAME"
 done

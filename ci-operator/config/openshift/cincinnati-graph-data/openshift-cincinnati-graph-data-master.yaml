@@ -7,39 +7,33 @@ base_images:
     name: cincinnati-build-root
     namespace: cincinnati-ci
     tag: deploy
-  ubi8-python36:
-    name: builder
+  ubi:
+    name: ubi
     namespace: ocp
-    tag: ubi8.python.36
+    tag: "9"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.12
+    tag: golang-1.19
 images:
 - dockerfile_path: Dockerfile
   to: stable
 - dockerfile_path: graph-data.rs/Dockerfile
   to: graphdata-unittests
-raw_steps:
-- pipeline_image_cache_step:
-    commands: |
-      cat <<DOCKERFILE > /tmp/Dockerfile
-      FROM ubi8-python36
-      WORKDIR /go/src/github.com/openshift/cincinnati-graph-data/hack
-      COPY . .
-      RUN pip3 install -r requirements.txt
-      DOCKERFILE
-    from: ubi8-python36
-    to: src-dockerfile
-- project_directory_image_build_step:
-    from: src
-    inputs:
-      src-dockerfile:
-        paths:
-        - destination_dir: .
-          source_path: /tmp/Dockerfile
-    to: webhook-unittests
+- dockerfile_literal: |
+    FROM ubi
+    RUN dnf -y install python-pip python
+    COPY . .
+    WORKDIR /cincinnati-graph-data
+    RUN pip install -r requirements.txt
+  from: ubi
+  inputs:
+    src:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/cincinnati-graph-data
+  to: content-checks
 resources:
   '*':
     requests:
@@ -88,16 +82,11 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: errata-webhook-unittests
-  commands: python3 -m unittest
-  container:
-    from: webhook-unittests
 - as: validate-blocked-edges
   commands: |
-    cd /go/src/github.com/openshift/cincinnati-graph-data
     exec hack/validate-blocked-edges.py
   container:
-    from: webhook-unittests
+    from: content-checks
 zz_generated_metadata:
   branch: master
   org: openshift

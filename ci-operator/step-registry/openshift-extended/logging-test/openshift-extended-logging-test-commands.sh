@@ -138,7 +138,7 @@ openstack*)
     source "${SHARED_DIR}/cinder_credentials.sh"
     export TEST_PROVIDER='{"type":"openstack"}';;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal)
+equinix-ocp-metal|equinix-ocp-metal-qe)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe)
     export TEST_PROVIDER='{"type":"nutanix"}';;
@@ -180,6 +180,7 @@ oc get clusterversion version -o yaml || true
 
 # execute the cases
 function run {
+    set_gloki_credentials
     test_scenarios=""
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
@@ -400,6 +401,23 @@ function check_case_selected {
         echo "find case"
     else
         echo "do not find case"
+    fi
+}
+
+function set_gloki_credentials() {
+    # Check if the glokiuser and glokipwd files exist
+    if [ -f "/var/run/ext-loki/glokiuser" ] && \
+       [ -f "/var/run/ext-loki/glokipwd" ]; then
+
+        # Read the values of glokiuser and glokipwd from their respective files
+        glokiuser=$(cat /var/run/ext-loki/glokiuser)
+        glokipwd=$(cat /var/run/ext-loki/glokipwd)
+
+        # Set the values as environment variables
+        export GLOKIUSER="$glokiuser"
+        export GLOKIPWD="$glokipwd"
+    else
+        echo "Error: glokiuser or glokipwd file not found. Make sure the ext-grafana-loki credential is mounted." >&2
     fi
 }
 run

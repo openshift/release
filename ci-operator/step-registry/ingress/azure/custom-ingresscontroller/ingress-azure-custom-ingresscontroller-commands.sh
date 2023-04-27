@@ -106,7 +106,7 @@ spec:
 EOF
 
 function wait_for_mcp() {
-    local try=0 retries=30
+    local try=0 retries=60
 
     ### $6 $7 $8 $9: MACHINECOUNT READYMACHINECOUNT UPDATEDMACHINECOUNT DEGRADEDMACHINECOUNT
     while [ X"$(oc get mcp infra --no-headers |awk '{print $6 $7 $8 $9}')" != X"3330" ] && [ $try -lt $retries ]; do

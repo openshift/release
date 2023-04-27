@@ -32,22 +32,28 @@ ref:
     name: cluster-secrets-openstack-vh-mecha-central
     mount_path: /var/run/cluster-secrets/openstack-vh-mecha-central
   env:
-  - name: APPLICATION_CREDENTIALS
-    default: ""
+  - name: OPENSTACK_AUTHENTICATION_METHOD
+    default: "version-default"
     documentation: |-
-      If this variable is not empty, the provided clouds.yaml will contain
-      ephemeral application credentials.
+      Determines what credentials are used to authenticate against OpenStack.
+      Can be "password", "application-credentials", or "version-default".
+      The "version-default" is equivalent to "password" for OCP versions below 4.13,
+      and "application-credentials" otherwise.
+      Application credentials are created on the fly and set to expire after a
+      time interval set with APPLICATION_CREDENTIALS_EXPIRATION.
   - name: APPLICATION_CREDENTIALS_EXPIRATION
     default: "5 hours"
     documentation: |-
-      When to set the expiration of the application credentials.
-      Use a format that `date -d` would understand.
-      This variable has no effect if APPLICATION_CREDENTIALS is empty.
+      When to set the expiration of the application credentials. Use a format
+      that `date -d` would understand. This variable only has effect if
+      OPENSTACK_AUTHENTICATION_METHOD is set to "application-credentials".
   - name: ROTATE_CLOUD_CREDENTIALS
     default: ""
     documentation: |-
       If this variable is not empty, prepare two different sets of credentials
-      to access the cluster, so that they can be rotated post-install.
+      to access the cluster, so that they can be rotated post-install and prior
+      to running the tests. This variable only has effect if
+      OPENSTACK_AUTHENTICATION_METHOD is set to "application-credentials".
   - name: OS_CLOUD
     default: "openstack"
     documentation: Name of cloud to use from the clouds.yaml file

@@ -4,9 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+#Save stacks events
+trap 'save_stack_events_to_artifacts' EXIT TERM INT
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION="${LEASED_RESOURCE}"
+
+function save_stack_events_to_artifacts()
+{
+  set +o errexit
+  aws --region ${REGION} cloudformation describe-stack-events --stack-name ${STACK_NAME} --output json > "${ARTIFACT_DIR}/stack-events-${STACK_NAME}.json"
+  set -o errexit
+}
 
 function run_command() {
     local CMD="$1"
@@ -113,7 +123,12 @@ EOF
 CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
 
 # first private subnet
-localzone_parent_subnet=$(yq-go r "${SHARED_DIR}/private_subnet_ids" '[0]')
+if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
+  localzone_parent_subnet=$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')
+else
+  localzone_parent_subnet=$(yq-go r "${SHARED_DIR}/private_subnet_ids" '[0]')
+fi
+
 vpc_id=$(head -n 1 "${SHARED_DIR}/vpc_id")
 
 if [[ "$vpc_id" == "" ]] || [[ "$vpc_id" == "null" ]] || [[ "$localzone_parent_subnet" == "" ]] || [[ "$localzone_parent_subnet" == "null" ]]; then

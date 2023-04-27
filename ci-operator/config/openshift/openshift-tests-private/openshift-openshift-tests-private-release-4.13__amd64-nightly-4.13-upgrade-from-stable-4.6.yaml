@@ -11,6 +11,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.12"
   tools:
     name: "4.13"
     namespace: ocp
@@ -19,41 +27,45 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: upi-installer
+  verification-tests:
+    name: verification-tests
+    namespace: ci
+    tag: latest
 releases:
   intermediate47:
     release:
       architecture: amd64
-      channel: stable
+      channel: fast
       version: "4.7"
   intermediate48:
     release:
       architecture: amd64
-      channel: stable
+      channel: fast
       version: "4.8"
   intermediate49:
     release:
       architecture: amd64
-      channel: stable
+      channel: fast
       version: "4.9"
   intermediate410:
     release:
       architecture: amd64
-      channel: stable
+      channel: fast
       version: "4.10"
   intermediate411:
     release:
       architecture: amd64
-      channel: stable
+      channel: fast
       version: "4.11"
   intermediate412:
     release:
       architecture: amd64
-      channel: stable
+      channel: fast
       version: "4.12"
   latest:
     release:
       architecture: amd64
-      channel: stable
+      channel: fast
       version: "4.6"
   target:
     candidate:
@@ -68,9 +80,12 @@ resources:
       memory: 200Mi
 tests:
 - as: gcp-ipi-proxy-private-p2-f30
-  cron: 16 0 16 * *
+  cron: 16 0 18 * *
   steps:
     cluster_profile: gcp-qe
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @gcp-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @gcp-ipi and not @fips'
     post:
     - chain: cucushift-installer-rehearse-gcp-ipi-proxy-private-deprovision
     pre:
@@ -105,8 +120,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    - ref: cucushift-upgrade-healthcheck
-    - ref: cucushift-upgrade-toimage
+    - ref: cucushift-installer-check
+    - ref: cucushift-chainupgrade-toimage
+    - chain: openshift-upgrade-qe-test
 zz_generated_metadata:
   branch: release-4.13
   org: openshift

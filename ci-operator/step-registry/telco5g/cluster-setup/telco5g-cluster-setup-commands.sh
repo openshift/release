@@ -16,8 +16,8 @@ BASTION_IP="$(cat /var/run/bastion-ip/bastionip)"
 HYPERV_IP="$(cat /var/run/up-hv-ip/uphvip)"
 COMMON_SSH_ARGS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o ServerAliveInterval=30"
 
-# Cluster to use for cnf-tests, and to exclude from selection in other jobs
-PREPARED_CLUSTER="cnfdu1"
+# Clusters to use for cnf-tests, and to exclude from selection in other jobs
+PREPARED_CLUSTER=("cnfdu1" "cnfdu3")
 
 source $SHARED_DIR/main.env
 echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
@@ -47,10 +47,14 @@ ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS"
 EOF
 
 ADDITIONAL_ARG=""
+# default to the first cluster in the array, unless 4.14
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-  ADDITIONAL_ARG="--cluster-name $PREPARED_CLUSTER --force"
+  ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force" 
+  if [[ "$T5CI_VERSION" == "4.14" ]]; then 
+    ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
+  fi 
 else
-  ADDITIONAL_ARG="-e $CL_SEARCH --exclude $PREPARED_CLUSTER"
+  ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
 fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml

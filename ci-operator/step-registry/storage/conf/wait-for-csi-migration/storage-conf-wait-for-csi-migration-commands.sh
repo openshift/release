@@ -13,11 +13,14 @@ function detect_version() {
             MIGRATED_FEATURE_GATE="CSIMigrationAWS"
             MIGRATED_PLUGIN="kubernetes.io/aws-ebs"
             ;;
-        *)
-            # Use vSphere for 4.12 and newer (unknown) OCP releases, it will be GA as the last.
+        12 )
+            # Use vSphere for 4.12 OCP releases, it will be GA as the last.
             MIGRATED_FEATURE_GATE="CSIMigrationvSphere"
             MIGRATED_PLUGIN="kubernetes.io/vsphere-volume"
             ;;
+        *)
+            # Migration check is not needed on these versions
+            return 1
     esac
 }
 
@@ -169,7 +172,10 @@ function wait_for_stable_cluster() {
     done
 }
 
-detect_version
-wait_for_kcms
-wait_for_nodes
-wait_for_stable_cluster
+if detect_version ; then
+    wait_for_kcms
+    wait_for_nodes
+    wait_for_stable_cluster
+else
+    echo "Wait for CSI migration not needed on this version"
+fi

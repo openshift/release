@@ -22,7 +22,7 @@ function populate_artifact_dir() {
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
   case "${CLUSTER_TYPE}" in
-    powervs)
+    powervs*)
       # We don't want debugging in this section
       unset TF_LOG_PROVIDER
       unset TF_LOG
@@ -223,7 +223,7 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.13.0/IBM_Cloud_CLI_2.13.0_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.15.0/IBM_Cloud_CLI_2.15.0_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
@@ -332,7 +332,7 @@ function init_ibmcloud() {
     ibmcloud login --apikey "${IBMCLOUD_API_KEY}" -r ${VPCREGION}
     ibmcloud target -g "${POWERVS_RESOURCE_GROUP}"
   fi
-  
+
   CIS_INSTANCE_CRN=$(ibmcloud cis instances --output json | jq -r '.[].id');
   export CIS_INSTANCE_CRN
 
@@ -434,10 +434,11 @@ function destroy_resources() {
   cat > "/tmp/ocp-test/metadata.json" << EOF
 {"clusterName":"${CLUSTER_NAME}","clusterID":"","infraID":"${CLUSTER_NAME}","powervs":{"BaseDomain":"${BASE_DOMAIN}","cisInstanceCRN":"${CIS_INSTANCE_CRN}","powerVSResourceGroup":"${POWERVS_RESOURCE_GROUP}","region":"${POWERVS_REGION}","vpcRegion":"","zone":"${POWERVS_ZONE}","serviceInstanceID":"${POWERVS_SERVICE_INSTANCE_ID}"}}
 EOF
-  
+
   #
   # Call destroy cluster on fake metadata file
   #
+  DESTROY_SUCCEEDED=false
   for i in {1..3}; do
     echo "Destroying cluster $i attempt..."
     echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
@@ -447,6 +448,7 @@ EOF
     date "+%F %X" > "${SHARED_DIR}/CLUSTER_CLEAR_RESOURCE_END_TIME_$i"
     echo "ret=${ret}"
     if [ ${ret} -eq 0 ]; then
+      DESTROY_SUCCEEDED=true
       break
     fi
   done
@@ -461,6 +463,12 @@ EOF
       ibmcloud pi network-delete ${UUID}
     done
   ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("rdr-multiarch-'${POWERVS_ZONE}'")) | .networkID')
+
+  if ! ${DESTROY_SUCCEEDED}
+  then
+    echo "Failed to destroy cluster failed after three attempts."
+    exit 1
+  fi
 }
 
 function dump_resources() {
@@ -631,7 +639,25 @@ function dump_resources() {
     echo
     echo "Select \"type\": \"Available\", where \"status\": \"False\" returns:"
     jq -r 'select (.type|test("Available"))' ${F_FILE}
-)
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get co 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get co
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get nodes 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get nodes -o=wide
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get pods not running nor completed 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get pods -A -o=wide | sed -e '/\(Running\|Completed\)/d'
+  )
 
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
   ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
@@ -677,6 +703,7 @@ IBMCLOUD_APIKEY_CCM_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds
 IBMCLOUD_APIKEY_INGRESS_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_INGRESS_CREDS")
 IBMCLOUD_APIKEY_MACHINEAPI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_MACHINEAPI_CREDS")
 IBMCLOUD_APIKEY_CSI_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_APIKEY_CSI_CREDS")
+IBMCLOUD_REGISTRY_INSTALLER_CREDS=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_REGISTRY_INSTALLER_CREDS")
 POWERVS_RESOURCE_GROUP=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_RESOURCE_GROUP")
 POWERVS_USER_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_USER_ID")
 POWERVS_SERVICE_INSTANCE_ID=$(yq eval '.POWERVS_SERVICE_INSTANCE_ID' "${SHARED_DIR}/powervs-conf.yaml")
@@ -700,7 +727,7 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
 # Powervs requires config.json
 cat > "/tmp/powervs-config.json" << EOF
-{"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}"}
+{"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
 cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
 export POWERVS_AUTH_FILEPATH=${SHARED_DIR}/powervs-config.json
@@ -713,10 +740,13 @@ init_ibmcloud
 destroy_resources
 
 case "${CLUSTER_TYPE}" in
-powervs)
+powervs*)
     export IBMCLOUD_API_KEY
     ;;
-*) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
+*)
+    >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
+    exit 1
+    ;;
 esac
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
@@ -728,11 +758,6 @@ date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
-
-# @BEGIN TEMPORARY-FIX
-export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="rhcos-powervs-images-${VPCREGION}/rhcos-412-86-202208090152-0-ppc64le-powervs.ova.gz"
-echo "OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE=${OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE}"
-# @END TEMPORARY-FIX
 
 openshift-install version
 
@@ -809,6 +834,21 @@ stringData:
 type: Opaque
 EOF
 
+cat > "${dir}/manifests/openshift-image-registry-installer-cloud-credentials-credentials.yaml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  creationTimestamp: null
+  name: installer-cloud-credentials
+  namespace: openshift-image-registry
+stringData:
+  ibm-credentials.env: |-
+    IBMCLOUD_AUTHTYPE=iam
+    IBMCLOUD_APIKEY=${IBMCLOUD_REGISTRY_INSTALLER_CREDS}
+  ibmcloud_api_key: ${IBMCLOUD_REGISTRY_INSTALLER_CREDS}
+type: Opaque
+EOF
+
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"
@@ -846,6 +886,18 @@ echo "ret=${ret}"
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
 
 if [ ${ret} -gt 0 ]; then
+  echo "8<--------8<--------8<--------8<-------- BEGIN: hack-for-kube-controller-manager 8<--------8<--------8<--------8<--------"
+  echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
+  OUTPUT=$(oc get co/kube-controller-manager -o json | jq -r '.status.conditions[]| select(.type == "Degraded").message')
+  echo "OUTPUT=${OUTPUT}"
+  if [[ "${OUTPUT}" == MissingStaticPodControllerDegraded* ]]; then
+    echo "Patching kubecontrollermanager cluster!"
+    oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$( date --rfc-3339=ns )"'"}}' --type=merge
+  fi
+  echo "8<--------8<--------8<--------8<-------- END: hack-for-kube-controller-manager 8<--------8<--------8<--------8<--------"
+fi
+
+if [ ${ret} -gt 0 ]; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
   openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
@@ -865,48 +917,6 @@ if test "${ret}" -eq 0 ; then
   touch  "${SHARED_DIR}/success"
   # Save console URL in `console.url` file so that ci-chat-bot could report success
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
-
-  echo "Collecting cluster data for analysis..."
-  set +o errexit
-  set +o pipefail
-  if [ ! -f /tmp/jq ]; then
-    curl -L https://stedolan.github.io/jq/download/linux64/jq -o /tmp/jq && chmod +x /tmp/jq
-  fi
-  if ! pip -V; then
-    echo "pip is not installed: installing"
-    if python -c "import sys; assert(sys.version_info >= (3,0))"; then
-      python -m ensurepip --user || easy_install --user 'pip'
-    fi
-  fi
-  echo "Installing python modules: json"
-  python3 -c "import json" || pip3 install --user pyjson
-  PLATFORM="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get infrastructure/cluster -o json | /tmp/jq '.status.platform')"
-  TOPOLOGY="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get infrastructure/cluster -o json | /tmp/jq '.status.infrastructureTopology')"
-  NETWORKTYPE="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get network.operator cluster -o json | /tmp/jq '.spec.defaultNetwork.type')"
-  if [[ "$(env KUBECONFIG=${dir}/auth/kubeconfig oc get network.operator cluster -o json | /tmp/jq '.spec.clusterNetwork[0].cidr')" =~ .*":".*  ]]; then
-    NETWORKSTACK="IPv6"
-  else
-    NETWORKSTACK="IPv4"
-  fi
-  CLOUDREGION="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get node -o json | /tmp/jq '.items[]|.metadata.labels' | grep topology.kubernetes.io/region | cut -d : -f 2 | head -1 | sed 's/,//g')"
-  CLOUDZONE="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get node -o json | /tmp/jq '.items[]|.metadata.labels' | grep topology.kubernetes.io/zone | cut -d : -f 2 | sort -u | tr -d \")"
-  CLUSTERVERSIONHISTORY="$(env KUBECONFIG=${dir}/auth/kubeconfig oc get clusterversion -o json | /tmp/jq '.items[]|.status.history' | grep version | cut -d : -f 2 | tr -d \")"
-  python3 -c '
-import json;
-dictionary = {
-    "Platform": '$PLATFORM',
-    "Topology": '$TOPOLOGY',
-    "NetworkType": '$NETWORKTYPE',
-    "NetworkStack": "'$NETWORKSTACK'",
-    "CloudRegion": '"$CLOUDREGION"',
-    "CloudZone": "'"$CLOUDZONE"'".split(),
-    "ClusterVersionHistory": "'"$CLUSTERVERSIONHISTORY"'".split()
-}
-with open("'${ARTIFACT_DIR}/cluster-data.json'", "w") as outfile:
-    json.dump(dictionary, outfile)'
-set -o errexit
-set -o pipefail
-echo "Done collecting cluster data for analysis!"
 fi
 
 echo "Exiting with ret=${ret}"
