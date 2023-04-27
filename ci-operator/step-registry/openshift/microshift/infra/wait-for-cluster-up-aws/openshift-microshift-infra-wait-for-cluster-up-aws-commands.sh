@@ -52,6 +52,6 @@ chmod +x "${HOME}"/start_microshift.sh
 
 scp -r /microshift/validate-microshift "${INSTANCE_PREFIX}":~/validate-microshift
 scp "${HOME}"/start_microshift.sh "${INSTANCE_PREFIX}":~/start_microshift.sh
-ssh "${INSTANCE_PREFIX}" '/home/rhel8user/start_microshift.sh'
+ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/start_microshift.sh"
 ssh "${INSTANCE_PREFIX}" \
   'cd ~/validate-microshift  && sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig ./kuttl-test.sh'
