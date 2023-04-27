@@ -145,9 +145,6 @@ metadata:
   name: ci-chat-bot
   labels:
     app: ci-chat-bot
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "9090"
 spec:
   selector:
     app: ci-chat-bot
@@ -157,6 +154,22 @@ spec:
     - name: metrics
       port: 9090
   type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ci-chat-bot
+  namespace: ci
+  labels:
+    app: ci-chat-bot
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: http
+  selector:
+    matchLabels:
+      app: ci-chat-bot
 ---
 kind: ServiceAccount
 apiVersion: v1
