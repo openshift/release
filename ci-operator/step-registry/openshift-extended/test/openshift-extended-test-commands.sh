@@ -49,16 +49,26 @@ if test -f "${SHARED_DIR}/bastion_private_address"
 then
     QE_BASTION_PRIVATE_ADDRESS=$(cat "${SHARED_DIR}/bastion_private_address")
     export QE_BASTION_PRIVATE_ADDRESS
-    if ! whoami &> /dev/null; then
-        if [[ -w /etc/passwd ]]; then
-            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
-        fi
-    fi
 fi
 if test -f "${SHARED_DIR}/bastion_ssh_user"
 then
     QE_BASTION_SSH_USER=$(cat "${SHARED_DIR}/bastion_ssh_user")
 fi
+
+if test -f "${SHARED_DIR}/bastion_public_address" ||  test -f "${SHARED_DIR}/bastion_private_address" || oc get service ssh-bastion -n "${SSH_BASTION_NAMESPACE:-test-ssh-bastion}" &> /dev/null
+then
+    echo "Ensure our UID, which is randomly generated, is in /etc/passwd. This is required to be able to SSH"
+    if ! whoami &> /dev/null; then
+        echo "try to add user ${USER_NAME:-default}"
+        if [[ -w /etc/passwd ]]; then
+            echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+            echo "added user ${USER_NAME:-default}"
+        fi
+    fi
+else
+    echo "do not need to ensure UID in passwd"
+fi
+
 mkdir -p ~/.ssh
 cp "${CLUSTER_PROFILE_DIR}/ssh-privatekey" ~/.ssh/ssh-privatekey || true
 chmod 0600 ~/.ssh/ssh-privatekey || true
