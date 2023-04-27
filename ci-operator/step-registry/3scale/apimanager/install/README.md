@@ -3,7 +3,7 @@
 ## Table of Contents<!-- omit from toc -->
 - [Purpose](#purpose)
 - [Process](#process)
-- [Requirements](#requirements)
+- [Prerequisite(s)](#prerequisite--s-)
   - [Infrastructure](#infrastructure)
   - [Environment Variables](#environment-variables)
 

@@ -7,7 +7,7 @@
 - [Process](#process)
   - [Cluster Provisioning and Deprovisioning: `ipi-aws`](#cluster-provisioning-and-deprovisioning--ipi-aws)
   - [Test Setup, Execution, and Reporting Results - `3scale-amp-interop-aws`](#test-setup-execution-and-reporting-results---3scale-amp-interop-aws)
-- [Prerequisite(s)](#prerequisites)
+- [Prerequisite(s)](#prerequisite--s-)
   - [Environment Variables](#environment-variables)
   - [Custom Images](#custom-images)
 
@@ -25,12 +25,14 @@ To provision the necessary infrastructure and use that infrastructure to execute
 
 ### Cluster Provisioning and Deprovisioning: `ipi-aws`
 
-Please see the [`ipi-aws`](https://steps.ci.openshift.org/workflow/ipi-aws) documentation for more information on this workflow. This workflow is not maintained by the Interop QE team. 
+The [`3scale-ipi-aws`](../../../step-registry/3scale/ipi/aws/README.md) workflow is essentially a copy of the `ipi-aws` workflow with 3scale API Manager uninstallation step specific to the 3scale interop scenario.
 
 The additional steps used in this workflow are as follows:
 
 - **post steps**
   - [`3scale-apimanager-uninstall`](../../../step-registry/3scale/apimanager/uninstall/README.md)
+
+Please see the [`ipi-aws`](https://steps.ci.openshift.org/workflow/ipi-aws) documentation for more information regarding the steps that are not either of the steps explained above as they are not maintained by the CSPI QE team.
 
 ### Test Setup, Execution, and Reporting Results - `3scale-amp-interop-aws`
 
