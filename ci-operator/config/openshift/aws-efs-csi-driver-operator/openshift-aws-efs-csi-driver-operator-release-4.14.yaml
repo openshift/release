@@ -35,6 +35,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: csi-node-driver-registrar
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -116,6 +120,16 @@ tests:
       OO_CHANNEL: stable
       TEST_SUITE: openshift/csi
     workflow: openshift-e2e-aws-csi-efs
+- as: operator-e2e-extended
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+    workflow: openshift-e2e-aws-csi-efs-extended
 zz_generated_metadata:
   branch: release-4.14
   org: openshift
