@@ -30,7 +30,15 @@ function check_latest_machineconfig_applied() {
     fi
     
     applied_machineconfig_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r --arg mc_name "${latest_machineconfig}" '.items[] | select(.metadata.annotations."machineconfiguration.openshift.io/state" == "Done" and .metadata.annotations."machineconfiguration.openshift.io/currentConfig" == $mc_name) | .metadata.name' | sort)
-    ready_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r '.items[].metadata.name' | sort)
+    if [[ "${role}" == "master" ]]; then
+        ready_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r '.items[].metadata.name' | sort)
+    else
+	# a node with both master and worker roles is applied the master machineconfig: sno/compact
+	# a node with only worker role is applied the worker machineconfig
+	# exclude master nodes from the validation queue for scaled sno/compact deployments
+	ready_machines=$(oc get node -l "node-role.kubernetes.io/${role}=,node-role.kubernetes.io/master!=" -o json | jq -r '.items[].metadata.name' | sort)
+    fi
+
     if [[ "${applied_machineconfig_machines}" == "${ready_machines}" ]]; then
         echo "latest machineconfig - ${latest_machineconfig} is already applied to ${ready_machines}"
         return 0
@@ -232,7 +240,7 @@ fi
 
 worker_num=$(oc get mcp -o json | jq -r --arg role_label "node-role.kubernetes.io/worker" '.items[] | select(.spec.nodeSelector.matchLabels[$role_label] == "") | .status.machineCount')
 if [[ "${worker_num}" == "0" ]]; then
-    echo "This is a compact or single-node cluster, skip chcking workers..."
+    echo "This is a compact or single-node cluster, skip checking workers..."
 else
     if wait_machineconfig_applied "worker"; then
         echo "workers are already applied with latest machineconfig"
