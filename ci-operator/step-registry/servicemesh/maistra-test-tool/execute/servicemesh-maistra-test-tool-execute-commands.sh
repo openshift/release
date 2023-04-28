@@ -17,3 +17,5 @@ make test
 
 echo "Copying logs and xmls to ${ARTIFACT_DIR}"
 cp tests/result-latest/* ${ARTIFACT_DIR}
+
+make test-cleanup
