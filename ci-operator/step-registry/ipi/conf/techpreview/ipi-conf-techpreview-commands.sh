@@ -1,17 +1,16 @@
 #!/bin/bash
+set -euo pipefail
 
-set -o nounset
-set -o errexit
-set -o pipefail
-
-CONFIG="${SHARED_DIR}/install-config.yaml"
-
-PATCH="${SHARED_DIR}/install-config-patch.yaml"
-cat > "${PATCH}" << EOF
-featureSet: ${FEATURE_SET}
+cat <<EOF > ${SHARED_DIR}/manifest_feature_gate.yaml
+---
+apiVersion: config.openshift.io/v1
+kind: FeatureGate
+metadata:
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+    include.release.openshift.io/single-node-developer: "true"
+    release.openshift.io/create-only: "true"
+  name: cluster
+spec:
+  featureSet: TechPreviewNoUpgrade
 EOF
-yq-go m -x -i "${CONFIG}" "${PATCH}"
-echo "Updated featureSet in '${CONFIG}'."
-
-echo "The updated featureSet:"
-yq-go r "${CONFIG}" featureSet
