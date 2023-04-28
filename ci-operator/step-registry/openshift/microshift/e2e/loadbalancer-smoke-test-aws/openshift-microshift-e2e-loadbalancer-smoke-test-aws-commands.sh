@@ -23,8 +23,6 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
-
-
 cat <<'EOF' >"${HOME}"/deploy.sh
 #!/usr/bin/env bash
 
