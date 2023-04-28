@@ -20,6 +20,11 @@ fi
 
 ami_id=${EC2_AMI}
 instance_type=${EC2_INSTANCE_TYPE}
+host_device_name="/dev/xvdc"
+
+if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c6g.* ]]; then
+  host_device_name="/dev/nvme1n1"
+fi
 
 echo "ec2-user" > "${SHARED_DIR}/ssh_user"
 
@@ -58,6 +63,9 @@ Parameters:
   PublicKeyString:
     Type: String
     Description: The public key used to connect to the EC2 instance
+  HostDeviceName:
+    Type: String
+    Description: Disk device name to create pvs and vgs
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -107,7 +115,6 @@ Resources:
     Properties:
       VpcId: !Ref RHELVPC
       CidrBlock: !Ref PublicSubnetCidr
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
@@ -240,7 +247,12 @@ Resources:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
           echo "\${PublicKeyString}" >> /home/ec2-user/.ssh/authorized_keys
-          sudo dnf install -y lvm2 && sudo pvcreate /dev/xvdc && sudo vgcreate rhel /dev/xvdc
+          sudo dnf install -y lvm2
+
+          # NOTE: wrappig script vars with {} since the cloudformation will see
+          # them as cloudformation vars instead.
+          sudo pvcreate "\${HostDeviceName}"
+          sudo vgcreate rhel "\${HostDeviceName}"
 
 Outputs:
   InstanceId:
@@ -264,6 +276,7 @@ aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" 
         ParameterKey=HostInstanceType,ParameterValue="${instance_type}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
+        ParameterKey=HostDeviceName,ParameterValue="${host_device_name}" \
         ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)" &
 
 wait "$!"
