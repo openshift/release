@@ -31,7 +31,7 @@ tempest init openshift
 
 pushd ~/tempest/openshift
 
-discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create
+discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create identity.v3_endpoint_type public
 
 # Generate skiplist and allow list
 ORG="openstack-k8s-operators"
@@ -84,7 +84,10 @@ stestr last --subunit > testrepository.subunit || true
 # Generate html
 subunit2html testrepository.subunit stestr_results.html || true
 
-# Copy stestr_results.html to artifacts directory
+# Copy stestr_results.html and tempest.conf to artifacts directory
+if [ -f etc/tempest.conf ]; then
+    cp etc/tempest.conf ${ARTIFACT_DIR}
+fi
 if [ -f stestr_results.html ]; then
     cp stestr_results.html ${ARTIFACT_DIR}
 fi
