@@ -55,3 +55,8 @@ TODO
   interoperability testing, users should use `interop` group.
     - **If left empty**: It will use `interop` as the [default value](../../../step-registry/service-registry/run-tests/README.md).
   Meaning only tests used for interoperability will be executed.
+
+### Custom Images
+
+- [apicurio/apicurio-ci-tools](https://quay.io/repository/apicurio/apicurio-ci-tools)
+- To see Dockerfile, please contact someone from Service Registry QE.
