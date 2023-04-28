@@ -13,14 +13,9 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     operator_name=$(jq --raw-output '.name' <<< "$operator_obj")
     operator_source=$(jq --raw-output '.source' <<< "$operator_obj")
     operator_channel=$(jq --raw-output '.channel' <<< "$operator_obj")
-    operator_group=$(jq --raw-output '.operator_group' <<< "$operator_obj")
     operator_install_namespace=$(jq --raw-output '.install_namespace' <<< "$operator_obj")
-    operator_target_namespaces=$(jq --raw-output '.target_namespaces' <<< "$operator_obj")
-
-    # If operator_group not defined, use default value.
-    if [[ -z "${operator_group}" ]]; then
-        operator_group="${operator_install_namespace}-operator-group"
-    fi
+    operator_group=$(jq --raw-output '.operator_group // ""' <<< "$operator_obj")
+    operator_target_namespaces=$(jq --raw-output '.target_namespaces // ""' <<< "$operator_obj")
 
     # If install_namespace not defined, exit.
     if [[ -z "${operator_install_namespace}" ]]; then
@@ -66,26 +61,28 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         name: "${operator_install_namespace}"
 EOF
 
-    # Deploy new operator group
-    if [[ -z "$operator_target_namespaces" ]]; then
-        oc apply -f - <<EOF
-        apiVersion: operators.coreos.com/v1
-        kind: OperatorGroup
-        metadata:
-            name: "${operator_group}"
-            namespace: "${operator_install_namespace}"
+    # Deploy new operator group if operator group is defined
+    if [[ -n "$operator_group" ]]; then
+        if [[ -z "$operator_target_namespaces" ]]; then
+            oc apply -f - <<EOF
+            apiVersion: operators.coreos.com/v1
+            kind: OperatorGroup
+            metadata:
+                name: "${operator_group}"
+                namespace: "${operator_install_namespace}"
 EOF
-    else
-        oc apply -f - <<EOF
-        apiVersion: operators.coreos.com/v1
-        kind: OperatorGroup
-        metadata:
-            name: "${operator_group}"
-            namespace: "${operator_install_namespace}"
-        spec:
-            targetNamespaces:
-            - $(echo \"${operator_target_namespaces}\" | sed "s|,|\"\n  - \"|g")
+        else
+            oc apply -f - <<EOF
+            apiVersion: operators.coreos.com/v1
+            kind: OperatorGroup
+            metadata:
+                name: "${operator_group}"
+                namespace: "${operator_install_namespace}"
+            spec:
+                targetNamespaces:
+                - $(echo \"${operator_target_namespaces}\" | sed "s|,|\"\n  - \"|g")
 EOF
+        fi
     fi
 
     # Subscribe to the operator
