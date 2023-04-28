@@ -56,7 +56,7 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
         operator_target_namespaces="${operator_install_namespace}"
     fi
     
-    echo "Installing ${operator_name} from ${operator_source} channel ${operator_channel} into ${operator_install_namespace}, targeting ${operator_target_namespaces}"
+    echo "Installing ${operator_name} from ${operator_source} channel ${operator_channel} into ${operator_install_namespace}${operator_target_namespaces:+, targeting $operator_target_namespaces}"
 
     # Create the install namespace
     oc apply -f - <<EOF
@@ -67,16 +67,26 @@ for operator_obj in "${OPERATOR_ARRAY[@]}"; do
 EOF
 
     # Deploy new operator group
-    oc apply -f - <<EOF
-    apiVersion: operators.coreos.com/v1
-    kind: OperatorGroup
-    metadata:
-        name: "${operator_group}"
-        namespace: "${operator_install_namespace}"
-    spec:
-        targetNamespaces:
-        - $(echo \"${operator_target_namespaces}\" | sed "s|,|\"\n  - \"|g")
+    if [[ -z "$operator_target_namespaces" ]]; then
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+            name: "${operator_group}"
+            namespace: "${operator_install_namespace}"
 EOF
+    else
+        oc apply -f - <<EOF
+        apiVersion: operators.coreos.com/v1
+        kind: OperatorGroup
+        metadata:
+            name: "${operator_group}"
+            namespace: "${operator_install_namespace}"
+        spec:
+            targetNamespaces:
+            - $(echo \"${operator_target_namespaces}\" | sed "s|,|\"\n  - \"|g")
+EOF
+    fi
 
     # Subscribe to the operator
     cat <<EOF | oc apply -f -
