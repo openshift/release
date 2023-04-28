@@ -90,9 +90,15 @@ tests:
       cli: latest
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
+          bash -c \
+          "echo 1 | tee >(/usr/bin/go-junit-report > ${ARTIFACT_DIR}/junit_test.xml)"
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "entrypoint \
           prow/integ-suite-kind.sh \
-          test.integration.helm.kube.presubmit
+          test.integration.helm.kube.presubmit"
+        # copy artifacts back to Prow cluster
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -102,19 +108,6 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
-    - as: copy-artifacts
-      cli: latest
-      commands: |
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
     workflow: servicemesh-istio-e2e-aws
 - as: integ-security-2-4
   cluster_claim:
