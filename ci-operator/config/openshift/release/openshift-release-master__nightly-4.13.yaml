@@ -95,6 +95,14 @@ releases:
       product: ocp
       stream: nightly
       version: "4.13"
+  oldest-supported-credentials-request:
+    release:
+      channel: candidate
+      version: 4.13.0-rc.5
+  oldest-supported-z-rollback:
+    release:
+      channel: candidate
+      version: 4.13.0-rc.5
 resources:
   '*':
     requests:
@@ -184,15 +192,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-sdn
-  cluster: build05
-  interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-sdn-bm
   cluster: build05
   interval: 168h
@@ -254,15 +253,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
-- as: e2e-metal-ipi-sdn-serial-compact
-  cluster: build05
-  interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e-sdn-serial-compact
 - as: e2e-metal-ipi-sdn-bm-upgrade
   cluster: build05
   cron: 0 12 1 1 *
@@ -306,20 +296,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-ovn-compact
-  cluster: build05
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6
-        MASTER_MEMORY=24576
-        NUM_WORKERS=0
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -477,7 +453,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-ovirt-sdn
-  cron: 0 2,8,14,20 * * *
+  cron: 0 2,8 * * *
   steps:
     cluster_profile: ovirt
     observers:
@@ -485,7 +461,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-ovirt-conformance
 - as: e2e-ovirt-ovn
-  cron: 0 6,18 * * *
+  cron: 0 18 * * *
   steps:
     cluster_profile: ovirt
     env:
@@ -669,6 +645,25 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
   timeout: 6h0m0s
+- as: e2e-aws-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
+- as: credentials-request-freeze
+  interval: 48h
+  steps:
+    dependencies:
+      OPENSHIFT_FROZEN_RELEASE_IMAGE: release:oldest-supported-credentials-request
+      OPENSHIFT_LATEST_RELEASE_IMAGE: release:latest
+    workflow: openshift-credentials-request-freeze
 - as: e2e-aws-sdn-upgrade
   interval: 168h
   steps:
@@ -901,6 +896,17 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
+- as: e2e-telco5g-ptp
+  cluster: build05
+  cron: 34 08 */1 * 1-5
+  steps:
+    env:
+      T5CI_JOB_TYPE: ptp
+      T5CI_VERSION: "4.13"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telco5g-ptp
 - as: e2e-alibaba-ovn
   interval: 168h
   steps:
@@ -1015,6 +1021,13 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-etcd-scaling
+- as: e2e-aws-ovn-cpu-partitioning
+  interval: 6h
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    workflow: openshift-e2e-aws-cpu-partitioning
 zz_generated_metadata:
   branch: master
   org: openshift

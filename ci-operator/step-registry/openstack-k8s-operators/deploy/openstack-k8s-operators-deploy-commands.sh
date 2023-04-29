@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 
 set -ex
-
-ORG="openstack-k8s-operators"
+DEFAULT_ORG="openstack-k8s-operators"
+DEFAULT_REGISTRY="quay.io"
 OPENSTACK_OPERATOR="openstack-operator"
+BASE_DIR=${HOME:-"/alabama"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
@@ -17,28 +18,38 @@ PR_SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 # Fails if step is not being used on openstack-k8s-operators repos
 # Gets base repo name
 BASE_OP=${REF_REPO}
-if [[ "$REF_ORG" != "$ORG" ]]; then
-    echo "Not a ${ORG} job. Checking if isn't a rehearsal job..."
+if [[ "$REF_ORG" != "$DEFAULT_ORG" ]]; then
+    echo "Not a ${DEFAULT_ORG} job. Checking if isn't a rehearsal job..."
     EXTRA_REF_REPO=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].repo')
     EXTRA_REF_ORG=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].org')
     #EXTRA_REF_BASE_REF=$(echo ${JOB_SPEC} | jq -r '.extra_refs[0].base_ref')
-    if [[ "$EXTRA_REF_ORG" != "$ORG" ]]; then
-      echo "Failing since this step supports only ${ORG} changes."
+    if [[ "$EXTRA_REF_ORG" != "$DEFAULT_ORG" ]]; then
+      echo "Failing since this step supports only ${DEFAULT_ORG} changes."
       exit 1
     fi
     BASE_OP=${EXTRA_REF_REPO}
 fi
 SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g')
 
-export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${OPENSTACK_OPERATOR}
-export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
+# Copy base operator code to home directory
+cp -r /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/ ${BASE_DIR}
 
-if [ ! -d "${HOME}/install_yamls" ]; then
-  cd ${HOME}
+if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
+  # when testing install_yamls patch, we can skip build process and
+  #  validate using latest openstack-operator tag
+  export IMAGE_TAG_BASE=${DEFAULT_REGISTRY}/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}
+  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:latest
+else
+  export IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${OPENSTACK_OPERATOR}
+  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
+fi
+
+if [ ! -d "${BASE_DIR}/install_yamls" ]; then
+  cd ${BASE_DIR}
   git clone https://github.com/openstack-k8s-operators/install_yamls.git
 fi
 
-cd ${HOME}/install_yamls
+cd ${BASE_DIR}/install_yamls
 # Create/enable openstack namespace
 make namespace
 # Creates storage
@@ -58,7 +69,7 @@ done
 
 
 # Deploy openstack operator
-make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX}
+make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
 # Wait before start checking all deployment status
 # Not expecting to fail here, only in next deployment checks
 n=0
@@ -77,16 +88,16 @@ sh -c 'oc wait --for=condition=Available deployment {} --timeout=-1s'
 
 # Export OPENSTACK_CR if testing openstack-operator changes
 if [[ "$SERVICE_NAME" == "OPENSTACK" ]]; then
-  export ${SERVICE_NAME}_CR=/go/src/github.com/${ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml
+  export ${SERVICE_NAME}_CR=/go/src/github.com/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml
 fi
 
 make ceph TIMEOUT=90
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
-make openstack_deploy_prep
+make openstack_deploy_prep NETWORK_ISOLATION=false
 
-cat <<EOF >${HOME}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
+cat <<EOF >${BASE_DIR}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -107,6 +118,7 @@ patches:
           region: r1
           extraVol:
           - propagation:
+            - Manila
             - Glance
             - volume1
             - CinderBackup
@@ -121,6 +133,9 @@ patches:
             - name: ceph
               mountPath: "/etc/ceph"
               readOnly: true
+    - op: replace
+      path: /spec/cinder/template/cinderVolumes/volume1/replicas
+      value: 1
     - op: add
       path: /spec/cinder/template/cinderVolumes/volume1/customServiceConfig
       value: |
@@ -136,6 +151,9 @@ patches:
             report_discard_supported=True
             backend_host=hostgroup
             rbd_secret_uuid=FSID
+    - op: replace
+      path: /spec/cinder/template/cinderBackup/replicas
+      value: 1
     - op: add
       path: /spec/cinder/template/cinderBackup/customServiceConfig
       value: |
@@ -156,17 +174,46 @@ patches:
             rbd_store_user=openstack
             rbd_store_pool=images
             store_description=ceph_glance_store
+$(if [[ "${SERVICE_NAME}" == "IRONIC" ]]; then
+  cat <<IRONIC_EOF
+    - op: add
+      path: /spec/ironic/enabled
+      value: true
+IRONIC_EOF
+fi)
+$(if [[ "${SERVICE_NAME}" == "MANILA" ]]; then
+  cat <<MANILA_EOF
+    - op: add
+      path: /spec/manila/enabled
+      value: true
+    - op: add
+      path: /spec/manila/template/customServiceConfig
+      value: |
+            [DEFAULT]
+            enabled_share_backends=cephfs
+            enabled_share_protocols=cephfs
+            [cephfs]
+            driver_handles_share_servers=False
+            share_backend_name=cephfs
+            share_driver=manila.share.drivers.cephfs.driver.CephFSDriver
+            cephfs_conf_path=/etc/ceph/ceph.conf
+            cephfs_auth_id=openstack
+            cephfs_cluster_name=ceph
+            cephfs_volume_mode=0755
+            cephfs_protocol_helper_type=CEPHFS
+MANILA_EOF
+fi)
   target:
     kind: OpenStackControlPlane
 EOF
 
 FSID=$(oc get secret ceph-conf-files -o json | jq -r '.data."ceph.conf"' | base64 -d | grep fsid | awk 'BEGIN { FS = "=" } ; { print $2 }' | xargs)
 
-sed -i ${HOME}/install_yamls/out/openstack/openstack/cr/kustomization.yaml -e s/FSID/$FSID/g
-cat ${HOME}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
+sed -i ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/kustomization.yaml -e s/FSID/$FSID/g
+cat ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
 
 make input
-oc kustomize ${HOME}/install_yamls/out/openstack/openstack/cr/ | oc apply -f -
+oc kustomize ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/ | oc apply -f -
 sleep 60
 
 # Waiting for all services to be ready

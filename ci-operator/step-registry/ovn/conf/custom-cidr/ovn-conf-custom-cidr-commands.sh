@@ -4,12 +4,18 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "update cidr to 20 to the max nodes num is 8"
+CLUSTER_NETWORK_CIDR=${CLUSTER_NETWORK_CIDR:-10.128.0.0/20}
+CLUSTER_NETWORK_HOST_PREFIX=${CLUSTER_NETWORK_HOST_PREFIX:-23}
+
+echo "default is to update cidr to 20 w/ hostPrefix of 23 so that max nodes num is 8"
+echo "\nsee below for actual values used\n--------------------------------\n"
 
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 networking:
   networkType: OVNKubernetes
   clusterNetwork:
-  - cidr: 10.128.0.0/20
-    hostPrefix: 23
+  - cidr: $CLUSTER_NETWORK_CIDR
+    hostPrefix: $CLUSTER_NETWORK_HOST_PREFIX
 EOF
+
+cat "${SHARED_DIR}/install-config.yaml"

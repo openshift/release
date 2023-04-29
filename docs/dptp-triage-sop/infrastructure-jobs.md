@@ -6,6 +6,7 @@
 4. [`periodic-org-sync`](#periodic-org-sync)
 5. [`periodic-openshift-release-fast-forward`](#periodic-openshift-release-fast-forward)
 6. [`periodic-check-gh-automation`](#periodic-check-gh-automation)
+7. [`periodic-openshift-release-private-org-sync`](#periodic-openshift-release-private-org-sync)
 
 ## `branch-ci-openshift-release-master-release-controller-annotate`
 
@@ -143,7 +144,7 @@ members, teams, team membership and other properties of the `openshift`
 GitHub organization based on configuration stored in private [openshift/config](https://github.com/openshift/config)
 repository. We share the ownership of this job with DPP: we make sure that `peribolos` works and DPP owns the config in
 [openshift/config](https://github.com/openshift/config). Most problems with this job are caused by the configuration, so
-we often just ping `@dpp-triage` to resolve them.
+we often just ping `@triage-dpp` to resolve them.
 
 #### Useful links
 
@@ -178,7 +179,7 @@ a team, organization or something similar.
 2. The status code hints about what kind of error was encountered: `status code 404 not one of [200]` hints that one of
    the entities was not found (and so likely does not exist).
 3. Confirm the existence of `some-user` by visiting https://github.com/some-user
-4. Ping `@dpp-triage` to remove the user from their Peribolos configuration.
+4. Ping `@triage-dpp` to remove the user from their Peribolos configuration.
 
 
 ## `periodic-openshift-release-fast-forward`
@@ -237,7 +238,42 @@ When the job fails, it will list all repos that are inaccessible by the bots at 
 
 #### Resolution
 
-Reach out to the owner(s) for each 
+Reach out to the owner(s) for each
 repo listed asking them to grant the bots permissions by following the docs.
 
-If there is argument that they do not want the bots to be added to a repo or org, it can be passed to the job as an additional `ignore` parameter.
+If there is argument that they do not want the bots to be added to a repo or org, it can be passed to the job as an
+additional `ignore` parameter.
+
+## `periodic-openshift-release-private-org-sync`
+
+This job runs [`private-org-sync`](https://github.com/openshift/ci-tools/tree/master/cmd/private-org-sync) to
+sync `openshift-priv`
+mirror repos with their respective "public" repos.
+
+#### Useful Links
+
+- [Recent executions on Deck-Internal](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/?job=periodic-openshift-release-private-org-sync)
+- [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
+
+### Failed to push to destination
+
+#### Symptom
+
+```
+level=error msg="failed to push to destination, no retry possible" branch=release-4.14 destination=openshift-priv/file-integrity-operator@release-4.14
+error="" exit-code=1 local-repo=/tmp/1719126826/openshift/file-integrity-operator org=openshift output="To https://github.com/openshift-priv/file-integrity-operator\n
+6e4fa791..c5b715ed  FETCH_HEAD -> release-4.14\n ! [rejected]          
+v1.2.0 -> v1.2.0 (already exists)\nerror: failed to push some refs to 'https://github.com/openshift-priv/file-integrity-operator'\n
+hint: Updates were rejected because the tag already exists in the remote.\n"
+```
+
+#### Culprit
+
+The private mirror repo already contains a tag that the tool is attempting to mirror to it from the public repo.
+This could be due to a tag being created, and then subsequently deleted and re-created in the public repo.
+
+#### Resolution
+
+Reach out to the repo owner(s) to confirm that this is the case. If they have the permissions, they can delete the tag
+in
+the private repo themselves. Otherwise, utilize the bot account to delete the tag.

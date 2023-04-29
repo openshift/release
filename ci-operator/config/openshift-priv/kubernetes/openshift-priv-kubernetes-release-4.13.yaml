@@ -23,18 +23,14 @@ base_images:
     name: 4.13-priv
     namespace: ocp-private
     tag: oc-rpms
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.13
-  rhel-coreos-8-base:
+  rhel-coreos-base:
     name: 4.13-priv
     namespace: ocp-private
-    tag: rhel-coreos-8
+    tag: rhel-coreos
   tools:
     name: 4.13-priv
     namespace: ocp-private
@@ -47,9 +43,6 @@ images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
@@ -57,9 +50,6 @@ images:
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
     ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
@@ -75,14 +65,14 @@ images:
       - registry.svc.ci.openshift.org/openshift/origin-v4.0:machine-os-content
   to: machine-os-content
 - dockerfile_literal: |
-    # This uses the new rhel-coreos-8 base image
+    # This uses the new rhel-coreos base image
     # https://github.com/openshift/enhancements/blob/master/enhancements/ocp-coreos-layering/ocp-coreos-layering.md
     FROM quay.io/centos/centos:stream9 as build
     # Sadly rpm-ostree in rhel8 right now doesn't support e.g. `rpm-ostree upgrade openshift-hyperkube`
     # in a container https://github.com/coreos/rpm-ostree/issues/4034
     RUN ls -al /etc/yum.repos.d && dnf -y install dnf-utils && dnf --disablerepo='*' --enablerepo=built download openshift-hyperkube
     # See also https://issues.redhat.com/browse/ART-4352
-    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos-8
+    FROM registry.ci.openshift.org/rhcos-devel/rhel-coreos
     COPY --from=build /*.rpm /
     # Also delete leftover RPM files; see https://issues.redhat.com/browse/OCPBUGS-6505.
     RUN rpm -Uvh --oldpackage /*.rpm && rm -vf /*.rpm /usr/share/rpm/__db.* /usr/share/rpm/.*.lock
@@ -90,25 +80,24 @@ images:
     base-machine-with-rpms:
       as:
       - quay.io/centos/centos:stream9
-    rhel-coreos-8-base:
+    rhel-coreos-base:
       as:
-      - registry.ci.openshift.org/rhcos-devel/rhel-coreos-8
-  to: rhel-coreos-8
+      - registry.ci.openshift.org/rhcos-devel/rhel-coreos
+  to: rhel-coreos
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: pod
 promotion:
   additional_images:
     artifacts: artifacts
-  disabled: true
   excluded_images:
   - machine-os-content
-  - rhel-coreos-8
+  - rhel-coreos
   name: 4.13-priv
   namespace: ocp-private
 raw_steps:
@@ -403,11 +392,6 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
-- as: e2e-aws-csi-migration
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-csi-migration
 - as: e2e-openstack
   optional: true
   run_if_changed: ^(staging/src/k8s.io/legacy-cloud-providers/openstack)

@@ -1,0 +1,39 @@
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  namespace: microshift
+  name: test-runtime
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: microshift
+  name: test-runtime
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: test-runtime:latest
+  source:
+    type: Git
+    git:
+      uri: 'https://github.com/openshift/microshift'
+      ref: main
+  strategy:
+    dockerStrategy:
+      dockerfilePath: packaging/images/openshift-ci/Dockerfile.test-runtime
+      from:
+        kind: ImageStreamTag
+        name: ubi:8
+        namespace: ocp
+      imageOptimizationPolicy: SkipLayers
+    type: Docker
+  triggers:
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: ubi:8
+        namespace: ocp
+    type: ImageChange

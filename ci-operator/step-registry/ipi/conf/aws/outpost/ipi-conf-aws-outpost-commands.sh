@@ -317,5 +317,5 @@ spec:
       $MTU
 _EOF
 
-ls -l "${SHARED_DIR}"
-cat "${CONFIG}"
+# ls -l "${SHARED_DIR}"
+# cat "${CONFIG}"

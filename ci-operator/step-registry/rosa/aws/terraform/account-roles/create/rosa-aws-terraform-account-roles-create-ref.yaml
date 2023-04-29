@@ -1,0 +1,29 @@
+ref:
+  as: rosa-aws-terraform-account-roles-create
+  from_image:
+    namespace: ci
+    name: ocm-tf-cli
+    tag: latest
+  grace_period: 10m
+  commands: rosa-aws-terraform-account-roles-create-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ACCOUNT_ROLES_PREFIX
+    default: ""
+    documentation: User-defined prefix for all generated AWS resources. if not specified, will use the namespace name as the prefix.
+  - name: ROSA_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for rosa login.
+  - name: OPENSHIFT_VERSION
+    default: ""
+    documentation: The openshift version for rosa to install (e.g. "4.10.12"). Specify a major/minor (e.g. "4.10") to get the latest version from that stream.
+  - name: CHANNEL_GROUP
+    default: "stable"
+    documentation: The channel group where to to get the openshift version. The supported groups are [stable, candidate, nightly].
+
+  documentation: |-
+    The rosa sts account-roles creation step uses rosa cli to create the account roles on the cloud provider using the the provided cluster profile.
+    The cluster profile should include the offline token ocm-token to login and .awscred to init the rosa environment.

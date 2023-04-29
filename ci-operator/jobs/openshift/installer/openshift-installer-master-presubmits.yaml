@@ -722,7 +722,6 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-aws-ovn-proxy
     optional: true
     rerun_command: /test e2e-aws-ovn-proxy
-    run_if_changed: aws
     spec:
       containers:
       - args:
@@ -780,6 +779,82 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-proxy,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build01
+    context: ci/prow/e2e-aws-ovn-public-subnets
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-aws-ovn-public-subnets
+    optional: true
+    rerun_command: /test e2e-aws-ovn-public-subnets
+    run_if_changed: /aws/subnet.go
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-public-subnets-cluster-profile
+        - --target=e2e-aws-ovn-public-subnets
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-public-subnets-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-public-subnets,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -933,7 +1008,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-single-node,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -1083,7 +1158,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-upi,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
@@ -1325,7 +1400,6 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-azure-ovn-resourcegroup
     optional: true
     rerun_command: /test e2e-azure-ovn-resourcegroup
-    run_if_changed: azure
     spec:
       containers:
       - args:
@@ -1782,7 +1856,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-installer-master-e2e-gcp-ovn
     rerun_command: /test e2e-gcp-ovn
-    run_if_changed: gcp
+    run_if_changed: (gcp|google)
     spec:
       containers:
       - args:
@@ -1862,7 +1936,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-gcp-ovn-shared-vpc
     optional: true
     rerun_command: /test e2e-gcp-ovn-shared-vpc
-    run_if_changed: gcp
+    run_if_changed: (gcp|google)
     spec:
       containers:
       - args:
@@ -2021,7 +2095,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-gcp-ovn-xpn
     optional: true
     rerun_command: /test e2e-gcp-ovn-xpn
-    run_if_changed: ^(ipi/gcp/.*)
+    run_if_changed: (gcp|google)
     spec:
       containers:
       - args:
@@ -2101,7 +2175,7 @@ presubmits:
     name: pull-ci-openshift-installer-master-e2e-gcp-secureboot
     optional: true
     rerun_command: /test e2e-gcp-secureboot
-    run_if_changed: gcp
+    run_if_changed: (gcp|google)
     spec:
       containers:
       - args:
@@ -3324,7 +3398,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     decoration_config:
@@ -3475,7 +3549,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack-sdn-parallel
     decorate: true
     decoration_config:
@@ -3551,7 +3625,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/e2e-openstack-upi
     decorate: true
     decoration_config:
@@ -4725,7 +4799,6 @@ presubmits:
     name: pull-ci-openshift-installer-master-okd-scos-e2e-aws-upgrade
     optional: true
     rerun_command: /test okd-scos-e2e-aws-upgrade
-    skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
     spec:
       containers:
       - args:
@@ -5272,7 +5345,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build01
     context: ci/prow/openstack-manifests
     decorate: true
     decoration_config:

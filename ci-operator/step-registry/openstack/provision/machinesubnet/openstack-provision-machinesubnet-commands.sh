@@ -120,5 +120,31 @@ if [[ "${CONFIG_TYPE}" == *"proxy"* || ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; t
   echo "Added bastion subnet ${BASTION_SUBNET_ID} to router: ${BASTION_ROUTER_ID}"
 fi
 
+if [[ "$CONFIG_TYPE" == *"externallb"* ]]; then
+  cat > ${SHARED_DIR}/failure_domain.json << EOF
+{
+    "failureDomains": [
+        {
+            "portTargets": [
+                {
+                    "id": "control-plane",
+                    "network": {
+                        "id": "${MACHINES_NET_ID}"
+                    },
+                    "fixedIPs": [
+                        {
+                            "subnet": {
+                                "id": "${MACHINES_SUBNET_ID}"
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    ]
+}
+EOF
+fi
+
 echo ${API_VIP}>${SHARED_DIR}/API_IP
 echo ${INGRESS_VIP}>${SHARED_DIR}/INGRESS_IP

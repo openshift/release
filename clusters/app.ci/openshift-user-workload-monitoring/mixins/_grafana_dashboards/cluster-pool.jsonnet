@@ -89,5 +89,28 @@ dashboard.new(
     x: 0,
     y: 0,
   })
+.addPanel(
+    (graphPanel.new(
+        'ci-ocp installion error',
+        description='',
+        datasource='prometheus-k8s-on-hive',
+        legend_alignAsTable=true,
+        legend_rightSide=true,
+        legend_values=true,
+        legend_max=true,
+        legend_min=true,
+        legend_current=true,
+        legend_sortDesc=true,
+        min='0',
+    ) + legendConfig)
+    .addTarget(prometheus.target(
+        'sum(increase(hive_install_errors{owner="openshift-ci"}[1h])) by (reason)',
+        legendFormat='{{reason}}',
+    )), gridPos = {
+    h: 9,
+    w: 24,
+    x: 0,
+    y: 0,
+  })
 
 + dashboardConfig

@@ -4,6 +4,20 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
+}
+
+function set_proxy_env(){
+    # Setup proxy if it's present in the shared dir
+    if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]]; then
+        # shellcheck disable=SC1091
+        source "${SHARED_DIR}/proxy-conf.sh"
+    fi
+}
+
 # Check if a build is signed
 function check_signed() {
     local digest algorithm hash_value response
@@ -19,7 +33,7 @@ function check_signed() {
 }
 
 function mirror_image(){
-    local mirror_release_image target_version
+    local mirror_release_image target_version cmd
     mirror_release_image="${MIRROR_REGISTRY_HOST}/${TARGET#*/}"
     MIRROR_RELEASE_IMAGE_REPO="${mirror_release_image%:*}"
     MIRROR_RELEASE_IMAGE_REPO="${MIRROR_RELEASE_IMAGE_REPO%@sha256*}"
@@ -29,10 +43,18 @@ function mirror_image(){
    
     echo "Mirroring ${target_version} (${TARGET}) to ${MIRROR_RELEASE_IMAGE_REPO}"
 
-    oc adm release mirror -a "${PULL_SECRET}" --insecure=true \
-        --from="${TARGET}" \
-        --to="${MIRROR_RELEASE_IMAGE_REPO}" \
-        --apply-release-image-signature="${APPLY_SIG}" | tee "${MIRROR_OUT_FILE}"
+    cmd="oc adm release mirror -a ${PULL_SECRET} --insecure=true --from=${TARGET} --to=${MIRROR_RELEASE_IMAGE_REPO}"
+    if [[ "${APPLY_SIG}" == "true" ]]; then
+        cmd="${cmd} --release-image-signature-to-dir=${SAVE_SIG_TO_DIR}"
+    fi
+    run_command "${cmd} | tee ${MIRROR_OUT_FILE}"
+}
+
+function apply_signature(){
+    if [[ "${APPLY_SIG}" == "true" ]]; then
+        echo "Apply signature against cluster..."
+        run_command "oc apply -f ${SAVE_SIG_TO_DIR}/signature-*.json --overwrite=true"
+    fi
 }
 
 function update_icsp(){
@@ -44,21 +66,14 @@ function update_icsp(){
         if [[ ! -f "${MIRROR_OUT_FILE}" ]]; then
             echo >&2 "${MIRROR_OUT_FILE} not found" && return 1
         fi
-        sed -n '/To use the new mirrored repository for upgrades, use the following to create an ImageContentSourcePolicy:/,/configmap\/sha256.*/{//!p;}' "${MIRROR_OUT_FILE}"  | grep -v '^$' > "${ICSP_FILE}"
-        echo "cat ${ICSP_FILE}:\n$(cat "${ICSP_FILE}")"       
-        oc create -f "${ICSP_FILE}"
+        sed -n '/To use the new mirrored repository for upgrades, use the following to create an ImageContentSourcePolicy:/,/configmap.*/{//!p;}' "${MIRROR_OUT_FILE}"  | grep -v '^$' > "${ICSP_FILE}"
+        run_command "cat ${ICSP_FILE}"
+        run_command "oc create -f ${ICSP_FILE}"
     fi
 }
 
 if [[ -f "${SHARED_DIR}/kubeconfig" ]] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
-fi
-
-# Setup proxy if it's present in the shared dir
-if [[ -f "${SHARED_DIR}/proxy-conf.sh" ]] 
-then
-    # shellcheck disable=SC1091
-    source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
 # Get the target upgrades release, by default, OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE is the target release
@@ -98,12 +113,19 @@ export ICSP_FILE="${SHARED_DIR}/icsp.yaml"
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
-    export APPLY_SIG="true"
     if ! check_signed; then
         echo "You're mirroring an unsigned images, don't apply signature"
         APPLY_SIG="false"
+        SAVE_SIG_TO_DIR=""
+    else
+        APPLY_SIG="true"
+        SAVE_SIG_TO_DIR=$(mktemp -d)
     fi
-    mirror_image 
+    export APPLY_SIG
+    export SAVE_SIG_TO_DIR
+    mirror_image
+    set_proxy_env
+    apply_signature
     update_icsp
     rm -f "${MIRROR_OUT_FILE}" "${ICSP_FILE}"
 done

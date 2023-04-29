@@ -92,6 +92,37 @@ subjects:
   kind: Group
   name: openshift-cluster-bot-developers
 ---
+kind: Role
+apiVersion: authorization.openshift.io/v1
+metadata:
+  name: ci-chat-bot-secret
+  namespace: ci
+rules:
+- apiGroups: [""]
+  resources:
+  - secrets
+  verbs:
+  - get
+  - create
+  - update
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-chat-bot-binding-secret
+  namespace: ci
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: ci-chat-bot-secret
+subjects:
+- kind: ServiceAccount
+  namespace: ci
+  name: ci-chat-bot
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: openshift-cluster-bot-developers
+---
 apiVersion: route.openshift.io/v1
 kind: Route
 metadata:
@@ -114,9 +145,6 @@ metadata:
   name: ci-chat-bot
   labels:
     app: ci-chat-bot
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "9090"
 spec:
   selector:
     app: ci-chat-bot
@@ -126,6 +154,22 @@ spec:
     - name: metrics
       port: 9090
   type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ci-chat-bot
+  namespace: ci
+  labels:
+    app: ci-chat-bot
+spec:
+  endpoints:
+  - interval: 30s
+    port: metrics
+    scheme: http
+  selector:
+    matchLabels:
+      app: ci-chat-bot
 ---
 kind: ServiceAccount
 apiVersion: v1
@@ -173,6 +217,8 @@ spec:
           - configMap:
               name: job-config-3.x
           - configMap:
+              name: job-config-4.0
+          - configMap:
               name: job-config-4.1
           - configMap:
               name: job-config-4.2
@@ -200,6 +246,8 @@ spec:
               name: job-config-4.13
           - configMap:
               name: job-config-4.14
+          - configMap:
+              name: job-config-4.15
       - name: build-cluster-kubeconfigs
         secret:
           secretName: ci-chat-bot-kubeconfigs
@@ -218,9 +266,37 @@ spec:
           items:
             - key: jira-token
               path: jira-token
+      - name: subnet-ids
+        secret:
+          secretName: ci-chat-bot-slack-app
+          items:
+            - key: rosa-subnet-ids
+              path: rosa-subnet-ids
+      - name: ocmcred
+        secret:
+          secretName: ci-chat-bot-slack-app
+          items:
+            - key: rosa-admin-ocm
+              path: rosa-admin-ocm
       containers:
       - name: bot
         image: ci-chat-bot:latest
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 8081
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        resources:
+          requests:
+            memory: "6Gi"
+            cpu: "250m"
         volumeMounts:
         - mountPath: /etc/config
           name: config
@@ -240,6 +316,12 @@ spec:
         - mountPath: /etc/jira
           name: jira
           readOnly: true
+        - mountPath: /etc/ocmcred
+          name: ocmcred
+          readOnly: true
+        - mountPath: /etc/subnet-ids
+          name: subnet-ids
+          readOnly: true
         env:
         - name: BOT_TOKEN
           valueFrom:
@@ -256,6 +338,20 @@ spec:
             secretKeyRef:
               name: ci-chat-bot-slack-app
               key: slack-app-bot-signing-secret
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: ci-chat-bot-slack-app
+              key: rosa-aws-access-key-id
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ci-chat-bot-slack-app
+              key: rosa-aws-secret-access-key
+        - name: OCM_CONFIG
+          value: /etc/ocmcred/rosa-admin-ocm
+        - name: AWS_REGION
+          value: us-east-1
         command:
         - /usr/bin/ci-chat-bot
         - --prow-config=/etc/config/config.yaml
@@ -270,3 +366,4 @@ spec:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --jira-endpoint=https://issues.redhat.com
         - --jira-bearer-token-file=/etc/jira/jira-token
+        - --rosa-subnetlist-path=/etc/subnet-ids/rosa-subnet-ids

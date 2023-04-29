@@ -311,14 +311,6 @@ fi
 
 export OC="run_command_oc"
 
-# Target version oc will be extract in the /tmp/client directory, use it first
-mkdir -p /tmp/client /tmp/jq
-export OC_DIR="/tmp/client"
-export JQ_DIR="/tmp/jq"
-export PATH=${OC_DIR}:${JQ_DIR}:$PATH
-
-curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o ${JQ_DIR}/jq && chmod +x ${JQ_DIR}/jq
-
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
 SOURCE_XY_VERSION="$(echo "${SOURCE_VERSION}" | cut -f1,2 -d.)"
 export SOURCE_VERSION

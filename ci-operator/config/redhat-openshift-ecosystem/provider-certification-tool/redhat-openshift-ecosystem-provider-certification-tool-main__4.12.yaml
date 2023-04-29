@@ -8,12 +8,12 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.19
 releases:
   latest:
     release:
       architecture: amd64
-      channel: candidate
+      channel: fast
       version: "4.12"
 resources:
   '*':
@@ -27,11 +27,21 @@ resources:
       cpu: "3"
       memory: 5Gi
 tests:
-- as: provider-certification-tool-vsphere-upi-platform-none
-  cron: 0 0 * * 2,4
+- as: platform-none-vsphere
+  cron: 0 0 * * 2
   steps:
     cluster_profile: vsphere
-    workflow: provider-certification-tool-vsphere-upi-platform-none
+    workflow: opct-test-platform-none-vsphere
+  timeout: 4h0m0s
+- as: platform-none-vsphere-upgrade
+  cron: 0 0 * * 2
+  steps:
+    cluster_profile: vsphere
+    env:
+      OPCT_RUN_MODE: upgrade
+      UPGRADE_TO_CHANNEL_TYPE: candidate
+    workflow: opct-test-platform-none-vsphere
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem

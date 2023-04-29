@@ -6,9 +6,6 @@ set -o pipefail
 
 echo "************ assisted common gather command ************"
 
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
-
 cat > gather_logs.yaml <<-EOF
 - name: Gather logs and debug information and save them for debug purpose
   hosts: all
@@ -28,10 +25,12 @@ cat > gather_logs.yaml <<-EOF
           state: directory
           mode: '0755'
 
+      # setsid is there to workaround an issue with virsh hanging when running in background
+      # https://serverfault.com/questions/1105733/virsh-command-hangs-when-script-runs-in-the-background
       - name: Gather sosreport from all hosts
         ansible.builtin.command: >-
-          sos report --batch --tmp-dir "{{ LOGS_DIR }}" --all-logs
-            -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,yum
+          setsid sos report --batch --tmp-dir "{{ LOGS_DIR }}" --all-logs
+            -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,dnf
             -k podman.all -k podman.logs
       ignore_errors: true
 
@@ -151,4 +150,4 @@ cat > gather_logs.yaml <<-EOF
 EOF
 
 export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
-ansible-playbook gather_logs.yaml -i "${SHARED_DIR}/inventory" -vv
+ansible-playbook gather_logs.yaml -i "${SHARED_DIR}/inventory"

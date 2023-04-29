@@ -45,7 +45,7 @@ cat > packing-test-infra.yaml <<-EOF
         dest: "{{ SHARED_DIR }}/inventory"
         content: |
           [primary]
-          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
+          primary-{{ lookup('env', 'IP') }} ansible_host={{ lookup('env', 'IP') }} ansible_user=root ansible_ssh_user=root ansible_ssh_private_key_file={{ lookup('env', 'SSH_KEY_FILE') }} ansible_ssh_common_args="-o ConnectTimeout=5 -o UserKnownHostsFile=/dev/null -o ServerAliveInterval=90 -o LogLevel=ERROR"
       when: not inventory.stat.exists
     - name: Create ssh config file
       ansible.builtin.copy:
@@ -65,15 +65,17 @@ cat > packing-test-infra.yaml <<-EOF
         content: |
           [defaults]
           callback_whitelist = profile_tasks
+          host_key_checking = False
+
+          verbosity = 2
+          stdout_callback = yaml
+          bin_ansible_callbacks = True
 EOF
 
 ansible-playbook packing-test-infra.yaml
 
 # shellcheck disable=SC2034
 export CI_CREDENTIALS_DIR=/var/run/assisted-installer-bot
-
-# TODO: Remove once OpenShift CI will be upgraded to 4.2 (see https://access.redhat.com/articles/4859371)
-~/fix_uid.sh
 
 echo "********** ${ASSISTED_CONFIG} ************* "
 

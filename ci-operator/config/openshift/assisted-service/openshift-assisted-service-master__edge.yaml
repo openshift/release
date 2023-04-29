@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-test-infra:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   cli:
@@ -28,7 +28,7 @@ base_images:
     namespace: ocp
     tag: cli
   cluster-api-provider-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: cluster-api-provider-agent
   dev-scripts:
@@ -130,7 +130,7 @@ operator:
   - pullspec: quay.io/centos7/postgresql-12-centos7:latest
     with: postgresql-12-centos7
 promotion:
-  name: ocm-2.8
+  name: ocm-2.9
   namespace: edge-infrastructure
 releases:
   candidate-4-11:
@@ -155,6 +155,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.12"
+  nightly-4-13:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
   stable-4-10:
     integration:
       name: "4.10"
@@ -278,6 +283,8 @@ tests:
       dependencies:
       - env: SERVICE
         name: assisted-service
+      - env: IMAGE_SERVICE
+        name: assisted-image-service
       from: assisted-service-subsystem
       resources:
         requests:
@@ -311,6 +318,8 @@ tests:
       dependencies:
       - env: SERVICE
         name: assisted-service
+      - env: IMAGE_SERVICE
+        name: assisted-image-service
       from: assisted-service-subsystem
       resources:
         requests:
@@ -345,6 +354,8 @@ tests:
       dependencies:
       - env: SERVICE
         name: assisted-service
+      - env: IMAGE_SERVICE
+        name: assisted-image-service
       from: assisted-service-subsystem
       resources:
         requests:
@@ -379,6 +390,8 @@ tests:
       dependencies:
       - env: SERVICE
         name: assisted-service
+      - env: IMAGE_SERVICE
+        name: assisted-image-service
       from: assisted-service-subsystem
       resources:
         requests:
@@ -720,16 +733,6 @@ tests:
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-hypershift
-- as: e2e-ai-operator-ztp-converged
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ALLOW_CONVERGED_FLOW: "True"
-    workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-tpmv2
   optional: true
   steps:
@@ -936,6 +939,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly-4-13
     env:
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
@@ -946,6 +951,8 @@ tests:
   cron: 25 02 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly-4-13
     env:
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno

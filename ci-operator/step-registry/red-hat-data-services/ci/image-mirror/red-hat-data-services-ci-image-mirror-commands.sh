@@ -48,25 +48,25 @@ if [[ -z "$IMAGE_TAG" ]]; then
     esac
 fi
 
-# Get IMAGE_TAG if it's equal to YearIndex in YYYYq_YYYYMMDD format
+# Get IMAGE_TAG if it's equal to YearIndex in YYYYMMDD format
 if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
-    YEAR_INDEX=$(echo "$(date +%Y)""$(echo "$(date +%q)"|sed 's/1/a/g;s/2/b/g;s/3/c/g;s/4/d/g')"_"$(date +%Y%m%d)")
+    YEAR_INDEX=$(echo "$(date +%Y%m%d)")
     case "$JOB_TYPE" in
         presubmit)
             log "INFO Building YearIndex image tag for a $JOB_TYPE job"
-            IMAGE_TAG="pr-${PULL_NUMBER}-${YEAR_INDEX}"
+            IMAGE_TAG="pr-${PULL_NUMBER}"
             if [[ -n "${RELEASE_VERSION-}" ]]; then
                 IMAGE_TAG="${RELEASE_VERSION}-${IMAGE_TAG}"
             fi
             ;;
         postsubmit)
             log "INFO Building YearIndex image tag for a $JOB_TYPE job"
-            IMAGE_TAG="${RELEASE_VERSION}-${YEAR_INDEX}"
-            IMAGE_FLOATING_TAG="${RELEASE_VERSION}"
+            IMAGE_TAG="${RELEASE_VERSION}-${YEAR_INDEX}-${PULL_BASE_SHA:0:7}"
+            IMAGE_FLOATING_TAG="${RELEASE_VERSION}-${YEAR_INDEX}"
             ;;
         periodic)
-            log "INFO Building YearIndex image tag for a $JOB_TYPE job"
-            IMAGE_TAG="${RELEASE_VERSION}-nightly-${YEAR_INDEX}"
+            log "INFO Building weekly image tag for a $JOB_TYPE job"
+            IMAGE_TAG="${RELEASE_VERSION}-weekly"
             ;;
         *)
             log "ERROR Cannot publish an image from a $JOB_TYPE job"
@@ -74,6 +74,22 @@ if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
             ;;
     esac
 fi
+
+# Get IMAGE_TAG if it's equal to weekly 
+if [[ "$IMAGE_TAG" == "weekly" ]]; then
+    case "$JOB_TYPE" in
+        periodic)
+            log "INFO Building weekly image tag for a $JOB_TYPE job"
+            if [[ -n "${RELEASE_VERSION-}" ]]; then
+                IMAGE_TAG="${RELEASE_VERSION}-${IMAGE_TAG}"
+            fi
+            ;;
+        *)
+            IMAGE_TAG=${IMAGE_TAG}
+            ;;
+    esac
+fi
+
 log "INFO Image tag is $IMAGE_TAG"
 
 # Setup registry credentials

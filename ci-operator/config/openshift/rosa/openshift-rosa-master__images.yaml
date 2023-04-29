@@ -36,6 +36,30 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: rosa-aws-cli
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/origin/4.10:cli
+
+    RUN curl -s https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo -o /etc/yum.repos.d/hashicorp.repo && \
+        wget https://github.com/openshift-online/ocm-cli/releases/download/v0.1.66/ocm-linux-amd64 -O /usr/local/bin/ocm && \
+        chmod +x /usr/local/bin/ocm
+
+    RUN yum -y install --setopt=skip_missing_names_on_install=False \
+        openssl \
+        jq \
+        unzip \
+        which \
+        terraform
+    RUN yum clean all &&\
+        ocm version &&\
+        terraform version
+  inputs:
+    origin_4.10_cli:
+      as:
+      - registry.ci.openshift.org/origin/4.10:cli
+    src:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: ocm-tf-cli
 promotion:
   namespace: ci
   tag: latest

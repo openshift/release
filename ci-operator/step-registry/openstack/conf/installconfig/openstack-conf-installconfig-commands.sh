@@ -73,7 +73,7 @@ case "$CONFIG_TYPE" in
 			| .platform.openstack.externalDNS = [\"1.1.1.1\", \"1.0.0.1\"]
 			| .platform.openstack.externalNetwork = \"${OPENSTACK_EXTERNAL_NETWORK}\"
 			| .platform.openstack.ingressFloatingIP = \"${INGRESS_IP}\"
-			| .platform.openstack.lbFloatingIP = \"${API_IP}\"
+			| .platform.openstack.apiFloatingIP = \"${API_IP}\"
 		" "$INSTALL_CONFIG"
 		;;
 	proxy*)
@@ -114,6 +114,13 @@ if [[ "${ZONES_COUNT}" -gt '0' ]]; then
 		| .compute[0].platform.openstack.rootVolume.type = \"tripleo\"
 		| .compute[0].platform.openstack.rootVolume.size = 30
 		| .compute[0].platform.openstack.rootVolume.zones = ${ZONES_JSON}
+	" "$INSTALL_CONFIG"
+fi
+
+if [[ -f "${SHARED_DIR}/failure_domain.json" ]]; then
+	yq --yaml-output --in-place ".
+		| .controlPlane.platform.openstack += $(<"${SHARED_DIR}/failure_domain.json")
+		| .featureSet = \"TechPreviewNoUpgrade\"
 	" "$INSTALL_CONFIG"
 fi
 
