@@ -25,9 +25,12 @@ echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
-# Run cnftests job on Upstream cluster
-if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
+# Run cnftests periodic and nightly job on Upstream cluster
+if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]]; then
     INTERNAL=false
+    INTERNAL_ONLY=false
+else
+    # Run other jobs on any cluster
     INTERNAL_ONLY=false
 fi
 # Whether to use the bastion environment
@@ -49,12 +52,23 @@ EOF
 ADDITIONAL_ARG=""
 # default to the first cluster in the array, unless 4.14
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-  ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force" 
-  if [[ "$T5CI_VERSION" == "4.14" ]]; then 
-    ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
-  fi 
+    ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
+    if [[ "$T5CI_VERSION" == "4.14" ]]; then
+        ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
+    fi
 else
-  ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
+    ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
+fi
+# Choose topology for different job types:
+# Run periodic cnftests job with 2 baremetal nodes (with all CNF tests)
+# Run nightly periodic jobs with 1 baremetal and 1 virtual node (with origin tests)
+# Run sno job with SNO topology
+if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 2b"
+elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
+elif [[ "$T5CI_JOB_TYPE"  == "sno" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology sno"
 fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
