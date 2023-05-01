@@ -264,13 +264,11 @@ aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" 
         ParameterKey=HostInstanceType,ParameterValue="${instance_type}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
-        ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)" &
+        ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)"
 
-wait "$!"
 echo "Created stack"
 
-aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}" &
-wait "$!"
+aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${stack_name}"
 echo "Waited for stack"
 
 echo "$stack_name" > "${SHARED_DIR}/rhel_host_stack_name"
