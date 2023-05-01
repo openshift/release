@@ -17,6 +17,18 @@ roleRef:
   apiGroup: rbac.authorization.k8s.io
   name: view
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+    name: grafana-var-lib
+    namespace: grafana-loki
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 256M
+---
 kind: Deployment
 apiVersion: apps/v1
 metadata:
@@ -42,6 +54,9 @@ spec:
           secret:
             secretName: grafana-datasources
             defaultMode: 420
+        - name: grafana-var-lib
+          persistentVolumeClaim:
+            claimName: grafana-var-lib
       containers:
         - name: grafana-sso
           image: 'quay.io/vrutkovs/grafana:9.4.3'
@@ -55,6 +70,8 @@ spec:
               mountPath: /etc/grafana
             - name: grafana-datasources
               mountPath: /etc/grafana/provisioning/datasources
+            - name: grafana-var-lib
+              mountPath: /var/lib/grafana
       restartPolicy: Always
       terminationGracePeriodSeconds: 30
       dnsPolicy: ClusterFirst
