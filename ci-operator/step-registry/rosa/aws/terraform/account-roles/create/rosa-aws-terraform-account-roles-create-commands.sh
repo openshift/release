@@ -6,10 +6,11 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-ACCOUNT_ROLES_PREFIX=${ACCOUNT_ROLES_PREFIX:-$NAMESPACE}
+ACCOUNT_ROLE_PREFIX=${ACCOUNT_ROLE_PREFIX:-$NAMESPACE}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
-CHANNEL_GROUP=${CHANNEL_GROUP}
+OCM_ENV=${OCM_ENV:-staging}
+
 
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -21,34 +22,25 @@ else
   exit 1
 fi
 
-# Log in
-ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${ROSA_TOKEN}" ]]; then
-  echo "Logging into ${ROSA_LOGIN_ENV} with offline token"
-  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
-  if [ $? -ne 0 ]; then
-    echo "Login failed"
-    exit 1
-  fi
+
+OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
+
+if [[ "${OCM_ENV}" == 'staging' ]]; then
+  export OCM_URL='https://api.stage.openshift.com'
 else
-  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
-  exit 1
+  export OCM_URL='https://api.openshift.com'
 fi
 
-# Support to create the account-roles with the higher version 
-VERSION_SWITCH=""
-if [[ "$CHANNEL_GROUP" != "stable" ]] && [[ ! -z "$OPENSHIFT_VERSION" ]]; then
-  OPENSHIFT_VERSION=$(echo "${OPENSHIFT_VERSION}" | cut -d '.' -f 1,2)
-  VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
-fi
+pwd
+ls -la
+printenv|sort
 
-# Whatever the account roles with the prefix exist or not, do creation.
-echo "Create the account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
-rosa create account-roles --prefix ${ACCOUNT_ROLES_PREFIX} -y --mode auto ${VERSION_SWITCH}
+cat <<_EOF > terraform.tfvars
+ocm_environment        = "$OCM_ENV"
+openshift_version      = "openshift-v$OPENSHIFT_VERSION"
+account_role_prefix    = "$ACCOUNT_ROLE_PREFIX"
+token                  = "$OCM_TOKEN"
+url                    = "$OCM_URL"
+_EOF
 
-# Store the account-role-prefix for the post steps and the account roles deletion
-echo -n "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-prefix"
-
-# List the created account roles
-echo -e "\nList the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
-rosa list account-roles | grep "${ACCOUNT_ROLES_PREFIX}"
+terraform apply -auto-approve

@@ -3,33 +3,39 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  cli:
+    name: "4.13"
+    namespace: origin
+    tag: cli
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
+images:
+- dockerfile_literal: "FROM registry.ci.openshift.org/origin/4.13:cli\n\nRUN curl
+    -s https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo -o /etc/yum.repos.d/hashicorp.repo
+    && \\\n    wget https://github.com/openshift-online/ocm-cli/releases/download/v0.1.66/ocm-linux-amd64
+    -O /usr/local/bin/ocm && \\\n    chmod +x /usr/local/bin/ocm &&\\\n    ocm version\n\nRUN
+    yum -y install --setopt=skip_missing_names_on_install=False \\\n    openssl \\\n
+    \   jq \\\n    unzip \\\n    which \\\n    terraform\n\nRUN yum clean all &&\\\n
+    \   terraform version\n\n    # git clone https://github.com/terraform-redhat/terraform-provider-ocm.git
+    --branch main --depth=1\nRUN git config --global http.sslVerify false && \\\n
+    \   git clone https://github.com/ashoshan/terraform-provider-ocm.git --branch
+    main --depth=1\n    \n"
+  to: ocm-tf-cli
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: lint
-  commands: |
-    export GOLANGCI_LINT_VERSION=$(cat .golangciversion)
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    unset GOFLAGS
-    curl -sfL "https://github.com/golangci/golangci-lint/releases/download/v${GOLANGCI_LINT_VERSION:?'golangci-lint version is unset'}/golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64.tar.gz" | tar -C /go/bin -zx --strip-components=1 "golangci-lint-${GOLANGCI_LINT_VERSION}-linux-amd64/golangci-lint"
-    go mod download
-    make lint
-  container:
-    from: src
-- as: build
-  commands: |
-    unset GOFLAGS
-    make
-  container:
-    from: src
 - as: terraform-rehearse-debug
   cron: '@yearly'
   steps:
