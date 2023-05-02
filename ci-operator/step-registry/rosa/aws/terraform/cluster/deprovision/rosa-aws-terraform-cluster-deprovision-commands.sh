@@ -7,7 +7,6 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
-OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 
 # Configure aws
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -19,12 +18,10 @@ else
   exit 1
 fi
 
-pushd "${SHARED_DIR}/terraform/cluster_sts"
+mkdir -p ${SHARED_DIR}/cluster_sts
+tar xvfz ${SHARED_DIR}/cluster_sts.tar.gz -C ${SHARED_DIR}/cluster_sts
+cd       ${SHARED_DIR}/cluster_sts
+
+terraform init
 
 terraform destroy
-
-pwd
-ls -la
-printenv|sort
-
-popd

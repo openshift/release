@@ -31,9 +31,12 @@ else
   export OCM_URL='https://api.openshift.com'
 fi
 
-pwd
-ls -la
-printenv|sort
+mkdir -p ${SHARED_DIR}/account_roles
+cd       ${SHARED_DIR}/account_roles
+
+cp /terraform-provider-ocm/examples/create_rosa_cluster/create_rosa_sts_cluster/classic_sts/account_roles/* ./
+
+# sed -i -rz 's/ocm(.+?)=(.+?)"terraform-redhat\/ocm"/ocm = {\n      source  = "terraform.local\/local\/ocm"\n      version = ">=0.0.1"/' main.tf
 
 cat <<_EOF > terraform.tfvars
 ocm_environment        = "$OCM_ENV"
@@ -43,4 +46,9 @@ token                  = "$OCM_TOKEN"
 url                    = "$OCM_URL"
 _EOF
 
+terraform init
+
 terraform apply -auto-approve
+
+cd ${HOME}
+tar cvfz ${SHARED_DIR}/account_roles.tar.gz -C ${SHARED_DIR}/account_roles .

@@ -13,16 +13,23 @@ build_root:
     namespace: openshift
     tag: golang-1.19
 images:
-- dockerfile_literal: "FROM registry.ci.openshift.org/origin/4.13:cli\n\nRUN curl
-    -s https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo -o /etc/yum.repos.d/hashicorp.repo
-    && \\\n    wget https://github.com/openshift-online/ocm-cli/releases/download/v0.1.66/ocm-linux-amd64
-    -O /usr/local/bin/ocm && \\\n    chmod +x /usr/local/bin/ocm &&\\\n    ocm version\n\nRUN
-    yum -y install --setopt=skip_missing_names_on_install=False \\\n    openssl \\\n
-    \   jq \\\n    unzip \\\n    which \\\n    terraform\n\nRUN yum clean all &&\\\n
-    \   terraform version\n\n    # git clone https://github.com/terraform-redhat/terraform-provider-ocm.git
-    --branch main --depth=1\nRUN git config --global http.sslVerify false && \\\n
-    \   git clone https://github.com/ashoshan/terraform-provider-ocm.git --branch
-    main --depth=1\n    \n"
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/origin/4.13:cli
+
+    RUN wget -q https://github.com/openshift-online/ocm-cli/releases/download/v0.1.66/ocm-linux-amd64 -O /usr/local/bin/ocm &&\
+        chmod +x /usr/local/bin/ocm &&\
+        ocm version
+
+    RUN curl -s https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo -o /etc/yum.repos.d/hashicorp.repo &&\
+        yum install -y terraform &&\
+        terraform version
+
+    RUN yum -y install --setopt=skip_missing_names_on_install=False \
+        openssl jq unzip which
+    RUN yum clean all
+
+    RUN git config --global http.sslVerify false &&\
+        git clone https://github.com/AsherShoshan/terraform-provider-ocm.git --branch main --depth=1
   to: ocm-tf-cli
 releases:
   latest:

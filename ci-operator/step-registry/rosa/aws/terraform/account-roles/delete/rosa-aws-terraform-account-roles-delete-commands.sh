@@ -18,8 +18,10 @@ else
   exit 1
 fi
 
-pushd "${SHARED_DIR}/terraform/account-roles"
+mkdir -p ${SHARED_DIR}/account-roles
+tar xvfz ${SHARED_DIR}/account-roles.tar.gz -C ${SHARED_DIR}/account-roles
+cd       ${SHARED_DIR}/account-roles
+
+terraform init
 
 terraform destroy -auto-approve
-
-popd

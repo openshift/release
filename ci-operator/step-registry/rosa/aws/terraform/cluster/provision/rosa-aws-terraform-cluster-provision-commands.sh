@@ -8,7 +8,8 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 ACCOUNT_ROLE_PREFIX=${ACCOUNT_ROLE_PREFIX:-$NAMESPACE}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
-OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
+CLUSTER_NAME=${CLUSTER_NAME:-asher}
+OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-4.12.13}
 OCM_ENV=${OCM_ENV:-staging}
 
 
@@ -30,28 +31,29 @@ else
   export OCM_URL='https://api.openshift.com'
 fi
 
-cp /terraform-provider-ocm/examples/create_rosa_cluster/create_rosa_sts_cluster/classic_sts/cluster/* ${SHARED_DIR}/terraform/cluster_sts/
+mkdir -p ${SHARED_DIR}/cluster_sts
+cd       ${SHARED_DIR}/cluster_sts
 
-pushd "${SHARED_DIR}/terraform/cluster_sts"
+cp /terraform-provider-ocm/examples/create_rosa_cluster/create_rosa_sts_cluster/classic_sts/cluster/* ./
 
-terraform init
+# sed -i -rz 's/ocm(.+?)=(.+?)"terraform-redhat\/ocm"/ocm = {\n      source  = "terraform.local\/local\/ocm"\n      version = ">=0.0.1"/' main.tf
 
 cat <<_EOF > terraform.tfvars
 url                    = "$OCM_URL"
 token                  = "$OCM_TOKEN"
 operator_role_prefix   = "$CLUSTER_NAME"
-account_role_prefix    = "ManagedOpenShift"
+account_role_prefix    = "$ACCOUNT_ROLE_PREFIX"
 cluster_name           = "$CLUSTER_NAME"
 aws_region             = "$AWS_DEFAULT_REGION"
 openshift_version      = "openshift-v$OPENSHIFT_VERSION"
 _EOF
 
+terraform init
+
 terraform apply -auto-approve
 
-echo $(terraform output -json cluster_id| jq -r .) > cluster_id
+terraform output -json cluster_id| jq -r . > ${SHARED_DIR}/ocm_cluster_id
 
-pwd
-ls -la
-printenv|sort
+cd ${HOME}
+tar cvfz ${SHARED_DIR}/cluster_sts.tar.gz -C ${SHARED_DIR}/cluster_sts .
 
-popd
