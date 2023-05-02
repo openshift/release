@@ -26,7 +26,7 @@ if [[ -f ${SHARED_DIR}"/BASTION_ROUTER_ID" ]]; then
   # * there is a machine subnet that was created
   # * we don't use a provider network for the machines since this network isn't connected to a neutron router
   # * when the network is not isolated, like it's the case in *"proxy"* CONFIG_TYPE
-  if [[ -f ${SHARED_DIR}"/MACHINES_SUBNET_ID" && ${OPENSTACK_PROVIDER_NETWORK} == "" && ${CONFIG_TYPE} != *"proxy"* ]]; then
+  if [[ -f ${SHARED_DIR}"/MACHINES_SUBNET_ID" && ${CONFIG_TYPE} != *"proxy"* ]]; then
     MACHINES_SUBNET_ID=$(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)
     openstack router remove subnet ${BASTION_ROUTER_ID} ${MACHINES_SUBNET_ID} || >&2 echo "Failed to delete machines subnet ${MACHINES_SUBNET_ID} from bastion router ${BASTION_ROUTER_ID}"
   fi
@@ -37,7 +37,7 @@ if [[ -f ${SHARED_DIR}"/BASTION_NET_ID" ]]; then
   openstack network delete ${NET_ID} || >&2 echo "Failed to delete bastion network ${NET_ID}"
 fi
 
-if [[ -f ${SHARED_DIR}"/MACHINES_NET_ID" && ${OPENSTACK_PROVIDER_NETWORK} == "" ]]; then
+if [[ -f ${SHARED_DIR}"/MACHINES_NET_ID" ]]; then
   NET_ID=$(<"${SHARED_DIR}"/MACHINES_NET_ID)
   openstack network delete ${NET_ID} || >&2 echo "Failed to delete machines network ${NET_ID}"
 fi
