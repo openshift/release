@@ -136,6 +136,33 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 8h0m0s
+    - as: proxy-update-istio-2-2
+      commands: |
+        # load test-infra automator.sh script
+        export ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
+        git clone https://github.com/maistra/test-infra.git
+        test-infra/tools/automator.sh \
+        -o maistra \
+        -r istio \
+        -f /maistra-secret/token \
+        -c bin/update_proxy.sh "${PULL_BASE_SHA}" \
+        '-t Automator: Update proxy' \
+        -l auto-merge \
+        -m bump-proxy \
+        -b maistra-2.2
+      credentials:
+      - mount_path: /maistra-secrets
+        name: github-token
+        namespace: ci
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
     workflow: servicemesh-proxy-e2e-aws
   timeout: 8h0m0s
 zz_generated_metadata:
