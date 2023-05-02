@@ -15,11 +15,11 @@ icsp_file="${SHARED_DIR}/local_registry_icsp_file.yaml"
 
 # private mirror registry host
 # <public_dns>:<port>
-MIRROR_REGISTRY_HOST=`head -n 1 "${SHARED_DIR}/mirror_registry_url"`
 if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
     echo "File ${SHARED_DIR}/mirror_registry_url does not exist."
     exit 1
 fi
+MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
 
 readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')

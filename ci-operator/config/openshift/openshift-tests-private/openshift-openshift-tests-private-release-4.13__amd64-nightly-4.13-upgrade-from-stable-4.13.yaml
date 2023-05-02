@@ -206,7 +206,6 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      SKIP_HYPERSHIFT_PULL_SECRET_UPDATE: "true"
       TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @hypershift-hosted
         and not @fips'
@@ -216,13 +215,28 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-hypershift-control-plane
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-worker-node-p1-f4
-  cron: 8 10 1,6,11,15,19,23,27 * *
+- as: aws-ipi-ovn-hypershift-worker-node-replace-p1-f7
+  cron: 11 7 6,14,22,29 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      SKIP_HYPERSHIFT_PULL_SECRET_UPDATE: "true"
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @hypershift-hosted
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and @hypershift-hosted
+        and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-hypershift-worker-node
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-ovn-hypershift-worker-node-inplace-p1-f7
+  cron: 57 16 1,9,17,24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --node-upgrade-type=InPlace
       TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @hypershift-hosted
         and not @fips'
@@ -444,8 +458,8 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
-- as: vsphere-ipi-proxy-workers-rhel8-p2-f7
-  cron: 32 16 5,12,20,28 * *
+- as: vsphere-ipi-proxy-workers-rhel8-p2-f14
+  cron: 32 22 14,29 * *
   steps:
     cluster_profile: vsphere-discon
     env:

@@ -1,14 +1,14 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -16,11 +16,11 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra
   coreos-centos-stream8:
@@ -54,7 +54,7 @@ images:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer-controller
 promotion:
-  name: ocm-2.8
+  name: ocm-2.9
   namespace: edge-infrastructure
 releases:
   latest:
@@ -72,7 +72,6 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
 - as: publish-multi-arch-images
-  cluster: build03
   postsubmit: true
   steps:
     cluster_profile: packet-assisted
@@ -82,7 +81,6 @@ tests:
         Dockerfile.assisted-installer-controller , quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
     workflow: assisted-tools-multi-arch
 - as: mirror-nightly-image
-  cluster: build03
   cron: '@daily'
   steps:
     dependencies:
@@ -92,7 +90,6 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-nightly-image-controller
-  cluster: build03
   cron: '@daily'
   steps:
     dependencies:
@@ -102,7 +99,6 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
-  cluster: build03
   postsubmit: true
   steps:
     dependencies:
@@ -112,7 +108,6 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image-controller
-  cluster: build03
   postsubmit: true
   steps:
     dependencies:
@@ -155,13 +150,11 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
 - as: e2e-metal-assisted
-  cluster: build03
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6
-  cluster: build03
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -171,7 +164,6 @@ tests:
         IPv4=no
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
-  cluster: build03
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -180,7 +172,6 @@ tests:
         NUM_MASTERS=1
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
-  cluster: build03
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -190,7 +181,6 @@ tests:
         OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
-  cluster: build03
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -202,7 +192,6 @@ tests:
         MASTER_CPU=9
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
-  cluster: build03
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -213,7 +202,6 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
-  cluster: build03
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -224,7 +212,6 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp
-  cluster: build03
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
