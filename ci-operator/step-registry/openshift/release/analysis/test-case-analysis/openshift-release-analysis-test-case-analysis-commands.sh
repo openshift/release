@@ -4,8 +4,15 @@ set -o nounset
 set +o errexit
 set -o pipefail
 
-MINIMUM_SUCCESSFUL_COUNT=2
+DEFAULT_MINIMUM_SUCCESSFUL_COUNT=2
 TEST_GROUP=install
+PIDS=""
+
+function save_pid() {
+	PIDS="$PIDS $1"
+	echo "PID is $1"
+}
+
 
 echo
 echo "********** Starting testcase analysis for:  aws-ovn-ipi "
@@ -16,12 +23,12 @@ job-run-aggregator analyze-test-case \
 	--platform=aws \
 	--network=ovn \
 	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
+	--minimum-successful-count=${DEFAULT_MINIMUM_SUCCESSFUL_COUNT} \
 	--job-start-time=${JOB_START_TIME} \
 	--working-dir=${ARTIFACT_DIR}/aws-ovn-ipi \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS=$!
+save_pid $!
 
 echo
 echo "********** Starting testcase analysis for:  aws-sdn-ipi "
@@ -32,12 +39,12 @@ job-run-aggregator analyze-test-case \
 	--platform=aws \
 	--network=sdn \
 	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
+	--minimum-successful-count=${DEFAULT_MINIMUM_SUCCESSFUL_COUNT} \
 	--job-start-time=${JOB_START_TIME} \
 	--working-dir=${ARTIFACT_DIR}/aws-sdn-ipi \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+save_pid $!
 
 echo
 echo "********** Starting testcase analysis for:  azure-ovn-ipi "
@@ -48,12 +55,12 @@ job-run-aggregator analyze-test-case \
 	--platform=azure \
 	--network=ovn \
 	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
+	--minimum-successful-count=${DEFAULT_MINIMUM_SUCCESSFUL_COUNT} \
 	--job-start-time=${JOB_START_TIME} \
 	--working-dir=${ARTIFACT_DIR}/azure-ovn-ipi \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+save_pid $!
 
 echo
 echo "********** Starting testcase analysis for:  gcp-sdn-ipi "
@@ -64,12 +71,12 @@ job-run-aggregator analyze-test-case \
 	--platform=gcp \
 	--network=sdn \
 	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
+	--minimum-successful-count=${DEFAULT_MINIMUM_SUCCESSFUL_COUNT} \
 	--job-start-time=${JOB_START_TIME} \
 	--working-dir=${ARTIFACT_DIR}/gcp-sdn-ipi \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+save_pid $!
 
 echo
 echo "********** Starting testcase analysis for:  vsphere-ovn-ipi "
@@ -80,12 +87,12 @@ job-run-aggregator analyze-test-case \
 	--platform=vsphere \
 	--network=ovn \
 	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
+	--minimum-successful-count=${DEFAULT_MINIMUM_SUCCESSFUL_COUNT} \
 	--job-start-time=${JOB_START_TIME} \
 	--working-dir=${ARTIFACT_DIR}/vsphere-ovn-ipi \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+save_pid $!
 
 echo
 echo "********** Starting testcase analysis for:  vsphere-ovn-upi "
@@ -96,12 +103,12 @@ job-run-aggregator analyze-test-case \
 	--platform=vsphere \
 	--network=ovn \
 	--infrastructure=upi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
+	--minimum-successful-count=${DEFAULT_MINIMUM_SUCCESSFUL_COUNT} \
 	--job-start-time=${JOB_START_TIME} \
 	--working-dir=${ARTIFACT_DIR}/vsphere-ovn-upi \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+save_pid $!
 
 echo
 echo "********** Starting testcase analysis for:  vsphere-sdn-ipi "
@@ -112,12 +119,12 @@ job-run-aggregator analyze-test-case \
 	--platform=vsphere \
 	--network=sdn \
 	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
+	--minimum-successful-count=${DEFAULT_MINIMUM_SUCCESSFUL_COUNT} \
 	--job-start-time=${JOB_START_TIME} \
 	--working-dir=${ARTIFACT_DIR}/vsphere-sdn-ipi \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+save_pid $!
 
 echo
 echo "********** Starting testcase analysis for:  metal-ovn-ipi "
@@ -128,12 +135,12 @@ job-run-aggregator analyze-test-case \
 	--platform=metal \
 	--network=ovn \
 	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
+	--minimum-successful-count=${DEFAULT_MINIMUM_SUCCESSFUL_COUNT} \
 	--job-start-time=${JOB_START_TIME} \
 	--working-dir=${ARTIFACT_DIR}/metal-ovn-ipi \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+save_pid $!
 
 echo
 echo "********** Starting testcase analysis for:  metal-sdn-ipi "
@@ -144,12 +151,12 @@ job-run-aggregator analyze-test-case \
 	--platform=metal \
 	--network=sdn \
 	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
+	--minimum-successful-count=${DEFAULT_MINIMUM_SUCCESSFUL_COUNT} \
 	--job-start-time=${JOB_START_TIME} \
 	--working-dir=${ARTIFACT_DIR}/metal-sdn-ipi \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+save_pid $!
 
 echo
 echo "********** Starting testcase analysis for aws proxy jobs"
@@ -164,7 +171,7 @@ job-run-aggregator analyze-test-case \
 	--working-dir=${ARTIFACT_DIR}/aws-proxy \
 	--timeout=4h30m \
 	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+save_pid $!
 
 echo "Waiting for pids to complete: $PIDS"
 ret=0
