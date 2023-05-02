@@ -8,7 +8,7 @@
     - [Test Setup, Execution, and Reporting Results](#test-setup-execution-and-reporting-results)
 - [Prerequisite(s)](#prerequisites)
     - [Environment Variables](#environment-variables)
-    - [Custom Images](#custom-images)
+    - [Custom Image](#custom-images)
 
 ## General Information
 
@@ -40,7 +40,7 @@ workflow. This workflow is not maintained by the Interop QE team.
 
 Following the test cluster being provisioned, the following steps are executed in this order:
 
-TODO
+1. [`service-registry-run-tests-ref`](../../../step-registry/service-registry/run-tests/README.md)
 
 ## Prerequisite(s)
 
@@ -50,13 +50,8 @@ TODO
     - **Definition**: A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for
   setting baseDomain variable of the install configuration of the cluster.
     - **If left empty**: The [`ipi-aws` workflow](../../../step-registry/ipi/aws/ipi-aws-workflow.yaml) will fail.
-- `PROFILE`
-    - **Definition**: Specify profile of tests that will be executed via maven command. To pick up tests used for
-  interoperability testing, users should use `interop` group.
-    - **If left empty**: It will use `interop` as the [default value](../../../step-registry/service-registry/run-tests/README.md).
-  Meaning only tests used for interoperability will be executed.
 
-### Custom Images
+### Custom Image
 
 - [apicurio/apicurio-ci-tools](https://quay.io/repository/apicurio/apicurio-ci-tools)
 - To see Dockerfile, please contact someone from Service Registry QE.

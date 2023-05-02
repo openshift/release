@@ -4,8 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Running the tests"
-./run_tests.sh
+echo "Download repository with tests"
+git clone https://github.com/Apicurio/apicurio-registry-system-tests
+
+echo "Change directory to system tests in repository"
+cd apicurio-registry-system-tests/system-tests
+
+echo "Run the tests"
+./scripts/run-interop-tests.sh
 
 echo "Copy logs and xunit to artifacts dir"
-./copy_logs.sh "${ARTIFACT_DIR}"
+cp target/surefire-reports/*.xml "${ARTIFACT_DIR}"
