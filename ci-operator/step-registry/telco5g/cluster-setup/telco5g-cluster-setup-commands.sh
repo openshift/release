@@ -274,6 +274,20 @@ cat << EOF > $SHARED_DIR/check-cluster.yml
     failed_when: "'True' not in ready_check.stdout"
 EOF
 
+cat << EOF > $SHARED_DIR/destroy-cluster.yml
+---
+- name: Delete cluster
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Delete deployment plan
+    shell: kcli delete plan -y ${PLAN_NAME}
+    args:
+      chdir: ~/kcli-openshift4-baremetal
+
+EOF
+
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
 # CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.
 # It is intentionally set to a string so that it can be evaluated as a command (either /bin/true or /bin/false)
