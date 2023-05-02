@@ -39,6 +39,7 @@ images:
     COPY oc hypershift /usr/bin/
     RUN mkdir -p /go/src/github.com/openshift && \
         cd /go/src/github.com/openshift && \
+        git clone https://github.com/openshift/kubevirt-csi-driver && \
         git clone https://github.com/openshift/hypershift.git && \
         cd hypershift/ && \
         go mod tidy && go mod vendor && \
@@ -87,67 +88,16 @@ tests:
   commands: make test
   container:
     from: src
-- as: cluster-api-provider-kubevirt-with-hypershift
+- as: e2e-kubevirt-aws-csi
   steps:
     cluster_profile: aws-virtualization
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+      CNV_PRERELEASE_VERSION: "4.13"
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
       CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
-    test:
-    - as: deploy-cnv
-      cli: latest
-      commands: CNV_PRERELEASE_VERSION=4.12 ./hack/ci/install-cnv.sh
-      credentials:
-      - mount_path: /etc/cnv-nightly-pull-credentials
-        name: openshift-cnv-quay-credentials
-        namespace: test-credentials
-      from: hypershift-cli-e2e
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: deploy-hypershift
-      cli: latest
-      commands: |-
-        set -x
-        hypershift install
-      from: hypershift-cli-e2e
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: hypershift-e2e
-      cli: latest
-      commands: |-
-        set -ex
-        # run the test
-        bin/test-e2e \
-                  --test.v \
-                  --test.timeout=0 \
-                  --test.run='^TestCreateCluster$' \
-                  --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-                  --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-                  --e2e.node-pool-replicas=2 \
-                  --e2e.kubevirt-node-memory="6Gi" \
-                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-                  --e2e.platform=KubeVirt
-      credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: OCP_IMAGE_LATEST
-        name: release:latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      from: hypershift-cli-e2e
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: ipi-aws-ovn
+    workflow: hypershift-kubevirt-csi-e2e
 zz_generated_metadata:
   branch: master
   org: openshift
