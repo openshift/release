@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "************ baremetalds devscripts setup command ************"
+echo "************ baremetalds devscripts setup command ***********"
 
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
