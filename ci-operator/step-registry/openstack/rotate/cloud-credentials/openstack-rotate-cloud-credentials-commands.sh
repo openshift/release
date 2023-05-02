@@ -53,7 +53,4 @@ oc wait --timeout=5m --for=condition=Progressing=false $(oc get clusteroperator 
 info 'Revoking the credentials that were used so far...'
 delete_application_credential "$ORIGINAL_CLOUDS_YAML"
 
-info 'Revoking the unrestricted credentials...'
-delete_application_credential "$UNRESTRICTED_CLOUDS_YAML"
-
 info 'Done.'

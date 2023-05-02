@@ -3,19 +3,19 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/csi-driver-shared-resource-operator
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: csi-driver-shared-resource-operator
 promotion:
   name: 4.15-priv
@@ -54,14 +54,18 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - ref: csi-driver-shared-resource-e2e
-    workflow: csi-driver-shared-resource-e2e-techpreview
+    workflow: csi-driver-shared-resource-e2e-test
 - as: e2e-aws-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-techpreview
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

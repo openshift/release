@@ -56,6 +56,7 @@ cat > create-machines.yaml <<-'EOF'
   vars:
     aws_region: "{{ lookup('env', 'AWS_REGION') }}"
     cluster_dir: "{{ lookup('env', 'SHARED_DIR') }}"
+    rhel_image: "{{ lookup('env', 'RHEL_IMAGE') }}"
     platform_type: "rhel"
     platform_version: "{{ lookup('env', 'PLATFORM_VERSION') }}"
     platform_type_dict:
@@ -82,7 +83,7 @@ cat > create-machines.yaml <<-'EOF'
 
   - name: Set aws_ami to most recent image
     set_fact:
-      aws_ami: "{{ ec2_ami_facts_results.images[-1].image_id }}"
+      aws_ami: "{{ rhel_image if rhel_image != '' else ec2_ami_facts_results.images[-1].image_id }}"
 
   - name: Get existing worker machinesets
     command: >

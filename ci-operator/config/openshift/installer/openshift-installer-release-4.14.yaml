@@ -51,6 +51,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
   rhel-7:
     name: builder
     namespace: ocp
@@ -67,6 +71,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
@@ -117,6 +124,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -127,6 +137,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: ovirt-installer
 - dockerfile_literal: |
     FROM src
@@ -256,9 +269,9 @@ tests:
         keyC valueC
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
-- as: e2e-aws-ovn-proxy
+- always_run: false
+  as: e2e-aws-ovn-proxy
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
@@ -334,12 +347,12 @@ tests:
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
-  run_if_changed: azure
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-resourcegroup
   timeout: 6h0m0s
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws
@@ -377,7 +390,8 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-upi
   timeout: 6h0m0s
-- as: e2e-aws-ovn-workers-rhel8
+- always_run: false
+  as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
     cluster_profile: aws

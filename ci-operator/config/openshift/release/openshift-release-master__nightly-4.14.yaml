@@ -184,15 +184,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-ipv4
-- as: e2e-metal-ipi-sdn
-  cluster: build05
-  interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e-sdn-ipv4
 - as: e2e-metal-ipi-sdn-bm
   cluster: build05
   interval: 168h
@@ -254,15 +245,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-serial-ovn-dualstack
-- as: e2e-metal-ipi-sdn-serial-compact
-  cluster: build05
-  interval: 168h
-  steps:
-    cluster_profile: equinix-ocp-metal
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e-sdn-serial-compact
 - as: e2e-metal-ipi-sdn-bm-upgrade
   cluster: build05
   cron: 0 12 1 1 *
@@ -306,20 +288,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: baremetalds-e2e-ovn-dualstack
-- as: e2e-metal-ipi-ovn-compact
-  cluster: build05
-  cron: 0 0 * * 1
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        IP_STACK=v6
-        MASTER_MEMORY=24576
-        NUM_WORKERS=0
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: baremetalds-e2e
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -341,12 +309,13 @@ tests:
   steps:
     cluster_profile: vsphere
     env:
+      FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
         In-tree Volumes \[Driver: vsphere\] \[Testpattern: Pre-provisioned PV'
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-vsphere-techpreview
+    workflow: openshift-e2e-vsphere
 - as: e2e-aws-ovn-local-gateway
   interval: 168h
   steps:
@@ -400,10 +369,12 @@ tests:
   cron: 0 9/12 * * *
   steps:
     cluster_profile: vsphere
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     observers:
       enable:
       - observers-resource-watch
-    workflow: openshift-e2e-vsphere-techpreview-serial
+    workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-upi
   cron: 0 10/12 * * *
   steps:
@@ -477,7 +448,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-workers-rhel
 - as: e2e-ovirt-sdn
-  cron: 0 2,8,14,20 * * *
+  cron: 0 14,20 * * *
   steps:
     cluster_profile: ovirt
     observers:
@@ -485,7 +456,7 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-ovirt-conformance
 - as: e2e-ovirt-ovn
-  cron: 0 6,18 * * *
+  cron: 0 18 * * *
   steps:
     cluster_profile: ovirt
     env:
@@ -1033,6 +1004,11 @@ tests:
     env:
       BASE_DOMAIN: aws-2.ci.openshift.org
     workflow: openshift-e2e-aws-cpu-partitioning
+- as: e2e-gcp-graceful-shutdown
+  interval: 168h
+  steps:
+    cluster_profile: gcp-openshift-gce-devel-ci-2
+    workflow: openshift-e2e-gcp-graceful-shutdown
 zz_generated_metadata:
   branch: master
   org: openshift
