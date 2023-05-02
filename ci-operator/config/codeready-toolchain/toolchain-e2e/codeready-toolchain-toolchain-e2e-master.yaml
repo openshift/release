@@ -2,11 +2,15 @@ build_root:
   project_image:
     dockerfile_path: openshift-ci/Dockerfile.tools
 releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
   latest:
-    release:
-      architecture: amd64
-      channel: stable
-      version: "4.12"
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -16,8 +20,6 @@ tests:
 - as: e2e
   steps:
     cluster_profile: aws
-    env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.4-multi
     test:
     - as: test
       cli: latest
@@ -26,7 +28,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: codeready-toolchain-install
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: codeready-toolchain
