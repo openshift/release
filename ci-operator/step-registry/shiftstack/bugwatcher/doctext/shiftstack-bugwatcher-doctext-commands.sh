@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 
 JIRA_TOKEN="$(</var/run/bugwatcher/jira-token)"
-SLACK_HOOK="$(</var/run/slack-hooks/forum-shiftstack)"
+SLACK_HOOK="$(</var/run/slack-hooks/team-shift-on-stack)"
 TEAM_MEMBERS_DICT="$(</var/run/team/teamdict.json)"
 TEAM_VACATION="$(</var/run/team/vacation.json)"
 
