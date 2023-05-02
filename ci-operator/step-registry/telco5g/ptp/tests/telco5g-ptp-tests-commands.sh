@@ -1,9 +1,12 @@
 #!/bin/bash
 
+if [[ "$JOB_TYPE" == "periodic" ]]; then
+  exit 1
+fi
+
 set -o nounset
 set -o errexit
 set -o pipefail
-
 
 function create_tests_skip_list_file {
 # List of test cases to skip for all releases
