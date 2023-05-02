@@ -12,7 +12,7 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
 
-REGION="${LEASED_RESOURCE}"
+REGION=${REGION:-$LEASED_RESOURCE}
 
 function save_stack_events_to_artifacts()
 {

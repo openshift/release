@@ -21,7 +21,7 @@ metadata:
   name: ${REQUIRED_ENCRYPTION_STORAGECLASS_NAME}
 parameters:
   # Using the vsphere preset encrypt storage policy
-  storagepolicyname: ${REQUIRED_ENCRYPTION_POLICY}
+  storagePolicyName: ${REQUIRED_ENCRYPTION_POLICY}
   datastoreurl: ${DATA_STORE_URL}
 provisioner: csi.vsphere.vmware.com
 reclaimPolicy: Delete

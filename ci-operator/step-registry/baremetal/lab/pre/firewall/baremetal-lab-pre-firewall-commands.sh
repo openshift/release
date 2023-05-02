@@ -53,3 +53,8 @@ export HTTPS_PROXY=${proxy}
 export http_proxy=${proxy}
 export https_proxy=${proxy}
 EOF
+
+if [ "${CLUSTER_WIDE_PROXY}" == "true" ]; then
+  # ipi-conf-proxy will run only if a specific file is found, see step code
+  cp "${CLUSTER_PROFILE_DIR}/proxy" "${SHARED_DIR}/proxy_private_url"
+fi

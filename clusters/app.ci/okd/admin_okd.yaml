@@ -1,6 +1,11 @@
 kind: List
 apiVersion: v1
 items:
+- kind: ServiceAccount
+  apiVersion: v1
+  metadata:
+    name: sa-image-tagger
+    namespace: origin
 - kind: Role
   apiVersion: rbac.authorization.k8s.io/v1
   metadata:
@@ -27,6 +32,9 @@ items:
   - kind: Group
     apiGroup: rbac.authorization.k8s.io
     name: okd-admins
+  - kind: ServiceAccount
+    name: sa-image-tagger
+    namespace: origin
   roleRef:
     kind: Role
     apiGroup: rbac.authorization.k8s.io
@@ -44,3 +52,16 @@ items:
     kind: ClusterRole
     apiGroup: rbac.authorization.k8s.io
     name: registry-editor
+- kind: RoleBinding
+  apiVersion: rbac.authorization.k8s.io/v1
+  metadata:
+    name: okd-admins-sa-pull-secret
+    namespace: origin
+  roleRef:
+    kind: ClusterRole
+    apiGroup: rbac.authorization.k8s.io
+    name: pull-secret-namespace-manager
+  subjects:
+    - kind: Group
+      apiGroup: rbac.authorization.k8s.io
+      name: okd-admins

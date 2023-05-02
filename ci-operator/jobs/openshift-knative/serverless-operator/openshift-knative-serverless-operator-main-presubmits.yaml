@@ -1,6 +1,73 @@
 presubmits:
   openshift-knative/serverless-operator:
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/4.10-e2e-kitchensink-ocp-410
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.10"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.10"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-main-4.10-e2e-kitchensink-ocp-410
+    optional: true
+    rerun_command: /test 4.10-e2e-kitchensink-ocp-410
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-kitchensink-ocp-410
+        - --variant=4.10
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.10-e2e-kitchensink-ocp-410,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -185,6 +252,73 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.10-ui-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/4.10-upgrade-kitchensink-ocp-410
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.10"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.10"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-main-4.10-upgrade-kitchensink-ocp-410
+    optional: true
+    rerun_command: /test 4.10-upgrade-kitchensink-ocp-410
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=upgrade-kitchensink-ocp-410
+        - --variant=4.10
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.10-upgrade-kitchensink-ocp-410,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -556,6 +690,73 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.12-azure-images,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/4.12-e2e-kitchensink-ocp-412
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.12"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-main-4.12-e2e-kitchensink-ocp-412
+    optional: true
+    rerun_command: /test 4.12-e2e-kitchensink-ocp-412
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-kitchensink-ocp-412
+        - --variant=4.12
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.12-e2e-kitchensink-ocp-412,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
@@ -843,6 +1044,73 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )4.12-ui-tests,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/4.12-upgrade-kitchensink-ocp-412
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: "4.12"
+      ci.openshift.io/generator: prowgen
+      job-release: "4.12"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-serverless-operator-main-4.12-upgrade-kitchensink-ocp-412
+    optional: true
+    rerun_command: /test 4.12-upgrade-kitchensink-ocp-412
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=upgrade-kitchensink-ocp-412
+        - --variant=4.12
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.12-upgrade-kitchensink-ocp-412,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

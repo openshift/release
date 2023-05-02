@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: 4.12-priv
+    name: 4.13-priv
     namespace: ocp-private
     tag: base
   must-gather:
-    name: 4.12-priv
+    name: 4.13-priv
     namespace: ocp-private
     tag: must-gather
   opm-builder:
@@ -18,12 +18,12 @@ base_images:
 binary_build_commands: make build build-vgmanager
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-8-golang-1.20-openshift-4.14
 canonical_go_repository: github.com/openshift/lvm-operator
 images:
-- dockerfile_path: Dockerfile.combined
+- dockerfile_path: Dockerfile
   from: ubi_minimal
   to: lvm-operator
 - dockerfile_path: bundle.Dockerfile
@@ -54,14 +54,14 @@ images:
 - context_dir: must-gather/
   dockerfile_path: Dockerfile
   from: must-gather
-  to: lvm-must-gather
+  to: lvms-must-gather
 operator:
   bundles:
   - as: lvm-operator-static-deps
     base_index: lvm-operator-deps-index
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/ocs-dev/lvm-operator:latest
+  - pullspec: quay.io/lvms_dev/lvms-operator:latest
     with: pipeline:lvm-operator
 promotion:
   excluded_images:
@@ -72,12 +72,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: 4.12-priv
+      name: 4.13-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.12-priv
+      name: 4.13-priv
       namespace: ocp-private
 resources:
   '*':
@@ -91,6 +91,10 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
   mkdir /.local && chmod 777 /.local
 tests:
+- as: verify
+  commands: make verify
+  container:
+    from: src
 - as: unit-test
   commands: make test
   container:
@@ -100,27 +104,27 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      MUST_GATHER_FULL_IMAGE_NAME: lvm-must-gather
+      MUST_GATHER_IMG: lvms-must-gather
       OO_INDEX: ci-index-lvm-operator-static-deps
     env:
       DISK_INSTALL: "true"
-      LVM_MUST_GATHER_DIR: ${ARTIFACT_DIR}/lvm-must-gather
       LVM_OPERATOR_INSTALL: "false"
       LVM_OPERATOR_UNINSTALL: "false"
+      LVMS_MUST_GATHER_DIR: ${ARTIFACT_DIR}/lvms-must-gather
       OO_CHANNEL: alpha
       OO_INSTALL_NAMESPACE: openshift-storage
       OO_PACKAGE: lvms-operator
       OO_TARGET_NAMESPACES: '!install'
     post:
-    - as: lvm-must-gather
+    - as: lvms-must-gather
       cli: latest
-      commands: mkdir -p "$LVM_MUST_GATHER_DIR"; oc --insecure-skip-tls-verify adm
-        must-gather --dest-dir "$LVM_MUST_GATHER_DIR"
+      commands: mkdir -p "LVMS_MUST_GATHER_DIR"; oc --insecure-skip-tls-verify adm
+        must-gather --dest-dir "LVMS_MUST_GATHER_DIR"
       dependencies:
-      - env: MUST_GATHER_FULL_IMAGE_NAME
-        name: lvm-must-gather
+      - env: MUST_GATHER_IMG
+        name: lvms-must-gather
       env:
-      - name: LVM_MUST_GATHER_DIR
+      - name: LVMS_MUST_GATHER_DIR
       from: src
       resources:
         requests:

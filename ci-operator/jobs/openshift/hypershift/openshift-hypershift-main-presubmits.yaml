@@ -393,66 +393,16 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build05
-    context: ci/prow/images
-    decorate: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-hypershift-main-images
-    rerun_command: /test images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --target=[release:latest]
-        - --target=test-bin
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^main$
-    - ^main-
-    cluster: build05
-    context: ci/prow/kubevirt-e2e-kubevirt-aws-ovn
+    context: ci/prow/e2e-kubevirt-aws-ovn
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: kubevirt
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-hypershift-main-kubevirt-e2e-kubevirt-aws-ovn
+    name: pull-ci-openshift-hypershift-main-e2e-kubevirt-aws-ovn
     optional: true
-    rerun_command: /test kubevirt-e2e-kubevirt-aws-ovn
+    rerun_command: /test e2e-kubevirt-aws-ovn
     spec:
       containers:
       - args:
@@ -463,7 +413,6 @@ presubmits:
         - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-kubevirt-aws-ovn-cluster-profile
         - --target=e2e-kubevirt-aws-ovn
-        - --variant=kubevirt
         command:
         - ci-operator
         image: ci-operator:latest
@@ -510,21 +459,20 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )kubevirt-e2e-kubevirt-aws-ovn,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-kubevirt-aws-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
     cluster: build05
-    context: ci/prow/kubevirt-images
+    context: ci/prow/images
     decorate: true
     labels:
-      ci-operator.openshift.io/variant: kubevirt
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-hypershift-main-kubevirt-images
-    rerun_command: /test kubevirt-images
+    name: pull-ci-openshift-hypershift-main-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
@@ -532,7 +480,8 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=kubevirt
+        - --target=[release:latest]
+        - --target=test-bin
         command:
         - ci-operator
         image: ci-operator:latest
@@ -559,7 +508,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )kubevirt-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:

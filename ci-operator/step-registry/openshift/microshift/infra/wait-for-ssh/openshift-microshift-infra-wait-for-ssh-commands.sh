@@ -13,32 +13,28 @@ if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
   exit 1
 fi
 
-mkdir -p "${HOME}"/.ssh
-
-# gcloud compute will use this key rather than create a new one
-cp "${CLUSTER_PROFILE_DIR}"/ssh-privatekey "${HOME}"/.ssh/google_compute_engine
-chmod 0600 "${HOME}"/.ssh/google_compute_engine
-cp "${CLUSTER_PROFILE_DIR}"/ssh-publickey "${HOME}"/.ssh/google_compute_engine.pub
-echo 'ServerAliveInterval 30' | tee -a "${HOME}"/.ssh/config
-echo 'ServerAliveCountMax 1200' | tee -a "${HOME}"/.ssh/config
-chmod 0600 "${HOME}"/.ssh/config
-
-# Copy pull secret to user home
-cp "${CLUSTER_PROFILE_DIR}"/pull-secret "${HOME}"/pull-secret
-
 gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
 gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
 gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
 gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
 
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+
+mkdir -p "${HOME}"/.ssh
+cat << EOF > "${HOME}"/.ssh/config
+Host ${INSTANCE_PREFIX}
+  User rhel8user
+  HostName ${IP_ADDRESS}
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+EOF
+chmod 0600 "${HOME}"/.ssh/config
+
 echo "verify gcp instance ssh connectivity" >&2
 
 timeout=300
 start=$(date +"%s")
-until gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command 'echo Hello, CI';
+until ssh "${INSTANCE_PREFIX}" 'echo Hello, CI';
 do
   if (( $(date +"%s") - $start >= $timeout )); then
     echo "timed out out waiting for ssh connection" >&2

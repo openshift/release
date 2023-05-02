@@ -25,9 +25,11 @@ cat > gather_logs.yaml <<-EOF
           state: directory
           mode: '0755'
 
+      # setsid is there to workaround an issue with virsh hanging when running in background
+      # https://serverfault.com/questions/1105733/virsh-command-hangs-when-script-runs-in-the-background
       - name: Gather sosreport from all hosts
         ansible.builtin.command: >-
-          sos report --batch --tmp-dir "{{ LOGS_DIR }}" --all-logs
+          setsid sos report --batch --tmp-dir "{{ LOGS_DIR }}" --all-logs
             -o memory,container_log,filesys,kvm,libvirt,logs,networkmanager,networking,podman,processor,rpm,sar,virsh,dnf
             -k podman.all -k podman.logs
       ignore_errors: true

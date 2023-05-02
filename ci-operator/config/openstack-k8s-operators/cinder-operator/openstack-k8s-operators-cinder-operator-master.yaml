@@ -3,10 +3,6 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: cli
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.48.0
   opm-builder:
     name: opm-builder
     namespace: ci
@@ -30,6 +26,11 @@ images:
       - destination_dir: .
         source_path: /bin/opm
   to: openstack-operator-ci-build-deploy
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install pre-commit
+  from: src
+  to: openstack-operator-ci-pre-commit
 - build_args:
   - name: KUTTL_VERSION
     value: v0.15.0
@@ -54,27 +55,6 @@ tests:
   commands: make gotest
   container:
     from: src
-- as: govet
-  commands: make govet
-  container:
-    from: src
-- as: golangci
-  commands: |
-    export GOCACHE=/tmp/
-    export GOLANGCI_LINT_CACHE=/tmp/.cache
-    export GOPROXY=https://proxy.golang.org
-    golangci-lint run --verbose --timeout=5m0s
-  container:
-    clone: true
-    from: golangci-lint
-- as: golint
-  commands: make golint
-  container:
-    from: src
-- as: gofmt
-  commands: make gofmt || true
-  container:
-    from: src
 - as: cinder-operator-build-deploy
   cluster_claim:
     architecture: amd64
@@ -97,6 +77,17 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy-kuttl
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    export GOFLAGS=
+    export PRE_COMMIT_HOME=/tmp
+    export GOLANGCI_LINT_CACHE=/tmp
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
+    pre-commit run --all-files --show-diff-on-failure
+  container:
+    from: openstack-operator-ci-pre-commit
 zz_generated_metadata:
   branch: master
   org: openstack-k8s-operators

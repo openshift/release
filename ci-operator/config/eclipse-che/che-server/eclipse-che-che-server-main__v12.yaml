@@ -1,0 +1,65 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gitlab-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-gitlab-flow.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: bitbucket-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-bitbucket-flow.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: github-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-github-flow.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: main
+  org: eclipse-che
+  repo: che-server
+  variant: v12

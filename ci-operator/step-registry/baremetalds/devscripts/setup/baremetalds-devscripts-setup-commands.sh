@@ -178,6 +178,15 @@ if [ -e /root/bm.json ] ; then
     nmcli con reload
     sleep 10
 
+    # Block the public zone (where eth2 is) from allowing and traffic from the provisioning network
+    # prevents arp responses from provisioning networks on other bm environment i.e.
+    # ERROR     : [/etc/sysconfig/network-scripts/ifup-eth] Error, some other host (F8:F2:1E:B2:DA:21) already uses address 172.22.0.1.
+    echo 1 | sudo dd of=/proc/sys/net/ipv4/conf/eth2/arp_ignore
+    # TODO: remove this once all running CI jobs are updated (i.e. its only  needed until arp_ignore is set on all environments)
+    sudo firewall-cmd --zone=public --add-rich-rule='rule family="ipv4" source address="172.22.0.0/24" destination address="172.22.0.0/24" reject' --permanent
+
+    sudo firewall-cmd --reload
+
     echo "export KUBECONFIG=/root/dev-scripts/ocp/\${CLUSTER_NAME}/auth/kubeconfig" >> /root/.bashrc
 else
     echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
@@ -185,7 +194,11 @@ fi
 
 timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
 
+# Add extra CI specific rules to the libvirt zone, this can't be done earlier because the zone only now exists
+# TODO: In reality the bridges should be in the public zone
 if [ -e /root/bm.json ] ; then
+    # Allow cluster nodes to use provising node as a ntp server (4.12 and above are more likely to use it vs. the dhcp set server)
+    sudo firewall-cmd --add-service=ntp --zone libvirt
     sudo firewall-cmd --add-port=8213/tcp --zone=libvirt
 fi
 EOF

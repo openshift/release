@@ -142,6 +142,11 @@ def get_rc_volumes(context):
                             'name': 'job-config-3.x'
                         }
                     },
+                    {
+                        'configMap': {
+                            'name': 'job-config-4.0'
+                        }
+                    },
                     *_get_dynamic_projected_deployment_volumes(context),
                 ]
             }

@@ -4,7 +4,18 @@ set -o nounset
 set -o pipefail
 
 date -u "+%Y-%m-%dT%H:%M:%SZ"
-array=("aescbc" "aesgcm")
+
+MAJOR=$(oc get clusterversion version -o jsonpath={..desired.version} | awk -F'.' '{print $1}')
+MINOR=$(oc get clusterversion version -o jsonpath={..desired.version} | awk -F'.' '{print $2}')
+
+if [[ $MAJOR -eq 4 && $MINOR -lt 13 ]]; then
+    echo "INFO - Version $MAJOR.$MINOR is less than 4.13"
+    array=("aescbc")
+else
+    echo "INFO - Version $MAJOR.$MINOR is 4.13 or greater, Selecting random encryption type from aescbc & aesgcm"
+    array=("aescbc" "aesgcm")
+fi
+
 counter=0
 while [ $counter -lt 10 ]
 do

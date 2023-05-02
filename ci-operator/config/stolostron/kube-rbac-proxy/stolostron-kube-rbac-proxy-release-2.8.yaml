@@ -59,6 +59,14 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kube-rbac-proxy
+    env:
+      IMAGE_REPO: kube-rbac-proxy
+      REGISTRY_ORG: stolostron
+    workflow: ocm-ci-image-mirror
 - as: publish
   postsubmit: true
   steps:
@@ -84,6 +92,13 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-ci-image-mirror
+- as: fast-forward-mce
+  postsubmit: true
+  steps:
+    env:
+      DESTINATION_BRANCH: backplane-2.3
+      SOURCE_BRANCH: release-2.8
+    workflow: ocm-ci-fastforward
 zz_generated_metadata:
   branch: release-2.8
   org: stolostron

@@ -11,6 +11,8 @@ echo "************ telco cluster setup command ************"
 export MAINENV="$SHARED_DIR/main.env"
 
 echo "# THERE IS THE ENVS FILE FOR JOBS" > $MAINENV
+echo "export DEBUG_T5CI_JOB_TYPE=${T5CI_JOB_TYPE}" >> $MAINENV
+echo "export DEBUG_T5CI_VERSION=${T5CI_VERSION}" >> $MAINENV
 echo "export DEBUG_PROW_JOB_ID=${PROW_JOB_ID}" >> $MAINENV
 echo "export DEBUG_JOB_NAME=${JOB_NAME}" >> $MAINENV
 echo "export DEBUG_JOB_TYPE=${JOB_TYPE}" >> $MAINENV
