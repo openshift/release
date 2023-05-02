@@ -1,12 +1,10 @@
-presubmits:
+postsubmits:
   maistra/proxy:
   - agent: kubernetes
     always_run: true
     branches:
     - ^maistra-2\.3$
-    - ^maistra-2\.3-
-    cluster: build05
-    context: ci/prow/maistra-proxy-unit-2-3
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -15,9 +13,8 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-maistra-proxy-maistra-2.3-maistra-proxy-unit-2-3
-    rerun_command: /test maistra-proxy-unit-2-3
+    max_concurrency: 1
+    name: branch-ci-maistra-proxy-maistra-2.3-copy-artifacts-gcs-2-3
     spec:
       containers:
       - args:
@@ -26,8 +23,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/maistra-proxy-unit-2-3-cluster-profile
-        - --target=maistra-proxy-unit-2-3
+        - --secret-dir=/usr/local/copy-artifacts-gcs-2-3-cluster-profile
+        - --target=copy-artifacts-gcs-2-3
         command:
         - ci-operator
         image: ci-operator:latest
@@ -43,7 +40,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/maistra-proxy-unit-2-3-cluster-profile
+        - mountPath: /usr/local/copy-artifacts-gcs-2-3-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -74,4 +71,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )maistra-proxy-unit-2-3,?($|\s.*)
