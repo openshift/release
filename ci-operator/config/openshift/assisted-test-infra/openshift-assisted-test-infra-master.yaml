@@ -52,15 +52,10 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
   latest-multi:
     candidate:
       architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.12"
-  nightly-4-13:
-    candidate:
       product: ocp
       stream: nightly
       version: "4.13"
@@ -362,8 +357,6 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly-4-13
     env:
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
@@ -569,6 +562,28 @@ tests:
         MAKEFILE_TARGET=test
       PLATFORM: vsphere
     workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-12
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.12
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-13
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.13
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-periodic
   cron: 45 02 */1 * 0-5
   steps:
@@ -579,6 +594,20 @@ tests:
         MAKEFILE_TARGET=test
         WORKER_VCPU=4
         WORKER_MEMORY=16384
+      PLATFORM: vsphere
+      TEST_SUITE: conformance
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-12-periodic
+  cron: 40 02 */1 * 0-5
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=3
+        MAKEFILE_TARGET=test
+        WORKER_VCPU=4
+        WORKER_MEMORY=16384
+        OPENSHIFT_VERSION=4.12
       PLATFORM: vsphere
       TEST_SUITE: conformance
     workflow: assisted-vsphere

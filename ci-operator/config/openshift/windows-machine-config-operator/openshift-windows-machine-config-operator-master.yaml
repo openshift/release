@@ -65,13 +65,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: aws-e2e-ccm-install
-  cron: 0 9 * * 1
-  steps:
-    cluster_profile: aws
-    test:
-    - ref: windows-e2e-operator-test
-    workflow: openshift-e2e-aws-ccm-ovn-hybrid-install
 - as: aws-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -136,6 +129,7 @@ tests:
         cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
         export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
         export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
+        export WINDOWS_SERVER_VERSION="2019"
         make run-ci-e2e-upgrade-test
       dependencies:
       - env: OO_INDEX

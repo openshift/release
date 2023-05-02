@@ -1,7 +1,7 @@
 #!/bin/bash
 set -o nounset
 set -o errexit
-set -o pipefail
+set -xeuo pipefail
 
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/env"
@@ -17,5 +17,12 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
 EOF
 
 currentDate=$(date +'%s')
-gcloud compute instances stop ${instance_name} --zone=${ZONE} 
+gcloud compute instances stop ${instance_name} --zone=${ZONE}
 gcloud compute images create crio-setup-${currentDate} --source-disk-zone=${ZONE} --source-disk="${instance_name//[$'\t\r\n']}" --family="crio-setup"
+# Delete images older than 2 weeks
+images=$(gcloud compute images list --filter="family:crio-setup AND creationTimestamp<$(date -d '2 weeks ago' +%Y-%m-%dT%H:%M:%SZ)" --format="value(name)")
+if [ -n "$images" ]; then
+  echo "$images" | xargs -I '{}' gcloud compute images delete '{}'
+else
+  echo "No images found that were created more than 2 weeks ago."
+fi

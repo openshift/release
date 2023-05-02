@@ -35,6 +35,10 @@ CONFIG = {
         'us-east-1': 10,
         'us-east-2': 10,
     },
+    'aws-cspi-qe-vpn-quota-slice': {
+        'us-east-1': 10,
+        'us-east-2': 10,
+    },
     'aws-managed-cspi-qe-quota-slice': {
         'us-east-1': 10,
         'us-east-2': 10,
@@ -278,7 +282,7 @@ for i in range(10, 15):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(83,93):
+for i in range(89,93):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(94,106):
