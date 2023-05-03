@@ -9,7 +9,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 ACCOUNT_ROLE_PREFIX=${ACCOUNT_ROLE_PREFIX:-$NAMESPACE}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 CLUSTER_NAME=${CLUSTER_NAME:-asher}
-OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-4.12.13}
 OCM_ENV=${OCM_ENV:-staging}
 
 
@@ -34,9 +33,7 @@ fi
 mkdir -p ${SHARED_DIR}/cluster_sts
 cd       ${SHARED_DIR}/cluster_sts
 
-cp /terraform-provider-ocm/examples/create_rosa_cluster/create_rosa_sts_cluster/classic_sts/cluster/* ./
-
-# sed -i -rz 's/ocm(.+?)=(.+?)"terraform-redhat\/ocm"/ocm = {\n      source  = "terraform.local\/local\/ocm"\n      version = ">=0.0.1"/' main.tf
+cp /terraform-provider-ocm/ci/e2e/terraform_provider_ocm_files/* ./
 
 cat <<_EOF > terraform.tfvars
 url                    = "$OCM_URL"
@@ -44,8 +41,6 @@ token                  = "$OCM_TOKEN"
 operator_role_prefix   = "$CLUSTER_NAME"
 account_role_prefix    = "$ACCOUNT_ROLE_PREFIX"
 cluster_name           = "$CLUSTER_NAME"
-aws_region             = "$AWS_DEFAULT_REGION"
-openshift_version      = "openshift-v$OPENSHIFT_VERSION"
 _EOF
 
 terraform init
@@ -57,3 +52,4 @@ terraform output -json cluster_id| jq -r . > ${SHARED_DIR}/ocm_cluster_id
 cd ${HOME}
 tar cvfz ${SHARED_DIR}/cluster_sts.tar.gz -C ${SHARED_DIR}/cluster_sts .
 
+# sed -i -rz 's/ocm(.+?)=(.+?)"terraform-redhat\/ocm"/ocm = {\n      source  = "terraform.local\/local\/ocm"\n      version = ">=0.0.1"/' main.tf
