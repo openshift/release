@@ -1,6 +1,6 @@
 # Special notes for building HyperShift images
 * `hypershift-cli` image serves both as the CLI and the operator.
-* Due to lack of forward/backward-compatibility of HyperShift, it is critical that we tag the build. For instance, once a build is done and pushed to `latest`, we shall tag it like
+* Due to lack of forward/backward-compatibility of HyperShift, it is critical that we tag the build. For instance, once a new build of `BuildConfig/hypershift-cli` is complete, we shall manually make a tag for that image while `latest` could be moved forward:
 ```
 oc --context app.ci -n ci tag hypershift-cli:latest hypershift-cli:20230428-12e6a502bd6a7ea5434df2b83fef102b7819b413 --as system:admin
 ```
