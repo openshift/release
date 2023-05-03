@@ -3,6 +3,7 @@
 # This script will create a network, subnet, router, then plug the subnet into that network
 # and connect the router to the external networ.
 # The resources UUIDs are written in SHARED_DIR.
+#
 
 set -o nounset
 set -o errexit
