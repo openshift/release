@@ -8,7 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 ACCOUNT_ROLE_PREFIX=${ACCOUNT_ROLE_PREFIX:-$NAMESPACE}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
-CLUSTER_NAME=${CLUSTER_NAME:-asher}
+CLUSTER_NAME=${CLUSTER_NAME:-ci-ocm-tf-$(mktemp -u XXXXX | tr '[:upper:]' '[:lower:]')}
 OCM_ENV=${OCM_ENV:-staging}
 
 
@@ -30,9 +30,9 @@ else
   export OCM_URL='https://api.openshift.com'
 fi
 
-mkdir -p ${SHARED_DIR}/cluster_sts
-cd       ${SHARED_DIR}/cluster_sts
-
+rm -rf ${SHARED_DIR}/cluster_sts
+mkdir  ${SHARED_DIR}/cluster_sts
+cd     ${SHARED_DIR}/cluster_sts
 cp /terraform-provider-ocm/ci/e2e/terraform_provider_ocm_files/* ./
 
 cat <<_EOF > terraform.tfvars
@@ -43,13 +43,16 @@ account_role_prefix    = "$ACCOUNT_ROLE_PREFIX"
 cluster_name           = "$CLUSTER_NAME"
 _EOF
 
+export HOME='/root' #pointing to location of .terraform.d
+
 terraform init
 
 terraform apply -auto-approve
 
 terraform output -json cluster_id| jq -r . > ${SHARED_DIR}/ocm_cluster_id
 
-cd ${HOME}
-tar cvfz ${SHARED_DIR}/cluster_sts.tar.gz -C ${SHARED_DIR}/cluster_sts .
+tar cvfz ${SHARED_DIR}/cluster_sts.tar.gz *.tf*  #save for later terraform destroy
 
-# sed -i -rz 's/ocm(.+?)=(.+?)"terraform-redhat\/ocm"/ocm = {\n      source  = "terraform.local\/local\/ocm"\n      version = ">=0.0.1"/' main.tf
+rm -rf ${SHARED_DIR}/cluster_sts
+export HOME="${PWD}" #restore HOME
+

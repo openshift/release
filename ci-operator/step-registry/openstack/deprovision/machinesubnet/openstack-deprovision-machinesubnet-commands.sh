@@ -24,7 +24,6 @@ if [[ -f ${SHARED_DIR}"/BASTION_ROUTER_ID" ]]; then
   fi
   # We want to remove the machines subnet from the router when:
   # * there is a machine subnet that was created
-  # * we don't use a provider network for the machines since this network isn't connected to a neutron router
   # * when the network is not isolated, like it's the case in *"proxy"* CONFIG_TYPE
   if [[ -f ${SHARED_DIR}"/MACHINES_SUBNET_ID" && ${CONFIG_TYPE} != *"proxy"* ]]; then
     MACHINES_SUBNET_ID=$(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)

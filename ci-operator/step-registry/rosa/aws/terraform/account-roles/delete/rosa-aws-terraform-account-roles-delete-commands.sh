@@ -18,10 +18,16 @@ else
   exit 1
 fi
 
-mkdir -p ${SHARED_DIR}/account-roles
+rm -rf   ${SHARED_DIR}/account-roles
+mkdir    ${SHARED_DIR}/account-roles
 tar xvfz ${SHARED_DIR}/account-roles.tar.gz -C ${SHARED_DIR}/account-roles
 cd       ${SHARED_DIR}/account-roles
+
+export HOME='/root' #pointing to location of .terraform.d
 
 terraform init
 
 terraform destroy -auto-approve
+
+rm -rf ${SHARED_DIR}/account_roles
+export HOME="${PWD}" # restore HOME
