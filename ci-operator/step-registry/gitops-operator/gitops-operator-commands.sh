@@ -2,5 +2,5 @@
 
 set -o pipefail
 
-scripts/openshift-interop-kuttl-tests.sh
-make e2e-tests-sequential
+scripts/openshift-CI-kuttl-tests.sh
+make e2e-tests-sequential IS_INTEROP="true"
