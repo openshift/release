@@ -2485,16 +2485,26 @@ periodics:
   name: periodic-github-ldap-user-group-creator
   spec:
     containers:
-    - command:
-      - /usr/bin/github-ldap-user-group-creator
-      - --kubeconfig-dir=/tmp/build-farm-credentials
-      - --kubeconfig-suffix=config
-      - --mapping-file=/etc/sync-rover-groups/mapping.yaml
-      - --groups-file=/etc/sync-rover-groups/groups.yaml
-      - --config-file=./core-services/sync-rover-groups/_config.yaml
-      - --peribolos-config=../config/org/config.yaml
-      - --log-level=debug
-      - --dry-run=false
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        tar -C /tmp -xvzf /etc/sync-rover-groups/users.yaml.tar.gz
+        /usr/bin/github-ldap-user-group-creator \
+        --kubeconfig-dir=/tmp/build-farm-credentials \
+        --kubeconfig-suffix=config \
+        --mapping-file=/etc/sync-rover-groups/mapping.yaml \
+        --groups-file=/etc/sync-rover-groups/groups.yaml \
+        --config-file=./core-services/sync-rover-groups/_config.yaml \
+        --github-users-file=/tmp/users.yaml \
+        --gcp-credentials-file=/etc/gcp-credentials/openshift-gce-devel-ci-infra-users-to-bigquery.json \
+        --peribolos-config=../config/org/config.yaml \
+        --log-level=debug \
+        --dry-run=false
+      command:
+      - /bin/bash
       image: registry.ci.openshift.org/ci/github-ldap-user-group-creator:latest
       imagePullPolicy: Always
       name: github-ldap-user-group-creator
@@ -2507,6 +2517,9 @@ periodics:
       - mountPath: /tmp/build-farm-credentials
         name: build-farm-credentials
         readOnly: true
+      - mountPath: /etc/gcp-credentials
+        name: gcp-credentials
+        readOnly: true
     serviceAccountName: github-ldap-user-group-creator
     volumes:
     - configMap:
@@ -2515,6 +2528,9 @@ periodics:
     - name: build-farm-credentials
       secret:
         secretName: github-ldap-user-group-creator
+    - name: gcp-credentials
+      secret:
+        secretName: openshift-gce-devel-ci-infra-users-to-bigquery-credentials
 - agent: kubernetes
   annotations:
     ci.openshift.io/description: This runs the check-gh-automation tool to verify
