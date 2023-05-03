@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: "8"
   cli:
-    name: "4.13"
+    name: "4.12"
     namespace: origin
     tag: cli
 build_root:
@@ -14,7 +14,7 @@ build_root:
     tag: golang-1.19
 images:
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/origin/4.13:cli
+    FROM registry.ci.openshift.org/origin/4.12:cli
 
     RUN wget -q https://github.com/openshift-online/ocm-cli/releases/download/v0.1.66/ocm-linux-amd64 -O /usr/local/bin/ocm &&\
         chmod +x /usr/local/bin/ocm &&\
@@ -29,7 +29,7 @@ images:
     RUN yum clean all
 
     RUN git config --global http.sslVerify false &&\
-        git clone https://github.com/terraform-redhat/terraform-provider-ocm.git --branch main --depth=1
+        git clone https://github.com/terraform-redhat/terraform-provider-ocm.git --branch main
 
     RUN curl -Ls https://go.dev/dl/go1.20.4.linux-amd64.tar.gz |tar -C /usr/local -xzf -
 
@@ -42,7 +42,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -53,8 +53,6 @@ tests:
   cron: '@yearly'
   steps:
     cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
     workflow: rosa-aws-terraform
 zz_generated_metadata:
   branch: master

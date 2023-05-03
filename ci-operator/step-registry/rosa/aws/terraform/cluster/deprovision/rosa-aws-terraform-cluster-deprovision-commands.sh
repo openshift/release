@@ -18,10 +18,16 @@ else
   exit 1
 fi
 
-mkdir -p ${SHARED_DIR}/cluster_sts
+rm -rf   ${SHARED_DIR}/cluster_sts
+mkdir    ${SHARED_DIR}/cluster_sts
 tar xvfz ${SHARED_DIR}/cluster_sts.tar.gz -C ${SHARED_DIR}/cluster_sts
 cd       ${SHARED_DIR}/cluster_sts
 
+export HOME='/root'  #pointing to location of .terraform.d
+
 terraform init
 
-terraform destroy
+terraform destroy -auto-approve
+
+rm -rf   ${SHARED_DIR}/cluster_sts
+export HOME=${PWD} # restore HOME

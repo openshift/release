@@ -22,25 +22,37 @@ else
   exit 1
 fi
 
+if [[ "${OCM_ENV}" == 'staging' ]]; then
+  export OCM_URL='https://api.stage.openshift.com'
+else
+  export OCM_URL='https://api.openshift.com'
+fi
+
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 
-mkdir -p ${SHARED_DIR}/account_roles
-cd       ${SHARED_DIR}/account_roles
+rm -rf ${SHARED_DIR}/account_roles
+mkdir  ${SHARED_DIR}/account_roles
+cd     ${SHARED_DIR}/account_roles
 
-cp /terraform-provider-ocm/ci/e2e/account_roles_files/* ./
+# cp /terraform-provider-ocm/ci/e2e/account_roles_files/* ./
+cp /terraform-provider-ocm/examples/create_rosa_cluster/create_rosa_sts_cluster/classic_sts/account_roles/* ./
+sed -i -rz 's/ocm(.+?)=(.+?)"terraform-redhat\/ocm"/ocm = {\n      source  = "terraform.local\/local\/ocm"\n      version = ">= 0.0.1"/' main.tf
 
 cat <<_EOF > terraform.tfvars
-ocm_environment        = "$OCM_ENV"
-openshift_version      = "$OPENSHIFT_VERSION"
-account_role_prefix    = "$ACCOUNT_ROLE_PREFIX"
-token                  = "$OCM_TOKEN"
+url                 = "$OCM_URL"
+token               = "$OCM_TOKEN"
+account_role_prefix = "$ACCOUNT_ROLE_PREFIX"
+ocm_environment     = "$OCM_ENV"
+openshift_version   = "$OPENSHIFT_VERSION"
 _EOF
+
+export HOME='/root' #pointing to location of .terraform.d
 
 terraform init
 
 terraform apply -auto-approve
 
-cd ${HOME}
-tar cvfz ${SHARED_DIR}/account_roles.tar.gz -C ${SHARED_DIR}/account_roles .
+tar cvfz ${SHARED_DIR}/account_roles.tar.gz *.tf*  #save for later terraform destroy
 
-# sed -i -rz 's/ocm(.+?)=(.+?)"terraform-redhat\/ocm"/ocm = {\n      source  = "terraform.local\/local\/ocm"\n      version = ">=0.0.1"/' main.tf
+rm -rf ${SHARED_DIR}/account_roles
+export HOME="${PWD}" # restore HOME
