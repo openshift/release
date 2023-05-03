@@ -21,7 +21,7 @@ The image in parameter `--hypershift-image` must have the SAME as the one invoki
 Then apply the file with
 `oc --context hive apply -f hypershift.yaml --server-side`
 
-Dont forget to update the workflow (`ci-operator/step-registry/hypershift/hostedcluster/create/hostedcluster/hypershift-hostedcluster-create-hostedcluster-ref.yaml`) to use the new image.
+The image in the workflow (`ci-operator/step-registry/hypershift/hostedcluster/create/hostedcluster/hypershift-hostedcluster-create-hostedcluster-ref.yaml`) has to be modifed accordingly each time after a new version of `hypershift-install.yaml` is generated and applied..
 
 # Note
 !!! IMPORTANT !!!
