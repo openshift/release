@@ -4,7 +4,9 @@ This directory includes the manifests, including the generated ones, for deployi
 [HyperShift CLI](https://hypershift-docs.netlify.app/getting-started/) which is the utility for installing HyperShift as well as creating and destroying hosted clusters and the HyperShift operator which is the core component running on HyperShift management cluster share the same image. 
 They must have the exact same version to work properly [HOSTEDCP-792](https://issues.redhat.com/browse/HOSTEDCP-792).
 
-The image is built with [hypershift-cli.yaml](clusters/app.ci/supplemental-ci-images/hypershift/hypershift-cli.yaml) to available for all build farms.
+The image is built with [hypershift-cli.yaml](clusters/app.ci/supplemental-ci-images/hypershift/hypershift-cli.yaml). The purposes of the build are
+- add useful utilities, e.g., `jq`, and
+- save a stable tag as explained before.
 
 # Deployment/upgrading on `hive`
 Prepare the AWS credentials for your management cluster account (in this case, the AWS account running `hive` cluster) in `~/workspace/mgmt-aws` (or any other path you prefer).
