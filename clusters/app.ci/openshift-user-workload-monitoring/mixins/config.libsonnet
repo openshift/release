@@ -50,8 +50,8 @@
         channel: '#kubevirt-ci-monitoring',
         notify: 'build-officer',
       },
-      'release-controller': {
-        team: 'release-controller',
+      'crt': {
+        team: 'crt',
         channel: '#ops-crt',
       },
     },
