@@ -5,4 +5,4 @@
 oc --context app.ci -n ci tag hypershift-cli:latest hypershift-cli:20230428-12e6a502bd6a7ea5434df2b83fef102b7819b413 --as system:admin
 ```
 The naming convention is `YYYYMMDD-<git commit hash>`.
-* If an aarch64 build is needed, we shall ensure it is built form the SAME source code as amd64, on the SAME commit
+If an image for `aarch64` is needed, we shall ensure it is built form the SAME source code as amd64, on the SAME commit.
