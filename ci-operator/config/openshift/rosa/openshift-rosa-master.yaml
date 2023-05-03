@@ -25,12 +25,16 @@ images:
         terraform version
 
     RUN yum -y install --setopt=skip_missing_names_on_install=False \
-        openssl jq unzip which
+        openssl jq unzip which make
     RUN yum clean all
 
     RUN git config --global http.sslVerify false &&\
         git clone https://github.com/terraform-redhat/terraform-provider-ocm.git --branch main --depth=1
 
+    RUN curl -Ls https://go.dev/dl/go1.20.4.linux-amd64.tar.gz |tar -C /usr/local -xzf -
+
+    ENV PATH="/usr/local/go/bin:${PATH}"
+    ENV GOPATH=/usr/local/go
     RUN cd terraform-provider-ocm && go mod tidy && go mod vendor && make install
   to: ocm-tf-cli
 releases:
