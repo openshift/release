@@ -19,7 +19,7 @@ docker run -ti --rm -v ~/workspace/mgmt-aws:/mgmt-aws:ro registry.ci.openshift.o
 The image in parameter `--hypershift-image` must have the SAME as the one invoking the command.
 
 Then apply the file with
-`oc --context hive apply -f hypershift.yaml --server-side`
+`oc --context hive apply -f hypershift-install.yaml --server-side`
 
 The image in the workflow (`ci-operator/step-registry/hypershift/hostedcluster/create/hostedcluster/hypershift-hostedcluster-create-hostedcluster-ref.yaml`) has to be modifed accordingly each time after a new version of `hypershift-install.yaml` is generated and applied..
 
