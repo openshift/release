@@ -3,6 +3,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.13"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -33,71 +37,77 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: installer-rehearse-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-8
+    env:
+      SLEEP_DURATION: 2h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-vsphere-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-vsphere-ipi-ovn-etcd-encryption-provision
 - as: installer-rehearse-aws
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
     workflow: cucushift-installer-rehearse-aws-ipi-compact
 - as: installer-rehearse-azure
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-    workflow: cucushift-installer-rehearse-azure-ipi-minimal-permission
+    workflow: cucushift-installer-rehearse-azure-ipi-ultrassd-disk
 - as: installer-rehearse-azure-stack
   cluster: build01
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: azurestack-qe
     env:
       CLUSTER_OS_IMAGE: https://vhdsa.blob.mtcazs.wwtatc.com/vhd/rhcos-413.92.202303281804-0-azurestack.x86_64.vhd
     workflow: cucushift-installer-rehearse-azure-stack-upi
 - as: installer-rehearse-alibabacloud
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: alibabacloud-qe
     workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
 - as: installer-rehearse-ibmcloud
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: ibmcloud-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
 - as: installer-rehearse-gcp
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: gcp-qe
     workflow: cucushift-installer-rehearse-gcp-ipi-workers-rhel8
-- as: installer-rehearse-vsphere
-  interval: 960h
+- as: installer-rehearse-vsphere-8
+  cron: '@yearly'
   steps:
     cluster_profile: vsphere-8
     workflow: cucushift-installer-rehearse-vsphere-upi
 - as: installer-rehearse-vsphere-multizone
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: vsphere-multizone
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones
-- as: installer-rehearse-nutanix-ipi-dis
+- as: installer-rehearse-nutanix-dis
   cluster: build01
-  interval: 960h
+  cron: '@yearly'
   steps:
     cluster_profile: nutanix-qe-dis
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: installer-rehearse-vsphere-ipi-remote-worker
-  interval: 960h
+- as: installer-rehearse-vsphere-connected
+  cron: '@yearly'
   steps:
     cluster_profile: vsphere-connected
     workflow: cucushift-installer-rehearse-vsphere-ipi-remote-worker
-- as: installer-rehearse-vsphere-upi-zones
-  interval: 960h
-  steps:
-    cluster_profile: vsphere-multizone
-    workflow: cucushift-installer-rehearse-vsphere-upi-zones
-- as: installer-rehearse-vsphere-dualstack
-  interval: 960h
+- as: installer-rehearse-vsphere-ibm7
+  cron: '@yearly'
   steps:
     cluster_profile: vsphere-ibm-7
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-dualstack
