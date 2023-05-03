@@ -21,6 +21,6 @@ EOF
 chmod 0600 "${HOME}/.ssh/config"
 
 
-ssh "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
+ssh "${HOST_USER}@${IP_ADDRESS}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
 KUBECONFIG=/tmp/kubeconfig openshift-tests run "${TEST_SUITE}" -v 2 --provider=none -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
