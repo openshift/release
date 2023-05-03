@@ -105,10 +105,9 @@ fi
 
 ${platform_required} && cat >> "${install_config}" << EOF
 baseDomain: $base_domain
-featureSet: TechPreviewNoUpgrade
 controlPlane:
   name: "master"
-  replicas: 3
+  replicas: ${MASTER_REPLICAS}
   platform:
     vsphere:
       zones:
@@ -117,7 +116,7 @@ controlPlane:
        - "us-east-3"
 compute:
 - name: "worker"
-  replicas: 4
+  replicas: ${WORKER_REPLICAS}
   platform:
     vsphere:
       zones:
@@ -186,6 +185,21 @@ networking:
 EOF
 fi
 
+declare zone_worker_ips zone_master_ips
+master_num=$((3 +  $MASTER_REPLICAS))
+for num in $(seq 4 $master_num); do
+    master_ip="192.168.${third_octet}.$num"
+    zone_master_ips+="\"$master_ip\"",
+done
+
+if [ ${WORKER_REPLICAS} -ne 0 ]; then
+    worker_num=$(($master_num + $WORKER_REPLICAS ))
+    for num in $(seq $(($master_num + 1)) $worker_num); do
+        worker_ips="192.168.${third_octet}.$num"
+        zone_worker_ips+="\"$worker_ips\"",
+    done
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
 machine_cidr = "192.168.${third_octet}.0/25"
@@ -201,8 +215,8 @@ compute_num_cpus = "4"
 vm_dns_addresses = ["${dns_server}"]
 bootstrap_ip_address = "192.168.${third_octet}.3"
 lb_ip_address = "192.168.${third_octet}.2"
-compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9","192.168.${third_octet}.10"]
-control_plane_ip_addresses = ["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
+compute_ip_addresses = [${zone_worker_ips%?}]
+control_plane_ip_addresses = [${zone_master_ips%?}]
 failure_domains = [
     {
         datacenter = "IBMCloud"

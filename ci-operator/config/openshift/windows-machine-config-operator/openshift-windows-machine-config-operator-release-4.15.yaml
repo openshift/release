@@ -122,6 +122,7 @@ tests:
         cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
         export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
         export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
+        export WINDOWS_SERVER_VERSION="2019"
         make run-ci-e2e-upgrade-test
       dependencies:
       - env: OO_INDEX
@@ -178,6 +179,14 @@ tests:
       DESTINATION_BRANCH: community-4.14
       SOURCE_BRANCH: master
     workflow: windows-ci-fastforward
+- as: nutanix-e2e-operator
+  cluster: build01
+  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: nutanix
+    test:
+    - ref: windows-e2e-operator-test
+    workflow: ipi-nutanix-ovn-hybrid
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
