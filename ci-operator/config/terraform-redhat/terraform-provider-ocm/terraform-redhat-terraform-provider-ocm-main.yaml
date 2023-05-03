@@ -1,0 +1,41 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make subsystem-test
+tests:
+- as: unit
+  commands: make unit-test
+  container:
+    from: test-bin
+- as: e2e-test
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make e2e_test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: terraform-redhat
+  repo: terraform-provider-ocm
