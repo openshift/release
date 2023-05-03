@@ -72,6 +72,10 @@ spec:
         - name: grafana-var-lib
           persistentVolumeClaim:
             claimName: grafana-var-lib
+        - name: proxy-tls
+          secret:
+            defaultMode: 420
+            secretName: proxy-tls
         - name: cookie-secret
           secret:
             defaultMode: 420
@@ -142,6 +146,23 @@ spec:
     - protocol: TCP
       port: 3000
       targetPort: 3000
+  selector:
+    app: grafana
+  type: ClusterIP
+---
+kind: Service
+apiVersion: v1
+metadata:
+  annotations:
+    service.beta.openshift.io/serving-cert-secret-name: proxy-tls
+  name: grafana-proxy
+  namespace: grafana-loki
+spec:
+  ports:
+    - name: metrics
+      protocol: TCP
+      port: 9001
+      targetPort: metrics
   selector:
     app: grafana
   type: ClusterIP
