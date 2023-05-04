@@ -6,6 +6,8 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   to: log-file-metric-exporter
+- dockerfile_path: Dockerfile.src
+  to: log-file-metric-exporter-src
 promotion:
   name: 5.y
   namespace: logging
@@ -24,10 +26,23 @@ resources:
       memory: 200Mi
 tests:
 - as: test
-  commands: make test
-  container:
-    from: src
-  timeout: 10m0s
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: test
+      commands: make test
+      from: log-file-metric-exporter-src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 15m0s
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: ViaQ
