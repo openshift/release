@@ -7,6 +7,17 @@ set -o pipefail
 # Read each operator in the JSON provided to an item in a BASH array.
 readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
 
+SECRETS_DIR="/tmp/secrets"
+
+SKIP_OCP_DEPLOY="true"
+if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
+    echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
+    cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/kubeconfig
+    cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
+fi
+
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
 # Iterate through each operator.
 for operator_obj in "${OPERATOR_ARRAY[@]}"; do
     # Set variables for this operator.
