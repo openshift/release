@@ -62,6 +62,3 @@ KUBECONFIG=/tmp/kubeconfig oc wait \
   -l='app.kubernetes.io/name=topolvm-csi-driver' \
   -n openshift-storage \
   --timeout=10m
-
-# ssh "${INSTANCE_PREFIX}" \
-#   'cd ~/validate-microshift  && sudo KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig ./kuttl-test.sh'
