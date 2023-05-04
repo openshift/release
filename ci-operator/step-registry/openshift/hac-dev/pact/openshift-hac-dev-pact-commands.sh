@@ -2,15 +2,21 @@
 
 PACT_BROKER_USERNAME=$(cat /usr/local/ci-secrets/pact/pact-username)
 PACT_BROKER_PASSWORD=$(cat /usr/local/ci-secrets/pact/pact-password)
-PACT_BROKER_URL=$(cat /usr/local/ci-secrets/pact/pact-broker-url)
+PACT_BROKER_BASE_URL=$(cat /usr/local/ci-secrets/pact/pact-broker-url)
 
+SHA=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].sha')
 PR_NUMBER=$(echo ${JOB_SPEC} | jq -r '.refs.pulls[0].number')
 
 npm i
 npm run pact
-cat pact/pacts/HACdev-HAS.json
-curl -v -X PUT \
-    -H "Content-Type: application/json" \
-    -d@pact/pacts/HACdev-HAS.json \
-    -u ${PACT_BROKER_USERNAME}:${PACT_BROKER_PASSWORD} \
-    ${PACT_BROKER_URL}/pacts/provider/HAS/consumer/HACdev/version/PR${PR_NUMBER}
+
+wget -qO- https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v1.92.0/pact-1.92.0-linux-x86_64.tar.gz | tar xz --one-top-level=./pactcli
+PATH=${PATH}:$(pwd)/pactcli/pact/bin
+
+pact-broker publish \
+ "$(pwd)/pact/pacts/HACdev-HAS.json" \
+ -a ${SHA:0:7} \
+ -t PR${PR_NUMBER} \
+ -b $PACT_BROKER_BASE_URL \
+ -u $PACT_BROKER_USERNAME \
+ -p $PACT_BROKER_PASSWORD
