@@ -4,9 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Download repository with tests"
-git clone https://github.com/Apicurio/apicurio-registry-system-tests
-
 echo "Change directory to system tests in repository"
 cd apicurio-registry-system-tests/system-tests
 
