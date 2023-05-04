@@ -6,7 +6,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/e2e-test
+    context: ci/prow/e2e-operator
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -14,10 +14,9 @@ presubmits:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-terraform-redhat-terraform-provider-ocm-main-e2e-test
-    rerun_command: /test e2e-test
+    name: pull-ci-terraform-redhat-terraform-provider-ocm-main-e2e-operator
+    rerun_command: /test e2e-operator
     spec:
       containers:
       - args:
@@ -26,8 +25,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-test-cluster-profile
-        - --target=e2e-test
+        - --secret-dir=/usr/local/e2e-operator-cluster-profile
+        - --target=e2e-operator
         command:
         - ci-operator
         image: ci-operator:latest
@@ -43,7 +42,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-test-cluster-profile
+        - mountPath: /usr/local/e2e-operator-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -74,7 +73,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-test,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-operator,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -87,7 +86,6 @@ presubmits:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.12"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-terraform-redhat-terraform-provider-ocm-main-unit
     rerun_command: /test unit
