@@ -15,7 +15,7 @@ timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_nam
     cd "\${REPO_DIR}/contrib/test/ci"
     ansible-playbook setup-main.yml --connection=local -vvv
 EOF
-
+echo "hi"
 currentDate=$(date +'%s')
 gcloud compute instances stop ${instance_name} --zone=${ZONE}
 gcloud compute images create crio-setup-${currentDate} --source-disk-zone=${ZONE} --source-disk="${instance_name//[$'\t\r\n']}" --family="crio-setup"
