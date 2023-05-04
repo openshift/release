@@ -1,0 +1,74 @@
+base_images:
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.develop
+images:
+- build_args:
+  - name: COMMIT_SHA
+    value: ci-sha
+  - name: IMAGE_VERSION
+    value: ci-test-img
+  context_dir: .
+  dockerfile_path: Dockerfile
+  from: ubi_minimal
+  to: modelmesh
+promotion:
+  namespace: opendatahub-io
+  tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: fvt
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.4xlarge
+    test:
+    - as: modelmesh-serving-fvt
+      commands: "export HOME=/go        \ngit clone https://github.com/opendatahub-io/modelmesh-serving\ncd
+        modelmesh-serving\nCONTROLLERNAMESPACE=modelmesh-serving NAMESPACE=modelmesh-serving
+        NAMESPACESCOPEMODE=true CUSTOM_IMG=modelmesh=${PR_MODELMESH_IMAGE} make e2e-test-for-odh\n"
+      dependencies:
+      - env: PR_MODELMESH_IMAGE
+        name: modelmesh
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: ipi-aws
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: modelmesh
+    env:
+      IMAGE_REPO: modelmesh
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: modelmesh
+    env:
+      IMAGE_REPO: modelmesh
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: modelmesh

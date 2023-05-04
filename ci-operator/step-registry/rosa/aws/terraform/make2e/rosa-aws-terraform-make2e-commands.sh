@@ -24,9 +24,9 @@ go version
 mkdir -p ~/.aws
 cp ${AWSCRED} ~/.aws/credentials
 
-cp -r /root/terraform-provider-ocm ~/
+cp -r /terraform-provider-ocm ~/
 cd ~/terraform-provider-ocm
 
 go mod tidy
 go mod vendor
-make e2e_tests
+make e2e_test
