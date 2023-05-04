@@ -26,7 +26,7 @@ create_subscription () {
     done
 }
 
-create_csv () {
+wait_for_csv () {
     #Wait up to 10 minutes for CSV to become ready
     for _ in $(seq 1 60); do
       CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
@@ -275,19 +275,19 @@ done
 if [ "$FOUND_INSTALLPLAN" = true ] ; then
     echo "Install Plan approved"
     echo "Waiting for ClusterServiceVersion to become ready..."
-    create_csv
+    wait_for_csv
     #if we returned here then it means that CSV is not created because otherwise we would have exited with return code 0
     #RETRY 2 times
     retry_attempts=2
-    while [ $retry_attempts -ne 0 ] {
+    while [ $retry_attempts -ne 0 ]; do
         oc delete subscription $SUB -n $OO_INSTALL_NAMESPACE
         create_subscription
         #installplan
-        if ("$FOUND_INSTALLPLAN" = true) {
-            create_csv
-        }
+        if ["$FOUND_INSTALLPLAN" = true]; then
+            wait_for_csv
+        fi
         retry_attempts-=1
-    }
+    done
     echo "All retry attempts failed. CSV has not become ready"
 fi
 
