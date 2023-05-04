@@ -24,7 +24,7 @@ ami_id=${EC2_AMI}
 instance_type=${EC2_INSTANCE_TYPE}
 host_device_name="/dev/xvdc"
 
-if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c6g.* ]]; then
+if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+g.* ]]; then
   host_device_name="/dev/nvme1n1"
 fi
 
