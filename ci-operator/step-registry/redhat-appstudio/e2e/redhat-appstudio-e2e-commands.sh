@@ -67,11 +67,14 @@ EOF
 	  exit 1
   fi
 
-BYOC_KUBECONFIG="$SHARED_DIR"/kubeconfig
+# Define a new environment for BYOC pointing to a kubeconfig with token. RHTAP environments only supports kubeconfig with token:
+# See: https://issues.redhat.com/browse/GITOPSRVCE-554
+BYOC_KUBECONFIG="/tmp/token-kubeconfig"
+cp "$KUBECONFIG" "$BYOC_KUBECONFIG"
 if [[ -s "$BYOC_KUBECONFIG" ]]; then
-    yq e -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $BYOC_KUBECONFIG
+    echo -e "byoc kubeconfig exists!"
 else
-    echo "Kubeconfig not exists in $SHARED_DIR... Aborting job"
+    echo "Kubeconfig not exists in $BYOC_KUBECONFIG... Aborting job"
     exit 1
 fi
 
