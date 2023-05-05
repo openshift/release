@@ -9,7 +9,7 @@ max_cpu=8
 isolated_cpu=${COMPUTE_NODE_ISOLATED_CPU:-4}
 sched_rt_runtime_us=-1
 stalld_service="service.stalld=start,enable"
-gcp_pattern="[n|c|m|a]{1}[1-9]{1}d?-(standard|highcpu|highmem|highgpu){1}-([0-9]+)"
+gcp_pattern="[e|n|c|m|a]{1}[1-9]{1}d?-(standard|highcpu|highmem|highgpu){1}-([0-9]+)"
 
 # Currently RT is only supported on GCP
 # if non supported node type provided, will default to 4 isolated and 8 max CPU usage
