@@ -415,14 +415,18 @@ spec:
           name: proxy-tls
         - mountPath: /etc/tls/cookie-secret
           name: cookie-secret
-      - args:
+      - name: prod-bearer-token
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+		args:
         - --oidc.audience=\$(AUDIENCE)
         - --oidc.client-id=\$(CLIENT_ID)
         - --oidc.client-secret=\$(CLIENT_SECRET)
         - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
         - --margin=10m
         - --file=/tmp/shared/prod_bearer_token
-        name: prod-bearer-token
         env:
           - name: CLIENT_ID
             valueFrom:
