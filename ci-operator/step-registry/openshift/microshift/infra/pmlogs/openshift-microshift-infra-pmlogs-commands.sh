@@ -4,23 +4,21 @@ set -eux
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
-GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
-GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-GOOGLE_COMPUTE_ZONE="$(< ${SHARED_DIR}/openshift_gcp_compute_zone)"
-if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
-  echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
-  exit 1
-fi
 
-gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
-gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
-gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
-gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
+IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
+HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute scp \
---quiet \
---project "${GOOGLE_PROJECT_ID}" \
---zone "${GOOGLE_COMPUTE_ZONE}" \
---recurse \
-rhel8user@"${INSTANCE_PREFIX}":/var/log/pcp/pmlogger/* ${ARTIFACT_DIR}/
+echo "Using Host $IP_ADDRESS"
+
+mkdir -p "${HOME}/.ssh"
+cat <<EOF >"${HOME}/.ssh/config"
+Host ${IP_ADDRESS}
+  User ${HOST_USER}
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+  ServerAliveInterval 30
+  ServerAliveCountMax 1200
+EOF
+chmod 0600 "${HOME}/.ssh/config"
+
+scp "${IP_ADDRESS}":/var/log/pcp/pmlogger/* ${ARTIFACT_DIR}/
