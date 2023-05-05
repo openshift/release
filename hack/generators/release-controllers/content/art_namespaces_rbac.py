@@ -397,7 +397,7 @@ def add_imagestream_namespace_rbac(gendoc):
             'apiVersion': 'rbac.authorization.k8s.io/v1',
             'kind': 'ClusterRoleBinding',
             'metadata': {
-                'name': f'release-controller{context.suffix}',
+                'name': f'release-controller-ocp{context.suffix}',
             },
             'roleRef': {
                 'apiGroup': 'rbac.authorization.k8s.io',
@@ -406,7 +406,7 @@ def add_imagestream_namespace_rbac(gendoc):
             },
             'subjects': [{
                 'kind': 'ServiceAccount',
-                'name': 'release-controller',
+                'name': context.rc_serviceaccount_name,
                 'namespace': context.config.rc_deployment_namespace
             }]
         }
