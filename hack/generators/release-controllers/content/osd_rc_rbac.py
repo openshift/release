@@ -79,7 +79,21 @@ def add_osd_rc_service_account_resources(gendoc):
                     'resources': ['subjectaccessreviews'],
                     'verbs': ['create']
                 }]
-        }
+        },
+        {
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'ClusterRole',
+            'metadata': {
+                'name': 'release-controller',
+            },
+            'rules': [
+                {
+                    'apiGroups': ['release.openshift.io'],
+                    'resources': ['releasepayloads'],
+                    'verbs': ['get', 'list', 'watch']
+                }
+            ]
+        },
     ])
 
     gendoc.append_all(
