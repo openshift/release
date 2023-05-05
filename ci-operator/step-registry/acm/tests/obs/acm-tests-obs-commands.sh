@@ -7,11 +7,19 @@ set -o pipefail
 SECRETS_DIR="/tmp/secrets"
 
 # Get the creds from ACMQE CI vault and run the automation on pre-exisiting HUB
+<<<<<<< HEAD
 SKIP_OCP_DEPLOY=$(cat $SECRETS_DIR/ci/skip-ocp-deploy)
+=======
+SKIP_OCP_DEPLOY="false"
+>>>>>>> 95a2a3367bd (Vboulos add step rigistry for grc (#37587))
 if [[ $SKIP_OCP_DEPLOY == "true" ]]; then
     echo "------------ Skipping OCP Deploy = $SKIP_OCP_DEPLOY ------------"
     cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/kubeconfig
     cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
+<<<<<<< HEAD
+=======
+    cp ${SECRETS_DIR}/ci/metadata $SHARED_DIR/metadata.json
+>>>>>>> 95a2a3367bd (Vboulos add step rigistry for grc (#37587))
 fi 
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
@@ -28,6 +36,7 @@ OC_HUB_CLUSTER_API_URL=$(oc whoami --show-server)
 export OC_HUB_CLUSTER_API_URL
 
 # Get the base domain from the API URL
+<<<<<<< HEAD
 left_cut=${OC_HUB_CLUSTER_API_URL:12} # substring --> ${VAR:start_index:length} --> remove https://api.
 BASE_DOMAIN=${left_cut/:6443/} # replace :6433 with empty string
 # BASE_DOMAIN=$(cat $SHARED_DIR/metadata.json |jq -r '.aws.clusterDomain')
@@ -35,6 +44,15 @@ export BASE_DOMAIN
 
 HUB_CLUSTER_NAME=${BASE_DOMAIN/.cspilp.interop.ccitredhat.com/}
 # HUB_CLUSTER_NAME=$(cat $SHARED_DIR/metadata.json |jq -r '.clusterName') 
+=======
+# left_cut=${OC_HUB_CLUSTER_API_URL:12} # substring --> ${VAR:start_index:length} --> remove https://api.
+# BASE_DOMAIN=${left_cut/:6443/} # replace :6433 with empty string
+BASE_DOMAIN=$(cat $SHARED_DIR/metadata.json |jq -r '.aws.clusterDomain')
+export BASE_DOMAIN
+
+# HUB_CLUSTER_NAME=${BASE_DOMAIN/.cspilp.interop.ccitredhat.com/}
+HUB_CLUSTER_NAME=$(cat $SHARED_DIR/metadata.json |jq -r '.clusterName') 
+>>>>>>> 95a2a3367bd (Vboulos add step rigistry for grc (#37587))
 export HUB_CLUSTER_NAME
 
 OC_HUB_CLUSTER_PASS=$(cat $SHARED_DIR/kubeadmin-password)
@@ -66,4 +84,8 @@ cp ${SHARED_DIR}/kubeconfig ~/.kube/config
 bash +x ./execute_obs_interop_commands.sh
 
 # Copy the test cases results to an external directory
+<<<<<<< HEAD
 cp -r /tmp/obs/tests/pkg/tests $ARTIFACT_DIR/
+=======
+cp -r tests/pkg/tests $ARTIFACT_DIR/
+>>>>>>> 95a2a3367bd (Vboulos add step rigistry for grc (#37587))
