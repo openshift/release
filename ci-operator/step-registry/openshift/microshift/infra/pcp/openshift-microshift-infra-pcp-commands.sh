@@ -4,21 +4,20 @@ set -eux
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
-GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
-GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-GOOGLE_COMPUTE_ZONE="$(< ${SHARED_DIR}/openshift_gcp_compute_zone)"
-if [[ -z "${GOOGLE_COMPUTE_ZONE}" ]]; then
-  echo "Expected \${SHARED_DIR}/openshift_gcp_compute_zone to contain the GCP zone"
-  exit 1
-fi
+IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
+HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
 
-gcloud auth activate-service-account --quiet --key-file "${CLUSTER_PROFILE_DIR}"/gce.json
-gcloud --quiet config set project "${GOOGLE_PROJECT_ID}"
-gcloud --quiet config set compute/zone "${GOOGLE_COMPUTE_ZONE}"
-gcloud --quiet config set compute/region "${GOOGLE_COMPUTE_REGION}"
+echo "Using Host $IP_ADDRESS"
 
-LD_PRELOAD=/usr/lib64/libnss_wrapper.so gcloud compute --project "${GOOGLE_PROJECT_ID}" ssh \
-  --zone "${GOOGLE_COMPUTE_ZONE}" \
-  rhel8user@"${INSTANCE_PREFIX}" \
-  --command "sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger"
+mkdir -p "${HOME}/.ssh"
+cat <<EOF >"${HOME}/.ssh/config"
+Host ${IP_ADDRESS}
+  User ${HOST_USER}
+  IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+  StrictHostKeyChecking accept-new
+  ServerAliveInterval 30
+  ServerAliveCountMax 1200
+EOF
+chmod 0600 "${HOME}/.ssh/config"
+
+ssh "${IP_ADDRESS}" "sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger"
