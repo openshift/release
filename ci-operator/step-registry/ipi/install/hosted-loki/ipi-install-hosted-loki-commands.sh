@@ -249,27 +249,6 @@ data:
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
-    - job_name: kubeapi-audit
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: kube-apiserver
-          __path__: /var/log/kube-apiserver/audit.log
-    - job_name: openshift-apiserver
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: openshift-apiserver
-          __path__: /var/log/openshift-apiserver/audit.log
-    - job_name: oauth-apiserver-audit
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: oauth-apiserver
-          __path__: /var/log/oauth-apiserver/audit.log
     - job_name: events
       kubernetes_sd_configs:
       - role: pod
