@@ -1,38 +1,26 @@
 base_images:
-  ansible:
-    name: "4.12"
-    namespace: ocp
-    tag: ansible
   cli:
-    name: "4.12"
+    name: "4.14"
     namespace: ocp
     tag: cli
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  hypershift-operator:
-    name: "4.12"
-    namespace: ocp
-    tag: hypershift-operator
-  openstack-installer:
-    name: "4.12"
-    namespace: ocp
-    tag: openstack-installer
   tests-private:
     name: tests-private
     namespace: ci
-    tag: "4.12"
+    tag: "4.14"
   tests-private-ui:
     name: tests-private-ui
     namespace: ci
-    tag: "4.12"
+    tag: "4.14"
   tools:
-    name: "4.12"
+    name: "4.14"
     namespace: ocp
     tag: tools
   upi-installer:
-    name: "4.12"
+    name: "4.14"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -46,7 +34,13 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.14"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -55,25 +49,25 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: azure-ipi-fips-p1-f3-openshift-logging-5-6
-  cron: 00 21 * * 1,4,0
+- as: aws-ipi-ovn-ipsec-p1-f7-openshift-logging-5-8
+  cron: 00 21 * * 6
   steps:
-    cluster_profile: azure-qe
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CO_SUB_CHANNEL: stable-5.6
-      COMPUTE_NODE_TYPE: Standard_D4s_v3
-      E2E_RUN_TAGS: '@logging5.6'
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CO_SUB_CHANNEL: stable-5.8
+      E2E_RUN_TAGS: '@logging5.7'
       E2E_SKIP_TAGS: ""
-      EO_SUB_CHANNEL: stable-5.6
+      EO_SUB_CHANNEL: stable-5.8
       FILTERS_ADDITIONAL: ""
-      FIPS_ENABLED: "true"
       FORCE_SUCCESS_EXIT: "true"
-      LO_SUB_CHANNEL: stable-5.6
-      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.6
+      LO_SUB_CHANNEL: stable-5.8
+      LOGGING_INDEX_IMAGE: quay.io/openshift-qe-optional-operators/aosqe-index:log5.8
       PARALLEL: "3"
       SIZE_VARIANT: large
-      TAG_VERSION: '@logging5.6'
+      TAG_VERSION: '@logging5.7'
       TEST_ADDITIONAL: ""
       TEST_FILTERS: ~Disruptive&;~disruptive&
       TEST_IMPORTANCE: ""
@@ -82,14 +76,15 @@ tests:
       TEST_SCENARIOS: sig-openshift-logging
       TEST_TIMEOUT: "15"
     test:
+    - ref: ipi-install-heterogeneous
     - ref: enable-qe-catalogsource-logging
     - ref: operatorhub-subscribe-elasticsearch-operator
     - ref: operatorhub-subscribe-cluster-logging-operator
     - ref: operatorhub-subscribe-loki-operator
     - chain: openshift-e2e-test-logging-qe
-    workflow: cucushift-installer-rehearse-azure-ipi
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
 zz_generated_metadata:
-  branch: release-4.12
+  branch: release-4.14
   org: openshift
   repo: openshift-tests-private
-  variant: amd64-nightly-openshift-logging-5.6
+  variant: multi-nightly-openshift-logging-5.8
