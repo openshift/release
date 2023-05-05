@@ -16,27 +16,14 @@ then
   exit 0
 fi
 
-# Temporarily limit the number of jobs we're going to ingest into loki while we test and scale the new instance:
-if [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.13-ocp-e2e-aws-ovn-arm64-single-node" ]] \
-	&& [[ $JOB_NAME != "periodic-ci-openshift-release-master-nightly-4.13-e2e-vsphere-8-ovn" ]] \
-	&& [[ ! "$JOB_NAME" =~ .*gcp.* ]] \
-	&& [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.14-ocp-e2e-aws-ovn-arm64-single-node" ]] \
-	&& [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.13-ocp-e2e-ovn-remote-libvirt-s390x" ]] \
-	&& [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.14-ocp-e2e-ovn-remote-libvirt-s390x" ]]; then
-	echo "This job is not on the list of supported jobs we're testing for the new loki, skipping..."
-	exit 0
-fi
-
 
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
-# openshift-trt taken from the tenants list in the LokiStack CR on DPCR:
-export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t7.p1.openshiftapps.com/api/logs/v1/openshift-trt/loki/api/v1
-
-# TODO: may be deprecated, moved to: https://github.com/resmoio/kubernetes-event-exporter
+export LOKI_ENDPOINT=https://observatorium-mst.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
 export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
+GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
 
 cat >> "${SHARED_DIR}/manifest_01_ns.yml" << EOF
@@ -112,9 +99,11 @@ data:
           min_period: 1s
         batchsize: 102400
         batchwait: 10s
-        bearer_token_file: /tmp/shared/prod_bearer_token
+        basic_auth:
+          username: ${GRAFANACLOUND_USERNAME}
+          password_file: /etc/promtail-grafanacom-secrets/password
         timeout: 10s
-        url: ${LOKI_ENDPOINT}/push
+        url: https://logs-prod3.grafana.net/api/prom/push
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
@@ -302,17 +291,24 @@ data:
     target_config:
       sync_period: 10s
 EOF
-
 cat >> "${SHARED_DIR}/manifest_creds.yml" << EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: promtail-prod-creds
+  name: promtail-creds
   namespace: openshift-e2e-loki
 data:
   client-id: "$(cat /var/run/loki-secret/client-id | base64 -w 0)"
   client-secret: "$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
-  audience: "$(cat /var/run/loki-secret/audience | base64 -w 0)"
+EOF
+cat >> "${SHARED_DIR}/manifest_grafanacom_creds.yml" << EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: promtail-grafanacom-creds
+  namespace: openshift-e2e-loki
+data:
+  password: "$(cat /var/run/loki-grafanacloud-secret/client-secret | base64 -w 0)"
 EOF
 cat >> "${SHARED_DIR}/manifest_ds.yml" << EOF
 apiVersion: apps/v1
@@ -386,6 +382,8 @@ spec:
         volumeMounts:
         - mountPath: "/etc/promtail"
           name: config
+        - mountPath: "/etc/promtail-grafanacom-secrets"
+          name: grafanacom-secrets
         - mountPath: "/run/promtail"
           name: run
         - mountPath: "/var/lib/docker/containers"
@@ -406,8 +404,6 @@ spec:
         - mountPath: "/var/log/journal"
           name: journal
           readOnly: true
-        - mountPath: "/tmp/shared"
-          name: shared-data
       - args:
         - --https-address=:9001
         - --provider=openshift
@@ -436,34 +432,6 @@ spec:
           name: proxy-tls
         - mountPath: /etc/tls/cookie-secret
           name: cookie-secret
-      - args:
-        - --oidc.audience=\$(AUDIENCE)
-        - --oidc.client-id=\$(CLIENT_ID)
-        - --oidc.client-secret=\$(CLIENT_SECRET)
-        - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
-        - --margin=10m
-        - --file=/tmp/shared/prod_bearer_token
-        name: prod-bearer-token
-        env:
-          - name: CLIENT_ID
-            valueFrom:
-              secretKeyRef:
-                name: promtail-prod-creds
-                key: client-id
-          - name: CLIENT_SECRET
-            valueFrom:
-              secretKeyRef:
-                name: promtail-prod-creds
-                key: client-secret
-          - name: AUDIENCE
-            valueFrom:
-              secretKeyRef:
-                name: promtail-prod-creds
-                key: audience
-        volumeMounts:
-        - mountPath: "/tmp/shared"
-          name: shared-data
-        image: quay.io/observatorium/token-refresher
       serviceAccountName: loki-promtail
       terminationGracePeriodSeconds: 180
       tolerations:
@@ -473,6 +441,9 @@ spec:
       - configMap:
           name: loki-promtail
         name: config
+      - secret:
+          secretName: promtail-grafanacom-creds
+        name: grafanacom-secrets
       - hostPath:
           path: "/run/promtail"
         name: run
@@ -502,8 +473,6 @@ spec:
         secret:
           defaultMode: 420
           secretName: cookie-secret
-      - name: shared-data
-        emptyDir: {}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
