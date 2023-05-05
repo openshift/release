@@ -6,6 +6,11 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+function get_nonrunning_pods_count() {
+  oc get pods\
+    --all-namespaces | grep -v "Running\|Completed" |grep -v NAME|wc -l
+}
+
 function get_ready_nodes_count() {
   oc get nodes \
     -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
@@ -16,7 +21,7 @@ function get_ready_nodes_count() {
 function wait_for_nodes_readiness()
 {
   local expected_nodes=${1}
-  local max_retries=${2:-10}
+  local max_retries=${2:-20}
   local period=${3:-5}
   for i in $(seq 1 "${max_retries}") max; do
     if [ "${i}" == "max" ]; then
@@ -30,6 +35,27 @@ function wait_for_nodes_readiness()
         return 0
     fi
     echo "[INFO] - ${expected_nodes} ready nodes expected, found ${ready_nodes}..." \
+      "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
+  done
+}
+
+# wait_for_pods+running loops till all pods are running/completed
+function wait_for_pods_running()
+{
+  local max_retries=5
+  local period=5
+  for i in $(seq 1 "${max_retries}") max; do
+    if [ "${i}" == "max" ]; then
+      echo "[ERROR] Timeout reached. Some pods not running."
+      return 1
+    fi
+    sleep "${period}m"
+    nonrunning_pods=$(get_nonrunning_pods_count)
+    if [ x"${nonrunning_pods}" == x"0" ]; then
+        echo "[INFO] pods ready, continuing..."
+        return 0
+    fi
+    echo "[INFO] - pods not ready..." \
       "Waiting ${period}min before retrying (timeout in $(( (max_retries - i) * (period) ))min)..."
   done
 }
@@ -49,7 +75,8 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
+# We will be removing a machine, but it might not equal additional_workers
+EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS))
 
 MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets | yq-v4 "$(cat <<EOF
   [.items[] | select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")][0]
@@ -61,6 +88,9 @@ MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets | yq-v4 "$(cat
   | del(.metadata.generation)
 EOF
 )")
+
+# Scale down the machineset off of which we are creating an additional machineset by 1 as we do not need excessive machines
+#oc scale --replicas=$(($(oc -n openshift-machine-api get -o yaml machinesets | yq-v4  -r '[.items[] | select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")][0].spec.replicas')-1)) machineset "$(oc -n openshift-machine-api get -o yaml machinesets | yq-v4  -r '[.items[] | select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")][0].metadata.name')" -n openshift-machine-api
 
 echo "Cluster type is ${CLUSTER_TYPE}"
 # AMI for AWS ARM
@@ -142,3 +172,6 @@ wait_for_nodes_readiness ${EXPECTED_NODES}
 ret="$?"
 echo "Exiting with ${ret}."
 exit ${ret}
+wait_for_pods_running
+ret="$?"
+echo "Exiting with ${ret}."
