@@ -20,6 +20,7 @@ fi
 # Do not change the default family type without consulting with cloud financial operations as their may
 # be active savings plans targeting this machine class.
 master_type=e2-standard-4
+echo "SIZE_VARIANT is ${SIZE_VARIANT}"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   master_type=e2-standard-32
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
