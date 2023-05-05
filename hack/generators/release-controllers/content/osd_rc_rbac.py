@@ -94,6 +94,23 @@ def add_osd_rc_service_account_resources(gendoc):
                 }
             ]
         },
+        {
+            'apiVersion': 'rbac.authorization.k8s.io/v1',
+            'kind': 'ClusterRoleBinding',
+            'metadata': {
+                'name': 'release-controller',
+            },
+            'roleRef': {
+                'apiGroup': 'rbac.authorization.k8s.io',
+                'kind': 'ClusterRole',
+                'name': 'release-controller'
+            },
+            'subjects': [{
+                'kind': 'ServiceAccount',
+                'name': 'release-controller',
+                'namespace': config.rc_deployment_namespace
+            }]
+        }
     ])
 
     gendoc.append_all(
