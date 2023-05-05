@@ -17,6 +17,7 @@ KIALI_ROUTE=$(oc get route kiali -n ${SMCP_NAMESPACE} -o=jsonpath='{.spec.host}'
 export CYPRESS_BASE_URL="https://${KIALI_ROUTE}"
 export CYPRESS_USERNAME=${OCP_CRED_USR}
 export CYPRESS_PASSWD=${OCP_CRED_PSW}
+export CYPRESS_AUTH_PROVIDER="kube:admin"
 
 yarn cypress:run:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 yarn cypress:combine:reports
