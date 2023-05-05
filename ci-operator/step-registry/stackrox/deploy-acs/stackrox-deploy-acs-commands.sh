@@ -1,28 +1,57 @@
-#!/bin/bash
+#!/usr/bin/env bash
+
+# !! WARNING !! There is currently a bug with single quotes in this script. It has to do with `handle_dangling_processes`
+# in the stackrox repo.
+
+# TODO :: Check if these files exist
+# shellcheck source=/dev/null
+source "scripts/ci/lib.sh"
+# shellcheck source=/dev/null
+source "tests/e2e/lib.sh"
+# shellcheck source=/dev/null
+source "scripts/ci/gcp.sh"
+# shellcheck source=/dev/null
+source "scripts/ci/sensor-wait.sh"
+# shellcheck source=/dev/null
+source "scripts/ci/create-webhookserver.sh"
+# shellcheck source=/dev/null
+source "tests/scripts/setup-certs.sh"
+# shellcheck source=/dev/null
+source "qa-tests-backend/scripts/lib.sh"
 
 set -o nounset
 set -o errexit
 set -o pipefail
 
-# Check "qa-tests-backend/scripts/run-part-1.sh"
+openshift_ci_mods
+openshift_ci_import_creds
+create_exit_trap
 
-# shellcheck source=/dev/null
-source "qa-tests-backend/scripts/run-part-1.sh"
+# Might not need some of these but adding for consistency for now
+export CI_JOB_NAME="ocp-qa-e2e-tests"
+export DEPLOY_STACKROX_VIA_OPERATOR="true"
+export ORCHESTRATOR_FLAVOR="openshift"
+export ROX_POSTGRES_DATASTORE="true"
 
+# Sensor will not deploy without scaling
+scripts/ci/openshift.sh scale_worker_nodes "1"
 
+gather_debug_for_cluster_under_test
+poll_for_system_test_images "3600"
+
+# Primarily used to share the TLS certs for the ACS components
 SHARED_STACKROX="${SHARED_DIR}/stackrox"
 mkdir -p "$SHARED_STACKROX"
 
-export ORCHESTRATOR_FLAVOR="openshift"
-
-# Essential replicat config_part_1
+# Essentially replicates config_part_1
 # There might be logic in here that is unnecessary
-info "Configuring the cluster to run part 1 of e2e tests"
+info "Deploying ACS components"
 
 require_environment "ORCHESTRATOR_FLAVOR"
 require_environment "KUBECONFIG"
 
 DEPLOY_DIR="${SHARED_STACKROX}/deploy/${ORCHESTRATOR_FLAVOR}"
+mkdir -p "$DEPLOY_DIR"
 
 export_test_environment
 
