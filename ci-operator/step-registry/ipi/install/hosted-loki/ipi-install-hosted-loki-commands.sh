@@ -20,6 +20,7 @@ fi
 if [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.13-ocp-e2e-aws-ovn-arm64-single-node" ]] \
 	&& [[ $JOB_NAME != "periodic-ci-openshift-release-master-nightly-4.13-e2e-vsphere-8-ovn" ]] \
 	&& [[ ! "$JOB_NAME" =~ .*gcp.* ]] \
+	&& [[ ! "$JOB_NAME" =~ .*azure.* ]] \
 	&& [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.14-ocp-e2e-aws-ovn-arm64-single-node" ]] \
 	&& [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.13-ocp-e2e-ovn-remote-libvirt-s390x" ]] \
 	&& [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.14-ocp-e2e-ovn-remote-libvirt-s390x" ]]; then
