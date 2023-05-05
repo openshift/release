@@ -249,27 +249,6 @@ data:
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
-    - job_name: kubeapi-audit
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: kube-apiserver
-          __path__: /var/log/kube-apiserver/audit.log
-    - job_name: openshift-apiserver
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: openshift-apiserver
-          __path__: /var/log/openshift-apiserver/audit.log
-    - job_name: oauth-apiserver-audit
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: oauth-apiserver
-          __path__: /var/log/oauth-apiserver/audit.log
     - job_name: events
       kubernetes_sd_configs:
       - role: pod
@@ -394,15 +373,6 @@ spec:
         - mountPath: "/var/log/pods"
           name: pods
           readOnly: true
-        - mountPath: "/var/log/kube-apiserver"
-          name: auditlogs-kube-apiserver
-          readOnly: true
-        - mountPath: "/var/log/openshift-apiserver"
-          name: auditlogs-openshift-apiserver
-          readOnly: true
-        - mountPath: "/var/log/oauth-apiserver"
-          name: auditlogs-oauth-apiserver
-          readOnly: true
         - mountPath: "/var/log/journal"
           name: journal
           readOnly: true
@@ -485,15 +455,6 @@ spec:
       - hostPath:
           path: "/var/log/journal"
         name: journal
-      - hostPath:
-          path: "/var/log/kube-apiserver"
-        name: auditlogs-kube-apiserver
-      - hostPath:
-          path: "/var/log/openshift-apiserver"
-        name: auditlogs-openshift-apiserver
-      - hostPath:
-          path: "/var/log/oauth-apiserver"
-        name: auditlogs-oauth-apiserver
       - name: proxy-tls
         secret:
           defaultMode: 420
