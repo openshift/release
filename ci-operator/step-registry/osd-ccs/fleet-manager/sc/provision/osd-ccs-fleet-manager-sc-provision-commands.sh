@@ -72,21 +72,11 @@ echo "${sc_cluster_id}" >> "${SHARED_DIR}/osd-fm-sc-id"
 echo "Waiting for Service Cluster ready..."
 wait_for_cluster
 
-# Print Management Cluster info, there might be multiple MC if 1st failed
-mc_cluster_num=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="parent.id='${sc_cluster_id}'" | jq -r '.total')
-for((i=0;i<${mc_cluster_num};i++));
-do
-  mc_cluster_state=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="parent.id='${sc_cluster_id}'" | jq -r '.items['$i'].status')
-  echo "Index $i MC is in ${mc_cluster_state} state"
-  # Save 1st ready MC indx to save kubeconfig later
-  if [[ "${mc_cluster_state}" == "ready" ]]; then
-    mc_ready_idx=$i
-  fi
-  mc_cluster_id=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="parent.id='${sc_cluster_id}'" | jq -r '.items['$i'].id')
-  echo "Management Cluster:${mc_cluster_id}"
-done
-
 #Save MC kubeconfig
-saved_mc_cluster_id=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.items['${mc_ready_idx}'].cluster_management_reference.cluster_id')
-echo "Save kubeconfig for Management Cluster:${saved_mc_cluster_id}"
-ocm get /api/clusters_mgmt/v1/clusters/${saved_mc_cluster_id}/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-mc.kubeconfig"
+mc_ocm_cluster_id=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters -p search="parent.id='${sc_cluster_id}' and status is 'ready'" -p size=1 | jq -r '.items[0].cluster_management_reference.cluster_id')
+echo "Save kubeconfig for Management Cluster:${mc_ocm_cluster_id}"
+if [[ -z "${mc_ocm_cluster_id}" ]]; then
+  echo "No ready MC, Exit..."
+  exit 1
+fi
+ocm get /api/clusters_mgmt/v1/clusters/${mc_ocm_cluster_id}/credentials | jq -r .kubeconfig > "${SHARED_DIR}/hs-mc.kubeconfig"

@@ -81,14 +81,9 @@ wait_for_cluster service_clusters ${sc_cluster_id} cleanup_ack_pending
 ocm delete /api/osd_fleet_mgmt/v1/service_clusters/${sc_cluster_id}/ack
 
 echo "Waiting for SC deletion..."
-while true; do
+while ocm get /api/osd_fleet_mgmt/v1/service_clusters/${sc_cluster_id} ; do
   sleep 60
-  sc_cluster_num=$(ocm get /api/osd_fleet_mgmt/v1/service_clusters -p search="region='${OSDFM_REGION}'" | jq -r '.total')
-  if ((${sc_cluster_num} == 0)); then
-    echo "Delete successful"
-    exit 0
-  fi
 done
 
-echo "Delete failed"
-exit 1
+echo "SC is no longer accessible; delete successful"
+exit 0
