@@ -8,7 +8,7 @@ export PATH=$PATH:/tmp/bin
 mkdir -p /tmp/bin
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
-    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT
+    GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT BYOC_KUBECONFIG
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
@@ -66,6 +66,17 @@ EOF
 	  echo "Timed out waiting for login"
 	  exit 1
   fi
+
+# Define a new environment for BYOC pointing to a kubeconfig with token. RHTAP environments only supports kubeconfig with token:
+# See: https://issues.redhat.com/browse/GITOPSRVCE-554
+BYOC_KUBECONFIG="/tmp/token-kubeconfig"
+cp "$KUBECONFIG" "$BYOC_KUBECONFIG"
+if [[ -s "$BYOC_KUBECONFIG" ]]; then
+    echo -e "byoc kubeconfig exists!"
+else
+    echo "Kubeconfig not exists in $BYOC_KUBECONFIG... Aborting job"
+    exit 1
+fi
 
 git config --global user.name "redhat-appstudio-qe-bot"
 git config --global user.email redhat-appstudio-qe-bot@redhat.com
