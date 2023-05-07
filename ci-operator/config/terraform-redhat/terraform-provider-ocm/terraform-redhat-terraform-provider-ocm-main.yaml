@@ -4,18 +4,40 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
-promotion:
-  name: "4.14"
-  namespace: ocp
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/origin/4.13:cli
+
+    RUN wget -q https://github.com/openshift-online/ocm-cli/releases/download/v0.1.66/ocm-linux-amd64 -O /usr/local/bin/ocm &&\
+        chmod +x /usr/local/bin/ocm &&\
+        ocm version
+
+    RUN curl -s https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo -o /etc/yum.repos.d/hashicorp.repo &&\
+        yum install -y terraform &&\
+        terraform version
+
+    RUN yum -y install --setopt=skip_missing_names_on_install=False \
+        openssl jq unzip which make
+    RUN yum clean all
+
+    RUN git config --global http.sslVerify false &&\
+        git clone https://github.com/terraform-redhat/terraform-provider-ocm.git --branch main
+
+    RUN curl -Ls https://go.dev/dl/go1.20.4.linux-amd64.tar.gz |tar -C /usr/local -xzf -
+
+    ENV PATH="/usr/local/go/bin:${PATH}"
+    ENV GOPATH=/usr/local/go
+    RUN cd terraform-provider-ocm && go mod tidy && go mod vendor && make install
+  to: ocm-tf-cli
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.13"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -32,6 +54,16 @@ tests:
     make unit-test
   container:
     from: src
+- as: rehearse-e2e-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    workflow: terraform-aws-e2e
+- as: rehearse-single-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    workflow: terraform-aws-single
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
