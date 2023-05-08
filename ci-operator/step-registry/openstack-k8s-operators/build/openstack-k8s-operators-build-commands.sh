@@ -163,10 +163,13 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
     export IMAGEBASE=${SERVICE_NAME}
   fi
 
-  go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/api=github.com/${REPO_NAME}/api@${API_SHA}
+  # mod can be either /api or /apis
+  MOD=$(grep github.com/${DEFAULT_ORG}/${BASE_OP}/api go.mod)
+  API_MOD=$(basename $MOD)
+  go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
   go mod tidy
   pushd ./apis/
-  go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/api=github.com/${REPO_NAME}/api@${API_SHA}
+  go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
   go mod tidy
   popd
 

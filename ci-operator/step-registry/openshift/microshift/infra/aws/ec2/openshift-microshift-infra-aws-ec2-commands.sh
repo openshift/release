@@ -5,6 +5,8 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+#Save stacks events
+trap 'save_stack_events_to_shared' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
@@ -22,9 +24,16 @@ ami_id=${EC2_AMI}
 instance_type=${EC2_INSTANCE_TYPE}
 host_device_name="/dev/xvdc"
 
-if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c6g.* ]]; then
+if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+g.* ]]; then
   host_device_name="/dev/nvme1n1"
 fi
+
+function save_stack_events_to_shared()
+{
+  set +o errexit
+  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${SHARED_DIR}/stack-events-${stack_name}.json"
+  set -o errexit
+}
 
 echo "ec2-user" > "${SHARED_DIR}/ssh_user"
 
@@ -238,21 +247,27 @@ Resources:
       - DeviceName: /dev/sda1
         Ebs:
           VolumeSize: "120"
-          VolumeType: gp2
+          VolumeType: gp3
+          Iops: 16000
       - DeviceName: /dev/sdc
         Ebs:
           VolumeSize: "120"
           VolumeType: gp3
+          Iops: 16000
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
+          echo "====== Authorizing public key ======" | tee -a /tmp/init_output.txt
           echo "\${PublicKeyString}" >> /home/ec2-user/.ssh/authorized_keys
-          sudo dnf install -y lvm2
+          echo "====== Running DNF Install ======" | tee -a /tmp/init_output.txt
+          sudo dnf install -y lvm2 |& tee -a /tmp/init_output.txt
 
           # NOTE: wrappig script vars with {} since the cloudformation will see
           # them as cloudformation vars instead.
-          sudo pvcreate "\${HostDeviceName}"
-          sudo vgcreate rhel "\${HostDeviceName}"
+          echo "====== Creating PV ======" | tee -a /tmp/init_output.txt
+          sudo pvcreate "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
+          echo "====== Creating VG ======" | tee -a /tmp/init_output.txt
+          sudo vgcreate rhel "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
 
 Outputs:
   InstanceId:
