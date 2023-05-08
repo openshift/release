@@ -138,79 +138,11 @@ function get_skip_tests {
     echo "${skip_list}"
 }
 
-
-function sno_set_registry {
-
-    # Create PVC storage for registry in a host of SNO baremetal in /var/registry
-    cat << EOF | oc apply -f -
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: image-registry-pv
-spec:
-  capacity:
-    storage: 100Gi
-  claimRef:
-    apiVersion: v1
-    kind: PersistentVolumeClaim
-    name: image-registry-storage
-    namespace: openshift-image-registry
-  accessModes:
-  - ReadWriteMany
-  hostPath:
-    path: /var/registry
-    type: DirectoryOrCreate
-  persistentVolumeReclaimPolicy: Retain
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: image-registry-storage
-  namespace: openshift-image-registry
-spec:
-  accessModes:
-  - ReadWriteMany
-  resources:
-    requests:
-      storage: 100Gi
-
-EOF
-
-    # Set registry to managed and configure PVC as a registry storage:
-    # https://docs.openshift.com/container-platform/4.12/registry/configuring_registry_storage/
-    # configuring-registry-storage-baremetal.html#configuring-registry-storage-baremetal
-    oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed"}}'
-    oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"pvc":{"claim":"image-registry-storage"}}}}'
-    # For debug purposes
-    sleep 60
-    timed=60
-    while [[ "$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.phase}')" != "Running" ]]; do
-        echo "Waiting for registry pod to be running ${timed} seconds"
-        sleep 10
-        timed=$((timed+10))
-        if [ "${timed}" -gt 600 ]; then
-            echo "Registry pod is not running after 600 seconds"
-            oc get pod -n openshift-image-registry -l docker-registry=default
-            status=$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.phase}')
-            echo "Status=${status}"
-            exit 1
-        fi
-    done
-    echo "Registry pod is running after ${timed} seconds"
-
-    oc get clusteroperator image-registry
-    oc get pod -n openshift-image-registry -l docker-registry=default
-    echo "Container state=$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.containerStatuses[0].ready}')"
-    # Wait 5 minutes until registry is up and running
-    sleep 300
-
-}
-
 source $SHARED_DIR/main.env
 
  # next: ovs_qos
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
-    export FEATURES="${FEATURES:-sriov sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
+    export FEATURES="${FEATURES:-performance}"
 else
     export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
 fi
@@ -241,8 +173,10 @@ export CNF_ORIGIN_TESTS
 
 if [[ "$T5CI_VERSION" == "4.14" ]]; then
     export CNF_BRANCH="master"
+    export CNF_TESTS_IMAGE="quay.io/openshift-kni/cnf-tests:4.14"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
+    export CNF_TESTS_IMAGE="quay.io/openshift-kni/cnf-tests:${T5CI_VERSION}"
 fi
 
 cnf_dir=${cnf_dir:-$(mktemp -d -t cnf-XXXXX)}
@@ -306,8 +240,9 @@ fi
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
-    # Create a registry for the tests
-    sno_set_registry
+    export ROLE_WORKER_CNF="master"
+    # Wait for the registry for tests
+    sleep 300
 fi
 export CNF_NODES="${test_nodes}"
 
