@@ -156,14 +156,21 @@ periodics:
   spec:
     containers:
     - args:
-      - --config-path=/etc/config/_config.yaml
-      - --github-mapping-config-path=/etc/github-mapping/mapping.yaml
-      - --slack-token-path=/etc/slack/oauth_token
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-token-path=/etc/oauth/oauth
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        tar -C /tmp -xvzf /etc/github-users/users.yaml.tar.gz
+        /usr/bin/pr-reminder \
+        --config-path=/etc/config/_config.yaml \
+        --github-users-file=/tmp/users.yaml \
+        --slack-token-path=/etc/slack/oauth_token \
+        --github-endpoint=http://ghproxy \
+        --github-endpoint=https://api.github.com \
+        --github-token-path=/etc/oauth/oauth
       command:
-      - /usr/bin/pr-reminder
+      - /bin/bash
       image: registry.ci.openshift.org/ci/pr-reminder:latest
       imagePullPolicy: Always
       name: ""
@@ -177,8 +184,8 @@ periodics:
       - mountPath: /etc/config
         name: config
         readOnly: true
-      - mountPath: /etc/github-mapping
-        name: github-mapping
+      - mountPath: /etc/github-users
+        name: github-users
         readOnly: true
       - mountPath: /etc/oauth
         name: github-token
@@ -191,7 +198,7 @@ periodics:
       name: config
     - configMap:
         name: sync-rover-groups
-      name: github-mapping
+      name: github-users
     - name: github-token
       secret:
         secretName: github-credentials-openshift-bot
