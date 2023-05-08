@@ -1390,17 +1390,18 @@ periodics:
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-openshift-cnv-tests
   spec:
+    automountServiceAccountToken: true
     containers:
     - args:
       - -c
       - |
         set -o errexit
-        cp ~/.docker/config.json /tmp/config.json
-        oc registry login --to /tmp/config.json
+        cp ~/.docker/config.json "${REGISTRY_AUTH_FILE_COMBINED}"
+        oc registry login --to "${REGISTRY_AUTH_FILE_COMBINED}"
         failures=0
         for mapping in /etc/imagemirror/mapping_openshift-cnv*; do
           echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+          if ! oc image mirror -a "${REGISTRY_AUTH_FILE_COMBINED}" --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
             failures=$((failures+1))
           fi
@@ -1411,6 +1412,8 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
+      - name: REGISTRY_AUTH_FILE_COMBINED
+        value: /tmp/config.json
       image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
