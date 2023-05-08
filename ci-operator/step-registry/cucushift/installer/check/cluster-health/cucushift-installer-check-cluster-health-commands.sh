@@ -163,6 +163,68 @@ function wait_clusteroperators_continous_success() {
     fi
 }
 
+function check_mcp() {
+    local updating_mcp unhealthy_mcp
+
+    updating_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status --no-headers | grep -v "False")
+    if [[ -n "${updating_mcp}" ]]; then
+        echo "Some mcp is updating..."
+        echo "${updating_mcp}"
+        return 1
+    fi
+
+    # Do not check UPDATED on purpose, beause some paused mcp would not update itself until unpaused
+    unhealthy_mcp=$(oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount --no-headers | grep -v "False.*False.*0")
+    if [[ -n "${unhealthy_mcp}" ]]; then
+        echo "Detected unhealthy mcp:"
+        echo "${unhealthy_mcp}"
+        echo "Real-time detected unhealthy mcp:"
+        oc get mcp -o custom-columns=NAME:metadata.name,CONFIG:spec.configuration.name,UPDATING:status.conditions[?\(@.type==\"Updating\"\)].status,DEGRADED:status.conditions[?\(@.type==\"Degraded\"\)].status,DEGRADEDMACHINECOUNT:status.degradedMachineCount | grep -v "False.*False.*0"
+        echo "Real-time full mcp output:"
+        oc get mcp
+        echo ""
+        unhealthy_mcp_names=$(echo "${unhealthy_mcp}" | awk '{print $1}')
+        echo "Using oc describe to check status of unhealthy mcp ..."
+        for mcp_name in ${unhealthy_mcp_names}; do
+          echo "Name: $mcp_name"
+          oc describe mcp $mcp_name || echo "oc describe mcp $mcp_name failed"
+        done
+        return 2
+    fi
+    return 0
+}
+
+function wait_mcp_continous_success() {
+    local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20 ret=0
+    while (( try < max_retries && continous_successful_check < passed_criteria )); do
+        echo "Checking #${try}"
+        ret=0
+        check_mcp || ret=$?
+        if [[ "$ret" == "0" ]]; then
+            echo "Passed #${continous_successful_check}"
+            (( continous_successful_check += 1 ))
+        elif [[ "$ret" == "1" ]]; then
+            echo "Some machines are updating..."
+            continous_successful_check=0
+        else
+            echo "Some machines are degraded..."
+            break
+        fi
+        echo "wait and retry..."
+        sleep 60
+        (( try += 1 ))
+    done
+    if (( continous_successful_check != passed_criteria )); then
+        echo >&2 "Some mcp does not get ready or not stable"
+        echo "Debug: current mcp output is:"
+        oc get mcp
+        return 1
+    else
+        echo "All mcp status check PASSED"
+        return 0
+    fi
+}
+
 function check_node() {
     local node_number ready_number
     node_number=$(oc get node --no-headers | wc -l)
@@ -223,24 +285,26 @@ fi
 check_history || exit 1
 
 echo "Step #1: Make sure all machines are applied with latest machineconfig"
-if wait_machineconfig_applied "master"; then
-    echo "masters are already applied with latest machineconfig"
-else
-    echo >&2 "some masters are not applied with latest machineconfig"
-    exit 1
-fi
+#if wait_machineconfig_applied "master"; then
+#    echo "masters are already applied with latest machineconfig"
+#else
+#    echo >&2 "some masters are not applied with latest machineconfig"
+#    exit 1
+#fi
+#
+#worker_num=$(oc get mcp -o json | jq -r --arg role_label "node-role.kubernetes.io/worker" '.items[] | select(.spec.nodeSelector.matchLabels[$role_label] == "") | .status.machineCount')
+#if [[ "${worker_num}" == "0" ]]; then
+#    echo "This is a compact or single-node cluster, skip chcking workers..."
+#else
+#    if wait_machineconfig_applied "worker"; then
+#        echo "workers are already applied with latest machineconfig"
+#    else
+#        echo >&2 "some workers are not applied with latest machineconfig"
+#        exit 1
+#    fi
+#fi
+wait_mcp_continous_success || exit 1
 
-worker_num=$(oc get mcp -o json | jq -r --arg role_label "node-role.kubernetes.io/worker" '.items[] | select(.spec.nodeSelector.matchLabels[$role_label] == "") | .status.machineCount')
-if [[ "${worker_num}" == "0" ]]; then
-    echo "This is a compact or single-node cluster, skip chcking workers..."
-else
-    if wait_machineconfig_applied "worker"; then
-        echo "workers are already applied with latest machineconfig"
-    else
-        echo >&2 "some workers are not applied with latest machineconfig"
-        exit 1
-    fi
-fi
 
 echo "Step #2: check all cluster operators get stable and ready"
 wait_clusteroperators_continous_success || exit 1

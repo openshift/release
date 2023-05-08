@@ -1,9 +1,20 @@
 workflow:
   as: osd-ccs-fleet-manager
   steps:
+    env:
+      HOSTED_CP: "true"
+      ZONES_COUNT: "1"
+      COMPUTE_MACHINE_TYPE: "m5.2xlarge"
+      REPLICAS: "3"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      OCM_LOGIN_ENV: "integration"
+      ROSA_LOGIN_ENV: "integration"
     pre:
     - ref: osd-ccs-fleet-manager-sc-provision
+    - chain: rosa-aws-sts-provision-byo-vpc
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
     post:
+    - chain: rosa-aws-sts-deprovision-byo-vpc
     - ref: osd-ccs-fleet-manager-sc-deprovision
   documentation: |-
-    The workflow installs a service cluster and a management cluster with the specific configuration. After finishing testing, both of the two clusters will be deprovsioned.
+    The workflow installs a service cluster and a management cluster with the specific configuration, then installs a rosa hypershift cluster in the same region. After finishing testing, clusters will be deprovsioned.

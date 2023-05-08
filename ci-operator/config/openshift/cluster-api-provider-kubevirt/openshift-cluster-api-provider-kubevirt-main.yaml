@@ -7,27 +7,31 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
-  hypershift-operator-4.13:
+  hypershift-operator:
     name: "4.14"
     namespace: ocp
     tag: hypershift-operator
-  openshift_release_golang-1.18:
+  openshift_release_golang-1.19:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
+  test-bin:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-tests
 binary_build_commands: make manager
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
 images:
 - build_args:
   - name: ARCH
     value: amd64
   - name: ldflags
   dockerfile_literal: |-
-    FROM registry.ci.openshift.org/openshift/release:golang-1.18 as toolchain
+    FROM registry.ci.openshift.org/openshift/release:golang-1.19 as toolchain
 
     # Run this with docker build --build_arg $(go env GOPROXY) to override the goproxy
     ARG goproxy=https://proxy.golang.org
@@ -57,65 +61,11 @@ images:
     ENTRYPOINT ["/manager"]
   from: base
   inputs:
-    openshift_release_golang-1.18:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: cluster-api-provider-kubevirt
-- build_args:
-  - name: ARCH
-    value: amd64
-  - name: ldflags
-  dockerfile_literal: |-
-    FROM src
-
-    RUN yum install -y expect
-    COPY oc /usr/bin/oc
-
-    RUN curl -L https://github.com/kubernetes-sigs/cluster-api/releases/download/v1.0.2/clusterctl-linux-amd64 -o /usr/bin/clusterctl && \
-        chmod +x /usr/bin/clusterctl
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: capk-oc-bin-image
-- build_args:
-  - name: ARCH
-    value: amd64
-  - name: ldflags
-  dockerfile_literal: |-
-    FROM src
-    COPY oc hypershift /usr/bin/
-    RUN mkdir -p /go/src/github.com/openshift && \
-        cd /go/src/github.com/openshift && \
-        git clone https://github.com/openshift/hypershift.git && \
-        cd hypershift/ && \
-        go mod tidy && go mod vendor && \
-        make e2e && \
-        sed -i 's|global-pull-secret.json|/tmp/global-pull-secret.json|g' ./hack/ci/install-cnv.sh
-    WORKDIR /go/src/github.com/openshift/hypershift
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    hypershift-operator-4.13:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/hypershift
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
-  to: hypershift-cli-e2e
 promotion:
-  excluded_images:
-  - capk-oc-bin-image
-  - hypershift-cli-e2e
   name: "4.14"
   namespace: ocp
 releases:
@@ -146,76 +96,16 @@ tests:
   commands: GOFLAGS="-mod=readonly" make test
   container:
     from: src
-- as: cluster-api-provider-kubevirt-with-hypershift
+- as: e2e-hypershift-kubevirt
   steps:
     cluster_profile: aws-virtualization
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
+      CNV_PRERELEASE_VERSION: "4.13"
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
       CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
-    test:
-    - as: deploy-cnv
-      cli: latest
-      commands: CNV_PRERELEASE_VERSION=4.13 ./hack/ci/install-cnv.sh
-      credentials:
-      - mount_path: /etc/cnv-nightly-pull-credentials
-        name: openshift-cnv-quay-credentials
-        namespace: test-credentials
-      from: hypershift-cli-e2e
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: deploy-hypershift
-      cli: latest
-      commands: |-
-        set -x
-        hypershift install
-        oc patch deployment -n hypershift operator --type=json -p '[{"op": "add", "path": "/spec/template/spec/containers/0/env/-", "value": {"name": "IMAGE_KUBEVIRT_CAPI_PROVIDER", "value": "'"${CAPK_IMAGE}"'"}}]'
-
-        # make sure the patch worked
-        oc get deployment -n hypershift operator -o yaml | grep "${CAPK_IMAGE}"
-
-        oc rollout status deployment -n hypershift operator --timeout=5m
-      dependencies:
-      - env: CAPK_IMAGE
-        name: cluster-api-provider-kubevirt
-      from: hypershift-cli-e2e
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    - as: hypershift-e2e
-      cli: latest
-      commands: |-
-        set -ex
-        # run the test
-        bin/test-e2e \
-                  --test.v \
-                  --test.timeout=0 \
-                  --test.run='^TestCreateCluster$' \
-                  --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
-                  --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
-                  --e2e.node-pool-replicas=2 \
-                  --e2e.kubevirt-node-memory="6Gi" \
-                  --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-                  --e2e.platform=KubeVirt
-      credentials:
-      - mount_path: /etc/ci-pull-credentials
-        name: ci-pull-credentials
-        namespace: test-credentials
-      dependencies:
-      - env: OCP_IMAGE_LATEST
-        name: release:latest
-      - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
-      from: hypershift-cli-e2e
-      resources:
-        requests:
-          cpu: 500m
-          memory: 1Gi
-    workflow: ipi-aws-ovn
+    workflow: hypershift-kubevirt-e2e-capk
 zz_generated_metadata:
   branch: main
   org: openshift
