@@ -111,6 +111,7 @@ EOF
     echo "$(date -u --rfc-3339=seconds) - Configured Resource Pool: ${GOVC_RESOURCE_POOL}"
     echo "$(date -u --rfc-3339=seconds) - Configured Leased Resource: ${LEASED_RESOURCE}"
     echo "$(date -u --rfc-3339=seconds) - Configured OVA Network as MOB ID: ${OVA_NETWORK}"
+    echo "$(date -u --rfc-3339=seconds) - Configured Datastore: ${GOVC_DATASTORE}"
 
     hw_versions=(15 17 18 19)
     if [[ ${vsphere_version} -eq 8 ]]; then
