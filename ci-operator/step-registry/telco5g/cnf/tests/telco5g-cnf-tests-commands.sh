@@ -138,9 +138,82 @@ function get_skip_tests {
     echo "${skip_list}"
 }
 
+
+function sno_set_registry {
+
+    # Create PVC storage for registry in a host of SNO baremetal in /var/registry
+    cat << EOF | oc apply -f -
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: image-registry-pv
+spec:
+  capacity:
+    storage: 100Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: image-registry-storage
+    namespace: openshift-image-registry
+  accessModes:
+  - ReadWriteMany
+  hostPath:
+    path: /var/registry
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: image-registry-storage
+  namespace: openshift-image-registry
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+
+EOF
+
+    # Set registry to managed and configure PVC as a registry storage:
+    # https://docs.openshift.com/container-platform/4.12/registry/configuring_registry_storage/
+    # configuring-registry-storage-baremetal.html#configuring-registry-storage-baremetal
+    oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed"}}'
+    oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"pvc":{"claim":"image-registry-storage"}}}}'
+    # For debug purposes
+    sleep 60
+    timed=60
+    while [[ "$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.phase}')" != "Running" ]]; do
+        echo "Waiting for registry pod to be running ${timed} seconds"
+        sleep 10
+        timed=$((timed+10))
+        if [ "${timed}" -gt 600 ]; then
+            echo "Registry pod is not running after 600 seconds"
+            oc get pod -n openshift-image-registry -l docker-registry=default
+            status=$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.phase}')
+            echo "Status=${status}"
+            exit 1
+        fi
+    done
+    echo "Registry pod is running after ${timed} seconds"
+
+    oc get clusteroperator image-registry
+    oc get pod -n openshift-image-registry -l docker-registry=default
+    echo "Container state=$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.containerStatuses[0].ready}')"
+    # Wait 5 minutes until registry is up and running
+    sleep 300
+
+}
+
 source $SHARED_DIR/main.env
 
-export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}" # next: ovs_qos
+ # next: ovs_qos
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+    export FEATURES="${FEATURES:-sriov sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
+else
+    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
+fi
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
@@ -172,7 +245,8 @@ else
     export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
 
-cnf_dir=$(mktemp -d -t cnf-XXXXX)
+cnf_dir=${cnf_dir:-$(mktemp -d -t cnf-XXXXX)}
+mkdir -p "$cnf_dir"
 cd "$cnf_dir" || exit 1
 
 echo "running on branch ${CNF_BRANCH}"
@@ -209,25 +283,32 @@ export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
 
 skip_tests=$(get_skip_tests)
 
-worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
---selector='!node-role.kubernetes.io/master' -o name)
-if [ -z "${worker_nodes}" ]; then
-    echo "[ERROR]: No worker nodes found in cluster"
-    exit 1
-fi
-# get BM workers for testing
-test_nodes=""
-for node in ${worker_nodes}; do
-    if is_bm_node "${node}"; then
-        test_nodes="${test_nodes} ${node}"
+if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
+    worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
+    --selector='!node-role.kubernetes.io/master' -o name)
+    if [ -z "${worker_nodes}" ]; then
+        echo "[ERROR]: No worker nodes found in cluster"
+        exit 1
     fi
-done
+    # get BM workers for testing
+    test_nodes=""
+    for node in ${worker_nodes}; do
+        if is_bm_node "${node}"; then
+            test_nodes="${test_nodes} ${node}"
+        fi
+    done
 
-if [ -z "${test_nodes}" ]; then
-    echo "[ERROR]: No BM worker nodes found in cluster"
-    exit 1
+    if [ -z "${test_nodes}" ]; then
+        echo "[ERROR]: No BM worker nodes found in cluster"
+        exit 1
+    fi
 fi
 
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+    test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
+    # Create a registry for the tests
+    sno_set_registry
+fi
 export CNF_NODES="${test_nodes}"
 
 cd cnf-features-deploy

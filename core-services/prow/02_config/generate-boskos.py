@@ -166,10 +166,10 @@ CONFIG = {
         'default': 5,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 5,
+        'default': 4,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 5,
+        'default': 2,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
