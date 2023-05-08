@@ -4,9 +4,31 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
-promotion:
-  name: "4.14"
-  namespace: ocp
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/openshift/release:golang-1.18
+
+    RUN wget -q https://github.com/openshift-online/ocm-cli/releases/download/v0.1.66/ocm-linux-amd64 -O /usr/local/bin/ocm &&\
+        chmod +x /usr/local/bin/ocm &&\
+        ocm version
+    RUN curl -s https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo -o /etc/yum.repos.d/hashicorp.repo &&\
+        yum install -y terraform &&\
+        terraform version
+    RUN yum -y install --setopt=skip_missing_names_on_install=False \
+        openssl jq unzip which make
+    RUN yum clean all
+
+    WORKDIR /terraform-provider-ocm
+    COPY --from=source-code /go/src/github.com/terraform-redhat/terraform-provider-ocm .
+
+    RUN go mod tidy && go mod vendor && make install
+
+    RUN chmod -R 777 $GOPATH /tmp .
+  inputs:
+    src:
+      as:
+      - source-code
+  to: ocm-tf-cli
 releases:
   initial:
     integration:
@@ -32,6 +54,11 @@ tests:
     make unit-test
   container:
     from: src
+- as: e2e
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    workflow: rosa-terraform
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
