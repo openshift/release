@@ -40,11 +40,13 @@ tests:
     make test
   container:
     from: src
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
 - as: fvt
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
     cluster_profile: aws
     env:
-      COMPUTE_NODE_TYPE: m5.4xlarge
+      COMPUTE_NODE_TYPE: m5.2xlarge
     test:
     - as: modelmesh-serving-fvt
       commands: "export HOME=/go        \ngit clone https://github.com/opendatahub-io/modelmesh-serving\ncd
@@ -61,6 +63,7 @@ tests:
           memory: 3Gi
     workflow: ipi-aws
 - as: pr-image-mirror
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: rest-proxy
@@ -69,6 +72,7 @@ tests:
     workflow: opendatahub-io-ci-image-mirror
 - as: fast-image-mirror
   postsubmit: true
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
     dependencies:
       SOURCE_IMAGE_REF: rest-proxy
