@@ -17,7 +17,7 @@ aws s3 ls
 
 cat "${SHARED_DIR}/new_pull_secret" | jq
 registry_ci_openshift_ci_auth=$(cat "${SHARED_DIR}/new_pull_secret" | jq '.auths."registry.ci.openshift.org".auth' | tr -d '"')
-cat "${SHARED_DIR}/local_registry_icsp_file.yaml"
+cat "${SHARED_DIR}/local_registry_idms_file.yaml"
 OMR_HOST_NAME=$(cat ${SHARED_DIR}/OMR_HOST_NAME)
 OCP_NAME="omrocpprowci$RANDOM"
 

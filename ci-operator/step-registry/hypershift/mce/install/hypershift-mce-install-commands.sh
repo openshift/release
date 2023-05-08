@@ -7,12 +7,12 @@ MCE_VERSION=${MCE_VERSION:-"2.2"}
 
 # Setup quay mirror container repo
 cat << EOF | oc apply -f -
-apiVersion: operator.openshift.io/v1alpha1
-kind: ImageContentSourcePolicy
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
 metadata:
   name: rhacm-repo
 spec:
-  repositoryDigestMirrors:
+  imageDigestMirrors:
   - mirrors:
     - quay.io:443/acm-d
     source: registry.redhat.io/rhacm2

@@ -67,21 +67,21 @@ function update_global_auth () {
 }
 
 function delete_resources() {
-  #Delete existing ICSP and CatalogSource
-  echo "Deleting any existing ICSP and CatalogSource"
-  oc delete imagecontentsourcepolicies brew-registry --ignore-not-found
+  #Delete existing IDMS and CatalogSource
+  echo "Deleting any existing IDMS and CatalogSource"
+  oc delete imagedigestmirrorsets brew-registry --ignore-not-found
   oc delete catalogsource qe-app-registry -n openshift-marketplace --ignore-not-found
 }
 
-# create ICSP for connected env.
-function create_icsp_connected () {
+# create IDMS for connected env.
+function create_idms_connected () {
     cat <<EOF | oc create -f -
-    apiVersion: operator.openshift.io/v1alpha1
-    kind: ImageContentSourcePolicy
+    apiVersion: config.openshift.io/v1
+    kind: ImageDigestMirrorSet
     metadata:
       name: brew-registry
     spec:
-      repositoryDigestMirrors:
+      imageDigestMirrors:
       - mirrors:
         - brew.registry.redhat.io
         source: registry.redhat.io
@@ -93,9 +93,9 @@ function create_icsp_connected () {
         source: registry-proxy.engineering.redhat.com
 EOF
     if [ $? == 0 ]; then
-        echo "create the ICSP successfully" 
+        echo "create the IDMS successfully" 
     else
-        echo "!!! fail to create the ICSP"
+        echo "!!! fail to create the IDMS"
         return 1
     fi
 }
@@ -186,6 +186,6 @@ update_global_auth
 sleep 5
 delete_resources
 sleep 10
-create_icsp_connected
+create_idms_connected
 check_marketplace
 create_catalog_sources

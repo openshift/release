@@ -20,10 +20,10 @@ SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 BASTION_IP=$(<"${SHARED_DIR}/bastion_private_address")
 BASTION_SSH_USER=$(<"${SHARED_DIR}/bastion_ssh_user")
 
-icsp_file="${SHARED_DIR}/local_registry_icsp_file.yaml"
+idms_file="${SHARED_DIR}/local_registry_idms_file.yaml"
 
-if [ ! -f "${icsp_file}" ]; then
-  ecoh "Unable to find file mirror_registry_icsp_file in SHARED_DIR, exiting..."
+if [ ! -f "${idms_file}" ]; then
+  ecoh "Unable to find file mirror_registry_idms_file in SHARED_DIR, exiting..."
   exit 1
 fi
 
@@ -110,8 +110,8 @@ sleep 60
 #  exit 1
 #fi
 
-echo "Adding ICSP to make cluster using the mirror registry"
-oc create -f "${icsp_file}"
+echo "Adding IDMS to make cluster using the mirror registry"
+oc create -f "${idms_file}"
 echo "Make sure all machines are applied with latest machineconfig"
 wait_machineconfig_applied "master"
 wait_machineconfig_applied "worker"

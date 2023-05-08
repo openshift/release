@@ -10,6 +10,8 @@ mirror_output="${SHARED_DIR}/mirror_output"
 pull_secret_filename="new_pull_secret"
 new_pull_secret="${SHARED_DIR}/${pull_secret_filename}"
 remote_pull_secret="/tmp/${pull_secret_filename}"
+install_config_idms_patch="${SHARED_DIR}/install-config-idms.yaml.patch"
+idms_file="${SHARED_DIR}/local_registry_idms_file.yaml"
 install_config_icsp_patch="${SHARED_DIR}/install-config-icsp.yaml.patch"
 icsp_file="${SHARED_DIR}/local_registry_icsp_file.yaml"
 
@@ -72,6 +74,11 @@ ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o St
 grep -B 1 -A 10 "kind: ImageContentSourcePolicy" ${mirror_output} > "${icsp_file}"
 grep -A 6 "imageContentSources" ${mirror_output} > "${install_config_icsp_patch}"
 
-echo "${install_config_icsp_patch}:"
-cat "${install_config_icsp_patch}"
+# convert icsp_file to ImageDigesMirrorSet file
+migrate_idms_file=$(oc adm migrate icsp ${icsp_file} --dest-dir "${SHARED_DIR}" | sed 's/^.*wrote ImageDigestMirrorSet to //' | grep -v '^$')
+cp "${migrate_idms_file}" "${idms_file}"
+# generate imageDigestSources for install_config_idms_patch
+sed '1s/.*/imageDigestSources/' ${install_config_icsp_patch} > "${install_config_idms_patch}"
+echo "${install_config_idms_patch}:"
+cat "${install_config_idms_patch}"
 rm -f "${new_pull_secret}"

@@ -74,10 +74,10 @@ echo "Recovering network"
 ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} \
     "sudo rm -rf /etc/dnsmasq.d/disconnected-dns.conf | sudo systemctl restart dnsmasq.service"
 
-#Delete all created ICSP
-echo "Deleting all created ICSP"
-icsp_list=$(oc get imagecontentsourcepolicy --no-headers | awk '{print $1}')
-oc delete imagecontentsourcepolicy ${icsp_list}
+#Delete all created IDMS
+echo "Deleting all created IDMS"
+idms_list=$(oc get imagedigestmirrorset --no-headers | awk '{print $1}')
+oc delete imagedigestmirrorset ${idms_list}
 echo "Make sure all machines are applied with latest machineconfig"
 wait_machineconfig_applied "master"
 wait_machineconfig_applied "worker"
