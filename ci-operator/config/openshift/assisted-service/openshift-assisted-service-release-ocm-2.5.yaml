@@ -252,38 +252,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: subsystem-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  cron: 00 00 */1 * 0-5
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-
-        make deploy-on-openshift-ci
-        make test
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      - env: IMAGE_SERVICE
-        name: assisted-image-service
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
 - as: subsystem-kubeapi-aws
   cluster_claim:
     architecture: amd64
@@ -317,50 +285,8 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: subsystem-kubeapi-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  cron: 00 00 */1 * 0-5
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-        export GENERATE_CRD=false
-
-        make deploy-on-openshift-ci
-        make enable-kube-api-for-subsystem
-        make test-kube-api
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      - env: IMAGE_SERVICE
-        name: assisted-image-service
-      from: test-bin
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
 - as: e2e-ai-operator-ztp
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-periodic
-  cron: 45 02 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -378,15 +304,6 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=3
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-3masters-periodic
-  cron: 05 03 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected
   steps:
     cluster_profile: packet-assisted
@@ -396,13 +313,6 @@ tests:
     env:
       DISCONNECTED: "true"
       IP_STACK: v6
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: 25 03 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      DISCONNECTED: "true"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-tpmv2
   optional: true
@@ -438,20 +348,6 @@ tests:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.5
         TEST_FUNC=test_deploy_day2_nodes_cloud
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-late-binding-single-node-periodic
-  cron: 05 04 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-      POST_INSTALL_COMMANDS: |
-        export INDEX_IMAGE=quay.io/edge-infrastructure/assisted-service-index:ocm-2.5
-        export TEST_FUNC=test_late_binding_kube_api_sno
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel
-      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
   optional: true

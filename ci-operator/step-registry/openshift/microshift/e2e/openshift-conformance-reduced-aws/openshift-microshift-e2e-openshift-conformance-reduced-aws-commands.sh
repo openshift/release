@@ -465,7 +465,6 @@ cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-storage] EmptyDir volumes when FSGroup is specified [LinuxOnly] [NodeFeature:FSGroup] volume on tmpfs should have the correct mode using FSGroup [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] EmptyDir wrapper volumes should not cause race condition when used for configmaps [Serial] [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]"
 "[sig-storage] EmptyDir wrapper volumes should not conflict [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-"[sig-storage] EmptyDir wrapper volumes should not cause race condition when used for configmaps [Serial] [Conformance] [Suite:openshift/conformance/serial/minimal] [Suite:k8s]"
 "[sig-storage] Ephemeralstorage When pod refers to non-existent ephemeral storage should allow deletion of pod with invalid volume : configmap [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] Ephemeralstorage When pod refers to non-existent ephemeral storage should allow deletion of pod with invalid volume : projected [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] Ephemeralstorage When pod refers to non-existent ephemeral storage should allow deletion of pod with invalid volume : secret [Suite:openshift/conformance/parallel] [Suite:k8s]"
