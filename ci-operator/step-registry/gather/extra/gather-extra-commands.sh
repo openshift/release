@@ -257,6 +257,11 @@ else
 	echo "Unable to find a Prometheus pod to snapshot."
 fi
 
+echo "Adding debug tools link to sippy for intervals"
+cat >> ${SHARED_DIR}/custom-links.txt << EOF
+<a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+EOF
+
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.
 # Load whatever timestamps we can, generate the metrics script, and then send it to the
 # thanos-querier pod on the cluster via exec (so we don't need to have a route exposed).

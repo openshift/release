@@ -28,7 +28,6 @@ if [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.13-ocp-e2e-
 	exit 0
 fi
 
-
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
 # openshift-trt taken from the tenants list in the LokiStack CR on DPCR:
@@ -691,8 +690,12 @@ echo "Promtail manifests created, the cluster can be found at https://grafana-lo
 
 
 if [[ -f "/usr/bin/python3" ]]; then
+  # Try to prepopulate the loki time window to match the job (with some leeway), so the user is never staring at no logs when they're actually there:
+  LOKI_EPOCH_MILLIS_FROM="$(date -d '-8 hours' +%s%N | cut -b1-13)"
+  LOKI_EPOCH_MILLIS_TO="$(date -d '+1 hours' +%s%N | cut -b1-13)"
+
   ENCODED_INVOKER="$(python3 -c "import urllib.parse; print(urllib.parse.quote('${OPENSHIFT_INSTALL_INVOKER}'))")"
   cat >> ${SHARED_DIR}/custom-links.txt << EOF
-  <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%5B%22now-24h%22,%22now%22,%22Grafana%20Cloud%22,%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%7C%20unpack%22%7D%5D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">Loki</a>&nbsp;<a target="_blank" href="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
+  <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%7B%22datasource%22:%22PCEB727DF2F34084E%22,%22queries%22:%5B%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%22,%22refId%22:%22A%22,%22editorMode%22:%22code%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22${LOKI_EPOCH_MILLIS_FROM}%22,%22to%22:%22${LOKI_EPOCH_MILLIS_TO}%22%7D%7D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">Loki</a>&nbsp;<a target="_blank" href="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
 EOF
 fi
