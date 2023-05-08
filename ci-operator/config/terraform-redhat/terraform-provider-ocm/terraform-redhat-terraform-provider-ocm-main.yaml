@@ -6,29 +6,28 @@ build_root:
     tag: golang-1.18
 images:
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/origin/4.13:cli
+    FROM registry.access.redhat.com/ubi8/ubi:latest
+    WORKDIR /root
 
-    RUN wget -q https://github.com/openshift-online/ocm-cli/releases/download/v0.1.66/ocm-linux-amd64 -O /usr/local/bin/ocm &&\
-        chmod +x /usr/local/bin/ocm &&\
-        ocm version
-
-    RUN curl -s https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo -o /etc/yum.repos.d/hashicorp.repo &&\
-        yum install -y terraform &&\
-        terraform version
-
-    RUN yum -y install --setopt=skip_missing_names_on_install=False \
-        openssl jq unzip which make
-    RUN yum clean all
-
-    RUN git config --global http.sslVerify false &&\
+    RUN yum install -y git &&\
+        git config --global http.sslVerify false &&\
         git clone https://github.com/terraform-redhat/terraform-provider-ocm.git --branch main
 
-    RUN curl -Ls https://go.dev/dl/go1.20.4.linux-amd64.tar.gz |tar -C /usr/local -xzf -
-
+    RUN curl -Ls https://go.dev/dl/go1.18.linux-amd64.tar.gz |tar -C /usr/local -xzf -
     ENV PATH="/usr/local/go/bin:${PATH}"
     ENV GOPATH=/usr/local/go
-    RUN cd terraform-provider-ocm && go mod tidy && go mod vendor && make install
-  to: ocm-tf-cli
+    ENV TEST_OFFLINE_TOKEN=""
+
+    RUN yum install -y yum-utils && \
+        yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo &&\
+        yum -y install terraform python3 make jq &&\
+        pip3 install PyYAML jinja2 &&\
+        go env -w GO111MODULE=on &&\
+        go install github.com/onsi/ginkgo/v2/ginkgo@latest &&\
+        go install github.com/golang/mock/mockgen@v1.6.0 &&\
+        cd terraform-provider-ocm && go mod tidy && go mod vendor && make install &&\
+        echo 'RUN done'
+  to: ocp-tf-e2e
 releases:
   initial:
     integration:
@@ -63,7 +62,12 @@ tests:
   cron: '@yearly'
   steps:
     cluster_profile: aws-qe
-    workflow: terraform-aws-single
+    env:
+      ART_NAME: cluster1
+    post:
+    - ref: terraform-aws-destroy
+    pre:
+    - ref: terraform-aws-apply
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
