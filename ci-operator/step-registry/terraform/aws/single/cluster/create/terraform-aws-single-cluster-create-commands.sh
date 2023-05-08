@@ -21,23 +21,24 @@ else
 fi
 
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
+export TF_VAR_token=${OCM_TOKEN}
 
 rm -rf ${SHARED_DIR}/work
 mkdir  ${SHARED_DIR}/work
 cd     ${SHARED_DIR}/work
-cp     ${TF_FOLDER}/* ./
 
 if [[ -f ${SHARED_DIR}/${ART_NAME}.tar.gz ]]; then
   tar xvfz ${SHARED_DIR}/${ART_NAME}.tar.gz -C ${SHARED_DIR}/work
-else
-  echo "token = \"${OCM_TOKEN}\""            > terraform.tfvars
-  echo "cluster_name = \"${CLUSTER_NAME}\"" >> terraform.tfvars
-
-  export IFS=';'
-  for KV in ${TF_VARS}; do
-    echo ${KV} >> terraform.tfvars
-  done
 fi
+
+cp     ${TF_FOLDER}/* ./
+
+echo "cluster_name = \"${CLUSTER_NAME}\"" >> terraform.tfvars
+export IFS=';'
+for KV in ${TF_VARS}; do
+  echo "${KV}" >> terraform.tfvars
+done
+cat terraform.tfvars
 
 export HOME='/root' #pointing to location of .terraform.d
 
@@ -45,7 +46,10 @@ terraform init
 
 terraform apply -auto-approve
 
-terraform output -json cluster_id| jq -r . > ${SHARED_DIR}/ocm_cluster_id
+tf_fldr="${TF_FOLDER##*/}"
+if [[ "$(echo ${tf_fldr}|grep 'account_roles')"  == "" ]]; then
+  terraform output -json cluster_id| jq -r . > ${SHARED_DIR}/ocm_cluster_id
+fi
 
 tar cvfz ${SHARED_DIR}/${ART_NAME}.tar.gz *.tf*  #save for later terraform destroy
 

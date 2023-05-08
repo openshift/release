@@ -29,7 +29,9 @@ cd ~/terraform-provider-ocm
 
 export GOCACHE="/tmp/cache"
 export GOMODCACHE="/tmp/cache"
-
+export GOPROXY=https://proxy.golang.org
+go mod download
 go mod tidy
 go mod vendor
+
 make e2e_test

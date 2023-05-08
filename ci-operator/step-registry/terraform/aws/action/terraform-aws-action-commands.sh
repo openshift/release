@@ -26,19 +26,17 @@ export TF_VAR_token=${OCM_TOKEN}
 rm -rf ${SHARED_DIR}/work
 mkdir  ${SHARED_DIR}/work
 cd     ${SHARED_DIR}/work
-cp     ${TF_FOLDER}/* ./
-
 if [[ -f ${SHARED_DIR}/${ART_NAME}.tar.gz ]]; then
   tar xvfz ${SHARED_DIR}/${ART_NAME}.tar.gz -C ${SHARED_DIR}/work
-else
-  echo "cluster_name = \"${CLUSTER_NAME}\"" >> terraform.tfvars
-  export IFS=';'
-  for KV in ${TF_VARS}; do
-    echo ${KV} >> terraform.tfvars
-  done
 fi
-cat terraform.tfvars
 
+cp     ${TF_FOLDER}/* ./
+
+echo "cluster_name = \"${CLUSTER_NAME}\"" >> terraform.tfvars
+export IFS=';'
+for KV in ${TF_VARS}; do
+  echo ${KV} >> terraform.tfvars
+done
 
 export HOME='/root' #pointing to location of .terraform.d
 
