@@ -550,4 +550,4 @@ chmod +r "${HOME}/suite.txt"
 
 ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
-KUBECONFIG=/tmp/kubeconfig openshift-tests run -v 2 --provider=none -f "${HOME}/suite.txt" -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
+KUBECONFIG=/tmp/kubeconfig openshift-tests run --max-parallel-tests 1 -v 2 --provider=none -f "${HOME}/suite.txt" -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
