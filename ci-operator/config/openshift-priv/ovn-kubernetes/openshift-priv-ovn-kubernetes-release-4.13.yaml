@@ -1,20 +1,8 @@
 base_images:
-  base:
-    name: 4.13-priv
-    namespace: ocp-private
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.13_cli:
-    name: 4.13-priv
-    namespace: ocp-private
-    tag: cli
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
   ocp_builder_rhel-9-base-openshift-4.13:
     name: builder
     namespace: ocp
@@ -30,25 +18,6 @@ build_root:
     tag: golang-1.18
 canonical_go_repository: github.com/openshift/ovn-kubernetes
 images:
-- dockerfile_path: Dockerfile.base
-  from: base
-  to: ovn-kubernetes-base
-- from: ovn-kubernetes-base
-  inputs:
-    ocp_4.13_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.13:cli
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: ovn-kubernetes
-- dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: ovn-kubernetes-microshift
 - dockerfile_path: Dockerfile.base.rhel9
   from: ocp_builder_rhel-9-base-openshift-4.13
   to: ovn-kubernetes-base-rhel-9
@@ -62,9 +31,6 @@ images:
 - dockerfile_path: Dockerfile.microshift.rhel9
   from: ovn-kubernetes-base-rhel-9
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
     ocp_builder_rhel-9-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
@@ -123,6 +89,8 @@ tests:
 - as: e2e-aws-ovn-windows
   steps:
     cluster_profile: aws
+    env:
+      WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid-toggle
