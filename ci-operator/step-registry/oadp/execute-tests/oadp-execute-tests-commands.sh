@@ -53,6 +53,7 @@ function archive-results() {
         echo "Copying ${RESULTS_FILE} to ${ARTIFACT_DIR}/junit_oadp_interop_results.xml..."
         cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/junit_oadp_interop_results.xml"
     fi
+    sleep 28800
 }
 
 # Execute tests
@@ -60,3 +61,4 @@ echo "Executing tests..."
 trap archive-results SIGINT SIGTERM ERR EXIT
 cd $OADP_GIT_DIR
 EXTRA_GINKGO_PARAMS=$OADP_TEST_FOCUS /bin/bash /alabama/cspi/test_settings/scripts/test_runner.sh
+sleep 28800
