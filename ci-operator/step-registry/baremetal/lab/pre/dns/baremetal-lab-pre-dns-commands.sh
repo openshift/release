@@ -15,7 +15,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 
-mac2ipv6() {
+function mac2ipv6() {
     local mac="$1" ; \
     echo "$mac" | \
     tr '-' ':' | \
