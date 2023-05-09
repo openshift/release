@@ -85,6 +85,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -215,6 +218,9 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
+test_binary_build_commands: |
+  # Some agent-based installer tests require nmstatectl
+  dnf install -y nmstate
 tests:
 - as: unit
   commands: |
@@ -222,7 +228,7 @@ tests:
     go tool cover -o $ARTIFACT_DIR/cover.txt -func /tmp/coverprofile.out
     go tool cover -o $ARTIFACT_DIR/cover.html -html /tmp/coverprofile.out
   container:
-    from: src
+    from: test-bin
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: aro-unit
   commands: go test ./pkg/... -tags=aro
