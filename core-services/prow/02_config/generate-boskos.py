@@ -166,10 +166,10 @@ CONFIG = {
         'default': 5,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 5,
+        'default': 4,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 5,
+        'default': 2,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
@@ -282,7 +282,7 @@ for i in range(10, 15):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(83,93):
+for i in range(89,93):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(94,106):

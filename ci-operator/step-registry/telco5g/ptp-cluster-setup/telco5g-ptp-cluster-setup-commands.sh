@@ -1,5 +1,7 @@
 #!/bin/bash
-
+if [[ "$JOB_TYPE" == "periodic" ]]; then
+  exit 1
+fi
 set -o nounset
 set -o errexit
 set -o pipefail
