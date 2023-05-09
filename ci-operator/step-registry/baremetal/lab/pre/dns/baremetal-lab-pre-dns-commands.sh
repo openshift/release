@@ -28,9 +28,6 @@ mac2ipv6() {
 . <(yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")' < "${SHARED_DIR}"/external_vips.yaml)
 
 # shellcheck disable=SC2154
-IP6="$(<"mac2ipv6 ${provisioning_mac}")"
-
-# shellcheck disable=SC2154
 if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ]; then
   echo "Unable to parse VIPs"
   exit 1
@@ -40,14 +37,12 @@ DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME
 api.${CLUSTER_NAME} IN A ${api_vip}
 provisioner.${CLUSTER_NAME} IN A ${INTERNAL_NET_IP}
 api-int.${CLUSTER_NAME} IN A ${api_vip}
-*.apps.${CLUSTER_NAME} IN A ${ingress_vip}
-api.${CLUSTER_NAME} IN AAAA ${IP6}
-api-int.${CLUSTER_NAME} IN AAAA ${IP6}
-*.apps.${CLUSTER_NAME} IN AAAA ${IP6}"
+*.apps.${CLUSTER_NAME} IN A ${ingress_vip}"
 
 DNS_REVERSE_INTERNAL=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  echo "$bmhost"
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   # shellcheck disable=SC2154
@@ -55,9 +50,14 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error when parsing the Bare Metal Host metadata"
     exit 1
   fi
+  # shellcheck disable=SC2154
+  IP6="$(<"mac2ipv6 ${provisioning_mac}")"
   DNS_FORWARD="${DNS_FORWARD}
 ${name}.${CLUSTER_NAME} IN A ${ip}
-${name}.${CLUSTER_NAME} IN AAAA ${IP6}"
+${name}.${CLUSTER_NAME} IN AAAA ${IP6}
+api.${CLUSTER_NAME} IN AAAA ${IP6}
+api-int.${CLUSTER_NAME} IN AAAA ${IP6}
+*.apps.${CLUSTER_NAME} IN AAAA ${IP6}"
   DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
 $(echo "${IP6}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}.
 $(echo "${ip}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
