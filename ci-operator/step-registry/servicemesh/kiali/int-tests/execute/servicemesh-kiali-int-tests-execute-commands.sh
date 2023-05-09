@@ -16,7 +16,8 @@ sleep 120
 make test-integration -e URL="https://$(oc get route -n ${SMCP_NAMESPACE} kiali -o 'jsonpath={.spec.host}')" -e TOKEN="$(oc whoami -t)"
 
 echo "Copying result xml to ${ARTIFACT_DIR}"
-cp tests/integration/junit-rest-report.xml ${ARTIFACT_DIR}
+# the file name must start with 'junit'
+cp tests/integration/junit-rest-report.xml ${ARTIFACT_DIR}/junit-kiali-int.xml
 
 hack/istio/install-bookinfo-demo.sh -db true -c oc -n bookinfo -in ${SMCP_NAMESPACE}
 

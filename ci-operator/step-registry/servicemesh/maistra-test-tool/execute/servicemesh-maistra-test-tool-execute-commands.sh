@@ -17,5 +17,7 @@ make test
 
 echo "Copying logs and xmls to ${ARTIFACT_DIR}"
 cp -r tests/result-latest/* ${ARTIFACT_DIR}
+# the junit file name must start with 'junit'
+cp tests/result-latest/**/report.xml ${ARTIFACT_DIR}/junit-maistra.xml
 
 make test-cleanup

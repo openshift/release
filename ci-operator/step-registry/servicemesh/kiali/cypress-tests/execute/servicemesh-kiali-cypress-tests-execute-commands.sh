@@ -23,7 +23,8 @@ yarn cypress:run:junit || true # do not fail on a exit code != 0 as it matches n
 yarn cypress:combine:reports
 
 echo "Copying result xml to ${ARTIFACT_DIR}"
-cp cypress/results/combined-report.xml ${ARTIFACT_DIR}
+# the file name must start with 'junit'
+cp cypress/results/combined-report.xml ${ARTIFACT_DIR}/junit-kiali-cypress.xml
 
 # cleaning demo apps
 hack/istio/install-testing-demos.sh -d true -c oc -in ${SMCP_NAMESPACE}
