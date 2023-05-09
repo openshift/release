@@ -64,8 +64,7 @@ api.${CLUSTER_NAME} IN AAAA ${IP6}
 api-int.${CLUSTER_NAME} IN AAAA ${IP6}
 *.apps.${CLUSTER_NAME} IN AAAA ${IP6}"
   DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
-$(echo "${IP6}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}.
-$("$(reverseIp6 "${IP6}")")ip6.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
+$(echo "${IP6}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
 done
 
 # TODO verify if the installation works with no external reverse dns entries
