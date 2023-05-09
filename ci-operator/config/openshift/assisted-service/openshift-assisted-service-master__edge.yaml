@@ -148,15 +148,10 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
   latest-multi:
     candidate:
       architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.12"
-  nightly-4-13:
-    candidate:
       product: ocp
       stream: nightly
       version: "4.13"
@@ -811,6 +806,7 @@ tests:
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
+        WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
@@ -940,8 +936,10 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly-4-13
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
@@ -952,8 +950,10 @@ tests:
   steps:
     cluster_profile: packet-assisted
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly-4-13
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
@@ -965,6 +965,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export HOLD_INSTALLATION=true
@@ -1002,6 +1004,28 @@ tests:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
         MAKEFILE_TARGET=test
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-12
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.12
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-13
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.13
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-umn

@@ -455,6 +455,25 @@ spec:
         severity: critical
     - expr: count(label_replace(count(github_token_usage{token_hash =~ "openshift.*"}) by (token_hash), "login", "$1", "token_hash", "(.*)") or github_user_info{login=~"openshift-.*"}) by (login)
       record: github:identity_names
+  - name: ci-chat-bot-down
+    rules:
+    - alert: ciChatBotDown
+      annotations:
+        message: '{{ $labels.deployment }} has been down for 5 minutes.'
+      expr: kube_deployment_status_replicas_unavailable{namespace="ci", deployment=~"ci-chat-bot"} >= 1
+      for: 5m
+      labels:
+        severity: critical
+        team: crt
+  - name: ci-chat-bot-errors
+    rules:
+    - alert: ciChatBotError
+      annotations:
+        message: Cluster Bot has reported an error.
+      expr: rate(cluster_bot_error_rate[5m]) > 0
+      labels:
+        severity: critical
+        team: crt
   - name: release-controller-down
     rules:
     - alert: releaseControllerDown
@@ -472,7 +491,7 @@ spec:
       expr: rate(release_controller_bugzilla_errors_total[5m]) > 0
       labels:
         severity: critical
-        team: release-controller
+        team: crt
   - name: release-controller-jira-errors
     rules:
     - alert: releaseControllerJiraError
@@ -481,7 +500,7 @@ spec:
       expr: rate(release_controller_jira_errors_total[5m]) > 0
       labels:
         severity: critical
-        team: release-controller
+        team: crt
   - name: tide-missing
     rules:
     - alert: TideNotMergingPRs

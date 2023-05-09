@@ -79,21 +79,23 @@ tests:
     cluster_profile: alibabacloud-qe
     env:
       E2E_RUN_TAGS: '@amd64 and @alibaba-ipi and @network-ovnkubernetes'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi-fips
+    workflow: cucushift-installer-rehearse-alibabacloud-ipi
 - as: alibaba-ipi-fips-p3-f28-destructive
   cron: 41 18 8 * *
   steps:
     cluster_profile: alibabacloud-qe
     env:
       E2E_RUN_TAGS: '@amd64 and @alibaba-ipi and @network-ovnkubernetes and @destructive'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi-fips
+    workflow: cucushift-installer-rehearse-alibabacloud-ipi
 - as: alibaba-ipi-private-p3-f28
   cron: 38 16 14 * *
   steps:
@@ -265,10 +267,11 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and not @fips'
+      SIZE_VARIANT: compact
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-compact
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-compact-p3-f28-destructive
   cron: 38 18 23 * *
   steps:
@@ -277,10 +280,11 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and not @fips
         and @destructive'
+      SIZE_VARIANT: compact
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-compact
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-disconnected-cco-manual-sts-ep-p2-f14
   cron: 23 17 14,29 * *
   steps:
@@ -461,11 +465,12 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @disconnected and @network-ovnkubernetes
         and not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-techpreview
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disconnected-private-techpreview-p3-f28-destructive
   cron: 12 1 18 * *
   steps:
@@ -474,11 +479,12 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @disconnected and @network-ovnkubernetes
         and not @fips and @destructive'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-techpreview
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-disconnected-sdn-rhcos-rhel8-p2-f7
   cron: 22 6 7,15,22,29 * *
   steps:
@@ -667,10 +673,11 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-fips-efs
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
 - as: aws-ipi-ovn-fips-efs-p3-f28-destructive
   cron: 47 1 22 * *
   steps:
@@ -680,11 +687,12 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and @destructive'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-fips-efs
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
 - as: aws-ipi-ovn-hypershift-guest-p1-f7
   cron: 29 4 7,14,21,29 * *
   steps:
@@ -700,8 +708,8 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-guest-p1-f28-destructive
-  cron: 29 11 10 * *
+- as: aws-ipi-ovn-hypershift-guest-p1-f7-destructive
+  cron: 11 7 2,10,18,25 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -1091,6 +1099,18 @@ tests:
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-p2-f28-long-duration-apiserver
+  cron: 32 22 6 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_SCENARIOS: API_Server
+      TEST_TIMEOUT: "600"
+    test:
+    - ref: cucushift-helper-service-build-info
+    - ref: openshift-extended-test-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-private-disasterrecovery-p2-f14
   cron: 36 15 9,24 * *
   steps:
@@ -1185,10 +1205,11 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @proxy and @network-ovnkubernetes and
         not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-techpreview-po
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-po
 - as: aws-ipi-proxy-techpreview-p3-f28-destructive
   cron: 54 13 26 * *
   steps:
@@ -1197,10 +1218,11 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @proxy and @network-ovnkubernetes and
         not @fips and @destructive'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-proxy-techpreview-po
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-po
 - as: aws-ipi-proxy-workers-rhel8-etcd-encryption-p2-f7
   cron: 23 1 6,14,22,29 * *
   steps:
@@ -1552,10 +1574,11 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      SIZE_VARIANT: compact
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-compact
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-compact-p3-f28-destructive
   cron: 35 23 20 * *
   steps:
@@ -1564,10 +1587,11 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips
         and @destructive'
+      SIZE_VARIANT: compact
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-compact
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-disconnected-fullyprivate-p2-f14
   cron: 58 18 1,16 * *
   steps:
@@ -1602,11 +1626,12 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @disconnected and @network-ovnkubernetes
         and not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-techpreview
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-disconnected-fullyprivate-tp-p3-f28-destructive
   cron: 44 11 26 * *
   steps:
@@ -1615,11 +1640,12 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @disconnected and @network-ovnkubernetes
         and not @fips and @destructive'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate-techpreview
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
 - as: azure-ipi-disconnected-p1-f4
   cron: 35 7 2,7,12,16,20,24,28 * *
   steps:
@@ -1678,10 +1704,11 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-fips
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-fips-p3-f28-destructive
   cron: 52 0 2 * *
   steps:
@@ -1689,11 +1716,12 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and @destructive'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-fips
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-fullyprivate-proxy-p1-f4
   cron: 37 15 4,9,13,17,21,25,29 * *
   steps:
@@ -1871,10 +1899,11 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @proxy and @network-ovnkubernetes and
         not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-proxy-techpreview
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
 - as: azure-ipi-proxy-techpreview-p3-f28-destructive
   cron: 19 7 16 * *
   steps:
@@ -1883,10 +1912,11 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @proxy and @network-ovnkubernetes and
         not @fips and @destructive'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-proxy-techpreview
+    workflow: cucushift-installer-rehearse-azure-ipi-proxy
 - as: azure-ipi-proxy-workers-rhcos-rhel8-p2-f7
   cron: 16 5 2,9,17,25 * *
   steps:
@@ -2012,10 +2042,11 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-usertags-techpreview
+    workflow: cucushift-installer-rehearse-azure-ipi-usertags
 - as: azure-ipi-usertags-techpreview-p3-f28-destructive
   cron: 14 8 8 * *
   steps:
@@ -2024,10 +2055,11 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips
         and @destructive'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-usertags-techpreview
+    workflow: cucushift-installer-rehearse-azure-ipi-usertags
 - as: azure-ipi-private-workers-marketimage-p2-f28
   cron: 24 18 3 * *
   steps:
@@ -2128,7 +2160,6 @@ tests:
   steps:
     cluster_profile: azurestack-qe
     env:
-      CLUSTER_OS_IMAGE: https://vhdsa.blob.mtcazs.wwtatc.com/vhd/rhcos-413.92.202303281804-0-azurestack.x86_64.vhd
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.13'
     test:
@@ -2140,7 +2171,6 @@ tests:
   steps:
     cluster_profile: azurestack-qe
     env:
-      CLUSTER_OS_IMAGE: https://vhdsa.blob.mtcazs.wwtatc.com/vhd/rhcos-413.92.202303281804-0-azurestack.x86_64.vhd
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips
         and @destructive'
       TAG_VERSION: '@4.13'
@@ -2154,7 +2184,6 @@ tests:
     cluster_profile: azurestack-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      CLUSTER_OS_IMAGE: https://vhdsa.blob.mtcazs.wwtatc.com/vhd/rhcos-413.92.202303281804-0-azurestack.x86_64.vhd
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @proxy and @network-ovnkubernetes and
         not @fips'
       TAG_VERSION: '@4.13'
@@ -2167,7 +2196,6 @@ tests:
   steps:
     cluster_profile: azurestack-qe
     env:
-      CLUSTER_OS_IMAGE: https://vhdsa.blob.mtcazs.wwtatc.com/vhd/rhcos-413.92.202303281804-0-azurestack.x86_64.vhd
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.13'
     test:
@@ -2179,7 +2207,6 @@ tests:
   steps:
     cluster_profile: azurestack-qe
     env:
-      CLUSTER_OS_IMAGE: https://vhdsa.blob.mtcazs.wwtatc.com/vhd/rhcos-413.92.202303281804-0-azurestack.x86_64.vhd
       E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips
         and @destructive'
       TAG_VERSION: '@4.13'
@@ -2351,10 +2378,11 @@ tests:
     cluster_profile: gcp-qe
     env:
       E2E_RUN_TAGS: '@amd64 and @gcp-ipi and @network-ovnkubernetes and not @fips'
+      SIZE_VARIANT: compact
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-compact
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-compact-p2-f28-destructive
   cron: 17 3 18 * *
   steps:
@@ -2362,10 +2390,11 @@ tests:
     env:
       E2E_RUN_TAGS: '@amd64 and @gcp-ipi and @network-ovnkubernetes and not @fips
         and @destructive'
+      SIZE_VARIANT: compact
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-compact
+    workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-confidential-computing-p2-f14
   cron: 44 16 3,18 * *
   steps:
@@ -2612,10 +2641,11 @@ tests:
     env:
       E2E_RUN_TAGS: '@amd64 and @gcp-ipi and @proxy and @network-ovnkubernetes and
         not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-techpreview
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy
 - as: gcp-ipi-proxy-techpreview-p3-f28-destructive
   cron: 11 5 20 * *
   steps:
@@ -2623,10 +2653,11 @@ tests:
     env:
       E2E_RUN_TAGS: '@amd64 and @gcp-ipi and @proxy and @network-ovnkubernetes and
         not @fips and @destructive'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-techpreview
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy
 - as: gcp-ipi-realtime-kernel-p2-f7
   cron: 49 7 3,11,18,25 * *
   steps:
@@ -2897,10 +2928,11 @@ tests:
     cluster_profile: ibmcloud-qe
     env:
       E2E_RUN_TAGS: '@amd64 and @ibmcloud-ipi and @network-ovnkubernetes'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private-fips
+    workflow: cucushift-installer-rehearse-ibmcloud-ipi-private
 - as: nutanix-ipi-boot-categories-project-p2-f28
   cluster: build01
   cron: 53 21 10 * *
@@ -2958,10 +2990,11 @@ tests:
     cluster_profile: nutanix-qe-dis
     env:
       E2E_RUN_TAGS: '@amd64 and @nutanix-ipi and @proxy and @network-ovnkubernetes'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy-fips
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: nutanix-ipi-proxy-fips-p3-f28-destructive
   cluster: build01
   cron: 2 7 29 * *
@@ -2970,10 +3003,11 @@ tests:
     env:
       E2E_RUN_TAGS: '@amd64 and @nutanix-ipi and @proxy and @network-ovnkubernetes
         and @destructive'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy-fips
+    workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
 - as: vsphere-8-ipi-ovn-etcd-encryption-p2-f7
   cron: 46 2 4,11,18,26 * *
   steps:
@@ -3000,10 +3034,11 @@ tests:
     cluster_profile: vsphere
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @network-ovnkubernetes and not @fips'
+      SIZE_VARIANT: compact
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-vsphere-ipi-compact
+    workflow: cucushift-installer-rehearse-vsphere-ipi
 - as: vsphere-ipi-disconnected-registry-pvc-p2-f7
   cron: 53 10 5,13,21,28 * *
   steps:
@@ -3049,7 +3084,7 @@ tests:
 - as: vsphere-ipi-ovn-dualstack-p2-f7
   cron: 19 1 1,9,17,24 * *
   steps:
-    cluster_profile: vsphere-ibm-7
+    cluster_profile: vsphere
     env:
       E2E_RUN_TAGS: '@vsphere-ipi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.13'
@@ -3082,10 +3117,11 @@ tests:
     cluster_profile: vsphere-discon
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @proxy and @network-ovnkubernetes'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-fips
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-fips-p3-f28-long-duration-cloud
   cron: 29 23 30 * *
   steps:
@@ -3093,12 +3129,13 @@ tests:
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @proxy and @network-ovnkubernetes
         and @long-duration'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
     - chain: openshift-e2e-test-qe-long-duration
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-fips
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-techpreview-p2-f14
   cron: 12 5 3,18 * *
   steps:
@@ -3106,10 +3143,11 @@ tests:
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-ipi and @proxy and @network-ovnkubernetes
         and not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy-techpreview
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-workers-rhel8-p2-f14
   cron: 19 7 5,20 * *
   steps:
@@ -3190,7 +3228,7 @@ tests:
 - as: vsphere-upi-encrypt-p2-f14
   cron: 49 11 15,30 * *
   steps:
-    cluster_profile: vsphere-ibm-7
+    cluster_profile: vsphere
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @network-ovnkubernetes and not @fips'
       TAG_VERSION: '@4.13'

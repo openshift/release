@@ -5,6 +5,8 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+#Save stacks events
+trap 'save_stack_events_to_shared' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
@@ -20,6 +22,18 @@ fi
 
 ami_id=${EC2_AMI}
 instance_type=${EC2_INSTANCE_TYPE}
+host_device_name="/dev/xvdc"
+
+if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+g.* ]]; then
+  host_device_name="/dev/nvme1n1"
+fi
+
+function save_stack_events_to_shared()
+{
+  set +o errexit
+  aws --region "${REGION}" cloudformation describe-stack-events --stack-name "${stack_name}" --output json > "${SHARED_DIR}/stack-events-${stack_name}.json"
+  set -o errexit
+}
 
 echo "ec2-user" > "${SHARED_DIR}/ssh_user"
 
@@ -58,6 +72,9 @@ Parameters:
   PublicKeyString:
     Type: String
     Description: The public key used to connect to the EC2 instance
+  HostDeviceName:
+    Type: String
+    Description: Disk device name to create pvs and vgs
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -107,7 +124,6 @@ Resources:
     Properties:
       VpcId: !Ref RHELVPC
       CidrBlock: !Ref PublicSubnetCidr
-      AvailabilityZone: !Select [ 0, !GetAZs '' ]
       MapPublicIpOnLaunch: true
       Tags:
         - Key: Name
@@ -231,16 +247,27 @@ Resources:
       - DeviceName: /dev/sda1
         Ebs:
           VolumeSize: "120"
-          VolumeType: gp2
+          VolumeType: gp3
+          Iops: 16000
       - DeviceName: /dev/sdc
         Ebs:
           VolumeSize: "120"
           VolumeType: gp3
+          Iops: 16000
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
+          echo "====== Authorizing public key ======" | tee -a /tmp/init_output.txt
           echo "\${PublicKeyString}" >> /home/ec2-user/.ssh/authorized_keys
-          sudo dnf install -y lvm2 && sudo pvcreate /dev/xvdc && sudo vgcreate rhel /dev/xvdc
+          echo "====== Running DNF Install ======" | tee -a /tmp/init_output.txt
+          sudo dnf install -y lvm2 |& tee -a /tmp/init_output.txt
+
+          # NOTE: wrappig script vars with {} since the cloudformation will see
+          # them as cloudformation vars instead.
+          echo "====== Creating PV ======" | tee -a /tmp/init_output.txt
+          sudo pvcreate "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
+          echo "====== Creating VG ======" | tee -a /tmp/init_output.txt
+          sudo vgcreate rhel "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
 
 Outputs:
   InstanceId:
@@ -264,6 +291,7 @@ aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" 
         ParameterKey=HostInstanceType,ParameterValue="${instance_type}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
+        ParameterKey=HostDeviceName,ParameterValue="${host_device_name}" \
         ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)" &
 
 wait "$!"
