@@ -4,7 +4,8 @@ set -eux
 
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 if [[ $OCP_ARCH == "arm64" ]]; then
-  OPERATOR_IMAGE="quay.io/hypershift/hypershift-operator:latest-arm64"
+  VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | cut -d'.' -f1-2)
+  OPERATOR_IMAGE="quay.io/hypershift/hypershift-operator:$VERSION-arm64"
 fi
 
 bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
