@@ -21,4 +21,4 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
-scp "${IP_ADDRESS}":/var/log/pcp/pmlogger/* ${ARTIFACT_DIR}/
+scp -r "${IP_ADDRESS}":/var/log/pcp/pmlogger/* ${ARTIFACT_DIR}/
