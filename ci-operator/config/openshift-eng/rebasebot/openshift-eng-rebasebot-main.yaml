@@ -309,7 +309,7 @@ tests:
           cpu: 100m
           memory: 200Mi
 - as: openstack-ironic
-  cron: 15 10 * * Mon,Wed,Fri
+  cron: 10 10 * * Mon,Wed,Fri
   steps:
     test:
     - as: openstack-ironic
@@ -317,6 +317,36 @@ tests:
         rebasebot --source https://github.com/openstack/ironic:master \
                   --dest openshift/openstack-ironic:master \
                   --rebase openshift-metal3/openstack-ironic:ironic-bot-master \
+                  --github-app-id 259896 \
+                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
+                  --github-cloner-id 318353 \
+                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
+                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
+                  --git-username ironic-bot \
+                  --git-email metal-platform@redhat.com
+      credentials:
+      - mount_path: /secrets/slack-hooks
+        name: metal-platform-slack-hooks
+        namespace: test-credentials
+      - mount_path: /secrets/ironic-bot
+        name: metal-platform-bot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openstack-ironic-python-agent
+  cron: 20 10 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: openstack-ironic-python-agent
+      commands: |
+        rebasebot --source https://github.com/openstack/ironic-python-agent:master \
+                  --dest openshift/openstack-ironic-python-agent:master \
+                  --rebase openshift-metal3/openstack-ironic-python-agent:ironic-bot-master \
                   --github-app-id 259896 \
                   --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
                   --github-cloner-id 318353 \
