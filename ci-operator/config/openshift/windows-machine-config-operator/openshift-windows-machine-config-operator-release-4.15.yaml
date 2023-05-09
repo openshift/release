@@ -85,6 +85,8 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
+    env:
+      WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
     workflow: openshift-e2e-azure-ccm-ovn-hybrid-install
@@ -150,9 +152,11 @@ tests:
     - chain: gather-network
     - ref: gather-proxy
     - chain: ipi-vsphere-post
+    - ref: vsphere-deprovision-bastionhost
     pre:
     - chain: ipi-conf-vsphere
-    - ref: ipi-conf-vsphere-proxy
+    - chain: vsphere-provision-bastionhost
+    - ref: ipi-conf-proxy
     - ref: ovn-conf
     - ref: ovn-conf-hybrid-manifest-with-custom-vxlan-port
     - chain: ipi-install-vsphere
