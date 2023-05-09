@@ -23,6 +23,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
 test -f "${KUBECONFIG}" && (ls -l "${KUBECONFIG}" || true) || echo "kubeconfig file does not exist"
 ls -l ${SHARED_DIR}/kubeconfig || echo "no kubeconfig in shared_dir"
+ls -l ${SHARED_DIR}/kubeadmin-password;echo "kubeadmin passwd exists" || echo "no kubeadmin passwd in shared_dir"
 
 # create link for oc to kubectl
 mkdir -p "${HOME}"
