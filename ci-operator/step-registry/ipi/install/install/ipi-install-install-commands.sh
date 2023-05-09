@@ -521,4 +521,10 @@ if test "${ret}" -eq 0 ; then
   echo "https://$(env KUBECONFIG=${dir}/auth/kubeconfig oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
 fi
 
+  sleep 3600s
+  sleep 3600s
+  sleep 3600s
+  sleep 3600s
+  sleep 3600s
+  sleep 3600s
 exit "$ret"
