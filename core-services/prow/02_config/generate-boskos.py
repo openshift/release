@@ -304,6 +304,8 @@ for i in range(151,158):
 
 for i in range(200,204):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
+for i in range(205,214):
+    CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {
     'resources': [],
