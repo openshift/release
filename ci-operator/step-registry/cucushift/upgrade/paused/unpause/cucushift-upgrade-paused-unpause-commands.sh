@@ -4,113 +4,47 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+trap 'FRC=$?; debug' EXIT TERM
+
+# Print cv, failed node, co, mcp information for debug purpose
+function debug() {
+    if (( FRC != 0 )); then
+        echo -e "oc get clusterversion/version -oyaml\n$(oc get clusterversion/version -oyaml)"
+        echo -e "Describing abnormal nodes...\n"
+        oc get node --no-headers | awk '$2 != "Ready" {print $1}' | while read node; do echo -e "\n#####oc describe node ${node}#####\n$(oc describe node ${node})"; done
+        echo -e "Describing abnormal operators...\n"
+        oc get co --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read co; do echo -e "\n#####oc describe co ${co}#####\n$(oc describe co ${co})"; done
+        echo -e "Describing abnormal mcp...\n"
+        oc get mcp --no-headers | awk '$3 != "True" || $4 != "False" || $5 != "False" {print $1}' | while read mcp; do echo -e "\n#####oc describe mcp ${mcp}#####\n$(oc describe mcp ${mcp})"; done
+    fi
+}
+
 function unpause() {
     oc patch --type=merge --patch='{"spec":{"paused":false}}' machineconfigpool/worker
     ret=$(oc get mcp worker -ojson| jq .spec.paused)
     if [[ "${ret}" != "false" ]]; then
-        exit 1
+        echo >&2 "Failed to resume worker pool, exiting..." && return 1
     fi
 }
 
-function monitor_clusterversion() {
-    INTERVAL=600
-    CNT=12
-
-    while [ $((CNT)) -gt 0 ]; do
-        version_full=$(oc get clusterversion/version -o json)
-        image=$(echo "${version_full}" | jq -r '.status.history[0].image')
-        state=$(echo "${version_full}" | jq -r '.status.history[0].state')
-        if [[ "${image}" != "${TARGET_RELEASE}" || "${state}" != "Completed" ]]; then
-            echo "Waiting for clusterversion to become ${TARGET_RELEASE}"
-            sleep "${INTERVAL}"
-            CNT=$((CNT))-1
-        else
-            echo "Cluster is now upgraded to ${TARGET_RELEASE}"
-            return 0
-        fi
-
-        if [[ $((CNT)) -eq 0 ]]; then
-            echo "Cluster did not complete upgrade"
-            echo "${version_full}"
-            return 1
-        fi
-    done
-}
-
-function monitor_mcp() {
-    INTERVAL=60
-    CNT=10
-
-    while [ $((CNT)) -gt 0 ]; do
-        READY=false
-        while read -r i
-        do
-            name=$(echo "${i}" | awk '{print $1}')
-            updated=$(echo "${i}" | awk '{print $3}')
-            updating=$(echo "${i}" | awk '{print $4}')
-            degraded=$(echo "${i}" | awk '{print $5}')
-            machine_cnt=$(echo "${i}" | awk '{print $6}')
-            ready_machine_cnt=$(echo "${i}" | awk '{print $7}')
-            updated_machine_cnt=$(echo "${i}" | awk '{print $8}')
-            degraded_machine_cnt=$(echo "${i}" | awk '{print $9}')
-
-            if [[ "${updated}" == "True" && "${updating}" == "False" && "${degraded}" == "False" && "${machine_cnt}" == "${ready_machine_cnt}" && "${ready_machine_cnt}" == "${updated_machine_cnt}" && $((degraded_machine_cnt)) -eq 0 ]]; then
-                READY=true
-            else
-                echo "Waiting for mcp ${name} to rollout"
-                READY=false
-            fi
-        done <<< "$(oc get mcp --no-headers)"
-
-        if [[ "${READY}" ]]; then
-            echo "mcp has successfully rolled out"
-            return 0
-        else
-            sleep "${INTERVAL}"
-            CNT=$((CNT))-1
-        fi
-
-        if [[ $((CNT)) -eq 0 ]]; then
-            echo "mcp did not successfully roll out"
-            oc get mcp
-            return 1
-        fi
-    done
-}
-
-function monitor_nodes() {
-    INTERVAL=60
-    CNT=10
-
-    while [ $((CNT)) -gt 0 ]; do
-        READY=false
-
-        while read -r i
-        do
-            name=$(echo "${i}" | awk '{print $1}')
-            status=$(echo "${i}" | awk '{print $2}')
-            if [[ "${status}" == "Ready" ]]; then
-                READY=true
-            else
-                echo "Waiting for ${name} to become ready"
-                READY=false
-            fi
-        done <<< "$(oc get nodes --no-headers)"
-
-        if [[ "${READY}" ]]; then
-            echo "All nodes are have ready status"
-            return 0
-        else
-            sleep "${INTERVAL}"
-            CNT=$((CNT))-1
-        fi
-
-        if [[ $((CNT)) -eq 0 ]]; then
-            echo "Nodes did not become ready"
-            oc get nodes
-            return 1
-        fi
-    done
+function check_mcp() {
+    local out updated updating degraded try=0 max_retries=30
+    echo -e "oc get mcp\n$(oc get mcp)"
+    while (( try < max_retries )); 
+    do
+        echo "Checking worker pool status #${try}..."
+        out="$(oc get mcp worker --no-headers)"
+        updated="$(echo "${out}" | awk '{print $3}')"
+        updating="$(echo "${out}" | awk '{print $4}')"
+        degraded="$(echo "${out}" | awk '{print $5}')"
+    
+        if [[ ${updated} == "True" && ${updating} == "False" && ${degraded} == "False" ]]; then
+            echo "Worker pool status check passed" && return 0
+        fi  
+        sleep 60
+        (( try += 1 ))
+    done  
+    echo >&2 "Worker pool status check failed" && return 1
 }
 
 if test -f "${SHARED_DIR}/proxy-conf.sh"
@@ -119,11 +53,5 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-echo "RELEASE_IMAGE_TARGET ${RELEASE_IMAGE_TARGET}"
-oc adm release info "${RELEASE_IMAGE_TARGET}"
-export TARGET_RELEASE="${RELEASE_IMAGE_TARGET}"
-
-sleep "${SLEEP_TIME}"
-monitor_clusterversion
-monitor_mcp
-monitor_nodes
+unpause
+check_mcp
