@@ -153,6 +153,7 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/01_vnet.json" \
   --parameters baseName="$INFRA_ID"
 
+CLUSTER_OS_IMAGE=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'platform.azure.ClusterOSImage')
 az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/02_storage.json" \
   --parameters vhdBlobURL="${CLUSTER_OS_IMAGE}" \
