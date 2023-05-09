@@ -15,8 +15,21 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 
+mac2ipv6() {
+    local mac="$1" ; \
+    echo "$mac" | \
+    tr '-' ':' | \
+    tr '[:upper:]' '[:lower:]' | \
+    awk -F: '{printf "fe80::%s%x%s:%sff:fe%s:%s%s\n", substr($1,1,1), xor(strtonum("0x"substr($1,2,1)),2), $2, $3, $4, $5, $6}'
+}
+
+
 # shellcheck disable=SC1090
 . <(yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")' < "${SHARED_DIR}"/external_vips.yaml)
+
+# shellcheck disable=SC2154
+IP6="$(<"mac2ipv6 ${provisioning_mac}")"
+
 # shellcheck disable=SC2154
 if [ ${#api_vip} -eq 0 ] || [ ${#ingress_vip} -eq 0 ]; then
   echo "Unable to parse VIPs"
@@ -27,7 +40,10 @@ DNS_FORWARD=";DO NOT EDIT; BEGIN $CLUSTER_NAME
 api.${CLUSTER_NAME} IN A ${api_vip}
 provisioner.${CLUSTER_NAME} IN A ${INTERNAL_NET_IP}
 api-int.${CLUSTER_NAME} IN A ${api_vip}
-*.apps.${CLUSTER_NAME} IN A ${ingress_vip}"
+*.apps.${CLUSTER_NAME} IN A ${ingress_vip}
+api.${CLUSTER_NAME} IN AAAA ${IP6}
+api-int.${CLUSTER_NAME} IN AAAA ${IP6}
+*.apps.${CLUSTER_NAME} IN AAAA ${IP6}"
 
 DNS_REVERSE_INTERNAL=";DO NOT EDIT; BEGIN $CLUSTER_NAME"
 
@@ -40,8 +56,10 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     exit 1
   fi
   DNS_FORWARD="${DNS_FORWARD}
-${name}.${CLUSTER_NAME} IN A ${ip}"
+${name}.${CLUSTER_NAME} IN A ${ip}
+${name}.${CLUSTER_NAME} IN AAAA ${IP6}"
   DNS_REVERSE_INTERNAL="${DNS_REVERSE_INTERNAL}
+$(echo "${IP6}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}.
 $(echo "${ip}." | ( rip=""; while read -r -d . b; do rip="$b${rip+.}${rip}"; done; echo "$rip" ))in-addr.arpa. IN PTR ${name}.${CLUSTER_NAME}.${BASE_DOMAIN}."
 done
 
