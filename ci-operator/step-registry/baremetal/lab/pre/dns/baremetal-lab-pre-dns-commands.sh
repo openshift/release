@@ -52,6 +52,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   fi
   # shellcheck disable=SC2154
   IP6="$(<"mac2ipv6 ${provisioning_mac}")"
+  echo "macaddress to ip6: ${IP6}" 
   DNS_FORWARD="${DNS_FORWARD}
 ${name}.${CLUSTER_NAME} IN A ${ip}
 ${name}.${CLUSTER_NAME} IN AAAA ${IP6}
