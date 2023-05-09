@@ -276,6 +276,7 @@ function run {
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     fi
+    sleep 3600
     set +x
     set +e
     rm -fr ./case_selected
@@ -421,3 +422,4 @@ function check_case_selected {
     fi
 }
 run
+sleep 4800
