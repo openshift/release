@@ -249,9 +249,16 @@ cnf_dir=${cnf_dir:-$(mktemp -d -t cnf-XXXXX)}
 mkdir -p "$cnf_dir"
 cd "$cnf_dir" || exit 1
 
+export GIT_COMMITTER_NAME='CI User'
+export GIT_COMMITTER_EMAIL='cnf-devel@redhat.com'
+git config --global user.name "CI User"
+git config --global user.email "cnf-devel@redhat.com"
+
 echo "running on branch ${CNF_BRANCH}"
-git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
+git -c user.name="CI User" -c user.email=cnf-devel@redhat.com clone "${CNF_REPO}" cnf-features-deploy
 cd cnf-features-deploy
+git -c user.name="CI User" -c user.email=cnf-devel@redhat.com fetch origin pull/1503/head:pull_1503
+git -c user.name="CI User" -c user.email=cnf-devel@redhat.com checkout pull_1503
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
 cd -
 
