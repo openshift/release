@@ -12,6 +12,11 @@ set -x
 # It then reads the output of "oc get pod" command in the corresponding HostedCluster namespace and checks if the status is "Running" or "Completed".
 # If any pod is not in the expected state, it prints an error message and returns 1. Otherwise, it returns 0.
 function check_control_plane_pod_status {
+    HYPERSHIFT_NAMESPACE=$(oc get hostedclusters --ignore-not-found -A '-o=jsonpath={.items[0].metadata.namespace}')
+    if [ -z "$HYPERSHIFT_NAMESPACE" ]; then
+        echo "Could not find HostedCluster, which is not valid."
+        return 1
+    fi
     CLUSTER_NAME=$(oc get hostedclusters -n "$HYPERSHIFT_NAMESPACE" -o=jsonpath='{.items[0].metadata.name}')
     while read -r pod _ status _; do
         if [[ "$status" != "Running" && "$status" != "Completed" ]]; then
