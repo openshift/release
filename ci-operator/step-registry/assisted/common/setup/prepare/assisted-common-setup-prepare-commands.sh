@@ -318,6 +318,10 @@ cat > run_test_playbook.yaml <<-"EOF"
         - name: Pull {{ ASSISTED_TEST_INFRA_IMAGE }}
           ansible.builtin.shell: |
             podman pull "{{ ASSISTED_TEST_INFRA_IMAGE }}"
+          retries: 5
+          delay: 5
+          register: result
+          until: result.rc == 0
         - name: Get working directory in {{ ASSISTED_TEST_INFRA_IMAGE }}
           ansible.builtin.shell: |
             podman inspect --format "{% raw %}{{ .Config.WorkingDir }}{% endraw %}" "{{ ASSISTED_TEST_INFRA_IMAGE }}"
