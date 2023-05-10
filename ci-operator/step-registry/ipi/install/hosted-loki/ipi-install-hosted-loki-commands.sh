@@ -693,9 +693,11 @@ echo "Promtail manifests created, the cluster can be found at https://grafana-lo
 
 
 if [[ -f "/usr/bin/python3" ]]; then
-  # Try to prepopulate the loki time window to match the job (with some leeway), so the user is never staring at no logs when they're actually there:
-  LOKI_EPOCH_MILLIS_FROM="$(date -d '-8 hours' +%s%N | cut -b1-13)"
-  LOKI_EPOCH_MILLIS_TO="$(date -d '+1 hours' +%s%N | cut -b1-13)"
+  # Try to prepopulate the loki time window to match the job (with some leeway), so the user is never staring at no logs when they're actually there.
+  # Note that this step runs prior to install, so we use a window 2 hours before now (to be ridiculously safe) and 8 hours after, which should cover
+  # the runtime of just about any job. There's no risk over overloading the UI or seeing logs you don't want because we filter by invoker (this job).
+  LOKI_EPOCH_MILLIS_FROM="$(date -d '-2 hours' +%s%N | cut -b1-13)"
+  LOKI_EPOCH_MILLIS_TO="$(date -d '+8 hours' +%s%N | cut -b1-13)"
 
   ENCODED_INVOKER="$(python3 -c "import urllib.parse; print(urllib.parse.quote('${OPENSHIFT_INSTALL_INVOKER}'))")"
   cat >> ${SHARED_DIR}/custom-links.txt << EOF
