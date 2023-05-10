@@ -91,8 +91,4 @@ fi
 if [ -f stestr_results.html ]; then
     cp stestr_results.html ${ARTIFACT_DIR}
 fi
-
-if [ -f etc/tempest.conf ]; then
-    cp etc/tempest.conf ${ARTIFACT_DIR}
-fi
 exit $EXIT_CODE
