@@ -35,10 +35,6 @@ CONFIG = {
         'us-east-1': 10,
         'us-east-2': 10,
     },
-    'aws-cspi-qe-vpn-quota-slice': {
-        'us-east-1': 10,
-        'us-east-2': 10,
-    },
     'aws-managed-cspi-qe-quota-slice': {
         'us-east-1': 10,
         'us-east-2': 10,
@@ -307,6 +303,8 @@ for i in range(151,158):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(200,204):
+    CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
+for i in range(205,214):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {

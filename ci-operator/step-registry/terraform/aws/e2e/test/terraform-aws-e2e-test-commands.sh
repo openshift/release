@@ -35,4 +35,5 @@ go mod download
 go mod tidy
 go mod vendor
 
-make e2e_test
+make e2e_test --offline-token=${TEST_OFFLINE_TOKEN} --gateway_url=${GATEWAY_URL} --openshift-version=${OPENSHIFT_VERSION}
+# --token-url=

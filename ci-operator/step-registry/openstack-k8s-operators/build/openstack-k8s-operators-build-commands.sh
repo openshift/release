@@ -164,14 +164,16 @@ if [[ "$BASE_OP" != "$META_OPERATOR" ]]; then
   fi
 
   # mod can be either /api or /apis
-  MOD=$(grep github.com/${DEFAULT_ORG}/${BASE_OP}/api go.mod)
-  API_MOD=$(basename $MOD)
-  go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
-  go mod tidy
-  pushd ./apis/
-  go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
-  go mod tidy
-  popd
+  MOD=$(grep github.com/${DEFAULT_ORG}/${BASE_OP}/api go.mod || true)
+  if [ -n "$MOD" ]; then
+    API_MOD=$(basename $MOD)
+    go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
+    go mod tidy
+    pushd ./apis/
+    go mod edit -replace github.com/${DEFAULT_ORG}/${BASE_OP}/${API_MOD}=github.com/${REPO_NAME}/${API_MOD}@${API_SHA}
+    go mod tidy
+    popd
+  fi
 
   # Build openstack-operator bundle and index
   IMAGE_TAG_BASE=${PUSH_REGISTRY}/${PUSH_ORGANIZATION}/${META_OPERATOR}
