@@ -75,6 +75,35 @@ spec:
         add: ["IPC_LOCK","SYS_ADMIN"]
       privileged: true
       runAsUser: 0
+    env:
+    - name: CI
+      value: "${CI:-}"
+    - name: ARTIFACTS
+      value: "${ARTIFACT_DIR:-}"
+    - name: JOB_NAME
+      value: "${JOB_NAME:-}"
+    - name: JOB_TYPE
+      value: "${JOB_TYPE:-}"
+    - name: BUILD_ID
+      value: "${BUILD_ID:-}"
+    - name: PROW_JOB_ID
+      value: "${PROW_JOB_ID:-}"
+    - name: REPO_OWNER
+      value: "${REPO_OWNER:-}"
+    - name: REPO_NAME
+      value: "${REPO_NAME:-}"
+    - name: PULL_BASE_REF
+      value: "${PULL_BASE_REF:-}"
+    - name: PULL_BASE_SHA
+      value: "${PULL_BASE_SHA:-}"
+    - name: PULL_REFS
+      value: "${PULL_REFS:-}"
+    - name: PULL_NUMBER
+      value: "${PULL_NUMBER:-}"
+    - name: PULL_PULL_SHA
+      value: "${PULL_PULL_SHA:-}"
+    - name: PULL_HEAD_REF
+      value: "${PULL_HEAD_REF:-}"
     resources:
       requests:
         memory: 1Gi
@@ -113,5 +142,11 @@ create_pod "${MAISTRA_SC_POD}"
 create_pod "${MAISTRA_MC_POD}"
 check_pod_status "${MAISTRA_SC_POD}"
 check_pod_status "${MAISTRA_MC_POD}"
+# create ARTIFACT_DIR
+oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
+oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
+# create soft link of go-junit-report
+oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -c testpmd -- ln -s /usr/local/bin/go-junit-report /usr/bin/go-junit-report
+oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" -c testpmd -- ln -s /usr/local/bin/go-junit-report /usr/bin/go-junit-report
 
 echo "Successfully created maistra istio builder pods"

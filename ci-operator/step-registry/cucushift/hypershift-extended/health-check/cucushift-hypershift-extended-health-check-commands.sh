@@ -73,8 +73,8 @@ echo "check mgmt cluster's HyperShift part"
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
   export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
+  check_control_plane_pod_status || exit 1
 fi
-check_control_plane_pod_status || exit 1
 
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 echo "check guest cluster"

@@ -29,6 +29,9 @@ images:
         chmod -R 777 $GOPATH &&\
         echo 'RUN done'
   to: ocm-tf-e2e
+- dockerfile_literal: |
+    FROM quay.io/ocp-edge-qe/aws-ocm-terraform-provider:latest
+  to: ocm-tf-cli
 releases:
   initial:
     integration:
@@ -58,6 +61,10 @@ tests:
   cron: '@yearly'
   steps:
     cluster_profile: aws-qe
+    env:
+      GATEWAY_URL: https://api.stage.openshift.com
+      OPENSHIFT_VERSION: "4.13"
+      TOKEN_URL: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
     workflow: terraform-aws-e2e
 - as: rehearse-single-debug
   cron: '@yearly'
@@ -65,6 +72,14 @@ tests:
     cluster_profile: aws-qe
     env:
       ART_NAME: cluster1
+      CLUSTER_NAME: ""
+      TF_FOLDER: ci/e2e/cluster_sts
+      TF_VARS: |
+        url = "https://api.stage.openshift.com"
+        operator_role_prefix = ""
+        account_role_prefix = "asher-ar1"
+        aws_region = "us-east-2"
+        aws_availability_zones = "us-east-2a"
     post:
     - ref: terraform-aws-destroy
     pre:
