@@ -269,12 +269,18 @@ function run {
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     fi
+    sleep 3600s
+    sleep 3600s
     set +x
     set +e
     rm -fr ./case_selected
     echo "try to handle result"
     handle_result
     echo "done to handle result"
+
+    sleep 3600s
+    sleep 3600s
+    sleep 3600s
     if [ "W${ret_value}W" == "W0W" ]; then
         echo "success"
         exit 0
@@ -286,6 +292,8 @@ function run {
         echo "force success exit"
         exit 1
     fi
+    sleep 3600s
+    sleep 3600s
     echo "normal exit"
     exit 0
 }
