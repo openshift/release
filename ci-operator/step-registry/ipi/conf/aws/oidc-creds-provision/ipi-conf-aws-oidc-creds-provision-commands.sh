@@ -21,6 +21,8 @@ if [[ "${STS_USE_PRIVATE_S3}" == "yes" ]]; then
   CCOCTL_OPTIONS=" $CCOCTL_OPTIONS --create-private-s3-bucket "
 fi
 
+sleep 3600
+
 # create required credentials infrastructure and installer manifests
 ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
 
