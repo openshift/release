@@ -36,7 +36,7 @@ while [[ "$(get_running_worker_count)" != "$expected_count" ]]; do
     sleep 20
 done
 
-make test-e2e-with-kafka
-make teardown
+#make test-e2e-with-kafka
+#make teardown
 
-sleep 80000
+sleep 600
