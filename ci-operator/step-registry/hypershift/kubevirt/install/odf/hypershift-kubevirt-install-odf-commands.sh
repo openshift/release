@@ -8,7 +8,7 @@ ODF_INSTALL_NAMESPACE=openshift-storage
 ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-'stable-4.12'}"
 ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
 ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
-ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
+ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
 
 # Make the masters schedulable so we have more capacity to run VMs
 oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
