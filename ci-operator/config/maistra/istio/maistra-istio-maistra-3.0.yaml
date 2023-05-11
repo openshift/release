@@ -77,8 +77,10 @@ tests:
           -p=${QUAY_PASS} quay.io
         # build and push images
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work; \
           entrypoint \
-          make -e HUB=quay.io/maistra-dev -e TAGS="3.0-latest 3.0-nightly-`date -I`" push.docker.pilot push.docker.proxyv2 push.docker.install-cni
+          make -e HUB=quay.io/maistra-dev -e TAGS='3.0-latest 3.0-nightly-`date -I`' push.docker.pilot push.docker.proxyv2 push.docker.install-cni"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow
@@ -139,7 +141,7 @@ tests:
       commands: |
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c \
-          "sleep 600;
+          "cd /work;
           entrypoint \
           prow/integ-suite-kind.sh \
           test.integration.pilot.kube.presubmit"
