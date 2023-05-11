@@ -6,8 +6,8 @@ set -x
 
 echo "This is the start SHARED_DIR: ${SHARED_DIR}"
 
-SECRETS_DIR="/tmp/secrets"
-export KUBECONFIG="{SHARED_DIR}/.kube/config"
+#SECRETS_DIR="/tmp/secrets"
+#export KUBECONFIG="{SHARED_DIR}/.kube/config"
 
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
