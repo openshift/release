@@ -21,8 +21,11 @@ current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/work
 
 export JOB_ITERATIONS=$((9*$current_worker_count))
 export WORKLOAD=cluster-density
-export GEN_CSV=false
+export GEN_CSV=true
 export CLEANUP_WHEN_FINISH=true
+
+export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.json kubelet.json etcd.json crio.json nodeMasters-max.json nodeWorkers.json"
+
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 

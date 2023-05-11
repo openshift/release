@@ -14,16 +14,15 @@ source ./venv_qe/bin/activate
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
-git clone https://github.com/cloud-bulldozer/e2e-benchmarking
-pushd e2e-benchmarking/workloads/kube-burner
-export WORKLOAD=node-density
-current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker | grep -v "NotReady\\|SchedulingDisabled" | wc -l | xargs)
-export NODE_COUNT=$(($current_worker_count))
-export PODS_PER_NODE=230
-export POD_READY_THRESHOLD=120000ms
-export GEN_CSV=true
-export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.json kubelet.json etcd.json crio.json nodeMasters-max.json nodeWorkers.json"
 
+git clone https://github.com/cloud-bulldozer/e2e-benchmarking
+pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+
+current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker | grep -v "NotReady\\|SchedulingDisabled" | wc -l | xargs)
+
+export ITERATIONS=$((9*$current_worker_count))
+export WORKLOAD=cluster-density-v2
+export GEN_CSV=true
 export CLEANUP_WHEN_FINISH=true
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
