@@ -58,6 +58,11 @@ chain:
       kubevirt)
           export TEST_PROVIDER='{"type":"kubevirt"}'
           openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/conformance/parallel | grep "\[Suite:openshift/conformance/parallel/minimal\]" > /tmp/tests_hs_kv
+          curl -L -o ${SHARED_DIR}/kubevirt-driver.yaml https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/master/hack/test-driver.yaml
+          sed -i 's/FromExistingClassName: kubevirt/FromExistingClassName: kubevirt-csi-infra-default/' ${SHARED_DIR}/kubevirt-driver.yaml
+          cat ${SHARED_DIR}/kubevirt-driver.yaml
+          export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/kubevirt-driver.yaml
+          openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" >> /tmp/tests_hs_kv
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests_hs_kv"
           ;;
       *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
