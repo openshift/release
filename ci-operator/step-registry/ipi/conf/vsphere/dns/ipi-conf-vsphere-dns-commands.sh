@@ -47,7 +47,7 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
-if [ "${JOB_NAME_SAFE}" = "launch" ]; then
+#if [ "${JOB_NAME_SAFE}" = "launch" ]; then
   nlb_arn=$(<"${SHARED_DIR}"/nlb_arn.txt)
   nlb_dnsname="$(aws elbv2 describe-load-balancers \
             --load-balancer-arns ${nlb_arn} \
@@ -65,13 +65,13 @@ if [ "${JOB_NAME_SAFE}" = "launch" ]; then
         "EvaluateTargetHealth": false
         }'
   apps_dns_target=$api_dns_target
-else
-  # Configure DNS direct to respective VIP
-  api_dns_target='"TTL": 60,
-        "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
-  apps_dns_target='"TTL": 60,
-        "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
-fi
+# else
+#   # Configure DNS direct to respective VIP
+#   api_dns_target='"TTL": 60,
+#         "ResourceRecords": [{"Value": "'${vips[0]}'"}]'
+#   apps_dns_target='"TTL": 60,
+#         "ResourceRecords": [{"Value": "'${vips[1]}'"}]'
+# fi
 
 # api-int record is needed just for Windows nodes
 # TODO: Remove the api-int entry in future
