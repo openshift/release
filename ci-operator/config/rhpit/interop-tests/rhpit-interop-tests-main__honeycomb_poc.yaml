@@ -10,11 +10,11 @@ build_root:
     tag: golang-1.19
 images:
 - dockerfile_literal: |-
-    FROM alpine:latest
-    RUN apk update
-    RUN apk upgrade
-    RUN apk add bash
-    RUN apk add iputils
+    FROM docker.io/library/python:3.11
+    RUN curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
+        tar -xzf oc.tar.gz && \
+        mv oc /usr/local/bin && \
+        rm oc.tar.gz
   to: honeycomb-poc-image
 releases:
   latest:
@@ -30,7 +30,7 @@ resources:
 tests:
 - as: honeycomb-poc
   commands: |
-    ping -c 10 10.19.26.5 && sleep 3600
+    sleep 3600
   container:
     from: honeycomb-poc-image
 zz_generated_metadata:
