@@ -9,6 +9,17 @@ OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPEN
 # Recycling BASTION_FLAVOR as it's a small flavor we can re-use.
 TESTING_FLAVOR="${TESTING_FLAVOR:-$(<"${SHARED_DIR}/BASTION_FLAVOR")}"
 
+# For disconnected or otherwise unreachable environments, we want to
+# have steps use an HTTP(S) proxy to reach the API server. This proxy
+# configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
+# environment variables, as well as their lowercase equivalents (note
+# that libcurl doesn't recognize the uppercase variables).
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+	# shellcheck disable=SC1090
+	source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 set +e
 echo "DEBUG: Running liveliness check script..."
 ./server.sh -d -t -l -f ${TESTING_FLAVOR} -i ${TESTING_IMAGE} -e ${OPENSTACK_EXTERNAL_NETWORK} shiftstack-ci-${CLUSTER_NAME}
