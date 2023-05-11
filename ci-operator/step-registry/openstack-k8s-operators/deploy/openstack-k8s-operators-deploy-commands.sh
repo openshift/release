@@ -91,7 +91,7 @@ if [[ "$SERVICE_NAME" == "OPENSTACK" ]]; then
   export ${SERVICE_NAME}_CR=/go/src/github.com/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml
 fi
 
-make ceph TIMEOUT=90
+make ceph DATA_SIZE=2Gi TIMEOUT=90
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
