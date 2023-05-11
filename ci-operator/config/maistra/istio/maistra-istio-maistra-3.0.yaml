@@ -89,10 +89,10 @@ tests:
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache" \
-    ARTIFACTS="${ARTIFACT_DIR:-}"
+    ARTIFACTS="${ARTIFACT_DIR:-}" \
+    2>&1 | tee "${ARTIFACT_DIR}"/make-unit.log
   container:
     from: src-test
-  timeout: 1h0m0s
 - as: integ-pilot-3-0
   cluster_claim:
     architecture: amd64
@@ -124,7 +124,7 @@ tests:
     - as: integ-pilot-3-0
       cli: latest
       commands: |
-        oc rsh -n "cd /work; ${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           prow/integ-suite-kind.sh \
           test.integration.pilot.kube.presubmit
