@@ -16,19 +16,10 @@ then
   exit 0
 fi
 
-# Temporarily limit the number of jobs we're going to ingest into loki while we test and scale the new instance:
-if [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.13-ocp-e2e-aws-ovn-arm64-single-node" ]] \
-	&& [[ $JOB_NAME != "periodic-ci-openshift-release-master-nightly-4.13-e2e-vsphere-8-ovn" ]] \
-	&& [[ ! "$JOB_NAME" =~ .*gcp.* ]] \
-	&& [[ ! "$JOB_NAME" =~ .*azure.* ]] \
-	&& [[ ! "$JOB_NAME" =~ .*metal.* ]] \
-	&& [[ ! "$JOB_NAME" =~ .*vsphere.* ]] \
-	&& [[ ! "$JOB_NAME" =~ .*aws.* ]] \
-	&& [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.14-ocp-e2e-aws-ovn-arm64-single-node" ]] \
-	&& [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.13-ocp-e2e-ovn-remote-libvirt-s390x" ]] \
-	&& [[ $JOB_NAME != "periodic-ci-openshift-multiarch-master-nightly-4.14-ocp-e2e-ovn-remote-libvirt-s390x" ]]; then
-	echo "This job is not on the list of supported jobs we're testing for the new loki, skipping..."
-	exit 0
+if [[ "$JOB_NAME" =~ .*proxy.* ]]
+then
+  echo "Clusters using a proxy are not yet supported for loki"
+  exit 0
 fi
 
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
