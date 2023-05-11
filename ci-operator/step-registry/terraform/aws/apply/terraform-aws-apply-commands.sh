@@ -23,6 +23,7 @@ fi
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 export TF_VAR_token=${OCM_TOKEN}
 
+
 rm -rf ${SHARED_DIR}/work
 mkdir  ${SHARED_DIR}/work
 if [[ -f ${SHARED_DIR}/${ART_NAME}.tar.gz ]]; then
@@ -42,8 +43,18 @@ terraform init
 
 terraform apply -auto-approve
 
-terraform output -json cluster_id| jq -r . > ${SHARED_DIR}/ocm_cluster_id
+cluster_id=$(terraform output -json cluster_id | jq -r .)
+echo ${cluster_id} > ${SHARED_DIR}/ocm_cluster_id
 
 tar cvfz ${SHARED_DIR}/${ART_NAME}.tar.gz *.tf*  #save for later terraform destroy
 
 export HOME="${PWD}" #restore HOME
+
+if [[ "$(cat terraform.tfvars | grep 'url' | awk -F '=' '{print $2}' | grep 'stage')" != '' ]]; then 
+  ocm login --token=${OCM_TOKEN} --url=staging
+else
+  ocm login --token=${OCM_TOKEN}
+fi
+ocm get /api/clusters_mgmt/v1/clusters/${cluster_id}/credentials | jq -r .kubeconfig > ${SHARED_DIR}/ocm_cluster_kubeconfig
+
+oc --kubeconfig ${SHARED_DIR}/ocm_cluster_kubeconfig get co

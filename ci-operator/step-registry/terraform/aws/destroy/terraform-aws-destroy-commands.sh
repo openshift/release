@@ -29,6 +29,8 @@ if [[ -f ${SHARED_DIR}/${ART_NAME}.tar.gz ]]; then
 fi
 cd ${SHARED_DIR}/work
 
+cat terraform.tfvars
+
 export HOME='/root' #pointing to location of .terraform.d
 
 terraform init

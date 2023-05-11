@@ -20,9 +20,6 @@ images:
 - dockerfile_path: operator/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
     stolostron_builder_go1.19-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.19-linux
@@ -37,9 +34,6 @@ images:
 - dockerfile_path: agent/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.18-linux:
-      as:
-      - registry.ci.openshift.org/stolostron/builder:go1.18-linux
     stolostron_builder_go1.19-linux:
       as:
       - registry.ci.openshift.org/stolostron/builder:go1.19-linux
@@ -74,8 +68,9 @@ tests:
     make unit-tests
   container:
     from: src
+  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
 - as: test-e2e
-  skip_if_only_changed: ^doc/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
+  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
   steps:
     env:
       AWS_CREDENTIALS_SECRET: ocm-hub-of-hubs-aws-kind
@@ -123,6 +118,7 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
 - as: sonarcloud-post-submit
   commands: |
     export TMP_BIN="/tmp/bin"
@@ -138,6 +134,7 @@ tests:
   secrets:
   - mount_path: /etc/sonarcloud/
     name: acm-sonarcloud-token
+  skip_if_only_changed: ^doc/|^samples/|\.md$|\.properties$|\.copyrightignore$|\.dockerignore$|^(?:.*/)?(?:\.gitignore|\.md$|OWNERS|PROJECT|LICENSE|DCO|manager/OWNERS|agent/OWNERS|operator/OWNERS|release-notes/*)$
 - as: latest-operator-image-mirror
   postsubmit: true
   steps:

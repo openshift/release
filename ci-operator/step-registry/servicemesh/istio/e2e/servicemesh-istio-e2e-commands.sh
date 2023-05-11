@@ -145,8 +145,5 @@ check_pod_status "${MAISTRA_MC_POD}"
 # create ARTIFACT_DIR
 oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
 oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" -c testpmd -- mkdir -p "${ARTIFACT_DIR}"
-# create soft link of go-junit-report
-oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" -c testpmd -- ln -s /usr/local/bin/go-junit-report /usr/bin/go-junit-report
-oc exec -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" -c testpmd -- ln -s /usr/local/bin/go-junit-report /usr/bin/go-junit-report
 
 echo "Successfully created maistra istio builder pods"
