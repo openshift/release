@@ -20,6 +20,12 @@ spec:
       memory: 3Gi
 EOF
 
+# enableSystemLogQuery needs to be enabled for oc adm node-logs to work if OCP version >= 4.14 (or if OCP_VERSION is not set)
+REQUIRED_OCP_VERSION="4.14"
+if [ "$(printf '%s\n' "${REQUIRED_OCP_VERSION}" "${OCP_VERSION}" | sort --version-sort | head -n1)" = "${REQUIRED_OCP_VERSION}" ]; then
+  echo "    enableSystemLogQuery: true" >> "${SHARED_DIR}/manifest_single-node-kubeletconfig.yml"
+fi
+
 # Use first eight cores on a single node for workload partitioning (see https://github.com/openshift/enhancements/blob/master/enhancements/workload-partitioning/management-workload-partitioning.md#goals)
 # ... but avoid applying workload partitioning if OCP version < 4.10 (or if OCP_VERSION is not set)
 REQUIRED_OCP_VERSION="4.10"
