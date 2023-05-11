@@ -4,18 +4,37 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
-promotion:
-  name: "4.14"
-  namespace: ocp
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    WORKDIR /root
+    RUN yum install -y yum-utils && \
+        yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+        yum -y install terraform python3 make git jq && \
+        git config --global http.sslVerify false &&\
+        git clone https://github.com/terraform-redhat/terraform-provider-ocm.git --branch main
+    ENV GO111MODULE=on
+    ENV GOFLAGS=""
+    RUN go install github.com/onsi/ginkgo/v2/ginkgo@latest && \
+        go install github.com/golang/mock/mockgen@v1.6.0 && \
+        go install github.com/openshift-online/ocm-cli/cmd/ocm@latest && \
+        go env GOPATH
+
+    RUN mkdir /.cache && chmod 775 -R /.cache ${GOPATH} && \
+        python3 -m pip install PyYAML jinja2
+
+
+    #ENTRYPOINT ["python3", "scripts/run_make_e2e_test.py"]
+  to: ocm-tf-cli
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.13"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -32,6 +51,16 @@ tests:
     make unit-test
   container:
     from: src
+- as: rehearse-e2e-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    workflow: terraform-aws-e2e
+- as: rehearse-single-debug
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-qe
+    workflow: terraform-aws-single
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
