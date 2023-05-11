@@ -4,14 +4,38 @@ build_root:
     namespace: ci
     tag: "3.0"
   use_build_cache: true
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ci/maistra-builder:3.0
+    # Git checks if the user that owns the files on the filesystem match the
+    # current user.  We need to disable this check because tests in Prow are
+    # running with a random user.
+    RUN git config --system --add safe.directory '*'
+  inputs:
+    src:
+      as:
+      - registry.ci.openshift.org/ci/maistra-builder:3.0
+  to: src-test
 resources:
   '*':
     limits:
       memory: 2Gi
     requests:
-      cpu: 100m
+      cpu: "2"
       memory: 200Mi
 tests:
+- as: maistra-istio-unit-3-0
+  commands: |
+    make -e T=-v build racetest binaries-test \
+    BUILD_WITH_CONTAINER="0" \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache" \
+    ARTIFACTS="${ARTIFACT_DIR:-}" \
+    2>&1 | tee "${ARTIFACT_DIR}"/make-unit.log
+  container:
+    from: src-test
 - as: nightly-images-3-0
   cluster_claim:
     architecture: amd64
@@ -62,7 +86,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
@@ -81,6 +105,53 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
+    workflow: servicemesh-istio-e2e-aws
+- as: integ-pilot-3-0
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-pilot-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.pilot.kube.presubmit"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
     workflow: servicemesh-istio-e2e-aws
 zz_generated_metadata:
   branch: maistra-3.0
