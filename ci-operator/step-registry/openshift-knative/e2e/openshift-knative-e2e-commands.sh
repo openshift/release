@@ -39,5 +39,5 @@ oc -n openshift-machine-api scale machineset "$first_worker_machine_set" --repli
 #make test-e2e-with-kafka
 #make teardown
 
-ifconfig | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' || true
+hostname -i || true
 sleep 600
