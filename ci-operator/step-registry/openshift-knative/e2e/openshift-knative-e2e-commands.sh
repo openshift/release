@@ -28,15 +28,16 @@ current_replicas="$(oc -n openshift-machine-api get machineset "$first_worker_ma
 new_machineset_count=$((current_replicas + 1))
 oc -n openshift-machine-api scale machineset "$first_worker_machine_set" --replicas="$new_machineset_count"
 
-expected_count=$((original_count + 1))
+#expected_count=$((original_count + 1))
 # note: timeout of this loop is handled by the calling context
-while [[ "$(get_running_worker_count)" != "$expected_count" ]]; do
-    info "Current machine state does not have the running count we desire ($expected_count)"
-    oc  -n openshift-machine-api get machines
-    sleep 20
-done
+#while [[ "$(get_running_worker_count)" != "$expected_count" ]]; do
+#    info "Current machine state does not have the running count we desire ($expected_count)"
+#    oc  -n openshift-machine-api get machines
+#    sleep 20
+#done
 
 #make test-e2e-with-kafka
 #make teardown
 
+ifconfig | grep 'inet ' | grep -v '127.0.0.1' | awk '{print $2}' || true
 sleep 600
