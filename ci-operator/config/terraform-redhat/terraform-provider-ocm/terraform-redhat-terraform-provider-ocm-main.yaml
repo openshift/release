@@ -29,9 +29,6 @@ images:
         chmod -R 777 $GOPATH &&\
         echo 'RUN done'
   to: ocm-tf-e2e
-- dockerfile_literal: |
-    FROM quay.io/ocp-edge-qe/aws-ocm-terraform-provider:latest
-  to: ocm-tf-cli
 releases:
   latest:
     integration:
@@ -67,8 +64,9 @@ tests:
     cluster_profile: aws-qe
     env:
       TF_VARS: |
+        ocm_environment = "staging"
         url = "https://api.stage.openshift.com"
-        account_role_prefix = "asher-ar"
+        openshift_version = "4.13"
     post:
     - ref: terraform-aws-cluster-delete
     - ref: terraform-aws-cluster-delete-account-roles
@@ -76,6 +74,9 @@ tests:
     - ref: terraform-aws-cluster-name
     - ref: terraform-aws-cluster-create-account-roles
     - ref: terraform-aws-cluster-create
+    - ref: idp-htpasswd
+    test:
+    - ref: cucushift-e2e
 zz_generated_metadata:
   branch: main
   org: terraform-redhat

@@ -32,8 +32,11 @@ cd ${SHARED_DIR}/work
 
 cp /root/terraform-provider-ocm/${TF_FOLDER}/* ./
 
-echo "cluster_name = \"${SHARED_DIR}\cluster_name\"" > terraform.tfvars
-echo "${TF_VARS}" | sed -r "s/operator_role_prefix(.*)/operator_role_prefix = \"${CLUSTER_NAME}\"/" >> terraform.tfvars
+rm terraform.tfvars || true
+echo "cluster_name = \"$(cat ${SHARED_DIR}/cluster-name)\""          >> terraform.tfvars
+echo "account_role_prefix = \"$(cat ${SHARED_DIR}/cluster-name)\""   >> terraform.tfvars
+echo "operator_role_prefix = \"$(cat ${SHARED_DIR}/cluster-name)\""  >> terraform.tfvars
+echo "${TF_VARS}"                                                    >> terraform.tfvars
 cat terraform.tfvars
 
 export HOME='/root' #pointing to location of .terraform.d
@@ -43,17 +46,19 @@ terraform init
 terraform apply -auto-approve
 
 cluster_id=$(terraform output -json cluster_id | jq -r .)
-echo ${cluster_id} > ${SHARED_DIR}/ocm_cluster_id
+echo ${cluster_id} > ${SHARED_DIR}/cluster-id
 
 tar cvfz ${SHARED_DIR}/${ART_NAME}.tar.gz *.tf*  #save for later terraform destroy
 
 export HOME="${PWD}" #restore HOME
 
+# get KUBECONFIG
 if [[ "$(cat terraform.tfvars | grep 'url' | awk -F '=' '{print $2}' | grep 'stage')" != '' ]]; then 
   ocm login --token=${OCM_TOKEN} --url=staging
 else
   ocm login --token=${OCM_TOKEN}
 fi
-ocm get /api/clusters_mgmt/v1/clusters/${cluster_id}/credentials | jq -r .kubeconfig > ${SHARED_DIR}/ocm_cluster_kubeconfig
+ocm get /api/clusters_mgmt/v1/clusters/${cluster_id}/credentials | jq -r .kubeconfig > ${SHARED_DIR}/kubeconfig
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-oc --kubeconfig ${SHARED_DIR}/ocm_cluster_kubeconfig get co
+oc get co

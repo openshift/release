@@ -32,8 +32,9 @@ cd ${SHARED_DIR}/work
 
 cp /root/terraform-provider-ocm/${TF_FOLDER}/* ./
 
-echo "account_role_prefix = \"${SHARED_DIR}\cluster_name\"" > terraform.tfvars
-echo "${TF_VARS}" >> terraform.tfvars
+rm terraform.tfvars || true
+echo "account_role_prefix = \"$(cat ${SHARED_DIR}/cluster-name)\""   >> terraform.tfvars
+echo "${TF_VARS}"                                                    >> terraform.tfvars
 cat terraform.tfvars
 
 export HOME='/root' #pointing to location of .terraform.d
