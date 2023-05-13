@@ -6,7 +6,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build01
-    context: ci/prow/e2e-aws-plugin-template
+    context: ci/prow/e2e-aws-plugin-template-debug-test
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -15,8 +15,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-console-plugin-template-main-e2e-aws-plugin-template
-    rerun_command: /test e2e-aws-plugin-template
+    name: pull-ci-openshift-console-plugin-template-main-e2e-aws-plugin-template-debug-test
+    rerun_command: /test e2e-aws-plugin-template-debug-test
     spec:
       containers:
       - args:
@@ -25,8 +25,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-aws-plugin-template-cluster-profile
-        - --target=e2e-aws-plugin-template
+        - --secret-dir=/usr/local/e2e-aws-plugin-template-debug-test-cluster-profile
+        - --target=e2e-aws-plugin-template-debug-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -42,7 +42,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-aws-plugin-template-cluster-profile
+        - mountPath: /usr/local/e2e-aws-plugin-template-debug-test-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -73,7 +73,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-aws-plugin-template,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-aws-plugin-template-debug-test,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -130,15 +130,15 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build03
-    context: ci/prow/lint-aws-plugin-template
+    context: ci/prow/lint-aws-plugin-template-debug-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-console-plugin-template-main-lint-aws-plugin-template
-    rerun_command: /test lint-aws-plugin-template
+    name: pull-ci-openshift-console-plugin-template-main-lint-aws-plugin-template-debug-test
+    rerun_command: /test lint-aws-plugin-template-debug-test
     spec:
       containers:
       - args:
@@ -146,7 +146,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=lint-aws-plugin-template
+        - --target=lint-aws-plugin-template-debug-test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -179,4 +179,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )lint-aws-plugin-template,?($|\s.*)
+    trigger: (?m)^/test( | .* )lint-aws-plugin-template-debug-test,?($|\s.*)
