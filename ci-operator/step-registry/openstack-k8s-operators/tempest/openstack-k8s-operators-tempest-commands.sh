@@ -54,7 +54,12 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
     fi
     BASE_OP=${EXTRA_REF_REPO}
 fi
+SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g')
 
+# NOTE: if manila is deployed, build a default share required by tempest
+if [[ "${SERVICE_NAME}" == "MANILA" ]]; then
+    oc exec -it pod/openstackclient -- openstack share type create default false
+fi
 
 set +e
 
