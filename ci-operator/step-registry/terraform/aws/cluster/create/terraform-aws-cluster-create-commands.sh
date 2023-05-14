@@ -59,6 +59,9 @@ else
   ocm login --token=${OCM_TOKEN}
 fi
 ocm get /api/clusters_mgmt/v1/clusters/${cluster_id}/credentials | jq -r .kubeconfig > ${SHARED_DIR}/kubeconfig
-export KUBECONFIG=${SHARED_DIR}/kubeconfig
+cp ${SHARED_DIR}/kubeconfig ${ARTIFACT_DIR}/
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+oc wait clusterversion version --for condition=Available --timeout=20m
 oc get co
+sleep 600
