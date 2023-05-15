@@ -313,12 +313,15 @@ tests:
     - as: integ-servicemesh-multicluster-2-3
       cli: latest
       commands: |
+        # temporary workaround: unset ARTIFACTS env for integ-servicemesh-multicluster
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" \
+          bash -c \
+          "unset ARTIFACTS; \
           entrypoint \
           prow/integ-suite-kind.sh \
           --topology \
           MULTICLUSTER \
-          test.integration.servicemesh.kube
+          test.integration.servicemesh.kube"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
