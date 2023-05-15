@@ -19,6 +19,8 @@ fi
 openshift_install_path="/var/lib/openshift-install"
 third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
+# TRIGGER ;-)
+
 export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
