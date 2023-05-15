@@ -105,11 +105,26 @@ then
         platform_required=false
 fi
 
+control_plane_replicas=3
+control_plane_addresses="\"192.168.${third_octet}.4\",\"192.168.${third_octet}.5\",\"192.168.${third_octet}.6\""
+compute_addresses="\"192.168.${third_octet}.7\",\"192.168.${third_octet}.8\",\"192.168.${third_octet}.9\""
+compute_replicas=3
+if [[ "${SIZE_VARIANT}" == "tiny" ]]; then
+        echo "Tiny SIZE_VARIANT was configured, a single control plane node and 2 workers are started"
+  control_plane_replicas=1
+  compute_replicas=2
+  control_plane_addresses="\"192.168.${third_octet}.4\""
+  compute_addresses="\"192.168.${third_octet}.7\",\"192.168.${third_octet}.8\""
+elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
+  compute_replicas=0
+fi
+
+
 ${platform_required} && cat >> "${install_config}" << EOF
 baseDomain: $base_domain
 controlPlane:
   name: "master"
-  replicas: 3
+  replicas: ${control_plane_replicas}
 compute:
 - name: "worker"
   replicas: 0
@@ -145,6 +160,8 @@ vsphere_server = "${vsphere_url}"
 ipam = "ipam.vmc.ci.openshift.org"
 cluster_id = "${cluster_name}"
 base_domain = "${base_domain}"
+control_plane_count = ${control_plane_replicas}
+compute_count = ${compute_replicas}
 cluster_domain = "${cluster_domain}"
 ssh_public_key_path = "${ssh_pub_key_path}"
 compute_memory = "16384"
@@ -153,8 +170,8 @@ vm_network = "${LEASED_RESOURCE}"
 vm_dns_addresses = ["${dns_server}"]
 bootstrap_ip_address = "192.168.${third_octet}.3"
 lb_ip_address = "192.168.${third_octet}.2"
-compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
-control_plane_ip_addresses = ["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
+compute_ip_addresses = [${compute_addresses}]
+control_plane_ip_addresses = [${control_plane_addresses}]
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
