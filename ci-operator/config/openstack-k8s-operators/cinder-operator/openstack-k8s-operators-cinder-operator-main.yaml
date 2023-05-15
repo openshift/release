@@ -3,6 +3,10 @@ base_images:
     name: "4.10"
     namespace: ocp
     tag: cli
+  openstack-operator-ci-tempest:
+    name: tools
+    namespace: openstack-k8s-operators
+    tag: openstack-operator-tempest-container
   opm-builder:
     name: opm-builder
     namespace: ci
@@ -26,6 +30,11 @@ images:
       - destination_dir: .
         source_path: /bin/opm
   to: openstack-operator-ci-build-deploy
+- dockerfile_literal: |
+    FROM src
+    RUN pip3 install pre-commit
+  from: src
+  to: openstack-operator-ci-pre-commit
 - build_args:
   - name: KUTTL_VERSION
     value: v0.15.0
@@ -38,11 +47,6 @@ images:
     RUN yum install -y skopeo
   from: openstack-operator-ci-build-deploy
   to: openstack-operator-ci-build-deploy-kuttl
-- dockerfile_literal: |
-    FROM src
-    RUN pip3 install pre-commit
-  from: src
-  to: openstack-operator-ci-pre-commit
 resources:
   '*':
     limits:
@@ -55,7 +59,7 @@ tests:
   commands: make gotest
   container:
     from: src
-- as: mariadb-operator-build-deploy
+- as: cinder-operator-build-deploy
   cluster_claim:
     architecture: amd64
     cloud: vexxhost
@@ -66,7 +70,7 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy
-- as: mariadb-operator-build-deploy-kuttl
+- as: cinder-operator-build-deploy-kuttl
   cluster_claim:
     architecture: amd64
     cloud: vexxhost
@@ -83,12 +87,23 @@ tests:
     export GOFLAGS=
     export PRE_COMMIT_HOME=/tmp
     export GOLANGCI_LINT_CACHE=/tmp
-    mkdir -p ../operator/ && cp -r . ../operator
+    mkdir -p ../operator && cp -r . ../operator
     cd ../operator
-    pre-commit run -a --show-diff-on-failure
+    pre-commit run --all-files --show-diff-on-failure
   container:
     from: openstack-operator-ci-pre-commit
+- as: cinder-operator-build-deploy-tempest
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h20m0s
+    version: "4.10"
+  optional: true
+  steps:
+    workflow: openstack-k8s-operators-test-build-deploy-tempest
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: openstack-k8s-operators
-  repo: mariadb-operator
+  repo: cinder-operator
