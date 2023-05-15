@@ -91,5 +91,4 @@ fi
 if [ -f stestr_results.html ]; then
     cp stestr_results.html ${ARTIFACT_DIR}
 fi
-
 exit $EXIT_CODE

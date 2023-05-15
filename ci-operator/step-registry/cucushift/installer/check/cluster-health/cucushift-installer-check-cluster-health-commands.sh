@@ -198,6 +198,7 @@ function wait_mcp_continous_success() {
     local try=0 continous_successful_check=0 passed_criteria=3 max_retries=20 ret=0
     while (( try < max_retries && continous_successful_check < passed_criteria )); do
         echo "Checking #${try}"
+        ret=0
         check_mcp || ret=$?
         if [[ "$ret" == "0" ]]; then
             echo "Passed #${continous_successful_check}"

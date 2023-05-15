@@ -16,14 +16,21 @@ then
   exit 0
 fi
 
+if [[ "$JOB_NAME" =~ .*proxy.* ]]
+then
+  echo "Clusters using a proxy are not yet supported for loki"
+  exit 0
+fi
 
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
-export LOKI_ENDPOINT=https://observatorium-mst.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+# openshift-trt taken from the tenants list in the LokiStack CR on DPCR:
+export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t7.p1.openshiftapps.com/api/logs/v1/openshift-trt/loki/api/v1
+
+# TODO: may be deprecated, moved to: https://github.com/resmoio/kubernetes-event-exporter
 export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
-GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
 
 cat >> "${SHARED_DIR}/manifest_01_ns.yml" << EOF
@@ -99,11 +106,9 @@ data:
           min_period: 1s
         batchsize: 102400
         batchwait: 10s
-        basic_auth:
-          username: ${GRAFANACLOUND_USERNAME}
-          password_file: /etc/promtail-grafanacom-secrets/password
+        bearer_token_file: /tmp/shared/prod_bearer_token
         timeout: 10s
-        url: https://logs-prod3.grafana.net/api/prom/push
+        url: ${LOKI_ENDPOINT}/push
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
@@ -238,27 +243,6 @@ data:
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
-    - job_name: kubeapi-audit
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: kube-apiserver
-          __path__: /var/log/kube-apiserver/audit.log
-    - job_name: openshift-apiserver
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: openshift-apiserver
-          __path__: /var/log/openshift-apiserver/audit.log
-    - job_name: oauth-apiserver-audit
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: oauth-apiserver
-          __path__: /var/log/oauth-apiserver/audit.log
     - job_name: events
       kubernetes_sd_configs:
       - role: pod
@@ -291,24 +275,17 @@ data:
     target_config:
       sync_period: 10s
 EOF
+
 cat >> "${SHARED_DIR}/manifest_creds.yml" << EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: promtail-creds
+  name: promtail-prod-creds
   namespace: openshift-e2e-loki
 data:
   client-id: "$(cat /var/run/loki-secret/client-id | base64 -w 0)"
   client-secret: "$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
-EOF
-cat >> "${SHARED_DIR}/manifest_grafanacom_creds.yml" << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: promtail-grafanacom-creds
-  namespace: openshift-e2e-loki
-data:
-  password: "$(cat /var/run/loki-grafanacloud-secret/client-secret | base64 -w 0)"
+  audience: "$(cat /var/run/loki-secret/audience | base64 -w 0)"
 EOF
 cat >> "${SHARED_DIR}/manifest_ds.yml" << EOF
 apiVersion: apps/v1
@@ -382,8 +359,6 @@ spec:
         volumeMounts:
         - mountPath: "/etc/promtail"
           name: config
-        - mountPath: "/etc/promtail-grafanacom-secrets"
-          name: grafanacom-secrets
         - mountPath: "/run/promtail"
           name: run
         - mountPath: "/var/lib/docker/containers"
@@ -392,18 +367,11 @@ spec:
         - mountPath: "/var/log/pods"
           name: pods
           readOnly: true
-        - mountPath: "/var/log/kube-apiserver"
-          name: auditlogs-kube-apiserver
-          readOnly: true
-        - mountPath: "/var/log/openshift-apiserver"
-          name: auditlogs-openshift-apiserver
-          readOnly: true
-        - mountPath: "/var/log/oauth-apiserver"
-          name: auditlogs-oauth-apiserver
-          readOnly: true
         - mountPath: "/var/log/journal"
           name: journal
           readOnly: true
+        - mountPath: "/tmp/shared"
+          name: shared-data
       - args:
         - --https-address=:9001
         - --provider=openshift
@@ -432,6 +400,38 @@ spec:
           name: proxy-tls
         - mountPath: /etc/tls/cookie-secret
           name: cookie-secret
+      - name: prod-bearer-token
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        args:
+        - --oidc.audience=\$(AUDIENCE)
+        - --oidc.client-id=\$(CLIENT_ID)
+        - --oidc.client-secret=\$(CLIENT_SECRET)
+        - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
+        - --margin=10m
+        - --file=/tmp/shared/prod_bearer_token
+        env:
+          - name: CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: client-id
+          - name: CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: client-secret
+          - name: AUDIENCE
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: audience
+        volumeMounts:
+        - mountPath: "/tmp/shared"
+          name: shared-data
+        image: quay.io/observatorium/token-refresher
       serviceAccountName: loki-promtail
       terminationGracePeriodSeconds: 180
       tolerations:
@@ -441,9 +441,6 @@ spec:
       - configMap:
           name: loki-promtail
         name: config
-      - secret:
-          secretName: promtail-grafanacom-creds
-        name: grafanacom-secrets
       - hostPath:
           path: "/run/promtail"
         name: run
@@ -456,15 +453,6 @@ spec:
       - hostPath:
           path: "/var/log/journal"
         name: journal
-      - hostPath:
-          path: "/var/log/kube-apiserver"
-        name: auditlogs-kube-apiserver
-      - hostPath:
-          path: "/var/log/openshift-apiserver"
-        name: auditlogs-openshift-apiserver
-      - hostPath:
-          path: "/var/log/oauth-apiserver"
-        name: auditlogs-oauth-apiserver
       - name: proxy-tls
         secret:
           defaultMode: 420
@@ -473,6 +461,8 @@ spec:
         secret:
           defaultMode: 420
           secretName: cookie-secret
+      - name: shared-data
+        emptyDir: {}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -694,8 +684,14 @@ echo "Promtail manifests created, the cluster can be found at https://grafana-lo
 
 
 if [[ -f "/usr/bin/python3" ]]; then
+  # Try to prepopulate the loki time window to match the job (with some leeway), so the user is never staring at no logs when they're actually there.
+  # Note that this step runs prior to install, so we use a window 2 hours before now (to be ridiculously safe) and 8 hours after, which should cover
+  # the runtime of just about any job. There's no risk over overloading the UI or seeing logs you don't want because we filter by invoker (this job).
+  LOKI_EPOCH_MILLIS_FROM="$(date -d '-2 hours' +%s%N | cut -b1-13)"
+  LOKI_EPOCH_MILLIS_TO="$(date -d '+8 hours' +%s%N | cut -b1-13)"
+
   ENCODED_INVOKER="$(python3 -c "import urllib.parse; print(urllib.parse.quote('${OPENSHIFT_INSTALL_INVOKER}'))")"
   cat >> ${SHARED_DIR}/custom-links.txt << EOF
-  <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%5B%22now-24h%22,%22now%22,%22Grafana%20Cloud%22,%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%7C%20unpack%22%7D%5D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">Loki</a>&nbsp;<a target="_blank" href="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
+  <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%7B%22datasource%22:%22PCEB727DF2F34084E%22,%22queries%22:%5B%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%22,%22refId%22:%22A%22,%22editorMode%22:%22code%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22${LOKI_EPOCH_MILLIS_FROM}%22,%22to%22:%22${LOKI_EPOCH_MILLIS_TO}%22%7D%7D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">Loki</a>&nbsp;<a target="_blank" href="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
 EOF
 fi
