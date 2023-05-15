@@ -6,26 +6,16 @@ set -o pipefail
 # Set PATH to include YQ, installed via pip in the image
 export PATH="$PATH:/usr/local/bin"
 
-tenant_id=$(jq -r .tenantId "${SHARED_DIR}/osServicePrincipal.json")
-aad_client_secret=$(jq -r .clientSecret "${SHARED_DIR}/osServicePrincipal.json")
-app_id=$(jq -r .clientId "${SHARED_DIR}/osServicePrincipal.json")
-
-
-azurestack_endpoint=$(cat "${SHARED_DIR}/AZURESTACK_ENDPOINT")
 suffix_endpoint=$(cat "${SHARED_DIR}/SUFFIX_ENDPOINT")
 
-az cloud register \
-    -n PPE \
-    --endpoint-resource-manager "${azurestack_endpoint}" \
-    --suffix-storage-endpoint "${suffix_endpoint}" 
-az cloud set -n PPE
-az cloud update --profile 2019-03-01-hybrid
-az login --service-principal -u "$app_id" -p "$aad_client_secret" --tenant "$tenant_id" > /dev/null
+# Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
+chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
+source ${SHARED_DIR}/azurestack-login-script.sh
 
 # Hard-coded storage account info for PPE3 environment.
 # The resource group, storage account, & container are expected to exist.
-resource_group=rhcos-storage-rg
-storage_account=rhcosvhdsa
+resource_group=${RHCOS_VHD_RESOURCE_GROUP}
+storage_account=${RHCOS_VHD_STORAGE_ACCOUNT}
 account_key=$(az storage account keys list -g $resource_group --account-name $storage_account --query "[0].value" -o tsv)
 container=vhd
 

@@ -1,4 +1,3 @@
-
 from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
 
 
@@ -138,7 +137,8 @@ def _add_origin_resources(gendoc):
                                     "--job-namespace=ci-release",
                                     "--tools-image-stream-tag=4.6:tests",
                                     "--release-architecture=amd64",
-                                    "-v=4"
+                                    "-v=4",
+                                    "--process-legacy-results"
                                 ],
                                 "image": "release-controller:latest",
                                 "name": "controller",

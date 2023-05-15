@@ -40,8 +40,7 @@ CONFIG = {
         'us-east-2': 10,
     },
     'aws-qe-quota-slice': {
-        'us-east-1': 20,
-        'us-east-2': 5,
+        'us-east-1': 25,
         'ap-northeast-1': 5,
     },
     'aws-sd-qe-quota-slice': {
@@ -162,10 +161,10 @@ CONFIG = {
         'default': 5,
     },
     'openstack-vh-mecha-central-quota-slice': {
-        'default': 5,
+        'default': 4,
     },
     'openstack-vh-mecha-az0-quota-slice': {
-        'default': 5,
+        'default': 2,
     },
     'openstack-ppc64le-quota-slice': {},
     'ovirt-quota-slice': {},
@@ -272,13 +271,13 @@ for i in range(2):
 for i in range(4):
     CONFIG['openstack-ppc64le-quota-slice']['openstack-ppc64le-{0:0>2}'.format(i)] = 1
 
-for i in range(10, 24):
+for i in range(10, 15):
     CONFIG['ovirt-quota-slice']['ovirt-{}'.format(i)] = 1
 
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(83,93):
+for i in range(89,93):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(94,106):
@@ -303,6 +302,8 @@ for i in range(151,158):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(200,204):
+    CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
+for i in range(205,214):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {

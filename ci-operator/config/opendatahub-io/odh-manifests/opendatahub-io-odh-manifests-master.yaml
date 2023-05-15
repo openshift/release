@@ -13,6 +13,9 @@ images:
   dockerfile_path: Dockerfile
   from: os
   to: odh-manifests-tests
+- context_dir: must-gather/
+  dockerfile_path: Dockerfile
+  to: must-gather-latest
 promotion:
   additional_images:
     latest: odh-manifests-tests
@@ -21,12 +24,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.12"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.12"
       namespace: ocp
 resources:
   '*':
@@ -48,8 +51,8 @@ tests:
           cpu: 2000m
           memory: 3Gi
     workflow: ipi-gcp
-- as: odh-manifests-e2e-nightly
-  cron: 28 20 2,16 * *
+- as: odh-manifests-e2e-nightly-412
+  cron: 40 12 10,20 * *
   steps:
     cluster_profile: gcp
     env:
@@ -60,9 +63,27 @@ tests:
       from: odh-manifests-tests
       resources:
         requests:
-          cpu: 2000m
-          memory: 3Gi
+          cpu: 1000m
+          memory: 2Gi
     workflow: ipi-gcp
+- as: odh-manifests-must-gather-pr-image
+  run_if_changed: ^(must-gather/.*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: must-gather-latest
+    env:
+      IMAGE_REPO: must-gather
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-manifests-must-gather
+  postsubmit: true
+  run_if_changed: ^(must-gather/.*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: must-gather-latest
+    env:
+      IMAGE_REPO: must-gather
+      RELEASE_VERSION: stable
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: master
   org: opendatahub-io

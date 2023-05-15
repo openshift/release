@@ -51,6 +51,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.19-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
   rhel-7:
     name: builder
     namespace: ocp
@@ -68,6 +72,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
@@ -78,6 +85,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
@@ -118,6 +128,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
@@ -128,6 +141,9 @@ images:
     ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: ovirt-installer
 - dockerfile_literal: |
     FROM src
@@ -202,6 +218,9 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
+test_binary_build_commands: |
+  # Some agent-based installer tests require nmstatectl
+  dnf install -y nmstate
 tests:
 - as: unit
   commands: |
@@ -209,7 +228,7 @@ tests:
     go tool cover -o $ARTIFACT_DIR/cover.txt -func /tmp/coverprofile.out
     go tool cover -o $ARTIFACT_DIR/cover.html -html /tmp/coverprofile.out
   container:
-    from: src
+    from: test-bin
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: aro-unit
   commands: go test ./pkg/... -tags=aro
@@ -256,9 +275,9 @@ tests:
         keyC valueC
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
-- as: e2e-aws-ovn-proxy
+- always_run: false
+  as: e2e-aws-ovn-proxy
   optional: true
-  run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
@@ -334,12 +353,12 @@ tests:
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
-  run_if_changed: azure
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-resourcegroup
   timeout: 6h0m0s
-- as: e2e-aws-ovn-upgrade
+- always_run: false
+  as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws
@@ -377,7 +396,8 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-upi
   timeout: 6h0m0s
-- as: e2e-aws-ovn-workers-rhel8
+- always_run: false
+  as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
     cluster_profile: aws
@@ -513,6 +533,12 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-static-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-8
+    workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))

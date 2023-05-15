@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: centos
-    namespace: openshift
-    tag: stream9
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -11,14 +7,21 @@ base_images:
     name: govulncheck
     namespace: ci
     tag: latest
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream9
+binary_build_commands: make
 build_root:
   from_repository: true
 images:
-- from: base
+- dockerfile_path: images/Dockerfile
+  from: os
   inputs:
-    root:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/openshift/ci-chat-bot/ci-chat-bot
   to: ci-chat-bot
 promotion:
   namespace: ci

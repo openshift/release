@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
@@ -45,20 +45,20 @@ images:
       - quay.io/ocp-splat/govc:v0.29.0
   to: assisted-test-infra-internal
 promotion:
-  name: ocm-2.8
+  name: ocm-2.9
   namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     requests:
@@ -179,7 +179,7 @@ tests:
         OPENSHIFT_VERSION=4.10
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-10-periodic
-  cron: 45 01 */1 * 0-5
+  cron: 45 01 */1 * 1,4
   steps:
     cluster_profile: packet-assisted
     env:
@@ -358,6 +358,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
@@ -368,6 +370,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export HOLD_INSTALLATION=true
@@ -462,6 +466,7 @@ tests:
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
+        WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite-periodic
   cron: 43 22 */1 * 1-5
@@ -476,6 +481,7 @@ tests:
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
+        WORKER_DISK=40000000000
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api
@@ -562,6 +568,28 @@ tests:
         MAKEFILE_TARGET=test
       PLATFORM: vsphere
     workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-12
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.12
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-13
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        OPENSHIFT_VERSION=4.13
+      PLATFORM: vsphere
+    workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-periodic
   cron: 45 02 */1 * 0-5
   steps:
@@ -573,7 +601,19 @@ tests:
         WORKER_VCPU=4
         WORKER_MEMORY=16384
       PLATFORM: vsphere
-      TEST_SUITE: conformance
+    workflow: assisted-vsphere
+- as: e2e-vsphere-assisted-4-12-periodic
+  cron: 40 02 */1 * 0-5
+  steps:
+    cluster_profile: vsphere
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=3
+        MAKEFILE_TARGET=test
+        WORKER_VCPU=4
+        WORKER_MEMORY=16384
+        OPENSHIFT_VERSION=4.12
+      PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-vsphere-assisted-kube-api
   optional: true
@@ -624,6 +664,7 @@ tests:
         TEST_FUNC=test_late_binding_kube_api_sno
         TEST=./src/tests/test_kube_api.py
         MAKEFILE_TARGET=test
+        WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-reclaim
   optional: true
@@ -636,6 +677,7 @@ tests:
         TEST_FUNC=test_late_binding_kube_api_ipv4_highly_available
         TEST=./src/tests/test_kube_api.py
         MAKEFILE_TARGET=test
+        WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipxe-periodic
   cron: 00 05 */1 * 0-5
@@ -728,6 +770,10 @@ tests:
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
     workflow: assisted-equinix
+- as: e2e-oci-assisted
+  optional: true
+  steps:
+    workflow: assisted-oci
 zz_generated_metadata:
   branch: master
   org: openshift

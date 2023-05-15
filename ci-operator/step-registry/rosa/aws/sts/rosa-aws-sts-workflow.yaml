@@ -10,14 +10,10 @@ workflow:
       ETCD_ENCRYPTION: "true"
       DISABLE_WORKLOAD_MONITORING: "false"
     pre:
-    - ref: rosa-sts-account-roles-create
-    - ref: rosa-sts-cluster-provision
-    - ref: rosa-conf-idp-htpasswd
+    - chain: rosa-aws-sts-provision
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
-    - ref: rosa-operators-wait-ready
     post:
-    - ref: rosa-sts-cluster-deprovision
-    - ref: rosa-sts-account-roles-delete
+    - chain: rosa-aws-sts-deprovision
   documentation: |-
     This workflow installs a rosa sts cluster. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
     After finish testing, the cluster will be deprovsioned.
