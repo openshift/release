@@ -1,7 +1,7 @@
 #!/bin/bash
 
 log(){
-    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${@}\033[0m"
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
 
 function waitForReady() {
