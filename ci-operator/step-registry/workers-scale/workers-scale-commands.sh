@@ -1,7 +1,7 @@
 #!/bin/bash
 
 log(){
-    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") ${@}\033[0m"
+    echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${@}\033[0m"
 }
 
 function waitForReady() {
@@ -9,7 +9,7 @@ function waitForReady() {
     set +x
     local retries=0
     local attempts=140
-    while [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/worker | grep -v "NotReady\\|SchedulingDisabled" | grep worker -c) != $1 ]]; do
+    while [[ $(oc get nodes --no-headers -l node-role.kubernetes.io/worker | grep -v "NotReady\\|SchedulingDisabled" | grep worker -c) != "$1" ]]; do
         log "Following nodes are currently present, waiting for desired count $1 to be met."
         log "Machinesets:"
         oc get machinesets -A
