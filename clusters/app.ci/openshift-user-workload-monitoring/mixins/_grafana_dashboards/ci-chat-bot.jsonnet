@@ -16,22 +16,22 @@ local dashboardConfig = {
     };
 
 local histogramQuantileSync(phi) = prometheus.target(
-        std.format('histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_sync_duration_seconds_sum_bucket[${range}])) by (le))', phi),
+        std.format('histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_sync_duration_seconds_bucket[${range}])) by (le))', phi),
         legendFormat=std.format('phi=%s', phi),
     );
 
 local histogramQuantileReadyDuration(phi) = prometheus.target(
-        std.format('histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_ready_duration_minutes_sum_bucket[${range}])) by (le))', phi),
+        std.format('histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_ready_duration_minutes_bucket[${range}])) by (le))', phi),
         legendFormat=std.format('phi=%s', phi),
     );
 
 local histogramQuantileAuthDuration(phi) = prometheus.target(
-        std.format('histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_auth_duration_minutes_sum_bucket[${range}])) by (le))', phi),
+        std.format('histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_auth_duration_minutes_bucket[${range}])) by (le))', phi),
         legendFormat=std.format('phi=%s', phi),
     );
 
 local histogramQuantileConsoleDuration(phi) = prometheus.target(
-        std.format('histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_console_duration_minutes_sum_bucket[${range}])) by (le))', phi),
+        std.format('histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_console_duration_minutes_bucket[${range}])) by (le))', phi),
         legendFormat=std.format('phi=%s', phi),
     );
 
@@ -84,7 +84,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Time to Auth-Ready in minutes',
-        description='histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_ready_duration_minutes_sum_bucket[${range}])) by (le))',
+        description='histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_ready_duration_minutes_bucket[${range}])) by (le))',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -105,7 +105,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Time to Console-Ready in minutes',
-        description='histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_console_duration_minutes_sum_bucket[${range}])) by (le))',
+        description='histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_console_duration_minutes_bucket[${range}])) by (le))',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -126,7 +126,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'Time to ROSA-Ready in minutes',
-        description='histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_ready_duration_minutes_sum_bucket[${range}])) by (le))',
+        description='histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_ready_duration_minutes_bucket[${range}])) by (le))',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
@@ -147,7 +147,7 @@ dashboard.new(
 .addPanel(
     (graphPanel.new(
         'ROSA Sync Time in seconds',
-        description='histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_sync_duration_seconds_sum_bucket[${range}])) by (le))',
+        description='histogram_quantile(%s, sum(rate(ci_chat_bot_rosa_sync_duration_seconds_bucket[${range}])) by (le))',
         datasource='prometheus',
         legend_alignAsTable=true,
         legend_rightSide=true,
