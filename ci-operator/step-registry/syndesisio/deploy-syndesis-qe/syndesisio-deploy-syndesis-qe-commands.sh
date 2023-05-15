@@ -76,12 +76,11 @@ spec:
     - name: test-run-results
 EOF
 
-oc wait --for=condition=ContainersReady=true pod/test-runner --timeout=15m
-oc logs -c runner -n default -f test-runner
+oc wait --for=condition=Ready pod/test-runner --timeout=15m || true
+oc logs -c runner -n default -f test-runner || true
+oc wait --for=condition=ContainersReady=false pod/test-runner --timeout=1h30m || true
 
-oc wait --for=condition=ContainersReady=false pod/test-runner --timeout=1h30m
 oc cp -c cli default/test-runner:/test-run-results /tmp/test-run-results
-
 cp /tmp/test-run-results/ui-tests/target/cucumber/cucumber-junit.xml "$ARTIFACT_DIR"/junit_ui-tests.xml
 cp /tmp/test-run-results/ui-tests/target/cucumber/cucumber-report.json "$ARTIFACT_DIR"/cucumber-report-ui-tests.json
 tar -czvf /tmp/test-run-results.tar.gz /tmp/test-run-results/
