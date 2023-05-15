@@ -22,9 +22,10 @@ export CYPRESS_AUTH_PROVIDER="kube:admin"
 yarn cypress:run:junit || true # do not fail on a exit code != 0 as it matches number of failed tests
 yarn cypress:combine:reports
 
-echo "Copying result xml to ${ARTIFACT_DIR}"
+echo "Copying result xml and screenshots to ${ARTIFACT_DIR}"
 # the file name must start with 'junit'
 cp cypress/results/combined-report.xml ${ARTIFACT_DIR}/junit-kiali-cypress.xml
+cp -r cypress/screenshots ${ARTIFACT_DIR}/ || true
 
 # cleaning demo apps
 hack/istio/install-testing-demos.sh -d true -c oc -in ${SMCP_NAMESPACE}
