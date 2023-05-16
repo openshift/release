@@ -79,9 +79,9 @@ function scaleDownMachines() {
 }
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker | grep -v "NotReady\\|SchedulingDisabled" | wc -l | xargs)
 echo "current worker count $current_worker_count"
-echo "worker scale count $WORKER_COUNT"
+echo "worker scale count $WORKER_REPLICA_COUNT"
 
-worker_count_num=$(($WORKER_COUNT))
+worker_count_num=$(($WORKER_REPLICA_COUNT))
 if [[ $current_worker_count -ne $worker_count_num ]]; then
     if [[ $current_worker_count -gt $worker_count_num ]]; then
         scaleDownMachines $current_worker_count $worker_count_num
