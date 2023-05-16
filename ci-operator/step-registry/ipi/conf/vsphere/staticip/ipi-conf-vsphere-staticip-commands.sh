@@ -10,6 +10,11 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
+echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
+# shellcheck source=/dev/null
+declare dns_server
+source "${SHARED_DIR}/vsphere_context.sh"
+
 echo "$(date -u --rfc-3339=seconds) - setting up static IP assignments"
 
 STATIC_IPS="${SHARED_DIR}"/static-ip-hosts.txt
@@ -24,49 +29,49 @@ cat >> "${STATIC_IPS}" << EOF
         - 192.168.${third_octet}.4/24
         gateway4: 192.168.${third_octet}.1
         nameservers:
-        - 8.8.8.8
+        - ${dns_server}
     - role: control-plane
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.5/24
         gateway4: 192.168.${third_octet}.1
         nameservers:
-        - 8.8.8.8
+        - ${dns_server}
     - role: control-plane
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.6/24
         gateway4: 192.168.${third_octet}.1
         nameservers:
-        - 8.8.8.8
+        - ${dns_server}
     - role: control-plane
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.7/24
         gateway4: 192.168.${third_octet}.1
         nameservers:
-        - 8.8.8.8
+        - ${dns_server}
     - role: compute
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.8/24
         gateway4: 192.168.${third_octet}.1
         nameservers:
-        - 8.8.8.8
+        - ${dns_server}
     - role: compute
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.9/24
         gateway4: 192.168.${third_octet}.1
         nameservers:
-        - 8.8.8.8
+        - ${dns_server}
     - role: compute
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.10/24
         gateway4: 192.168.${third_octet}.1
         nameservers:
-        - 8.8.8.8"
+        - ${dns_server}
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - set up static IP assignments"
