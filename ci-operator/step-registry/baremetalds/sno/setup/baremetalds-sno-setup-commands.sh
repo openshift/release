@@ -126,6 +126,7 @@ echo "${SINGLE_NODE_IP_ADDRESS} ${CLUSTER_API_DOMAIN}" | tee --append /etc/hosts
 for ingress_app in ${INGRESS_APPS[@]}; do
   echo "${SINGLE_NODE_IP_ADDRESS} \${ingress_app}.${CLUSTER_INGRESS_SUB_DOMAIN}" | tee --append /etc/hosts
 done
+echo "export SINGLE_NODE_IP_ADDRESS=${SINGLE_NODE_IP_ADDRESS}" >> /root/config
 
 echo Reloading NetworkManager systemd configuration
 systemctl reload NetworkManager

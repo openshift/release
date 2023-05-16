@@ -27,6 +27,7 @@ echo "### Gathering logs..."
 timeout -s 9 20m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF" |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 
 set -xeo pipefail
+source /root/config
 
 # Get sosreport including sar data
 sos report --batch --tmp-dir /tmp/artifacts --all-logs \
@@ -35,6 +36,22 @@ sos report --batch --tmp-dir /tmp/artifacts --all-logs \
 
 cp -v -r /var/log/swtpm/libvirt/qemu /tmp/artifacts/libvirt-qemu || true
 ls -ltr /var/lib/swtpm-localca/ >> /tmp/artifacts/libvirt-qemu/ls-swtpm-localca.txt || true
+
+INTERNAL_SSH_OPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+)
+echo "Fetching SOS report from ${SINGLE_NODE_IP_ADDRESS}"
+ssh "${INTERNAL_SSH_OPTS[@]}" core@${SINGLE_NODE_IP_ADDRESS} sudo mkdir /run/artifacts &&
+ssh "${INTERNAL_SSH_OPTS[@]}" core@${SINGLE_NODE_IP_ADDRESS} \
+  sudo podman run -it --name toolbox --authfile /var/lib/kubelet/config.json --privileged --ipc=host --net=host --pid=host -e HOST=/host -e NAME=toolbox- -e IMAGE=registry.redhat.io/rhel8/support-tools:latest -v /run:/run -v /var/log:/var/log -v /etc/machine-id:/etc/machine-id -v /etc/localtime:/etc/localtime -v /:/host registry.redhat.io/rhel8/support-tools:latest \
+      sos report --case-id "\$HOSTNAME" --batch \
+        -o container_log,filesys,logs,networkmanager,podman,processor,sar \
+        -k podman.all -k podman.logs \
+        --tmp-dir /run/artifacts && \
+ssh "${INTERNAL_SSH_OPTS[@]}" core@${SINGLE_NODE_IP_ADDRESS} sudo chown -R core:core /run/artifacts &&
+scp "${INTERNAL_SSH_OPTS[@]}" core@${SINGLE_NODE_IP_ADDRESS}:/run/artifacts/*.tar* /tmp/artifacts/ || true
 
 echo "Copy content from setup step to artifacts dir..."
 cp -r /home/sno/build/ /tmp/artifacts/
