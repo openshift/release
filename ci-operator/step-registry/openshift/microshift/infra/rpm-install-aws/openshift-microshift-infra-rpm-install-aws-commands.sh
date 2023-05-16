@@ -30,7 +30,7 @@ dnf install subscription-manager -y
 subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
-
+sudo subscription-manager repos --list
 mkdir -p /etc/microshift
 cat << EOF2 > /etc/microshift/config.yaml
 apiServer:
