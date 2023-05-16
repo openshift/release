@@ -1,0 +1,26 @@
+chain:
+  as: cucushift-installer-rehearse-ibmcloud-ipi-workers-rhel8-provision
+  steps:
+  - ref: ibmcloud-provision-vpc
+  - chain: ibmcloud-provision-bastionhost
+  - chain: ipi-conf-ibmcloud
+  - ref: ipi-conf-ibmcloud-provisionednetwork
+  - chain: ipi-install
+  - ref: enable-qe-catalogsource
+  - ref: workers-rhel-ibmcloud-provision
+  - chain: workers-rhel  
+  env:
+  - name: RHEL_WORKER_COUNT
+    default: 3
+  - name: RHEL_VM_SIZE
+    default: "bx2-2x8"
+  - name: RHEL_IMAGE
+    default: "ibm-redhat-8-6-minimal-amd64-4"
+  - name: PLATFORM_VERSION
+    default:  "8.6"
+  - name: REMOVE_RHCOS_WORKER
+    default: "yes"
+    documentation: |-
+      Keep or remove rhcos worker after scaling up rhel worker
+  documentation: |-
+    Create a IPI cluster with RHEL worker nodes on IBMCloud for QE e2e tests.

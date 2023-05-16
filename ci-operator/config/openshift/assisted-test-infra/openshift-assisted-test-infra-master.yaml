@@ -211,6 +211,14 @@ tests:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.13
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.14
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-12-periodic
   cron: 00 02 */1 * 0-5
   steps:
@@ -227,6 +235,15 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OPENSHIFT_VERSION=4.13
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-14-periodic
+  cron: 00 03 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.14
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
@@ -280,6 +297,26 @@ tests:
         OLM_OPERATORS=odf
         OPENSHIFT_VERSION=4.12
       PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-mce
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
+        NUM_WORKERS=3
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-mce-sno
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
+        NUM_MASTERS=1
+        NUM_WORKERS=0
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-periodic
   cron: 30 02 */1 * 0-5
@@ -770,6 +807,10 @@ tests:
         CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
         INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
     workflow: assisted-equinix
+- as: e2e-oci-assisted
+  optional: true
+  steps:
+    workflow: assisted-oci
 zz_generated_metadata:
   branch: master
   org: openshift
