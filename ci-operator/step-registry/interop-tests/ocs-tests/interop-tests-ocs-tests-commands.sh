@@ -4,14 +4,17 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-OCP_VERSION=4.11
-OCS_VERSION=4.11
+CLUSTER_VERSION=$(oc get clusterVersion version -o jsonpath='{$.status.desired.version}')
+OCP_MAJOR_MINOR=$(echo "${CLUSTER_VERSION}" | cut -d '.' -f1,2)
+OCP_VERSION="${OCP_MAJOR_MINOR}"
+
+OCS_VERSION=$(oc get csv -n openshift-storage -o json | jq -r '.items[] | select(.metadata.name | startswith("ocs-operator")).spec.version' | cut -d. -f1,2)
+
 CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
 CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
 LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
 LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
 CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
-
 
 mkdir -p "${LOGS_FOLDER}"
 mkdir -p "${CLUSTER_PATH}/auth"
