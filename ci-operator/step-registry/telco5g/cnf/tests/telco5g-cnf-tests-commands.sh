@@ -307,7 +307,7 @@ fi
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
     # Create a registry for the tests
-    sno_set_registry
+    sleep 300
 fi
 export CNF_NODES="${test_nodes}"
 

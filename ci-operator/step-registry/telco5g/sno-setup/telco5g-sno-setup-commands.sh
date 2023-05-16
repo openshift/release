@@ -56,6 +56,9 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
 - name: Grab and run kcli to install openshift cluster
   hosts: bastion
   gather_facts: false
+  vars:
+    cluster:
+      {"cnfdr15": {"port": 6443, "ip": "10.1.98.32", "hvip": "10.1.98.8"}}
   tasks:
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
@@ -66,7 +69,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster -c '{{ cluster|to_json }}'
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
@@ -92,7 +95,7 @@ cat << EOF > $SHARED_DIR/release-cluster.yml
   tasks:
 
   - name: Release cluster from job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --release-cluster $CLUSTER_NAME -s
 EOF
 
 if [[ "$CLUSTER_ENV" != "upstreambil" ]]; then
@@ -138,7 +141,7 @@ cat << EOF > ~/ocp-install.yml
       state: absent
 
   - name: Run deployment
-    shell: ./scripts/sno_ag.py $SNO_PARAM --host ${CLUSTER_NAME} --debug --wait --host-ip ${HYPERV_IP} --mcp ./mcp/setup-registry-storage-full.yaml 2>&1 > /tmp/${CLUSTER_NAME}_sno_ag.log
+    shell: ./scripts/sno_ag.py $SNO_PARAM --host ${CLUSTER_NAME} --debug --wait --host-ip ${CLUSTER_HV_IP} --registry 2>&1 > /tmp/${CLUSTER_NAME}_sno_ag.log
     args:
       chdir: /home/kni/telco5g-lab-deployment
     async: 5500
