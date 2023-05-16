@@ -19,20 +19,20 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.14
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-network-operator
 promotion:
   disabled: true
@@ -127,6 +127,8 @@ tests:
 - as: e2e-aws-ovn-windows
   steps:
     cluster_profile: aws
+    env:
+      WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
