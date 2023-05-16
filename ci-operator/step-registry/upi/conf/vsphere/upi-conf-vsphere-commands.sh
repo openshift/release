@@ -105,7 +105,8 @@ then
         platform_required=false
 fi
 
-${platform_required} && cat >> "${install_config}" << EOF
+# ${platform_required} && cat >> "${install_config}" << EOF
+cat >> "${install_config}" << EOF
 baseDomain: $base_domain
 controlPlane:
   name: "master"
@@ -124,6 +125,10 @@ platform:
     username: "${GOVC_USERNAME}"
     folder: "/${vsphere_datacenter}/vm/${cluster_name}"
 EOF
+
+cat ${install_config}
+
+echo "### $(cat ${install_config}) ###"
 
 #set machine cidr if proxy is enabled
 if grep 'httpProxy' "${install_config}" ; then
@@ -153,7 +158,7 @@ vm_network = "${LEASED_RESOURCE}"
 vm_dns_addresses = ["${dns_server}"]
 bootstrap_ip_address = "192.168.${third_octet}.3"
 lb_ip_address = "192.168.${third_octet}.2"
-compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
+compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9","192.168.${third_octet}.10","192.168.${third_octet}.11","192.168.${third_octet}.12"]
 control_plane_ip_addresses = ["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
 EOF
 

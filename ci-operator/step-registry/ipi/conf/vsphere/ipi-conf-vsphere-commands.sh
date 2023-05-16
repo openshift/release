@@ -40,7 +40,7 @@ if [ ! -z ${VERSION} ]; then
         echo "4.x installation is later than 4.9, will install with resource pool"
         RESOURCE_POOL_DEF="resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources/ipi-ci-clusters"
     fi
-    if [ ${Z_VERSION} -lt 11 ]; then
+    if [ ${Z_VERSION} -gt 11 ]; then
       MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: 3
@@ -50,7 +50,7 @@ if [ ! -z ${VERSION} ]; then
         diskSizeGB: 120
 compute:
 - name: worker
-  replicas: 3
+  replicas: 6
   platform:
     vsphere:
       cpus: 4
