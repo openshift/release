@@ -7,6 +7,10 @@ set -o pipefail
 echo "Deploying Syndesis QE Test Runner"
 
 oc project default
+oc create --as system:admin user kubeadmin
+oc create --as system:admin identity kube:admin
+oc create --as system:admin useridentitymapping kube:admin kubeadmin
+oc adm policy --as system:admin add-cluster-role-to-user cluster-admin kubeadmin
 
 ADMIN_PASSWORD=$(cat "$SHARED_DIR"/kubeadmin-password)
 export ADMIN_PASSWORD
@@ -76,9 +80,9 @@ spec:
     - name: test-run-results
 EOF
 
-oc wait --for=condition=Ready pod/test-runner --timeout=15m || true
-oc logs -c runner -n default -f test-runner || true
-oc wait --for=condition=ContainersReady=false pod/test-runner --timeout=1h30m || true
+oc wait --for=condition=Ready pod/test-runner --timeout=15m
+oc logs -c runner -n default -f test-runner
+oc wait --for=condition=ContainersReady=false pod/test-runner --timeout=1h30m
 
 oc cp -c cli default/test-runner:/test-run-results /tmp/test-run-results
 cp /tmp/test-run-results/ui-tests/target/cucumber/cucumber-junit.xml "$ARTIFACT_DIR"/junit_ui-tests.xml
