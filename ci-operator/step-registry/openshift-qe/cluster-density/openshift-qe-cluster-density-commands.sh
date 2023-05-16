@@ -24,8 +24,7 @@ export WORKLOAD=cluster-density
 export GEN_CSV=true
 export CLEANUP_WHEN_FINISH=true
 
-export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.json kubelet.json etcd.json crio.json nodeMasters-max.json nodeWorkers.json"
-
+export COMPARISON_CONFIG="clusterVersion.json podLatency.json etcd.json nodeMasters-max.json nodeAggWorkers.json"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 

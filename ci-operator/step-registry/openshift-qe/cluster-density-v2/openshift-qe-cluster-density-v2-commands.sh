@@ -24,6 +24,7 @@ export ITERATIONS=$((9*$current_worker_count))
 export WORKLOAD=cluster-density-v2
 export GEN_CSV=true
 export CLEANUP_WHEN_FINISH=true
+export EXTRA_FLAGS="--churn-duration=20m"
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
