@@ -33,24 +33,46 @@ export ROX_POSTGRES_DATASTORE="true"
 gather_debug_for_cluster_under_test
 poll_for_system_test_images "3600"
 
-SHARED_STACKROX="${SHARED_DIR}/stackrox"
-DEPLOY_DIR="${SHARED_STACKROX}/deploy/${ORCHESTRATOR_FLAVOR}"
+
+ls -lh "$SHARED_DIR"
 
 # Essentially replicates reuse_config_part_1
 # There might be logic in here that is unnecessary
 info "Reusing config from a prior part 1 e2e test"
 
+export POD_SECURITY_POLICIES="false"
+
 export_test_environment
 setup_deployment_env false false
-export_default_TLS_certs "$DEPLOY_DIR/default_TLS_certs"
-export_client_TLS_certs "$DEPLOY_DIR/client_TLS_certs"
+#export_default_TLS_certs "$DEPLOY_DIR/default_TLS_certs"
+default_TLS_certs_path_prefix="${SHARED_DIR}/default_TLS_certs-"
+export ROX_DEFAULT_TLS_CERT_FILE="${default_TLS_certs_path_prefix}tls.crt"
+export ROX_DEFAULT_TLS_KEY_FILE="${default_TLS_certs_path_prefix}tls.key"
+export DEFAULT_CA_FILE="${default_TLS_certs_path_prefix}ca.crt"
+ROX_TEST_CA_PEM="$(cat "${default_TLS_certs_path_prefix}ca.crt")"
+export ROX_TEST_CA_PEM="$ROX_TEST_CA_PEM"
+export ROX_TEST_CENTRAL_CN="custom-tls-cert.central.stackrox.local"
+export TRUSTSTORE_PATH="${default_TLS_certs_path_prefix}keystore.p12"
+
+#export_client_TLS_certs "$DEPLOY_DIR/client_TLS_certs"
+client_TLS_certs_path_prefix="${SHARED_DIR}/client_TLS_certs-"
+export KEYSTORE_PATH="${client_TLS_certs_path_prefix}keystore.p12"
+export CLIENT_CA_PATH="${client_TLS_certs_path_prefix}ca.crt"
+export CLIENT_CERT_PATH="${client_TLS_certs_path_prefix}tls.crt"
+export CLIENT_KEY_PATH="${client_TLS_certs_path_prefix}tls.key"
 
 create_webhook_server_port_forward
-export_webhook_server_certs "$DEPLOY_DIR/webhook_server_certs"
+#export_webhook_server_certs "$DEPLOY_DIR/webhook_server_certs"
+GENERIC_WEBHOOK_SERVER_CA_CONTENTS="$(cat "${SHARED_DIR}/webhook_server_certs-ca.crt")"
+export GENERIC_WEBHOOK_SERVER_CA_CONTENTS="$GENERIC_WEBHOOK_SERVER_CA_CONTENTS"
+
 get_ECR_docker_pull_password
 
 wait_for_api
-export_central_basic_auth_creds
+#export_central_basic_auth_creds
+export ROX_USERNAME="admin"
+ROX_PASSWORD="$(cat "${SHARED_DIR}"/central-admin-password)"
+export ROX_PASSWORD="$ROX_PASSWORD"
 
 export CLUSTER="${ORCHESTRATOR_FLAVOR^^}"
 

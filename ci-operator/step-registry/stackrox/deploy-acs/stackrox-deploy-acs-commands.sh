@@ -39,10 +39,6 @@ scripts/ci/openshift.sh scale_worker_nodes "1"
 gather_debug_for_cluster_under_test
 poll_for_system_test_images "3600"
 
-# Primarily used to share the TLS certs for the ACS components
-SHARED_STACKROX="${SHARED_DIR}/stackrox"
-mkdir -p "$SHARED_STACKROX"
-
 # Essentially replicates config_part_1
 # There might be logic in here that is unnecessary
 info "Deploying ACS components"
@@ -50,8 +46,8 @@ info "Deploying ACS components"
 require_environment "ORCHESTRATOR_FLAVOR"
 require_environment "KUBECONFIG"
 
-DEPLOY_DIR="${SHARED_STACKROX}/deploy/${ORCHESTRATOR_FLAVOR}"
-mkdir -p "$DEPLOY_DIR"
+DIRECTORIES_TO_SHARE=()
+DEPLOY_DIR="${PWD}/deploy/${ORCHESTRATOR_FLAVOR}"
 
 export_test_environment
 
@@ -60,9 +56,29 @@ setup_deployment_env false false
 setup_podsecuritypolicies_config
 remove_existing_stackrox_resources
 setup_default_TLS_certs "$DEPLOY_DIR/default_TLS_certs"
+DIRECTORIES_TO_SHARE+=("$DEPLOY_DIR/default_TLS_certs")
 
 deploy_stackrox "$DEPLOY_DIR/client_TLS_certs"
+DIRECTORIES_TO_SHARE+=("$DEPLOY_DIR/client_TLS_certs")
 
 deploy_default_psp
 deploy_webhook_server "$DEPLOY_DIR/webhook_server_certs"
+DIRECTORIES_TO_SHARE+=("$DEPLOY_DIR/webhook_server_certs")
 get_ECR_docker_pull_password
+
+ls -lh "${DIRECTORIES_TO_SHARE[@]}"
+ls -lh "$SHARED_DIR"
+
+# We need to move some files because the shared directory for OpenShift CI steps does not support directories. Yay!!!
+for directory in "${DIRECTORIES_TO_SHARE[@]}"; do
+  for file in "$directory"/*; do
+    base=$(basename "$file")
+    lastdir=$(basename "$(dirname "$file")")
+    mv "$file" "$SHARED_DIR/$lastdir-$base"
+  done
+done
+
+# TODO :: There has got to be better way to do this
+
+echo "$ROX_PASSWORD" > "$SHARED_DIR/central-admin-password"
+ls -lh "$SHARED_DIR"
