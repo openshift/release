@@ -1,0 +1,55 @@
+binary_build_commands: ./build.sh
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: tectonic-console-builder-v23
+images:
+- context_dir: integration-tests
+  dockerfile_path: Dockerfile
+  to: e2e-runner
+promotion:
+  name: hac-dev
+  namespace: ci
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: test
+  commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) \n./test.sh\n"
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: hac-dev-codecov-token
+- as: pact
+  optional: true
+  steps:
+    test:
+    - ref: openshift-hac-dev-pact
+- as: test-coverage-upload
+  commands: "export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN) \n./test.sh\n"
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: hac-dev-codecov-token
+- as: periodic-tests
+  cron: 0 0 * * *
+  steps:
+    test:
+    - ref: openshift-hac-dev-e2e
+zz_generated_metadata:
+  branch: main-next
+  org: openshift
+  repo: hac-dev
