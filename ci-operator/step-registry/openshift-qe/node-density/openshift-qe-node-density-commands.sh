@@ -17,7 +17,9 @@ ES_USERNAME=$(cat "/secret/username")
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner
 export WORKLOAD=node-density
-export NODE_COUNT=3
+
+current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker | grep -v "NotReady\\|SchedulingDisabled" | wc -l | xargs)
+export NODE_COUNT=$(($current_worker_count))
 export PODS_PER_NODE=230
 export POD_READY_THRESHOLD=120000ms
 export GEN_CSV=false
