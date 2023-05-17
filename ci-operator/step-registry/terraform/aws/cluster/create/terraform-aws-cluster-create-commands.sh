@@ -64,4 +64,3 @@ cp ${SHARED_DIR}/kubeconfig ${ARTIFACT_DIR}/
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 oc wait clusterversion version --for condition=Available --timeout=20m
 oc get co
-sleep 600
