@@ -45,6 +45,61 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build03
+    context: ci/prow/dpcr-dry
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-continuous-release-jobs-master-dpcr-dry
+    rerun_command: /test dpcr-dry
+    run_if_changed: ^config/clusters/dpcr/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir
+        - config/clusters/dpcr
+        - --ignore-file
+        - config/clusters/dpcr/bootstrap/_s3bucket_with_cloudfront.yml
+        - --kubeconfig
+        - /etc/credentials/kubeconfig
+        - --as=
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/credentials
+          name: credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: credentials
+        secret:
+          items:
+          - key: kubeconfig
+            path: kubeconfig
+          secretName: dptools-jenkins-service-account-kubeconfig
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )dpcr-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
