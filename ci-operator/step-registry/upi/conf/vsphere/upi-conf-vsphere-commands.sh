@@ -158,7 +158,7 @@ vm_network = "${LEASED_RESOURCE}"
 vm_dns_addresses = ["${dns_server}"]
 bootstrap_ip_address = "192.168.${third_octet}.3"
 lb_ip_address = "192.168.${third_octet}.2"
-compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9","192.168.${third_octet}.10","192.168.${third_octet}.11","192.168.${third_octet}.12"]
+compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9","192.168.${third_octet}.10","192.168.${third_octet}.11","192.168.${third_octet}.12","192.168.${third_octet}.13","192.168.${third_octet}.14","192.168.${third_octet}.15"]
 control_plane_ip_addresses = ["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
 EOF
 
