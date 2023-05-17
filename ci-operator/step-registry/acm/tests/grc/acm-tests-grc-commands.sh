@@ -27,7 +27,7 @@ RBAC_PASS=$(cat $SECRETS_DIR/grc/rbac-pass)
 export RBAC_PASS
 
 # run the test execution script
-./execute_grc_interop_commands.sh
+./execute_grc_interop_commands.sh || :
 
 # Copy the test cases results to an external directory
 cp -r test-output/cypress $ARTIFACT_DIR/

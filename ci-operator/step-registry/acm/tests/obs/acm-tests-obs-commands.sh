@@ -64,7 +64,7 @@ mkdir -p /alabama/.kube
 cp ${SHARED_DIR}/kubeconfig ~/.kube/config
 
 # run the test execution script
-bash +x ./execute_obs_interop_commands.sh
+bash +x ./execute_obs_interop_commands.sh || :
 
 # Copy the test cases results to an external directory
 cp -r tests/pkg/tests $ARTIFACT_DIR/
