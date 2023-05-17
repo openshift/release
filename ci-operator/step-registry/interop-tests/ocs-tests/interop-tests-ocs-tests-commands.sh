@@ -16,6 +16,9 @@ LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
 LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
 CLUSTER_PATH="${ARTIFACT_DIR}/ocs-tests"
 
+# Overwrite OCS Test data folder
+export OCSCI_DATA_DIR="${ARTIFACT_DIR}"
+
 mkdir -p "${LOGS_FOLDER}"
 mkdir -p "${CLUSTER_PATH}/auth"
 mkdir -p "${CLUSTER_PATH}/data"
