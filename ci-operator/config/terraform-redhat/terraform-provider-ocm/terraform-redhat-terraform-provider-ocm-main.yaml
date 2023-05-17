@@ -1,12 +1,3 @@
-base_images:
-  ansible:
-    name: "4.13"
-    namespace: ocp
-    tag: ansible
-  cli:
-    name: "4.13"
-    namespace: ocp
-    tag: cli
 binary_build_commands: make install
 build_root:
   image_stream_tag:
@@ -43,7 +34,8 @@ tests:
       GATEWAY_URL: https://api.stage.openshift.com
       OPENSHIFT_VERSION: "4.13"
       TOKEN_URL: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
-    workflow: terraform-aws-e2e
+    pre:
+    - ref: rosa-terraform-aws-e2e-test
 - as: e2e-periodic
   cron: '@daily'
   steps:
@@ -52,7 +44,8 @@ tests:
       GATEWAY_URL: https://api.stage.openshift.com
       OPENSHIFT_VERSION: "4.13"
       TOKEN_URL: https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token
-    workflow: terraform-aws-e2e
+    pre:
+    - ref: rosa-terraform-aws-e2e-test
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
