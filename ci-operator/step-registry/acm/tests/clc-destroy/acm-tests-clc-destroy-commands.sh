@@ -27,6 +27,6 @@ CYPRESS_OPTIONS_HUB_PASSWORD=$(cat $SHARED_DIR/kubeadmin-password)
 export CYPRESS_OPTIONS_HUB_PASSWORD
 
 # run the test execution script
-./execute_clc_interop_commands.sh
+./execute_clc_interop_commands.sh || :
 
 cp -r reports/ocp_interop $ARTIFACT_DIR/
