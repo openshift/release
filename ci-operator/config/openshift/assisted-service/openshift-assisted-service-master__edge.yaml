@@ -806,6 +806,7 @@ tests:
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
+        WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
@@ -869,6 +870,15 @@ tests:
         OPENSHIFT_VERSION=4.13
         OPENSHIFT_INSTALL_RELEASE_IMAGE=""
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-4-14
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OPENSHIFT_VERSION=4.14
+        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
@@ -898,6 +908,37 @@ tests:
         OLM_OPERATORS=odf
         OPENSHIFT_VERSION=4.12
       PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-mce
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
+        NUM_WORKERS=3
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-mce-4-10
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
+        OPENSHIFT_VERSION=4.10
+        NUM_WORKERS=3
+      PACKET_PLAN: m3.large.x86
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-mce-sno
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
+        NUM_MASTERS=1
+        NUM_WORKERS=0
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ocs
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
@@ -937,6 +978,8 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
@@ -949,6 +992,8 @@ tests:
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
@@ -960,6 +1005,8 @@ tests:
   steps:
     cluster_profile: packet-assisted
     env:
+      ASSISTED_CONFIG: |
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export HOLD_INSTALLATION=true

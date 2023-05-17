@@ -124,8 +124,11 @@ EOF
         if [[ "$(govc vm.info "${vm_template}-hw${hw_version}" | wc -c)" -eq 0 ]]
         then
             echo "$(date -u --rfc-3339=seconds) - Cloning and upgrading ${vm_template} to hw version ${hw_version}..."
-            govc vm.clone -on=false -cluster=$CLUSTER -vm="${vm_template}" "${vm_template}-hw${hw_version}"
+            echo "$(date -u --rfc-3339=seconds) - Configured Cluster for clone: ${CLUSTER}"
+
+            govc vm.clone -ds=${GOVC_DATASTORE} -pool=${GOVC_RESOURCE_POOL} -on=false -vm="${vm_template}" "${vm_template}-hw${hw_version}"
             govc vm.upgrade -vm="${vm_template}-hw${hw_version}" -version=${hw_version}
+
         else
             echo "$(date -u --rfc-3339=seconds) - Skipping ova import for hw${hw_version} due to image already existing."
         fi

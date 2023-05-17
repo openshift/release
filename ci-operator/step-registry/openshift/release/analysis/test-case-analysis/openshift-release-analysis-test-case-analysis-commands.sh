@@ -41,15 +41,27 @@ run_analysis aws-sdn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
   --network=sdn \
   --infrastructure=ipi
 
+run_analysis aws-techpreview $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
+  --platform=aws \
+  --include-job-names=techpreview
+
 run_analysis azure-ovn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
   --platform=azure \
   --network=ovn \
   --infrastructure=ipi
 
+run_analysis azure-techpreview $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
+  --platform=azure \
+  --include-job-names=techpreview
+
 run_analysis gcp-sdn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
   --platform=gcp \
   --network=sdn \
   --infrastructure=ipi
+
+run_analysis gcp-techpreview $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
+  --platform=gcp \
+  --include-job-names=techpreview
 
 run_analysis vsphere-ovn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
   --platform=vsphere \
@@ -65,6 +77,10 @@ run_analysis vsphere-ovn-upi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
   --platform=vsphere \
   --network=ovn \
   --infrastructure=upi
+
+run_analysis vsphere-techpreview $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
+  --platform=vsphere \
+  --include-job-names=techpreview
 
 run_analysis metal-ovn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
   --platform=metal \

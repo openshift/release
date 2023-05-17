@@ -4,6 +4,38 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Waits up to 5 minutes for InstallPlan to be created
+wait_for_installplan () {
+    echo "Waiting for installPlan to be created"
+    # store subscription name and install namespace to shared directory for upgrade step
+    echo "${OO_INSTALL_NAMESPACE}" > "${SHARED_DIR}"/oo-install-namespace
+    echo "${SUB}" > "${SHARED_DIR}"/oo-subscription
+
+    FOUND_INSTALLPLAN=false
+    # wait up to 5 minutes for CSV installPlan to appear
+    for _ in $(seq 1 60); do
+        INSTALL_PLAN=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installplan.name}' || true)
+
+        if [[ -n "$INSTALL_PLAN" ]]; then
+            oc -n "$OO_INSTALL_NAMESPACE" patch installPlan "${INSTALL_PLAN}" --type merge --patch '{"spec":{"approved":true}}'
+            FOUND_INSTALLPLAN=true
+            break
+        fi
+        sleep 5
+    done
+}
+
+# Retries Subscription creation
+# Deletes current Subscription in the namespace before retrying creating a new one
+retry_subscription_creation () {
+    echo "Deleting subscription $SUB in the namespace $OO_INSTALL_NAMESPACE"
+    oc delete subscription $SUB -n $OO_INSTALL_NAMESPACE
+
+    echo "Creating subscription"
+    SUB=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${SUB_MANIFEST}" )
+    echo "Subscription name is \"$SUB\""
+}
+
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
 # configuration file should export HTTP_PROXY, HTTPS_PROXY, and NO_PROXY
@@ -176,6 +208,9 @@ if [ $IS_CATSRC_CREATED = false ] ; then
     exit 1
 fi
 
+# A suggestion was made in OCPBUGS-6523 for CVP to add 5-10s wait time after CatalogSource reports READY and before creating the Subscription
+sleep 10
+
 DEPLOYMENT_START_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
 echo "Set the deployment start time: ${DEPLOYMENT_START_TIME}"
 echo "Creating Subscription"
@@ -211,21 +246,20 @@ echo "SUB_MANIFEST : ${SUB_MANIFEST} "
 SUB=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${SUB_MANIFEST}" )
 
 echo "Subscription name is \"$SUB\""
-echo "Waiting for installPlan to be created"
-# store subscription name and install namespace to shared directory for upgrade step
-echo "${OO_INSTALL_NAMESPACE}" > "${SHARED_DIR}"/oo-install-namespace
-echo "${SUB}" > "${SHARED_DIR}"/oo-subscription
 
-FOUND_INSTALLPLAN=false
-# wait up to 5 minutes for CSV installPlan to appear
-for _ in $(seq 1 60); do
-    INSTALL_PLAN=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installplan.name}' || true)
-    if [[ -n "$INSTALL_PLAN" ]]; then
-      oc -n "$OO_INSTALL_NAMESPACE" patch installPlan "${INSTALL_PLAN}" --type merge --patch '{"spec":{"approved":true}}'
-      FOUND_INSTALLPLAN=true
-      break
-    fi
-    sleep 5
+wait_for_installplan
+
+retry_attempts=2
+
+while [[ "$FOUND_INSTALLPLAN" = false && "$retry_attempts" -ne 0 ]]; do
+    echo "Failed to find installPlan for subscription"
+
+    echo "Retrying subscription creation...${retry_attempts} attempts left"
+
+    retry_subscription_creation
+    wait_for_installplan
+
+    retry_attempts=$((retry_attempts-1))
 done
 
 if [ "$FOUND_INSTALLPLAN" = true ] ; then
@@ -258,6 +292,7 @@ EOF
     echo "Timed out waiting for csv to become ready"
 else
     echo "Failed to find installPlan for subscription"
+    echo "All retry attempts failed"
 fi
 
 NS_ART="$ARTIFACT_DIR/ns-$OO_INSTALL_NAMESPACE.yaml"
