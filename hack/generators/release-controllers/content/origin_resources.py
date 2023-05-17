@@ -33,7 +33,10 @@ def _add_origin_rbac(gendoc):
                 'verbs': ['get',
                           'list',
                           'watch',
-                          'create']
+                          'create',
+                          'delete',
+                          'update',
+                          'patch']
             },
             {
                 'apiGroups': [''],
