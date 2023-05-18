@@ -32,14 +32,30 @@ function check_control_plane_pod_status {
 # It reads the output of "oc get pod" command and checks if the status is "Running" or "Completed".
 # If any pod is not in the expected state, it prints an error message and returns 1. Otherwise, it returns 0.
 function check_pod_status {
-    while read -r namespace pod _ status _; do
-        if [[ "$status" != "Running" && "$status" != "Completed" ]]; then
-            echo "Pod $pod in namespace $namespace has status $status, which is not valid."
-            return 1
+    local max_retries=10
+    local retry_delay=30
+    local retries=0
+
+    while [[ $retries -lt $max_retries ]]; do
+        while read -r namespace pod _ status _; do
+            if [[ "$status" != "Running" && "$status" != "Completed" ]]; then
+                echo "Pod $pod in namespace $namespace has status $status, which is not valid."
+                return 1
+            fi
+        done < <(oc get pod --all-namespaces --no-headers)
+
+        echo "All pods are in the expected state."
+        return 0
+
+        retries=$((retries + 1))
+        if [[ $retries -lt $max_retries ]]; then
+            echo "Retrying in $retry_delay seconds..."
+            sleep $retry_delay
         fi
-    done < <(oc get pod --all-namespaces --no-headers)
-    echo "All pods are in the expected state."
-    return 0
+    done
+
+    echo "Failed to get all pods in the expected state after $max_retries attempts."
+    return 1
 }
 
 # This function checks the status of all cluster operators.
