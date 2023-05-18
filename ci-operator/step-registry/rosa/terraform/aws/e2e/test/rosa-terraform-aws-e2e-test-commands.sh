@@ -18,12 +18,7 @@ else
   exit 1
 fi
 
-
-mkdir -p ~/.aws
-cp ${AWSCRED} ~/.aws/credentials
-
 TEST_OFFLINE_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-export TF_VAR_token=${TEST_OFFLINE_TOKEN}
 
 cp -r /root/terraform-provider-ocm ~/
 cd ~/terraform-provider-ocm
