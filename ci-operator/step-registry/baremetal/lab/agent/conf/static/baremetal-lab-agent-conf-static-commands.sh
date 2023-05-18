@@ -20,19 +20,19 @@ EOF
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [ -z "$DISK_BY_PATH" ]
+  if [ -z "$DISK_BY_VENDOR" ]
   then
-        echo "\$DISK_BY_PATH is empty"
+        echo "\$DISK_BY_VENDOR is empty"
   DEVICE_HINT="
   rootDeviceHints:
     ${root_device:+deviceName: ${root_device}}
     ${root_dev_hctl:+hctl: ${root_dev_hctl}}
 "
   else
-        echo "\$DISK_BY_PATH is NOT empty"
+        echo "\$DISK_BY_VENDOR is NOT empty"
   DEVICE_HINT="
   rootDeviceHints:
-    deviceName: ${DISK_BY_PATH}
+    vendor: ${DISK_BY_VENDOR}
 "
   fi
   ADAPTED_YAML="
