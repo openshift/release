@@ -7,6 +7,13 @@ set -o errexit
 set -o pipefail
 set -x
 
+# This function retrieves the cluster version using the 'oc' command and prints it.
+function print_clusterversion {
+    local clusterversion
+    clusterversion=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
+    echo "Cluster version: $clusterversion"
+}
+
 # This function checks the status of control plane pods in a HostedCluster.
 # It first gets the name of the cluster using the "oc get hostedclusters" command.
 # It then reads the output of "oc get pod" command in the corresponding HostedCluster namespace and checks if the status is "Running" or "Completed".
@@ -46,14 +53,34 @@ function check_pod_status {
 # It reads the output of "oc get clusteroperators" command and checks if the conditions are in the expected state.
 # If any cluster operator is not in the expected state, it prints an error message and returns 1. Otherwise, it returns 0.
 function check_cluster_operators {
-    while read -r name _ available progressing degraded _; do
-        if [[ "$available" != "True" || "$progressing" != "False" || "$degraded" != "False" ]]; then
-            echo "Cluster operator $name is not in the expected state."
-            return 1
+    local max_retries=10      # Maximum number of retries
+    local retry_delay=60      # Delay between retries in seconds
+    local retries=0           # Current retry count
+
+    while [[ $retries -lt $max_retries ]]; do
+        while read -r name _ available progressing degraded _; do
+            # Check if the cluster operator is in the expected state
+            if [[ "$available" != "True" || "$progressing" != "False" || "$degraded" != "False" ]]; then
+                echo "Cluster operator $name is not in the expected state."
+                return 1
+            fi
+        done < <(oc get clusteroperators --no-headers)
+
+        # If all cluster operators are in the expected state, return success
+        echo "All cluster operators are in the expected state."
+        return 0
+
+        # Increment retry count and wait before the next retry
+        retries=$((retries + 1))
+        if [[ $retries -lt $max_retries ]]; then
+            echo "Retrying in $retry_delay seconds..."
+            sleep $retry_delay
         fi
-    done < <(oc get clusteroperators --no-headers)
-    echo "All cluster operators are in the expected state."
-    return 0
+    done
+
+    # Failed to get cluster operators in the expected state after max_retries attempts
+    echo "Failed to get cluster operators in the expected state after $max_retries attempts."
+    return 1
 }
 
 # This function checks the status of all nodes.
@@ -74,6 +101,7 @@ if [ -f "${SHARED_DIR}/cluster-type" ] ; then
     CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
     if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]]; then
         echo "this cluster is ROSA-HyperShift"
+        print_clusterversion
         check_node_status || exit 1
         check_cluster_operators || exit 1
         check_pod_status || exit 1
@@ -85,11 +113,13 @@ echo "check mgmt cluster's HyperShift part"
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
   export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
+  print_clusterversion
   check_control_plane_pod_status || exit 1
 fi
 
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 echo "check guest cluster"
+print_clusterversion
 check_node_status || exit 1
 check_cluster_operators || exit 1
 check_pod_status || exit 1
