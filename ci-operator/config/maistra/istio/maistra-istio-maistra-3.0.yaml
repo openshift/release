@@ -156,6 +156,150 @@ tests:
           memory: 2Gi
       timeout: 1h0m0s
     workflow: servicemesh-istio-e2e-aws
+- as: integ-telemetry-3-0
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-telemetry-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work;
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.telemetry.kube.presubmit"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-aws
+- as: integ-security-3-0
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-security-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work;
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.security.kube.presubmit"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-aws
+- as: integ-helm-3-0
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-helm-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work;
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.helm.kube.presubmit"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-aws
 zz_generated_metadata:
   branch: maistra-3.0
   org: maistra
