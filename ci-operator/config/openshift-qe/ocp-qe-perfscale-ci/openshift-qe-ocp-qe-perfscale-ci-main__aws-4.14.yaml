@@ -5,7 +5,7 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci
+  to: ocp-qe-perfscale-ci-aws-414
 promotion:
   namespace: ci
   tag: latest
@@ -27,11 +27,20 @@ tests:
     cluster_profile: aws-qe
     env:
       WORKER_REPLICA_COUNT: "20"
-      OPENSHIFT_VERSION: "4.14"
     pre:
     - chain: workers-scale
     workflow: openshift-qe-ocp-qe-perfscale-ci-tests
+- as: ocp-qe-perfscale-ci-network-tests
+  cron: 29 5 */1 * 1-5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      WORKER_REPLICA_COUNT: "20"
+    pre:
+    - chain: workers-scale
+    workflow: openshift-qe-network-perf
 zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
+  variant: perfscale-aws-414
