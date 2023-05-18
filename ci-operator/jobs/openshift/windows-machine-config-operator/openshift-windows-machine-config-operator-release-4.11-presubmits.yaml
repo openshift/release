@@ -346,13 +346,13 @@ presubmits:
     - ^release-4\.11$
     - ^release-4\.11-
     cluster: build04
-    context: ci/prow/ci-index
+    context: ci/prow/ci-index-wmco-bundle
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-windows-machine-config-operator-release-4.11-ci-index
-    rerun_command: /test ci-index
+    name: pull-ci-openshift-windows-machine-config-operator-release-4.11-ci-index-wmco-bundle
+    rerun_command: /test ci-index-wmco-bundle
     skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
@@ -360,7 +360,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=ci-index-wmco-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -387,9 +387,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index-wmco-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.11$
     - ^release-4\.11-
@@ -401,7 +401,6 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-windows-machine-config-operator-release-4.11-images
     rerun_command: /test images
-    skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -410,6 +409,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
+        - --target=wmco-bundle
         command:
         - ci-operator
         image: ci-operator:latest
