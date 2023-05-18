@@ -14,7 +14,7 @@ source ./venv_qe/bin/activate
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
-git clone https://github.com/cloud-bulldozer/e2e-benchmarking
+git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
 pushd e2e-benchmarking/workloads/network-perf-v2
 
 # Clean up resources from possible previous tests.
