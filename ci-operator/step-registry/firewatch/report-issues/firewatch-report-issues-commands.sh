@@ -13,8 +13,4 @@ if [ "$FIREWATCH_FAIL_WITH_TEST_FAILURES" = "true" ]; then
     command+=" --fail_with_test_failures"
 fi
 
-if [ "$FIREWATCH_IGNORE_TEST_FAILURES" = "true" ]; then
-    command+=" --ignore_test_failures"
-fi
-
 eval "$command"
