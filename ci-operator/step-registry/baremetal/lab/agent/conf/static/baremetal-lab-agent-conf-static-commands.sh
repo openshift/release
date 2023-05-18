@@ -15,16 +15,30 @@ additionalNTPSources:
 hosts: []
 EOF
 
+
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  if [ -z "$DISK_BY_PATH" ]
+  then
+        echo "\$DISK_BY_PATH is empty"
+        DEVICE_HINT="
+        rootDeviceHints:
+          ${root_device:+deviceName: ${root_device}}
+          ${root_dev_hctl:+hctl: ${root_dev_hctl}}
+"
+  else
+        echo "\$DISK_BY_PATH is NOT empty"
+        DEVICE_HINT="
+        rootDeviceHints:
+          deviceName: ${DISK_BY_PATH}
+"
+  fi
   ADAPTED_YAML="
   hostname: ${name}
   role: ${name%%-[0-9]*}
-  rootDeviceHints:
-    ${root_device:+deviceName: ${root_device}}
-    ${root_dev_hctl:+hctl: ${root_dev_hctl}}
+  ${DEVICE_HINT}
   interfaces:
   - macAddress: ${mac}
     name: ${baremetal_iface}
