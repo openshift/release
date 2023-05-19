@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# TODO :: Check if these files exist
+# TODO(blugo): Check if these files exist
 # shellcheck source=/dev/null
 source "scripts/ci/lib.sh"
 # shellcheck source=/dev/null
@@ -33,9 +33,6 @@ export ROX_POSTGRES_DATASTORE="true"
 gather_debug_for_cluster_under_test
 poll_for_system_test_images "3600"
 
-
-ls -lh "$SHARED_DIR"
-
 # Essentially replicates reuse_config_part_1
 # There might be logic in here that is unnecessary
 info "Reusing config from a prior part 1 e2e test"
@@ -44,6 +41,7 @@ export POD_SECURITY_POLICIES="false"
 
 export_test_environment
 setup_deployment_env false false
+
 #export_default_TLS_certs "$DEPLOY_DIR/default_TLS_certs"
 default_TLS_certs_path_prefix="${SHARED_DIR}/default_TLS_certs-"
 export ROX_DEFAULT_TLS_CERT_FILE="${default_TLS_certs_path_prefix}tls.crt"
@@ -62,6 +60,7 @@ export CLIENT_CERT_PATH="${client_TLS_certs_path_prefix}tls.crt"
 export CLIENT_KEY_PATH="${client_TLS_certs_path_prefix}tls.key"
 
 create_webhook_server_port_forward
+
 #export_webhook_server_certs "$DEPLOY_DIR/webhook_server_certs"
 GENERIC_WEBHOOK_SERVER_CA_CONTENTS="$(cat "${SHARED_DIR}/webhook_server_certs-ca.crt")"
 export GENERIC_WEBHOOK_SERVER_CA_CONTENTS="$GENERIC_WEBHOOK_SERVER_CA_CONTENTS"
@@ -86,9 +85,6 @@ fi
 
 export CLUSTER="${ORCHESTRATOR_FLAVOR^^}"
 
-# TODO :: Why is this here?
-rm -f FAIL
-
 if is_openshift_CI_rehearse_PR; then
     info "On an openshift rehearse PR, running BAT tests only..."
     test_target="bat-test"
@@ -105,7 +101,6 @@ fi
 
 update_job_record "test_target" "${test_target}"
 
-make -C qa-tests-backend "${test_target}" || touch FAIL
+make -C qa-tests-backend "${test_target}"
 
 store_qa_test_results "part-1-tests"
-[[ ! -f FAIL ]] || die "Part 1 tests failed"

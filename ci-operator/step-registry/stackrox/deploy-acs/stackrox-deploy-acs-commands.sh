@@ -3,7 +3,7 @@
 # !! WARNING !! There is currently a bug with single quotes in this script. It has to do with `handle_dangling_processes`
 # in the stackrox repo.
 
-# TODO :: Check if these files exist
+# TODO(blugo): Check if these files exist
 # shellcheck source=/dev/null
 source "scripts/ci/lib.sh"
 # shellcheck source=/dev/null
@@ -66,9 +66,6 @@ deploy_webhook_server "$DEPLOY_DIR/webhook_server_certs"
 DIRECTORIES_TO_SHARE+=("$DEPLOY_DIR/webhook_server_certs")
 get_ECR_docker_pull_password
 
-ls -lh "${DIRECTORIES_TO_SHARE[@]}"
-ls -lh "$SHARED_DIR"
-
 # We need to move some files because the shared directory for OpenShift CI steps does not support directories. Yay!!!
 for directory in "${DIRECTORIES_TO_SHARE[@]}"; do
   for file in "$directory"/*; do
@@ -78,7 +75,5 @@ for directory in "${DIRECTORIES_TO_SHARE[@]}"; do
   done
 done
 
-# TODO :: There has got to be better way to do this
-
+# TODO(blugo): There must be a better way to do this
 echo "$ROX_PASSWORD" > "$SHARED_DIR/central-admin-password"
-ls -lh "$SHARED_DIR"
