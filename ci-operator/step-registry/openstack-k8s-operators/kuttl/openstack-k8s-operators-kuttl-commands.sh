@@ -2,6 +2,7 @@
 
 set -ex
 
+META_OPERATOR="openstack-operator"
 ORG="openstack-k8s-operators"
 
 # We don't want to use OpenShift-CI build cluster namespace
@@ -54,6 +55,8 @@ fi
 # changes in the PR)
 export ${SERVICE_NAME^^}_REPO=/go/src/github.com/${ORG}/${BASE_OP}
 
+# Use built META_OPERATOR bundle image
+export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:${PR_SHA}
 
 if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   if [ ! -d "${HOME}/install_yamls" ]; then

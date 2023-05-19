@@ -313,12 +313,15 @@ tests:
     - as: integ-servicemesh-multicluster-2-2
       cli: latest
       commands: |
+        # temporary workaround: unset ARTIFACTS env for integ-servicemesh-multicluster
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" \
+          bash -c \
+          "unset ARTIFACTS; \
           entrypoint \
           prow/integ-suite-kind.sh \
           --topology \
           MULTICLUSTER \
-          test.integration.servicemesh.kube
+          test.integration.servicemesh.kube"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
@@ -393,6 +396,30 @@ tests:
           memory: 2Gi
       timeout: 40m0s
     workflow: servicemesh-istio-e2e-aws
+- as: istio-update-operator-2-2
+  commands: |
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export GOFLAGS="-mod=vendor"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -f /creds-github/token \
+      '-c make clean update-2.2-charts' \
+      '-t [maistra-2.2] Automator: Update charts from maistra/istio' \
+      -m update_charts_istio_2.2 \
+      -b maistra-2.2
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
 zz_generated_metadata:
   branch: maistra-2.2
   org: maistra
