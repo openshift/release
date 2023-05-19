@@ -18,7 +18,7 @@ START_TIME=$(date "+%s")
 poetry run pytest tests \
   --pytest-log-file="${ARTIFACT_DIR}/pytest.log" \
   --data-collector="${COLLECTOR_CONF_FILE}" \
-  --junit-xml="${ARTIFACT_DIR}/xunit_results.xml" \
+  --junit-xml="${ARTIFACT_DIR}/junit_results.xml" \
   --tc-file=tests/global_config.py \
   --tc-format=python \
   --tc default_storage_class:ocs-storagecluster-ceph-rbd \
