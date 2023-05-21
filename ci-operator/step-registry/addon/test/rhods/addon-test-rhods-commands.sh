@@ -23,5 +23,9 @@ export RUN_SCRIPT_ARGS
 
 mkdir $ARTIFACT_DIR/results
 
+sleep 2h
+
+# oc get identity -oname | xargs oc delete
+
 # running RHODS testsuite
 ./ods_ci/build/run.sh
