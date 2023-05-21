@@ -23,13 +23,5 @@ export RUN_SCRIPT_ARGS
 
 mkdir $ARTIFACT_DIR/results
 
-sleep 2h
-
-CLUSTER_ID=$(ocm list clusters  --no-headers --parameter search="api.url = '${OC_HOST}'" | awk '{print $1}')
-HTPASSWD_NAME=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID}/identity_providers | jq .items[0].name)
-
-# Clean cluster's IDP before running RHODS testsuite
-oc adm delete identity $HTPASSWD_NAME:$(oc whoami)
-
 # running RHODS testsuite
 ./ods_ci/build/run.sh
