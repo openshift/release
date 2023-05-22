@@ -108,11 +108,6 @@ spec:
       value: "${PULL_PULL_SHA:-}"
     - name: PULL_HEAD_REF
       value: "${PULL_HEAD_REF:-}"
-    resources:
-      requests:
-        memory: 4Gi
-        cpu: '4'
-        ${RESOURCE_REQUEST:-}
     volumeMounts:
     - mountPath: /lib/modules
       name: modules
