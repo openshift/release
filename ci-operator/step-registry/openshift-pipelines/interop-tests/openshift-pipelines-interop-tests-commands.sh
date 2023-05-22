@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-XML_PATH="/root/release-tests/reports/xml-report/result.xml"
+XML_PATH="/tmp/release-tests/reports/xml-report/result.xml"
 
 echo "Running gauge specs parallely..."
 gauge run --log-level=debug --verbose --tags sanity -p specs/clustertasks/ specs/pipelines/ specs/triggers/ specs/hub/ specs/metrics/ specs/pac/ specs/operator/addon.spec specs/operator/post-upgrade.spec specs/operator/pre-upgrade.spec
