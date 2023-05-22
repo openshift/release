@@ -3,6 +3,15 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: openshift-pipelines-runner
 releases:
   latest:
     candidate:
@@ -28,14 +37,13 @@ tests:
         [
             {"name": "openshift-pipelines-operator-rh", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
         ]
-      SLEEP_DURATION: 2h
       SPOT_INSTANCES: "true"
     test:
     - ref: install-operators
-    - ref: wait
+    - ref: openshift-pipelines-interop-tests
     workflow: ipi-aws
 zz_generated_metadata:
-  branch: master
-  org: openshift-pipelines
+  branch: interop-v1.10
+  org: cchetna
   repo: release-tests
   variant: openshift-pipelines-ocp4.13-lp-interop
