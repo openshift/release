@@ -293,17 +293,17 @@ tests:
   steps:
     env:
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.2
-      MAISTRA_MC_POD: maistra-e2e-test-mc-pod
       MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
     test:
     - as: copy-src
       cli: latest
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":/work/
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
       env:
       - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_MC_POD
+      - name: MAISTRA_SC_POD
       from: src
       resources:
         requests:
@@ -314,7 +314,7 @@ tests:
       cli: latest
       commands: |
         # temporary workaround: unset ARTIFACTS env for integ-servicemesh-multicluster
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" \
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c \
           "unset ARTIFACTS; \
           entrypoint \
@@ -322,10 +322,10 @@ tests:
           --topology \
           MULTICLUSTER \
           test.integration.servicemesh.kube"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_MC_POD
+      - name: MAISTRA_SC_POD
       from: src
       resources:
         requests:
