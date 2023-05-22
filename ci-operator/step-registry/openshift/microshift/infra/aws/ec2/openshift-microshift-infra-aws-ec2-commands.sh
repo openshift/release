@@ -255,6 +255,9 @@ Resources:
           VolumeSize: "120"
           VolumeType: gp3
           Iops: 16000
+      PrivateDnsNameOptions:
+        EnableResourceNameDnsARecord: true
+        HostnameType: resource-name
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe

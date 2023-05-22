@@ -22,7 +22,23 @@ chmod 0600 "${HOME}/.ssh/config"
 
 cat <<EOF > /tmp/install.sh
 #!/bin/bash
-set -xeuo pipefail
+set -xuo pipefail
+
+hostname -A
+
+ping -4 -c 1 \$(hostname -A)
+
+curl -v -i \$(hostname -A)
+
+cat /etc/nsswitch.conf
+
+cat /etc/resolv.conf
+
+dnf install -q -y bind-utils
+
+dig \$(hostname -A)
+
+set -e
 
 rpm --rebuilddb
 dnf install subscription-manager -y
