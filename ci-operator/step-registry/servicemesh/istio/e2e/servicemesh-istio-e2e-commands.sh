@@ -76,6 +76,10 @@ spec:
       privileged: true
       runAsUser: 0
     env:
+    - name: BUILD_WITH_CONTAINER
+      value: "${BUILD_WITH_CONTAINER:-}"
+    - name: INTEGRATION_TEST_FLAGS
+      value: "${INTEGRATION_TEST_FLAGS:-}"
     - name: CI
       value: "${CI:-}"
     - name: ARTIFACTS
