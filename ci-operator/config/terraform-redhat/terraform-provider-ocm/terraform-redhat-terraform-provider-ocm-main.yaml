@@ -4,13 +4,13 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
-promotion:
-  name: "4.14"
-  namespace: ocp
+images:
+- dockerfile_path: build/ci-tf-e2e.Dockerfile
+  to: ocm-tf-e2e
 releases:
   latest:
     integration:
-      name: "4.14"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -27,6 +27,22 @@ tests:
     make unit-test
   container:
     from: src
+- as: e2e-presubmit
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      OPENSHIFT_VERSION: "4.13"
+    test:
+    - ref: rosa-terraform-aws-e2e-test
+- as: e2e-periodic
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-qe
+    env:
+      OPENSHIFT_VERSION: "4.13"
+    test:
+    - ref: rosa-terraform-aws-e2e-test
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
