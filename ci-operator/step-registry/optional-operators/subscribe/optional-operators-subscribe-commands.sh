@@ -25,6 +25,35 @@ wait_for_installplan () {
     done
 }
 
+# Waits up to 10 minutes for CSV to become ready
+wait_for_csv () {
+    for _ in $(seq 1 60); do
+        CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
+        if [[ -n "$CSV" ]]; then
+            if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
+                echo "ClusterServiceVersion \"$CSV\" ready"
+
+                DEPLOYMENT_ART="oo_deployment_details.yaml"
+                echo "Saving deployment details in ${DEPLOYMENT_ART} as a shared artifact"
+                cat > "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" <<EOF
+---
+csv: "${CSV}"
+operatorgroup: "${OPERATORGROUP}"
+subscription: "${SUB}"
+catalogsource: "${CATSRC}"
+install_namespace: "${OO_INSTALL_NAMESPACE}"
+target_namespaces: "${OO_TARGET_NAMESPACES}"
+deployment_start_time: "${DEPLOYMENT_START_TIME}"
+EOF
+                cp "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" "${SHARED_DIR}/${DEPLOYMENT_ART}"
+                exit 0
+            fi
+        fi
+        sleep 10
+    done
+    echo "Timed out waiting for csv to become ready"
+}
+
 # Retries Subscription creation
 # Deletes current Subscription in the namespace before retrying creating a new one
 retry_subscription_creation () {
@@ -34,6 +63,21 @@ retry_subscription_creation () {
     echo "Creating subscription"
     SUB=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${SUB_MANIFEST}" )
     echo "Subscription name is \"$SUB\""
+}
+
+# Re-tries InstallPlan creation which includes deleting Subscription, creating it again, and waiting for InstallPlan to come up
+retry_installplan_creation () {
+    retry_attempts=2
+
+    while [[ "$FOUND_INSTALLPLAN" = false && "$retry_attempts" -ne 0 ]]; do
+        echo "Failed to find installPlan for subscription"
+        echo "Retrying subscription creation...${retry_attempts} attempts left"
+
+        retry_subscription_creation
+        wait_for_installplan
+
+        retry_attempts=$((retry_attempts-1))
+    done
 }
 
 # For disconnected or otherwise unreachable environments, we want to
@@ -249,47 +293,45 @@ echo "Subscription name is \"$SUB\""
 
 wait_for_installplan
 
-retry_attempts=2
-
-while [[ "$FOUND_INSTALLPLAN" = false && "$retry_attempts" -ne 0 ]]; do
-    echo "Failed to find installPlan for subscription"
-
-    echo "Retrying subscription creation...${retry_attempts} attempts left"
-
-    retry_subscription_creation
-    wait_for_installplan
-
-    retry_attempts=$((retry_attempts-1))
-done
+if [ "$FOUND_INSTALLPLAN" = false ] ; then
+    retry_installplan_creation
+fi
 
 if [ "$FOUND_INSTALLPLAN" = true ] ; then
     echo "Install Plan approved"
     echo "Waiting for ClusterServiceVersion to become ready..."
-    for _ in $(seq 1 60); do
-      CSV=$(oc -n "$OO_INSTALL_NAMESPACE" get subscription "$SUB" -o jsonpath='{.status.installedCSV}' || true)
-      if [[ -n "$CSV" ]]; then
-          if [[ "$(oc -n "$OO_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
-              echo "ClusterServiceVersion \"$CSV\" ready"
+    wait_for_csv
+    retry_attempts_csv=2
+    while [[ "$retry_attempts_csv" -ne 0 ]]; do
+        echo "Retrying CSV creation...${retry_attempts_csv} attempts left"
 
-              DEPLOYMENT_ART="oo_deployment_details.yaml"
-              echo "Saving deployment details in ${DEPLOYMENT_ART} as a shared artifact"
-              cat > "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" <<EOF
----
-csv: "${CSV}"
-operatorgroup: "${OPERATORGROUP}"
-subscription: "${SUB}"
-catalogsource: "${CATSRC}"
-install_namespace: "${OO_INSTALL_NAMESPACE}"
-target_namespaces: "${OO_TARGET_NAMESPACES}"
-deployment_start_time: "${DEPLOYMENT_START_TIME}"
-EOF
-              cp "${ARTIFACT_DIR}/${DEPLOYMENT_ART}" "${SHARED_DIR}/${DEPLOYMENT_ART}"
-              exit 0
-          fi
-      fi
-      sleep 10
+        # Delete CSV if it exists
+        if [[ -n "${CSV:-}" ]]; then
+            echo "CSV \"${CSV}\" was created but never became ready. Deleting CSV \"${CSV}\"..."
+            oc delete csv $CSV -n $OO_INSTALL_NAMESPACE
+        else
+            echo "There is no CSV in the namespace \"${OO_INSTALL_NAMESPACE}\""
+        fi
+
+        echo "Re-creating Subscription and InstallPlan"
+        retry_subscription_creation
+        wait_for_installplan
+
+        if [ "$FOUND_INSTALLPLAN" = false ]; then
+            retry_installplan_creation
+        fi
+        
+        if [ "$FOUND_INSTALLPLAN" = true ]; then
+            echo "Install Plan approved"
+            echo "Waiting for ClusterServiceVersion to become ready..."
+            wait_for_csv
+        else
+            echo "Failed to find installPlan for subscription"
+        fi
+
+        retry_attempts_csv=$((retry_attempts_csv-1))
     done
-    echo "Timed out waiting for csv to become ready"
+    echo "All retry attempts failed"
 else
     echo "Failed to find installPlan for subscription"
     echo "All retry attempts failed"
