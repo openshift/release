@@ -119,12 +119,27 @@ def get_rc_volumes(context):
                     },
                     {
                         'configMap': {
+                            'name': 'job-config-main-periodics'
+                        }
+                    },
+                    {
+                        'configMap': {
                             'name': 'job-config-master-postsubmits'
                         }
                     },
                     {
                         'configMap': {
+                            'name': 'job-config-main-postsubmits'
+                        }
+                    },
+                    {
+                        'configMap': {
                             'name': 'job-config-master-presubmits'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-main-presubmits'
                         }
                     },
                     {
