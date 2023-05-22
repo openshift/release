@@ -54,16 +54,31 @@ function create_openstack_namespace {
 function check_build_result {
   local build_name
   local build_status
+  local n
+  local nb_retries
 
   build_name="$1"
   # At this moment, we don't expect more than one build per build-config
+
   build_status=$(oc get builds -l buildconfig="${build_name}" -o json | jq -r '.items[0].status.phase')
-  if [[ "$build_status" != "Complete" ]]; then
-    echo "Build ${build_name} failed with status ${build_status}"
+  if [[ "$build_status" == "Failed" ]]; then
+    echo "Build ${build_name} failed to complete. Aborting build step..."
     exit 1
   fi
-}
 
+  n=0
+  # sleep time hardcoded to 30s. Adding + 29 to round up the result
+  nb_retries=$(((BUILD_COMPLETE_TIMEOUT + 29) / 30))
+  while [[ "$build_status" != "Complete" ]]; do
+    n=$((n+1))
+    if (( n > nb_retries )); then
+      echo "Build ${build_name} failed to complete. Current status is ${build_status}. Aborting..."
+      exit 1
+    fi
+    sleep 30
+    build_status=$(oc get builds -l buildconfig="${build_name}" -o json | jq -r '.items[0].status.phase')
+  done
+}
 
 # Builds and push operator image
 function build_push_operator_images {
