@@ -63,16 +63,6 @@ cat << EOF >> ~/ocp-install.yml
     register: file_info
     failed_when: file_info.stat.exists
 
-  - name: Handle file existence
-    debug:
-      msg: "aborting run"
-    when: file_info.stat.exists
-
-  - name: Handle file existence
-    debug:
-      msg: "continue run"
-    when: file_info.stat.exists == False
-
 EOF
 fi
 cat << EOF >> ~/ocp-install.yml
