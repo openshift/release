@@ -1,9 +1,19 @@
+base_images:
+  cli:
+    name: "4.10"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
     tag: "2.3"
   use_build_cache: true
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.10"
 resources:
   '*':
     limits:
@@ -53,15 +63,11 @@ tests:
   container:
     from: src
 - as: integ-helm-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.4xlarge
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -94,20 +100,16 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-security-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.4xlarge
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -140,20 +142,16 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-pilot-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.4xlarge
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -186,20 +184,16 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-servicemesh-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.4xlarge
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -232,20 +226,16 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-telemetry-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.4xlarge
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -278,32 +268,28 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-servicemesh-multicluster-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
     env:
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.4xlarge
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
-      MAISTRA_MC_POD: maistra-e2e-test-mc-pod
       MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
     test:
     - as: copy-src
       cli: latest
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":/work/
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
       env:
       - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_MC_POD
+      - name: MAISTRA_SC_POD
       from: src
       resources:
         requests:
@@ -314,7 +300,7 @@ tests:
       cli: latest
       commands: |
         # temporary workaround: unset ARTIFACTS env for integ-servicemesh-multicluster
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_MC_POD}" \
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c \
           "unset ARTIFACTS; \
           entrypoint \
@@ -322,28 +308,24 @@ tests:
           --topology \
           MULTICLUSTER \
           test.integration.servicemesh.kube"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_MC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
       - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_MC_POD
+      - name: MAISTRA_SC_POD
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: maistra-istio-push-image-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
     env:
       BUILD_WITH_CONTAINER: "0"
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.4xlarge
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
@@ -392,10 +374,10 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 40m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: istio-update-operator-2-3
   commands: |
     # load test-infra automator.sh script
