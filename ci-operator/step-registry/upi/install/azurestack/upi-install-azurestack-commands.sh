@@ -40,8 +40,6 @@ python3 -c "import yaml" || pip3 install --user pyyaml
 sed -i "s|ppe.azurestack.devcluster.openshift.com|ppe.upi.azurestack.devcluster.openshift.com|g" install-config.yaml
 
 CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
-AAD_CLIENT_ID=$(jq -r .clientId ${SHARED_DIR}/osServicePrincipal.json)
-AZURE_REGION=ppe3
 SSH_KEY=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["sshKey"])')
 BASE_DOMAIN=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
 TENANT_ID=$(jq -r .tenantId ${SHARED_DIR}/osServicePrincipal.json)
@@ -49,8 +47,6 @@ AAD_CLIENT_SECRET=$(jq -r .clientSecret ${SHARED_DIR}/osServicePrincipal.json)
 APP_ID=$(jq -r .clientId ${SHARED_DIR}/osServicePrincipal.json)
 
 export CLUSTER_NAME
-export AAD_CLIENT_ID
-export AZURE_REGION
 export SSH_KEY
 export TENANT_ID
 export BASE_DOMAIN
@@ -61,20 +57,15 @@ echo $TENANT_ID >> ${SHARED_DIR}/TENANT_ID
 echo $AAD_CLIENT_SECRET >> ${SHARED_DIR}/AAD_CLIENT_SECRET
 echo $APP_ID >> ${SHARED_DIR}/APP_ID
 
-AZURESTACK_ENDPOINT=$(cat ${SHARED_DIR}/AZURESTACK_ENDPOINT)
-SUFFIX_ENDPOINT=$(cat ${SHARED_DIR}/SUFFIX_ENDPOINT)
+# Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
+chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
+source ${SHARED_DIR}/azurestack-login-script.sh
 
-az cloud register \
-    -n PPE \
-    --endpoint-resource-manager "${AZURESTACK_ENDPOINT}" \
-    --suffix-storage-endpoint "${SUFFIX_ENDPOINT}"
-az cloud set -n PPE
-az cloud update --profile 2019-03-01-hybrid
-az login --service-principal -u $APP_ID -p $AAD_CLIENT_SECRET --tenant $TENANT_ID > /dev/null
+#Avoid x509 error thown out from installer when get azurestack wwt endpoint
+if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+    export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+fi
 
-# shellcheck disable=SC2034
-SUBSCRIPTION_ID=$(az account show | jq -r .id)
-export SUBSCRIPTION_ID
 export AZURE_AUTH_LOCATION="${SHARED_DIR}/osServicePrincipal.json"
 
 # remove workers from the install config so the mco won't try to create them
@@ -92,47 +83,7 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 rm -f openshift/99_openshift-machine-api_master-control-plane-machine-set.yaml
 
-RESOURCE_GROUP=$(python3 -c 'import yaml;data = yaml.full_load(open("manifests/cluster-infrastructure-02-config.yml"));print(data["status"]["platformStatus"]["azure"]["resourceGroupName"])')
-oc adm release extract $RELEASE_IMAGE_LATEST --credentials-requests --cloud=azure --to=credentials-request
-ls credentials-request
-files=$(ls credentials-request)
-for f in $files
-do
-  SECRET_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["name"])')
-  SECRET_NAMESPACE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print(data["spec"]["secretRef"]["namespace"])')
-  FEATURE_GATE=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-gate" in data["metadata"]["annotations"])')
-  FEATURE_SET=$(python3 -c 'import yaml;data = yaml.full_load(open("credentials-request/'${f}'"));print("release.openshift.io/feature-set" in data["metadata"]["annotations"])')
-
-# 4.10 includes techpreview of CAPI which without the namespace: openshift-cluster-api
-# fails to bootstrap. Below checks if TechPreviewNoUpgrade is annotated and if so skips
-# creating that secret.
-
-  if [[ $FEATURE_GATE == *"True"* ]]; then
-      continue
-  fi
-
-  if [[ $FEATURE_SET == *"True"* ]]; then
-      continue
-  fi
-
-  filename=${f/request/secret}
-  cat >> "manifests/$filename" << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-    name: ${SECRET_NAME}
-    namespace: ${SECRET_NAMESPACE}
-stringData:
-  azure_subscription_id: ${SUBSCRIPTION_ID}
-  azure_client_id: ${AAD_CLIENT_ID}
-  azure_client_secret: ${AAD_CLIENT_SECRET}
-  azure_tenant_id: ${TENANT_ID}
-  azure_resource_prefix: ${CLUSTER_NAME}
-  azure_resourcegroup: ${RESOURCE_GROUP}
-  azure_region: ${AZURE_REGION}
-EOF
-done
-
+cp ${SHARED_DIR}/manifest_* ./manifests
 cat >> manifests/cco-configmap.yaml <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -162,7 +113,6 @@ del data["spec"]["publicZone"];
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 INFRA_ID=$(python3 -c 'import yaml;data = yaml.full_load(open("manifests/cluster-infrastructure-02-config.yml"));print(data["status"]["infrastructureName"])')
-echo "${RESOURCE_GROUP}" > "${SHARED_DIR}/RESOURCE_GROUP_NAME"
 
 openshift-install create ignition-configs &
 
@@ -185,14 +135,14 @@ export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 RESOURCE_GROUP=$(cat "${SHARED_DIR}/RESOURCE_GROUP_NAME")
 
-az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
+az group create --name "$RESOURCE_GROUP" --location "$LEASED_RESOURCE"
 
 KUBECONFIG="${dir}/auth/kubeconfig"
 export KUBECONFIG
 
 ACCOUNT_NAME=$(echo ${CLUSTER_NAME}sa | tr -cd '[:alnum:]')
 echo "Creating storage account"
-az storage account create -g "$RESOURCE_GROUP" --location "$AZURE_REGION" --name "$ACCOUNT_NAME" --kind Storage --sku Standard_LRS
+az storage account create -g "$RESOURCE_GROUP" --location "$LEASED_RESOURCE" --name "$ACCOUNT_NAME" --kind Storage --sku Standard_LRS
 ACCOUNT_KEY=$(az storage account keys list -g "$RESOURCE_GROUP" --account-name "$ACCOUNT_NAME" --query "[0].value" -o tsv)
 
 az storage container create --name files --account-name "${ACCOUNT_NAME}" --public-access blob --account-key "$ACCOUNT_KEY"
@@ -203,10 +153,10 @@ az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/01_vnet.json" \
   --parameters baseName="$INFRA_ID"
 
-VHD_BLOB_URL="https://rhcossa.blob.ppe3.stackpoc.com/vhd/rhcos-49-84-202108221651.vhd"
+CLUSTER_OS_IMAGE=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'platform.azure.ClusterOSImage')
 az deployment group create -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/02_storage.json" \
-  --parameters vhdBlobURL="$VHD_BLOB_URL" \
+  --parameters vhdBlobURL="${CLUSTER_OS_IMAGE}" \
   --parameters baseName="$INFRA_ID"
 
 az deployment group create -g "$RESOURCE_GROUP" \
@@ -220,7 +170,12 @@ az network dns record-set a add-record -g "$RESOURCE_GROUP" -z "${CLUSTER_NAME}.
 az network dns record-set a add-record -g "$RESOURCE_GROUP" -z "${CLUSTER_NAME}.${BASE_DOMAIN}" -n api-int -a "$PRIVATE_IP" --ttl 60
 
 BOOTSTRAP_URL=$(az storage blob url --account-name "${ACCOUNT_NAME}" --account-key "$ACCOUNT_KEY" -c "files" -n "bootstrap.ign" -o tsv)
-BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "3.2.0" --arg url "$BOOTSTRAP_URL" '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 | tr -d '\n')
+if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+    CA="data:text/plain;charset=utf-8;base64,$(cat "${CLUSTER_PROFILE_DIR}/ca.pem" | base64 |tr -d '\n')"
+    BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "3.2.0" --arg url "$BOOTSTRAP_URL" --arg cert "$CA" '{ignition:{version:$v,security:{tls:{certificateAuthorities:[{source:$cert}]}},config:{replace:{source:$url}}}}' | base64 | tr -d '\n')
+else
+    BOOTSTRAP_IGNITION=$(jq -rcnM --arg v "3.2.0" --arg url "$BOOTSTRAP_URL" '{ignition:{version:$v,config:{replace:{source:$url}}}}' | base64 | tr -d '\n')
+fi
 
 az deployment group create --verbose -g "$RESOURCE_GROUP" \
   --template-file "${AZURESTACK_UPI_LOCATION}/04_bootstrap.json" \

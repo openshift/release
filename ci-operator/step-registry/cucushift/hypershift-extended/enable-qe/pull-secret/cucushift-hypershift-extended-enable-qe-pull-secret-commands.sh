@@ -4,6 +4,49 @@ set -e
 set -u
 set -o pipefail
 
+function check_node() {
+    local node_number ready_number
+    node_number=$(oc get node --no-headers | grep -cv STATUS)
+    ready_number=$(oc get node --no-headers | awk '$2 == "Ready"' | wc -l)
+    if (( node_number == ready_number )); then
+        echo "All nodes status check PASSED"
+        return 0
+    else
+        if (( ready_number == 0 )); then
+            echo >&2 "No any ready node"
+        else
+            echo >&2 "We found failed node"
+            oc get node --no-headers | awk '$2 != "Ready"'
+        fi
+        return 1
+    fi
+}
+
+function check_pod() {
+    echo "Show all pods status for reference/debug"
+    oc get pods --all-namespaces
+}
+
+function health_check() {
+    echo "Step #1: Check all cluster operators get stable and ready"
+    timeout 900s bash <<EOT
+until
+  oc wait clusteroperators --all --for='condition=Available=True' --timeout=30s && \
+  oc wait clusteroperators --all --for='condition=Progressing=False' --timeout=30s && \
+  oc wait clusteroperators --all --for='condition=Degraded=False' --timeout=30s;
+do
+  sleep 30 && echo "Cluster Operators Degraded=True,Progressing=True,or Available=False";
+done
+EOT
+    oc wait clusterversion/version --for='condition=Available=True' --timeout=15m
+
+    echo "Step #2: Make sure every machine is in 'Ready' status"
+    check_node
+
+    echo "Step #3: Check all pods are in status running or complete"
+    check_pod
+}
+
 if [[ $SKIP_HYPERSHIFT_PULL_SECRET_UPDATE == "true" ]]; then
   echo "SKIP ....."
   exit 0
@@ -53,6 +96,7 @@ for i in $(seq ${RETRIES}); do
   done
   if [ "$UPDATED_COUNT" == "$COUNT" ] ; then
       echo "day 2 pull-secret successful"
+      health_check
       exit 0
   fi
   echo "Try ${i}/${RETRIES}: pull-secret is not updated yet. Checking again in 60 seconds"

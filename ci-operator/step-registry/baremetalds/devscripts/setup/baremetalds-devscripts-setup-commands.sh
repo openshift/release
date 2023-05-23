@@ -69,6 +69,69 @@ do
   scp "${SSHOPTS[@]}" "${item}" "root@${IP}:manifests/${manifest##manifest_}"
 done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
 
+
+# For baremetal clusters ofcir has returned details about the hardware in the cluster
+# prepare those details into a format the devscripts understands
+function prepare_bmcluster() {
+    # The extra data is missing the square brackets to prevent ironic parsing it as json
+    # FIXME: this should be fixed in ofcir or ironic
+    echo "[" > $EXTRAFILE
+    jq -r .extra < $CIRFILE >> $EXTRAFILE
+    echo "]" >> $EXTRAFILE
+
+    # dev-scripts can be used to provision baremetal (in place of the VM's it usually creates)
+    # build the details of the bm nodes into a $NODES_FILE for consumption by dev-scripts
+    NODES=
+    n=0
+    _IFS=$IFS
+    IFS=$'\n'
+    for DATA in $(cat $EXTRAFILE |jq '.[] | "\(.bmcip) \(.mac)"' -rc) ; do
+        IFS=" " read BMCIP MAC <<< "$(echo $DATA)"
+        NODES="$NODES{\"name\":\"openshift-$n\",\"driver\":\"ipmi\",\"resource_class\":\"baremetal\",\"driver_info\":{\"username\":\"root\",\"password\":\"calvin\",\"address\":\"ipmi://$BMCIP\",\"deploy_kernel\":\"http://172.22.0.2/images/ironic-python-agent.kernel\",\"deploy_ramdisk\":\"http://172.22.0.2/images/ironic-python-agent.initramfs\",\"disable_certificate_verification\":false},\"ports\":[{\"address\":\"$MAC\",\"pxe_enabled\":true}],\"properties\":{\"local_gb\":\"50\",\"cpu_arch\":\"x86_64\",\"boot_mode\":\"legacy\"}},"
+        n=$((n+1))
+    done
+    IFS=$_IFS
+
+    cat - <<EOF > $BMJSON
+{
+  "nodes": [
+    ${NODES%,}
+  ]
+}
+EOF
+
+    # In addition the the NODES_FILE, we need to configure some dev-scripts
+    # properties to understand some specifics about our lab environments
+    cat - <<EOF >> "${SHARED_DIR}/dev-scripts-additional-config"
+export NODES_FILE="/root/dev-scripts/bm.json"
+export NODES_PLATFORM=baremetal
+export PRO_IF="eth3"
+export INT_IF="eth2"
+export MANAGE_BR_BRIDGE=n
+export CLUSTER_PRO_IF="enp3s0f1"
+export MANAGE_INT_BRIDGE=n
+export ROOT_DISK_NAME="/dev/sda"
+export BASE_DOMAIN="ocpci.eng.rdu2.redhat.com"
+export EXTERNAL_SUBNET_V4="10.10.129.0/24"
+export ADDN_DNS="10.38.5.26"
+export PROVISIONING_HOST_EXTERNAL_IP=$IP
+export NUM_WORKERS=2
+EOF
+    scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "root@${IP}:bm.json"
+}
+
+# dev-scripts setup for baremetal clusters
+CIRFILE=$SHARED_DIR/cir
+EXTRAFILE=$SHARED_DIR/cir-extra
+BMJSON=$SHARED_DIR/bm.json
+if [ -e "$CIRFILE" ] && [ "$(cat $CIRFILE | jq -r .type)" == "cluster" ] ; then
+    prepare_bmcluster
+elif [ -e "${SHARED_DIR}/bm.json" ] ; then
+    # Support for bm hosts from baremetalds-packet-setup
+    # TODO: Remove when all switched over
+    scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "root@${IP}:bm.json"
+fi
+
 # Additional mechanism to inject dev-scripts additional variables directly
 # from a multistage step configuration.
 # Backward compatible with the previous approach based on creating the
@@ -88,7 +151,7 @@ then
   scp "${SSHOPTS[@]}" "${SHARED_DIR}/dev-scripts-additional-config" "root@${IP}:dev-scripts-additional-config"
 fi
 
-[ -e "${SHARED_DIR}/bm.json" ] && scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "root@${IP}:bm.json"
+
 
 
 timeout -s 9 175m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
@@ -168,7 +231,15 @@ then
 fi
 
 if [ -e /root/bm.json ] ; then
-    . /root/dev-scripts-additional-config
+    cat /root/dev-scripts-additional-config >> /root/dev-scripts/config_root.sh
+
+    # On baremetal clusters DNS has been setup so that the clustername is part of the provision host long name
+    # i.e. hostname == host1.clusterXX.ocpci.eng.rdu2.redhat.com
+    export LOCAL_REGISTRY_DNS_NAME=\$(hostname -f)
+    export "CLUSTER_NAME=\$(hostname -f | cut -d . -f 2)"
+
+    echo "export LOCAL_REGISTRY_DNS_NAME=\$LOCAL_REGISTRY_DNS_NAME" >> /root/dev-scripts/config_root.sh
+    echo "export CLUSTER_NAME=\$CLUSTER_NAME" >> /root/dev-scripts/config_root.sh
 
     cp /root/bm.json /root/dev-scripts/bm.json
 
@@ -178,6 +249,15 @@ if [ -e /root/bm.json ] ; then
     nmcli con reload
     sleep 10
 
+    # Block the public zone (where eth2 is) from allowing and traffic from the provisioning network
+    # prevents arp responses from provisioning networks on other bm environment i.e.
+    # ERROR     : [/etc/sysconfig/network-scripts/ifup-eth] Error, some other host (F8:F2:1E:B2:DA:21) already uses address 172.22.0.1.
+    echo 1 | sudo dd of=/proc/sys/net/ipv4/conf/eth2/arp_ignore
+    # TODO: remove this once all running CI jobs are updated (i.e. its only  needed until arp_ignore is set on all environments)
+    sudo firewall-cmd --zone=public --add-rich-rule='rule family="ipv4" source address="172.22.0.0/24" destination address="172.22.0.0/24" reject' --permanent
+
+    sudo firewall-cmd --reload
+
     echo "export KUBECONFIG=/root/dev-scripts/ocp/\${CLUSTER_NAME}/auth/kubeconfig" >> /root/.bashrc
 else
     echo 'export KUBECONFIG=/root/dev-scripts/ocp/ostest/auth/kubeconfig' >> /root/.bashrc
@@ -185,7 +265,11 @@ fi
 
 timeout -s 9 105m make ${DEVSCRIPTS_TARGET}
 
+# Add extra CI specific rules to the libvirt zone, this can't be done earlier because the zone only now exists
+# TODO: In reality the bridges should be in the public zone
 if [ -e /root/bm.json ] ; then
+    # Allow cluster nodes to use provising node as a ntp server (4.12 and above are more likely to use it vs. the dhcp set server)
+    sudo firewall-cmd --add-service=ntp --zone libvirt
     sudo firewall-cmd --add-port=8213/tcp --zone=libvirt
 fi
 EOF

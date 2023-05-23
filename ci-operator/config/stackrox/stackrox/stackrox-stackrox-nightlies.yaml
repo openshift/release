@@ -1,4 +1,8 @@
 base_images:
+  aks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aks-0.6.10
   aro:
     name: automation-flavors
     namespace: stackrox
@@ -23,7 +27,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-test-0.3.56
+    tag: stackrox-test-0.3.58
 resources:
   '*':
     requests:
@@ -39,8 +43,6 @@ tests:
 - as: gke-qa-e2e-tests
   postsubmit: true
   steps:
-    env:
-      QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
@@ -49,7 +51,6 @@ tests:
   steps:
     env:
       GKE_CLUSTER_VERSION: oldest
-      QA_TEST_TARGET: test
       TEST_SUITE: gke-qa-e2e-tests
     test:
     - ref: stackrox-e2e
@@ -59,40 +60,7 @@ tests:
   steps:
     env:
       GKE_CLUSTER_VERSION: latest
-      QA_TEST_TARGET: test
       TEST_SUITE: gke-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: ocp-4-8-qa-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.8"
-  postsubmit: true
-  steps:
-    env:
-      QA_TEST_TARGET: test
-      TEST_SUITE: openshift-newest-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: ocp-4-11-qa-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.11"
-  postsubmit: true
-  steps:
-    env:
-      QA_TEST_TARGET: test
-      TEST_SUITE: openshift-newest-qa-e2e-tests
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
@@ -154,12 +122,6 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: gke-kernel-qa-e2e-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
 - as: gke-upgrade-tests
   postsubmit: true
   steps:
@@ -199,40 +161,15 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: ocp-4-8-operator-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.8"
-  postsubmit: true
-  steps:
-    env:
-      TEST_SUITE: openshift-4-operator-e2e-tests
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: ocp-4-11-operator-e2e-tests
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 5h0m0s
-    version: "4.11"
-  postsubmit: true
-  steps:
-    env:
-      TEST_SUITE: openshift-4-operator-e2e-tests
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
 - as: eks-qa-e2e-tests
   postsubmit: true
   steps:
     workflow: stackrox-automation-flavors-eks-e2e
+  timeout: 5h0m0s
+- as: osd-aws-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-aws-e2e
   timeout: 5h0m0s
 - as: osd-gcp-qa-e2e-tests
   postsubmit: true
@@ -243,6 +180,16 @@ tests:
   postsubmit: true
   steps:
     workflow: stackrox-automation-flavors-aro-e2e
+  timeout: 5h0m0s
+- as: aks-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-aks-e2e
+  timeout: 5h0m0s
+- as: rosa-qa-e2e-tests
+  postsubmit: true
+  steps:
+    workflow: stackrox-automation-flavors-rosa-e2e
   timeout: 5h0m0s
 - as: nightly-tag
   cron: 0 5 * * 1,2,3,4,5

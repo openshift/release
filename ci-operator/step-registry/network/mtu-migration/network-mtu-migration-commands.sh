@@ -151,7 +151,7 @@ check_no_api_alerts() {
   timeout "${timeout}" bash <<'EOT' || result=$?
   ALERT_HOSTNAME=$(oc get routes/prometheus-k8s -n openshift-monitoring -o json | jq -r '.spec.host')
   ALERT_URL="https://${ALERT_HOSTNAME}/api/v1/alerts"
-	ALERT_TOKEN=$(oc -n openshift-monitoring sa get-token prometheus-k8s)
+	ALERT_TOKEN=$(oc -n openshift-monitoring create token prometheus-k8s)
   ALERTS="(KubeAggregatedAPIErrors|KubeAggregatedAPIDown)"
   while true
   do

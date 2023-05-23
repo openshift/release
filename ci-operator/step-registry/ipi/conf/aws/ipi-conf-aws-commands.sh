@@ -222,6 +222,12 @@ EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 
+printf '%s' "${USER_TAGS:-}" | while read -r TAG VALUE
+do
+  printf 'Setting user tag %s: %s\n' "${TAG}" "${VALUE}"
+  yq-go write -i "${CONFIG}" "platform.aws.userTags.${TAG}" "${VALUE}"
+done
+
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)

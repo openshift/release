@@ -22,7 +22,7 @@ function populate_artifact_dir() {
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${SHARED_DIR}/installation_stats.log" > "${ARTIFACT_DIR}/installation_stats.log"
   case "${CLUSTER_TYPE}" in
-    powervs)
+    powervs*)
       # We don't want debugging in this section
       unset TF_LOG_PROVIDER
       unset TF_LOG
@@ -639,7 +639,25 @@ function dump_resources() {
     echo
     echo "Select \"type\": \"Available\", where \"status\": \"False\" returns:"
     jq -r 'select (.type|test("Available"))' ${F_FILE}
-)
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get co 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get co
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get nodes 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get nodes -o=wide
+  )
+
+  echo "8<--------8<--------8<--------8<-------- oc get pods not running nor completed 8<--------8<--------8<--------8<--------"
+  (
+    export KUBECONFIG=${dir}/auth/kubeconfig
+    oc --request-timeout=5s get pods -A -o=wide | sed -e '/\(Running\|Completed\)/d'
+  )
 
   echo "8<--------8<--------8<--------8<-------- Instance names, health 8<--------8<--------8<--------8<--------"
   ibmcloud pi instances --json | jq -r '.pvmInstances[] | select (.serverName|test("'${CLUSTER_NAME}'")) | " \(.serverName) - \(.status) - health: \(.health.reason) - \(.health.status)"'
@@ -709,7 +727,7 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
 # Powervs requires config.json
 cat > "/tmp/powervs-config.json" << EOF
-{"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}"}
+{"id":"${POWERVS_USER_ID}","apikey":"${IBMCLOUD_API_KEY}","region":"${POWERVS_REGION}","zone":"${POWERVS_ZONE}","serviceinstance":"${POWERVS_SERVICE_INSTANCE_ID}","resourcegroup":"${POWERVS_RESOURCE_GROUP}"}
 EOF
 cp "/tmp/powervs-config.json" "${SHARED_DIR}/"
 export POWERVS_AUTH_FILEPATH=${SHARED_DIR}/powervs-config.json
@@ -722,10 +740,13 @@ init_ibmcloud
 destroy_resources
 
 case "${CLUSTER_TYPE}" in
-powervs)
+powervs*)
     export IBMCLOUD_API_KEY
     ;;
-*) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
+*)
+    >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
+    exit 1
+    ;;
 esac
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
@@ -737,11 +758,6 @@ date "+%s" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 echo "POWERVS_REGION=${POWERVS_REGION}"
 echo "POWERVS_ZONE=${POWERVS_ZONE}"
-
-# @BEGIN TEMPORARY-FIX
-export OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="rhcos-powervs-images-${VPCREGION}/rhcos-412-86-202208090152-0-ppc64le-powervs.ova.gz"
-echo "OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE=${OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE}"
-# @END TEMPORARY-FIX
 
 openshift-install version
 
@@ -868,6 +884,18 @@ openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v '
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
+
+if [ ${ret} -gt 0 ]; then
+  echo "8<--------8<--------8<--------8<-------- BEGIN: hack-for-kube-controller-manager 8<--------8<--------8<--------8<--------"
+  echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
+  OUTPUT=$(oc get co/kube-controller-manager -o json | jq -r '.status.conditions[]| select(.type == "Degraded").message')
+  echo "OUTPUT=${OUTPUT}"
+  if [[ "${OUTPUT}" == MissingStaticPodControllerDegraded* ]]; then
+    echo "Patching kubecontrollermanager cluster!"
+    oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$( date --rfc-3339=ns )"'"}}' --type=merge
+  fi
+  echo "8<--------8<--------8<--------8<-------- END: hack-for-kube-controller-manager 8<--------8<--------8<--------8<--------"
+fi
 
 if [ ${ret} -gt 0 ]; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"

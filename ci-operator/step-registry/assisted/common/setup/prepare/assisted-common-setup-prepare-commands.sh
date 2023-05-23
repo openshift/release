@@ -66,7 +66,10 @@ cat > packing-test-infra.yaml <<-EOF
           [defaults]
           callback_whitelist = profile_tasks
           host_key_checking = False
+
           verbosity = 2
+          stdout_callback = yaml
+          bin_ansible_callbacks = True
 EOF
 
 ansible-playbook packing-test-infra.yaml

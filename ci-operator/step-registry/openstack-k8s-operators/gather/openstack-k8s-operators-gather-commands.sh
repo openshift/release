@@ -38,10 +38,10 @@ function gen_pods_debug_cmd {
 function gen_resource_yaml_debug_cmd {
   local cmd
   if [ -z "${1}" ]; then
-    cmd=("echo 'Getting info for {} resource'; oc get {} -o yaml > {}.yaml")
+    cmd=("echo 'Getting info for {} resource'; oc get {} -o yaml > {}.yaml; oc describe {} > {}-describe.log")
   else
     create_out_dir ${1}
-    cmd=("echo 'Getting info for {} resource'; oc get {} -o yaml > ${1}/{}.yaml")
+    cmd=("echo 'Getting info for {} resource'; oc get {} -o yaml > ${1}/{}.yaml; oc describe {} > ${1}/{}-describe.log")
   fi
   echo "${cmd[@]}"
 }

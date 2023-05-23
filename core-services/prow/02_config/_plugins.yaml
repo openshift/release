@@ -30,26 +30,6 @@ bugzilla:
       - status: ASSIGNED
       - status: ON_DEV
       - status: POST
-    agent-installer:
-      add_external_link: true
-      allowed_groups:
-      - redhat
-      - qe_staff
-      - nec
-      exclude_defaults: true
-      is_open: true
-      state_after_close:
-        status: NEW
-      state_after_merge:
-        status: MODIFIED
-      state_after_validation:
-        status: POST
-      target_release: 4.13.0
-      valid_states:
-      - status: NEW
-      - status: ASSIGNED
-      - status: ON_DEV
-      - status: POST
     fcos:
       validate_by_default: false
     main:
@@ -181,16 +161,13 @@ bugzilla:
     openshift-4.12:
       dependent_bug_target_releases:
       - 4.13.0
+      - 4.13.z
       target_release: 4.12.z
       validate_by_default: true
     openshift-4.13:
-      dependent_bug_states:
-      - status: MODIFIED
-      - status: ON_QA
-      - status: VERIFIED
       dependent_bug_target_releases:
       - 4.14.0
-      target_release: 4.13.0
+      target_release: 4.13.z
       validate_by_default: true
     openshift-4.14:
       dependent_bug_states:
@@ -299,16 +276,13 @@ bugzilla:
     release-4.12:
       dependent_bug_target_releases:
       - 4.13.0
+      - 4.13.z
       target_release: 4.12.z
       validate_by_default: true
     release-4.13:
-      dependent_bug_states:
-      - status: MODIFIED
-      - status: ON_QA
-      - status: VERIFIED
       dependent_bug_target_releases:
       - 4.14.0
-      target_release: 4.13.0
+      target_release: 4.13.z
       validate_by_default: true
     release-4.14:
       dependent_bug_states:
@@ -343,6 +317,7 @@ config_updater:
       - build03
       - build04
       - build05
+      - multi01
       - vsphere
       namespaces:
       - ci
@@ -354,6 +329,7 @@ config_updater:
       - build03
       - build04
       - build05
+      - multi01
       - vsphere
       namespaces:
       - ocp
@@ -362,12 +338,6 @@ config_updater:
       - arm01
   gzip: false
   maps:
-    ci-operator/config/**/*-agent-installer.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
     ci-operator/config/**/*-fcos.yaml:
       clusters:
         app.ci:
@@ -392,12 +362,6 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/**/*-layering.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
     ci-operator/config/**/*-logging*/openshift*-*-logging*-release-5.*.yaml:
       clusters:
         app.ci:
@@ -415,13 +379,13 @@ config_updater:
         app.ci:
         - ci
       gzip: true
-      name: ci-operator-master-configs
+      name: ci-operator-main-configs
     ci-operator/config/**/*-main__*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
-      name: ci-operator-master-configs
+      name: ci-operator-main-configs
     ci-operator/config/**/*-ocp-ci-integration.yaml:
       clusters:
         app.ci:
@@ -440,37 +404,31 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/**/*che*/*-7.60.x*.yaml:
+    ci-operator/config/**/*che*/*-7.66.x*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/**/*che*/*-7.61.x*.yaml:
+    ci-operator/config/**/*che*/*-7.67.x*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/**/*che*/*-7.62.x*.yaml:
+    ci-operator/config/**/*che*/*-7.68.x*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/**/*che*/*-7.63.x*.yaml:
+    ci-operator/config/**/*che*/*-7.69.x*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/config/**/*che*/*-7.64.x*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: ci-operator-misc-configs
-    ci-operator/config/**/*che*/*-7.65.x*.yaml:
+    ci-operator/config/**/*che*/*-7.70.x*.yaml:
       clusters:
         app.ci:
         - ci
@@ -764,6 +722,18 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/**/log-file-metric-exporter/ViaQ-log-file-metric-exporter-release-5.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/**/logging-fluentd/ViaQ-logging-fluentd-release-5.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/**/logging-fluentd/ViaQ-logging-fluentd-ruby*.yaml:
       clusters:
         app.ci:
@@ -818,6 +788,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/**/vector/ViaQ-vector-release-5.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/**/vector/ViaQ-vector-v*.yaml:
       clusters:
         app.ci:
@@ -843,6 +819,18 @@ config_updater:
       gzip: true
       name: ci-operator-misc-configs
     ci-operator/config/3scale/3scale-operator/*-3scale-2.12-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/CSPI-QE/**/CSPI-QE-MSI*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/Intersmash/intersmash/Intersmash-intersmash-openshift-ci*.yaml:
       clusters:
         app.ci:
         - ci
@@ -938,7 +926,19 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-2.x-configs
-    ci-operator/config/maistra/**/*maistra-*.yaml:
+    ci-operator/config/maistra/**/maistra-*-maistra-*.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/migtools/velero-plugin-for-vsm/migtools-velero-plugin-for-vsm-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/migtools/volume-snapshot-mover/migtools-volume-snapshot-mover-oadp-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -998,6 +998,12 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/openshift/openshift-velero-plugin/openshift-openshift-velero-plugin-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/openshift/os/openshift-os-c9s*.yaml:
       clusters:
         app.ci:
@@ -1016,7 +1022,25 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/openshift/velero-plugin-for-aws/openshift-velero-plugin-for-aws-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/openshift/velero-plugin-for-csi/openshift-velero-plugin-for-csi-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/openshift/velero-plugin-for-gcp/openshift-velero-plugin-for-gcp-konveyor-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/openshift/velero-plugin-for-gcp/openshift-velero-plugin-for-gcp-oadp-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1028,7 +1052,19 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-misc-configs
+    ci-operator/config/openshift/velero-plugin-for-microsoft-azure/openshift-velero-plugin-for-microsoft-azure-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/openshift/velero/openshift-velero-konveyor-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/openshift/velero/openshift-velero-oadp-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1068,6 +1104,12 @@ config_updater:
       clusters:
         app.ci:
         - ci
+      name: ci-operator-misc-configs
+    ci-operator/config/redhat-developer/gitops-operator/*v1.8*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
       name: ci-operator-misc-configs
     ci-operator/config/redhat-developer/odo/*-v2.yaml:
       clusters:
@@ -1165,6 +1207,18 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-2.x-configs
+    ci-operator/config/stackrox/stackrox/*-release-4.0*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-4.0-configs
+    ci-operator/config/stackrox/stackrox/*-release-x.y*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
     ci-operator/config/stolostron/**/*-backplane-1.0*.yaml:
       clusters:
         app.ci:
@@ -1190,6 +1244,12 @@ config_updater:
       gzip: true
       name: ci-operator-misc-configs
     ci-operator/config/stolostron/**/*-backplane-2.3*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-misc-configs
+    ci-operator/config/stolostron/**/*-backplane-2.4*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1255,18 +1315,24 @@ config_updater:
         - ci
       gzip: true
       name: ci-operator-2.x-configs
+    ci-operator/config/stolostron/**/*-release-2.9*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: ci-operator-2.x-configs
     ci-operator/config/stolostron/**/*-release-9.9*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: ci-operator-misc-configs
-    ci-operator/jobs/**/*-agent-installer-presubmits.yaml:
+    ci-operator/config/windup/windup-ui-tests/windup-*-v1.0*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
-      name: job-config-misc
+      name: ci-operator-misc-configs
     ci-operator/jobs/**/*-branch-openshift-*.yaml:
       clusters:
         app.ci:
@@ -1297,12 +1363,6 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/**/*-layering-*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
     ci-operator/jobs/**/*-logging*/openshift*-logging*-release-5.*.yaml:
       clusters:
         app.ci:
@@ -1320,19 +1380,19 @@ config_updater:
         app.ci:
         - ci
       gzip: true
-      name: job-config-master-periodics
+      name: job-config-main-periodics
     ci-operator/jobs/**/*-main-postsubmits.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
-      name: job-config-master-postsubmits
+      name: job-config-main-postsubmits
     ci-operator/jobs/**/*-main-presubmits.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
-      name: job-config-master-presubmits
+      name: job-config-main-presubmits
     ci-operator/jobs/**/*-ocp-ci-integration*.yaml:
       clusters:
         app.ci:
@@ -1345,37 +1405,31 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/**/*che*/*-7.60.x-*.yaml:
+    ci-operator/jobs/**/*che*/*-7.66.x-*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/**/*che*/*-7.61.x-*.yaml:
+    ci-operator/jobs/**/*che*/*-7.67.x-*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/**/*che*/*-7.62.x-*.yaml:
+    ci-operator/jobs/**/*che*/*-7.68.x-*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/**/*che*/*-7.63.x-*.yaml:
+    ci-operator/jobs/**/*che*/*-7.69.x-*.yaml:
       clusters:
         app.ci:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/**/*che*/*-7.64.x-*.yaml:
-      clusters:
-        app.ci:
-        - ci
-      gzip: true
-      name: job-config-misc
-    ci-operator/jobs/**/*che*/*-7.65.x-*.yaml:
+    ci-operator/jobs/**/*che*/*-7.70.x-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1705,6 +1759,18 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/**/log-file-metric-exporter/ViaQ-log-file-metric-exporter-release-5.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/**/logging-fluentd/ViaQ-logging-fluentd-release-5.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/**/logging-fluentd/ViaQ-logging-fluentd-ruby*.yaml:
       clusters:
         app.ci:
@@ -1759,6 +1825,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/**/vector/ViaQ-vector-release-5.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/**/vector/ViaQ-vector-v*.yaml:
       clusters:
         app.ci:
@@ -1784,6 +1856,18 @@ config_updater:
       gzip: true
       name: job-config-misc
     ci-operator/jobs/3scale/3scale-operator/*-3scale-2.12-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/CSPI-QE/**/CSPI-QE-MSI*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/Intersmash/intersmash/Intersmash-intersmash-openshift-ci*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1873,7 +1957,19 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
-    ci-operator/jobs/maistra/**/*{maistra,main}*.yaml:
+    ci-operator/jobs/maistra/**/maistra-*-maistra-*.*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/migtools/velero-plugin-for-vsm/migtools-velero-plugin-for-vsm-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/migtools/volume-snapshot-mover/migtools-volume-snapshot-mover-oadp-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1933,6 +2029,12 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/openshift/openshift-velero-plugin/openshift-openshift-velero-plugin-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/openshift/os/openshift-os-c9s*.yaml:
       clusters:
         app.ci:
@@ -1951,7 +2053,25 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/openshift/velero-plugin-for-aws/openshift-velero-plugin-for-aws-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/openshift/velero-plugin-for-csi/openshift-velero-plugin-for-csi-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/openshift/velero-plugin-for-gcp/openshift-velero-plugin-for-gcp-konveyor-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/openshift/velero-plugin-for-gcp/openshift-velero-plugin-for-gcp-oadp-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -1963,7 +2083,19 @@ config_updater:
         - ci
       gzip: true
       name: job-config-misc
+    ci-operator/jobs/openshift/velero-plugin-for-microsoft-azure/openshift-velero-plugin-for-microsoft-azure-oadp-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/openshift/velero/openshift-velero-konveyor-*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/openshift/velero/openshift-velero-oadp-*.yaml:
       clusters:
         app.ci:
         - ci
@@ -2000,6 +2132,12 @@ config_updater:
       gzip: true
       name: job-config-misc
     ci-operator/jobs/red-hat-data-services/openvino_model_server/red-hat-data-services-openvino_model_server*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/redhat-developer/gitops-operator/*v1.8*.yaml:
       clusters:
         app.ci:
         - ci
@@ -2101,6 +2239,18 @@ config_updater:
         - ci
       gzip: true
       name: job-config-2.x
+    ci-operator/jobs/stackrox/stackrox/*-release-4.0*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-4.0
+    ci-operator/jobs/stackrox/stackrox/*-release-x.y*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
     ci-operator/jobs/stolostron/**/*-backplane-1.0*.yaml:
       clusters:
         app.ci:
@@ -2126,6 +2276,12 @@ config_updater:
       gzip: true
       name: job-config-misc
     ci-operator/jobs/stolostron/**/*-backplane-2.3*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/stolostron/**/*-backplane-2.4*.yaml:
       clusters:
         app.ci:
         - ci
@@ -2191,7 +2347,19 @@ config_updater:
         - ci
       gzip: true
       name: job-config-2.x
+    ci-operator/jobs/stolostron/**/*-release-2.9*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-2.x
     ci-operator/jobs/stolostron/**/*-release-9.9*.yaml:
+      clusters:
+        app.ci:
+        - ci
+      gzip: true
+      name: job-config-misc
+    ci-operator/jobs/windup/windup-ui-tests/windup-*-v1.0*.yaml:
       clusters:
         app.ci:
         - ci
@@ -2428,6 +2596,19 @@ config_updater:
         app.ci:
         - ci
       name: retester-config
+dco:
+  stolostron/config-policy-controller:
+    trusted_apps:
+    - red-hat-trusted-app-pipeline
+  stolostron/governance-policy-addon-controller:
+    trusted_apps:
+    - red-hat-trusted-app-pipeline
+  stolostron/governance-policy-framework-addon:
+    trusted_apps:
+    - red-hat-trusted-app-pipeline
+  stolostron/governance-policy-propagator:
+    trusted_apps:
+    - red-hat-trusted-app-pipeline
 golint: {}
 goose:
   key_path: /etc/unsplash-api/api-key
@@ -2457,15 +2638,18 @@ label:
   - docs-approved
   - qe-approved
   - downstream-change-needed
+  - rebase/manual
   restricted_labels:
     '*':
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
+      - openshift-release-oversight
       label: cherry-pick-approved
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
+      - openshift-release-oversight
       label: backport-risk-assessed
     - allowed_teams:
       - openshift-patch-managers
@@ -2474,10 +2658,12 @@ label:
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
+      - openshift-release-oversight
       label: jira/valid-bug
     - allowed_teams:
       - openshift-patch-managers
       - openshift-staff-engineers
+      - openshift-release-oversight
       label: bugzilla/valid-bug
     - allowed_teams:
       - openshift-release-oversight
@@ -2568,8 +2754,7 @@ repo_milestone:
     maintainers_team: odo-maintainers
 require_matching_label:
 - grace_period: 5s
-  missing_comment: Please specify area/hypershift-operator, area/control-plane-operator
-    or both
+  missing_comment: Please specify an area label
   missing_label: do-not-merge/needs-area
   org: openshift
   prs: true

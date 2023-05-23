@@ -30,6 +30,11 @@ function create_tests_temp_skip_list_11 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-8433
+# TESTNAME
+metallb "Correct and incorrect MetalLB resources coexist"
+
 EOF
 }
 
@@ -40,15 +45,57 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
 # SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-4194
+# bz### https://issues.redhat.com/browse/OCPBUGS-10424
 # TESTNAME
 performance "Should have the correct RPS configuration"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-8433
+# TESTNAME
+metallb "Correct and incorrect MetalLB resources coexist"
 
 EOF
 }
 
 function create_tests_temp_skip_list_13 {
-    create_tests_temp_skip_list_12
+# List of temporarly skipped tests for 4.13
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10424
+# TESTNAME
+performance "Check RPS Mask is applied to atleast one single rx queue on all veth interface"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-11750
+# TESTNAME
+tuningcni "sysctl allowlist update should start a pod with custom sysctl only after adding sysctl to allowlist"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+}
+
+function create_tests_temp_skip_list_14 {
+# List of temporarly skipped tests for 4.14
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-11046
+# TESTNAME
+tuningcni "sysctl allowlist update should start a pod with custom sysctl only after adding sysctl to allowlist"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
 }
 
 function is_bm_node {
@@ -91,9 +138,82 @@ function get_skip_tests {
     echo "${skip_list}"
 }
 
+
+function sno_set_registry {
+
+    # Create PVC storage for registry in a host of SNO baremetal in /var/registry
+    cat << EOF | oc apply -f -
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: image-registry-pv
+spec:
+  capacity:
+    storage: 100Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: image-registry-storage
+    namespace: openshift-image-registry
+  accessModes:
+  - ReadWriteMany
+  hostPath:
+    path: /var/registry
+    type: DirectoryOrCreate
+  persistentVolumeReclaimPolicy: Retain
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: image-registry-storage
+  namespace: openshift-image-registry
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 100Gi
+
+EOF
+
+    # Set registry to managed and configure PVC as a registry storage:
+    # https://docs.openshift.com/container-platform/4.12/registry/configuring_registry_storage/
+    # configuring-registry-storage-baremetal.html#configuring-registry-storage-baremetal
+    oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed"}}'
+    oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"pvc":{"claim":"image-registry-storage"}}}}'
+    # For debug purposes
+    sleep 60
+    timed=60
+    while [[ "$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.phase}')" != "Running" ]]; do
+        echo "Waiting for registry pod to be running ${timed} seconds"
+        sleep 10
+        timed=$((timed+10))
+        if [ "${timed}" -gt 600 ]; then
+            echo "Registry pod is not running after 600 seconds"
+            oc get pod -n openshift-image-registry -l docker-registry=default
+            status=$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.phase}')
+            echo "Status=${status}"
+            exit 1
+        fi
+    done
+    echo "Registry pod is running after ${timed} seconds"
+
+    oc get clusteroperator image-registry
+    oc get pod -n openshift-image-registry -l docker-registry=default
+    echo "Container state=$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.containerStatuses[0].ready}')"
+    # Wait 5 minutes until registry is up and running
+    sleep 300
+
+}
+
 source $SHARED_DIR/main.env
 
-export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}" # next: ovs_qos
+ # next: ovs_qos
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+    export FEATURES="${FEATURES:-sriov sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
+else
+    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
+fi
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
@@ -119,15 +239,14 @@ fi
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 
-if [[ "$T5CI_VERSION" == "4.13" ]]; then
-    export CNF_BRANCH="master"
-elif [[ "$T5CI_VERSION" == "4.14" ]]; then
+if [[ "$T5CI_VERSION" == "4.14" ]]; then
     export CNF_BRANCH="master"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
 fi
 
-cnf_dir=$(mktemp -d -t cnf-XXXXX)
+cnf_dir=${cnf_dir:-$(mktemp -d -t cnf-XXXXX)}
+mkdir -p "$cnf_dir"
 cd "$cnf_dir" || exit 1
 
 echo "running on branch ${CNF_BRANCH}"
@@ -150,8 +269,12 @@ if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
     export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
 
 fi
-if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
     create_tests_temp_skip_list_13
+    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
+fi
+if [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+    create_tests_temp_skip_list_14
     export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
@@ -160,25 +283,32 @@ export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
 
 skip_tests=$(get_skip_tests)
 
-worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
---selector='!node-role.kubernetes.io/master' -o name)
-if [ -z "${worker_nodes}" ]; then
-    echo "[ERROR]: No worker nodes found in cluster"
-    exit 1
-fi
-# get BM workers for testing
-test_nodes=""
-for node in ${worker_nodes}; do
-    if is_bm_node "${node}"; then
-        test_nodes="${test_nodes} ${node}"
+if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
+    worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
+    --selector='!node-role.kubernetes.io/master' -o name)
+    if [ -z "${worker_nodes}" ]; then
+        echo "[ERROR]: No worker nodes found in cluster"
+        exit 1
     fi
-done
+    # get BM workers for testing
+    test_nodes=""
+    for node in ${worker_nodes}; do
+        if is_bm_node "${node}"; then
+            test_nodes="${test_nodes} ${node}"
+        fi
+    done
 
-if [ -z "${test_nodes}" ]; then
-    echo "[ERROR]: No BM worker nodes found in cluster"
-    exit 1
+    if [ -z "${test_nodes}" ]; then
+        echo "[ERROR]: No BM worker nodes found in cluster"
+        exit 1
+    fi
 fi
 
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+    test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
+    # Create a registry for the tests
+    sno_set_registry
+fi
 export CNF_NODES="${test_nodes}"
 
 cd cnf-features-deploy
@@ -186,26 +316,31 @@ status=0
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
-FEATURES_ENVIRONMENT="ci" make functests-on-ci || status=$?
+FEATURES_ENVIRONMENT="ci" make functests-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
 cd -
 
 set +e
+set -x
 python3 -m venv ${SHARED_DIR}/myenv
 source ${SHARED_DIR}/myenv/bin/activate
 git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci
 pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
 # Create HTML reports for humans/aliens
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.html
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.html
+[[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.html
+ls ${ARTIFACT_DIR}/validation_junit*xml && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
+[[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.html
+# Run validation parser
+[[ -f ${SHARED_DIR}/cnf-tests-run.log ]] && python ${SHARED_DIR}/telco5gci/parse_log.py --test-type validations --path ${SHARED_DIR}/cnf-tests-run.log --output-file ${ARTIFACT_DIR}/parsed-validations.json
+[[ -f ${ARTIFACT_DIR}/parsed-validations.json ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/parsed-validations.json -f json -o ${ARTIFACT_DIR}/parsed_validations.html
 # Create JSON reports for robots
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.json
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.json
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.json
+[[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.json
+[[ -f ${ARTIFACT_DIR}/validation_junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/validation_junit.xml -o ${ARTIFACT_DIR}/validation_results.json
+[[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.json
 
 junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
 
-rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
+rm -rf ${SHARED_DIR}/myenv
+set +x
 set -e
 
 exit ${status}

@@ -119,12 +119,27 @@ def get_rc_volumes(context):
                     },
                     {
                         'configMap': {
+                            'name': 'job-config-main-periodics'
+                        }
+                    },
+                    {
+                        'configMap': {
                             'name': 'job-config-master-postsubmits'
                         }
                     },
                     {
                         'configMap': {
+                            'name': 'job-config-main-postsubmits'
+                        }
+                    },
+                    {
+                        'configMap': {
                             'name': 'job-config-master-presubmits'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-main-presubmits'
                         }
                     },
                     {
@@ -140,6 +155,11 @@ def get_rc_volumes(context):
                     {
                         'configMap': {
                             'name': 'job-config-3.x'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-4.0'
                         }
                     },
                     *_get_dynamic_projected_deployment_volumes(context),

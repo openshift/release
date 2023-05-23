@@ -41,33 +41,6 @@ metadata:
 EOF
 }
 
-# create ICSP for connected env.
-function create_icsp_connected () {
-    cat <<EOF | oc create -f -
-    apiVersion: operator.openshift.io/v1alpha1
-    kind: ImageContentSourcePolicy
-    metadata:
-      name: brew-registry
-    spec:
-      repositoryDigestMirrors:
-      - mirrors:
-        - brew.registry.redhat.io
-        source: registry.redhat.io
-      - mirrors:
-        - brew.registry.redhat.io
-        source: registry.stage.redhat.io
-      - mirrors:
-        - brew.registry.redhat.io
-        source: registry-proxy.engineering.redhat.com
-EOF
-    if [ $? == 0 ]; then
-        echo "create the ICSP successfully"
-    else
-        echo "!!! fail to create the ICSP"
-        return 1
-    fi
-}
-
 function create_catalog_sources() {
     # get cluster Major.Minor version
     ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
@@ -112,14 +85,6 @@ EOF
         run_command "oc get pods -o wide -n openshift-marketplace"
         run_command "oc -n openshift-marketplace get catalogsource qe-app-registry -o yaml"
         run_command "oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o yaml"
-        node_name=$(oc -n openshift-marketplace get pods -l olm.catalogSource=qe-app-registry -o=jsonpath='{.items[0].spec.nodeName}')
-        run_command "oc create ns debug-qe -o yaml | oc label -f - security.openshift.io/scc.podSecurityLabelSync=false pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged --overwrite"
-        run_command "oc -n debug-qe debug node/${node_name} -- chroot /host podman pull --authfile /var/lib/kubelet/config.json ${index_image}"
-
-        run_command "oc get mcp,node"
-        run_command "oc get mcp worker -o yaml"
-        run_command "oc get mc $(oc get mcp/worker --no-headers | awk '{print $2}') -o=jsonpath={.spec.config.storage.files}|jq '.[] | select(.path==\"/var/lib/kubelet/config.json\")'"
-
         return 1
     fi
     set -e
@@ -137,6 +102,5 @@ fi
 echo "enable qe catalogsource"
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
 
-create_icsp_connected
 check_marketplace
 create_catalog_sources

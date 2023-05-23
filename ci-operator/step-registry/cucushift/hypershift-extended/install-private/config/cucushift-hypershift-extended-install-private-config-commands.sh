@@ -48,7 +48,7 @@ else
 fi
 
 echo "create user hypershift-operator"
-user=$(aws iam get-user --user-name=hypershift-operator 2>/dev/null)
+user=$(aws iam get-user --user-name=hypershift-operator 2>/dev/null || true)
 if [ -z "$user" ] ; then
     aws iam create-user --user-name=hypershift-operator
     [ $? -ne 0 ] && exit 1

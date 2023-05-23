@@ -34,6 +34,10 @@ ERROR: helps reviewing the changes the automation does.
 ERROR: Run the following command to re-format the Prow jobs:
 ERROR: $ make jobs
 
+ERROR: Hint: if this is running as a presubmit, chances are your PR has probably gone stale.
+ERROR: This is especially true if everything is fine on your localhost but the presubmit keeps failing.
+ERROR: If that is the case, sync your repository with its upstream parent and finally rebase the PR. 
+
 ERROR: The following errors were found:
 
 EOF

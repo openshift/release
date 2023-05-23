@@ -4,18 +4,6 @@ build_root:
     namespace: ci
     tag: "2.2"
   use_build_cache: true
-images:
-- dockerfile_literal: |
-    FROM quay.io/maistra-dev/maistra-builder:2.2
-    # Git checks if the user that owns the files on the filesystem match the
-    # current user.  We need to disable this check because tests in Prow are
-    # running with a random user.
-    RUN git config --system --add safe.directory '*'
-  inputs:
-    src:
-      as:
-      - quay.io/maistra-dev/maistra-builder:2.2
-  to: src-test
 resources:
   '*':
     limits:
@@ -33,7 +21,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     TEST_FLAGS="-v"
   container:
-    from: src-test
+    from: src
   timeout: 4h0m0s
 - as: istio-operator-gencheck-2-2
   commands: |
@@ -43,7 +31,31 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src-test
+    from: src
+- as: update-charts-in-2-4
+  commands: |
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export GOFLAGS="-mod=vendor"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -b maistra-2.4 \
+      -f /creds-github/token \
+      '-c make clean update-charts-2.1 update-charts-2.2' \
+      '-t [maistra-2.4] Automator: Update charts from previous versions' \
+      -m update_charts_from_previous_versions_2.1_2.2
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
 zz_generated_metadata:
   branch: maistra-2.2
   org: maistra

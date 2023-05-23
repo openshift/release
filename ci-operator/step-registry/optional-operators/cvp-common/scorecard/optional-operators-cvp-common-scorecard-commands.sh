@@ -36,6 +36,7 @@ basic_tests() {
                        --verbose \
                        --output json \
                        --wait-time 60s \
+                       --pod-security "restricted" \
                        "${OPERATOR_DIR}" > "${OUTPUT_FILE}" || true
 }
 
@@ -56,6 +57,7 @@ custom_tests() {
       --verbose \
       --output "${CUSTOM_SCORECARD_OUTPUT_FORMAT}" \
       --wait-time 3000s \
+      --pod-security "restricted" \
       ${ADDITIONAL_OPTIONS} \
       --service-account "${SCORECARD_SERVICE_ACCOUNT}" \
       "${OPERATOR_DIR}" > "${OUTPUT_FILE}" || true

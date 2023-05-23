@@ -64,6 +64,23 @@ while true; do
   fi
 done
 
+echo "Waiting for cluster-admin ready..."
+start_time=$(date +"%s")
+while true; do
+  sleep 30
+  echo "Attempt to get cluster-admins group..."
+  cluster_admin=$(oc get group cluster-admins -o json | jq -r '.users[0]' || true)
+  if [[ "${cluster_admin}" == "${IDP_USER}" ]]; then
+    echo "cluster-admin is granted succesffully on the user ${cluster_admin}"
+    break
+  fi
+
+  if (( $(date +"%s") - $start_time >= $IDP_TIMEOUT )); then
+    echo "error: Timed out while waiting for cluster-admin to be granted"
+    exit 1
+  fi
+done
+
 # Store kubeconfig
 echo "Kubeconfig file: ${KUBECONFIG}"
 cat ${KUBECONFIG} > "${SHARED_DIR}/kubeconfig"

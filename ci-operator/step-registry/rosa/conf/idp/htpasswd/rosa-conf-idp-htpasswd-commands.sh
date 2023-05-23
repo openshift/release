@@ -79,7 +79,7 @@ while true; do
   sleep 30
   echo "Attempt to get cluster-admins group..."
   cluster_admin=$(oc get group cluster-admins -o json | jq -r '.users[0]' || true)
-  if [[ "${cluster_admin}" == "rosa-admin" ]]; then
+  if [[ "${cluster_admin}" == "${IDP_USER}" ]]; then
     echo "cluster-admin is granted succesffully on the user ${cluster_admin}"
     break
   fi

@@ -5,10 +5,19 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+#Save stacks events
+trap 'save_stack_events_to_artifacts' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION="${LEASED_RESOURCE}"
+
+function save_stack_events_to_artifacts()
+{
+  set +o errexit
+  aws --region ${REGION} cloudformation describe-stack-events --stack-name ${stack_name} --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.json"
+  set -o errexit
+}
 
 # Using source region for C2S and SC2S
 if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then

@@ -58,7 +58,7 @@
 * cpu: "100m"
 * ephemeral-storage: "1Mi"
 
-# [ jenkins-operator, kata-jenkins-operator ]
+# [ kata-jenkins-operator ]
 ### requests:
 * memory: "500Mi"
 * cpu: "100m"

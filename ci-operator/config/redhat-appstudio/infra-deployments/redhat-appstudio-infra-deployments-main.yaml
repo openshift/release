@@ -1,3 +1,8 @@
+base_images:
+  hypershift-operator:
+    name: "4.12"
+    namespace: ocp
+    tag: hypershift-operator
 build_root:
   image_stream_tag:
     name: redhat-appstudio
@@ -7,7 +12,7 @@ releases:
   latest:
     release:
       architecture: amd64
-      channel: stable
+      channel: fast
       version: "4.12"
 resources:
   '*':
@@ -17,8 +22,19 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: appstudio-hac-e2e-tests
+  optional: true
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.4-multi
+    test:
+    - ref: redhat-appstudio-install-rhtap
+    - ref: redhat-appstudio-hac-e2e
+    workflow: redhat-appstudio-install
 - as: appstudio-e2e-tests
-  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|monitoring|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     env:

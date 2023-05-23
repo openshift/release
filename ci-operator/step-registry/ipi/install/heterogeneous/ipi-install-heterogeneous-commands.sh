@@ -44,6 +44,11 @@ PATH=${PATH}:/tmp
 
 echo "Fetching Worker MachineSet..."
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    echo "Setting proxy"
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
 
 MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets | yq-v4 "$(cat <<EOF

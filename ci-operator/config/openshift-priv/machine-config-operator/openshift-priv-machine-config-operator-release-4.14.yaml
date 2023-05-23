@@ -31,6 +31,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: hypershift-operator
+  hypershift-tests:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: hypershift-tests
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -69,12 +77,6 @@ promotion:
   name: 4.14-priv
   namespace: ocp-private
 releases:
-  hosted-ocp-previous:
-    candidate:
-      product: ocp
-      relative: 1
-      stream: ci
-      version: "4.12"
   initial:
     integration:
       name: 4.14-priv
@@ -190,12 +192,13 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
-      - env: OS_IMAGE_URL
+      - env: MCO_OS_IMAGE_URL
         name: pipeline:custom-os-image
       from: src
       resources:
         requests:
           cpu: 100m
+      timeout: 2h30m0s
     workflow: ipi-gcp
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -238,6 +241,18 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi
+- as: e2e-vsphere-upi-zones
+  optional: true
+  steps:
+    cluster_profile: vsphere-multizone
+    workflow: openshift-e2e-vsphere-upi-zones
+  timeout: 6h0m0s
+- as: e2e-vsphere-zones
+  optional: true
+  steps:
+    cluster_profile: vsphere-multizone
+    workflow: openshift-e2e-vsphere-zones
+  timeout: 6h0m0s
 - as: e2e-metal-ipi
   cluster: build05
   optional: true
@@ -333,7 +348,7 @@ tests:
       cli: latest
       commands: make test-e2e-single-node
       dependencies:
-      - env: OS_IMAGE_URL
+      - env: MCO_OS_IMAGE_URL
         name: pipeline:custom-os-image
       from: src
       resources:

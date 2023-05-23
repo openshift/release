@@ -3,10 +3,18 @@ periodics:
   cluster: app.ci
   cron: '@hourly'
   decorate: true
+  decoration_config:
+    timeout: 5h0m0s
   labels:
     ci.openshift.io/area: knative
     ci.openshift.io/role: image-mirroring
   name: periodic-image-mirroring-knative
+  reporter_config:
+    slack:
+      channel: '#serverless-dev'
+      job_states_to_report:
+      - failure
+      report_template: Job {{.Spec.Job}} failed
   spec:
     containers:
     - args:
@@ -27,7 +35,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -78,7 +86,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -115,7 +123,7 @@ periodics:
         failures=0
         for mapping in /etc/imagemirror/mapping_openshift_azure*; do
           echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
+          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
             failures=$((failures+1))
           fi
@@ -184,7 +192,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -232,7 +240,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -280,7 +288,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -328,7 +336,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -376,7 +384,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -424,7 +432,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -472,7 +480,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -520,7 +528,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -568,7 +576,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -619,7 +627,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -670,7 +678,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -721,7 +729,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -775,7 +783,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -823,7 +831,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -871,7 +879,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -907,10 +915,10 @@ periodics:
         set -o errexit
         failures=0
         for mapping in /etc/imagemirror/mapping_supplemental_ci_images_*; do
-          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
+          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
           attempts=3
           for attempt in $( seq $attempts ); do
-            if oc image mirror -f="$mapping" --skip-multiple-scopes; then
+            if oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
               break
             fi
             if [[ $attempt -eq $attempts ]]; then
@@ -925,7 +933,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -962,7 +970,7 @@ periodics:
         failures=0
         for mapping in /etc/imagemirror/mapping_supplemental_ci_private_images_redhat_*; do
           echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
+          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
             failures=$((failures+1))
           fi
@@ -973,7 +981,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1029,7 +1037,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1080,7 +1088,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1120,7 +1128,7 @@ periodics:
           # Remove --keep-manifest-list option for now until the internal
           # registry supports it. https://issues.redhat.com/browse/IR-192
           echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror -f="$mapping" --skip-multiple-scopes; then
+          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
             echo "ERROR: Failed to mirror images from $mapping"
             failures=$((failures+1))
           fi
@@ -1131,7 +1139,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1179,7 +1187,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1237,7 +1245,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1295,7 +1303,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1353,7 +1361,7 @@ periodics:
       env:
       - name: HOME
         value: /home/mirror
-      image: registry.ci.openshift.org/ocp/4.9:cli
+      image: registry.ci.openshift.org/ocp/4.12:cli
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1370,6 +1378,59 @@ periodics:
     - name: push
       secret:
         secretName: registry-push-credentials-quay-io-albo
+    - configMap:
+        name: image-mirror-mappings
+      name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@hourly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: openshift-cnv
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-openshift-cnv-tests
+  spec:
+    automountServiceAccountToken: true
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        cp ~/.docker/config.json "${REGISTRY_AUTH_FILE_COMBINED}"
+        oc registry login --to "${REGISTRY_AUTH_FILE_COMBINED}"
+        failures=0
+        for mapping in /etc/imagemirror/mapping_openshift-cnv*; do
+          echo "Running: oc image mirror --keep-manifest-list -f=$mapping --skip-multiple-scopes"
+          if ! oc image mirror -a "${REGISTRY_AUTH_FILE_COMBINED}" --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+            echo "ERROR: Failed to mirror images from $mapping"
+            failures=$((failures+1))
+          fi
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      env:
+      - name: HOME
+        value: /home/mirror
+      - name: REGISTRY_AUTH_FILE_COMBINED
+        value: /tmp/config.json
+      image: registry.ci.openshift.org/ocp/4.12:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
+      volumeMounts:
+      - mountPath: /home/mirror/.docker/config.json
+        name: push
+        readOnly: true
+        subPath: config.json
+      - mountPath: /etc/imagemirror
+        name: config
+    volumes:
+    - name: push
+      secret:
+        secretName: cluster-secrets-aws-interop-qe
     - configMap:
         name: image-mirror-mappings
       name: config

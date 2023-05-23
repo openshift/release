@@ -4,11 +4,14 @@ set -euo pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 #Save exit code for must-gather to generate junit
 trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
+#Save stacks events
+trap 'save_stack_events_to_artifacts' EXIT TERM INT
 
 # The oc binary is placed in the shared-tmp by the test container and we want to use
 # that oc for all actions.
 export PATH=/tmp:${PATH}
 GATHER_BOOTSTRAP_ARGS=
+NEW_STACKS=$(mktemp)
 
 function add_param_to_json() {
     local k="$1"
@@ -27,6 +30,17 @@ function gather_bootstrap_and_fail() {
 
   return 1
 }
+
+function save_stack_events_to_artifacts()
+{
+  set +o errexit
+  while read -r stack_name
+  do
+    aws --region ${AWS_REGION} cloudformation describe-stack-events --stack-name ${stack_name} --output json > "${ARTIFACT_DIR}/stack-events-${stack_name}.json"
+  done < "${NEW_STACKS}"
+  set -o errexit
+}
+
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
@@ -111,8 +125,17 @@ HOSTED_ZONE="$(aws route53 list-hosted-zones-by-name \
   --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
   --output text)"
 
+# Define Stack names
+VPC_STACK_NAME=${CLUSTER_NAME}-vpc
+INFRA_STACK_NAME=${CLUSTER_NAME}-infra
+SECURITY_STACK_NAME=${CLUSTER_NAME}-security
+PROXY_STACK_NAME=${CLUSTER_NAME}-proxy
+BOOTSTRAP_STACK_NAME=${CLUSTER_NAME}-bootstrap
+CONTROL_PLANE_STACK_NAME=${CLUSTER_NAME}-control-plane
+COMPUTE_STACK_NAME_PREFIX=${CLUSTER_NAME}-compute
+
 # Create s3 bucket for bootstrap and proxy ignition configs
-aws s3 mb s3://"${CLUSTER_NAME}-infra"
+aws s3 mb s3://"${INFRA_STACK_NAME}"
 
 # If we are using a proxy, create a 'black-hole' private subnet vpc TODO
 # For now this is just a placeholder...
@@ -120,16 +143,17 @@ cf_params_vpc=${ARTIFACT_DIR}/cf_params_vpc.json
 add_param_to_json AvailabilityZoneCount 3 "${cf_params_vpc}"
 cat "${cf_params_vpc}"
 
-aws cloudformation create-stack  --stack-name "${CLUSTER_NAME}-vpc" \
+echo "${VPC_STACK_NAME}" >> "${NEW_STACKS}"
+aws cloudformation create-stack  --stack-name "${VPC_STACK_NAME}" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/01_vpc.yaml")" \
   --tags "${TAGS}" \
   --parameters file://${cf_params_vpc} &
 wait "$!"
 
-aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-vpc" &
+aws cloudformation wait stack-create-complete --stack-name "${VPC_STACK_NAME}" &
 wait "$!"
 
-VPC_JSON="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-vpc" \
+VPC_JSON="$(aws cloudformation describe-stacks --stack-name "${VPC_STACK_NAME}" \
   --query 'Stacks[].Outputs[]' --output json)"
 VPC_ID="$(echo "${VPC_JSON}" | jq -r '.[] | select(.OutputKey == "VpcId").OutputValue')"
 PRIVATE_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PrivateSubnetIds").OutputValue')"  # explicitly keeping wrapping quotes
@@ -153,18 +177,19 @@ add_param_to_json PublicSubnets "$(echo "${PUBLIC_SUBNETS}" | sed 's/"//g')" "${
 
 cat "${cf_params_infra}"
 
+echo "${INFRA_STACK_NAME}" >> "${NEW_STACKS}"
 aws cloudformation create-stack \
-  --stack-name "${CLUSTER_NAME}-infra" \
+  --stack-name "${INFRA_STACK_NAME}" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/02_cluster_infra.yaml")" \
   --tags "${TAGS}" \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters file://${cf_params_infra} &
 wait "$!"
 
-aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-infra" &
+aws cloudformation wait stack-create-complete --stack-name "${INFRA_STACK_NAME}" &
 wait "$!"
 
-INFRA_JSON="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-infra" \
+INFRA_JSON="$(aws cloudformation describe-stacks --stack-name "${INFRA_STACK_NAME}" \
   --query 'Stacks[].Outputs[]' --output json)"
 NLB_IP_TARGETS_LAMBDA="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "RegisterNlbIpTargetsLambda").OutputValue')"
 EXTERNAL_API_TARGET_GROUP="$(echo "${INFRA_JSON}" | jq -r '.[] | select(.OutputKey == "ExternalApiTargetGroupArn").OutputValue')"
@@ -180,18 +205,19 @@ add_param_to_json PrivateSubnets "$(echo "${PRIVATE_SUBNETS}" | sed 's/"//g')" "
 
 cat "${cf_params_security}"
 
+echo "${SECURITY_STACK_NAME}" >> "${NEW_STACKS}"
 aws cloudformation create-stack \
-  --stack-name "${CLUSTER_NAME}-security" \
+  --stack-name "${SECURITY_STACK_NAME}" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/03_cluster_security.yaml")" \
   --tags "${TAGS}" \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters file://${cf_params_security} &
 wait "$!"
 
-aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-security" &
+aws cloudformation wait stack-create-complete --stack-name "${SECURITY_STACK_NAME}" &
 wait "$!"
 
-SECURITY_JSON="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-security" \
+SECURITY_JSON="$(aws cloudformation describe-stacks --stack-name "${SECURITY_STACK_NAME}" \
   --query 'Stacks[].Outputs[]' --output json)"
 MASTER_SECURITY_GROUP="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "MasterSecurityGroupId").OutputValue')"
 MASTER_INSTANCE_PROFILE="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.OutputKey == "MasterInstanceProfile").OutputValue')"
@@ -200,14 +226,15 @@ WORKER_INSTANCE_PROFILE="$(echo "${SECURITY_JSON}" | jq -r '.[] | select(.Output
 
 if [[ -d "${SHARED_DIR}/CA" ]]; then
   # host proxy ignition on s3
-  S3_PROXY_URI="s3://${CLUSTER_NAME}-infra/proxy.ign"
+  S3_PROXY_URI="s3://${INFRA_STACK_NAME}/proxy.ign"
   aws s3 cp ${SHARED_DIR}/proxy.ign "$S3_PROXY_URI"
 
   PROXY_URI="https://${JOB_NAME_SAFE}-bootstrap-exporter-${NAMESPACE}.svc.ci.openshift.org/proxy.ign"
   export PROXY_URI
 
+  echo "${PROXY_STACK_NAME}" >> "${NEW_STACKS}"
   aws cloudformation create-stack \
-    --stack-name "${CLUSTER_NAME}-proxy" \
+    --stack-name "${PROXY_STACK_NAME}" \
     --template-body "$(cat "${SHARED_DIR}/04_cluster_proxy.yaml")" \
     --tags "${TAGS}" \
     --capabilities CAPABILITY_NAMED_IAM \
@@ -228,10 +255,10 @@ if [[ -d "${SHARED_DIR}/CA" ]]; then
       ParameterKey=InternalServiceTargetGroupArn,ParameterValue="${INTERNAL_SERVICE_TARGET_GROUP}" &
   wait "$!"
 
-  aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-proxy" &
+  aws cloudformation wait stack-create-complete --stack-name "${PROXY_STACK_NAME}" &
   wait "$!"
 
-  PROXY_IP="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-proxy" \
+  PROXY_IP="$(aws cloudformation describe-stacks --stack-name "${PROXY_STACK_NAME}" \
     --query 'Stacks[].Outputs[?OutputKey == `ProxyPublicIp`].OutputValue' --output text)"
 
   PROXY_URL=$(cat ${SHARED_DIR}/PROXY_URL)
@@ -243,7 +270,7 @@ if [[ -d "${SHARED_DIR}/CA" ]]; then
   echo ${PROXY_IP} > ${ARTIFACT_DIR}/installer/proxyip
 fi
 
-S3_BOOTSTRAP_URI="s3://${CLUSTER_NAME}-infra/bootstrap.ign"
+S3_BOOTSTRAP_URI="s3://${INFRA_STACK_NAME}/bootstrap.ign"
 aws s3 cp ${ARTIFACT_DIR}/installer/bootstrap.ign "$S3_BOOTSTRAP_URI"
 
 cf_params_bootstrap=${ARTIFACT_DIR}/cf_params_bootstrap.json
@@ -266,18 +293,19 @@ fi
 
 cat "${cf_params_bootstrap}"
 
+echo "${BOOTSTRAP_STACK_NAME}" >> "${NEW_STACKS}"
 aws cloudformation create-stack \
-  --stack-name "${CLUSTER_NAME}-bootstrap" \
+  --stack-name "${BOOTSTRAP_STACK_NAME}" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/04_cluster_bootstrap.yaml")" \
   --tags "${TAGS}" \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters file://${cf_params_bootstrap} &
 wait "$!"
 
-aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
+aws cloudformation wait stack-create-complete --stack-name "${BOOTSTRAP_STACK_NAME}" &
 wait "$!"
 
-BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-bootstrap" \
+BOOTSTRAP_IP="$(aws cloudformation describe-stacks --stack-name "${BOOTSTRAP_STACK_NAME}" \
   --query 'Stacks[].Outputs[?OutputKey == `BootstrapPublicIp`].OutputValue' --output text)"
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --bootstrap ${BOOTSTRAP_IP}"
 
@@ -301,18 +329,19 @@ add_param_to_json MasterInstanceType "${MASTER_INSTANCE_TYPE}" "${cf_params_cont
 
 cat "${cf_params_control_plane}"
 
+echo "${CONTROL_PLANE_STACK_NAME}" >> "${NEW_STACKS}"
 aws cloudformation create-stack \
-  --stack-name "${CLUSTER_NAME}-control-plane" \
+  --stack-name "${CONTROL_PLANE_STACK_NAME}" \
   --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/05_cluster_master_nodes.yaml")" \
   --tags "${TAGS}" \
   --parameters file://${cf_params_control_plane} &
 wait "$!"
 
-aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-control-plane" &
+aws cloudformation wait stack-create-complete --stack-name "${CONTROL_PLANE_STACK_NAME}" &
 wait "$!"
 
-aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-control-plane"
-CONTROL_PLANE_IPS="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-control-plane" --query 'Stacks[].Outputs[?OutputKey == `PrivateIPs`].OutputValue' --output text)"
+aws cloudformation wait stack-create-complete --stack-name "${CONTROL_PLANE_STACK_NAME}"
+CONTROL_PLANE_IPS="$(aws cloudformation describe-stacks --stack-name "${CONTROL_PLANE_STACK_NAME}" --query 'Stacks[].Outputs[?OutputKey == `PrivateIPs`].OutputValue' --output text)"
 CONTROL_PLANE_0_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f1)"
 CONTROL_PLANE_1_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f2)"
 CONTROL_PLANE_2_IP="$(echo "${CONTROL_PLANE_IPS}" | cut -d, -f3)"
@@ -321,6 +350,7 @@ GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${CONTROL_PLANE_0_IP} -
 for INDEX in 0 1 2
 do
   SUBNET="PRIVATE_SUBNET_${INDEX}"
+  COMPUTE_STACK_NAME=${COMPUTE_STACK_NAME_PREFIX}-${INDEX}
 
   cf_params_compute="${ARTIFACT_DIR}/cf_params_compute_${INDEX}.json"
   add_param_to_json InfrastructureName "${INFRA_ID}" "${cf_params_compute}"
@@ -334,18 +364,19 @@ do
   
 
   cat "${cf_params_compute}"
+  echo "${COMPUTE_STACK_NAME}" >> "${NEW_STACKS}"
   aws cloudformation create-stack \
-    --stack-name "${CLUSTER_NAME}-compute-${INDEX}" \
+    --stack-name "${COMPUTE_STACK_NAME}" \
     --template-body "$(cat "/var/lib/openshift-install/upi/aws/cloudformation/06_cluster_worker_node.yaml")" \
     --tags "${TAGS}" \
     --parameters file://${cf_params_compute} &
   wait "$!"
 
-  aws cloudformation wait stack-create-complete --stack-name "${CLUSTER_NAME}-compute-${INDEX}" &
+  aws cloudformation wait stack-create-complete --stack-name "${COMPUTE_STACK_NAME}" &
   wait "$!"
 
   COMPUTE_VAR="COMPUTE_${INDEX}_IP"
-  COMPUTE_IP="$(aws cloudformation describe-stacks --stack-name "${CLUSTER_NAME}-compute-${INDEX}" --query 'Stacks[].Outputs[?OutputKey == `PrivateIP`].OutputValue' --output text)"
+  COMPUTE_IP="$(aws cloudformation describe-stacks --stack-name "${COMPUTE_STACK_NAME}" --query 'Stacks[].Outputs[?OutputKey == `PrivateIP`].OutputValue' --output text)"
   export COMPUTE_IP
   eval "${COMPUTE_VAR}=\${COMPUTE_IP}"
 done
@@ -358,10 +389,10 @@ openshift-install --dir=${ARTIFACT_DIR}/installer wait-for bootstrap-complete &
 wait "$!" || gather_bootstrap_and_fail
 
 echo "Bootstrap complete, destroying bootstrap resources"
-aws cloudformation delete-stack --stack-name "${CLUSTER_NAME}-bootstrap" &
+aws cloudformation delete-stack --stack-name "${BOOTSTRAP_STACK_NAME}" &
 wait "$!"
 
-aws cloudformation wait stack-delete-complete --stack-name "${CLUSTER_NAME}-bootstrap" &
+aws cloudformation wait stack-delete-complete --stack-name "${BOOTSTRAP_STACK_NAME}" &
 wait "$!"
 
 function approve_csrs() {
@@ -403,5 +434,6 @@ sed -i 's/password: .*/password: REDACTED"/g' ${ARTIFACT_DIR}/installer/.openshi
 # is not properly configured. Rerun patching
 # after cluster complete
 cp "${ARTIFACT_DIR}/installer/metadata.json" "${SHARED_DIR}/"
-cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}"
+cp "${ARTIFACT_DIR}/installer/auth/kubeconfig" "${SHARED_DIR}/"
+cp "${ARTIFACT_DIR}/installer/auth/kubeadmin-password" "${SHARED_DIR}/"
 touch /tmp/install-complete

@@ -96,6 +96,46 @@ in 3.11).''')
         }]
     }, comment='Allow ART to mirror images to the ocp-private namespace so 4.x:base images can be pushed')
 
+    gendoc.append({
+        'apiVersion': 'authorization.openshift.io/v1',
+        'kind': 'Role',
+        'metadata': {
+            'name': 'art-publish-modify-release',
+            'namespace': 'ocp-private'
+        },
+        'rules': [
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreams'],
+                'verbs': ['get', 'list', 'watch', 'update', 'patch']
+            },
+            {
+                'apiGroups': ['image.openshift.io'],
+                'resources': ['imagestreamtags'],
+                'verbs': ['get', 'list', 'watch', 'update', 'patch', 'delete']
+            }
+        ]
+    })
+
+    gendoc.append({
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'art-publish-modify-release',
+            'namespace': 'ocp-private'
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Role',
+            'name': 'art-publish-modify-release'
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'art-publish',
+            'namespace': 'ocp'
+        }]
+    })
+
     gendoc.append_all([{
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'Role',

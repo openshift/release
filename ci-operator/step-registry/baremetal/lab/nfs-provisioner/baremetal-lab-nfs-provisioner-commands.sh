@@ -3,6 +3,16 @@
 set -o errexit
 set -o pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
+# In a network restricted environment additional images required by the nfs provisioner cannot be pulled from the internet,
+# thus the need to have it mirrored and accessible through the proxy registry hosted on the aux host.
+# Associated PR at https://gitlab.cee.redhat.com/aosqe/tests-images/-/merge_requests/85
+NFS_CLIENT_MIRRORED_IMAGE_URL="quay.io/openshifttest/nfs-subdir-external-provisioner@sha256:3036bf6b741cdee4caf8fc30bccd049afdf662e08a52f2e6ae47b75ef52a40ac"
+
+
 # Set the NFS_SERVER value to the same value as the AUX_HOST, unless explicitly set.
 NFS_SERVER=${NFS_SERVER:-${AUX_HOST}}
 DIR=/tmp/nfs-provisioner
@@ -61,6 +71,7 @@ spec:
     spec:
       containers:
         - name: nfs-client-provisioner
+          image: ${NFS_CLIENT_MIRRORED_IMAGE_URL}
           env:
             - name: NFS_SERVER
               value: ${NFS_SERVER}

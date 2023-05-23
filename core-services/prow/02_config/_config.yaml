@@ -13,26 +13,30 @@ deck:
   default_rerun_auth_configs:
   - repo: '*'
     rerun_auth_configs:
+      github_team_slugs:
+      - org: openshift
+        slug: test-platform
       github_users:
       - stevekuznetsov
-      - droslean
-      - bbguimaraes
-      - hongkailiu
       - vikaslaad
       - dobbymoodge
-      - jmguzik
       - bparees
       - AlexNPavel
       - jupierce
-      - smg247
-      - danilo-gemoli
   - repo: openshift/openshift-tests-private
     rerun_auth_configs:
       github_team_slugs:
       - org: openshift
         slug: team-qe
+      - org: openshift
+        slug: team-red-hat
+      - org: openshift
+        slug: test-platform
   - repo: openshift/hypershift
     rerun_auth_configs:
+      github_team_slugs:
+      - org: openshift
+        slug: test-platform
       github_users:
       - aleskandro
       - bryan-cox
@@ -42,15 +46,17 @@ deck:
       github_team_slugs:
       - org: openshift
         slug: team-qe
+      - org: openshift
+        slug: team-red-hat
+      - org: openshift
+        slug: test-platform
   - repo: openshift/osde2e
     rerun_auth_configs:
       github_team_slugs:
       - org: openshift
         slug: openshift-team-sd-sre-cicd
-  external_agent_logs:
-  - agent: jenkins
-    selector: master=ci.openshift.redhat.com
-    url_template: http://jenkins-operator/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/consoleText
+      - org: openshift
+        slug: test-platform
   hidden_repos:
   - openshift/ose
   - openshift/online-registration
@@ -117,10 +123,17 @@ deck:
       optional_files:
       - .*/custom-link-.*\.html|.*/test-risk-analysis.*\.html
       required_files:
-      - .*/e2e-intervals_spyglass.*\.html|.*-summary\.html|.*/e2e-timelines_spyglass_.*\.html|.*/camgi\.html
+      - .*/e2e-intervals_spyglass.*\.html|.*-summary.*\.html|.*/e2e-timelines_spyglass_.*\.html|.*/camgi\.html
     size_limit: 500000000
   tide_update_period: 10s
 default_job_timeout: 24h0m0s
+gangway:
+  allowed_api_clients:
+  - allowed_jobs_filters:
+    - tenant_id: gangway-api
+    gcp:
+      endpoint_api_consumer_number: "1"
+      endpoint_api_consumer_type: PROJECT
 gerrit:
   ratelimit: 5
   tick_interval: 1m0s
@@ -138,33 +151,6 @@ in_repo_config:
     '*':
     - default
 jenkins_operators:
-- job_url_template: https://prow.ci.openshift.org/view/gs/origin-{{if eq .Spec.Type
-    "presubmit"}}{{if eq .Spec.Refs.Org "kubernetes"}}federated-results{{else if eq
-    .Spec.Refs.Org "kubernetes-incubator"}}federated-results{{else if eq .Spec.Refs.Org
-    "cri-o"}}federated-results{{else}}ci-test{{end}}{{else}}ci-test{{end}}/{{if eq
-    .Spec.Type "presubmit"}}pr-logs/pull{{else if eq .Spec.Type "batch"}}pr-logs/pull{{else}}logs{{end}}{{if
-    ne .Spec.Type "periodic"}}{{if ne .Spec.Refs.Repo "origin"}}/{{.Spec.Refs.Org}}_{{.Spec.Refs.Repo}}{{end}}{{end}}{{if
-    eq .Spec.Type "presubmit"}}/{{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}{{else
-    if eq .Spec.Type "batch"}}/batch{{end}}/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}/
-  label_selector: master=ci.openshift.redhat.com
-  max_concurrency: 150
-  max_goroutines: 20
-  report_templates:
-    '*': '[Full PR test history](https://prow.ci.openshift.org/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://prow.ci.openshift.org/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
-    openshift-priv: '[Full PR test history](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://deck-internal-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
-    openshift-psap/ci-artifacts-priv: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
-    openshift/cucushift: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
-    openshift/openshift-tests-private: '[Full PR test history](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with
-      index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}). [Your PR dashboard](https://qe-private-deck-ci.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
-      index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).'
 - job_url_template: http://jenkins.katacontainers.io/job/{{.Spec.Job}}/{{.Status.JenkinsBuildID}}
   label_selector: master=jenkins.katacontainers.io
   max_concurrency: 10
@@ -220,17 +206,17 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20230315-6d54c174f4
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20230315-6d54c174f4
-        initupload: gcr.io/k8s-prow/initupload:v20230315-6d54c174f4
-        sidecar: gcr.io/k8s-prow/sidecar:v20230315-6d54c174f4
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20230518-c802d8aea4
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20230518-c802d8aea4
+        initupload: gcr.io/k8s-prow/initupload:v20230518-c802d8aea4
+        sidecar: gcr.io/k8s-prow/sidecar:v20230518-c802d8aea4
   - cluster: arm01
     config:
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20230315-6d54c174f4-arm64
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20230315-6d54c174f4-arm64
-        initupload: gcr.io/k8s-prow/initupload:v20230315-6d54c174f4-arm64
-        sidecar: gcr.io/k8s-prow/sidecar:v20230315-6d54c174f4-arm64
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20230518-c802d8aea4-arm64
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20230518-c802d8aea4-arm64
+        initupload: gcr.io/k8s-prow/initupload:v20230518-c802d8aea4-arm64
+        sidecar: gcr.io/k8s-prow/sidecar:v20230518-c802d8aea4-arm64
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -353,6 +339,8 @@ tide:
           cri-o:
             skip-unknown-contexts: true
       kcp-dev:
+        skip-unknown-contexts: true
+      maistra:
         skip-unknown-contexts: true
       openshift:
         repos:

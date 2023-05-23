@@ -4,18 +4,6 @@ build_root:
     namespace: ci
     tag: "2.1"
   use_build_cache: true
-images:
-- dockerfile_literal: |
-    FROM quay.io/maistra-dev/maistra-builder:2.1
-    # Git checks if the user that owns the files on the filesystem match the
-    # current user.  We need to disable this check because tests in Prow are
-    # running with a random user.
-    RUN git config --system --add safe.directory '*'
-  inputs:
-    src:
-      as:
-      - quay.io/maistra-dev/maistra-builder:2.1
-  to: src-test
 resources:
   '*':
     limits:
@@ -27,6 +15,7 @@ tests:
 - as: istio-unit-2-1
   commands: |
     make -e T=-v build racetest binaries-test \
+    ARTIFACTS="${ARTIFACT_DIR:-}" \
     BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
@@ -35,11 +24,12 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
-    from: src-test
+    from: src
   timeout: 4h0m0s
 - as: istio-gencheck-2-1
   commands: |
     make gen-check \
+    ARTIFACTS="${ARTIFACT_DIR:-}" \
     BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
@@ -48,10 +38,11 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
-    from: src-test
+    from: src
 - as: istio-lint-2-1
   commands: |
     make lint \
+    ARTIFACTS="${ARTIFACT_DIR:-}" \
     BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
@@ -60,7 +51,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     ISTIO_ENVOY_BASE_URL="https://storage.googleapis.com/maistra-prow-testing/proxy"
   container:
-    from: src-test
+    from: src
 zz_generated_metadata:
   branch: maistra-2.1
   org: maistra

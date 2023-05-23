@@ -4,9 +4,19 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+#Save stacks events
+trap 'save_stack_events_to_artifacts' EXIT TERM INT
+
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION="${LEASED_RESOURCE}"
+
+function save_stack_events_to_artifacts()
+{
+  set +o errexit
+  aws --region ${REGION} cloudformation describe-stack-events --stack-name ${STACK_NAME} --output json > "${ARTIFACT_DIR}/stack-events-${STACK_NAME}.json"
+  set -o errexit
+}
 
 function run_command() {
     local CMD="$1"

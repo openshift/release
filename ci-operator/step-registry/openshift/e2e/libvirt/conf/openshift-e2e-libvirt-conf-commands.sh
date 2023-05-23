@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "TEST_TYPE=${TEST_TYPE}"
+echo "BRANCH=${BRANCH}"
+echo "ARCH=${ARCH}"
+
 # List of exclude tests from conformance/serial suite
 if [ "${TEST_TYPE}" == "conformance-serial" ]; then
     cat > "${SHARED_DIR}/excluded_tests" << EOF
@@ -262,6 +266,18 @@ elif [ "${BRANCH}" == "4.6" ] && [ "${ARCH}" == "s390x" ]; then
 "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (default fs)(allowExpansion)] volume-expand Verify if offline PVC expansion works [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] In-tree Volumes [Driver: local][LocalVolumeType: dir] [Testpattern: Dynamic PV (ntfs)][sig-windows] subPath should support readOnly file specified in the volumeMount [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage] PersistentVolumes GCEPD should test that deleting a PVC before the pod does not cause pod deletion to fail on PD detach [Suite:openshift/conformance/parallel] [Suite:k8s]"
+EOF
+elif [ "${BRANCH}" == "4.13" ] && [ "${ARCH}" == "ppc64le" ]; then
+     cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
+"[sig-storage][Feature:DisableStorageClass][Serial] should not reconcile the StorageClass when StorageClassState is Unmanaged [Suite:openshift/conformance/serial]"
+EOF
+elif [ "${BRANCH}" == "4.14" ] && [ "${ARCH}" == "ppc64le" ]; then
+     cat > "${SHARED_DIR}/excluded_tests" << EOF
+"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
+"[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
+"[sig-storage][Feature:DisableStorageClass][Serial] should not reconcile the StorageClass when StorageClassState is Unmanaged [Suite:openshift/conformance/serial]"
 EOF
 else
     echo "Executing all tests"
