@@ -32,3 +32,11 @@ export -f firewall::open_port
 export -f firewall::close_port
 
 USHIFT_IP="${IP_ADDRESS}" USHIFT_USER="${HOST_USER}" /microshift/e2e/main.sh run
+
+# Robot Framework setup and execution.
+cat << EOF >/tmp/variables.yaml
+USHIFT_HOST: ${IP_ADDRESS}
+USHIFT_USER: ${HOST_USER}
+SSH_PRIV_KEY: ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+EOF
+/microshift/test/run.sh -o ${ARTIFACT_DIR} -i /tmp/variables.yaml -v /tmp/venv
