@@ -22,6 +22,6 @@ EOF
 chmod 0600 "${HOME}/.ssh/config"
 
 ssh "${INSTANCE_PREFIX}" \
-  "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network -o logs && sudo chmod +r /tmp/sosreport*"
+  "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network,microshift -o logs && sudo chmod +r /tmp/sosreport*"
 
 scp "${INSTANCE_PREFIX}":/tmp/sosreport* ${ARTIFACT_DIR}/
