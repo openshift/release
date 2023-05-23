@@ -71,7 +71,7 @@ cat << EOF >> ~/ocp-install.yml
   - name: Handle file existence
     debug:
       msg: "continue run"
-    when: file_info.stat.exists == False
+    when: not file_info.stat.exists
 
 EOF
 fi
