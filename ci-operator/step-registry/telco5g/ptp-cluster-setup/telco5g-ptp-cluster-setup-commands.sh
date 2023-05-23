@@ -49,7 +49,7 @@ cat << EOF > ~/ocp-install.yml
   gather_facts: false
   tasks:
 EOF
-#if [[ "$JOB_TYPE" == "periodic" ]]; then
+if [[ "$JOB_TYPE" == "periodic" ]]; then
 cat << EOF >> ~/ocp-install.yml
   - name: Check if abort file exists
     stat:
@@ -67,7 +67,7 @@ cat << EOF >> ~/ocp-install.yml
       msg: "continue run"
     when: file_info.stat.exists == False
 EOF
-#fi
+fi
 cat << EOF >> ~/ocp-install.yml
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
