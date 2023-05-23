@@ -1,0 +1,48 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+  tools:
+    name: "4.15"
+    namespace: ocp
+    tag: tools
+binary_build_commands: make all
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- dockerfile_path: images/Dockerfile
+  from: tools
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: tests-private
+- dockerfile_literal: |
+    FROM src
+    RUN curl --silent --location https://rpm.nodesource.com/setup_lts.x | bash - && \
+        curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo && \
+        PACKAGES="openssh-clients httpd-tools nodejs yarn xorg-x11-server-Xvfb gtk2-devel gtk3-devel libnotify-devel GConf2 nss libXScrnSaver alsa-lib" && \
+        yum install --setopt=tsflags=nodocs -y $PACKAGES && \
+        yum clean all && rm -rf /var/cache/yum/*
+  from: src
+  to: tests-private-ui
+promotion:
+  namespace: ci
+  tag: "4.15"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+test_binary_build_commands: make test
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift
+  repo: openshift-tests-private
+  variant: images
