@@ -4,8 +4,7 @@ set -x
 set -o nounset
 set -o errexit
 set -o pipefail
-# local testing
-source ./main.env || true
+
 build_images(){
 oc delete namespace openshift-ptp || true
 oc create namespace openshift-ptp -o yaml | oc label -f - pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged || true

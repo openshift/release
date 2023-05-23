@@ -1,8 +1,5 @@
 #!/bin/bash
-# to disable periodic job uncomment below
-#if [[ "$JOB_TYPE" == "periodic" ]]; then
-#  exit 1
-#fi
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -51,7 +48,27 @@ cat << EOF > ~/ocp-install.yml
   hosts: hypervisor
   gather_facts: false
   tasks:
+EOF
+#if [[ "$JOB_TYPE" == "periodic" ]]; then
+cat << EOF >> ~/ocp-install.yml
+  - name: Check if abort file exists
+    stat:
+      path: /home/kni/abort
+    register: file_info
+    failed_when: file_info.stat.exists
 
+  - name: Handle file existence
+    debug:
+      msg: "aborting run"
+    when: file_info.stat.exists
+
+  - name: Handle file existence
+    debug:
+      msg: "continue run"
+    when: file_info.stat.exists == False
+EOF
+#fi
+cat << EOF >> ~/ocp-install.yml
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
       delay: 10
@@ -219,7 +236,7 @@ spec:
             [Service]
             Type=oneshot
             TimeoutStartSec=300
-            ExecStart=/usr/sbin/chronyd -n -f /etc/chrony.conf -q
+            ExecStart=/bin/sh -c '/usr/sbin/chronyd -n -f /etc/chrony.conf -q && hwclock -w && hwclock && date'
             RemainAfterExit=yes
             [Install]
             WantedBy=multi-user.target
@@ -248,14 +265,23 @@ EOT
   echo "All MachineConfigPools to finished updating"
 }
 
+log_chronyd_status() {
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc version
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
+}
+
+
 #Set status and run playbooks
 status=0
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
-
-#installer has issues applying machine-configs with OCP 4.10, using manual way
-KUBECONFIG=$SHARED_DIR/kubeconfig oc apply -f $SHARED_DIR/disable_ntp.yml || true
-wait_for_mcp "2700s" || true
-
+if [[ "$status" == 0 ]]; then
+  #installer has issues applying machine-configs with OCP 4.10, using manual way
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc apply -f $SHARED_DIR/disable_ntp.yml || true
+  wait_for_mcp "2700s" || true
+  log_chronyd_status || true
+fi
 exit ${status}
