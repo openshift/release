@@ -48,6 +48,12 @@ cat << EOF > ~/ocp-install.yml
   hosts: hypervisor
   gather_facts: false
   tasks:
+
+    - name: Wait 300 seconds, but only start checking after 10 seconds
+    wait_for_connection:
+      delay: 10
+      timeout: 300
+
 EOF
 if [[ "$JOB_TYPE" == "periodic" ]]; then
 cat << EOF >> ~/ocp-install.yml
@@ -66,14 +72,10 @@ cat << EOF >> ~/ocp-install.yml
     debug:
       msg: "continue run"
     when: file_info.stat.exists == False
+
 EOF
 fi
 cat << EOF >> ~/ocp-install.yml
-  - name: Wait 300 seconds, but only start checking after 10 seconds
-    wait_for_connection:
-      delay: 10
-      timeout: 300
-
   - name: Remove last run
     shell: kcli delete plan --yes ${PLAN_NAME}
     ignore_errors: yes
