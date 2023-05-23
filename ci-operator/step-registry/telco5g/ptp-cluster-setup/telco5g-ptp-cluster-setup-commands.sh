@@ -49,7 +49,7 @@ cat << EOF > ~/ocp-install.yml
   gather_facts: false
   tasks:
 
-    - name: Wait 300 seconds, but only start checking after 10 seconds
+  - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
       delay: 10
       timeout: 300
