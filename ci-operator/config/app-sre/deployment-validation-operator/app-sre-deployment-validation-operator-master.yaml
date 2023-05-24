@@ -3,6 +3,10 @@ build_root:
 images:
 - dockerfile_path: build/Dockerfile
   to: unused
+operator:
+  bundles: # entries create bundle images from Dockerfiles and an index containing all bundles
+  - as: my-bundle
+    dockerfile_path: build/Dockerfile
 resources:
   '*':
     limits:
@@ -42,6 +46,29 @@ tests:
   commands: make validate
   container:
     from: src
+- as: e2e-in-cluster-build-4.14
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace my-namespace
+        operator-sdk run bundle -n my-namespace "$OO_BUNDLE"
+        oc wait --for condition=Available -n my-namespace deployment my-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
 zz_generated_metadata:
   branch: master
   org: app-sre
