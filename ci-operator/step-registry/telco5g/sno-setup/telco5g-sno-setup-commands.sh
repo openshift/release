@@ -138,7 +138,10 @@ cat << EOF > ~/ocp-install.yml
       state: absent
 
   - name: Run deployment
-    shell: ./scripts/sno_ag.py $SNO_PARAM --host ${CLUSTER_NAME} --debug --wait --host-ip ${HYPERV_IP} --mcp ./mcp/setup-registry-storage-full.yaml 2>&1 > /tmp/${CLUSTER_NAME}_sno_ag.log
+    shell: >-
+        ./scripts/sno_ag.py $SNO_PARAM --host ${CLUSTER_NAME} --debug --wait
+        --host-ip ${HYPERV_IP} --registry
+        -L /tmp/${CLUSTER_NAME}_sno_ci.log 2>&1 > /tmp/${CLUSTER_NAME}_sno_ag.log
     args:
       chdir: /home/kni/telco5g-lab-deployment
     async: 5500
@@ -157,9 +160,14 @@ cat << EOF > ~/ocp-install.yml
 
   - name: Grab the log from HV to artifacts
     fetch:
-      src: /tmp/${CLUSTER_NAME}_sno_ag.log
-      dest: ${ARTIFACT_DIR}/sno_deploy.log
+      src: "{{ item.src }}"
+      dest: "{{ item.dest }}"
       flat: yes
+    loop:
+      - src: /tmp/${CLUSTER_NAME}_sno_ag.log
+        dest: ${ARTIFACT_DIR}/openshift-install.log
+      - src: /tmp/${CLUSTER_NAME}_sno_ci.log
+        dest: ${ARTIFACT_DIR}/sno-script.log
     ignore_errors: true
 
   - name: Set fact if deployment passed
