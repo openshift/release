@@ -18,6 +18,26 @@ export ADMIN_PASSWORD
 URL=$(oc whoami --show-server)
 export URL
 
+htpasswd -c -B -b users.htpasswd kubeadmin "$ADMIN_PASSWORD"
+oc create secret generic htpass-secret --from-file=htpasswd=users.htpasswd -n default
+
+cat <<EOF > htpasswd-cr.yaml
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+spec:
+  identityProviders:
+  - name: my_htpasswd_provider
+    mappingMethod: claim
+    type: HTPasswd
+    htpasswd:
+      fileData:
+        name: htpass-secret
+EOF
+
+oc apply -f htpasswd-cr.yaml
+
 cat <<EOF | oc create -f -
 apiVersion: v1
 kind: Pod
