@@ -81,7 +81,7 @@ oc patch hostedclusters -n "$HYPERSHIFT_NAMESPACE" "$CLUSTER_NAME" --type=merge 
 
 echo "check day-2 pull-secret update"
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-RETRIES=30
+RETRIES=45
 for i in $(seq ${RETRIES}); do
   UPDATED_COUNT=0
   workers=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{","}{end}')
