@@ -9,6 +9,8 @@ oc projects
 python3 --version
 pushd /tmp
 
+ls
+
 ls -la /root/kraken
 git clone https://github.com/redhat-chaos/krkn-hub.git
 pushd krkn-hub/
