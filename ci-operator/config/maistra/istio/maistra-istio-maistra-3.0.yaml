@@ -100,18 +100,13 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-profile
 - as: maistra-istio-unit-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 2h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws
     env:
-      BUILD_WITH_CONTAINER: "0"
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: m5d.4xlarge
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -137,19 +132,18 @@ tests:
           bash -c \
           "cd /work;
           entrypoint \
-          make -e "T=-v -count=1" build racetest binaries-test"
+          make -e 'T=-v -count=1' build racetest binaries-test"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
-      - name: BUILD_WITH_CONTAINER
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       from: src-test
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
+          cpu: 100m
+          memory: 100Mi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-pilot-3-0
   steps:
     cluster_profile: aws
