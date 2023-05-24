@@ -125,7 +125,7 @@ SUBNET_ID_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
   HYPERSHIFT_SWITCH="--hosted-cp --classic-oidc-config"
   if [[ "$ENABLE_SECTOR" == "true" ]]; then
-    PROVISION_SHARD_ID=$(cat ${SHARED_DIR}/provision_shard_ids | head -n 1)
+    PROVISION_SHARD_ID="de4fdee8-f9be-11ed-8102-0a580a8108c9"
     if [[ -z "$PROVISION_SHARD_ID" ]]; then
       echo -e "No available provision shard."
       exit 1
