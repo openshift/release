@@ -1,4 +1,3 @@
-
 def generate_signer_resources(gendoc):
     resources = gendoc
     context = gendoc.context
@@ -112,7 +111,7 @@ The signer will sign both OKD, CI, and nightly releases, but nightly releases do
                             '--audit=gs://openshift-ci-release/releases',
                             '--sign=/etc/release-controller/signer/openshift-ci.gpg',
                             '--audit-gcs-service-account=/etc/release-controller/publisher/service-account.json',
-                            '-v=4'
+                            '-v=6'
                         ]
                     }]
                 }
