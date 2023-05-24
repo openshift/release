@@ -228,6 +228,7 @@ ansible_become=True
 new_workers
 EOF
 
+
 ansible-playbook create-machines.yaml -vvv
 
 cp "${SHARED_DIR}/ansible-hosts" "${ARTIFACT_DIR}"
