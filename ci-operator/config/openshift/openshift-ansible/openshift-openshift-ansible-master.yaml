@@ -28,14 +28,15 @@ raw_steps:
       skip_if_unavailable = false
       exclude=openshift-ansible*
       REPOFILE
-      INSTALL_PKGS="which tar wget hostname util-linux socat tree findutils lsof bind-utils"
+      INSTALL_PKGS="which tar wget hostname util-linux socat tree findutils lsof bind-utils python2 python38"
       cat <<DOCKERFILE > /opt/Dockerfile
       FROM os
       COPY ose.repo /etc/yum.repos.d/ose.repo
       RUN mkdir -p /var/lib/origin && \
           yum install --setopt=tsflags=nodocs --setopt=install_weak_deps=False -y ${INSTALL_PKGS} && \
           rpm -V ${INSTALL_PKGS} && \
-          yum clean all && rm -rf /var/cache/yum/*
+          yum clean all && rm -rf /var/cache/yum/* && \
+          ln -s /usr/bin/python2 /usr/bin/python
       DOCKERFILE
     from: os
     to: src-dockerfile
