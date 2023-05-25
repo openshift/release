@@ -11,9 +11,9 @@ export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini
 export HOME=/tmp/home
 export PATH=/usr/libexec/origin:$PATH
 
-LOKI_SSO_CLIENT_ID="$(cat /var/run/loki-secret/client-id | base64 -w 0)"
+LOKI_SSO_CLIENT_ID="$(cat /var/run/loki-secret/client-id)"
 export LOKI_SSO_CLIENT_ID
-LOKI_SSO_CLIENT_SECRET="$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
+LOKI_SSO_CLIENT_SECRET="$(cat /var/run/loki-secret/client-secret)"
 export LOKI_SSO_CLIENT_SECRET
 
 # HACK: HyperShift clusters use their own profile type, but the cluster type
