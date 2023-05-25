@@ -125,7 +125,7 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
   export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
   print_clusterversion
-  check_control_plane_pod_status || exit 1
+  retry check_control_plane_pod_status || exit 1
 fi
 
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
