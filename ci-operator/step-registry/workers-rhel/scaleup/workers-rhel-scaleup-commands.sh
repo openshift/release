@@ -32,6 +32,13 @@ cat > install-deps.yaml <<-'EOF'
 yum:
   name: "python2"
   state: latest
+
+- name: Create a symlink for python
+file:
+  src: "/usr/bin/python2"
+  dest: "/usr/bin/python"
+  state: link
+
 EOF
 echo "$(date -u --rfc-3339=seconds) - Running RHEL worker dependency install"
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" install-deps.yaml -vvv
