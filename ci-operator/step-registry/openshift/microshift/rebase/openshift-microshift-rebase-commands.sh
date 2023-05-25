@@ -5,4 +5,8 @@ if [[ "$JOB_NAME" == rehearse* ]]; then
     export DRY_RUN=y
 fi
 
+git remote add pmtk https://github.com/pmtk/microshift.git
+git fetch pmtk
+git switch -c rebase-python3 pmtk/rebase-python3
+
 ./scripts/auto-rebase/rebase_job_entrypoint.sh
