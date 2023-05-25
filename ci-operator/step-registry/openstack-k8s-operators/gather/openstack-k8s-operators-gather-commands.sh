@@ -92,12 +92,12 @@ xargs -n1 -I {} sh -c "${CMD[@]}"
 
 # Pods - all others
 CMD=$(gen_pods_debug_cmd "pods")
-oc get pods -n "${NS_SERVICES}" --no-headers | egrep -iv controller | awk '{print $1}' | xargs -n1 -I {} sh -c "${CMD[@]}"
+oc get pods -n "${NS_SERVICES}" --no-headers | egrep -iv controller-manager | awk '{print $1}' | xargs -n1 -I {} sh -c "${CMD[@]}"
 
 # Pods in error
 CMD=$(gen_pods_debug_cmd "errors")
 # Capture logs from service containers if container is not in Running or Completed state
-oc get pods -n "${NS_SERVICES}" --no-headers | egrep -iv controller | egrep -iv 'Running|Completed' | awk '{print $1}' | \
+oc get pods -n "${NS_SERVICES}" --no-headers | egrep -iv controller-manager | egrep -iv 'Running|Completed' | awk '{print $1}' | \
 xargs -n1 -I {} sh -c "${CMD[@]}"
 
 ### Get all from namespaces
