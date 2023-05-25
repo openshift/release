@@ -112,7 +112,8 @@ CONFIG = {
         'westus': 6
     },
     'azuremag-qe-quota-slice': {
-        'usgovvirginia': 10
+        'usgovvirginia': 5,
+        'usgovtexas': 5 
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 40,
