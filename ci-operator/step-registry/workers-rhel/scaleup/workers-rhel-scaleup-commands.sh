@@ -25,6 +25,17 @@ fi
 
 echo "$(date -u --rfc-3339=seconds) - Validating parsed Ansible inventory"
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
+
+cat > install-deps.yaml <<-'EOF'
+---
+- name: Install python dependencies
+yum:
+  name: "python2"
+  state: latest
+EOF
+echo "$(date -u --rfc-3339=seconds) - Running RHEL worker dependency install"
+ansible-playbook -i "${SHARED_DIR}/ansible-hosts" install-deps.yaml -vvv
+
 echo "$(date -u --rfc-3339=seconds) - Running RHEL worker scaleup"
 ansible-playbook -i "${SHARED_DIR}/ansible-hosts" playbooks/scaleup.yml -vvv
 
