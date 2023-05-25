@@ -20,6 +20,11 @@ echo "applying dual-stack networking config"
 /tmp/yq e --inplace '.platform.vsphere.apiVIPs += [strenv(API_VIP), "fd65:a1a8:60ad:271c::200"]' ${SHARED_DIR}/install-config.yaml
 /tmp/yq e --inplace '.platform.vsphere.ingressVIPs += [strenv(INGRESS_VIP), "fd65:a1a8:60ad:271c::201"]' ${SHARED_DIR}/install-config.yaml
 
+
+# debug
+/tmp/yq '.platform.vsphere.apiVIPs' ${SHARED_DIR}/install-config.yaml
+/tmp/yq '.platform.vsphere.ingressVIPs' ${SHARED_DIR}/install-config.yaml
+
 cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 networking:
   networkType: OVNKubernetes
