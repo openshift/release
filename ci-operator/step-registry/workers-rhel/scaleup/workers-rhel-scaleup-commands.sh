@@ -29,15 +29,15 @@ ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 cat > install-deps.yaml <<-'EOF'
 ---
 - name: Install python dependencies
-yum:
-  name: "python2"
-  state: latest
+  yum:
+    name: "python2"
+    state: latest
 
 - name: Create a symlink for python
-file:
-  src: "/usr/bin/python2"
-  dest: "/usr/bin/python"
-  state: link
+  file:
+    src: "/usr/bin/python2"
+    dest: "/usr/bin/python"
+    state: link
 
 EOF
 echo "$(date -u --rfc-3339=seconds) - Running RHEL worker dependency install"
