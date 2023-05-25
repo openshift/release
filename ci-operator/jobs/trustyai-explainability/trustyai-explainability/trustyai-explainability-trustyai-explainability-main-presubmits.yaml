@@ -22,8 +22,6 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --target=[release:latest]
-        - --target=trustyai-explainability-ci-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -57,7 +55,7 @@ presubmits:
     - ^main$
     - ^main-
     cluster: build02
-    context: ci/prow/trustyai-explainability-e2e
+    context: ci/prow/trustyai-explainability
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -66,8 +64,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: gcp
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-trustyai-explainability-trustyai-explainability-main-trustyai-explainability-e2e
-    rerun_command: /test trustyai-explainability-e2e
+    name: pull-ci-trustyai-explainability-trustyai-explainability-main-trustyai-explainability
+    rerun_command: /test trustyai-explainability
     run_if_changed: ^(tests/*|explainability-service/*|explainability-core/*|explainability-connectors/*|Dockerfile|pom.xml)
     spec:
       containers:
@@ -77,8 +75,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/trustyai-explainability-e2e-cluster-profile
-        - --target=trustyai-explainability-e2e
+        - --secret-dir=/usr/local/trustyai-explainability-cluster-profile
+        - --target=trustyai-explainability
         command:
         - ci-operator
         image: ci-operator:latest
@@ -94,7 +92,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/trustyai-explainability-e2e-cluster-profile
+        - mountPath: /usr/local/trustyai-explainability-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -129,4 +127,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )trustyai-explainability-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )trustyai-explainability,?($|\s.*)
