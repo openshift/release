@@ -113,6 +113,15 @@ oc get nncp -n "${NS_SERVICES}" -o yaml > nncp.yaml
 oc get ipaddresspool -n metallb-system -o yaml > ipaddresspool.yaml
 oc get l2advertisement -n metallb-system -o yaml > l2advertisement.yaml
 
+# OLM
+olm_resources=$(oc get -o name olm)
+for r in ${olm_resources}; do
+    r_type=$(echo ${r} | cut -d'.' -f1)
+    r_name=$(echo ${r} | cut -d'/' -f2)
+    create_out_dir ${r_type}
+    oc get -o yaml ${r} > ${r_type}/${r_name}
+done
+
 # must-gather
 # TODO: use openstack-k8s-operator must-gather image when available
 mkdir -p ${ARTIFACT_DIR}/must-gather/
