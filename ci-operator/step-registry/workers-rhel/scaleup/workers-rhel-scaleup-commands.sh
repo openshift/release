@@ -23,6 +23,11 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+echo "python versions"
+ls -la /usr/bin/python*
+whoami
+cat /etc/os-release
+
 echo "$(date -u --rfc-3339=seconds) - Validating parsed Ansible inventory"
 ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
 echo "$(date -u --rfc-3339=seconds) - Running RHEL worker scaleup"
