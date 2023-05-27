@@ -1007,16 +1007,13 @@ presubmits:
     branches:
     - ^release-3\.74$
     - ^release-3\.74-
-    cluster: build03
+    cluster: build05
     context: ci/prow/ocp-4-11-operator-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: ocp-4-11
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-release-3.74-ocp-4-11-operator-e2e-tests
@@ -1026,13 +1023,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/operator-e2e-tests-cluster-profile
-        - --target=operator-e2e-tests
-        - --variant=ocp-4-11
+        - --target=ocp-4-11-operator-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1042,16 +1037,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/operator-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -1061,18 +1054,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1085,16 +1072,13 @@ presubmits:
     branches:
     - ^release-3\.74$
     - ^release-3\.74-
-    cluster: build03
+    cluster: build05
     context: ci/prow/ocp-4-11-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: ocp-4-11
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-release-3.74-ocp-4-11-qa-e2e-tests
@@ -1104,13 +1088,11 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/qa-e2e-tests-cluster-profile
-        - --target=qa-e2e-tests
-        - --variant=ocp-4-11
+        - --target=ocp-4-11-qa-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1120,16 +1102,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/qa-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -1139,18 +1119,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1163,32 +1137,26 @@ presubmits:
     branches:
     - ^release-3\.74$
     - ^release-3\.74-
-    cluster: build02
+    cluster: build05
     context: ci/prow/ocp-4-12-operator-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/variant: ocp-4-12
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-release-3.74-ocp-4-12-operator-e2e-tests
-    optional: true
     rerun_command: /test ocp-4-12-operator-e2e-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/operator-e2e-tests-cluster-profile
-        - --target=operator-e2e-tests
-        - --variant=ocp-4-12
+        - --target=ocp-4-12-operator-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1198,16 +1166,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/operator-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -1217,22 +1183,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1245,32 +1201,26 @@ presubmits:
     branches:
     - ^release-3\.74$
     - ^release-3\.74-
-    cluster: build02
+    cluster: build05
     context: ci/prow/ocp-4-12-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/variant: ocp-4-12
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-release-3.74-ocp-4-12-qa-e2e-tests
-    optional: true
     rerun_command: /test ocp-4-12-qa-e2e-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/qa-e2e-tests-cluster-profile
-        - --target=qa-e2e-tests
-        - --variant=ocp-4-12
+        - --target=ocp-4-12-qa-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1280,16 +1230,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/qa-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -1299,22 +1247,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1639,32 +1577,26 @@ presubmits:
     branches:
     - ^release-3\.74$
     - ^release-3\.74-
-    cluster: build02
+    cluster: build05
     context: ci/prow/ocp-4-8-operator-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/variant: ocp-4-8
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-release-3.74-ocp-4-8-operator-e2e-tests
-    optional: true
     rerun_command: /test ocp-4-8-operator-e2e-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/operator-e2e-tests-cluster-profile
-        - --target=operator-e2e-tests
-        - --variant=ocp-4-8
+        - --target=ocp-4-8-operator-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1674,16 +1606,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/operator-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -1693,22 +1623,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1721,32 +1641,26 @@ presubmits:
     branches:
     - ^release-3\.74$
     - ^release-3\.74-
-    cluster: build02
+    cluster: build05
     context: ci/prow/ocp-4-8-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
-      ci-operator.openshift.io/variant: ocp-4-8
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-stackrox-stackrox-release-3.74-ocp-4-8-qa-e2e-tests
-    optional: true
     rerun_command: /test ocp-4-8-qa-e2e-tests
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/qa-e2e-tests-cluster-profile
-        - --target=qa-e2e-tests
-        - --variant=ocp-4-8
+        - --target=ocp-4-8-qa-e2e-tests
         command:
         - ci-operator
         image: ci-operator:latest
@@ -1756,16 +1670,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/qa-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -1775,22 +1687,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
