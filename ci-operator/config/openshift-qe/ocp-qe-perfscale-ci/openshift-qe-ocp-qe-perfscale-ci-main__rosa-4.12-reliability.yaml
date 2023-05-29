@@ -1,0 +1,82 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: svt-reliability-rosa
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: perfscale-reliability-rosa-staging
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-perf-qe
+    env:
+      ENABLE_AUTOSCALING: "false"
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-east-2
+      REPLICAS: "3"
+      ROSA_LOGIN_ENV: staging
+      SLEEP_DURATION: 168h
+    test:
+    - ref: openshift-qe-perfscale-wait
+    workflow: rosa-aws-sts
+- as: perfscale-reliability-rosa-production
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-perf-qe
+    env:
+      ENABLE_AUTOSCALING: "false"
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-east-2
+      REPLICAS: "3"
+      ROSA_LOGIN_ENV: production
+      SLEEP_DURATION: 168h
+    test:
+    - ref: openshift-qe-perfscale-wait
+    workflow: rosa-aws-sts
+- as: perfscale-reliability-rosa-hypershift-staging
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-perf-qe
+    env:
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.12"
+      ROSA_LOGIN_ENV: staging
+      SLEEP_DURATION: 168h
+    test:
+    - ref: openshift-qe-perfscale-wait
+    workflow: rosa-aws-sts-hypershift
+- as: perfscale-reliability-rosa-hypershift-production
+  cron: '@yearly'
+  steps:
+    cluster_profile: aws-perf-qe
+    env:
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      ROSA_LOGIN_ENV: production
+      SLEEP_DURATION: 168h
+    test:
+    - ref: openshift-qe-perfscale-wait
+    workflow: rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: rosa-4.12-reliability
