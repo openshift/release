@@ -12,7 +12,9 @@ python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
 # Environment setup
-cd cluster-post-config
+#cd cluster-post-config
+pwd
+ls -l
 ./install-infra-workload.sh
 
 # Remove the folder to resolve OCPQE-12185
