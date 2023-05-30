@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-
 function create_tests_skip_list_file {
 # List of test cases to ignore due to open bugs
 cat <<EOF >"${SKIP_TESTS_FILE}"
@@ -201,6 +200,10 @@ function check_commit_message_for_prs {
 
 
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
+
+printenv|sort
+sleep 1000
+
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
     export FEATURES="${FEATURES:-performance}"

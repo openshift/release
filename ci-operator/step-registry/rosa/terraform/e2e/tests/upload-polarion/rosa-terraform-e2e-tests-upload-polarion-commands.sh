@@ -6,6 +6,8 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+sleep 1000
+
 if [ ! -f $SHARED_DIR/ginkgo-results.tar.gz ]; then
   echo "ginkgo-results.tar.gz not found in shared_dir"
   # curl -kLs https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/openshift_release/39679/rehearse-39679-periodic-ci-terraform-redhat-terraform-provider-ocm-main-e2e-periodic2/1663193140435095552/artifacts/e2e-periodic2/rosa-terraform-aws-e2e-tests-ginkgo/artifacts/ginkgo-results.tar \
