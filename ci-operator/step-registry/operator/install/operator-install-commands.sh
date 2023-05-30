@@ -16,7 +16,7 @@ OPERATORS_CMD=""
 for i in {1..4}; do
   OPERATOR_VALUE=$(eval "echo $"OPERATOR$i"_CONFIG")
   if [[ -n $OPERATOR_VALUE ]]; then
-    OPERATORS_CMD="${OPERATORS_CMD} --operator ${OPERATOR_VALUE}"
+    OPERATORS_CMD="${OPERATORS_CMD} --operators ${OPERATOR_VALUE}"
   fi
 done
 
