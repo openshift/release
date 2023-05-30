@@ -298,9 +298,8 @@ function run {
         exit 1
     fi
 
-    set -x
     tar cvfz ${SHARED_DIR}/ginkgo-results.tar.gz -C ${ARTIFACT_DIR}/junit . #copy xml's to shared-dir
-    cp ${SHARED_DIR}/ginkgo-results.tar.gz $ARTIFACT_DIR/
+    # cp ${SHARED_DIR}/ginkgo-results.tar.gz $ARTIFACT_DIR/
 
     echo "normal exit"
     exit 0
