@@ -150,9 +150,14 @@ retry_with_timeout() {
 
 # print RTC logs
 print_time() {
-  oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host sh -c "date;sudo hwclock"
-  oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host sh -c "date;sudo hwclock"
-  oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host sh -c "date;sudo hwclock"
+# Get the list of nodes in the cluster
+NODES=$(kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+
+# Loop through each node
+for node in $NODES; do
+    echo "Processing node: $node"
+    oc debug node/$node -- chroot /host sh -c "date;sudo hwclock"
+done
 }
 
 echo "************ telco5g cnf-tests commands ************"
