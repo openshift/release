@@ -1,3 +1,12 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.13"
 binary_build_commands: make install
 build_root:
   image_stream_tag:
@@ -42,15 +51,29 @@ tests:
     pre:
     - ref: rosa-terraform-e2e-setup
 - as: e2e-periodic
+  cluster: build05
   cron: '@daily'
   steps:
     cluster_profile: aws-qe
     env:
       OPENSHIFT_VERSION: 4.13.0
+      POLARION_PROPERTIES: |
+        polarion-testrun-id: "20230528-0959"
+        polarion-custom-subteam: "kni"
+        polarion-custom-casecomponent: "installer"
+        polarion-custom-pillar: "acceleration"
+        polarion-custom-version: "4_13"
+        polarion-custom-products: "ocp"
+        polarion-custom-plannedin: "OCP_4_13_Z"
+      TEST_FILTERS: ~MicroShiftOnly&;~HyperShiftMGMT&;~CPaasrunOnly&;~NonPreRelease&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;~DisconnectedOnly&;~Disruptive&;~Serial&;ROSA&
+      TEST_SCENARIOS: OLM|Security_and_Compliance|Operator_SDK|Network_Edge|Workloads|Image_Registry|Container_Engine_Tools|MCO|ETCD|PSAP|SDN|Cluster_Infrastructure|API_Server|Authentication|Cluster_Observability|LOGGING
     post:
     - ref: rosa-terraform-e2e-teardown
     pre:
     - ref: rosa-terraform-e2e-setup
+    test:
+    - ref: rosa-terraform-e2e-tests-ginkgo
+    - ref: rosa-terraform-e2e-tests-upload-polarion
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
