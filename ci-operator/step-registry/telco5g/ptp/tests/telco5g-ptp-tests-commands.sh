@@ -179,8 +179,8 @@ export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 export TEST_BRANCH="mno-external-gm"
 export PTP_UNDER_TEST_BRANCH="master"
-
 export KUBECONFIG=$SHARED_DIR/kubeconfig
+
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 
 cd "$temp_dir" || exit 1
