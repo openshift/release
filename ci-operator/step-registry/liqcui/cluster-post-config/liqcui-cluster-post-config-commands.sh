@@ -13,8 +13,10 @@ source ./venv_qe/bin/activate
 
 # Environment setup
 #cd cluster-post-config
+git clone https://github.com/liqcui/ocp-qe-perfscale-ci.git
+cd ocp-qe-perfscale-ci/cluster-post-config/
 pwd
-ls -l
+ls
 ./install-infra-workload.sh
 
 # Remove the folder to resolve OCPQE-12185
