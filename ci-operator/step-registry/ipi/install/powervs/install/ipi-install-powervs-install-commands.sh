@@ -886,18 +886,6 @@ echo "ret=${ret}"
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
 
 if [ ${ret} -gt 0 ]; then
-  echo "8<--------8<--------8<--------8<-------- BEGIN: hack-for-kube-controller-manager 8<--------8<--------8<--------8<--------"
-  echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
-  OUTPUT=$(oc get co/kube-controller-manager -o json | jq -r '.status.conditions[]| select(.type == "Degraded").message')
-  echo "OUTPUT=${OUTPUT}"
-  if [[ "${OUTPUT}" == MissingStaticPodControllerDegraded* ]]; then
-    echo "Patching kubecontrollermanager cluster!"
-    oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$( date --rfc-3339=ns )"'"}}' --type=merge
-  fi
-  echo "8<--------8<--------8<--------8<-------- END: hack-for-kube-controller-manager 8<--------8<--------8<--------8<--------"
-fi
-
-if [ ${ret} -gt 0 ]; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"
   echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
   openshift-install wait-for install-complete --dir="${dir}" | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:'
