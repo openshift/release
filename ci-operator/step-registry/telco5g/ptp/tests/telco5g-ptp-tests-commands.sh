@@ -151,7 +151,7 @@ retry_with_timeout() {
 # print RTC logs
 print_time() {
 # Get the list of nodes in the cluster
-NODES=$(kubectl get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
 # Loop through each node
 for node in $NODES; do
