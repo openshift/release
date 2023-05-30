@@ -32,6 +32,10 @@ if [ -n "${PARALLEL}" ]; then
     RUN_COMMAND="${RUN_COMMAND} --parallel"
 fi
 
+if [ -n "${ROSA}" ]; then
+    RUN_COMMAND="${RUN_COMMAND} --rosa"
+fi
+
 echo "$RUN_COMMAND"
 
 poetry run python app/cli.py addon \
