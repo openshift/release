@@ -78,12 +78,12 @@ create_catalogsource () {
 apiVersion: operators.coreos.com/v1alpha1
 kind: CatalogSource
 metadata:
-    $CS_NAMESTANZA
-    namespace: $CS_NAMESPACE
+  $CS_NAMESTANZA
+  namespace: $CS_NAMESPACE
 spec:
-    sourceType: grpc
-    image: "$OO_INDEX"
-    $CS_PODCONFIG
+  sourceType: grpc
+  image: "$OO_INDEX"
+$CS_PODCONFIG
 EOF
 )
 
@@ -240,12 +240,21 @@ else
   CS_NAMESPACE="${OO_INSTALL_NAMESPACE}"
 fi
 
-# The securityContextConfig API field was added in 4.12
+# The securityContextConfig API field was added in 4.12, but the default "enforce" is "restricted" since OCP 4.14
+# But once "featureSet: TechPreviewNoUpgrade" enabeld, the PSA enforce will be changed to "restricted" from "privileged" since OCP 4.12.
+# $ oc get featuregate cluster -o yaml
+# apiVersion: config.openshift.io/v1
+# kind: FeatureGate
+# metadata:
+#   name: cluster
+# spec:
+#   featureSet: TechPreviewNoUpgrade
+# So, add "securityContextConfig: restricted" since OCP 4.12
 CS_PODCONFIG=""
 OCP_MINOR_VERSION=$(oc version | grep "Server Version" | cut -d '.' -f2)
 if [ "$OCP_MINOR_VERSION" -gt "11" ]; then
   CS_PODCONFIG=$(cat <<EOF
-grpcPodConfig:
+  grpcPodConfig:
     securityContextConfig: restricted
 EOF
 )
