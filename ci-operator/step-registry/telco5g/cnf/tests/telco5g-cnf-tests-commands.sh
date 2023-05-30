@@ -356,4 +356,7 @@ rm -rf ${SHARED_DIR}/myenv
 set +x
 set -e
 
+cp $SHARED_DIR/kubeconfig $ARTIFACT_DIR/ || true
+cp $KUBECONFIG $ARTIFACT_DIR/kubeconfig2 || true
+
 exit ${status}
