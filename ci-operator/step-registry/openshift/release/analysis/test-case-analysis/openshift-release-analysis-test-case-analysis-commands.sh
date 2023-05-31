@@ -4,8 +4,6 @@ set -o nounset
 set +o errexit
 set -o pipefail
 
-DEFAULT_MINIMUM_SUCCESSFUL_COUNT=1
-TEST_GROUP=install
 PIDS=""
 
 function run_analysis() {
@@ -18,6 +16,7 @@ function run_analysis() {
   echo
   echo "********** Starting testcase analysis for: ${analysis} "
   echo
+  set -x
   job-run-aggregator analyze-test-case \
     --google-service-account-credential-file "${GOOGLE_SA_CREDENTIAL_FILE}" \
     --payload-tag="${PAYLOAD_TAG}" \
@@ -27,73 +26,41 @@ function run_analysis() {
     --timeout=4h30m \
     $parameters \
     --test-group="${TEST_GROUP}" > "${artifacts}/${analysis}.log" 2>&1  &
+  set +x
   PIDS="$PIDS $!"
   echo "PID is $!"
 }
 
-run_analysis aws-ovn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=aws \
-  --network=ovn \
-  --infrastructure=ipi
+# Read the configuration from the JOB_CONFIGURATION environment
+# variable. The variable is a list of configurations separated by
+# newline. Each individual configuration is in the format:
+#   NAME,MINIMUM_COUNT,PARAMETERS
+#
+# Example:
+#   aws-ovn-ipi,1,--platform=aws --network=ovn --infrastructure=ipi
 
-run_analysis aws-sdn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=aws \
-  --network=sdn \
-  --infrastructure=ipi
+# Save original Internal Field Separator (IFS)
+OIFS="$IFS"
 
-run_analysis aws-techpreview $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=aws \
-  --include-job-names=techpreview
+# Iterate over each line in JOB_CONFIGURATION
+while IFS=',' read -r name min_count args
+do
+  # If JOB_CONFIGURATION has a trailing newline, it'll end up with an
+  # empty entry and we need to skip it.
+  if [[ -z $name || -z $min_count ]];
+  then
+    continue
+  fi
 
-run_analysis azure-ovn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=azure \
-  --network=ovn \
-  --infrastructure=ipi
+  # Split 'args' into an array
+  IFS=' ' read -r -a args_array <<< "$args"
 
-run_analysis azure-techpreview $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=azure \
-  --include-job-names=techpreview
+  run_analysis "$name" "$min_count" "${args_array[@]}"
 
-run_analysis gcp-sdn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=gcp \
-  --network=sdn \
-  --infrastructure=ipi
+done <<< "$JOB_CONFIGURATION"
 
-run_analysis gcp-techpreview $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=gcp \
-  --include-job-names=techpreview
-
-run_analysis vsphere-ovn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=vsphere \
-  --network=ovn \
-  --infrastructure=ipi
-
-run_analysis vsphere-sdn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=vsphere \
-  --network=sdn \
-  --infrastructure=ipi \
-
-run_analysis vsphere-ovn-upi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=vsphere \
-  --network=ovn \
-  --infrastructure=upi
-
-run_analysis vsphere-techpreview $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=vsphere \
-  --include-job-names=techpreview
-
-run_analysis metal-ovn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=metal \
-  --network=ovn \
-  --infrastructure=ipi
-
-run_analysis metal-sdn-ipi $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --platform=metal \
-  --network=sdn \
-  --infrastructure=ipi
-
-run_analysis aws-proxy $DEFAULT_MINIMUM_SUCCESSFUL_COUNT \
-  --include-job-names=ovn-proxy
+# Restore original IFS
+IFS="$OIFS"
 
 echo "Waiting for pids to complete: $PIDS"
 ret=0
