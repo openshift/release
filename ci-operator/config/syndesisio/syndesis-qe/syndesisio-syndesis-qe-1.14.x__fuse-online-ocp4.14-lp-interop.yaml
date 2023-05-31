@@ -10,6 +10,11 @@ build_root:
     tag: golang-1.19
 images:
 - context_dir: docker
+  to: fuse-online-base
+- dockerfile_literal: |-
+    FROM fuse-online-base
+    USER 1200:1201
+  from: fuse-online-base
   to: fuse-online-test-runner
 releases:
   latest:
@@ -21,7 +26,7 @@ resources:
   '*':
     requests:
       cpu: 100m
-      memory: 200Mi
+      memory: 2Gi
 tests:
 - as: fuse-online-interop-aws
   cron: 0 6 * * 1
@@ -30,7 +35,12 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      OPERATORS: |
+        [
+            {"name": "fuse-online", "source": "redhat-operators", "channel": "latest", "install_namespace": "fuse-online", "operator_group":"fuse-online-operator-group", "target_namespaces": "fuse-online"}
+        ]
     test:
+    - ref: install-operators
     - ref: syndesisio-deploy-syndesis-qe
     workflow: ipi-aws
 zz_generated_metadata:

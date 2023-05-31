@@ -1,21 +1,18 @@
 ref:
   as: syndesisio-deploy-syndesis-qe
-  from: cli
+  from: fuse-online-test-runner
   commands: syndesisio-deploy-syndesis-qe-commands.sh
   best_effort: false
   timeout: 120m0s
   resources:
     requests:
-      cpu: '1'
-      memory: 200Mi
+      cpu: 300m
+      ci-operator.openshift.io/shm: 2G
+    limits:
+      ci-operator.openshift.io/shm: 2G
   dependencies:
     - env: FUSE_ONLINE_TEST_RUNNER
       name: fuse-online-test-runner
-    - env: CLI
-      name: cli
-  env:
-    - name: FUSE_ONLINE_NAMESPACE
-      documentation: The namespace in which to deploy the fuse-online operator.
-      default: "fuse-online"
+  run_as_script: true
   documentation: |-
     Create the syndesis-qe test runner pod, execute the test suite entrypoint, and archive the test run artifacts.
