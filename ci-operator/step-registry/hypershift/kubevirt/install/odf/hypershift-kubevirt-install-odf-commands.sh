@@ -36,7 +36,7 @@ spec:
   - $(echo \"${ODF_INSTALL_NAMESPACE}\" | sed "s|,|\"\n  - \"|g")
 EOF
 
-echo "subscribe to the operator"
+echo "subscribe to the operator subscription name: $ODF_SUBSCRIPTION_NAME, namespace: $ODF_INSTALL_NAMESPACE, channel $ODF_OPERATOR_CHANNEL"
 SUB=$(
     cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
@@ -61,9 +61,12 @@ for ((i=1; i <= $RETRIES; i++)); do
         if [[ "$(oc -n "$ODF_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             echo "ClusterServiceVersion \"$CSV\" ready"
             break
+	else
+	   oc -n "$ODF_INSTALL_NAMESPACE" get csv "$CSV" -o yaml --ignore-not-found
         fi
     else
       echo "Try ${i}/${RETRIES}: ODF is not deployed yet. Checking again in 10 seconds"
+      oc -n "$ODF_INSTALL_NAMESPACE" get subscription "$SUB" -o yaml --ignore-not-found
     fi
     sleep 10
 done
