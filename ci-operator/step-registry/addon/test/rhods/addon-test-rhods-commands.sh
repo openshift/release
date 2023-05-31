@@ -23,5 +23,7 @@ export RUN_SCRIPT_ARGS
 
 mkdir $ARTIFACT_DIR/results
 
+sleep 1h
+
 # running RHODS testsuite
 ./ods_ci/build/run.sh
