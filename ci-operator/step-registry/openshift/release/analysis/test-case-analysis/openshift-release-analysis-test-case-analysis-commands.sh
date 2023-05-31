@@ -45,6 +45,13 @@ OIFS="$IFS"
 # Iterate over each line in JOB_CONFIGURATION
 while IFS=',' read -r name min_count args
 do
+  # If JOB_CONFIGURATION has a trailing newline, it'll end up with an
+  # empty entry and we need to skip it.
+  if [[ -z $name || -z $min_count ]];
+  then
+    continue
+  fi
+
   # Split 'args' into an array
   IFS=' ' read -r -a args_array <<< "$args"
 
