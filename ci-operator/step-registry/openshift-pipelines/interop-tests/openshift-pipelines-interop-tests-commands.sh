@@ -4,9 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+
 XML_PATH="/tmp/release-tests/reports/xml-report/result.xml"
 
-sleep 30m
+#echo "Running olm.spec to install operator..."
+#CATALOG_SOURCE=custom-operators CHANNEL=latest gauge run --log-level=debug --verbose --tags install specs/olm.spec
+#cp $XML_PATH ${ARTIFACT_DIR}/olm_specs.xml
 
 echo "Running gauge specs parallely..."
 gauge run --log-level=debug --verbose --tags sanity -p specs/clustertasks/ specs/pipelines/ specs/triggers/ specs/hub/ specs/metrics/ specs/pac/ specs/operator/addon.spec specs/operator/post-upgrade.spec specs/operator/pre-upgrade.spec
