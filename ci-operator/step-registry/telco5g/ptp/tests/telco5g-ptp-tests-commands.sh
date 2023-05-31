@@ -281,7 +281,8 @@ export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8
 export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
 
 # wait before first run
-sleep 60
+# wait more to let openshift complete initialization
+sleep 300
 
 # get RTC logs
 print_time
