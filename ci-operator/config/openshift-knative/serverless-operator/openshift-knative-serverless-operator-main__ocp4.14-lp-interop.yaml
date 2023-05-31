@@ -7,6 +7,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  manila-csi-driver-operator-test:
+    name: "4.13"
+    namespace: ocp
+    tag: manila-csi-driver-operator-test
   openshift_eventing-istio-src_knative-v1.8:
     name: eventing-istio-src
     namespace: openshift
@@ -27,6 +31,18 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.19
+  openstack-cinder-csi-driver-operator-test:
+    name: "4.13"
+    namespace: ocp
+    tag: openstack-cinder-csi-driver-operator-test
+  openstack-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: openstack-installer
+  openstack-tests:
+    name: "4.13"
+    namespace: ocp
+    tag: openstack-tests
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
@@ -104,59 +120,8 @@ tests:
   cron: 0 6 23 11 *
   remote_api: true
   steps:
-    cluster_profile: aws-cspi-qe
-    env:
-      BASE_DOMAIN: cspilp.interop.ccitredhat.com
     test:
-    - as: operator-e2e
-      commands: make test-e2e-with-kafka
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: knative-serving-eventing-e2e
-      commands: make test-upstream-e2e-no-upgrade
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: knative-eventing-kafka-broker-e2e
-      commands: make test-upstream-e2e-kafka-no-upgrade
-      dependencies:
-      - env: KNATIVE_OPENSHIFT_INGRESS
-        name: knative-openshift-ingress
-      - env: KNATIVE_OPERATOR
-        name: knative-operator
-      - env: OPENSHIFT_KNATIVE_OPERATOR
-        name: openshift-knative-operator
-      from: serverless-operator-src
-      resources:
-        limits:
-          memory: 6Gi
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: ipi-aws
+    - ref: openshift-knative-e2e
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main

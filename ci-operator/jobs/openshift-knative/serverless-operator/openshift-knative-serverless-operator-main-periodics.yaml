@@ -1453,7 +1453,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build01
+  cluster: build02
   cron: 0 6 23 11 *
   decorate: true
   decoration_config:
@@ -1464,8 +1464,6 @@ periodics:
     org: openshift-knative
     repo: serverless-operator
   labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
     ci-operator.openshift.io/variant: ocp4.14-lp-interop
     ci.openshift.io/generator: prowgen
     job-release: "4.14"
@@ -1486,10 +1484,8 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/operator-e2e-interop-aws-ocp414-cluster-profile
       - --target=operator-e2e-interop-aws-ocp414
       - --variant=ocp4.14-lp-interop
       command:
@@ -1501,14 +1497,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/operator-e2e-interop-aws-ocp414-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -1520,18 +1511,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-cspi-qe
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
