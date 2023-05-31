@@ -17,7 +17,7 @@ function run_analysis() {
   echo "********** Starting testcase analysis for: ${analysis} "
   echo
   set -x
-  ./job-run-aggregator analyze-test-case \
+  job-run-aggregator analyze-test-case \
     --google-service-account-credential-file "${GOOGLE_SA_CREDENTIAL_FILE}" \
     --payload-tag="${PAYLOAD_TAG}" \
     --minimum-successful-count="${min_successful}" \
