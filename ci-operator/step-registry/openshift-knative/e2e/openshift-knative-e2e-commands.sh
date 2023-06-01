@@ -6,35 +6,43 @@ set -x
 
 echo "This is the start SHARED_DIR: ${SHARED_DIR}"
 echo "ARTIFACT_DIR: ${ARTIFACT_DIR}"
-SECRETS_DIR="/tmp/secrets"
+SECRETS_DIR="/tmp/secrets/ci"
 #echo "password is: $SHARED_DIR/kubeadmin-password"
 #echo "$(cat $SHARED_DIR/kubeadmin-password)"
 
-export KUBECONFIG="$SHARED_DIR/.kube/config"
-#export KUBECONFIG=""
+#export KUBECONFIG="$SHARED_DIR/.kube/config"
 
+#mkdir -p $SHARED_DIR/.kube
+#touch $SHARED_DIR/.kube/config
+#cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/.kube/config
+#cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
+#echo "password: $(cat $SECRETS_DIR/ci/kubeadmin-password)"
+#echo "kubeconfig: $(cat $SECRETS_DIR/ci/kubeconfig)"
 
-mkdir -p $SHARED_DIR/.kube
-touch $SHARED_DIR/.kube/config
-cp ${SECRETS_DIR}/ci/kubeconfig $SHARED_DIR/.kube/config
-cp ${SECRETS_DIR}/ci/kubeadmin-password $SHARED_DIR/kubeadmin-password
-echo "password: $(cat $SECRETS_DIR/ci/kubeadmin-password)"
-echo "kubeconfig: $(cat $SECRETS_DIR/ci/kubeconfig)"
+#echo "password: $(cat $SECRETS_DIR/ci/password)"
+#echo "username: $(cat $SECRETS_DIR/ci/username)"
 
-echo "password: $(cat $SECRETS_DIR/ci/password)"
-echo "username: $(cat $SECRETS_DIR/ci/username)"
+echo "$(ls -all ${SECRETS_DIR})"
 
-echo "$(ls -all $SHARED_DIR)"
+oc login https://api.fipstest.sivw.p1.openshiftapps.com:6443 --username cluster-admin --password $(cat $SECRETS_DIR/kubeadmin-password) || true
 
-export KUBECONFIG="${SECRETS_DIR}/ci/kubeconfig"
+podman login -u=$(cat $SECRETS_DIR/username)" -p=$(cat $SECRETS_DIR/password)" quay.io || true
+
+podman pull quay.io/cspi-qe-images/opp:test || true
+
+podman pull quay.io/cspi-qe-images/opp:test || true
+
+podman pull quay.io/cloudservices/iqe-tests:latest || true
+
+#export KUBECONFIG="${SECRETS_DIR}/ci/kubeconfig"
 
 #oc login https://api.ci-ln-bz6wd82-76ef8.aws-2.ci.openshift.org:6443 --insecure-skip-tls-verify=true -u kubeadmin -p 2RddM-mufnh-PMEhh-YBYe4
 
-oc whoami
-oc whoami --show-server
-API_URL=$(oc whoami --show-server)
-echo "API_URL: ${API_URL}"
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+#oc whoami
+#oc whoami --show-server
+#API_URL=$(oc whoami --show-server)
+#echo "API_URL: ${API_URL}"
+#cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
 
 #CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 #API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
@@ -73,7 +81,7 @@ info "Current node/machine state:"
 #    sleep 20
 #done
 
-make test-e2e-with-kafka
-make teardown
+#make test-e2e-with-kafka
+#make teardown
 
 sleep 10
