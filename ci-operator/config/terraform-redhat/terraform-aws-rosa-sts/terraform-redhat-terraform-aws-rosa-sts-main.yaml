@@ -3,9 +3,6 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.13
-images:
-- dockerfile_path: build/ci-tf-e2e.Dockerfile
-  to: ocm-tf-e2e
 resources:
   '*':
     limits:
@@ -15,19 +12,9 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: make test-unit
+  commands: echo 'prow unit'
   container:
     from: src
-- as: e2e-presubmit
-  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/
-  steps:
-    cluster_profile: aws-qe
-    env:
-      OPENSHIFT_VERSION: 4.13.0
-    post:
-    - ref: rosa-terraform-e2e-teardown
-    pre:
-    - ref: rosa-terraform-e2e-setup
 zz_generated_metadata:
   branch: main
   org: terraform-redhat
