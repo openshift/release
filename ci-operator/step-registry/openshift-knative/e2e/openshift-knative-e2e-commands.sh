@@ -35,11 +35,11 @@ docker pull quay.io/cloudservices/iqe-tests:latest || true
 
 iqe tests plugin cost_management -m cost_interop -vv --junitxml="test_run.xml" || true
 
-export KUBECONFIG="${SECRETS_DIR}/kubeconfig"
+#export KUBECONFIG="${SECRETS_DIR}/kubeconfig"
 
 #oc login https://api.ci-ln-bz6wd82-76ef8.aws-2.ci.openshift.org:6443 --insecure-skip-tls-verify=true -u kubeadmin -p 2RddM-mufnh-PMEhh-YBYe4
 
-oc whoami
+#oc whoami
 #oc whoami --show-server
 #API_URL=$(oc whoami --show-server)
 #echo "API_URL: ${API_URL}"
