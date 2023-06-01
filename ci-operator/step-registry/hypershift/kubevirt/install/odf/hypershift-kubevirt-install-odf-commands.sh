@@ -22,6 +22,56 @@ metadata:
   name: "${ODF_INSTALL_NAMESPACE}"
 EOF
 
+# TODO remove this override once https://issues.redhat.com/browse/CLOUDDST-18990 is resolved
+# ODF isn't in the 4.14 catalog, which causes the install to fail. This workaround
+# should work for both 4.13 and 4.14, which are the only two versions being tested
+# at this point in time.
+#
+# Override the subscription source
+ODF_SUBSCRIPTION_SOURCE="redhat-operators-4-13"
+# create the custom catalog source that points to 4.13 regardless of the OCP version
+oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  annotations:
+    operatorframework.io/managed-by: marketplace-operator
+    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+  generation: 5
+  name: redhat-operators-4-13
+  namespace: openshift-marketplace
+spec:
+  displayName: Red Hat Operators
+  grpcPodConfig:
+    nodeSelector:
+      kubernetes.io/os: linux
+      node-role.kubernetes.io/master: ""
+    priorityClassName: system-cluster-critical
+    securityContextConfig: restricted
+    tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/master
+      operator: Exists
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 120
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 120
+  icon:
+    base64data: ""
+    mediatype: ""
+  image: registry.redhat.io/redhat/redhat-operator-index:v4.13
+  priority: -100
+  publisher: Red Hat
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 10m
+EOF
+
 # deploy new operator group
 oc apply -f - <<EOF
 apiVersion: operators.coreos.com/v1
@@ -48,7 +98,7 @@ spec:
   channel: $ODF_OPERATOR_CHANNEL
   installPlanApproval: Automatic
   name: $ODF_SUBSCRIPTION_NAME
-  source: redhat-operators
+  source: $ODF_SUBSCRIPTION_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 )
