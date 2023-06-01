@@ -124,6 +124,13 @@ if [ "${FIPS_ENABLED:-}" = "true" ]; then
 	" "$INSTALL_CONFIG"
 fi
 
+if [ -n "${FEATURE_SET}" ]; then
+        echo "Adding 'featureSet: ...' to install-config.yaml"
+	yq --yaml-output --in-place ".
+		| .featureSet = \"${FEATURE_SET}\"
+	" "$INSTALL_CONFIG"
+fi
+
 # Regenerate install-config.yaml to fill in unset values with default values.
 # Note that this triggers some validation against the OpenStack infrastructure.
 (
