@@ -19,14 +19,12 @@ go mod vendor
 
 EXIT_STATUS=0
 
-export TF_FOLDER_SAVE="${TF_FOLDER:-ci/e2e/terraform_provider_ocm_files}"
-
 export ARCHIVE_NAME=cluster-terraform-archive
-export TF_FOLDER=./ci/e2e/terraform_provider_ocm_files/
+export TF_FOLDER="${TF_FOLDER:-ci/e2e/terraform_provider_ocm_files}"
 make destroy_folder || EXIT_STATUS=$?
 
 export ARCHIVE_NAME=account-roles-terraform-archive
-export TF_FOLDER="${TF_FOLDER_SAVE}"
+export TF_FOLDER=./ci/e2e/account_roles_files/
 make destroy_folder || EXIT_STATUS=$?
 
 exit ${EXIT_STATUS}
