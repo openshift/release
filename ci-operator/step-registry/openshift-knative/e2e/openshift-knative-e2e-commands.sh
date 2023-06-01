@@ -24,21 +24,22 @@ SECRETS_DIR="/tmp/secrets/ci"
 
 echo "$(ls -all ${SECRETS_DIR})"
 
-oc login https://api.fipstest.sivw.p1.openshiftapps.com:6443 --username cluster-admin --password $(cat $SECRETS_DIR/kubeadmin-password) || true
+unset KUBECONFIG
+oc login https://api.fipstest.sivw.p1.openshiftapps.com:6443 --username cluster-admin --password "$(cat $SECRETS_DIR/kubeadmin-password)" || true
 
-podman login -u=$(cat $SECRETS_DIR/username)" -p=$(cat $SECRETS_DIR/password)" quay.io || true
-
-podman pull quay.io/cspi-qe-images/opp:test || true
+podman login -u="$(cat $SECRETS_DIR/username)" -p="$(cat $SECRETS_DIR/password)" quay.io || true
 
 podman pull quay.io/cspi-qe-images/opp:test || true
 
 podman pull quay.io/cloudservices/iqe-tests:latest || true
 
-#export KUBECONFIG="${SECRETS_DIR}/ci/kubeconfig"
+iqe tests plugin cost_management -m cost_interop -vv --junitxml="test_run.xml" || true
+
+export KUBECONFIG="${SECRETS_DIR}/kubeconfig"
 
 #oc login https://api.ci-ln-bz6wd82-76ef8.aws-2.ci.openshift.org:6443 --insecure-skip-tls-verify=true -u kubeadmin -p 2RddM-mufnh-PMEhh-YBYe4
 
-#oc whoami
+oc whoami
 #oc whoami --show-server
 #API_URL=$(oc whoami --show-server)
 #echo "API_URL: ${API_URL}"
