@@ -25,8 +25,10 @@ EOF
 )
 export TF_VARS
 
+export TF_FOLDER_SAVE="${TF_FOLDER:-ci/e2e/terraform_provider_ocm_files}"
+
 export ARCHIVE_NAME=account-roles-terraform-archive
-TF_FOLDER=ci/e2e/account_roles_files \
+export TF_FOLDER=ci/e2e/account_roles_files
 make apply_folder
 
 # TODO: fix this problem or add here a busy-wait loop that makes sure that the account roles exist
@@ -34,5 +36,5 @@ echo "As a temporary hack, wait a minute for the account roles to get created...
 sleep 1m
 
 export ARCHIVE_NAME=cluster-terraform-archive
-export TF_FOLDER="${TF_FOLDER:-ci/e2e/terraform_provider_ocm_files}"
+export TF_FOLDER="${TF_FOLDER_SAVE}"
 make apply_folder
