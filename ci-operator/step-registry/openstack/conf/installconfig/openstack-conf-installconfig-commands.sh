@@ -84,7 +84,6 @@ case "$CONFIG_TYPE" in
 		if [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
     			yq --yaml-output --in-place ".
     			    | .platform.openstack.loadBalancer.type = \"UserManaged\"
-    			    | .featureSet = \"TechPreviewNoUpgrade\"
     			" "$INSTALL_CONFIG"
 		fi
 		;;
