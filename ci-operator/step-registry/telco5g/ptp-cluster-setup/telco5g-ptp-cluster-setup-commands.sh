@@ -1,8 +1,5 @@
 #!/bin/bash
-# to disable periodic job uncomment below
-#if [[ "$JOB_TYPE" == "periodic" ]]; then
-#  exit 1
-#fi
+
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -57,6 +54,18 @@ cat << EOF > ~/ocp-install.yml
       delay: 10
       timeout: 300
 
+EOF
+if [[ "$JOB_TYPE" == "periodic" ]]; then
+cat << EOF >> ~/ocp-install.yml
+  - name: Check if abort file exists
+    stat:
+      path: /home/kni/abort
+    register: file_info
+    failed_when: file_info.stat.exists
+
+EOF
+fi
+cat << EOF >> ~/ocp-install.yml
   - name: Remove last run
     shell: kcli delete plan --yes ${PLAN_NAME}
     ignore_errors: yes
@@ -172,6 +181,30 @@ kind: MachineConfig
 metadata:
   labels:
     machineconfiguration.openshift.io/role: worker
+  name: 98-worker-chrony-configuration
+spec:
+  config:
+    ignition:
+      config: {}
+      security:
+        tls: {}
+      timeouts: {}
+      version: 3.1.0
+    networkd: {}
+    passwd: {}
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,ICAgIHBvb2wgY2xvY2sucmVkaGF0LmNvbSBpYnVyc3QKICAgIGRyaWZ0ZmlsZSAvdmFyL2xpYi9jaHJvbnkvZHJpZnQKICAgIG1ha2VzdGVwIDEuMCAzCiAgICBydGNzeW5jCiAgICBsb2dkaXIgL3Zhci9sb2cvY2hyb255Cg==
+        mode: 420
+        overwrite: true
+        path: /etc/chrony.conf
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
   name: 99-disable-chronyd
 spec:
   config:
@@ -219,7 +252,7 @@ spec:
             [Service]
             Type=oneshot
             TimeoutStartSec=300
-            ExecStart=/usr/sbin/chronyd -n -f /etc/chrony.conf -q
+            ExecStart=/bin/sh -c '/usr/sbin/chronyd -n -f /etc/chrony.conf -q && hwclock -w && hwclock && date'
             RemainAfterExit=yes
             [Install]
             WantedBy=multi-user.target
@@ -248,14 +281,23 @@ EOT
   echo "All MachineConfigPools to finished updating"
 }
 
+log_chronyd_status() {
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc version
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
+}
+
+
 #Set status and run playbooks
 status=0
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
-
-#installer has issues applying machine-configs with OCP 4.10, using manual way
-KUBECONFIG=$SHARED_DIR/kubeconfig oc apply -f $SHARED_DIR/disable_ntp.yml || true
-wait_for_mcp "2700s" || true
-
+if [[ "$status" == 0 ]]; then
+  #installer has issues applying machine-configs with OCP 4.10, using manual way
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc apply -f $SHARED_DIR/disable_ntp.yml || true
+  wait_for_mcp "2700s" || true
+  log_chronyd_status || true
+fi
 exit ${status}

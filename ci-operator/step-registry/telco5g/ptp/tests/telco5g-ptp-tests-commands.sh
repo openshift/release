@@ -4,8 +4,7 @@ set -x
 set -o nounset
 set -o errexit
 set -o pipefail
-# local testing
-source ./main.env || true
+
 build_images(){
 oc delete namespace openshift-ptp || true
 oc create namespace openshift-ptp -o yaml | oc label -f - pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged || true
@@ -149,6 +148,18 @@ retry_with_timeout() {
   done
 }
 
+# print RTC logs
+print_time() {
+# Get the list of nodes in the cluster
+NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
+
+# Loop through each node
+for node in $NODES; do
+    echo "Processing node: $node"
+    oc debug node/$node -- chroot /host sh -c "date;sudo hwclock"
+done
+}
+
 echo "************ telco5g cnf-tests commands ************"
 
 if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
@@ -168,8 +179,8 @@ export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
 export TEST_BRANCH="mno-external-gm"
 export PTP_UNDER_TEST_BRANCH="master"
-
 export KUBECONFIG=$SHARED_DIR/kubeconfig
+
 temp_dir=$(mktemp -d -t cnf-XXXXX)
 
 cd "$temp_dir" || exit 1
@@ -270,7 +281,11 @@ export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8
 export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
 
 # wait before first run
-sleep 60
+# wait more to let openshift complete initialization
+sleep 300
+
+# get RTC logs
+print_time
 
 # Running Dual NIC BC scenario
 export PTP_TEST_MODE=dualnicbc
@@ -280,6 +295,9 @@ make functests || temp_status_dnbc=$?
 # wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
 sleep 60
 
+# get RTC logs
+print_time
+
 # Running BC scenario
 export PTP_TEST_MODE=bc
 export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
@@ -288,10 +306,16 @@ make functests || temp_status_bc=$?
 # wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
 sleep 60
 
+# get RTC logs
+print_time
+
 # Running OC scenario
 export PTP_TEST_MODE=oc
 export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
 make functests || temp_status_oc=$?
+
+# get RTC logs
+print_time
 
 # saving overall status (all success=0, any failure=1)
 status=0

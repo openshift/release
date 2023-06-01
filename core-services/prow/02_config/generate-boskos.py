@@ -70,6 +70,9 @@ CONFIG = {
         'us-east-1': 2,
         'us-west-2': 2
     },
+    'aws-perf-qe-quota-slice': {
+        'us-west-2': 3,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
@@ -112,7 +115,8 @@ CONFIG = {
         'westus': 6
     },
     'azuremag-qe-quota-slice': {
-        'usgovvirginia': 10
+        'usgovvirginia': 5,
+        'usgovtexas': 5 
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 40,

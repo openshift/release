@@ -1,3 +1,8 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: maistra-builder
@@ -16,6 +21,11 @@ images:
       as:
       - registry.ci.openshift.org/ci/maistra-builder:upstream-master
   to: src-test
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -25,18 +35,12 @@ resources:
       memory: 200Mi
 tests:
 - as: nightly-images-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.12"
   cron: 00 03 * * *
   steps:
+    cluster_profile: aws-2
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
-      MAISTRA_MC_POD: not-used
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
     test:
@@ -95,17 +99,54 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
-    workflow: servicemesh-istio-e2e-aws
-- as: integ-pilot-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
+    workflow: servicemesh-istio-e2e-profile
+- as: maistra-istio-unit-3-0
   steps:
+    cluster_profile: aws-2
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: maistra-istio-unit-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work;
+          entrypoint \
+          make -e 'T=-v -count=1' build racetest binaries-test"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: integ-pilot-3-0
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -140,20 +181,15 @@ tests:
       from: src-test
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-telemetry-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws-2
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -188,20 +224,15 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-security-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws-2
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -236,20 +267,15 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: integ-helm-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws-2
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -284,10 +310,33 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: istio-update-operator-3-0
+  commands: |
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -f /creds-github/token \
+      '-c make update-istio gen' \
+      '-t [maistra-3.0] Automator: Update charts from maistra/istio' \
+      -m update_charts_istio_3.0 \
+      -b maistra-3.0
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
 zz_generated_metadata:
   branch: maistra-3.0
   org: maistra

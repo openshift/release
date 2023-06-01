@@ -54,6 +54,51 @@ EOF
     echo "Timed out waiting for csv to become ready"
 }
 
+# Waits up to 10 minutes until the Catalog source state is 'READY'
+wait_for_catalogsource () {
+    for i in $(seq 1 120); do
+        CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$CS_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')
+        echo $CATSRC_STATE
+        if [ "$CATSRC_STATE" = "READY" ] ; then
+            echo "Catalogsource created successfully after waiting $((5*i)) seconds"
+            echo "current state of catalogsource is \"$CATSRC_STATE\""
+            IS_CATSRC_CREATED=true
+            break
+        fi
+        sleep 5
+    done
+}
+
+# Creates CatalogSource
+create_catalogsource () {
+    CATSRC=""
+    IS_CATSRC_CREATED=${IS_CATSRC_CREATED:-false}
+    if [ "$IS_CATSRC_CREATED" = false ] ; then
+        CS_MANIFEST=$(cat <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  $CS_NAMESTANZA
+  namespace: $CS_NAMESPACE
+spec:
+  sourceType: grpc
+  image: "$OO_INDEX"
+$CS_PODCONFIG
+EOF
+)
+
+        echo "Creating CatalogSource: $CS_MANIFEST"
+        CATSRC=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${CS_MANIFEST}" )
+        echo "CatalogSource name is \"$CATSRC\""
+
+    else
+        echo "$CS_NAMESTANZA"
+        arrIN=("${CS_NAMESTANZA//:/ }")
+        CATSRC=${arrIN[1]}
+        CATSRC=`echo $CATSRC | sed 's/ *$//g'`
+    fi
+}
+
 # Retries Subscription creation
 # Deletes current Subscription in the namespace before retrying creating a new one
 retry_subscription_creation () {
@@ -195,60 +240,48 @@ else
   CS_NAMESPACE="${OO_INSTALL_NAMESPACE}"
 fi
 
-# The securityContextConfig API field was added in 4.12
+# The securityContextConfig API field was added in 4.12, but the default "enforce" is "restricted" since OCP 4.14
+# But once "featureSet: TechPreviewNoUpgrade" enabeld, the PSA enforce will be changed to "restricted" from "privileged" since OCP 4.12.
+# $ oc get featuregate cluster -o yaml
+# apiVersion: config.openshift.io/v1
+# kind: FeatureGate
+# metadata:
+#   name: cluster
+# spec:
+#   featureSet: TechPreviewNoUpgrade
+# So, add "securityContextConfig: restricted" since OCP 4.12
 CS_PODCONFIG=""
 OCP_MINOR_VERSION=$(oc version | grep "Server Version" | cut -d '.' -f2)
 if [ "$OCP_MINOR_VERSION" -gt "11" ]; then
   CS_PODCONFIG=$(cat <<EOF
-grpcPodConfig:
+  grpcPodConfig:
     securityContextConfig: restricted
 EOF
 )
 fi
-CATSRC=""
-IS_CATSRC_CREATED=${IS_CATSRC_CREATED:-false}
-if [ "$IS_CATSRC_CREATED" = false ] ; then
-CS_MANIFEST=$(cat <<EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  $CS_NAMESTANZA
-  namespace: $CS_NAMESPACE
-spec:
-  sourceType: grpc
-  image: "$OO_INDEX"
-  $CS_PODCONFIG
-EOF
-)
 
-echo "Creating CatalogSource: $CS_MANIFEST"
-CATSRC=$(oc create -f - -o jsonpath='{.metadata.name}' <<< "${CS_MANIFEST}" )
-echo "CatalogSource name is \"$CATSRC\""
+create_catalogsource
+wait_for_catalogsource
 
-else
-	echo "$CS_NAMESTANZA"
-        arrIN=("${CS_NAMESTANZA//:/ }")
-        CATSRC=${arrIN[1]}
-	CATSRC=`echo $CATSRC | sed 's/ *$//g'`
-fi
+retry_attempts_catalogsource=2
+while [[ "$IS_CATSRC_CREATED" = false && "$retry_attempts_catalogsource" -ne 0 ]]; do
+    echo "Timed out waiting for the catalog source $CATSRC to become ready after 10 minutes."
 
-# Wait for 10 minutes until the Catalog source state is 'READY'
-for i in $(seq 1 120); do
-    CATSRC_STATE=$(oc get catalogsources/"$CATSRC" -n "$CS_NAMESPACE" -o jsonpath='{.status.connectionState.lastObservedState}')
-    echo $CATSRC_STATE
-    if [ "$CATSRC_STATE" = "READY" ] ; then
-        echo "Catalogsource created successfully after waiting $((5*i)) seconds"
-        echo "current state of cataloguesource is \"$CATSRC\""
-        IS_CATSRC_CREATED=true
-        break
-    fi
-    sleep 5
+    echo "Retrying catalogsource creation...${retry_attempts_catalogsource} attempts left"
+    echo "Deleting catalogsource $CATSRC in the namespace $CS_NAMESPACE"
+    oc delete catalogsource $CATSRC -n $CS_NAMESPACE
+    
+    create_catalogsource
+    wait_for_catalogsource
+
+    retry_attempts_catalogsource=$((retry_attempts_catalogsource-1))
 done
 
 if [ $IS_CATSRC_CREATED = false ] ; then
     echo "Timed out waiting for the catalog source $CATSRC to become ready after 10 minutes."
     echo "Catalogsource state at timeout is \"$CATSRC_STATE\""
     echo "Catalogsource image used is \"$OO_INDEX\""
+    echo "All retry attempts failed"
     exit 1
 fi
 
