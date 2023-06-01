@@ -27,11 +27,11 @@ echo "$(ls -all ${SECRETS_DIR})"
 unset KUBECONFIG
 oc login https://api.fipstest.sivw.p1.openshiftapps.com:6443 --username cluster-admin --password "$(cat $SECRETS_DIR/kubeadmin-password)" || true
 
-podman login -u="$(cat $SECRETS_DIR/username)" -p="$(cat $SECRETS_DIR/password)" quay.io || true
+docker login -u="$(cat $SECRETS_DIR/username)" -p="$(cat $SECRETS_DIR/password)" quay.io || true
 
-podman pull quay.io/cspi-qe-images/opp:test || true
+docker pull quay.io/cspi-qe-images/opp:test || true
 
-podman pull quay.io/cloudservices/iqe-tests:latest || true
+docker pull quay.io/cloudservices/iqe-tests:latest || true
 
 iqe tests plugin cost_management -m cost_interop -vv --junitxml="test_run.xml" || true
 
