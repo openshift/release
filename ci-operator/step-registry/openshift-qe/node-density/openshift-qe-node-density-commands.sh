@@ -16,10 +16,8 @@ ES_USERNAME=$(cat "/secret/username")
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
-export EXTRA_FLAGS="--pods-per-node=100 --pod-ready-threshold=120000ms"
+export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD"
 export WORKLOAD=node-density
-export PODS_PER_NODE=230
-export POD_READY_THRESHOLD=180000ms
 export GEN_CSV=true
 export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.json kubelet.json etcd.json crio.json nodeMasters-max.json nodeWorkers.json"
 
