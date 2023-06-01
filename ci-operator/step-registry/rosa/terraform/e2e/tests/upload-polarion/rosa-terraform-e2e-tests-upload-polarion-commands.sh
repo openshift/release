@@ -14,8 +14,10 @@ RESULTS_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-t
 if [[ "$(echo $JOB_NAME | awk -F '-' '{print $1}')" == "rehearse" && "$JOB_TYPE" == "presubmit" ]]; then
   RESULTS_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/openshift_release/$(echo $JOB_NAME | awk -F '-' '{print $2}')/$JOB_NAME/$BUILD_ID/$POLARION_STEP_RESULTS"
 fi
+
 echo "POLARION_PROPERTIES=\"$POLARION_PROPERTIES\""
 echo "POLARION_RESULTS_URL=\"$RESULTS_URL\""
+echo " "
 
 ssh -i ~/pkey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no $proxyip \
     "podman run -it --rm --pull=always \
