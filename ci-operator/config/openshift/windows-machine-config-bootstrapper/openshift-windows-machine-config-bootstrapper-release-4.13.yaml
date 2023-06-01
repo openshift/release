@@ -43,34 +43,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: aws-e2e-ccm-install
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: aws
-    test:
-    - as: e2e-wmcb
-      commands: |-
-        #!/bin/bash
-
-        set -o nounset
-        set -o errexit
-        set -o pipefail
-
-        cluster_profile=/var/run/secrets/ci.openshift.io/cluster-profile
-        export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
-        export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
-        export DOCKER_RUNTIME=false
-
-        make run-wmcb-ci-e2e-test
-      dependencies:
-      - env: WMCB_IMAGE
-        name: windows-machine-config-bootstrapper-tests
-      from: src
-      resources:
-        requests:
-          cpu: 1000m
-          memory: 600Mi
-    workflow: openshift-e2e-aws-ccm-ovn-hybrid-install
 - as: e2e-wmcb
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
