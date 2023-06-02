@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'FRC=$?; createArchMigrationJunit; debug' EXIT TERM
+trap 'FRC=$?; createArchMigrationJunit; debug; sleep 8h' EXIT TERM
 
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
