@@ -218,8 +218,8 @@ Resources:
         ToPort: 5678
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
-        FromPort: 6443
-        ToPort: 6453
+        FromPort: 6000
+        ToPort: 6010
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 7000
@@ -326,6 +326,9 @@ HOST_PRIVATE_IP="$(aws --region "${REGION}" cloudformation describe-stacks --sta
 
 echo "${HOST_PUBLIC_IP}" > "${SHARED_DIR}/public_address"
 echo "${HOST_PRIVATE_IP}" > "${SHARED_DIR}/private_address"
+
+#TODO put the special ports in the shared dir too. For ssh and api access.
+# anything else in there? The ip for some of the steps too, like pcp and sos.then i also need the original ip for deprovisioning the stack
 
 echo "Waiting up to 5 min for RHEL host to be up."
 timeout 5m aws --region "${REGION}" ec2 wait instance-status-ok --instance-id "${INSTANCE_ID}"

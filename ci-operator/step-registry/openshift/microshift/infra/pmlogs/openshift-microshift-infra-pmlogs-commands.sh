@@ -6,14 +6,16 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 
 IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
-HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
+USHIFT_USER="$(cat ${SHARED_DIR}/ushift_user)"
+USHIFT_PORT="$(cat ${SHARED_DIR}/ushift_port)"
 
 echo "Using Host $IP_ADDRESS"
 
 mkdir -p "${HOME}/.ssh"
 cat <<EOF >"${HOME}/.ssh/config"
 Host ${IP_ADDRESS}
-  User ${HOST_USER}
+  User ${USHIFT_USER}
+  Port ${USHIFT_PORT}
   IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
   StrictHostKeyChecking accept-new
   ServerAliveInterval 30

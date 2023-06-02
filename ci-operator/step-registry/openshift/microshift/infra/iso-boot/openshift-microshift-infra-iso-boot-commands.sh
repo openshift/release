@@ -23,7 +23,6 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
-# number of VMs to create. This will change over time as we add more tests.
 NUM_VMS=1
 echo "${NUM_VMS}" > ${SHARED_DIR}/num_vms
 for (( i=0; i<$NUM_VMS; i++ ))
@@ -38,11 +37,13 @@ cd ~/microshift
 ./scripts/image-builder/create-vm.sh ${VM_NAME} default \$(find _output/image-builder -name "*.iso")
 VMIPADDR=\$(./scripts/devenv-builder/manage-vm.sh ip -n ${VM_NAME})
 timeout 5m bash -c "until ssh -oStrictHostKeyChecking=accept-new redhat@\${VMIPADDR} 'echo hello'; do sleep 5; done"
+
 cat << EOF2 > /tmp/config.yaml
 apiServer:
   subjectAltNames:
   - "${IP_ADDRESS}"
 EOF2
+
 scp /tmp/config.yaml "redhat@\${VMIPADDR}":/tmp/
 set +e
 ssh "redhat@\${VMIPADDR}" "sudo mv /tmp/config.yaml /etc/microshift/config.yaml && sudo reboot"
@@ -64,4 +65,5 @@ EOF
   sed -i "s,:6443,:${API_EXTERNAL_PORT}," ${SHARED_DIR}/kubeconfig_${i}
   echo "${SSH_EXTERNAL_PORT}" > ${SHARED_DIR}/ssh_port_${i}
   echo "redhat" > ${SHARED_DIR}/user_${i}
+  KUBECONFIG=${SHARED_DIR}/kubeconfig_${i} oc get pod -A
 done

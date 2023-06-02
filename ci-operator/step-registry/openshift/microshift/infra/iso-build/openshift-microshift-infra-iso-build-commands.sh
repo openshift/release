@@ -28,11 +28,9 @@ chmod 0755 ~
 mkdir ~/rpms
 tar -xf /tmp/rpms.tar -C ~/rpms
 tar -xf /tmp/microshift.tgz -C ~
-
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
 chmod 0400 ~/.ssh/id_rsa*
-
 sudo subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
