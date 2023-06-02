@@ -3,7 +3,7 @@ base_images:
     name: centos
     namespace: origin
     tag: stream8
-binary_build_commands: make tools build && make build WHAT=./test/e2e/fixtures/kcp-test-image
+binary_build_commands: make tools build
 build_root:
   from_repository: true
   use_build_cache: true
@@ -41,28 +41,6 @@ images:
       - destination_dir: .
         source_path: /go/src/github.com/kcp-dev/kcp/bin/virtual-workspaces
   to: virtual-workspaces
-- dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    ADD syncer /usr/bin/syncer
-    ENTRYPOINT ["/usr/bin/syncer"]
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/kcp-dev/kcp/bin/syncer
-  to: syncer
-- dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    ADD kcp-test-image /usr/bin/kcp-test-image
-    ENTRYPOINT ["/usr/bin/kcp-test-image"]
-  from: os
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/kcp-dev/kcp/bin/kcp-test-image
-  to: kcp-test-image
 promotion:
   namespace: kcp
   tag: latest
@@ -158,7 +136,7 @@ tests:
     test:
     - as: e2e
       commands: KUBE_CACHE_MUTATION_DETECTOR=1 USE_GOTESTSUM=1 E2E_PARALLELISM=3 ./hack/run-with-prometheus.sh
-        make test-e2e SUITES=control-plane,transparent-multi-cluster
+        make test-e2e SUITES=control-plane
       from: bin
       resources:
         requests:
@@ -170,7 +148,7 @@ tests:
     test:
     - as: e2e
       commands: KUBE_CACHE_MUTATION_DETECTOR=1 USE_GOTESTSUM=1 E2E_PARALLELISM=3 ./hack/run-with-prometheus.sh
-        make test-e2e SUITES=control-plane,transparent-multi-cluster
+        make test-e2e SUITES=control-plane
       from: bin
       resources:
         requests:
@@ -182,7 +160,7 @@ tests:
     test:
     - as: e2e-multiple-runs
       commands: KUBE_CACHE_MUTATION_DETECTOR=1 USE_GOTESTSUM=1 COUNT=3 E2E_PARALLELISM=3
-        ./hack/run-with-prometheus.sh make test-e2e SUITES=control-plane,transparent-multi-cluster
+        ./hack/run-with-prometheus.sh make test-e2e SUITES=control-plane
       from: bin
       resources:
         requests:
@@ -194,7 +172,7 @@ tests:
     test:
     - as: e2e-multiple-runs
       commands: KUBE_CACHE_MUTATION_DETECTOR=1 USE_GOTESTSUM=1 COUNT=3 E2E_PARALLELISM=3
-        ./hack/run-with-prometheus.sh make test-e2e SUITES=control-plane,transparent-multi-cluster
+        ./hack/run-with-prometheus.sh make test-e2e SUITES=control-plane
       from: bin
       resources:
         requests:
@@ -206,7 +184,7 @@ tests:
     test:
     - as: e2e-shared
       commands: KUBE_CACHE_MUTATION_DETECTOR=1 USE_GOTESTSUM=1 ./hack/run-with-prometheus.sh
-        make test-e2e-shared-minimal SUITES=control-plane,transparent-multi-cluster
+        make test-e2e-shared-minimal SUITES=control-plane
       from: bin
       resources:
         requests:
@@ -218,7 +196,7 @@ tests:
     test:
     - as: e2e-shared
       commands: KUBE_CACHE_MUTATION_DETECTOR=1 USE_GOTESTSUM=1 ./hack/run-with-prometheus.sh
-        make test-e2e-shared-minimal SUITES=control-plane,transparent-multi-cluster
+        make test-e2e-shared-minimal SUITES=control-plane
       from: bin
       resources:
         requests:
@@ -230,7 +208,7 @@ tests:
     test:
     - as: e2e-sharded
       commands: KUBE_CACHE_MUTATION_DETECTOR=1 USE_GOTESTSUM=1 ./hack/run-with-prometheus.sh
-        make test-e2e-sharded-minimal SUITES=control-plane,transparent-multi-cluster
+        make test-e2e-sharded-minimal SUITES=control-plane
       from: bin
       resources:
         requests:
@@ -242,7 +220,7 @@ tests:
     test:
     - as: e2e-shared
       commands: KUBE_CACHE_MUTATION_DETECTOR=1 USE_GOTESTSUM=1 ./hack/run-with-prometheus.sh
-        make test-e2e-sharded-minimal SUITES=control-plane,transparent-multi-cluster
+        make test-e2e-sharded-minimal SUITES=control-plane
       from: bin
       resources:
         requests:
