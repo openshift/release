@@ -307,7 +307,7 @@ EOF
   fi
 
   APPS_DNS_STACK_NAME="${CLUSTER_NAME}-apps-dns"
-  echo ${APPS_DNS_STACK_NAME} > "${SHARED_DIR}/apps_dns_stack_name"
+  echo ${APPS_DNS_STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
   REGION="${LEASED_RESOURCE}"
 
   private_route53_hostzone_name="${CLUSTER_NAME}.${BASE_DOMAIN}"
@@ -316,7 +316,6 @@ EOF
 
   if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
     router_lb_hostzone_id=$(aws --region ${REGION} elb describe-load-balancers | jq -r ".LoadBalancerDescriptions[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneNameID")
-    echo ${APPS_DNS_STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
     aws --region "${REGION}" cloudformation create-stack --stack-name ${APPS_DNS_STACK_NAME} \
       --template-body 'file:///tmp/ingress_app.yml' \
       --parameters \
