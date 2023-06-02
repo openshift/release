@@ -84,7 +84,6 @@ case "$CONFIG_TYPE" in
 		if [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
     			yq --yaml-output --in-place ".
     			    | .platform.openstack.loadBalancer.type = \"UserManaged\"
-    			    | .featureSet = \"TechPreviewNoUpgrade\"
     			" "$INSTALL_CONFIG"
 		fi
 		;;
@@ -101,13 +100,6 @@ if [[ "${ZONES_COUNT}" -gt '0' ]]; then
 		| .compute[0].platform.openstack.rootVolume.type = \"tripleo\"
 		| .compute[0].platform.openstack.rootVolume.size = 30
 		| .compute[0].platform.openstack.rootVolume.zones = ${ZONES_JSON}
-	" "$INSTALL_CONFIG"
-fi
-
-if [[ -f "${SHARED_DIR}/failure_domain.json" ]]; then
-	yq --yaml-output --in-place ".
-		| .controlPlane.platform.openstack += $(<"${SHARED_DIR}/failure_domain.json")
-		| .featureSet = \"TechPreviewNoUpgrade\"
 	" "$INSTALL_CONFIG"
 fi
 
@@ -128,6 +120,13 @@ if [ "${FIPS_ENABLED:-}" = "true" ]; then
 	echo "Adding 'fips: true' to install-config.yaml"
 	yq --yaml-output --in-place ".
 		| .fips = true
+	" "$INSTALL_CONFIG"
+fi
+
+if [ -n "${FEATURE_SET}" ]; then
+        echo "Adding 'featureSet: ...' to install-config.yaml"
+	yq --yaml-output --in-place ".
+		| .featureSet = \"${FEATURE_SET}\"
 	" "$INSTALL_CONFIG"
 fi
 
