@@ -46,10 +46,11 @@ base_images:
 build_root:
   project_image:
     dockerfile_literal: |
-      FROM registry.access.redhat.com/ubi8
-      USER root
-      RUN yum podman fuse-overlayfs --exclude container-selinux; && \
-          rm -rf /var/cache /var/log/dnf* /var/log/yum.*
+      FROM registry.access.redhat.com/ubi8/ubi
+      USER 0
+      RUN dnf -y update; yum -y reinstall shadow-utils; \
+      yum -y install podman fuse-overlayfs --exclude container-selinux; \
+      rm -rf /var/cache /var/log/dnf* /var/log/yum.*
       USER 1001
 images:
 - context_dir: openshift/ci-operator/source-image
