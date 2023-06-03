@@ -15,7 +15,7 @@ metadata:
 spec:
   hub_bucket_volume_size: "80Gi"
   cache_data_volume_size: "100Gi"
-  rwx_supported: "true"
+  rwx_supported: "false"
 EOF
 
 sleep 7200
