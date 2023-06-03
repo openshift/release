@@ -51,7 +51,8 @@ fi
 
 EXPECTED_NODES=$(( $(get_ready_nodes_count) + ADDITIONAL_WORKERS ))
 
-MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets | yq-v4 "$(cat <<EOF
+#there will be two kind of machinesets when cluster-api is enabled, using full name to get the correct machinesets
+MACHINE_SET=$(oc -n openshift-machine-api get -o yaml machinesets.machine.openshift.io | yq-v4 "$(cat <<EOF
   [.items[] | select(.spec.template.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "worker")][0]
   | .metadata.name += "-additional"
   | .spec.replicas = ${ADDITIONAL_WORKERS}
