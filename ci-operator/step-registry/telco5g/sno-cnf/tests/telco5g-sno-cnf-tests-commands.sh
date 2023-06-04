@@ -30,7 +30,7 @@ spec:
 _EOF
 
 oc wait --for=condition=Updating --timeout=180s mcp master
-oc wait --for=condition=Updated --timeout=600s mcp master
+oc wait --for=condition=Updated --timeout=60m mcp master
 
 test="pi-stress"
 oc create -f - <<_EOF
