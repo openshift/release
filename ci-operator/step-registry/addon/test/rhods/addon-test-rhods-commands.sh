@@ -8,6 +8,7 @@ set -o verbose
 OCM_ENV=$API_HOST
 SET_ENVIRONMENT="1"
 OC_HOST=$(oc whoami --show-server)
+CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 ROBOT_EXTRA_ARGS="-i $TEST_MARKER -e AutomationBug -e Resources-GPU -e Resources-2GPUS"
@@ -23,7 +24,14 @@ export RUN_SCRIPT_ARGS
 
 mkdir $ARTIFACT_DIR/results
 
-sleep 1h
+# delete IDPs before running testsuite
+if [ "${API_HOST}" = "stage" ]; then
+    API_URL=https://api.stage.openshift.com/
+else
+    API_URL=https://api.openshift.com/
+fi
+ocm login --url=$API_URL --token=$OCM_TOKEN
+ocm delete idp rosa-htpasswd --cluster=$CLUSTER_ID
 
 # running RHODS testsuite
 ./ods_ci/build/run.sh
