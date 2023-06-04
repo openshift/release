@@ -313,8 +313,6 @@ fi
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
     export ROLE_WORKER_CNF="master"
-    # Wait for the registry for tests
-    sleep 300
 fi
 export CNF_NODES="${test_nodes}"
 

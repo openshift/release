@@ -264,6 +264,7 @@ EOF
 status=0
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
+sleep 300  # Wait for cluster to be ready after a reboot
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/check-cluster.yml -vv
 exit ${status}
