@@ -212,6 +212,8 @@ else
     OG_OPERATION=create
     if [[ "${TEST_MODE}" == "msp" ]]; then
       OG_NAMESTANZA="name: redhat-layered-product-og"
+    elif [[ "${TEST_MODE}" == "qe-ci" ]]; then
+      OG_NAMESTANZA="generateName: qe-ci-"
     else
       OG_NAMESTANZA="generateName: oo-"
     fi
@@ -234,6 +236,9 @@ echo "Creating CatalogSource"
 
 if [[ "${TEST_MODE}" == "msp" ]]; then
   CS_NAMESTANZA="name: addon-$OO_PACKAGE-catalog"
+  CS_NAMESPACE="openshift-marketplace"
+elif [[ "${TEST_MODE}" == "qe-ci" ]]; then
+  CS_NAMESTANZA="name: qe-app-registry"
   CS_NAMESPACE="openshift-marketplace"
 else
   CS_NAMESTANZA="generateName: oo-"
@@ -260,8 +265,14 @@ EOF
 )
 fi
 
-create_catalogsource
-wait_for_catalogsource
+# qe-ci test mode using enable-qe-catalogsource create the catalogsource then no need to create extra catalogsource again
+if [[ "${TEST_MODE}" == "qe-ci" ]]; then
+  IS_CATSRC_CREATED=true
+  echo "TEST_MODE is qe-ci, using the exist qe-app-registry catalog install the optional operator, skipped create catalogSource"  
+else
+  create_catalogsource
+  wait_for_catalogsource
+fi
 
 retry_attempts_catalogsource=2
 while [[ "$IS_CATSRC_CREATED" = false && "$retry_attempts_catalogsource" -ne 0 ]]; do
@@ -294,6 +305,10 @@ echo "Creating Subscription"
 
 if [[ "${TEST_MODE}" == "msp" ]]; then
   SUB_NAMESTANZA="name: addon-$OO_PACKAGE"
+elif [[ "${TEST_MODE}" == "qe-ci" ]]; then
+  SUB_NAMESTANZA="generateName: qe-ci-"
+  CATSRC="qe-app-registry"
+  CS_NAMESPACE="openshift-marketplace"
 else
   SUB_NAMESTANZA="generateName: oo-"
 fi
