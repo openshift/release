@@ -143,20 +143,32 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           docker login -u='maistra-dev+prow' \
           -p=${QUAY_PASS} quay.io
-        # build and push images
+        # build and push images and publish the bundle into OperatorHub
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c ' \
-          export REPO=quay.io/maistra-dev/istio-ubi9-operator; \
-          export IMAGE=$REPO:3.0-latest; \
-          make -e COMMUNITY=false clean image; \
-          docker tag $IMAGE $REPO:3.0-nightly-`date -I`; \
-          docker push $IMAGE; \
-          docker push $REPO:3.0-nightly-`date -I`'
+          export DATE=`date -I`; \
+          export GH_TOKEN=`cat /creds-github/token`; \
+          export VERSION=3.0.0; \
+          export MINOR_VERSION=`v="${VERSION}" && echo "${v%.*}"`; \
+          export NIGHTLY_VERSION="${VERSION}-nightly-${DATE}"; \
+          export NIGHTLY_MINOR_VERSION="${MINOR_VERSION}-nightly-${DATE}"; \
+          export IMAGE="quay.io/maistra-dev/istio-ubi9-operator:${NIGHTLY_MINOR_VERSION}"; \
+          make docker-build docker-push IMAGE="${IMAGE}" \
+            -e CHANNELS="${MINOR_VERSION}-nightly" bundle \
+            -e OPERATOR_VERSION="${NIGHTLY_VERSION}" TAG="${NIGHTLY_MINOR_VERSION}" \
+            -e GIT_USER=`curl -sSfLH "Authorization: token ${GH_TOKEN}" https://api.github.com/user | jq --raw-output .login` \
+            -e GITHUB_TOKEN="${GH_TOKEN}" bundle-publish; \
+          # tag and push the latest image
+          docker tag ${IMAGE} quay.io/maistra-dev/istio-ubi9-operator:3.0-latest
+          docker push quay.io/maistra-dev/istio-ubi9-operator:3.0-latest
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow
+        namespace: test-credentials
+      - mount_path: /creds-github
+        name: github-token    
         namespace: test-credentials
       env:
       - name: MAISTRA_NAMESPACE
