@@ -319,9 +319,18 @@ export CNF_NODES="${test_nodes}"
 pushd $CNF_REPO_DIR
 status=0
 if [[ -n "$skip_tests" ]]; then
-    export SKIP_TESTS="${skip_tests}"
+    export SKIP_TESTS=${SKIP_TESTS:-"$skip_tests"}
 fi
-FEATURES_ENVIRONMENT="ci" make functests-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
+
+if [[ -n "${CUSTOM_TEST_RUN-}" ]]; then
+    FEATURES=${CUSTOM_CNF_VALIDATION_FEATURES:-"$FEATURES"} FEATURES_ENVIRONMENT="ci" make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log || status=$?
+    if [[ -n "${FOCUS_TESTS-}" ]]; then
+        export FOCUS_TESTS
+        FEATURES_ENVIRONMENT="ci" make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
+    fi
+else
+    FEATURES_ENVIRONMENT="ci" make functests-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
+fi
 popd
 
 set +e
