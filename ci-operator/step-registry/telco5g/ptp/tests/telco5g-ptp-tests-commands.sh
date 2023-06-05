@@ -347,8 +347,9 @@ python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_dualnicbc.
 python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_bc.xml -o ${ARTIFACT_DIR}/test_results_bc.html
 python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_oc.xml -o ${ARTIFACT_DIR}/test_results_oc.html
 
-# merge junit files in to one 
-junitparser merge ${ARTIFACT_DIR}/test_results_*xml ${ARTIFACT_DIR}/test_results_all.xml
+# merge junit files in to one
+junitparser merge ${ARTIFACT_DIR}/test_results_*xml ${ARTIFACT_DIR}/test_results_all.xml && \
+cp ${ARTIFACT_DIR}/test_results_all.xml ${ARTIFACT_DIR}/junit.xml
 
 # delete original separate junit files
 #rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/test_results_*xml
