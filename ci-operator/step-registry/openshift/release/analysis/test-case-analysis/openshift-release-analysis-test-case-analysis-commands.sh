@@ -17,7 +17,7 @@ function run_analysis() {
   echo "********** Starting testcase analysis for: ${analysis} "
   echo
   set -x
-  ./job-run-aggregator analyze-test-case \
+  job-run-aggregator analyze-test-case \
     --google-service-account-credential-file "${GOOGLE_SA_CREDENTIAL_FILE}" \
     --payload-tag="${PAYLOAD_TAG}" \
     --minimum-successful-count="${min_successful}" \
@@ -45,6 +45,13 @@ OIFS="$IFS"
 # Iterate over each line in JOB_CONFIGURATION
 while IFS=',' read -r name min_count args
 do
+  # If JOB_CONFIGURATION has a trailing newline, it'll end up with an
+  # empty entry and we need to skip it.
+  if [[ -z $name || -z $min_count ]];
+  then
+    continue
+  fi
+
   # Split 'args' into an array
   IFS=' ' read -r -a args_array <<< "$args"
 

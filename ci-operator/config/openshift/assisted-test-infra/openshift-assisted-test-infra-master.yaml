@@ -318,6 +318,14 @@ tests:
         NUM_MASTERS=1
         NUM_WORKERS=0
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-metallb
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=metallb
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-periodic
   cron: 30 02 */1 * 0-5
   steps:
@@ -326,6 +334,16 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
         OPENSHIFT_VERSION=4.12
+      PACKET_PLAN: m3.large.x86
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-mce-periodic
+  cron: 30 04 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=mce
       PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
@@ -810,6 +828,7 @@ tests:
 - as: e2e-oci-assisted
   optional: true
   steps:
+    cluster_profile: oci-assisted
     workflow: assisted-oci
 zz_generated_metadata:
   branch: master

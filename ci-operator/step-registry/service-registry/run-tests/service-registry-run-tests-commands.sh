@@ -10,5 +10,8 @@ echo "Run the tests"
 echo "Rename JUnit files"
 rename TEST junit_TEST target/surefire-reports/*.xml
 
-echo "Copy logs and xunit to artifacts dir"
+echo "Remove unnecessary comma in decimal numbers in JUnit files"
+sed -i -r 's/([0-9]),([0-9])/\1\2/g' target/surefire-reports/*.xml
+
+echo "Copy JUnit files into artifacts dir"
 cp target/surefire-reports/*.xml "${ARTIFACT_DIR}"
