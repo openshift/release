@@ -5,7 +5,7 @@ set +eu
 
 BASE_DIR=${HOME:-"/alabama"}
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"5m"}
-NS_OPERATORS=${NS_OPERATORS:-"openstack"}
+NS_OPERATORS=${NS_OPERATORS:-"openstack-operators"}
 NS_SERVICES=${NS_SERVICES:-"openstack"}
 
 # Creates directory if does not exists
