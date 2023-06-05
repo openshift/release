@@ -18,8 +18,6 @@ git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD"
 export WORKLOAD=node-density
-export GEN_CSV=true
-export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.json kubelet.json etcd.json crio.json nodeMasters-max.json nodeWorkers.json"
 
 export CLEANUP_WHEN_FINISH=true
 
