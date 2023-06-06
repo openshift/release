@@ -5,34 +5,35 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-rosa
+  to: ocp-qe-perfscale-ci-rosa-4.12-prod.yaml
 promotion:
   namespace: ci
   tag: latest
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
-      version: "4.13"
+    release:
+      channel: candidate
+      version: "4.12"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-qe-perfscale-ci-tests-rosa
+- as: ocp-qe-perfscale-ci-tests-rosa-hypershift-cluster-density
   cron: 0 12 * * 5
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-perf-qe
     env:
-      CHANNEL_GROUP: nightly
-      OPENSHIFT_VERSION: "4.13"
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-east-2
+      ROSA_LOGIN_ENV: production
     test:
     - ref: openshift-qe-cluster-density
-    workflow: rosa-aws-sts
+    workflow: rosa-aws-sts-hypershift
 zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
-  variant: rosa-4.13-nightly
+  variant: rosa-4.12-stable-prod
