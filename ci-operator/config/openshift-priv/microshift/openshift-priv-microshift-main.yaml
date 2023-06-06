@@ -39,7 +39,8 @@ images:
 - dockerfile_literal: |
     FROM src as rpms
     RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
-    RUN make rpm && TARGET_ARCH=aarch64 make rpm
+    # Disable cgo when cross-compiling because it is not supported.
+    RUN make rpm && TARGET_ARCH=aarch64 CGO_ENABLED=0 make rpm
     RUN tar cvf /rpms.tar -C _output/rpmbuild/RPMS/ .
 
     FROM test-runtime
