@@ -58,6 +58,6 @@ If you would like to run the tests on a specific payload,
 $ curl -X POST -d '{"job_execution_type": "1", "pod_spec_options": { "envs":  {"RELEASE_IMAGE_LATEST": "quay.io/openshift-release-dev/ocp-release:4.14.0-ec.1-x86_64"} } }' -H "Authorization: Bearer ${TOKEN}" "${GANGWAY_API}/v1/executions/${JOB_NAME}"
 # for upgrade testing,
 JOB_NAME='replace-me-eg-periodic-ci-openshift-openshift-tests-private-release-4.14-amd64-nightly-4.14-upgrade-from-stable-4.13-aws-ipi-network-mtu-localzone-p2-f14'
-$ curl -X POST -d '{"job_execution_type": "1", "pod_spec_options": { "envs":  {"RELEASE_IMAGE_LATEST": "quay.io/openshift-release-dev/ocp-release:4.14.0-ec.1-x86_64", "RELEASE_IMAGE_INITIAL": "quay.io/openshift-release-dev/ocp-release:4.13.2-x86_64"} } }' -H "Authorization: Bearer ${TOKEN}" "${GANGWAY_API}/v1/executions/${JOB_NAME}"
+$ curl -X POST -d '{"job_execution_type": "1", "pod_spec_options": { "envs":  {"RELEASE_IMAGE_LATEST": "quay.io/openshift-release-dev/ocp-release:4.13.2-x86_64", "RELEASE_IMAGE_TARGET": "quay.io/openshift-release-dev/ocp-release:4.14.0-ec.1-x86_64"} } }' -H "Authorization: Bearer ${TOKEN}" "${GANGWAY_API}/v1/executions/${JOB_NAME}"
 ```
 You can use `-v` option for curl to see detailed information about the request as well as error message.
