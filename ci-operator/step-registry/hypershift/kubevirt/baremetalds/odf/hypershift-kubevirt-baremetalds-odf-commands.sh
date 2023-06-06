@@ -5,10 +5,10 @@ set -o errexit
 set -o pipefail
 set -x
 
-oc label node worker-0 cluster.ocs.openshift.io/openshift-storage=''
-oc label node worker-1 cluster.ocs.openshift.io/openshift-storage=''
-oc label node worker-2 cluster.ocs.openshift.io/openshift-storage=''
-oc label node worker-3 cluster.ocs.openshift.io/openshift-storage=''
+while read -r node _ _ _ _; do
+    echo "$node"
+    oc label node "$node" cluster.ocs.openshift.io/openshift-storage=''
+done < <(oc get node -lnode-role.kubernetes.io/worker="" --no-headers)
 
 oc apply -f - <<EOF
 apiVersion: local.storage.openshift.io/v1
