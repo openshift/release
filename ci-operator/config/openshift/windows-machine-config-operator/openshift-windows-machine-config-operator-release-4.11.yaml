@@ -3,6 +3,10 @@ base_images:
     name: release
     namespace: openshift
     tag: golang-1.18
+  operator-sdk:
+    name: "4.11"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -16,12 +20,15 @@ images:
   to: windows-machine-config-operator-test
 operator:
   bundles:
-  - context_dir: .
+  - as: wmco-bundle
+    context_dir: .
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: REPLACE_IMAGE
     with: pipeline:windows-machine-config-operator-test
 promotion:
+  additional_images:
+    windows-machine-config-operator-bundle: wmco-bundle
   name: "4.11"
   namespace: ocp
 releases:
@@ -65,15 +72,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: aws-e2e-ccm-install
-  cron: 0 9 * * 1
-  steps:
-    cluster_profile: aws
-    env:
-      WINDOWS_SERVER_VERSION: "2019"
-    test:
-    - ref: windows-e2e-operator-test
-    workflow: openshift-e2e-aws-ccm-ovn-hybrid-install
 - as: aws-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -90,15 +88,6 @@ tests:
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-azure-ovn-hybrid
-- as: azure-e2e-ccm-install
-  skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    env:
-      WINDOWS_SERVER_VERSION: "2019"
-    test:
-    - ref: windows-e2e-operator-test
-    workflow: openshift-e2e-azure-ccm-ovn-hybrid-install
 - as: vsphere-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -110,12 +99,23 @@ tests:
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
-    env:
-      OO_CHANNEL: preview
-      OO_INSTALL_NAMESPACE: openshift-windows-machine-config-operator
-      OO_PACKAGE: windows-machine-config-operator
-      OO_TARGET_NAMESPACES: '!install'
     test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-windows-machine-config-operator
+        oc label --overwrite=true ns openshift-windows-machine-config-operator openshift.io/cluster-monitoring=true \
+        pod-security.kubernetes.io/enforce=privileged
+        operator-sdk run bundle --timeout=10m -n openshift-windows-machine-config-operator "$OO_BUNDLE"
+        oc wait --timeout=5m --for condition=Available -n openshift-windows-machine-config-operator deployment windows-machine-config-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: wmco-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
     - as: e2e-aws-upgrade
       cli: latest
       commands: |-
@@ -125,18 +125,14 @@ tests:
         export AWS_SHARED_CREDENTIALS_FILE=${cluster_profile}/.awscred
         export KUBE_SSH_KEY_PATH=${cluster_profile}/ssh-privatekey
         export WINDOWS_SERVER_VERSION="2019"
+        export OPERATOR_IMAGE="PLACEHOLDER"
         make run-ci-e2e-upgrade-test
-      dependencies:
-      - env: OO_INDEX
-        name: ci-index
-      - env: OPERATOR_IMAGE
-        name: windows-machine-config-operator-test
       from: windows-machine-config-operator-test
       resources:
         requests:
           cpu: 1000m
           memory: 400Mi
-    workflow: optional-operators-ci-aws-ovn-hybrid
+    workflow: ipi-aws-ovn-hybrid
 - as: platform-none-vsphere-e2e-operator
   skip_if_only_changed: ^(?:docs|\.github)/|\.md$|^(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

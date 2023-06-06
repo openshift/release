@@ -37,20 +37,16 @@ build_root:
     namespace: openshift
     tag: golang-1.18
 releases:
-  initial:
-    release:
-      architecture: amd64
-      channel: fast
-      version: "4.10"
   intermediate:
-    release:
+    candidate:
       architecture: amd64
-      channel: fast
+      product: ocp
+      stream: nightly
       version: "4.11"
   latest:
     release:
       architecture: amd64
-      channel: fast
+      channel: candidate
       version: "4.10"
   target:
     candidate:
@@ -64,21 +60,37 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-ipi-ovn-p2-f14
-  cron: 57 0 2,17 * *
+- as: azure-ipi-p2-f14
+  cron: 55 22 4,19 * *
   remote_api: true
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: azure-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_INTERMEDIATE_TAGS: '@upgrade-sanity and @4.11 and @aws-ipi and not @fips'
-      E2E_RUN_LATEST_TAGS: '@upgrade-sanity and @4.12 and @aws-ipi and not @fips'
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.10 and @aws-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.10 and @aws-ipi and not @fips'
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_INTERMEDIATE_TAGS: '@4.11 and @azure-ipi and @upgrade-sanity and not
+        @fips'
+      E2E_RUN_LATEST_TAGS: '@4.12 and @azure-ipi and @upgrade-sanity and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@4.10 and @azure-ipi and @upgrade-check and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@4.10 and @azure-ipi and @upgrade-prepare and not @fips'
     test:
     - ref: cucushift-installer-check
-    - chain: cucushift-upgrade-paused
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn
+    - chain: openshift-upgrade-qe-test-paused
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: vsphere-ipi-p2-f14
+  cron: 26 20 4,19 * *
+  remote_api: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      E2E_RUN_INTERMEDIATE_TAGS: '@4.11 and @vsphere-ipi and @upgrade-sanity and not
+        @fips'
+      E2E_RUN_LATEST_TAGS: '@4.12 and @vsphere-ipi and @upgrade-sanity and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@4.10 and @vsphere-ipi and @upgrade-check and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@4.10 and @vsphere-ipi and @upgrade-prepare and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-paused
+    workflow: cucushift-installer-rehearse-vsphere-ipi
 zz_generated_metadata:
   branch: release-4.12
   org: openshift

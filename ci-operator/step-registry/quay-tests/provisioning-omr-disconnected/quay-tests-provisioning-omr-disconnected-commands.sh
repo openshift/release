@@ -24,6 +24,7 @@ echo "PublicSubnet: $PublicSubnet"
 
 # get AWS region
 REGION="${LEASED_RESOURCE}"
+echo "REGION: $REGION"
 ####################
 
 cat >>omr-ami-images.json <<EOF

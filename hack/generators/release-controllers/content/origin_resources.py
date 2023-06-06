@@ -1,9 +1,8 @@
-
 from content.utils import get_rc_volumes, get_rc_volume_mounts, get_rcapi_volumes, get_rcapi_volume_mounts
 
 
 def _add_origin_rbac(gendoc):
-    gendoc.append({
+    gendoc.append_all([{
         'apiVersion': 'authorization.openshift.io/v1',
         'kind': 'Role',
         'metadata': {
@@ -34,14 +33,35 @@ def _add_origin_rbac(gendoc):
                 'verbs': ['get',
                           'list',
                           'watch',
-                          'create']
+                          'create',
+                          'delete',
+                          'update',
+                          'patch']
             },
             {
                 'apiGroups': [''],
                 'resources': ['events'],
                 'verbs': ['create', 'patch', 'update']
             }]
-    })
+    }, {
+        'apiVersion': 'rbac.authorization.k8s.io/v1',
+        'kind': 'RoleBinding',
+        'metadata': {
+            'name': 'release-controller-binding',
+            'namespace': 'origin',
+        },
+        'roleRef': {
+            'apiGroup': 'rbac.authorization.k8s.io',
+            'kind': 'Role',
+            'name': 'release-controller-modify',
+        },
+        'subjects': [{
+            'kind': 'ServiceAccount',
+            'name': 'release-controller',
+            'namespace': 'ci'
+        }
+        ]
+    }])
 
 
 def _add_origin_resources(gendoc):
@@ -138,7 +158,8 @@ def _add_origin_resources(gendoc):
                                     "--job-namespace=ci-release",
                                     "--tools-image-stream-tag=4.6:tests",
                                     "--release-architecture=amd64",
-                                    "-v=4"
+                                    "-v=4",
+                                    "--process-legacy-results"
                                 ],
                                 "image": "release-controller:latest",
                                 "name": "controller",

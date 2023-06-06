@@ -52,15 +52,10 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.12"
+      version: "4.13"
   latest-multi:
     candidate:
       architecture: multi
-      product: ocp
-      stream: nightly
-      version: "4.12"
-  nightly-4-13:
-    candidate:
       product: ocp
       stream: nightly
       version: "4.13"
@@ -80,11 +75,10 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-assisted
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:nightly-4-13
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.8
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export KUBECONFIG=$(find ${KUBECONFIG} -type f)
@@ -97,6 +91,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         SERVICE_BASE_REF=release-ocm-2.8
+        WORKER_DISK=40000000000
       POST_INSTALL_COMMANDS: |
         export TEST_FUNC=test_late_binding_kube_api_sno
         export HOLD_INSTALLATION=true
@@ -117,6 +112,7 @@ tests:
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
+        WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-net-suite-periodic
   cron: 43 22 */1 * 1-5
@@ -132,6 +128,7 @@ tests:
         STATIC_IPS=true
         TEST_FUNC=test_kubeapi
         MAKEFILE_TARGET="test_kube_api_parallel"
+        WORKER_DISK=40000000000
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ha-kube-api
@@ -229,6 +226,7 @@ tests:
         TEST_FUNC=test_late_binding_kube_api_sno
         TEST=./src/tests/test_kube_api.py
         MAKEFILE_TARGET=test
+        WORKER_DISK=40000000000
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-reclaim
   optional: true
@@ -242,6 +240,7 @@ tests:
         TEST_FUNC=test_late_binding_kube_api_ipv4_highly_available
         TEST=./src/tests/test_kube_api.py
         MAKEFILE_TARGET=test
+        WORKER_DISK=40000000000
     workflow: assisted-baremetal
 zz_generated_metadata:
   branch: release-ocm-2.8

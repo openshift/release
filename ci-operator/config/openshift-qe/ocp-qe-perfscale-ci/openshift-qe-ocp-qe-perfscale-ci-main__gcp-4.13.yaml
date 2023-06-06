@@ -1,0 +1,73 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-gcp-413
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-qe-perfscale-ci-tests-kube-burner
+  cron: 29 5 */1 * 1-5
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      WORKER_REPLICA_COUNT: "20"
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    - chain: workers-scale
+    workflow: openshift-qe-ocp-qe-perfscale-ci-tests
+- as: ocp-qe-perfscale-ci-tests-net-perf
+  cron: 29 5 */1 * 1-5
+  steps:
+    cluster_profile: gcp-qe
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    workflow: openshift-qe-network-perf
+- as: ocp-qe-perfscale-router-perf-gcp
+  cron: 0 9 * * 4
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      WORKER_REPLICA_COUNT: "20"
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    - chain: workers-scale
+    workflow: openshift-qe-router-perf
+- as: ocp-qe-perfscale-node-density-heavy-gcp
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      WORKER_REPLICA_COUNT: "20"
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    - chain: workers-scale
+    workflow: openshift-qe-node-density-heavy
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: gcp-4.13

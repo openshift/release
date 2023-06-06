@@ -8,7 +8,8 @@ ODF_INSTALL_NAMESPACE=openshift-storage
 ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-'stable-4.12'}"
 ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
 ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
-ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
+ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
+ODF_SUBSCRIPTION_SOURCE="${ODF_SUBSCRIPTION_SOURCE:-'redhat-operators'}"
 
 # Make the masters schedulable so we have more capacity to run VMs
 oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
@@ -20,6 +21,56 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: "${ODF_INSTALL_NAMESPACE}"
+EOF
+
+# TODO remove this override once https://issues.redhat.com/browse/CLOUDDST-18990 is resolved
+# ODF isn't in the 4.14 catalog, which causes the install to fail. This workaround
+# should work for both 4.13 and 4.14, which are the only two versions being tested
+# at this point in time.
+#
+# Override the subscription source
+ODF_SUBSCRIPTION_SOURCE="redhat-operators-4-13"
+# create the custom catalog source that points to 4.13 regardless of the OCP version
+oc apply -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  annotations:
+    operatorframework.io/managed-by: marketplace-operator
+    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+  generation: 5
+  name: redhat-operators-4-13
+  namespace: openshift-marketplace
+spec:
+  displayName: Red Hat Operators
+  grpcPodConfig:
+    nodeSelector:
+      kubernetes.io/os: linux
+      node-role.kubernetes.io/master: ""
+    priorityClassName: system-cluster-critical
+    securityContextConfig: restricted
+    tolerations:
+    - effect: NoSchedule
+      key: node-role.kubernetes.io/master
+      operator: Exists
+    - effect: NoExecute
+      key: node.kubernetes.io/unreachable
+      operator: Exists
+      tolerationSeconds: 120
+    - effect: NoExecute
+      key: node.kubernetes.io/not-ready
+      operator: Exists
+      tolerationSeconds: 120
+  icon:
+    base64data: ""
+    mediatype: ""
+  image: registry.redhat.io/redhat/redhat-operator-index:v4.13
+  priority: -100
+  publisher: Red Hat
+  sourceType: grpc
+  updateStrategy:
+    registryPoll:
+      interval: 10m
 EOF
 
 # deploy new operator group
@@ -36,7 +87,7 @@ spec:
   - $(echo \"${ODF_INSTALL_NAMESPACE}\" | sed "s|,|\"\n  - \"|g")
 EOF
 
-echo "subscribe to the operator"
+echo "subscribe to the operator subscription name: $ODF_SUBSCRIPTION_NAME, namespace: $ODF_INSTALL_NAMESPACE, channel $ODF_OPERATOR_CHANNEL"
 SUB=$(
     cat <<EOF | oc apply -f - -o jsonpath='{.metadata.name}'
 apiVersion: operators.coreos.com/v1alpha1
@@ -48,7 +99,7 @@ spec:
   channel: $ODF_OPERATOR_CHANNEL
   installPlanApproval: Automatic
   name: $ODF_SUBSCRIPTION_NAME
-  source: redhat-operators
+  source: $ODF_SUBSCRIPTION_SOURCE
   sourceNamespace: openshift-marketplace
 EOF
 )
@@ -61,9 +112,12 @@ for ((i=1; i <= $RETRIES; i++)); do
         if [[ "$(oc -n "$ODF_INSTALL_NAMESPACE" get csv "$CSV" -o jsonpath='{.status.phase}')" == "Succeeded" ]]; then
             echo "ClusterServiceVersion \"$CSV\" ready"
             break
+	else
+	   oc -n "$ODF_INSTALL_NAMESPACE" get csv "$CSV" -o yaml --ignore-not-found
         fi
     else
       echo "Try ${i}/${RETRIES}: ODF is not deployed yet. Checking again in 10 seconds"
+      oc -n "$ODF_INSTALL_NAMESPACE" get subscription "$SUB" -o yaml --ignore-not-found
     fi
     sleep 10
 done
