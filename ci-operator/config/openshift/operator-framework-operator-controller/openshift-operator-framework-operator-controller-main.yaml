@@ -14,10 +14,12 @@ images:
     FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14 AS builder
     WORKDIR /build
     COPY . .
-    RUN make build CGO_ENABLED=0 GO_FLAGS="-mod=vendor"
+    RUN CGO_ENABLED=0 GOOS=${GOOS} GOPROXY=${GOPROXY} go build \
+      -o operator-controller-manager \
+      ./cmd/manager/main.go
 
     FROM registry.ci.openshift.org/ocp/4.14:base
-    COPY --from=builder build/bin/manager /usr/bin/operator-controller-manager
+    COPY --from=builder /build/operator-controller-manager /usr/bin/operator-controller-manager
     LABEL io.k8s.display-name="OpenShift Operator Lifecycle Manager Operator Controller" \
           io.k8s.description="This is a component of OpenShift Container Platform that allows operator installation."
   from: base
