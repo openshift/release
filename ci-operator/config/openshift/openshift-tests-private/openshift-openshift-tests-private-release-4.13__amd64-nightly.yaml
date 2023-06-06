@@ -73,49 +73,26 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: alibaba-ipi-fips-p3-f28
-  cron: 59 14 25 * *
+- as: alibaba-ipi-private-fips-p3-f28
+  cron: 46 5 13 * *
   remote_api: true
   steps:
     cluster_profile: alibabacloud-qe
     env:
       E2E_RUN_TAGS: '@amd64 and @alibaba-ipi and @network-ovnkubernetes'
       FIPS_ENABLED: "true"
-      TAG_VERSION: '@4.13'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi
-- as: alibaba-ipi-fips-p3-f28-destructive
-  cron: 41 18 8 * *
-  remote_api: true
-  steps:
-    cluster_profile: alibabacloud-qe
-    env:
-      E2E_RUN_TAGS: '@amd64 and @alibaba-ipi and @network-ovnkubernetes and @destructive'
-      FIPS_ENABLED: "true"
-      TAG_VERSION: '@4.13'
-      TEST_ADDITIONAL: Network_Observability
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-alibabacloud-ipi
-- as: alibaba-ipi-private-p3-f28
-  cron: 38 16 14 * *
-  remote_api: true
-  steps:
-    cluster_profile: alibabacloud-qe
-    env:
-      E2E_RUN_TAGS: '@amd64 and @alibaba-ipi and @network-ovnkubernetes'
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
-- as: alibaba-ipi-private-p3-f28-destructive
-  cron: 38 22 24 * *
+- as: alibaba-ipi-private-fips-p2-f28-destructive
+  cron: 7 11 27 * *
   remote_api: true
   steps:
     cluster_profile: alibabacloud-qe
     env:
       E2E_RUN_TAGS: '@amd64 and @alibaba-ipi and @network-ovnkubernetes and @destructive'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
@@ -331,11 +308,13 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-disconnected-cco-manual-sts-p2-f14
-  cron: 16 16 9,24 * *
+- as: aws-ipi-disconnected-cco-manual-sts-efs-p2-f14
+  cron: 32 21 7,22 * *
   remote_api: true
   steps:
     cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.13
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @disconnected and @network-ovnkubernetes
@@ -344,12 +323,14 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
-- as: aws-ipi-disconnected-cco-manual-sts-p3-f28-destructive
-  cron: 29 12 27 * *
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
+- as: aws-ipi-disconnected-cco-manual-sts-efs-p3-f28-destructive
+  cron: 51 22 24 * *
   remote_api: true
   steps:
     cluster_profile: aws-qe
+    dependency_overrides:
+      OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.13
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @disconnected and @network-ovnkubernetes
@@ -358,7 +339,7 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
 - as: aws-ipi-disconnected-network-mtu-localzone-p2-f14
   cron: 22 20 12,27 * *
   remote_api: true

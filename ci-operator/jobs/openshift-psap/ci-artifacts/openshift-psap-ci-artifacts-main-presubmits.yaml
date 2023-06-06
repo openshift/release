@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -54,7 +54,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/model-mesh-images
     decorate: true
     decoration_config:
@@ -105,7 +105,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/model-mesh-plot
     decorate: true
     decoration_config:
@@ -155,7 +155,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/model-mesh-protelion
     decorate: true
     decoration_config:
@@ -205,7 +205,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/model-mesh-protelion-light
     decorate: true
     decoration_config:
@@ -269,7 +269,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/ods-images
     decorate: true
     decoration_config:
@@ -320,7 +320,171 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
+    context: ci/prow/ods-loadaware
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ods
+      ci.openshift.io/generator: prowgen
+    name: pull-ci-openshift-psap-ci-artifacts-main-ods-loadaware
+    rerun_command: /test ods-loadaware
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=loadaware
+        - --variant=ods
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ods-loadaware,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/ods-loadaware-light
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ods
+      ci.openshift.io/generator: prowgen
+    name: pull-ci-openshift-psap-ci-artifacts-main-ods-loadaware-light
+    rerun_command: /test ods-loadaware-light
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=loadaware-light
+        - --variant=ods
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ods-loadaware-light,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/ods-loadaware-plot
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: ods
+      ci.openshift.io/generator: prowgen
+    name: pull-ci-openshift-psap-ci-artifacts-main-ods-loadaware-plot
+    rerun_command: /test ods-loadaware-plot
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=loadaware-plot
+        - --variant=ods
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ods-loadaware-plot,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
     context: ci/prow/ods-notebooks
     decorate: true
     decoration_config:
@@ -370,7 +534,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/ods-notebooks-light
     decorate: true
     decoration_config:
@@ -434,7 +598,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/ods-notebooks-long
     decorate: true
     decoration_config:
@@ -485,7 +649,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/ods-notebooks-on-private
     decorate: true
     decoration_config:
@@ -549,7 +713,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/ods-notebooks-plot
     decorate: true
     decoration_config:
@@ -599,7 +763,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/ods-pipelines
     decorate: true
     decoration_config:
@@ -649,7 +813,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/ods-pipelines-light
     decorate: true
     decoration_config:
@@ -713,7 +877,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/ods-pipelines-plot
     decorate: true
     decoration_config:
@@ -763,7 +927,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/test-pr
     decorate: true
     decoration_config:
@@ -825,7 +989,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/test-pr-no-cluster
     decorate: true
     decoration_config:
@@ -873,7 +1037,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/wisdom-images
     decorate: true
     decoration_config:
@@ -924,11 +1088,12 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/wisdom-load-test
     decorate: true
     decoration_config:
       skip_cloning: true
+      timeout: 4h0m0s
     labels:
       ci-operator.openshift.io/variant: wisdom
       ci.openshift.io/generator: prowgen
@@ -974,7 +1139,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build02
     context: ci/prow/wisdom-load-test-light
     decorate: true
     decoration_config:

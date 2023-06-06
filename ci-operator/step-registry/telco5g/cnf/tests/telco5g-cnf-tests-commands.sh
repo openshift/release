@@ -237,10 +237,10 @@ export CNF_ORIGIN_TESTS
 
 if [[ "$T5CI_VERSION" == "4.14" ]]; then
     export CNF_BRANCH="master"
-    export CNF_TESTS_IMAGE="quay.io/openshift-kni/cnf-tests:4.14"
+    export CNF_TESTS_IMAGE="cnf-tests:4.14"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
-    export CNF_TESTS_IMAGE="quay.io/openshift-kni/cnf-tests:${T5CI_VERSION}"
+    export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
 fi
 
 CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}

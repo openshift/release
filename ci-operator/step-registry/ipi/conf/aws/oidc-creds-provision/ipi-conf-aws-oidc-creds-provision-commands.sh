@@ -14,6 +14,31 @@ REGION="${LEASED_RESOURCE}"
 oc registry login
 oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
 
+# Create extra efs csi driver iam resources, it's optional only for efs csi driver related tests on sts clusters
+if [[ "${CREATE_EFS_CSI_DRIVER_IAM}" == "yes" ]]; then
+  cat <<EOF >/tmp/credrequests/aws-efs-csi-driver-operator-credentialsrequest.yaml
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  name: openshift-aws-efs-csi-driver
+  namespace: openshift-cloud-credential-operator
+spec:
+  providerSpec:
+    apiVersion: cloudcredential.openshift.io/v1
+    kind: AWSProviderSpec
+    statementEntries:
+    - action:
+      - elasticfilesystem:*
+      effect: Allow
+      resource: '*'
+  secretRef:
+    name: aws-efs-cloud-credentials
+    namespace: openshift-cluster-csi-drivers
+  serviceAccountNames:
+  - aws-efs-csi-driver-operator
+  - aws-efs-csi-driver-controller-sa
+EOF
+fi
 
 CCOCTL_OPTIONS=""
 
