@@ -19,6 +19,8 @@ go mod vendor
 
 EXIT_STATUS=0
 
+export GATEWAY_URL="$(echo "${TF_VARS}" | grep 'url' | awk -F '=' '{print $2}' | sed 's/[ |"]//g')"
+
 export ARCHIVE_NAME=cluster-terraform-archive
 export TF_FOLDER="${TF_FOLDER:-ci/e2e/terraform_provider_ocm_files}"
 make destroy_folder || EXIT_STATUS=$?
