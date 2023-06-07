@@ -41,13 +41,17 @@ else
   cp /etc/ci-pull-credentials/.dockerconfigjson /tmp/pull-secret.json
 fi
 
+if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
+  COMPUTE_NODE_TYPE="m5.xlarge"
+fi
+
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 /usr/bin/hypershift create cluster aws \
   ${EXTRA_ARGS} \
   --name ${CLUSTER_NAME} \
   --infra-id ${INFRA_ID} \
   --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
-  --instance-type=m5.xlarge \
+  --instance-type=${COMPUTE_NODE_TYPE} \
   --base-domain ${DOMAIN} \
   --region ${HYPERSHIFT_AWS_REGION} \
   --control-plane-availability-policy ${HYPERSHIFT_CP_AVAILABILITY_POLICY} \
