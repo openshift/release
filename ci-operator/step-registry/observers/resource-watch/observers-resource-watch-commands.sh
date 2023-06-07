@@ -47,6 +47,6 @@ then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-openshift-tests run-resourcewatch --kubeconfig $KUBECONFIG --namespace default > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
+openshift-tests run-resourcewatch --v=4 --kubeconfig $KUBECONFIG --namespace default > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
 openshift-tests run-monitor --artifact-dir $STORE_PATH > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
 wait

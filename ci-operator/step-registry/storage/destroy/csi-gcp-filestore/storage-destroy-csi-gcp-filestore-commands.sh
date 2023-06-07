@@ -3,6 +3,9 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
+python3 --version 
+export CLOUDSDK_PYTHON=python3
+
 CLUSTER_ID="$(oc get -o jsonpath='{.status.infrastructureName}{"\n"}' infrastructure cluster)"
 export CLUSTER_ID
 

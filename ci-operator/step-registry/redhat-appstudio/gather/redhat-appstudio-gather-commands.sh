@@ -39,6 +39,12 @@ queue ${ARTIFACT_DIR}/spiaccesstokenbindings.json  oc --insecure-skip-tls-verify
 queue ${ARTIFACT_DIR}/spiaccesstokendataupdates.json  oc --insecure-skip-tls-verify --request-timeout=5s get spiaccesstokendataupdates.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/spiaccesstokens.json  oc --insecure-skip-tls-verify --request-timeout=5s get spiaccesstokens.appstudio.redhat.com --all-namespaces -o json
 queue ${ARTIFACT_DIR}/spifilecontentrequests.json  oc --insecure-skip-tls-verify --request-timeout=5s get spifilecontentrequests.appstudio.redhat.com --all-namespaces -o json
+# JBS resources (jvm-build-service)
+queue ${ARTIFACT_DIR}/artifactbuilds.json  oc --insecure-skip-tls-verify --request-timeout=5s get artifactbuilds.jvmbuildservice.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/dependencybuilds.json  oc --insecure-skip-tls-verify --request-timeout=5s get dependencybuilds.jvmbuildservice.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/jbsconfigs.json  oc --insecure-skip-tls-verify --request-timeout=5s get jbsconfigs.jvmbuildservice.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/rebuiltartifacts.json  oc --insecure-skip-tls-verify --request-timeout=5s get rebuiltartifacts.jvmbuildservice.io --all-namespaces -o json
+queue ${ARTIFACT_DIR}/systemconfigs.json  oc --insecure-skip-tls-verify --request-timeout=5s get systemconfigs.jvmbuildservice.io --all-namespaces -o json
 
 # ArgoCD resources
 queue ${ARTIFACT_DIR}/applications_argoproj.json  oc --insecure-skip-tls-verify --request-timeout=5s get applications.argoproj.io --all-namespaces -o json
