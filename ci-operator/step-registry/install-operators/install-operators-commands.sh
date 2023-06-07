@@ -4,8 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-sleep 3600
-
 # Read each operator in the JSON provided to an item in a BASH array.
 readarray -t OPERATOR_ARRAY < <(jq --compact-output '.[]' <<< "$OPERATORS")
 
