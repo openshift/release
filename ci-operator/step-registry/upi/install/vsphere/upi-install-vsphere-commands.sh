@@ -153,6 +153,10 @@ if [ -f ${SHARED_DIR}/haproxy-router-image ]; then
   sed -i "s#/bin/podman pull #/bin/podman pull --creds=${registry_auths} --tls-verify=false #" ./lb/haproxy.service
 fi
 
+if [ ! -z ${FIRMWARE_SET} ]; then
+ sed -i "/guest_id/a\ firmware     = \"${FIRMWARE_SET}\"" ./vm/main.tf
+fi
+
 if [ ${SECURE_BOOT_ENABLED} = "true" ]; then
   sed -i '/guest_id/a\  firmware         = "efi"\n  efi_secure_boot_enabled = "true"' ./vm/main.tf
 fi
