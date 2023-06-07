@@ -100,7 +100,8 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: e2e-operator-encryption
+- as: e2e-operator-encryption-aescbc
+  optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
   steps:
     cluster_profile: gcp
@@ -108,14 +109,31 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make test-e2e-encryption JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+        make test-e2e-encryption-aescbc JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-rotation
+- as: e2e-operator-encryption-aesgcm
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-rotation-aescbc
+  optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
   steps:
     cluster_profile: gcp
@@ -123,14 +141,31 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make test-e2e-encryption-rotation JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+        make test-e2e-encryption-rotation-aescbc JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: ipi-gcp
-- as: e2e-gcp-operator-encryption-perf
+- as: e2e-gcp-operator-encryption-rotation-aesgcm
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-rotation)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-rotation-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-perf-aescbc
+  optional: true
   run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
   steps:
     cluster_profile: gcp
@@ -138,7 +173,22 @@ tests:
     - as: test
       cli: latest
       commands: |
-        make test-e2e-encryption-perf JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+        make test-e2e-encryption-perf-aescbc JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-operator-encryption-perf-aesgcm
+  optional: true
+  run_if_changed: ^(vendor/github.com/openshift/library-go/pkg/operator/encryption)|^(test/e2e-encryption-perf)|^(test/library/encryption)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e-encryption-perf-aesgcm JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
       from: src
       resources:
         requests:
