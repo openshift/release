@@ -18,13 +18,13 @@ KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 
 SSH_KEY_PATH="/tmp/id_rsa"
 SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
-SSH_CMD="ocp.sh acquire"
+SSH_CMD="/home/ubuntu/stackrox-ci/k8smanager create"
 
 # setup ssh key
 cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
 chmod 400 $SSH_KEY_PATH
 
-# acquire a ocp cluster
-ssh $SSH_ARGS root@cluster.pool.synergyonpower.com "$SSH_CMD" > $KUBECONFIG_FILE
+# create a k8s cluster
+ssh $SSH_ARGS root@163.66.94.115 "$SSH_CMD" > $KUBECONFIG_FILE
 
 KUBECONFIG="$KUBECONFIG_FILE" ./kubectl get nodes
