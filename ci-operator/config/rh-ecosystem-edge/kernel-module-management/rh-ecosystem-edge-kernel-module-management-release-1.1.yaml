@@ -2,7 +2,7 @@ base_images:
   go-builder:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
+    tag: rhel-9-golang-1.19-openshift-4.13
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -16,7 +16,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
 images:
 - build_args:
   - name: TARGET
@@ -30,9 +30,9 @@ images:
   to: kernel-module-management-operator-hub
 - dockerfile_path: Dockerfile.signimage
   inputs:
-    ubi8-minimal-entitled:
+    ubi9-minimal-entitled:
       as:
-      - registry.access.redhat.com/ubi8/ubi-minimal:8.7
+      - registry.access.redhat.com/ubi9/ubi-minimal:9.2
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
@@ -41,6 +41,11 @@ images:
     RUN rm -rf /etc/yum.repos.d/*
     RUN curl http://base-4-12-rhel8.ocp.svc > /etc/yum.repos.d/base-4-12-rhel8.repo
   to: ubi8-minimal-entitled
+- dockerfile_literal: |
+    FROM ubi9-minimal
+    RUN rm -rf /etc/yum.repos.d/*
+    RUN curl http://base-4-13-rhel9.ocp.svc > /etc/yum.repos.d/base-4-13-rhel9.repo
+  to: ubi9-minimal-entitled
 operator:
   bundles:
   - as: operator-bundle
@@ -59,6 +64,7 @@ operator:
 promotion:
   excluded_images:
   - ubi8-minimal-entitled
+  - ubi9-minimal-entitled
   namespace: edge-infrastructure
   tag: release-1.1
   tag_by_commit: true
@@ -75,7 +81,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit-tests-pr
+- as: unit-tests
   steps:
     test:
     - as: run-and-upload-codecov
@@ -92,7 +98,7 @@ tests:
       resources:
         requests:
           memory: 1Gi
-- as: unit-tests-main
+- as: unit-tests-postsubmit
   postsubmit: true
   steps:
     test:

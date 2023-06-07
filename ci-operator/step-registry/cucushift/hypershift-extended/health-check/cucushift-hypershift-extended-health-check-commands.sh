@@ -7,6 +7,44 @@ set -o errexit
 set -o pipefail
 set -x
 
+# This function retrieves the cluster version using the 'oc' command and prints it.
+function print_clusterversion {
+    local clusterversion
+    clusterversion=$(oc get clusterversion version -o jsonpath='{.status.desired.version}')
+    echo "Cluster version: $clusterversion"
+}
+
+# Retry function that executes a given check function multiple times until it succeeds or reaches the maximum number of retries.
+# Parameters:
+#   - check_func: The function to be executed and checked for success.
+# Returns:
+#   - 0 if the check function succeeds within the maximum number of retries.
+#   - 1 if the check function fails to succeed within the maximum number of retries.
+# Usage example:
+#   retry my_check_function
+function retry() {
+    local check_func=$1
+    local max_retries=10
+    local retry_delay=30
+    local retries=0
+
+    while (( retries < max_retries )); do
+        if $check_func; then
+            echo "All resources are in the expected state."
+            return 0
+        fi
+
+        (( retries++ ))
+        if (( retries < max_retries )); then
+            echo "Retrying in $retry_delay seconds..."
+            sleep $retry_delay
+        fi
+    done
+
+    echo "Failed to get all resources in the expected state after $max_retries attempts."
+    return 1
+}
+
 # This function checks the status of control plane pods in a HostedCluster.
 # It first gets the name of the cluster using the "oc get hostedclusters" command.
 # It then reads the output of "oc get pod" command in the corresponding HostedCluster namespace and checks if the status is "Running" or "Completed".
@@ -69,15 +107,30 @@ function check_node_status {
     echo "All nodes are in the expected state."
     return 0
 }
+
+if [ -f "${SHARED_DIR}/cluster-type" ] ; then
+    CLUSTER_TYPE=$(cat "${SHARED_DIR}/cluster-type")
+    if [[ "$CLUSTER_TYPE" == "osd" ]] || [[ "$CLUSTER_TYPE" == "rosa" ]]; then
+        echo "this cluster is ROSA-HyperShift"
+        print_clusterversion
+        check_node_status || exit 1
+        retry check_cluster_operators || exit 1
+        retry check_pod_status || exit 1
+        exit 0
+    fi
+fi
+
 echo "check mgmt cluster's HyperShift part"
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 if test -s "${SHARED_DIR}/mgmt_kubeconfig" ; then
   export KUBECONFIG=${SHARED_DIR}/mgmt_kubeconfig
-  check_control_plane_pod_status || exit 1
+  print_clusterversion
+  retry check_control_plane_pod_status || exit 1
 fi
 
 export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
 echo "check guest cluster"
+print_clusterversion
 check_node_status || exit 1
-check_cluster_operators || exit 1
-check_pod_status || exit 1
+retry check_cluster_operators || exit 1
+retry check_pod_status || exit 1

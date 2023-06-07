@@ -217,6 +217,8 @@ bootstrap_ip_address = "192.168.${third_octet}.3"
 lb_ip_address = "192.168.${third_octet}.2"
 compute_ip_addresses = [${zone_worker_ips%?}]
 control_plane_ip_addresses = [${zone_master_ips%?}]
+control_plane_count = ${MASTER_REPLICAS}
+compute_count = ${WORKER_REPLICAS}
 failure_domains = [
     {
         datacenter = "IBMCloud"

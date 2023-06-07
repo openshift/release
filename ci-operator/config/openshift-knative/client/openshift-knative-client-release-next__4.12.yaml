@@ -1,0 +1,274 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  knative-eventing-apiserver-receive-adapter:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-apiserver-receive-adapter
+  knative-eventing-appender:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-appender
+  knative-eventing-channel-controller:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-channel-controller
+  knative-eventing-channel-dispatcher:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-channel-dispatcher
+  knative-eventing-controller:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-controller
+  knative-eventing-event-display:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-event-display
+  knative-eventing-heartbeats:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-heartbeats
+  knative-eventing-heartbeats-receiver:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-heartbeats-receiver
+  knative-eventing-migrate:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-migrate
+  knative-eventing-mtbroker-filter:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-mtbroker-filter
+  knative-eventing-mtbroker-ingress:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-mtbroker-ingress
+  knative-eventing-mtchannel-broker:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-mtchannel-broker
+  knative-eventing-mtping:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-mtping
+  knative-eventing-pong:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-pong
+  knative-eventing-schema:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-schema
+  knative-eventing-webhook:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-webhook
+  knative-eventing-websocketsource:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-eventing-websocketsource
+  knative-serving-activator:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-serving-activator
+  knative-serving-autoscaler:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-serving-autoscaler
+  knative-serving-autoscaler-hpa:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-serving-autoscaler-hpa
+  knative-serving-controller:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-serving-controller
+  knative-serving-domain-mapping:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-serving-domain-mapping
+  knative-serving-domain-mapping-webhook:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-serving-domain-mapping-webhook
+  knative-serving-queue:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-serving-queue
+  knative-serving-storage-version-migration:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-serving-storage-version-migration
+  knative-serving-webhook:
+    name: knative-nightly
+    namespace: openshift
+    tag: knative-serving-webhook
+  ocp_ubi-minimal_8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: |
+  make install
+  make build-cross
+build_root:
+  project_image:
+    dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+canonical_go_repository: github.com/knative/client
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile
+  from: base
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/kn
+  to: knative-client
+- dockerfile_path: openshift/ci-operator/knative-images/client/Dockerfile.cliartifacts
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-linux-amd64
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-darwin-amd64
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/kn-windows-amd64.exe
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/LICENSE
+      - destination_dir: .
+        source_path: /go/src/github.com/knative/client/package_cliartifacts.sh
+    ocp_ubi-minimal_8:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
+  to: kn-cli-artifacts
+- dockerfile_path: openshift/ci-operator/knative-test-images/helloworld/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/helloworld
+  to: knative-client-test-helloworld
+- dockerfile_path: openshift/ci-operator/knative-test-images/grpc-ping/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/grpc-ping
+  to: knative-client-test-grpc-ping
+- dockerfile_path: openshift/ci-operator/knative-test-images/servingcontainer/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/servingcontainer
+  to: knative-client-test-servingcontainer
+- dockerfile_path: openshift/ci-operator/knative-test-images/sidecarcontainer/Dockerfile
+  from: base
+  inputs:
+    test-bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/sidecarcontainer
+  to: knative-client-test-sidecarcontainer
+promotion:
+  name: knative-nightly
+  namespace: openshift
+resources:
+  '*':
+    requests:
+      memory: 2Gi
+test_binary_build_commands: make test-install
+tests:
+- as: e2e-aws-ocp
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 4h0m0s
+    version: "4.12"
+  steps:
+    allow_skip_on_success: true
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      dependencies:
+      - env: KNATIVE_SERVING_WEBHOOK
+        name: knative-serving-webhook
+      - env: KNATIVE_SERVING_ACTIVATOR
+        name: knative-serving-activator
+      - env: KNATIVE_SERVING_CONTROLLER
+        name: knative-serving-controller
+      - env: KNATIVE_SERVING_AUTOSCALER_HPA
+        name: knative-serving-autoscaler-hpa
+      - env: KNATIVE_SERVING_QUEUE
+        name: knative-serving-queue
+      - env: KNATIVE_SERVING_AUTOSCALER
+        name: knative-serving-autoscaler
+      - env: KNATIVE_SERVING_STORAGE_VERSION_MIGRATION
+        name: knative-serving-storage-version-migration
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING
+        name: knative-serving-domain-mapping
+      - env: KNATIVE_SERVING_DOMAIN_MAPPING_WEBHOOK
+        name: knative-serving-domain-mapping-webhook
+      - env: KNATIVE_CLIENT_TEST_HELLOWORLD
+        name: knative-client-test-helloworld
+      - env: KNATIVE_CLIENT_TEST_GRPC_PING
+        name: knative-client-test-grpc-ping
+      - env: KNATIVE_CLIENT_TEST_SERVINGCONTAINER
+        name: knative-client-test-servingcontainer
+      - env: KNATIVE_CLIENT_TEST_SIDECARCONTAINER
+        name: knative-client-test-sidecarcontainer
+      - env: KNATIVE_EVENTING_APISERVER_RECEIVE_ADAPTER
+        name: knative-eventing-apiserver-receive-adapter
+      - env: KNATIVE_EVENTING_APPENDER
+        name: knative-eventing-appender
+      - env: KNATIVE_EVENTING_CHANNEL_CONTROLLER
+        name: knative-eventing-channel-controller
+      - env: KNATIVE_EVENTING_CHANNEL_DISPATCHER
+        name: knative-eventing-channel-dispatcher
+      - env: KNATIVE_EVENTING_CONTROLLER
+        name: knative-eventing-controller
+      - env: KNATIVE_EVENTING_EVENT_DISPLAY
+        name: knative-eventing-event-display
+      - env: KNATIVE_EVENTING_HEARTBEATS
+        name: knative-eventing-heartbeats
+      - env: KNATIVE_EVENTING_HEARTBEATS_RECEIVER
+        name: knative-eventing-heartbeats-receiver
+      - env: KNATIVE_EVENTING_MIGRATE
+        name: knative-eventing-migrate
+      - env: KNATIVE_EVENTING_MTBROKER_FILTER
+        name: knative-eventing-mtbroker-filter
+      - env: KNATIVE_EVENTING_MTBROKER_INGRESS
+        name: knative-eventing-mtbroker-ingress
+      - env: KNATIVE_EVENTING_MTCHANNEL_BROKER
+        name: knative-eventing-mtchannel-broker
+      - env: KNATIVE_EVENTING_MTPING
+        name: knative-eventing-mtping
+      - env: KNATIVE_EVENTING_PONG
+        name: knative-eventing-pong
+      - env: KNATIVE_EVENTING_SCHEMA
+        name: knative-eventing-schema
+      - env: KNATIVE_EVENTING_WEBHOOK
+        name: knative-eventing-webhook
+      - env: KNATIVE_EVENTING_WEBSOCKETSOURCE
+        name: knative-eventing-websocketsource
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-next
+  org: openshift-knative
+  repo: client
+  variant: "4.12"

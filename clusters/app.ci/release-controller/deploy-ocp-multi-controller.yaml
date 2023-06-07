@@ -24,7 +24,7 @@ spec:
   tags:
   - from:
       kind: DockerImage
-      name: image-registry.openshift-image-registry.svc:5000/ocp/4.13:tests
+      name: image-registry.openshift-image-registry.svc:5000/ocp/4.14:tests
     importPolicy:
       scheduled: true
     name: tests
@@ -168,10 +168,6 @@ spec:
         - --github-endpoint=http://ghproxy
         - --github-graphql-endpoint=http://ghproxy/graphql
         - --github-throttle=250
-        - --bugzilla-endpoint=https://bugzilla.redhat.com
-        - --bugzilla-api-key-path=/etc/bugzilla/api
-        - --bugzilla-auth-method=bearer
-        - --verify-bugzilla
         - --jira-endpoint=https://issues.redhat.com
         - --jira-bearer-token-file=/etc/jira/api
         - --verify-jira
@@ -208,9 +204,6 @@ spec:
         - mountPath: /etc/github
           name: oauth
           readOnly: true
-        - mountPath: /etc/bugzilla
-          name: bugzilla
-          readOnly: true
         - mountPath: /etc/jira
           name: jira
           readOnly: true
@@ -234,9 +227,15 @@ spec:
           - configMap:
               name: job-config-master-periodics
           - configMap:
+              name: job-config-main-periodics
+          - configMap:
               name: job-config-master-postsubmits
           - configMap:
+              name: job-config-main-postsubmits
+          - configMap:
               name: job-config-master-presubmits
+          - configMap:
+              name: job-config-main-presubmits
           - configMap:
               name: job-config-1.x
           - configMap:
@@ -277,10 +276,6 @@ spec:
         secret:
           defaultMode: 420
           secretName: github-credentials-openshift-merge-robot
-      - name: bugzilla
-        secret:
-          defaultMode: 420
-          secretName: bugzilla-credentials-openshift-bugzilla-robot
       - name: jira
         secret:
           defaultMode: 420

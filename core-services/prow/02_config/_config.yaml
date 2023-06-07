@@ -13,19 +13,16 @@ deck:
   default_rerun_auth_configs:
   - repo: '*'
     rerun_auth_configs:
+      github_team_slugs:
+      - org: openshift
+        slug: test-platform
       github_users:
       - stevekuznetsov
-      - droslean
-      - bbguimaraes
-      - hongkailiu
       - vikaslaad
       - dobbymoodge
-      - jmguzik
       - bparees
       - AlexNPavel
       - jupierce
-      - smg247
-      - danilo-gemoli
   - repo: openshift/openshift-tests-private
     rerun_auth_configs:
       github_team_slugs:
@@ -33,8 +30,13 @@ deck:
         slug: team-qe
       - org: openshift
         slug: team-red-hat
+      - org: openshift
+        slug: test-platform
   - repo: openshift/hypershift
     rerun_auth_configs:
+      github_team_slugs:
+      - org: openshift
+        slug: test-platform
       github_users:
       - aleskandro
       - bryan-cox
@@ -46,11 +48,15 @@ deck:
         slug: team-qe
       - org: openshift
         slug: team-red-hat
+      - org: openshift
+        slug: test-platform
   - repo: openshift/osde2e
     rerun_auth_configs:
       github_team_slugs:
       - org: openshift
         slug: openshift-team-sd-sre-cicd
+      - org: openshift
+        slug: test-platform
   hidden_repos:
   - openshift/ose
   - openshift/online-registration
@@ -117,7 +123,7 @@ deck:
       optional_files:
       - .*/custom-link-.*\.html|.*/test-risk-analysis.*\.html
       required_files:
-      - .*/e2e-intervals_spyglass.*\.html|.*-summary\.html|.*/e2e-timelines_spyglass_.*\.html|.*/camgi\.html
+      - .*/e2e-intervals_spyglass.*\.html|.*-summary.*\.html|.*/e2e-timelines_spyglass_.*\.html|.*/camgi\.html
     size_limit: 500000000
   tide_update_period: 10s
 default_job_timeout: 24h0m0s
@@ -125,6 +131,8 @@ gangway:
   allowed_api_clients:
   - allowed_jobs_filters:
     - tenant_id: gangway-api
+    - tenant_id: qe-private
+    - tenant_id: GlobalDefaultID
     gcp:
       endpoint_api_consumer_number: "1"
       endpoint_api_consumer_type: PROJECT
@@ -200,17 +208,17 @@ plank:
             memory: 250Mi
       timeout: 4h0m0s
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20230510-91962c0408
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20230510-91962c0408
-        initupload: gcr.io/k8s-prow/initupload:v20230510-91962c0408
-        sidecar: gcr.io/k8s-prow/sidecar:v20230510-91962c0408
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20230531-c07ee56d8f
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20230531-c07ee56d8f
+        initupload: gcr.io/k8s-prow/initupload:v20230531-c07ee56d8f
+        sidecar: gcr.io/k8s-prow/sidecar:v20230531-c07ee56d8f
   - cluster: arm01
     config:
       utility_images:
-        clonerefs: gcr.io/k8s-prow/clonerefs:v20230510-91962c0408-arm64
-        entrypoint: gcr.io/k8s-prow/entrypoint:v20230510-91962c0408-arm64
-        initupload: gcr.io/k8s-prow/initupload:v20230510-91962c0408-arm64
-        sidecar: gcr.io/k8s-prow/sidecar:v20230510-91962c0408-arm64
+        clonerefs: gcr.io/k8s-prow/clonerefs:v20230531-c07ee56d8f-arm64
+        entrypoint: gcr.io/k8s-prow/entrypoint:v20230531-c07ee56d8f-arm64
+        initupload: gcr.io/k8s-prow/initupload:v20230531-c07ee56d8f-arm64
+        sidecar: gcr.io/k8s-prow/sidecar:v20230531-c07ee56d8f-arm64
   - config:
       gcs_configuration:
         bucket: origin-ci-private
@@ -308,6 +316,10 @@ tide:
   context_options:
     from-branch-protection: true
     orgs:
+      ViaQ:
+        repos:
+          vector:
+            skip-unknown-contexts: true
       containers:
         repos:
           aardvark-dns:
@@ -332,8 +344,6 @@ tide:
         repos:
           cri-o:
             skip-unknown-contexts: true
-      kcp-dev:
-        skip-unknown-contexts: true
       maistra:
         skip-unknown-contexts: true
       openshift:

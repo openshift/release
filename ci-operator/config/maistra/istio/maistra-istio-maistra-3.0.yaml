@@ -1,30 +1,46 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
-    tag: "3.0"
+    tag: upstream-master
   use_build_cache: true
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ci/maistra-builder:upstream-master
+    # Git checks if the user that owns the files on the filesystem match the
+    # current user.  We need to disable this check because tests in Prow are
+    # running with a random user.
+    RUN git config --system --add safe.directory '*'
+  inputs:
+    src:
+      as:
+      - registry.ci.openshift.org/ci/maistra-builder:upstream-master
+  to: src-test
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
       memory: 2Gi
     requests:
-      cpu: 100m
+      cpu: "2"
       memory: 200Mi
 tests:
 - as: nightly-images-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.12"
   cron: 00 03 * * *
   steps:
+    cluster_profile: aws-2
     env:
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
-      MAISTRA_MC_POD: not-used
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
     test:
@@ -53,8 +69,10 @@ tests:
           -p=${QUAY_PASS} quay.io
         # build and push images
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work; \
           entrypoint \
-          make -e HUB=quay.io/maistra-dev -e TAGS="3.0-latest 3.0-nightly-`date -I`" push.docker.pilot push.docker.proxyv2 push.docker.install-cni
+          make -e HUB=quay.io/maistra-dev -e TAGS='3.0-latest 3.0-nightly-`date -I`' push.docker.pilot push.docker.proxyv2 push.docker.install-cni"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow
@@ -62,7 +80,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
@@ -81,7 +99,244 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-profile
+- as: maistra-istio-unit-3-0
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: maistra-istio-unit-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work;
+          entrypoint \
+          make -e 'T=-v -count=1' build racetest binaries-test"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: integ-pilot-3-0
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-pilot-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work;
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.pilot.kube.presubmit"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: integ-telemetry-3-0
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-telemetry-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work;
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.telemetry.kube.presubmit"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: integ-security-3-0
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-security-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work;
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.security.kube.presubmit"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: integ-helm-3-0
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: integ-helm-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          bash -c \
+          "cd /work;
+          entrypoint \
+          prow/integ-suite-kind.sh \
+          test.integration.helm.kube.presubmit"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: istio-update-operator-3-0
+  commands: |
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -f /creds-github/token \
+      '-c make update-istio gen' \
+      '-t [maistra-3.0] Automator: Update charts from maistra/istio' \
+      -m update_charts_istio_3.0 \
+      -b maistra-3.0
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
 zz_generated_metadata:
   branch: maistra-3.0
   org: maistra

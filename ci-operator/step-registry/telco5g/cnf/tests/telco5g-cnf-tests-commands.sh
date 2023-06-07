@@ -68,11 +68,6 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 performance "Check RPS Mask is applied to atleast one single rx queue on all veth interface"
 
 # SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-11750
-# TESTNAME
-tuningcni "sysctl allowlist update should start a pod with custom sysctl only after adding sysctl to allowlist"
-
-# SKIPTEST
 # bz### https://issues.redhat.com/browse/OCPBUGS-10927
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
@@ -84,11 +79,6 @@ function create_tests_temp_skip_list_14 {
 # List of temporarly skipped tests for 4.14
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-11046
-# TESTNAME
-tuningcni "sysctl allowlist update should start a pod with custom sysctl only after adding sysctl to allowlist"
 
 # SKIPTEST
 # bz### https://issues.redhat.com/browse/OCPBUGS-10927
@@ -120,7 +110,7 @@ function get_skip_tests {
     skip_list=""
     if [ -f "${SKIP_TESTS_FILE}" ]; then
         rm -f feature_skip_list.txt
-        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > feature_skip_list.txt
+        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > ${SHARED_DIR}/feature_skip_list.txt
         skip_list=""
         while read line;
         do
@@ -132,85 +122,95 @@ function get_skip_tests {
                     skip_list="${skip_list} ${test}"
                 fi
             fi
-        done < feature_skip_list.txt
+        done < ${SHARED_DIR}/feature_skip_list.txt
     fi
 
     echo "${skip_list}"
 }
 
-
-function sno_set_registry {
-
-    # Create PVC storage for registry in a host of SNO baremetal in /var/registry
-    cat << EOF | oc apply -f -
-apiVersion: v1
-kind: PersistentVolume
-metadata:
-  name: image-registry-pv
-spec:
-  capacity:
-    storage: 100Gi
-  claimRef:
-    apiVersion: v1
-    kind: PersistentVolumeClaim
-    name: image-registry-storage
-    namespace: openshift-image-registry
-  accessModes:
-  - ReadWriteMany
-  hostPath:
-    path: /var/registry
-    type: DirectoryOrCreate
-  persistentVolumeReclaimPolicy: Retain
----
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: image-registry-storage
-  namespace: openshift-image-registry
-spec:
-  accessModes:
-  - ReadWriteMany
-  resources:
-    requests:
-      storage: 100Gi
-
-EOF
-
-    # Set registry to managed and configure PVC as a registry storage:
-    # https://docs.openshift.com/container-platform/4.12/registry/configuring_registry_storage/
-    # configuring-registry-storage-baremetal.html#configuring-registry-storage-baremetal
-    oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"managementState":"Managed"}}'
-    oc patch configs.imageregistry.operator.openshift.io cluster --type merge --patch '{"spec":{"storage":{"pvc":{"claim":"image-registry-storage"}}}}'
-    # For debug purposes
-    sleep 60
-    timed=60
-    while [[ "$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.phase}')" != "Running" ]]; do
-        echo "Waiting for registry pod to be running ${timed} seconds"
-        sleep 10
-        timed=$((timed+10))
-        if [ "${timed}" -gt 600 ]; then
-            echo "Registry pod is not running after 600 seconds"
-            oc get pod -n openshift-image-registry -l docker-registry=default
-            status=$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.phase}')
-            echo "Status=${status}"
-            exit 1
-        fi
-    done
-    echo "Registry pod is running after ${timed} seconds"
-
-    oc get clusteroperator image-registry
-    oc get pod -n openshift-image-registry -l docker-registry=default
-    echo "Container state=$(oc get pod -n openshift-image-registry -l docker-registry=default -o=jsonpath='{.items[0].status.containerStatuses[0].ready}')"
-    # Wait 5 minutes until registry is up and running
-    sleep 300
-
+# Checkout the pull request branch
+# $1 - github organization
+# $2 - github repository
+# $3 - pull request number
+function checkout_pr_branch() {
+    set -x
+    local org="$1"
+    local repo="$2"
+    local pr_number="$3"
+    # Fetch the pull request branch
+    git fetch --force origin --update-head-ok "pull/$pr_number/head:pr/$pr_number"
+    # Check out the pull request branch
+    git checkout "pr/$pr_number"
+    git reset --hard HEAD
+    set +x
 }
 
-source $SHARED_DIR/main.env
+# Check if we are running on a pull request and checkout the pull request branch
+# $1 - github organization
+# $2 - github repository
+# PULL_URL - pull request URL the job is running on, from main.env file - calculated from CI environment variables
+# PR_URLS - additional pull request URLs.
+function check_for_pr() {
+    set -x
+    local org="$1"
+    local repo="$2"
+    # Check if current org and repo are in PULL_URL
+    if [[ -n "${PULL_URL-}" && "${PULL_URL-}" == *"github.com/$org/$repo"* ]]; then
+        # Extract the pull request number from the URL
+        pr_number=$(echo "${PULL_URL-}" | cut -d'/' -f7)
+        checkout_pr_branch "$org" "$repo" "$pr_number"
+    # Check additional PRs from environment variable
+    elif [[ -n "$PR_URLS" && "$PR_URLS" == *"github.com/$org/$repo"* ]]; then
+        # Extract the pull request URL with org and repo from PR_URLS list
+        TEST_CNF_TESTS_PR=$(echo "$PR_URLS" | grep -Eo "https://github.com/$org/$repo/\S+")
+        # Remove the first and last quotes from the URL
+        TEST_CNF_TESTS_PR=${TEST_CNF_TESTS_PR%\"}
+        TEST_CNF_TESTS_PR=${TEST_CNF_TESTS_PR#\"}
+        # Extract the pull request number from the URL
+        pr_number=$(echo "$TEST_CNF_TESTS_PR" | cut -d'/' -f7)
+        checkout_pr_branch "$org" "$repo" "$pr_number"
+    else
+        echo "The given pull request URL doesn't match the expected repository and organization: PULL_URL=${PULL_URL-}"
+    fi
+    set +x
+    }
 
- # next: ovs_qos
+# Check if we are running on a pull request and check commit message for Depends-On
+# If Depends-On is found, extract the pull request URL with org and repo from commit message
+# For example: Depends-On: https://github.com/openshift-kni/cnf-features-deploy/pull/1394
+function check_commit_message_for_prs {
+    set -x
+    EXTRACTED_PRS=""
+    # Check if we in CI mode
+    if [[ -n "${JOB_NAME-}" && -n "${PULL_URL-}" && "${JOB_NAME-}" == *"rehears"* ]]; then
+        # Get the commit message from Github of current PR if exists
+        API_PR_URL=$(echo "${PULL_URL-}" | sed "s@github.com@api.github.com/repos@" | sed "s/pull/pulls/")
+        COMMIT_MESSAGE=$(curl -s "$API_PR_URL" | jq -r '.body')
+        # Check if we have Depends-On: in commit message
+        if [[ "$COMMIT_MESSAGE" == *"Depends-On:"* ]]; then
+            # Extract the pull request URL with org and repo from commit message
+            EXTRACTED_PRS=$(echo "$COMMIT_MESSAGE" | grep -oP 'Depends-On:\s*\S+' | sed "s/Depends-On:\s*//g" | xargs)
+            if [[ $EXTRACTED_PRS == *"https"* ]]; then
+                export PR_URLS="${PR_URLS} ${EXTRACTED_PRS}"
+                # Trim spaces from PR_URLS
+                export PR_URLS=${PR_URLS## }
+            fi
+        fi
+    fi
+}
+
+function sno_fixes {
+    echo "************ SNO fixes ************"
+    pushd $CNF_REPO_DIR
+    sed -i "s/role: worker-cnf/role: master/g" feature-configs/deploy/sctp/sctp_module_mc.yaml
+
+    popd
+}
+
+[[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
+
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
-    export FEATURES="${FEATURES:-sriov sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
+    export FEATURES="${FEATURES:-performance sriov sctp}"
 else
     export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
 fi
@@ -220,6 +220,9 @@ export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
 
 export CNF_REPO="${CNF_REPO:-https://github.com/openshift-kni/cnf-features-deploy.git}"
 export CNF_BRANCH="${CNF_BRANCH:-master}"
+# List of PRs to test
+export PR_URLS="${PR_URLS:-}"
+check_commit_message_for_prs || true  # Ignore errors, we don't want to fail the job if we can't get the commit message
 
 echo "************ telco5g cnf-tests commands ************"
 
@@ -241,19 +244,29 @@ export CNF_ORIGIN_TESTS
 
 if [[ "$T5CI_VERSION" == "4.14" ]]; then
     export CNF_BRANCH="master"
+    export CNF_TESTS_IMAGE="cnf-tests:4.14"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
+    export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
 fi
 
-cnf_dir=${cnf_dir:-$(mktemp -d -t cnf-XXXXX)}
-mkdir -p "$cnf_dir"
-cd "$cnf_dir" || exit 1
+CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}
 
-echo "running on branch ${CNF_BRANCH}"
-git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
-cd cnf-features-deploy
+# Check if cnf-features-deploy repository exists
+# If not, clone it
+if [[ ! -d "${CNF_REPO_DIR}" ]]; then
+    echo "cnf-features-deploy repository not found, cloning it to ${CNF_REPO_DIR}"
+    mkdir -p "$CNF_REPO_DIR"
+    echo "running on branch ${CNF_BRANCH}"
+    git clone -b "${CNF_BRANCH}" "${CNF_REPO}" $CNF_REPO_DIR
+fi
+
+pushd $CNF_REPO_DIR
+echo "Checking out pull request for repository cnf-features-deploy if exists"
+check_for_pr "openshift-kni" "cnf-features-deploy"
+
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
-cd -
+popd
 
 # Skiplist common for all releases
 create_tests_skip_list_file
@@ -306,24 +319,31 @@ fi
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
-    # Create a registry for the tests
-    sno_set_registry
+    export ROLE_WORKER_CNF="master"
+    # Make local workarounds for SNO
+    sno_fixes
 fi
 export CNF_NODES="${test_nodes}"
 
-cd cnf-features-deploy
+pushd $CNF_REPO_DIR
 status=0
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
 FEATURES_ENVIRONMENT="ci" make functests-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
-cd -
+popd
 
 set +e
 set -x
 python3 -m venv ${SHARED_DIR}/myenv
 source ${SHARED_DIR}/myenv/bin/activate
 git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci
+
+# Check if telco5gci pull request exists and checkout the pull request branch if so
+pushd ${SHARED_DIR}/telco5gci
+check_for_pr "openshift-kni" "telco5gci"
+popd
+
 pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
 # Create HTML reports for humans/aliens
 [[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.html

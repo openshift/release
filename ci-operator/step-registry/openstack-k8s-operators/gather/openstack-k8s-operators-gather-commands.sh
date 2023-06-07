@@ -5,7 +5,7 @@ set +eu
 
 BASE_DIR=${HOME:-"/alabama"}
 MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"5m"}
-NS_OPERATORS=${NS_OPERATORS:-"openstack"}
+NS_OPERATORS=${NS_OPERATORS:-"openstack-operators"}
 NS_SERVICES=${NS_SERVICES:-"openstack"}
 
 # Creates directory if does not exists
@@ -20,28 +20,30 @@ function create_out_dir {
 
 # Generates a debug command toz get pods logs and description. To be used with "xargs -I {}".
 #  Parameters:
-#  $1: directory to store output logs (optional)
+#  $1: namespace (mandatory)
+#  $2: directory to store output logs (optional)
 function gen_pods_debug_cmd {
   local cmd
-  if [ -z "${1}" ]; then
-    cmd=("echo 'Logs for pod: {}'; oc describe pod {} > {}-describe.log; oc logs --prefix=true --all-containers=true {} >> {}-containers.log")
+  if [ -z "${2}" ]; then
+    cmd=("echo 'Logs for pod: {}'; oc -n ${1} describe pod {} > {}-describe.log; oc -n ${1} logs --prefix=true --all-containers=true {} >> {}-containers.log")
   else
-    create_out_dir ${1}
-    cmd=("echo 'Logs for pod: {}'; oc describe pod {} > ${1}/{}-describe.log; oc logs --prefix=true --all-containers=true {} >> ${1}/{}-containers.log")
+    create_out_dir ${2}
+    cmd=("echo 'Logs for pod: {}'; oc -n ${1} describe pod {} > ${2}/{}-describe.log; oc -n ${1} logs --prefix=true --all-containers=true {} >> ${2}/{}-containers.log")
   fi
   echo "${cmd[@]}"
 }
 
 # Generates a debug command to get yaml output for a resource. To be used with "xargs -I {}".
 #  Parameters:
-#  $1: directory to store output logs (optional)
+#  $1: namespace (mandatory)
+#  $2: directory to store output logs (optional)
 function gen_resource_yaml_debug_cmd {
   local cmd
-  if [ -z "${1}" ]; then
-    cmd=("echo 'Getting info for {} resource'; oc get {} -o yaml > {}.yaml; oc describe {} > {}-describe.log")
+  if [ -z "${2}" ]; then
+    cmd=("echo 'Getting info for {} resource'; oc -n ${1} get {} -o yaml > {}.yaml; oc -n ${1} describe {} > {}-describe.log")
   else
-    create_out_dir ${1}
-    cmd=("echo 'Getting info for {} resource'; oc get {} -o yaml > ${1}/{}.yaml; oc describe {} > ${1}/{}-describe.log")
+    create_out_dir ${2}
+    cmd=("echo 'Getting info for {} resource'; oc -n ${1} get {} -o yaml > ${2}/{}.yaml; oc -n ${1} describe {} > ${2}/{}-describe.log")
   fi
   echo "${cmd[@]}"
 }
@@ -60,7 +62,7 @@ function get_all_from_ns {
     get_all=$(oc get all -o name -n "${1}" | egrep -iv "${2}")
   fi
 
-  cmd=$(gen_resource_yaml_debug_cmd)
+  cmd=$(gen_resource_yaml_debug_cmd ${1})
   for i in ${get_all}; do
     dir=$(echo $i | cut -d "/" -f1)
     create_out_dir "${dir}"
@@ -76,40 +78,39 @@ pushd "${BASE_DIR}" || exit
 mkdir logs
 pushd logs || exit
 
-oc get all > get_all.log
-
 # api-resources - OpenStack
-CMD=$(gen_resource_yaml_debug_cmd "api-resources")
-oc api-resources | grep 'openstack' | awk '{print $1}' | xargs -n1 -I {} sh -c "${CMD[@]}"
+CMD=$(gen_resource_yaml_debug_cmd "${NS_SERVICES}" "api-resources")
+oc -n "${NS_SERVICES}" api-resources | grep 'openstack' | awk '{print $1}' | xargs -n1 -I {} sh -c "${CMD[@]}"
 # RabbitMQCluster
-oc get -o yaml RabbitMQCluster > RabbitMQCluster.yaml
+oc -n "${NS_SERVICES}" get -o yaml RabbitMQCluster > RabbitMQCluster.yaml
 
 ### Pods
 # Pods - controller manager
-CMD=$(gen_pods_debug_cmd "controller-manager")
+CMD=$(gen_pods_debug_cmd "${NS_OPERATORS}" "controller-manager")
 oc get pods -n "${NS_OPERATORS}" --show-labels | grep -i '.*control\-plane\=.*controller\-manager.*' | awk '{print $1}' | \
 xargs -n1 -I {} sh -c "${CMD[@]}"
 
 # Pods - all others
-CMD=$(gen_pods_debug_cmd "pods")
-oc get pods -n "${NS_SERVICES}" --no-headers | egrep -iv controller | awk '{print $1}' | xargs -n1 -I {} sh -c "${CMD[@]}"
+CMD=$(gen_pods_debug_cmd "${NS_SERVICES}" "pods")
+oc get pods -n "${NS_SERVICES}" --no-headers | egrep -iv controller-manager | awk '{print $1}' | xargs -n1 -I {} sh -c "${CMD[@]}"
 
 # Pods in error
-CMD=$(gen_pods_debug_cmd "errors")
+CMD=$(gen_pods_debug_cmd "${NS_SERVICES}" "errors")
 # Capture logs from service containers if container is not in Running or Completed state
-oc get pods -n "${NS_SERVICES}" --no-headers | egrep -iv controller | egrep -iv 'Running|Completed' | awk '{print $1}' | \
+oc get pods -n "${NS_SERVICES}" --no-headers | egrep -iv controller-manager | egrep -iv 'Running|Completed' | awk '{print $1}' | \
 xargs -n1 -I {} sh -c "${CMD[@]}"
 
 ### Get all from namespaces
-# excluding pods from ALL
-get_all_from_ns ${NS_OPERATORS} "pod"
+echo "### ${NS_OPERATORS} namespace" > get_all.log
+get_all_from_ns ${NS_OPERATORS} "pod" >> get_all.log
 if [[ "$NS_SERVICES" != "$NS_OPERATORS" ]]; then
-  get_all_from_ns ${NS_SERVICES} "pod"
+  echo "### ${NS_SERVICES} namespace" >> get_all.log
+  get_all_from_ns ${NS_SERVICES} "pod" >> get_all.log
 fi
 
 # For network isolation
-oc get network-attachment-definition -n "${NS_SERVICES}" -o yaml > net-attachment-definition.yaml
-oc get nncp -n "${NS_SERVICES}" -o yaml > nncp.yaml
+oc get -n "${NS_SERVICES}" network-attachment-definition -o yaml > net-attachment-definition.yaml
+oc get -n "${NS_SERVICES}" nncp -o yaml > nncp.yaml
 oc get ipaddresspool -n metallb-system -o yaml > ipaddresspool.yaml
 oc get l2advertisement -n metallb-system -o yaml > l2advertisement.yaml
 

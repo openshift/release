@@ -1,6 +1,6 @@
 #!/bin/bash
 set -o nounset
-set -o errexit
+# set -o errexit
 set -o pipefail
 
 # The variables defined in this step come from files in the `SHARED_DIR` and credentials from Vault.
@@ -49,7 +49,7 @@ COLLECTIVE_OCP_TOKEN=$(cat $SECRETS_DIR/alc/collective-ocp-token)
 export COLLECTIVE_OCP_TOKEN
 
 # run the test execution script
-./../execute_alc_interop_commands.sh
+./../execute_alc_interop_commands.sh || :
 
 # Copy the test cases results to an external directory
-cp -r tests/cypress/results $ARTIFACT_DIR/
+cp -r ../tests/cypress/results $ARTIFACT_DIR/

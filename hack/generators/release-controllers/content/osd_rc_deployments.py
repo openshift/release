@@ -24,7 +24,7 @@ def _add_osd_rc_bootstrap(gendoc):
                 {
                     'from': {
                         'kind': 'DockerImage',
-                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.13:tests'
+                        'name': 'image-registry.openshift-image-registry.svc:5000/ocp/4.14:tests'
                     },
                     'importPolicy': {
                         'scheduled': True
@@ -272,10 +272,6 @@ def _add_osd_rc_deployment(gendoc):
                                         '--github-endpoint=http://ghproxy',
                                         '--github-graphql-endpoint=http://ghproxy/graphql',
                                         '--github-throttle=250',
-                                        '--bugzilla-endpoint=https://bugzilla.redhat.com',
-                                        '--bugzilla-api-key-path=/etc/bugzilla/api',
-                                        '--bugzilla-auth-method=bearer',
-                                        '--verify-bugzilla',
                                         '--jira-endpoint=https://issues.redhat.com',
                                         '--jira-bearer-token-file=/etc/jira/api',
                                         '--verify-jira',
