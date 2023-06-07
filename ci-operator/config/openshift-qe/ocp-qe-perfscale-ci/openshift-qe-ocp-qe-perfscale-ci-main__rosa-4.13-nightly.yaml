@@ -5,7 +5,7 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-rosa
+  to: ocp-qe-perfscale-ci-rosa-4.13-nightly
 promotion:
   namespace: ci
   tag: latest
@@ -21,8 +21,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-qe-perfscale-ci-tests-rosa
-  cron: 0 12 * * 5
+- as: ocp-qe-perfscale-ci-tests-rosa-cluster-density
+  cron: 0 12 * * 4
   steps:
     cluster_profile: aws-qe
     env:
@@ -30,6 +30,27 @@ tests:
       OPENSHIFT_VERSION: "4.13"
     test:
     - ref: openshift-qe-cluster-density
+    workflow: rosa-aws-sts
+- as: ocp-qe-perfscale-ci-tests-rosa-cluster-density-v2
+  cron: 0 12 * * 4
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "4.13"
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    workflow: rosa-aws-sts
+- as: ocp-qe-perfscale-ci-tests-rosa-node-density
+  cron: 0 12 * * 4
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "4.13"
+      PODS_PER_NODE: "100"
+    test:
+    - ref: openshift-qe-node-density
     workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: main
