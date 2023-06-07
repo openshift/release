@@ -217,6 +217,9 @@ CONFIG = {
     'ibmcloud-qe-quota-slice': {
         'jp-tok': 10,
     },
+    'ibmcloud-multi-s390x-quota-slice': {
+        'us-east': 3,
+    },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
     },
