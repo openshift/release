@@ -1,0 +1,69 @@
+ref:
+  as: openshift-qe-workers-infra-workload
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  commands: openshift-qe-workers-infra-workload-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: SET_ENV_BY_PLATFORM
+    default: ""
+    documentation: |-
+      Default is empty, which means the script automatically detect what's platform and choose default instance type/volume type/size to deploy infra and workload. You can set SET_ENV_BY_PLATFORM=custom to override those variable,if only specify SET_ENV_BY_PLATFORM=custom, the script will use the same instance type with normal worker nodes.
+  - name: OPENSHIFT_INFRA_NODE_INSTANCE_TYPE
+    default: ""
+    documentation: |-
+      Default is empty, which means script automatically detect what's platform and choose instance type that perfscale job used. if you can override OPENSHIFT_INFRA_NODE_INSTANCE_TYPE when SET_ENV_BY_PLATFORM=custom. only for aws,gcp,azure,ibmcloud,openstack,alibabacloud.
+  - name: OPENSHIFT_INFRA_NODE_VOLUME_TYPE
+    default: ""
+    documentation: |-
+      Default is empty, which means script automatically detect what's platform and choose volume type that perfscale job used. if you can override OPENSHIFT_INFRA_NODE_VOLUME_TYPE when SET_ENV_BY_PLATFORM=custom. only for aws,gcp,azure,ibmcloud,openstack,alibabacloud.
+  - name: OPENSHIFT_INFRA_NODE_VOLUME_SIZE
+    default: ""
+    documentation: |-
+      Default is empty, which means script automatically detect what's platform and choose volume size that perfscale job used. if you can override OPENSHIFT_INFRA_NODE_VOLUME_SIZE when SET_ENV_BY_PLATFORM=custom. only for aws,gcp,azure,ibmcloud,openstack,alibabacloud.
+  - name: OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE
+    default: ""
+    documentation: |-
+      Default is empty, which means script automatically detect what's platform and choose instance type that perfscale job used. if you can override OPENSHIFT_WORKLOAD_NODE_INSTANCE_TYPE when SET_ENV_BY_PLATFORM=custom. only for aws,gcp,azure,ibmcloud,openstack,alibabacloud.
+  - name: OPENSHIFT_WORKLOAD_NODE_VOLUME_TYPE
+    default: ""
+    documentation: |-
+      Default is empty, which means script automatically detect what's platform and choose volume type that perfscale job used. if you can override OPENSHIFT_WORKLOAD_NODE_VOLUME_TYPE when SET_ENV_BY_PLATFORM=custom. only for aws,gcp,azure,ibmcloud,openstack,alibabacloud.
+  - name: OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE
+    default: ""
+    documentation: |-
+      Default is empty, which means script automatically detect what's platform and choose volume size that perfscale job used. if you can override OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE when SET_ENV_BY_PLATFORM=custom. only for aws,gcp,azure,ibmcloud,openstack,alibabacloud.
+  - name: IF_CREATE_WORKLOAD_NODE
+    default: "true"
+    documentation: |-
+      Default is true, which means openshift-qe-workers-infra-workload-commands.sh will create workload node. You can set it to false to disable creating workload node
+  documentation: |-
+    The entrypoint that creat emachinesets for deploying infra/workload worker nodes for minitoring/ingress/registry.
+
+    ###########################################################################################
+    #Other ENV that can be override
+    #
+    #Only for AWS:
+    #OPENSHIFT_INFRA_NODE_VOLUME_IOPS=""
+    #OPENSHIFT_WORKLOAD_NODE_VOLUME_IOPS=""
+    #
+    #ENV that can override only for vsphere
+    #OPENSHIFT_INFRA_NODE_VOLUME_SIZE=120
+    #OPENSHIFT_INFRA_NODE_CPU_COUNT=48
+    #OPENSHIFT_INFRA_NODE_MEMORY_SIZE=196608
+    #OPENSHIFT_INFRA_NODE_CPU_CORE_PER_SOCKET_COUNT=2
+    #OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE=500
+    #OPENSHIFT_WORKLOAD_NODE_CPU_COUNT=32
+    #OPENSHIFT_WORKLOAD_NODE_MEMORY_SIZE=131072
+    #OPENSHIFT_WORKLOAD_NODE_CPU_CORE_PER_SOCKET_COUNT=2
+
+    #ENV that can override only for nutanix
+    #OPENSHIFT_INFRA_NODE_INSTANCE_VCPU=16
+    #OPENSHIFT_INFRA_NODE_INSTANCE_MEMORYSIZE=64Gi
+    #OPENSHIFT_WORKLOAD_NODE_INSTANCE_VCPU=16
+    #OPENSHIFT_WORKLOAD_NODE_INSTANCE_MEMORYSIZE=64Gi  
