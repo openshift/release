@@ -36,8 +36,19 @@ tests:
     make unit-test
   container:
     from: src
+- always_run: false
+  as: rosa-classic-e2e-presubmit
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
+  steps:
+    cluster_profile: aws-qe
+    env:
+      TF_FOLDER: ci/e2e/terraform_provider_ocm_files
+    post:
+    - ref: rosa-terraform-e2e-teardown
+    pre:
+    - ref: rosa-terraform-e2e-setup
 - as: managed-oidc-config-e2e-presubmit
-  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem|^examples/
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
   steps:
     cluster_profile: aws-qe
     env:
@@ -47,7 +58,7 @@ tests:
     pre:
     - ref: rosa-terraform-e2e-setup
 - as: unmanaged-oidc-config-e2e-presubmit
-  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem|^examples/
+  skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
   steps:
     cluster_profile: aws-qe
     env:
