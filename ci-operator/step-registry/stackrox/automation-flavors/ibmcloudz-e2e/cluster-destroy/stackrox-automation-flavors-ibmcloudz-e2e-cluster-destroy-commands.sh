@@ -16,7 +16,7 @@ PRIVATE_KEY_FILE="${SECRET_DIR}/PRIVATE_KEY_FILE"
 # https://docs.ci.openshift.org/docs/architecture/step-registry/#sharing-data-between-steps
 KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 
-CLUSTER_NAME=$(KUBECONFIG="$KUBECONFIG_FILE" ./kubectl config view --minify -o jsonpath='{.clusters[].name}')
+# CLUSTER_NAME=$(KUBECONFIG="$KUBECONFIG_FILE" ./kubectl config view --minify -o jsonpath='{.clusters[].name}')
 
 SSH_KEY_PATH="/tmp/id_rsa"
 SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
