@@ -221,7 +221,7 @@ CONFIG = {
         'jp-tok': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'jp-osa': 10,
+        'jp-osa': 3,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
