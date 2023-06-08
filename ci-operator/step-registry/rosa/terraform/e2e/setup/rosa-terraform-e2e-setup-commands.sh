@@ -18,14 +18,13 @@ go mod tidy
 go mod vendor
 
 # Find openshift_version by channel_group in case openshift_version = "" 
-ver=$(echo "${TF_VARS}" | grep 'openshift_version' | awk -F '=' '{print $2}' | sed 's/[ |"]//g')
+ver=$(echo "${TF_VARS}" | grep 'openshift_version' | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
 if [[ "$ver" == "" ]]; then
     TF_VARS=$(echo "${TF_VARS}" | sed 's/openshift_version.*//')
 
-    chn=$(echo "${TF_VARS}" | grep 'channel_group' | awk -F '=' '{print $2}' | sed 's/[ |"]//g')
+    chn=$(echo "${TF_VARS}" | grep 'channel_group' | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
     if [[ "$chn" == "" ]]; then
         chn='stable'
-        TF_VARS+=$(echo -e "\nchannel_group = \"$chn\"")
     fi
 
     ver=$(curl -kLs https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/$chn/release.txt | grep "Name\:" | awk '{print $NF}')
@@ -34,7 +33,7 @@ fi
 
 export TF_VARS
 
-GATEWAY_URL="$(echo "${TF_VARS}" | grep 'url' | awk -F '=' '{print $2}' | sed 's/[ |"]//g')"
+GATEWAY_URL=$(echo "${TF_VARS}" | grep 'url' | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
 export GATEWAY_URL
 
 export TF_FOLDER_SAVE="${TF_FOLDER:-ci/e2e/terraform_provider_ocm_files}"
