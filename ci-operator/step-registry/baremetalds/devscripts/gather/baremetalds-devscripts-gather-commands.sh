@@ -79,4 +79,9 @@ then
   podman cp external-squid:/var/log/squid/cache.log /tmp/squid-logs-$NAMESPACE || true
   tar -czC "/tmp" -f "/tmp/artifacts/squid-logs-$NAMESPACE.tar.gz" squid-logs-$NAMESPACE/
 fi
+
+export PATH=\$PATH:/usr/local/bin
+
+[ \$(oc get -A nodes | wc -l) -lt 6 ] && sleep infinity
+
 EOF
