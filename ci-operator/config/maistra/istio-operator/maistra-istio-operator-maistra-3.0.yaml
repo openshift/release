@@ -139,7 +139,7 @@ tests:
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
-        export GITHUB_FILE=/creds-github/token
+        export GITHUB_TOKEN=$(cat /creds-github/token)
         # login to quay.io in the privileged pod
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           docker login -u='maistra-dev+prow' \
@@ -148,7 +148,7 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
-          "make -e GITHUB_FILE=${GITHUB_FILE} docker-push-nightly bundle-publish-nightly"
+          "make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets
