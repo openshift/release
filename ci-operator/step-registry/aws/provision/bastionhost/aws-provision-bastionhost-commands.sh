@@ -218,11 +218,11 @@ Resources:
           - "UseIgnition"
           - - DeviceName: /dev/xvda
               Ebs:
-                VolumeSize: "120"
+                VolumeSize: "200"
                 VolumeType: gp2
           - - DeviceName: /dev/sda1
               Ebs:
-                VolumeSize: "120"
+                VolumeSize: "200"
                 VolumeType: gp2
       UserData:
         !If

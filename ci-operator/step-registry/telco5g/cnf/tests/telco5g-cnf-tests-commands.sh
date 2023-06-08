@@ -110,7 +110,7 @@ function get_skip_tests {
     skip_list=""
     if [ -f "${SKIP_TESTS_FILE}" ]; then
         rm -f feature_skip_list.txt
-        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > feature_skip_list.txt
+        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > ${SHARED_DIR}/feature_skip_list.txt
         skip_list=""
         while read line;
         do
@@ -122,7 +122,7 @@ function get_skip_tests {
                     skip_list="${skip_list} ${test}"
                 fi
             fi
-        done < feature_skip_list.txt
+        done < ${SHARED_DIR}/feature_skip_list.txt
     fi
 
     echo "${skip_list}"
@@ -199,11 +199,18 @@ function check_commit_message_for_prs {
     fi
 }
 
+function sno_fixes {
+    echo "************ SNO fixes ************"
+    pushd $CNF_REPO_DIR
+    sed -i "s/role: worker-cnf/role: master/g" feature-configs/deploy/sctp/sctp_module_mc.yaml
+
+    popd
+}
 
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
-    export FEATURES="${FEATURES:-performance}"
+    export FEATURES="${FEATURES:-performance sriov sctp}"
 else
     export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
 fi
@@ -313,6 +320,8 @@ fi
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
     export ROLE_WORKER_CNF="master"
+    # Make local workarounds for SNO
+    sno_fixes
 fi
 export CNF_NODES="${test_nodes}"
 
