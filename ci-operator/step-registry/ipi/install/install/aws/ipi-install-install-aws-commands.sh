@@ -21,6 +21,12 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+  sed -i '
+    s/password: .*/password: REDACTED/;
+	s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+	s/UserData:.*,/UserData: REDACTED,/;
+	' "${dir}/terraform.txt"
+  tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
 }
 
 function prepare_next_steps() {
@@ -203,7 +209,10 @@ fi
 # ---------------------------------------------------------
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+TF_LOG_PATH="${dir}/terraform.txt"
+export TF_LOG_PATH
+
+openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
 set +e
 wait "$!"
@@ -348,7 +357,7 @@ EOF
   echo "Waited for stack $APPS_DNS_STACK_NAME"
 
   # completing installation
-  TF_LOG=debug openshift-install --dir="${dir}" wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  openshift-install --dir="${dir}" wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
 
