@@ -458,11 +458,7 @@ if [[ "${GCP_PUBLIC_IPS:-}"  == 'auto' ]]; then
       # manager or other aspects to include more non-RC jobs. For PoC, we can
       # assess impact with presubmit only.
 
-      if [[ "${JOB_NAME}" != *"serial"* ]]; then
-        # The serial job presently fails because of egress failures.
-        # e.g. [sig-network][Feature:EgressIP][apigroup:operator.openshift.io] [external-targets][apigroup:user.openshift.io][apigroup:security.openshift.io] pods should have the assigned EgressIPs and EgressIPs can be updated [Skipped:Network/OpenShiftSDN] [Serial] [Suite:openshift/conformance/serial]
-        export GCP_PUBLIC_IPS="true"
-      fi
+      export GCP_PUBLIC_IPS="true"
     fi
   fi
 fi
