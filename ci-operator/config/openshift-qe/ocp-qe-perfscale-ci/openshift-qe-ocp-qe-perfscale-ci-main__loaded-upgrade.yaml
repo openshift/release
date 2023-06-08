@@ -1,0 +1,49 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_literal: |
+    FROM src
+    #FROM quay.io/openshifttest/python:3.9
+
+    LABEL vendor="Red Hat Inc." maintainer="OCP QE Team"
+
+    RUN curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar -xvzf -  &&\
+    mv oc /bin && mv kubectl /bin && apt-get update && apt-get install -y gettext-base uuid-runtime jq && \
+    ln -s /bin/bash /usr/bin/bash && /usr/local/bin/python -m pip install --upgrade pip && pip install virtualenv jq
+  from: src
+  to: ocp-qe-perfscale-ci-ld
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-qe-perfscale-loaded-upgrade-gcp
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      WORKER_REPLICA_COUNT: "5"
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    - chain: workers-scale
+    workflow: openshift-qe-loaded-upgrade
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: loaded-upgrade
