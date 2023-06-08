@@ -135,27 +135,28 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-baselinecaps-none
-- as: aws-ipi-byo-iam-role-p2-f28
-  cron: 32 19 5 * *
+- as: aws-ipi-byo-iam-role-fips-p2-f28
+  cron: 27 18 8 * *
   remote_api: true
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-openshiftsdn and not @fips'
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-openshiftsdn'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.11'
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
-- as: aws-ipi-byo-iam-role-p3-f28-destructive
-  cron: 39 13 5 * *
+- as: aws-ipi-byo-iam-role-fips-p3-f28-destructive
+  cron: 13 4 13 * *
   remote_api: true
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-openshiftsdn and not @fips and
-        @destructive'
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-openshiftsdn and @destructive'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.11'
       TEST_ADDITIONAL: Network_Observability
     test:
@@ -1041,33 +1042,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
-- as: azure-ipi-fips-p2-f14
-  cron: 41 17 3,18 * *
-  remote_api: true
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-openshiftsdn'
-      FIPS_ENABLED: "true"
-      TAG_VERSION: '@4.11'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-fips-p3-f28-destructive
-  cron: 11 21 19 * *
-  remote_api: true
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-openshiftsdn and @destructive'
-      FIPS_ENABLED: "true"
-      TAG_VERSION: '@4.11'
-      TEST_ADDITIONAL: Network_Observability
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-fullyprivate-proxy-p2-f14
   cron: 26 15 13,28 * *
   remote_api: true
@@ -1094,7 +1068,7 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
-- as: azure-ipi-ingress-custom-ingress-fips-p3-f28
+- as: azure-ipi-ingress-custom-controller-fips-p3-f28
   cron: 3 18 13 * *
   remote_api: true
   steps:
@@ -1106,8 +1080,8 @@ tests:
       TAG_VERSION: '@4.11'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-ingresscontroller
-- as: azure-ipi-ingress-custom-ingress-fips-p3-f28-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
+- as: azure-ipi-ingress-custom-controller-fips-p3-f28-destructive
   cron: 59 20 29 * *
   remote_api: true
   steps:
@@ -1119,7 +1093,7 @@ tests:
       TAG_VERSION: '@4.11'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-ingresscontroller
+    workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
 - as: azure-ipi-ovn-etcd-encryption-p2-f14
   cron: 52 7 10,25 * *
   remote_api: true
@@ -1505,8 +1479,11 @@ tests:
     env:
       BASE_DOMAIN: shiftstack.devcluster.openshift.com
       CONFIG_TYPE: minimal
+      E2E_RUN_TAGS: '@amd64 and @openstack-ipi and @network-openshiftsdn and not @fips'
+      TAG_VERSION: '@4.11'
     test:
-    - ref: openshift-extended-test
+    - ref: enable-qe-catalogsource
+    - chain: openshift-e2e-test-qe
     workflow: ipi-openstack
 - as: gcp-ipi-cco-manual-workload-identity-fips-p2-f14
   cron: 24 0 5,20 * *
