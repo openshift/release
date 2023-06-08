@@ -42,7 +42,7 @@ function copy_kubeconfig_minimal() {
   echo 'kubeconfig received!'
 
   echo 'waiting for api to be available'
-  until env KUBECONFIG="${dir}/auth/kubeconfig" oc get --raw / >/dev/null 2>&1; do
+  until env KUBECONFIG="${dir}/auth/kubeconfig" oc get apiservices -o json | jq -r '.items[].status.conditions[]? | select(.type == "Available") | .status' | grep -iv "True" >/dev/null 2>&1; do
     sleep 5
   done
   echo 'api available'
