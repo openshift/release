@@ -61,7 +61,6 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-CONFIG_PLATFORM="  platform: {}"
 POWERVS_ZONE=${LEASED_RESOURCE}
 case "${LEASED_RESOURCE}" in
    "lon04")
@@ -78,8 +77,6 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_OSA21")
       POWERVS_REGION=osa
       VPCREGION=jp-osa
-      # https://www.gnu.org/software/bash/manual/html_node/ANSI_002dC-Quoting.html#ANSI_002dC-Quoting
-      CONFIG_PLATFORM=$'  platform:\n    powervs:\n      sysType: e980'
    ;;
    "sao01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")
@@ -113,6 +110,18 @@ case "${LEASED_RESOURCE}" in
       VPCREGION=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/VPCREGION")
    ;;
 esac
+
+#
+# Find out the largest system pool type
+#
+curl --output /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz --location https://github.com/hamzy/PowerVS-get-largest-system-pool/releases/download/v0.1.6/PowerVS-get-largest-system-pool-v0.1.6-linux-amd64.tar.gz
+tar -C /tmp -xzf /tmp/PowerVS-get-largest-system-pool-linux-amd64.tar.gz
+chmod u+x /tmp/PowerVS-get-largest-system-pool
+POOL_TYPE=$(/tmp/PowerVS-get-largest-system-pool -apiKey "$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/IBMCLOUD_API_KEY")" -serviceGUID ${POWERVS_SERVICE_INSTANCE_ID})
+echo "POOL_TYPE=${POOL_TYPE}"
+# https://www.gnu.org/software/bash/manual/html_node/ANSI_002dC-Quoting.html#ANSI_002dC-Quoting
+CONFIG_PLATFORM=$'  platform:\n    powervs:\n      sysType: '${POOL_TYPE}
+echo "CONFIG_PLATFORM=${CONFIG_PLATFORM}"
 
 cat > "${SHARED_DIR}/powervs-conf.yaml" << EOF
 CLUSTER_NAME: ${CLUSTER_NAME}
