@@ -511,7 +511,10 @@ export PATH=${OC_DIR}:$PATH
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
-    TARGET_VERSION="$(oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    printenv | grep -i proxy
+    sleep 2h
+    TARGET_VERSION="$(env "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
