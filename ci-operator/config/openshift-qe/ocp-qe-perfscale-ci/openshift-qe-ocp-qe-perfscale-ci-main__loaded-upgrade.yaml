@@ -8,6 +8,7 @@ images:
   to: ocp-qe-perfscale-ci-ld
 - dockerfile_literal: |
     FROM src as builder
+    FROM ocp-qe-perfscale-ci-ld
     COPY --from=builder /go/src/github.com/openshift-qe/ocp-qe-perfscale-ci /tmp/
   from: ocp-qe-perfscale-ci-ld
   to: repo-scripts
@@ -29,10 +30,10 @@ resources:
       memory: 200Mi
 tests:
 - as: code-check
-  commands: pwd;ls
+  commands: pwd;ls -R /tmp/
   container:
     clone: true
-    from: ocp-qe-perfscale-ci-ld
+    from: repo-scripts
   optional: true
 - as: ocp-qe-perfscale-loaded-upgrade-gcp
   cron: 0 12 * * 1
