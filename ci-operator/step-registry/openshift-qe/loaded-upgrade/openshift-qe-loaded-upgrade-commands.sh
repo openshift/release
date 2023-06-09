@@ -23,6 +23,7 @@ cat /etc/os-release
 pwd
 echo  "------------------------------------------"
 ls
+echo  "------------------------------------------"
 echo $UPGRADE_FROM to UPGRADE_TO
 #./run.sh
 sleep 720
