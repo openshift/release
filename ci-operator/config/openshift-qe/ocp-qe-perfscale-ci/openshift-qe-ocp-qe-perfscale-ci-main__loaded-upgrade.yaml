@@ -5,8 +5,13 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  from: src
   to: ocp-qe-perfscale-ci-ld
+- dockerfile_literal: |
+    FROM src AS builder
+    FROM ocp-qe-perfscale-ci-ld
+    COPY --from=builder /go/src/github.com/openshift-qe/ocp-qe-perfscale-ci/ /opt/
+  from: src
+  to: dev-image
 promotion:
   additional_images:
     ocp-qe-perfscale-ci-ld: ocp-qe-perfscale-ci-ld
@@ -28,7 +33,7 @@ tests:
   commands: pwd;ls -R /go/src/github.com/openshift-qe/ocp-qe-perfscale-ci/
   container:
     clone: true
-    from: ocp-qe-perfscale-ci-ld
+    from: dev-image
 - as: ocp-qe-perfscale-loaded-upgrade-gcp
   cron: 0 12 * * 1
   steps:
