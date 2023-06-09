@@ -21,4 +21,16 @@ export WORKLOAD=node-density
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
+# wait for all nodes to reach Ready=true to ensure that all machines and nodes came up, before we run
+# any e2e tests that might require specific workload capacity.
+echo "$(date) - waiting for nodes to be ready..."
+ret=0
+oc wait nodes --all --for=condition=Ready=true --timeout=10m || ret=$?
+if [[ "$ret" == 0 ]]; then
+    echo "$(date) - all nodes are ready"
+else
+    oc get nodes
+    echo "Timed out waiting for nodes to be ready. Return code: $ret."
+    exit 1
+fi
 ./run.sh
