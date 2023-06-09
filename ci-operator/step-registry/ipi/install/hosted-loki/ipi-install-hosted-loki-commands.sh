@@ -112,7 +112,7 @@ data:
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
-    - job_name: kubernetes
+    - job_name: kubernetes-pods
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
@@ -120,72 +120,21 @@ data:
       - match:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
           action: drop
-      - labeldrop:
-        - filename
       - pack:
           labels:
-          - namespace
-          - pod_name
-          - container_name
           - app
-      - labelallow:
+          - container
           - host
+          - pod
+      - labelallow:
           - invoker
-          - audit
-      relabel_configs:
-      - action: drop
-        regex: ''
-        source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-      - source_labels:
-        - __meta_kubernetes_pod_label_name
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: pod_name
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-    - job_name: kubernetes-pods-static
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-      - pack:
-          labels:
           - namespace
-          - pod_name
-          - container_name
           - app
-      - labelallow:
+          - container
           - host
-          - invoker
-      kubernetes_sd_configs:
-      - role: pod
+          - pod
+      - static_labels:
+          type: pod
       relabel_configs:
       - action: drop
         regex: ''
@@ -195,15 +144,11 @@ data:
         - __meta_kubernetes_pod_label_name
         target_label: __service__
       - source_labels:
+        - __meta_kubernetes_pod_label_app
+        target_label: app
+      - source_labels:
         - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
+        target_label: host
       - action: replace
         source_labels:
         - __meta_kubernetes_namespace
@@ -211,11 +156,11 @@ data:
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_name
-        target_label: pod_name
+        target_label: pod
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_container_name
-        target_label: container_name
+        target_label: container
       - replacement: /var/log/pods/*\$1/*.log
         separator: /
         source_labels:
@@ -237,9 +182,11 @@ data:
           labels:
           - boot_id
           - systemd_unit
-      - labelallow:
           - host
+      - labelallow:
           - invoker
+      - static_labels:
+          type: journal
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
@@ -252,11 +199,10 @@ data:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
           stages:
           - static_labels:
-              audit: events
+              type: kube-event
       - labelallow:
-          - host
           - invoker
-          - audit
+          - type
       relabel_configs:
       - action: replace
         source_labels:
@@ -314,7 +260,7 @@ spec:
       containers:
       - command:
         - promtail
-        - -client.external-labels=host=\$(HOSTNAME),invoker=\$(INVOKER)
+        - -client.external-labels=invoker=\$(INVOKER)
         - -config.file=/etc/promtail/promtail.yaml
         env:
         - name: HOSTNAME
