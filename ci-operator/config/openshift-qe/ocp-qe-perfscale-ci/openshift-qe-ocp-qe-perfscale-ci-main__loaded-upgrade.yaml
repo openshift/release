@@ -7,25 +7,13 @@ images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-ld
 - dockerfile_literal: |
-    FROM src
-    RUN export VERSION="stable" && \
-      URL="https://github.com/koalaman/shellcheck/releases/download" && \
-      export URL="${URL}/${VERSION}/shellcheck-${VERSION}.linux.x86_64.tar.xz" && \
-      wget -q -O - "${URL}" | tar -xJv && \
-      cp "shellcheck-${VERSION}/shellcheck" /usr/local/bin/ && \
-      rm -rf "shellcheck-${VERSION}"
-    RUN mkdir /tmp/oc && \
-        cd /tmp/oc && \
-        curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
-        tar xzvf oc.tar.gz && \
-        mv kubectl /usr/local/bin/ && \
-        cd - && \
-        rm -rf /tmp/oc
-  from: src
-  to: test-bin
+    FROM src as builder
+    COPY /go/src/github.com/openshift-qe/ocp-qe-perfscale-ci /tmp/
+  from: ocp-qe-perfscale-ci-ld
+  to: repo-scripts
 promotion:
-  excluded_images:
-  - test-bin
+  additional_images:
+    repo-scripts: repo-scripts
   namespace: ci
   tag: latest
 releases:
@@ -43,7 +31,8 @@ tests:
 - as: code-check
   commands: pwd;ls
   container:
-    from: test-bin
+    clone: true
+    from: ocp-qe-perfscale-ci-ld
   optional: true
 - as: ocp-qe-perfscale-loaded-upgrade-gcp
   cron: 0 12 * * 1
