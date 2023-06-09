@@ -55,27 +55,8 @@ tests:
   container:
     from: modelmesh-serving-develop
   run_if_changed: ^(apis/.*|controllers/.*|pkg/.*|Dockerfile|main\.go|go\.mod|go\.sum)
-- as: fvt
-  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum)
-  steps:
-    cluster_profile: gcp
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-    test:
-    - as: fvt
-      commands: "export HOME=/go\nexport NAMESPACE=modelmesh-serving\nexport MODELMESH_SERVING_IMAGE=${PR_MODELMESH_SERVING_IMAGE}
-        \  \ncat  ./config/internal/base/deployment.yaml.tmpl     \nmake e2e-test\n"
-      dependencies:
-      - env: PR_MODELMESH_SERVING_IMAGE
-        name: modelmesh-serving
-      from: modelmesh-serving-develop
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 3Gi
-    workflow: ipi-gcp
 - as: fvt-odh-manifests
-  run_if_changed: ^(opendatahub/odh-manifests)
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum|opendatahub/odh-manifests)
   steps:
     cluster_profile: aws
     env:

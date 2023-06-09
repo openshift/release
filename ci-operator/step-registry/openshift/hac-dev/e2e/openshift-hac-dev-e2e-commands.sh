@@ -7,7 +7,7 @@ CHROME_IMAGE="quay.io/cloudservices/insights-chrome-frontend"
 CHROME_TAG="f5f1929"
 
 #Vault Secrets
-export HAC_KC_SSO_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC
+export HAC_KC_SSO_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC CYPRESS_VC_KUBECONFIG
 HAC_KC_SSO_URL=$(cat /usr/local/ci-secrets/devsandbox/sso_hostname)
 HAC_KC_USERNAME=$(cat /usr/local/ci-secrets/devsandbox/username)
 HAC_KC_PASSWORD=$(cat /usr/local/ci-secrets/devsandbox/new-password)
@@ -17,6 +17,7 @@ CYPRESS_GH_TOKEN=$(cat /usr/local/ci-secrets/github/github-token)
 CYPRESS_GH_PASSWORD=$(cat /usr/local/ci-secrets/github/github-password)
 CYPRESS_QUAY_TOKEN=$(cat /usr/local/ci-secrets/github/quay-token)
 CYPRESS_RP_HAC=$(cat /usr/local/ci-secrets/github/report-portal-token-hac)
+CYPRESS_VC_KUBECONFIG=$(cat /usr/local/ci-secrets/github/vc-kubeconfig)
 
 #QONTRACT
 export QONTRACT_PASSWORD QONTRACT_USERNAME QONTRACT_BASE_URL
