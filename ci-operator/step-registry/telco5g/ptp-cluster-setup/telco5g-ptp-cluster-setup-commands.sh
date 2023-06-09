@@ -9,6 +9,8 @@ echo "************ telco cluster setup command ************"
 #Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 #Set ssh path and permissions for connection to hypervisor
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
