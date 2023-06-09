@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+
 CONFIG="${SHARED_DIR}/install-config.yaml"
 function getVersion() {
   local release_image=""
