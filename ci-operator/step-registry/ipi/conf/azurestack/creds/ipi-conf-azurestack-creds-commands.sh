@@ -11,6 +11,10 @@ fi
 
 # Set PATH to include YQ, installed via pip in the image
 export PATH="$PATH:/usr/local/bin"
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
 
 CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
 RESOURCE_GROUP=${CLUSTER_NAME}
