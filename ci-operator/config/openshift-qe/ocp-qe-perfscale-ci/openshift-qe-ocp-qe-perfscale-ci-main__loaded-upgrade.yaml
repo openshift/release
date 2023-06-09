@@ -4,22 +4,9 @@ build_root:
     namespace: ci
     tag: latest
 images:
-- dockerfile_literal: |
-    FROM src as builder
-    FROM quay.io/openshifttest/python:3.9
-
-    LABEL vendor="Red Hat Inc." maintainer="OCP QE Team"
-
-    RUN curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar -xvzf -  &&\
-    mv oc /bin && mv kubectl /bin && apt-get update && apt-get install -y gettext-base uuid-runtime jq && \
-    ln -s /bin/bash /usr/bin/bash && /usr/local/bin/python -m pip install --upgrade pip && pip install virtualenv jq
-
-    COPY --from=builder /go/src/github.com/openshift-qe/ocp-qe-perfscale-ci /tmp/
-  from: src
-  to: repo-scripts
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-ld
 promotion:
-  additional_images:
-    repo-scripts: repo-scripts
   namespace: ci
   tag: latest
 releases:
@@ -38,7 +25,7 @@ tests:
   commands: pwd;ls -R /tmp/
   container:
     clone: true
-    from: repo-scripts
+    from: ocp-qe-perfscale-ci-ld
   optional: true
 - as: ocp-qe-perfscale-loaded-upgrade-gcp
   cron: 0 12 * * 1
