@@ -1,34 +1,12 @@
-base_images:
-  cli:
-    name: "4.14"
-    namespace: ocp
-    tag: cli
-  tools:
-    name: "4.14"
-    namespace: ocp
-    tag: tools
 build_root:
   image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-ld
-- dockerfile_literal: |
-    FROM tools
-    #FROM quay.io/openshifttest/python:3.9
-
-    LABEL vendor="Red Hat Inc." maintainer="OCP QE Team"
-
-    RUN curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar -xvzf -  &&\
-    mv oc /bin && mv kubectl /bin && apt-get update && apt-get install -y gettext-base uuid-runtime jq && \
-    ln -s /bin/bash /usr/bin/bash && /usr/local/bin/python -m pip install --upgrade pip && pip install virtualenv jq
-  from: tools
-  to: ocp-qe-perfscale-ci-tool
 promotion:
-  excluded_images:
-  - ocp-qe-perfscale-ci-tool
   namespace: ci
   tag: latest
 releases:
@@ -47,13 +25,10 @@ tests:
   cron: 0 12 * * 1
   steps:
     cluster_profile: gcp-qe
-    env:
-      WORKER_REPLICA_COUNT: "5"
     post:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
-    - chain: workers-scale
     workflow: openshift-qe-loaded-upgrade
 zz_generated_metadata:
   branch: main
