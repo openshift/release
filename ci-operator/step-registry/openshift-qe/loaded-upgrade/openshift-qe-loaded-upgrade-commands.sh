@@ -25,4 +25,4 @@ echo  "------------------------------------------"
 ls
 echo $UPGRADE_FROM to UPGRADE_TO
 #./run.sh
-sleep 3600
+sleep 720
