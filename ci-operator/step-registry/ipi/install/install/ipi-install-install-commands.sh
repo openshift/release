@@ -41,17 +41,17 @@ function copy_kubeconfig_minimal() {
   done
   echo 'kubeconfig received!'
 
-  echo 'waiting for api to be available'
-  until env KUBECONFIG="${dir}/auth/kubeconfig" oc get apiservices -o json | jq -r '.items[].status.conditions[]? | select(.type == "Available") | .status' | grep -iv "True" >/dev/null 2>&1; do
-    sleep 5
-  done
-  echo 'api available'
-
   echo 'waiting for bootstrap to complete'
   openshift-install --dir="${dir}" wait-for bootstrap-complete &
   wait "$!"
   ret=$?
   if [ $ret -eq 0 ]; then
+    echo 'waiting for all api services to be available'
+    while KUBECONFIG="${dir}/auth/kubeconfig" oc get apiservices -o custom-columns="Available:status.conditions[?(@.type=='Available')].status" --no-headers |grep -iv True >/dev/null 2>&1; do
+      sleep 5
+    done
+    echo 'all api services available'
+
     echo "Copying kubeconfig to shared dir as kubeconfig-minimal"
     cp "${dir}/auth/kubeconfig" "${SHARED_DIR}/kubeconfig-minimal"
   fi
