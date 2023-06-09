@@ -6,9 +6,26 @@ build_root:
 images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-ld
+- dockerfile_literal: |
+    FROM src
+    RUN export VERSION="stable" && \
+      URL="https://github.com/koalaman/shellcheck/releases/download" && \
+      export URL="${URL}/${VERSION}/shellcheck-${VERSION}.linux.x86_64.tar.xz" && \
+      wget -q -O - "${URL}" | tar -xJv && \
+      cp "shellcheck-${VERSION}/shellcheck" /usr/local/bin/ && \
+      rm -rf "shellcheck-${VERSION}"
+    RUN mkdir /tmp/oc && \
+        cd /tmp/oc && \
+        curl -L https://mirror.openshift.com/pub/openshift-v4/clients/oc/latest/linux/oc.tar.gz -o oc.tar.gz && \
+        tar xzvf oc.tar.gz && \
+        mv kubectl /usr/local/bin/ && \
+        cd - && \
+        rm -rf /tmp/oc
+  from: src
+  to: test-bin
 promotion:
-  additional_images:
-    repo-scripts: src
+  excluded_images:
+  - test-bin
   namespace: ci
   tag: latest
 releases:
