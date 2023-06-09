@@ -1,10 +1,29 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  tools:
+    name: "4.13"
+    namespace: ocp
+    tag: tools
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
 images:
-- dockerfile_path: prow/Dockerfile
+- dockerfile_literal: |
+    FROM quay.io/openshifttest/python:3.9
+
+    LABEL vendor="Red Hat Inc." maintainer="OCP QE Team"
+
+    RUN curl -sSL https://mirror.openshift.com/pub/openshift-v4/clients/ocp/stable/openshift-client-linux.tar.gz | tar -xvzf -  &&\
+    mv oc /bin && mv kubectl /bin && apt-get update && apt-get install -y gettext-base uuid-runtime jq && \
+    ln -s /bin/bash /usr/bin/bash && /usr/local/bin/python -m pip install --upgrade pip && pip install virtualenv jq
+    RUN pwd;ls
+    COPY ./ /opt/
+    RUN ls -R /opt/
   to: ocp-qe-perfscale-ci-ld
 promotion:
   namespace: ci
