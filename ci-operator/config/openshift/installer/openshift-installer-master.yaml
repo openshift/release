@@ -666,6 +666,24 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-publicsubnets
+    test:
+    - as: move-ahead-on-demand
+      commands: |
+        while [ ! -f /tmp/dummy-file ]; do
+          sleep 5s
+        done
+      dependencies:
+      - env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+        name: release:latest
+      from: tests
+      grace_period: 10m0s
+      resources:
+        limits:
+          memory: 8Gi
+        requests:
+          cpu: "1"
+          memory: 300Mi
+      timeout: 4h0m0s
   timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
