@@ -13,27 +13,28 @@ RUN_COMMAND="
     --token ${OCM_TOKEN} \
     --api-host ${API_HOST} \
     --timeout ${TIMEOUT} \
-    --brew-token ${BREW_TOKEN} \
     "
 
 ADDONS_CMD=""
 for i in {1..4}; do
   ADDON_VALUE=$(eval "echo $"ADDON$i"_CONFIG")
   if [[ -n $ADDON_VALUE ]]; then
-    ADDONS_CMD="${ADDONS_CMD} --addons ${ADDON_VALUE}"
+    ADDONS_CMD+=" --addons ${ADDON_VALUE}"
   fi
 done
-
-echo "$ADDONS_CMD"
 
 RUN_COMMAND="${RUN_COMMAND} ${ADDONS_CMD}"
 
 if [ -n "${PARALLEL}" ]; then
-    RUN_COMMAND="${RUN_COMMAND} --parallel"
+    RUN_COMMAND+=" --parallel"
 fi
 
 if [ -n "${ROSA}" ]; then
-    RUN_COMMAND="${RUN_COMMAND} --rosa"
+    RUN_COMMAND+=" --rosa"
+fi
+
+if [ -n "${BREW_TOKEN}" ]; then
+    RUN_COMMAND+=" --brew-token ${BREW_TOKEN} "
 fi
 
 echo "$RUN_COMMAND"
