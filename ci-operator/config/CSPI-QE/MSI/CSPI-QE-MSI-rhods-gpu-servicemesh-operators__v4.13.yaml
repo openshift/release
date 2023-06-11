@@ -21,7 +21,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: rhods-tests
+- as: rhods-gpu-servicemesh-tests
   cron: 0 12 * * 6
   remote_api: true
   steps:
@@ -29,19 +29,22 @@ tests:
     env:
       API_HOST: stage
       CHANNEL_GROUP: candidate
-      CLUSTER_NAME: ods-oper-413
-      COMPUTE_MACHINE_TYPE: m5.4xlarge
+      CLUSTER_NAME: rhods-gpu-sm
+      COMPUTE_MACHINE_TYPE: g4dn.2xlarge
       ENABLE_AUTOSCALING: "false"
-      MIN_REPLICAS: "6"
+      MIN_REPLICAS: "2"
+      MULTI_AZ: "false"
       OPENSHIFT_VERSION: "4.13"
       OPERATOR1_CONFIG: rhods-operator|namespace=redhat-ods-operator
-      REGION: us-west-2
+      OPERATOR2_CONFIG: servicemeshoperator
+      OPERATOR3_CONFIG: gpu-operator|namespace=nvidia-gpu-operator
+      PARALLEL: "true"
     test:
     - ref: operator-install
     - ref: operator-uninstall
-    workflow: rosa-aws-sts-hypershift
+    workflow: rosa-aws-sts
 zz_generated_metadata:
-  branch: rhods-operator
+  branch: rhods-gpu-servicemesh-operators
   org: CSPI-QE
   repo: MSI
   variant: v4.13
