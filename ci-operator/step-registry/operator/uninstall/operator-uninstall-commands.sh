@@ -16,17 +16,14 @@ OPERATORS_CMD=""
 for i in {1..4}; do
   OPERATOR_VALUE=$(eval "echo $"OPERATOR$i"_CONFIG")
   if [[ -n $OPERATOR_VALUE ]]; then
-    OPERATORS_CMD="${OPERATORS_CMD} --operators ${OPERATOR_VALUE}"
+    OPERATORS_CMD+=" --operators ${OPERATOR_VALUE}"
   fi
 done
 
-echo "$OPERATORS_CMD"
-
 RUN_COMMAND="${RUN_COMMAND} ${OPERATORS_CMD}"
 
-
 if [ -n "${PARALLEL}" ]; then
-    RUN_COMMAND="${RUN_COMMAND} --parallel"
+    RUN_COMMAND+=" --parallel"
 fi
 
 echo "$RUN_COMMAND"
