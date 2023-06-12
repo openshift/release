@@ -282,10 +282,10 @@ EOT
 }
 
 log_chronyd_status() {
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc version
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc version || true
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
 }
 
 
