@@ -29,6 +29,13 @@ curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/
 cp ${CLUSTER_PROFILE_DIR}/pull-secret /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret ${RELEASE_IMAGE_LATEST} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+
+if [[ "${ocp_version}" == "0.0" ]]; then
+  # for non-regular version, e.g. 0.0.1-2023-06-11-014041
+  # trying to get x.y from release name
+  ocp_version=$(echo $RELEASE_IMAGE_LATEST | cut -d: -f 2 | cut -d. -f 1,2)
+fi
+
 rm /tmp/pull-secret
 echo "ocp_version: ${ocp_version}"
 
