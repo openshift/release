@@ -119,6 +119,11 @@ function create_catalog_sources()
 {
     # get cluster Major.Minor version
     ocp_version=$(oc version -o json | jq -r '.openshiftVersion' | cut -d '.' -f1,2)
+    #WA if ocp_version is "0.0"
+    if [[ "${ocp_version}" == "0.0" ]]; then
+        echo "ocp_version is 0.0, use value 4.11"
+        ocp_version="4.11"
+    fi
     index_image="quay.io/openshift-qe-optional-operators/aosqe-index:v${ocp_version}"
 
     echo "create QE catalogsource: qe-app-registry"
