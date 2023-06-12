@@ -8,7 +8,7 @@ build_root:
 images:
 - dockerfile_path: prow/Dockerfile
   from: os
-  to: krkn-hub-rosa
+  to: krkn-hub-rosa-hp
 promotion:
   namespace: ci
   tag: latest
@@ -17,25 +17,27 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.12"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-qe-perfscale-ci-tests-rosa
+- as: ocp-qe-perfscale-ci-tests-rosa-hp
   cron: 0 12 * * 5
   steps:
     cluster_profile: aws-qe
     env:
-      CHANNEL_GROUP: nightly
-      OPENSHIFT_VERSION: "4.13"
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-east-2
+      ROSA_LOGIN_ENV: production
     test:
     - chain: redhat-chaos-krkn-hub-tests
-    workflow: rosa-aws-sts
+    workflow: rosa-aws-sts-hypershift
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
   repo: krkn-hub
-  variant: rosa-4.13-nightly
+  variant: rosa-4.12-hp
