@@ -27,11 +27,18 @@ cd ~/microshift
 ./scripts/image-builder/create-vm.sh edge default \$(find _output/image-builder -name "*.iso")
 VMIPADDR=\$(./scripts/devenv-builder/manage-vm.sh ip -n edge)
 timeout 5m bash -c "until ssh -oStrictHostKeyChecking=accept-new redhat@\${VMIPADDR} 'echo hello'; do sleep 5; done"
-VMHOSTNAME=\$(ssh "redhat@\${VMIPADDR}" hostname)
-echo "\${VMIPADDR} \${VMHOSTNAME}" | sudo tee -a /etc/hosts
-ssh-keyscan -H \${VMHOSTNAME} >> ~/.ssh/known_hosts
-timeout 5m bash -c "date; until ssh redhat@\${VMHOSTNAME} \"sudo systemctl status greenboot-healthcheck | grep 'active (exited)'\"; do sleep 5; done; date"
-ssh "redhat@\${VMHOSTNAME}" "sudo cat /var/lib/microshift/resources/kubeadmin/\${VMHOSTNAME}/kubeconfig" > /tmp/kubeconfig
+cat << EOF2 > /tmp/config.yaml
+apiServer:
+  subjectAltNames:
+  - "\${VMIPADDR}"
+EOF2
+scp /tmp/config.yaml "redhat@\${VMIPADDR}":/tmp/
+set +e
+ssh "redhat@\${VMIPADDR}" "sudo mv /tmp/config.yaml /etc/microshift/config.yaml; sudo reboot"
+set -e
+timeout 5m bash -c "until ssh -oStrictHostKeyChecking=accept-new redhat@\${VMIPADDR} 'echo hello'; do sleep 5; done"
+timeout 5m bash -c "date; until ssh redhat@\${VMIPADDR} \"sudo systemctl status greenboot-healthcheck | grep 'active (exited)'\"; do sleep 5; done; date"
+ssh "redhat@\${VMIPADDR}" "sudo cat /var/lib/microshift/resources/kubeadmin/\${VMIPADDR}/kubeconfig" > /tmp/kubeconfig
 EOF
 chmod +x /tmp/boot.sh
 
