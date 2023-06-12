@@ -24,7 +24,7 @@ SSH_CMD="/home/ubuntu/stackrox-ci/k8smanager create"
 cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
 chmod 400 $SSH_KEY_PATH
 
-# create a k8s cluster
+# create k8s cluster. k8smanager script runs on bastion node [163.66.94.115] on IBM cloud
 ssh $SSH_ARGS root@163.66.94.115 "$SSH_CMD" > $KUBECONFIG_FILE
 
 KUBECONFIG="$KUBECONFIG_FILE" ./kubectl get nodes
