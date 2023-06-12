@@ -16,8 +16,6 @@ PRIVATE_KEY_FILE="${SECRET_DIR}/PRIVATE_KEY_FILE"
 # https://docs.ci.openshift.org/docs/architecture/step-registry/#sharing-data-between-steps
 KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 
-# CLUSTER_NAME=$(KUBECONFIG="$KUBECONFIG_FILE" ./kubectl config view --minify -o jsonpath='{.clusters[].name}')
-
 SSH_KEY_PATH="/tmp/id_rsa"
 SSH_ARGS="-i ${SSH_KEY_PATH} -o MACs=hmac-sha2-256 -o StrictHostKeyChecking=no -o LogLevel=ERROR -o UserKnownHostsFile=/dev/null"
 SSH_CMD="/home/ubuntu/stackrox-ci/k8smanager delete"
@@ -26,5 +24,5 @@ SSH_CMD="/home/ubuntu/stackrox-ci/k8smanager delete"
 cp -f $PRIVATE_KEY_FILE $SSH_KEY_PATH
 chmod 400 $SSH_KEY_PATH
 
-# delete k8s cluster
+# delete k8s cluster. k8smanager script runs on bastion node [163.66.94.115] on IBM cloud
 ssh $SSH_ARGS root@163.66.94.115 "$SSH_CMD" > $KUBECONFIG_FILE
