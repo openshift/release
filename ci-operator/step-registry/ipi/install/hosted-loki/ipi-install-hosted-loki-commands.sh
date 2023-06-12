@@ -120,6 +120,9 @@ data:
       - match:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
           action: drop
+      - match:
+          selector: '{namespace!~"openshift-.*"}'
+          action: drop
       - pack:
           labels:
           - app
@@ -196,13 +199,13 @@ data:
       pipeline_stages:
       - cri: {}
       - match:
-          selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
-          stages:
-          - static_labels:
-              type: kube-event
+          selector: '{namespace!="openshift-e2e-loki", app!="event-exporter"}'
+          action: drop
       - labelallow:
           - invoker
           - type
+      - static_labels:
+          type: kube-event
       relabel_configs:
       - action: replace
         source_labels:
