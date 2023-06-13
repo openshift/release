@@ -3,52 +3,36 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
-  upi-installer:
-    name: "4.13"
-    namespace: ocp
-    tag: upi-installer
 build_root:
   from_repository: true
 images:
 - dockerfile_path: prow/Dockerfile
   from: os
-  to: krkn-hub-aro
+  to: krkn-hub
+promotion:
+  namespace: ci
+  tag: latest
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
-    integration:
-      include_built_images: true
-      name: "4.13"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-<<<<<<< HEAD
-- as: krkn-hub-tests-aro-413
-  cron: 0 8 */2 * *
-=======
 - as: ocp-qe-perfscale-ci-tests-aro
   cron: 0 12 * * 5
->>>>>>> dashes not underscores
   steps:
     cluster_profile: azure-qe
     test:
     - chain: redhat-chaos-krkn-hub-tests
-<<<<<<< HEAD
-    workflow: openshift-qe-installer-azure-aro
-=======
     workflow: cucushift-installer-rehearse-azure-aro
->>>>>>> dashes not underscores
 zz_generated_metadata:
   branch: main
   org: redhat-chaos
   repo: krkn-hub
-  variant: aro-4.13-nightly
+  variant: aro-4.14-nightly
