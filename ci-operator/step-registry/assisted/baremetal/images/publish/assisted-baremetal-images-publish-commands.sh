@@ -68,6 +68,7 @@ REGISTRY_TOKEN_FILE="$SECRETS_PATH/$REGISTRY_SECRET/$REGISTRY_SECRET_FILE"
 
 # we need to store credentials in $HOME/.docker/config.json for pre 4.10 oc
 config_file="$HOME/.docker/config.json"
+mkdir -p "$HOME/.docker"
 cat "$REGISTRY_TOKEN_FILE" > "$config_file" || {
     echo "ERROR Could not read registry secret file"
     echo "      From: $REGISTRY_TOKEN_FILE"
