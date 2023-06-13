@@ -160,6 +160,10 @@ for node in $NODES; do
 done
 }
 
+set_events_output_file() {
+  sed -i -E 's@(event_output_file:\s*)(.*)@event_output_file: '${ARTIFACT_DIR}'/event_log_'${PTP_TEST_MODE}'.csv@g' ${SHARED_DIR}/test-config.yaml
+}
+
 echo "************ telco5g cnf-tests commands ************"
 
 if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
@@ -177,7 +181,7 @@ fi
 
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
-export TEST_BRANCH="mno-external-gm"
+export TEST_BRANCH="master"
 export PTP_UNDER_TEST_BRANCH="master"
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
@@ -216,7 +220,7 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/edcdavid/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
@@ -290,6 +294,7 @@ print_time
 # Running Dual NIC BC scenario
 export PTP_TEST_MODE=dualnicbc
 export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
+set_events_output_file
 make functests || temp_status_dnbc=$?
 
 # wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
@@ -301,6 +306,7 @@ print_time
 # Running BC scenario
 export PTP_TEST_MODE=bc
 export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
+set_events_output_file
 make functests || temp_status_bc=$?
 
 # wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
@@ -312,6 +318,7 @@ print_time
 # Running OC scenario
 export PTP_TEST_MODE=oc
 export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
+set_events_output_file
 make functests || temp_status_oc=$?
 
 # get RTC logs

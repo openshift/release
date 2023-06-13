@@ -6,6 +6,11 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+
 mirror_output="${SHARED_DIR}/mirror_output"
 pull_secret_filename="new_pull_secret"
 new_pull_secret="${SHARED_DIR}/${pull_secret_filename}"
@@ -21,6 +26,7 @@ if [ ! -f "${SHARED_DIR}/mirror_registry_url" ]; then
 fi
 MIRROR_REGISTRY_HOST=$(head -n 1 "${SHARED_DIR}/mirror_registry_url")
 echo "MIRROR_REGISTRY_HOST: $MIRROR_REGISTRY_HOST"
+echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}"
 
 readable_version=$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o jsonpath='{.metadata.version}')
 echo "readable_version: $readable_version"

@@ -39,7 +39,8 @@ images:
 - dockerfile_literal: |
     FROM src as rpms
     RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
-    RUN make rpm && TARGET_ARCH=aarch64 make rpm
+    # Disable cgo when cross-compiling because it is not supported.
+    RUN make rpm && TARGET_ARCH=aarch64 CGO_ENABLED=0 make rpm
     RUN tar cvf /rpms.tar -C _output/rpmbuild/RPMS/ .
 
     FROM test-runtime
@@ -123,6 +124,14 @@ tests:
   container:
     from: src
   run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+- as: test-rebase
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)
+  steps:
+    env:
+      DRY_RUN: "y"
+    workflow: openshift-microshift-rebase
 - as: e2e-openshift-conformance-reduced
   cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)

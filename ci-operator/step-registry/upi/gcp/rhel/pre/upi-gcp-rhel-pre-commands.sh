@@ -59,3 +59,9 @@ gcloud compute instances create "$INSTANCE_PREFIX" \
     --subnet "$INSTANCE_PREFIX" \
     --network "$INSTANCE_PREFIX" \
     --hostname "release-ci-${INSTANCE_PREFIX}.openshift-ci.com"
+
+IP_ADDRESS="$(gcloud compute instances describe ${INSTANCE_PREFIX} --format='get(networkInterfaces[0].accessConfigs[0].natIP)')"
+HOST_USER="rhel8user"
+
+echo "${HOST_USER}" > "${SHARED_DIR}/ssh_user"
+echo "${IP_ADDRESS}" > "${SHARED_DIR}/public_address"

@@ -99,6 +99,11 @@ fi
 echo "Choosing openshift version ${OPENSHIFT_VERSION}"
 
 # Switches
+EC2_METADATA_HTTP_TOKENS_SWITCH=""
+if [[ -n "${EC2_METADATA_HTTP_TOKENS}" && "$HOSTED_CP" != "true" ]]; then
+  EC2_METADATA_HTTP_TOKENS_SWITCH="--ec2-metadata-http-tokens ${EC2_METADATA_HTTP_TOKENS}"
+fi
+
 MULTI_AZ_SWITCH=""
 if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
@@ -245,7 +250,7 @@ rosa create cluster -y \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
---ec2-metadata-http-tokens ${EC2_METADATA_HTTP_TOKENS} \
+${EC2_METADATA_HTTP_TOKENS_SWITCH} \
 ${MULTI_AZ_SWITCH} \
 ${COMPUTE_NODES_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
@@ -277,7 +282,7 @@ rosa create cluster -y \
                     --version "${OPENSHIFT_VERSION}" \
                     --channel-group ${CHANNEL_GROUP} \
                     --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
-                    --ec2-metadata-http-tokens "${EC2_METADATA_HTTP_TOKENS}" \
+                    ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
                     ${MULTI_AZ_SWITCH} \
                     ${COMPUTE_NODES_SWITCH} \
                     ${ETCD_ENCRYPTION_SWITCH} \

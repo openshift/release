@@ -1,8 +1,3 @@
-base_images:
-  hypershift-operator:
-    name: "4.12"
-    namespace: ocp
-    tag: hypershift-operator
 build_root:
   image_stream_tag:
     name: release
@@ -21,7 +16,7 @@ images:
     RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
     RUN yum install -y httpd-tools
     RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh
-    RUN curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/latest/download/vcluster-linux-amd64" && install -c -m 0755 vcluster /usr/local/bin && rm -f vcluster
+    RUN curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/download/v0.15.0/vcluster-linux-amd64" && install -c -m 0755 vcluster /usr/local/bin && rm -f vcluster
     RUN vcluster --version && helm version
   from: src
   to: e2e-test-runner
@@ -47,6 +42,7 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
       HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.19-multi
       HYPERSHIFT_NODE_COUNT: "6"
     test:
@@ -86,6 +82,46 @@ tests:
     cluster_profile: aws
     env:
       SCENARIO: ci-10u-10t
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-go
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-go
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-java
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-java
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-nodejs
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-nodejs
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-python
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-python
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-10u-10t-quarkus
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-10u-10t-quarkus
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
 - as: load-test-ci-daily-10u-10t
