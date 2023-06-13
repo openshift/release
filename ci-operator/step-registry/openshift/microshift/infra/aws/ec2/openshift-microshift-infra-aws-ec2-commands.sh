@@ -219,7 +219,11 @@ Resources:
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 6443
-        ToPort: 6443
+        ToPort: 6453
+        CidrIp: 0.0.0.0/0
+      - IpProtocol: tcp
+        FromPort: 7000
+        ToPort: 7010
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 30000
