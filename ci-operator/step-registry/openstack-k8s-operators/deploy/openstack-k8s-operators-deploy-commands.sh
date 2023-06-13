@@ -244,3 +244,6 @@ oc exec -it  pod/mariadb-openstack -- mysql -uroot -p${MARIADB_PASSWD} -e "show 
 # Post tests for keystone-operator
 # Check to confirm you can issue a token.
 openstack token issue
+
+# Dump keystone catalog endpoints
+openstack endpoint list
