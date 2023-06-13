@@ -283,7 +283,7 @@ case "${BOOT_MODE}" in
   ### Create ISO image
   echo -e "\nCreating image..."
   # shellcheck disable=SC2034
-  OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="https://releases-rhcos-devel.apps.ocp-virt.prod.psi.redhat.com/storage/prod/streams/4.14-9.2/builds/414.92.202304250624-0/x86_64/rhcos-414.92.202304250624-0-live.x86_64.iso"
+  OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="<not-valid-image>"
   oinst agent create image
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
