@@ -35,15 +35,18 @@ SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g'
 # Copy base operator code to home directory
 cp -r /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/ ${BASE_DIR}
 
-if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
-  # when testing install_yamls patch, we can skip build process and
-  #  validate using latest openstack-operator tag
-  export IMAGE_TAG_BASE=${DEFAULT_REGISTRY}/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}
-  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:latest
-else
-  export IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${OPENSTACK_OPERATOR}
-  export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
+if [[ -z "$OPENSTACK_OPERATOR_INDEX" ]]; then
+  if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
+    # when testing install_yamls patch, we can skip build process and
+    #  validate using latest openstack-operator tag
+    export IMAGE_TAG_BASE=${DEFAULT_REGISTRY}/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}
+    export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:latest
+  else
+    export IMAGE_TAG_BASE=${PULL_REGISTRY}/${PULL_ORGANIZATION}/${OPENSTACK_OPERATOR}
+    export OPENSTACK_OPERATOR_INDEX=${IMAGE_TAG_BASE}-index:${PR_SHA}
+  fi
 fi
+
 
 if [ ! -d "${BASE_DIR}/install_yamls" ]; then
   cd ${BASE_DIR}
@@ -70,7 +73,7 @@ done
 
 
 # Deploy openstack operator
-make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
+make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false BMO_SETUP=false
 # Wait before start checking all deployment status
 # Not expecting to fail here, only in next deployment checks
 n=0
@@ -96,7 +99,7 @@ make ceph DATA_SIZE=2Gi TIMEOUT=90
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
-make openstack_deploy_prep NETWORK_ISOLATION=false
+make openstack_deploy_prep NETWORK_ISOLATION=false BMO_SETUP=false
 
 cat <<EOF >${BASE_DIR}/install_yamls/out/openstack/openstack/cr/kustomization.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1

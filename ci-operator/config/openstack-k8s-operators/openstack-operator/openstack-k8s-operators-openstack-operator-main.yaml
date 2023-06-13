@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.12"
     namespace: ocp
     tag: cli
   openstack-operator-ci-tempest:
@@ -35,6 +35,11 @@ images:
     RUN pip3 install pre-commit
   from: src
   to: openstack-operator-ci-pre-commit
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -82,6 +87,13 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy-tempest
+- as: openstack-operator-build-deploy-hypershift
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
+      OPENSTACK_OPERATOR_INDEX: quay.io/openstack-k8s-operators/openstack-operator-index:latest
+    workflow: openstack-k8s-operators-test-build-deploy-hypershift
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators
