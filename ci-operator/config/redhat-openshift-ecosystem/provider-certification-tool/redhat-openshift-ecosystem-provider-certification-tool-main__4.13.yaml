@@ -1,4 +1,8 @@
 base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
   upi-installer:
     name: "4.13"
     namespace: ocp
@@ -9,6 +13,22 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.19
+images:
+- dockerfile_literal: |
+    FROM quay.io/ocp-cert/opct-runner:0.0.0-dev.92-5763394953
+    COPY oc /usr/bin/oc
+    COPY openshift-install /usr/bin/openshift-install
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    upi-installer:
+      paths:
+      - destination_dir: .
+        source_path: /bin/openshift-install
+  to: opct-runner
 releases:
   latest:
     release:
@@ -30,17 +50,27 @@ tests:
 - as: platform-none-vsphere
   cron: 0 0 * * 1
   steps:
-    cluster_profile: vsphere-2
-    workflow: opct-test-platform-none-vsphere
-  timeout: 6h0m0s
+    cluster_profile: vsphere
+    workflow: opct-flow-platform-none-vsphere
+  timeout: 4h0m0s
 - as: platform-external-vsphere
   cron: 0 0 * * 1
   steps:
-    cluster_profile: vsphere-2
+    cluster_profile: vsphere
+    workflow: opct-flow-platform-external-vsphere
+  timeout: 4h0m0s
+- as: platform-external-oci
+  cron: 0 0 * * 1
+  steps:
+    cluster_profile: aws
     env:
+      CLUSTER_REGION: us-sanjose-1
+      OPCT_CUSTOM_PLUGIN_IMAGE: openshift-tests-provider-cert:devel
+      OPCT_DOMAIN: splat-oci.devcluster.openshift.com
+      OPCT_SETUP_REGISTRY_LOCAL: "yes"
       PATCH_INFRA_MANIFEST: "true"
-    workflow: opct-test-platform-external-vsphere
-  timeout: 6h0m0s
+    workflow: opct-flow-platform-external-oci
+  timeout: 4h0m0s
 zz_generated_metadata:
   branch: main
   org: redhat-openshift-ecosystem

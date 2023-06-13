@@ -1,0 +1,24 @@
+workflow:
+  as: opct-flow-platform-none-aws
+  steps:
+    pre:
+      - ref: opct-upi-conf-runner-setup
+      - ref: opct-upi-conf-aws
+      - ref: opct-upi-conf-runner
+      - ref: opct-upi-runner-create-all
+      - ref: opct-test-pre-conf-dedicated
+      - ref: opct-test-pre-conf-setup
+      - ref: opct-test-pre-wait-ready
+    test:
+      - ref: opct-test-run
+      - ref: opct-test-results
+    post:
+      - chain: gather
+      - ref: opct-test-post-destroy
+      - ref: opct-upi-runner-destroy-cluster
+    env:
+      PLATFORM_TYPE: none
+      PROVIDER_NAME: aws
+  documentation: |-
+    The Openshift E2E OCI (with platform: External) chain executes the provider certification tool,
+    gather's the results archive, and performs certification namespace teardown.
