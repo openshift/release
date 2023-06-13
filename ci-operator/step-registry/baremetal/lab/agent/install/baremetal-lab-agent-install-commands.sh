@@ -284,6 +284,7 @@ case "${BOOT_MODE}" in
   echo -e "\nCreating image..."
   # shellcheck disable=SC2034
   OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE="<not-valid-image>"
+  echo -e "OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE is: ${OPENSHIFT_INSTALL_OS_IMAGE_OVERRIDE}"
   oinst agent create image
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
