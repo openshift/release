@@ -4,7 +4,7 @@ set -u
 set -e
 set -o pipefail
 
-CLUSTER_URL=$(oc whoami --show-server)
+CLUSTER_URL=$(cat "$SHARED_DIR"/console.url)
 export CLUSTER_URL
 
 ADMIN_PASSWORD=$(cat "$KUBEADMIN_PASSWORD_FILE")
