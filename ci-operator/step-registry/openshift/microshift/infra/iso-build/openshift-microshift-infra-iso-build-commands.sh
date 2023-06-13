@@ -28,9 +28,6 @@ chmod 0755 ~
 mkdir ~/rpms
 tar -xf /tmp/rpms.tar -C ~/rpms
 tar -xf /tmp/microshift.tgz -C ~
-cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
-cp /tmp/ssh-privatekey ~/.ssh/id_rsa
-chmod 0400 ~/.ssh/id_rsa*
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa

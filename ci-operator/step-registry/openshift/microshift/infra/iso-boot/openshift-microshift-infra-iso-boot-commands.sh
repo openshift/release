@@ -7,6 +7,9 @@ IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
 HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
 
+SSH_EXTERNAL_PORT=7000
+API_EXTERNAL_PORT=6443
+
 echo "Using Host $IP_ADDRESS"
 
 mkdir -p "${HOME}/.ssh"
@@ -30,15 +33,20 @@ timeout 5m bash -c "until ssh -oStrictHostKeyChecking=accept-new redhat@\${VMIPA
 cat << EOF2 > /tmp/config.yaml
 apiServer:
   subjectAltNames:
-  - "\${VMIPADDR}"
+  - "${IP_ADDRESS}"
 EOF2
 scp /tmp/config.yaml "redhat@\${VMIPADDR}":/tmp/
 set +e
-ssh "redhat@\${VMIPADDR}" "sudo mv /tmp/config.yaml /etc/microshift/config.yaml; sudo reboot"
+ssh "redhat@\${VMIPADDR}" "sudo mv /tmp/config.yaml /etc/microshift/config.yaml && sudo reboot"
 set -e
-timeout 5m bash -c "until ssh -oStrictHostKeyChecking=accept-new redhat@\${VMIPADDR} 'echo hello'; do sleep 5; done"
+timeout 5m bash -c "until ssh redhat@\${VMIPADDR} 'echo hello'; do sleep 5; done"
 timeout 5m bash -c "date; until ssh redhat@\${VMIPADDR} \"sudo systemctl status greenboot-healthcheck | grep 'active (exited)'\"; do sleep 5; done; date"
-ssh "redhat@\${VMIPADDR}" "sudo cat /var/lib/microshift/resources/kubeadmin/\${VMIPADDR}/kubeconfig" > /tmp/kubeconfig
+
+# Setup external access with port forwarding to allow running commands and tests from the CI container.
+sudo /sbin/iptables -I FORWARD -o virbr0 -p tcp -d \${VMIPADDR} --dport 6443 -j ACCEPT
+sudo /sbin/iptables -t nat -I PREROUTING -p tcp --dport "${API_EXTERNAL_PORT}" -j DNAT --to \${VMIPADDR}:6443
+sudo /sbin/iptables -I FORWARD -o virbr0 -p tcp -d \${VMIPADDR} --dport 22 -j ACCEPT
+sudo /sbin/iptables -t nat -I PREROUTING -p tcp --dport "${SSH_EXTERNAL_PORT}" -j DNAT --to \${VMIPADDR}:22
 EOF
 chmod +x /tmp/boot.sh
 
@@ -46,3 +54,5 @@ scp \
   /tmp/boot.sh \
   "${INSTANCE_PREFIX}:/tmp"
 ssh "${INSTANCE_PREFIX}" "/tmp/boot.sh"
+
+ssh -oStrictHostKeyChecking=accept-new -i ${CLUSTER_PROFILE_DIR}/ssh-privatekey "redhat@${IP_ADDRESS}" -p ${SSH_EXTERNAL_PORT} "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" > ${SHARED_DIR}/kubeconfig
