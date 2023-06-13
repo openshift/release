@@ -13,14 +13,20 @@ ls -la /root/kraken
 git clone https://github.com/redhat-chaos/krkn-hub.git
 pushd krkn-hub/
 
+<<<<<<< HEAD
 echo "kubeconfig loc $$KUBECONFIG"
 echo "Using the flattened version of kubeconfig"
 oc config view --flatten > /tmp/config
 export KUBECONFIG=/tmp/config
+=======
+echo "kubeconfig loc $KUBECONFIG"
+>>>>>>> adding aro files
 
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE
 export ENABLE_ALERTS=False
+
+
 ./prow/container-scenarios/prow_run.sh
 rc=$?
 echo "Finished running container scenarios"
