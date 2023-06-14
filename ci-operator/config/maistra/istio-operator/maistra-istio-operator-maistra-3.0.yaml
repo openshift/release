@@ -139,24 +139,25 @@ tests:
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
+        export GITHUB_TOKEN=$(cat /creds-github/token)
         # login to quay.io in the privileged pod
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           docker login -u='maistra-dev+prow' \
           -p=${QUAY_PASS} quay.io
-        # build and push images
+        # build and push images and publish the bundle into OperatorHub
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
-          sh -c ' \
-          export REPO=quay.io/maistra-dev/istio-ubi9-operator; \
-          export IMAGE=$REPO:3.0-latest; \
-          make -e COMMUNITY=false clean image; \
-          docker tag $IMAGE $REPO:3.0-nightly-`date -I`; \
-          docker push $IMAGE; \
-          docker push $REPO:3.0-nightly-`date -I`'
+          sh -c \
+          "git config --global user.email 'dgrimm@redhat.com'; \
+           git config --global user.name 'Daniel Grimm'; \
+           make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow
+        namespace: test-credentials
+      - mount_path: /creds-github
+        name: workflow-github
         namespace: test-credentials
       env:
       - name: MAISTRA_NAMESPACE
