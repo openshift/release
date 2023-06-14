@@ -10,7 +10,7 @@ OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 RUN_COMMAND="poetry run python app/cli.py addons --cluster ${CLUSTER_NAME} --token ${OCM_TOKEN} --api-host ${API_HOST} --timeout ${TIMEOUT} "
 
 ADDONS_CMD=""
-for i in {1..4}; do
+for i in {1..6}; do
   ADDON_VALUE=$(eval "echo $"ADDON$i"_CONFIG")
   if [[ -n $ADDON_VALUE ]]; then
     ADDONS_CMD+=" --addon ${ADDON_VALUE} "
