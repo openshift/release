@@ -5,6 +5,7 @@ DEFAULT_ORG="openstack-k8s-operators"
 DEFAULT_REGISTRY="quay.io"
 OPENSTACK_OPERATOR="openstack-operator"
 BASE_DIR=${HOME:-"/alabama"}
+NS_SERVICES=${NS_SERVICES:-"openstack"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
@@ -91,7 +92,7 @@ if [[ "$SERVICE_NAME" == "OPENSTACK" ]]; then
   export ${SERVICE_NAME}_CR=/go/src/github.com/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml
 fi
 
-make ceph TIMEOUT=90
+make ceph DATA_SIZE=2Gi TIMEOUT=90
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
@@ -220,10 +221,13 @@ sleep 60
 oc get OpenStackControlPlane openstack -o json | jq -r '.status.conditions[].type' | \
 timeout ${TIMEOUT_SERVICES_READY} xargs -d '\n' -I {} sh -c 'echo testing condition={}; oc wait openstackcontrolplane.core.openstack.org/openstack --for=condition={} --timeout=-1s'
 
+# Basic validations after deploying
+oc project "${NS_SERVICES}"
+
 # Create clouds.yaml file to be used in further tests.
 mkdir -p ~/.config/openstack
 cat > ~/.config/openstack/clouds.yaml << EOF
-$(oc get cm openstack-config -n openstack -o json | jq -r '.data["clouds.yaml"]')
+$(oc get cm openstack-config -o json | jq -r '.data["clouds.yaml"]')
 EOF
 export OS_CLOUD=default
 KEYSTONE_SECRET_NAME=$(oc get keystoneapi keystone -o json | jq -r .spec.secret)
@@ -240,3 +244,6 @@ oc exec -it  pod/mariadb-openstack -- mysql -uroot -p${MARIADB_PASSWD} -e "show 
 # Post tests for keystone-operator
 # Check to confirm you can issue a token.
 openstack token issue
+
+# Dump keystone catalog endpoints
+openstack endpoint list

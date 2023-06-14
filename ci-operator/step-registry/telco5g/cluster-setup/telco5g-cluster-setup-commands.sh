@@ -25,9 +25,12 @@ echo "==========  Running with KCLI_PARAM=$KCLI_PARAM =========="
 # Set environment for jobs to run
 INTERNAL=true
 INTERNAL_ONLY=true
-# Run cnftests job on Upstream cluster
-if [[ "$T5CI_JOB_TYPE" == "cnftests" ]]; then
+# Run cnftests periodic and nightly job on Upstream cluster
+if [[ "$T5_JOB_TRIGGER" == "periodic" ]] || [[ "$T5_JOB_TRIGGER" == "nightly" ]]; then
     INTERNAL=false
+    INTERNAL_ONLY=false
+else
+    # Run other jobs on any cluster
     INTERNAL_ONLY=false
 fi
 # Whether to use the bastion environment
@@ -49,12 +52,23 @@ EOF
 ADDITIONAL_ARG=""
 # default to the first cluster in the array, unless 4.14
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
-  ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force" 
-  if [[ "$T5CI_VERSION" == "4.14" ]]; then 
-    ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
-  fi 
+    ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
+    if [[ "$T5CI_VERSION" == "4.14" ]]; then
+        ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
+    fi
 else
-  ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
+    ADDITIONAL_ARG="-e $CL_SEARCH --exclude ${PREPARED_CLUSTER[0]} --exclude ${PREPARED_CLUSTER[1]}"
+fi
+# Choose topology for different job types:
+# Run periodic cnftests job with 2 baremetal nodes (with all CNF tests)
+# Run nightly periodic jobs with 1 baremetal and 1 virtual node (with origin tests)
+# Run sno job with SNO topology
+if [[ "$T5CI_JOB_TYPE"  == "cnftests" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 2b"
+elif [[ "$T5CI_JOB_TYPE"  == "origintests" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology 1b1v"
+elif [[ "$T5CI_JOB_TYPE"  == "sno" ]]; then
+    ADDITIONAL_ARG="$ADDITIONAL_ARG --topology sno"
 fi
 
 cat << EOF > $SHARED_DIR/get-cluster-name.yml
@@ -255,9 +269,41 @@ cat << EOF > $SHARED_DIR/check-cluster.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'"
     register: ready_check
 
+  - name: Grab the kcli log from installer
+    shell: >-
+      kcli scp root@${CLUSTER_NAME}-installer:/var/log/cloud-init-output.log /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+    ignore_errors: true
+
+  - name: Grab the log from HV to artifacts
+    fetch:
+      src: /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+      dest: ${ARTIFACT_DIR}/cloud-init-output.log
+      flat: yes
+    ignore_errors: true
+
+  - name: Show last logs from cloud init if failed
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer 'tail -100 /var/log/cloud-init-output.log'
+    when: "'True' not in ready_check.stdout"
+    ignore_errors: true
+
   - name: Fail when cluster is not available
     shell: "echo Cluster ready: {{ ready_check.stdout }}"
     failed_when: "'True' not in ready_check.stdout"
+EOF
+
+cat << EOF > $SHARED_DIR/destroy-cluster.yml
+---
+- name: Delete cluster
+  hosts: hypervisor
+  gather_facts: false
+  tasks:
+
+  - name: Delete deployment plan
+    shell: kcli delete plan -y ${PLAN_NAME}
+    args:
+      chdir: ~/kcli-openshift4-baremetal
+
 EOF
 
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.

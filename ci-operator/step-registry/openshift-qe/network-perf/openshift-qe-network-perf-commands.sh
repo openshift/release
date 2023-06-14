@@ -14,9 +14,13 @@ source ./venv_qe/bin/activate
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
-git clone https://github.com/cloud-bulldozer/e2e-benchmarking
-pushd e2e-benchmarking/workloads/network-perf
+git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
+pushd e2e-benchmarking/workloads/network-perf-v2
 
+# Clean up resources from possible previous tests.
+oc delete ns netperf --wait=true --ignore-not-found=true
+
+# Only store the results from the full run versus the smoke test.
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-./run.sh
+WORKLOAD=full-run.yaml ./run.sh

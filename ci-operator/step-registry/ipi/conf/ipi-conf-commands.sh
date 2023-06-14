@@ -49,3 +49,10 @@ if [ -n "${PUBLISH}" ]; then
 publish: ${PUBLISH}
 EOF
 fi
+
+if [ -n "${FEATURE_SET}" ]; then
+        echo "Adding 'featureSet: ...' to install-config.yaml"
+        cat >> "${out}" << EOF
+featureSet: ${FEATURE_SET}
+EOF
+fi

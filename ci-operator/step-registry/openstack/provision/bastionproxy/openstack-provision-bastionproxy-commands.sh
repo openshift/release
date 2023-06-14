@@ -5,10 +5,6 @@ set -o errexit
 set -o pipefail
 
 if [[ "$CONFIG_TYPE" != *"proxy"* ]]; then
-    if [[ "$ZONES_COUNT" != "0" ]]; then
-      echo "ZONES_COUNT was set to '${ZONES_COUNT}', although CONFIG_TYPE was not set to 'proxy'."
-      exit 1
-    fi
     echo "Skipping step due to CONFIG_TYPE not matching proxy."
     exit 0
 fi
@@ -39,31 +35,17 @@ MACHINES_SUBNET_ID=$(<"${SHARED_DIR}"/MACHINES_SUBNET_ID)
 OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPENSTACK_EXTERNAL_NETWORK")}"
 BASTION_FLAVOR="${BASTION_FLAVOR:-$(<"${SHARED_DIR}/BASTION_FLAVOR")}"
 BASTION_USER=${BASTION_USER:-cloud-user}
-ZONES=$(<"${SHARED_DIR}"/ZONES)
-
-mapfile -t ZONES < <(printf ${ZONES}) >/dev/null
-MAX_ZONES_COUNT=${#ZONES[@]}
-
-if [[ ${ZONES_COUNT} -gt ${MAX_ZONES_COUNT} ]]; then
-  echo "Too many zones were requested: ${ZONES_COUNT}; only ${MAX_ZONES_COUNT} are available: ${ZONES[*]}"
-  exit 1
-fi
-
-if [[ "${ZONES_COUNT}" == "0" ]]; then
-  ZONES_ARGS=""
-elif [[ "${ZONES_COUNT}" == "1" ]]; then
-  for ((i=0; i<${MAX_ZONES_COUNT}; ++i )) ; do
-    ZONES_ARGS+="--availability-zone ${ZONES[$i]} "
-  done
-else
-  # For now, we only support a cluster within a single AZ.
-  # This will change in the future.
-  echo "Wrong ZONE_COUNT, can only be 0 or 1, got ${ZONES_COUNT}"
-  exit 1
-fi
-
 API_IP=$(<"${SHARED_DIR}"/API_IP)
 INGRESS_IP=$(<"${SHARED_DIR}"/INGRESS_IP)
+
+if [[ -f "${SHARED_DIR}/squid-credentials.txt" ]]; then
+    echo "A proxy job that has squid-credentials already will need a public floating IP to work in CI, overriding OPENSTACK_EXTERNAL_NETWORK to be the public proxy network."
+    OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK}-proxy"
+    if ! openstack network show "${OPENSTACK_EXTERNAL_NETWORK}" >/dev/null; then
+	echo "ERROR: External network for the proxy does not exist: ${OPENSTACK_EXTERNAL_NETWORK}"
+	exit 1
+    fi 
+fi
 
 if ! openstack image show $BASTION_IMAGE >/dev/null; then
 		echo "ERROR: Bastion image does not exist: $BASTION_IMAGE"
@@ -93,7 +75,7 @@ if [[ "$CONFIG_TYPE" == *"externallb"* ]]; then
 fi
 >&2 echo "Created necessary security group rules in ${sg_id}"
 
-server_params=" --image $BASTION_IMAGE --flavor $BASTION_FLAVOR $ZONES_ARGS \
+server_params=" --image $BASTION_IMAGE --flavor $BASTION_FLAVOR \
   --security-group $sg_id --key-name bastionproxy-${CLUSTER_NAME}-${CONFIG_TYPE}"
 
 if [[ -f ${SHARED_DIR}"/BASTION_NET_ID" ]]; then

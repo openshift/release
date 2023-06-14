@@ -7,7 +7,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-test-0.3.57
+    tag: stackrox-test-0.3.59
 releases:
   latest:
     release:
@@ -25,7 +25,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      TEST_SUITE: openshift-newest-qa-e2e-tests
+      TEST_SUITE: ocp-qa-e2e-tests
     test:
     - ref: stackrox-e2e
     workflow: ipi-aws
@@ -35,7 +35,17 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      TEST_SUITE: openshift-4-operator-e2e-tests
+      TEST_SUITE: ocp-operator-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: sensor-integration-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: ocp-sensor-integration-tests
     test:
     - ref: stackrox-e2e
     workflow: ipi-aws
@@ -55,8 +65,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      QA_TEST_TARGET: test
-      TEST_SUITE: openshift-newest-qa-e2e-tests
+      TEST_SUITE: ocp-qa-e2e-tests
     test:
     - ref: stackrox-e2e
     workflow: ipi-aws
@@ -66,7 +75,17 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      TEST_SUITE: openshift-4-operator-e2e-tests
+      TEST_SUITE: ocp-operator-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: merge-ui-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: ocp-ui-e2e-tests
     test:
     - ref: stackrox-e2e
     workflow: ipi-aws

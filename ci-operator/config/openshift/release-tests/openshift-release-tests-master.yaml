@@ -1,0 +1,30 @@
+build_root:
+  image_stream_tag:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
+images:
+- dockerfile_path: prow/Dockerfile
+  from: root
+  to: job-python3
+promotion:
+  namespace: ci
+  tag: master
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+test_binary_build_commands: job --help
+tests:
+- as: stable-build-test
+  cron: 0 * * * *
+  steps:
+    test:
+    - ref: api-job
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: release-tests

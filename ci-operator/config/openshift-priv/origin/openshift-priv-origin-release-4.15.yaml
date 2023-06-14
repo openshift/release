@@ -11,14 +11,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.14
   tools:
     name: 4.15-priv
     namespace: ocp-private
@@ -31,19 +27,16 @@ images:
 - dockerfile_path: images/tests/Dockerfile.rhel
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: hello-openshift
 promotion:
   name: 4.15-priv
@@ -375,18 +368,27 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-etcd-scaling
+- as: e2e-aws-etcd-recovery
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-etcd-recovery
 - always_run: false
   as: e2e-gcp-ovn-techpreview
   optional: true
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
-    workflow: openshift-e2e-gcp-techpreview
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp
 - always_run: false
   as: e2e-gcp-ovn-techpreview-serial
   optional: true
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
-    workflow: openshift-e2e-gcp-techpreview
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

@@ -23,6 +23,19 @@ images:
 - dockerfile_path: dev/Dockerfile
   from: base
   to: cincinnati-graph-data-container
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.14"
+  thirteen:
+    release:
+      channel: candidate
+      version: "4.13"
+  twelve:
+    release:
+      channel: candidate
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -40,7 +53,7 @@ tests:
   commands: make unit-test
   container:
     from: src
-- as: operator-e2e
+- as: operator-e2e-410
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -54,7 +67,7 @@ tests:
       cli: latest
       commands: |
         make func-test \
-        RELATED_IMAGE_OPERAND=quay.io/app-sre/cincinnati@sha256:921b7a2e579d4cfe0e58ecf3abcc2262b321b6d0f8be7f6ebcb700acfca5ba55 \
+        RELATED_IMAGE_OPERAND=registry.redhat.io/openshift-update-service/openshift-update-service-rhel8@sha256:0e67daa2313ac7695b53de468ca0a540988befe1dfa5c9036eb05e21fd9f107a \
         OPENSHIFT_BUILD_NAMESPACE=
       dependencies:
       - env: OPERATOR_IMAGE
@@ -69,7 +82,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: operator-e2e-latest-osus
+- as: operator-e2e-latest-osus-410
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -97,6 +110,212 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
+- as: operator-e2e-411
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        RELATED_IMAGE_OPERAND=registry.redhat.io/openshift-update-service/openshift-update-service-rhel8@sha256:0e67daa2313ac7695b53de468ca0a540988befe1dfa5c9036eb05e21fd9f107a \
+        OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:cincinnati-graph-data-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: operator-e2e-latest-osus-411
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make func-test OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: graphdata
+      - env: RELATED_IMAGE_OPERAND
+        name: cincinnati_operand_latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
+- as: operator-e2e-412
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:twelve
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        RELATED_IMAGE_OPERAND=registry.redhat.io/openshift-update-service/openshift-update-service-rhel8@sha256:0e67daa2313ac7695b53de468ca0a540988befe1dfa5c9036eb05e21fd9f107a \
+        OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:cincinnati-graph-data-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: operator-e2e-latest-osus-412
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:twelve
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make func-test OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: graphdata
+      - env: RELATED_IMAGE_OPERAND
+        name: cincinnati_operand_latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: operator-e2e-413
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:thirteen
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        RELATED_IMAGE_OPERAND=registry.redhat.io/openshift-update-service/openshift-update-service-rhel8@sha256:0e67daa2313ac7695b53de468ca0a540988befe1dfa5c9036eb05e21fd9f107a \
+        OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:cincinnati-graph-data-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: operator-e2e-latest-osus-413
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:thirteen
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make func-test OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: graphdata
+      - env: RELATED_IMAGE_OPERAND
+        name: cincinnati_operand_latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: operator-e2e-414
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: |
+        make func-test \
+        RELATED_IMAGE_OPERAND=registry.redhat.io/openshift-update-service/openshift-update-service-rhel8@sha256:0e67daa2313ac7695b53de468ca0a540988befe1dfa5c9036eb05e21fd9f107a \
+        OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: pipeline:cincinnati-graph-data-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
+- as: operator-e2e-latest-osus-414
+  steps:
+    allow_best_effort_post_steps: true
+    cluster_profile: aws-2
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: make func-test OPENSHIFT_BUILD_NAMESPACE=
+      dependencies:
+      - env: OPERATOR_IMAGE
+        name: pipeline:cincinnati-operator
+      - env: RELATED_IMAGE_OPERATOR
+        name: pipeline:cincinnati-operator
+      - env: GRAPH_DATA_IMAGE
+        name: graphdata
+      - env: RELATED_IMAGE_OPERAND
+        name: cincinnati_operand_latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: master
   org: openshift

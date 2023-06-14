@@ -43,18 +43,10 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: cli
-  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
-  rhel-7:
-    name: builder
-    namespace: ocp
-    tag: rhel-7-golang-1.16-openshift-4.10
+    tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -62,39 +54,33 @@ images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: rhel-7
+- dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+  from: base
   inputs:
     ocp_4.10_cli:
       as:
       - registry.ci.openshift.org/ocp/4.10:cli
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   from: base
@@ -102,32 +88,23 @@ images:
     ocp_4.14_cli:
       as:
       - registry.ci.openshift.org/ocp/4.14:cli
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: ovirt-installer
 - dockerfile_literal: |
     FROM src
@@ -203,6 +180,9 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
+test_binary_build_commands: |
+  # Some agent-based installer tests require nmstatectl
+  dnf install -y nmstate
 tests:
 - as: unit
   commands: |
@@ -210,7 +190,7 @@ tests:
     go tool cover -o $ARTIFACT_DIR/cover.txt -func /tmp/coverprofile.out
     go tool cover -o $ARTIFACT_DIR/cover.html -html /tmp/coverprofile.out
   container:
-    from: src
+    from: test-bin
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: aro-unit
   commands: go test ./pkg/... -tags=aro
@@ -498,7 +478,7 @@ tests:
     workflow: openshift-e2e-openstack-proxy
   timeout: 6h0m0s
 - always_run: false
-  as: e2e-openstack-externallb-techpreview
+  as: e2e-openstack-externallb
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
@@ -515,6 +495,12 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
+  timeout: 6h0m0s
+- as: e2e-vsphere-static-ovn
+  optional: true
+  steps:
+    cluster_profile: vsphere-8
+    workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
@@ -556,13 +542,6 @@ tests:
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
-  timeout: 6h0m0s
-- as: e2e-ovirt-sdn
-  optional: true
-  run_if_changed: ovirt
-  steps:
-    cluster_profile: ovirt
-    workflow: openshift-e2e-ovirt-minimal
   timeout: 6h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true

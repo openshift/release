@@ -9,12 +9,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -115,6 +115,78 @@ tests:
           memory: 200Mi
     workflow: ipi-gcp-single-node
   timeout: 8h0m0s
+- as: win10-pipeline-example-test
+  run_if_changed: (^data/tekton-pipelines/.*|^data/tekton-tasks/.*|^internal/tekton-bundle/.*|^internal/operands/tekton-pipelines/.*|^internal/operands/tekton-tasks/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win10-pipeline-example-test
+      commands: export TARGET=windows10 && ./automation/e2e-tekton/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win11-pipeline-example-test
+  run_if_changed: (^data/tekton-pipelines/.*|^data/tekton-tasks/.*|^internal/tekton-bundle/.*|^internal/operands/tekton-pipelines/.*|^internal/operands/tekton-tasks/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      commands: export TARGET=windows11 && ./automation/e2e-tekton/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win2k22-pipeline-example-test
+  run_if_changed: (^data/tekton-pipelines/.*|^data/tekton-tasks/.*|^internal/tekton-bundle/.*|^internal/operands/tekton-pipelines/.*|^internal/operands/tekton-tasks/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      commands: export TARGET=windows2k22 && ./automation/e2e-tekton/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: master
   org: kubevirt

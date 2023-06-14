@@ -30,16 +30,23 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-- as: api-update-istio-2.4
+- as: api-update-istio-2-4
   commands: |
-    ./maistra/run-test-infra-script.sh ./tools/automator.sh \
-    -o maistra \
-    -f /creds-github/github-token \
-    -r istio \
-    -c UPDATE_BRANCH=$AUTOMATOR_SHA bin/update_maistra_deps.sh \
-    '-t Automator: Update maistra/api dependency' \
-    -m update_api_istio \
-    -b maistra-2.4
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio \
+      -f /creds-github/token \
+      "-c UPDATE_BRANCH=${PULL_BASE_SHA} bin/update_maistra_deps.sh" \
+      '-t [maistra-2.4] Automator: Update maistra/api dependency' \
+      -m update_api_istio-2.4 \
+      -b maistra-2.4
   container:
     from: src
   postsubmit: true

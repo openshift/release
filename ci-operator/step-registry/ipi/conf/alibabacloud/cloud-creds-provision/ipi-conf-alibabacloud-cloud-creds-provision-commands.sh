@@ -9,6 +9,11 @@ MPREFIX="${SHARED_DIR}/manifest"
 cluster_id="${NAMESPACE}-${JOB_NAME_HASH}"
 export ALIBABA_CLOUD_CREDENTIALS_FILE="${SHARED_DIR}/alibabacreds.ini"
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+
 # extract ccoctl from the release image
 oc registry login
 # extract alibabacloud credentials requests from the release image

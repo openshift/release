@@ -101,7 +101,7 @@ option rfc3442-classless-static-routes code 121 = array of unsigned integer 8;
 send host-name = gethostname();
 request subnet-mask, broadcast-address, time-offset, host-name,
         netbios-name-servers, netbios-scope, interface-mtu,
-        rfc3442-classless-static-routes, ntp-servers;
+        ntp-servers;
 
 # Assuming eth1 will be the interface with the default gateway route
 interface "eth1" {

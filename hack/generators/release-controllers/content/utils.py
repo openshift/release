@@ -41,11 +41,6 @@ def get_rc_volume_mounts():
             'readOnly': True
         },
         {
-            'mountPath': '/etc/bugzilla',
-            'name': 'bugzilla',
-            'readOnly': True
-        },
-        {
             'mountPath': '/etc/jira',
             'name': 'jira',
             'readOnly': True
@@ -119,12 +114,27 @@ def get_rc_volumes(context):
                     },
                     {
                         'configMap': {
+                            'name': 'job-config-main-periodics'
+                        }
+                    },
+                    {
+                        'configMap': {
                             'name': 'job-config-master-postsubmits'
                         }
                     },
                     {
                         'configMap': {
+                            'name': 'job-config-main-postsubmits'
+                        }
+                    },
+                    {
+                        'configMap': {
                             'name': 'job-config-master-presubmits'
+                        }
+                    },
+                    {
+                        'configMap': {
+                            'name': 'job-config-main-presubmits'
                         }
                     },
                     {
@@ -156,13 +166,6 @@ def get_rc_volumes(context):
             'secret': {
                 'defaultMode': 420,
                 'secretName': 'github-credentials-openshift-merge-robot'
-            }
-        },
-        {
-            'name': 'bugzilla',
-            'secret': {
-                'defaultMode': 420,
-                'secretName': 'bugzilla-credentials-openshift-bugzilla-robot'
             }
         },
         {

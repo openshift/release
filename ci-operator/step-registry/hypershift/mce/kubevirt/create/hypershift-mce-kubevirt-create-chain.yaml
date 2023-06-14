@@ -7,6 +7,9 @@ chain:
         - name: HYPERSHIFT_NODE_COUNT
           default: "3"
           documentation: "The number nodes to automatically create and join to the cluster."
+        - name: ENABLE_ICSP
+          default: "false"
+          documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_iscp.yaml)"
       commands: |-
         set -exuo pipefail
 
@@ -22,6 +25,15 @@ chain:
 
         CLUSTER_NAMESPACE=local-cluster-${CLUSTER_NAME}
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+        
+        PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
+        ICSP_COMMAND=""
+        if [[ $ENABLE_ICSP == "true" ]]; then
+          ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_iscp.yaml")
+          echo "extract secret/pull-secret"
+          oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+          PULL_SECRET_PATH="/tmp/.dockerconfigjson"
+        fi
       
         # Enable wildcard routes on the management cluster
         oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
@@ -29,7 +41,7 @@ chain:
 
 
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-        /tmp/hypershift create cluster kubevirt \
+        /tmp/hypershift create cluster kubevirt ${ICSP_COMMAND} \
           --name ${CLUSTER_NAME} \
           --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
           --memory 16Gi \

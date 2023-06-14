@@ -35,7 +35,7 @@ declare -A compute_flavor=(
 	)
 
 declare -A compute_azs=(
-	['openstack-kuryr']=''
+	['openstack-kuryr']='az0'
 	['openstack-vexxhost']=''
         ['openstack-operators-vexxhost']=''
 	['openstack-vh-mecha-central']=''
@@ -45,7 +45,7 @@ declare -A compute_azs=(
 	)
 
 declare -A bastion_flavor=(
-	['openstack-kuryr']=''
+	['openstack-kuryr']='m1.small'
 	['openstack-vexxhost']='1vcpu_2gb'
         ['openstack-operators-vexxhost']='ci.m1.small'
 	['openstack-vh-mecha-central']='m1.small'

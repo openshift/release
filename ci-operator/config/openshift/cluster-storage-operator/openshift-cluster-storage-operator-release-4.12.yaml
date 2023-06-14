@@ -104,9 +104,11 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - ref: csi-driver-shared-resource-e2e
-    workflow: csi-driver-shared-resource-e2e-techpreview
+    workflow: csi-driver-shared-resource-e2e-test
 - as: e2e-openstack
   optional: true
   steps:
@@ -125,10 +127,14 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-hypershift-ovn-conformance
+- as: hypershift-aws-e2e-external
   optional: true
   steps:
-    workflow: hypershift-aws-conformance
+    workflow: hypershift-aws-e2e-external
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.12
   org: openshift

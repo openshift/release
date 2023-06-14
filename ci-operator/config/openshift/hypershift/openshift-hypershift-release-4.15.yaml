@@ -60,7 +60,7 @@ releases:
       relative: 1
       stream: ci
       version: "4.13"
-  hosted-ocp-previous:
+  initial:
     candidate:
       product: ocp
       stream: ci
@@ -99,6 +99,15 @@ tests:
   skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     workflow: hypershift-aws-e2e-nested
+- as: e2e-kubevirt-aws-ovn
+  steps:
+    cluster_profile: aws
+    env:
+      CNV_PRERELEASE_VERSION: "4.13"
+      COMPUTE_NODE_REPLICAS: "1"
+      COMPUTE_NODE_TYPE: c5n.metal
+      ETCD_STORAGE_CLASS: gp3-csi
+    workflow: hypershift-kubevirt-e2e
 - as: e2e-aws-4-12
   optional: true
   steps:
@@ -143,16 +152,6 @@ tests:
       TEST_TYPE: main
       VERIFY_COMPLIANCE_OPERATOR_SCAN: "true"
     workflow: hypershift-ibmcloud-e2e
-- as: e2e-kubevirt-aws-ovn
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      CNV_PRERELEASE_VERSION: "4.13"
-      COMPUTE_NODE_REPLICAS: "1"
-      COMPUTE_NODE_TYPE: c5n.metal
-      CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
-    workflow: hypershift-kubevirt-e2e
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

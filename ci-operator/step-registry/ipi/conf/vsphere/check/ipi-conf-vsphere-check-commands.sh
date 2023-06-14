@@ -46,7 +46,7 @@ if [ ${LEASE_NUMBER} -ge 200 ]; then
   vsphere_url="vcenter.ibmc.devcluster.openshift.com"
   vsphere_datacenter="IBMCdatacenter"
   cloud_where_run="IBM8"
-  dns_server="10.177.56.78"
+  dns_server="192.168.${LEASE_NUMBER}.1"
   vsphere_resource_pool="/IBMCdatacenter/host/IBMCcluster/Resources/ipi-ci-clusters"
   vsphere_cluster="IBMCcluster"
   vsphere_datastore="vsanDatastore"

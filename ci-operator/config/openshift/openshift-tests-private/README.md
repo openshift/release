@@ -32,3 +32,32 @@ Job frequency is defined by cron according to the priority of a job (subject to 
 - f4: every 4 days
 - f5: every 5 days
 - ...
+
+
+# Trigger a new test for an existing periodic job in Prow
+Navigate to the app.ci console URL (For URL, search 'prow' in BitWarden). After logging in (via SSO) to this cluster using the console, use the link in the top right “Copy login command” to get your token.
+Run the specific periodic job you want using REST API.
+```
+TOKEN='sha256~the_token_you_get_from_above'
+GANGWAY_API='https://gangway***.com' # For API URL, search 'prow' in BitWarden
+JOB_NAME='replace-me-eg-periodic-ci-openshift-openshift-tests-private-release-4.14-amd64-nightly-gcp-ipi-sdn-migration-ovn-p2-f7'
+$ curl -X POST -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${TOKEN}" "${GANGWAY_API}/v1/executions/${JOB_NAME}"
+{
+ "id": "d7c56195-428f-4217-aab0-6f95b2f2e763",
+ "job_name": "periodic-ci-openshift-openshift-tests-private-release-4.14-amd64-nightly-gcp-ipi-sdn-migration-ovn-p2-f7",
+ "job_type": "PERIODIC",
+ "job_status": "TRIGGERED",
+ "gcs_path": ""
+}
+```
+You should be able to find the triggered job in QE PRIVATE DECK (search 'prow' in BitWarden for the URL) via job name.
+
+If you would like to run the tests on a specific payload,
+```
+# for E2E testing,
+$ curl -X POST -d '{"job_execution_type": "1", "pod_spec_options": { "envs":  {"RELEASE_IMAGE_LATEST": "quay.io/openshift-release-dev/ocp-release:4.14.0-ec.1-x86_64"} } }' -H "Authorization: Bearer ${TOKEN}" "${GANGWAY_API}/v1/executions/${JOB_NAME}"
+# for upgrade testing,
+JOB_NAME='replace-me-eg-periodic-ci-openshift-openshift-tests-private-release-4.14-amd64-nightly-4.14-upgrade-from-stable-4.13-aws-ipi-network-mtu-localzone-p2-f14'
+$ curl -X POST -d '{"job_execution_type": "1", "pod_spec_options": { "envs":  {"RELEASE_IMAGE_LATEST": "quay.io/openshift-release-dev/ocp-release:4.13.2-x86_64", "RELEASE_IMAGE_TARGET": "quay.io/openshift-release-dev/ocp-release:4.14.0-ec.1-x86_64"} } }' -H "Authorization: Bearer ${TOKEN}" "${GANGWAY_API}/v1/executions/${JOB_NAME}"
+```
+You can use `-v` option for curl to see detailed information about the request as well as error message.

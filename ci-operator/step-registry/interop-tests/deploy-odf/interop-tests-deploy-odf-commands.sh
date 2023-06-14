@@ -71,48 +71,28 @@ oc label nodes cluster.ocs.openshift.io/openshift-storage='' \
 
 # Create StorageCluster
 cat <<EOF | oc apply -f -
-kind: StorageCluster
 apiVersion: ocs.openshift.io/v1
+kind: StorageCluster
 metadata:
   name: ocs-storagecluster
-  namespace: $ODF_INSTALL_NAMESPACE
+  namespace: openshift-storage
 spec:
-  resources:
-    mon:
-      requests:
-        cpu: "0"
-        memory: "0"
-    mgr:
-      requests:
-        cpu: "0"
-        memory: "0"
-  monDataDirHostPath: /var/lib/rook
-  managedResources:
-    cephFilesystems:
-      reconcileStrategy: ignore
-    cephObjectStores:
-      reconcileStrategy: ignore
-  multiCloudGateway:
-    reconcileStrategy: ignore
   storageDeviceSets:
-    - name: ocs-deviceset
-      count: 3
-      dataPVCTemplate:
-        spec:
-          storageClassName: $ODF_BACKEND_STORAGE_CLASS
-          accessModes:
-            - ReadWriteOnce
-          resources:
-            requests:
-              storage: $ODF_VOLUME_SIZE
-          volumeMode: Block
-      placement: {}
-      portable: false
-      replica: 1
-      resources:
-        requests:
-          cpu: "0"
-          memory: "0"
+  - count: 1
+    dataPVCTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+        storageClassName: gp2-csi
+        volumeMode: Block
+    name: ocs-deviceset
+    placement: {}
+    portable: true
+    replica: 3
+    resources: {}
 EOF
 
 # Wait for StorageCluster to be deployed

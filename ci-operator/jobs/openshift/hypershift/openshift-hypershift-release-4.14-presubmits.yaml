@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws
     decorate: true
     labels:
@@ -60,7 +60,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-4-12
     decorate: true
     labels:
@@ -115,7 +115,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-4-13
     decorate: true
     labels:
@@ -170,7 +170,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-metrics
     decorate: true
     labels:
@@ -225,7 +225,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-conformance
     decorate: true
     labels:
@@ -280,7 +280,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-ibmcloud-iks
     decorate: true
     labels:
@@ -336,7 +336,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-ibmcloud-roks
     decorate: true
     labels:
@@ -401,7 +401,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-hypershift-release-4.14-e2e-kubevirt-aws-ovn
-    optional: true
     rerun_command: /test e2e-kubevirt-aws-ovn
     spec:
       containers:
@@ -465,7 +464,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -513,7 +512,59 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
+    context: ci/prow/mce-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: mce
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-hypershift-release-4.14-mce-images
+    optional: true
+    rerun_command: /test mce-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=mce
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )mce-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.14$
+    - ^release-4\.14-
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -561,7 +612,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build05
+    cluster: build03
     context: ci/prow/verify
     decorate: true
     labels:

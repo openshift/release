@@ -25,7 +25,7 @@
             expr: 'rate(release_controller_bugzilla_errors_total[5m]) > 0',
             labels: {
               severity: 'critical',
-              team: 'release-controller',
+              team: 'crt',
             },
             annotations: {
               message: 'Release-controller has reported errors in bugzilla verification.'
@@ -41,7 +41,7 @@
             expr: 'rate(release_controller_jira_errors_total[5m]) > 0',
             labels: {
               severity: 'critical',
-              team: 'release-controller',
+              team: 'crt',
             },
             annotations: {
               message: 'Release-controller has reported errors in jira verification.'

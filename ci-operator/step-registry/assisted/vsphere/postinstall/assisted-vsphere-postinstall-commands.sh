@@ -15,8 +15,13 @@ ssh -F ${SHARED_DIR}/ssh_config "root@ci_machine" "find \${KUBECONFIG} -type f -
 oc get nodes
 
 # Backup
-oc get secret vsphere-creds -o yaml -n kube-system > creds_backup.yaml
-oc get cm cloud-provider-config -o yaml -n openshift-config > cloud-provider-config_backup.yaml
+echo "Getting vsphere-creds and cloud-provider-config"
+oc get secret vsphere-creds -o yaml -n kube-system > vsphere-creds.yaml
+oc get cm cloud-provider-config -o yaml -n openshift-config > cloud-provider-config.yaml
+
+
+version=$(oc version | grep -oE 'Server Version: ([0-9]+\.[0-9]+)' | sed 's/Server Version: //')
+
 
 cat <<EOF | oc replace -f -
 apiVersion: v1
@@ -34,26 +39,38 @@ EOF
 
 oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$( date --rfc-3339=ns )"'"}}' --type=merge
 
-cat <<EOF | oc apply -f -
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cloud-provider-config
-  namespace: openshift-config
-data:
-  config: |
-    [Global]
-    secret-name = "vsphere-creds"
-    secret-namespace = "kube-system"
-    insecure-flag = "1"
-    [Workspace]
-    server = "${VSPHERE_VCENTER}"
-    datacenter = "${VSPHERE_DATACENTER}"
-    default-datastore = "${VSPHERE_DATASTORE}"
-    folder = "${VSPHERE_FOLDER}"
-    [VirtualCenter "${VSPHERE_VCENTER}"]
-    datacenters = "${VSPHERE_DATACENTER}"
-EOF
+
+echo "Applying changes on cloud-provider-config"
+oc get cm cloud-provider-config -o yaml -n openshift-config > cloud-provider-config.yaml
+sed -i -e "s/vcenterplaceholder/${VSPHERE_VCENTER}/g" \
+       -e "s/datacenterplaceholder/${VSPHERE_DATACENTER}/g" \
+       -e "s/clusterplaceholder\/\/Resources/${VSPHERE_CLUSTER}\/Resources/g" \
+       -e "s/clusterplaceholder/${VSPHERE_CLUSTER}/g" \
+       -e "s/defaultdatastoreplaceholder/${VSPHERE_DATASTORE}/g" \
+       -e "s/networkplaceholder/${VSPHERE_NETWORK}/g" \
+       -e "s/folderplaceholder/${VSPHERE_FOLDER}/g" cloud-provider-config.yaml
+
+cat cloud-provider-config.yaml
+oc apply -f cloud-provider-config.yaml
+
+# Do the following if OCP version is >=4.13
+if [[ $(echo -e "4.13\n$version" | sort -V | tail -n 1) == "$version" ]]; then
+  echo "Found OCP version $version"
+    # Taint the nodes with the uninitialized taint
+    nodes=$(oc get nodes -o wide | awk '{print $1}' | tail -n +2)
+    for NODE in $nodes; do
+      oc adm taint node "$NODE" node.cloudprovider.kubernetes.io/uninitialized=true:NoSchedule
+    done
+      oc get infrastructures.config.openshift.io -o yaml > infrastructures.config.openshift.io.yaml
+      sed -i -e "s/vcenterplaceholder/${VSPHERE_VCENTER}/g" \
+       -e "s/datacenterplaceholder/${VSPHERE_DATACENTER}/g" \
+       -e "s/clusterplaceholder\/\/Resources/${VSPHERE_CLUSTER}\/Resources/g" \
+       -e "s/clusterplaceholder/${VSPHERE_CLUSTER}/g" \
+       -e "s/defaultdatastoreplaceholder/${VSPHERE_DATASTORE}/g" \
+       -e "s/networkplaceholder/${VSPHERE_NETWORK}/g" \
+       -e "s/folderplaceholder/${VSPHERE_FOLDER}/g" infrastructures.config.openshift.io.yaml
+      oc apply -f infrastructures.config.openshift.io.yaml --overwrite=true
+fi
 
 oc patch clusterversion version --type json -p '[{"op": "remove", "path": "/spec/channel"}]}]'
 

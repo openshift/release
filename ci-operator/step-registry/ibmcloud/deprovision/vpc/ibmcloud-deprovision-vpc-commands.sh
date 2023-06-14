@@ -13,17 +13,12 @@ function run_command() {
 
 # IBM Cloud CLI login
 function ibmcloud_login {
-  echo "Try to login..."
-  "${IBMCLOUD_CLI}" login -r ${LEASED_RESOURCE} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
-}
-
-function checkCli() {
   export IBMCLOUD_CLI=ibmcloud
-  export IBMCLOUD_HOME=/output  
-  echo "check IBMCLOUD_CLI: ${IBMCLOUD_CLI}..."  
-  command -v "${IBMCLOUD_CLI}"
-  "${IBMCLOUD_CLI}" --version
-  "${IBMCLOUD_CLI}" plugin list
+  export IBMCLOUD_HOME=/output
+  region="${LEASED_RESOURCE}"
+  export region
+  echo "Try to login..."
+  "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
 
 function run_command_with_retries() {
@@ -91,19 +86,14 @@ function delete_vpc() {
   run_command "${IBMCLOUD_CLI} is vpcd -f ${vpc_name}"
 }
 
-# ibmcloud should already be there
-checkCli
-
 ibmcloud_login
-
-region="${LEASED_RESOURCE}"
 
 vpc_name=$(cat "${SHARED_DIR}/ibmcloud_vpc_name")
 
 resource_group=$(cat "${SHARED_DIR}/ibmcloud_resource_group")
 echo "Using region: ${region}  resource_group: ${resource_group} vpc: ${vpc_name}"
 
-"${IBMCLOUD_CLI}" target -g ${resource_group} -r ${region}
+"${IBMCLOUD_CLI}" target -g ${resource_group}
 
 echo "DEBUG" "Removing the vpc ${vpc_name} ..."
 delete_vpc "${vpc_name}"

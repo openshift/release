@@ -1,8 +1,8 @@
 base_images:
   base:
-    name: "4.13"
-    namespace: ocp
-    tag: base
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.19-openshift-4.13
   elasticsearch-operator:
     name: "5.7"
     namespace: logging
@@ -55,7 +55,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
 images:
 - from: base
   to: cluster-logging-operator
@@ -99,12 +99,15 @@ tests:
   commands: make lint
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: unit
   commands: ARTIFACTS_DIR=${ARTIFACT_DIR} make coverage
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   timeout: 15m0s
 - as: e2e-target
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     test:
@@ -155,6 +158,7 @@ tests:
     timeout: 1h0m0s
     version: "4.12"
   optional: true
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -204,6 +208,7 @@ tests:
     timeout: 1h0m0s
     version: "4.11"
   optional: true
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -252,6 +257,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.12"
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -286,6 +292,7 @@ tests:
     workflow: generic-claim
 - as: functional-target
   optional: true
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
     test:

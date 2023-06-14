@@ -157,8 +157,9 @@ oc adm release extract ${RELEASE_IMAGE_LATEST} --credentials-requests --cloud=aw
 echo "Extracted CR files:"
 ls $cr_yaml_d
 
-annotation="TechPreviewNoUpgrade"
-remove_tech_preview_feature_from_manifests ${cr_yaml_d} ${annotation} || exit 1
+if [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/manifest_feature_gate.yaml ]]; then
+  remove_tech_preview_feature_from_manifests "${cr_yaml_d}" "TechPreviewNoUpgrade" || exit 1
+fi
 
 credentials_requests_files=`mktemp`
 ls ${cr_yaml_d} > ${credentials_requests_files}

@@ -1,0 +1,186 @@
+base_images:
+  openshift_release_golang-1.18:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+  os:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make code/compile COMPILE_TARGET="./build/_output/bin/integreatly-operator"
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- dockerfile_path: build/Dockerfile
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/src/github.com/integr8ly/integreatly-operator/build
+  to: integreatly-operator
+- dockerfile_path: Dockerfile.osde2e
+  from: os
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: integreatly-operator-test-harness-osde2e
+- dockerfile_path: Dockerfile.functional
+  from: os
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: integreatly-operator-test-harness
+- dockerfile_path: Dockerfile.scorecard
+  from: os
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: scorecard-test-kuttl
+- dockerfile_path: Dockerfile.external
+  from: os
+  inputs:
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: integreatly-operator-test-external
+promotion:
+  name: mgdapi-5727-obo
+  namespace: integr8ly
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 250Mi
+  unit:
+    requests:
+      cpu: 200m
+      memory: 2Gi
+tests:
+- as: vendor
+  commands: make vendor/check
+  container:
+    from: src
+- as: unit
+  commands: make test/unit
+  container:
+    from: src
+- as: format
+  commands: make code/check
+  container:
+    from: src
+- as: gosec
+  commands: make gosec
+  container:
+    from: src
+- as: test-cases-lint
+  commands: make test-cases/lint
+  container:
+    from: src
+  run_if_changed: test-cases/.*
+- as: kubebuilder
+  commands: make kubebuilder/check
+  container:
+    from: src
+- as: rhoam-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  optional: true
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: make test/e2e/rhoam/prow
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: integreatly-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: multitenant-rhoam-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  optional: true
+  steps:
+    test:
+    - as: test
+      cli: latest
+      commands: make test/e2e/multitenant-rhoam/prow
+      dependencies:
+      - env: IMAGE_FORMAT
+        name: integreatly-operator
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: manifest
+  commands: make manifest/check
+  container:
+    from: src
+- as: versions
+  commands: make versions/check
+  container:
+    from: src
+  run_if_changed: pkg/apis/integreatly/v1alpha1/rhmi_types.go
+- as: commits
+  commands: make commits/check
+  container:
+    from: src
+- as: coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  secret:
+    mount_path: /tmp/secret
+    name: integreatly-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: integreatly-operator-codecov-token
+- as: lint
+  commands: GOLANGCI_LINT_CACHE=/tmp/golangci-cache make test/lint
+  container:
+    from: src
+- as: scripts
+  commands: make test/scripts
+  container:
+    from: src
+zz_generated_metadata:
+  branch: mgdapi-5727-obo
+  org: integr8ly
+  repo: integreatly-operator

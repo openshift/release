@@ -60,6 +60,8 @@ FILTER=gzip queue ${ARTIFACT_DIR}/daemonsets.json.gz oc --insecure-skip-tls-veri
 queue ${ARTIFACT_DIR}/oc_cmds/daemonsets oc --insecure-skip-tls-verify --request-timeout=5s get daemonsets --all-namespaces -o wide
 queue ${ARTIFACT_DIR}/events.json oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/events oc --insecure-skip-tls-verify --request-timeout=5s get events --all-namespaces
+queue ${ARTIFACT_DIR}/featuregate.json oc --insecure-skip-tls-verify --request-timeout=5s get featuregate -o json
+queue ${ARTIFACT_DIR}/oc_cmds/featuregate oc --insecure-skip-tls-verify --request-timeout=5s get featuregate
 queue ${ARTIFACT_DIR}/kubeapiserver.json oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver -o json
 queue ${ARTIFACT_DIR}/oc_cmds/kubeapiserver oc --insecure-skip-tls-verify --request-timeout=5s get kubeapiserver
 queue ${ARTIFACT_DIR}/kubecontrollermanager.json oc --insecure-skip-tls-verify --request-timeout=5s get kubecontrollermanager -o json
@@ -254,6 +256,11 @@ if [[ -n "${prometheus}" ]]; then
 else
 	echo "Unable to find a Prometheus pod to snapshot."
 fi
+
+echo "Adding debug tools link to sippy for intervals"
+cat >> ${SHARED_DIR}/custom-links.txt << EOF
+<a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+EOF
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.
 # Load whatever timestamps we can, generate the metrics script, and then send it to the

@@ -2,15 +2,6 @@
 
 set -o nounset
 set -o pipefail
-
-
-# Make sure jq is installed
-if ! command -v jq; then
-    # TODO move to image
-    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /tmp/jq
-    chmod +x /tmp/jq
-fi
-
 set -o errexit
 
 
@@ -63,20 +54,16 @@ function command_retry {
     return 1
 }
 
-function checkCli() {
-  export IBMCLOUD_CLI=ibmcloud
-  export IBMCLOUD_HOME=/output  
-  echo "check IBMCLOUD_CLI: ${IBMCLOUD_CLI}..."
-  command -v ${IBMCLOUD_CLI}
-  ${IBMCLOUD_CLI} --version
-  ${IBMCLOUD_CLI} plugin list
-}
-
 # IBM Cloud CLI login
 function ibmcloud_login {
-    echo "Try to login..."
-    "${IBMCLOUD_CLI}" login -r ${LEASED_RESOURCE} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  export IBMCLOUD_CLI=ibmcloud
+  export IBMCLOUD_HOME=/output
+  region="${LEASED_RESOURCE}"
+  export region
+  echo "Try to login..."
+  "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
+
 
 # Gather load-balancer resources
 function gather_lb_resources {
@@ -161,8 +148,6 @@ function gather_resources {
     gather_cos
     gather_cis
 }
-
-checkCli
 
 ibmcloud_login
 

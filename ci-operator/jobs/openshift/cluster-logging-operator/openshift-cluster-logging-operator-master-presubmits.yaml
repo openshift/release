@@ -5,14 +5,13 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build03
     context: ci/prow/ci-index-cluster-logging-operator-bundle
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-logging-operator-master-ci-index-cluster-logging-operator-bundle
     rerun_command: /test ci-index-cluster-logging-operator-bundle
@@ -51,11 +50,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )ci-index-cluster-logging-operator-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-ocp-target-minus-one
     decorate: true
     decoration_config:
@@ -63,11 +62,11 @@ presubmits:
       timeout: 5h0m0s
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-logging-operator-master-e2e-ocp-target-minus-one
     optional: true
     rerun_command: /test e2e-ocp-target-minus-one
+    skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -117,11 +116,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ocp-target-minus-one,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build03
     context: ci/prow/e2e-ocp-target-minus-two
     decorate: true
     decoration_config:
@@ -129,11 +128,11 @@ presubmits:
       timeout: 5h0m0s
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-logging-operator-master-e2e-ocp-target-minus-two
     optional: true
     rerun_command: /test e2e-ocp-target-minus-two
+    skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -183,24 +182,24 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ocp-target-minus-two,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/e2e-target
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-logging-operator-master-e2e-target
     rerun_command: /test e2e-target
+    skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -249,12 +248,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -263,21 +258,21 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-target,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build03
     context: ci/prow/functional
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-logging-operator-master-functional
     rerun_command: /test functional
+    skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -327,24 +322,24 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )functional,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build01
     context: ci/prow/functional-target
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: gcp
-      ci-operator.openshift.io/cloud-cluster-profile: gcp
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-logging-operator-master-functional-target
     optional: true
     rerun_command: /test functional-target
+    skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -393,12 +388,8 @@ presubmits:
         secret:
           secretName: ci-pull-credentials
       - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-gcp
-          - configMap:
-              name: cluster-profile-gcp
+        secret:
+          secretName: cluster-secrets-aws
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -411,14 +402,13 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-logging-operator-master-images
     rerun_command: /test images
@@ -461,14 +451,13 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build03
     context: ci/prow/lint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-logging-operator-master-lint
     rerun_command: /test lint
@@ -511,7 +500,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -519,7 +508,6 @@ presubmits:
       timeout: 15m0s
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-cluster-logging-operator-master-unit
     rerun_command: /test unit

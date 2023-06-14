@@ -1,0 +1,62 @@
+base_images:
+  operator-base:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make manager
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: operator-base
+  to: machine-deletion-remediation-operator
+operator:
+  bundles:
+  - as: machine-deletion-remediation-bundle
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/medik8s/machine-deletion-remediation-operator:latest
+    with: pipeline:machine-deletion-remediation-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-machine-deletion-remediation-bundle
+    env:
+      OO_CHANNEL: candidate
+      OO_INSTALL_NAMESPACE: mdr-install
+      OO_PACKAGE: machine-deletion-remediation
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: main
+  org: medik8s
+  repo: machine-deletion-remediation
+  variant: "4.14"

@@ -24,12 +24,42 @@ tests:
 - as: ocp-qe-perfscale-ci-tests
   cron: 29 5 */1 * 1-5
   steps:
-    cluster_profile: gcp
+    cluster_profile: gcp-qe
+    env:
+      WORKER_REPLICA_COUNT: "5"
     post:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-ocp-qe-perfscale-ci-tests
+- as: ocp-qe-perfscale-router-perf-gcp
+  cron: 0 9 * * 4
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      WORKER_REPLICA_COUNT: "5"
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-router-perf
+- as: ocp-qe-perfscale-node-density-heavy-gcp
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      WORKER_REPLICA_COUNT: "5"
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-node-density-heavy
 zz_generated_metadata:
   branch: main
   org: openshift-qe

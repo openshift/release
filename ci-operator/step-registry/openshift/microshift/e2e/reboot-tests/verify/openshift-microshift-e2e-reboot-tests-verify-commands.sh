@@ -27,39 +27,27 @@ Host ${INSTANCE_PREFIX}
   HostName ${IP_ADDRESS}
   IdentityFile ${CLUSTER_PROFILE_DIR}/ssh-privatekey
   StrictHostKeyChecking accept-new
-  ServerAliveInterval 30
-  ServerAliveCountMax 1200
 EOF
 chmod 0600 "${HOME}"/.ssh/config
 
-timeout=1200 # 20 minute wait.  
+# Steps may not be used more than once in a test, so this block duplicates the behavior of wait-for-ssh for reboot tests.
+timeout=300 # 5 minute wait.
+>&2 echo "Polling ssh connectivity before proceeding.  Timeout=$timeout second"
 start=$(date +"%s")
-until ssh "${INSTANCE_PREFIX}" 'true'; do
-  if (( $(date +"%s") - start >= timeout )); then
-    echo "timed out out waiting for ssh connection" >&2
+until ssh "${INSTANCE_PREFIX}" 'sudo systemctl start microshift';
+do
+  if (( $(date +"%s") - $start >= $timeout )); then
+    echo "timed out out waiting for MicroShift to start" >&2
     exit 1
   fi
+  echo "waiting for MicroShift to start"
+  sleep 5
 done
 >&2 echo "It took $(( $(date +'%s') - start)) seconds to connect via ssh"
 
-cat > "${HOME}"/wait_for_pod_ready.sh <<'EOF'
-#!/bin/bash
-set -euo pipefail
+ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
 
-echo "block until microshift is ready (according to systemd)"
-echo "give extra time for api server to update status of the pods"
-echo "(immediatelly after reboot, it thinks they're all Running, but it's out of date)"
-set -x
-systemctl start microshift
-
-export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig
-echo "waiting 180s to accomodate for slow kubelet actions with topolvm pvc after reboot"
-oc wait --for=condition=Ready --timeout=180s pod/test-pod
-EOF
-chmod +x "${HOME}"/wait_for_pod_ready.sh
-scp "${HOME}"/wait_for_pod_ready.sh "${INSTANCE_PREFIX}":~/wait_for_pod_ready.sh
-
-if ! ssh "${INSTANCE_PREFIX}" 'sudo ~/wait_for_pod_ready.sh'; then
+if ! oc wait --kubeconfig=/tmp/kubeconfig --for=condition=Ready --timeout=120s pod/test-pod; then
   scp /microshift/validate-microshift/cluster-debug-info.sh "${INSTANCE_PREFIX}":~
   ssh "${INSTANCE_PREFIX}" 'export KUBECONFIG=/var/lib/microshift/resources/kubeadmin/kubeconfig; sudo -E ~/cluster-debug-info.sh'
   exit 1

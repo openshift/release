@@ -31,12 +31,10 @@ fi
 case "${PIPELINE_STAGE}" in
     dev)
         ;;
-    edge)
-        ;;
     integration)
         ;;
     *)
-        log "ERROR Invalid PIPELINE_STAGE $PIPELINE_STAGE must be dev, edge, or integration."
+        log "ERROR Invalid PIPELINE_STAGE $PIPELINE_STAGE must be dev or integration."
         exit 1
         ;;
 esac
@@ -178,22 +176,7 @@ fi
 # Trim "release-" prefix.
 release=${release#release-}
 
-# Based on release, stomp on PIPELINE_STAGE since we changed defaults midstream in 2.5
-log "PIPELINE_STAGE=${PIPELINE_STAGE}"
-if [[ $release = "2.0" ]]; then
-  PIPELINE_STAGE="edge"
-elif [[ $release = "2.1" ]]; then
-  PIPELINE_STAGE="edge"
-elif [[ $release = "2.2" ]]; then
-  PIPELINE_STAGE="edge"
-elif [[ $release = "2.3" ]]; then
-  PIPELINE_STAGE="edge"
-elif [[ $release = "2.4" ]]; then
-  PIPELINE_STAGE="edge"
-else
-  PIPELINE_STAGE=${PIPELINE_STAGE:-"dev"}
-fi
-log "Based on release ${release}, setting your PIPELINE_STAGE to: $PIPELINE_STAGE"
+PIPELINE_STAGE=${PIPELINE_STAGE:-"dev"}
 
 # Get pipeline branch.
 pipeline_branch="${release}-${PIPELINE_STAGE}"
@@ -801,13 +784,14 @@ deploy() {
         fi
 
         # Get MCH name
-        KUBECONFIG="$_kc" oc -n $NAMESPACE get multiclusterhub -o name > mch_name 2> >(tee -a "$_log") || {
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get multiclusterhub -o name 2> >(tee -a "$_log") > mch_name || {
             logf "$_log" "WARN Deploy $_cluster: Error getting MCH name. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
 
         # Check that MCH name isn't empty
         _mch_name=$(cat mch_name)
+        logf "$_log" "Deploy $_cluster: Found MCH name '$_mch_name'"
         if [[ -z "$_mch_name" ]]; then
             logf "$_log" "WARN Deploy $_cluster: MCH not created yet. Will retry (${_elapsed}/${_timeout}s)"
             continue
@@ -815,13 +799,18 @@ deploy() {
 
         # Get MCH status
         KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_mch_name" \
-            -o json > mch.json 2> >(tee -a "$_log") || {
+            -o json 2> >(tee -a "$_log") > mch.json || {
             logf "$_log" "WARN Deploy $_cluster: Error getting MCH status. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
 
         # Check MCH status
-        _mch_status=$(jq -r .status.phase mch.json 2> >(tee -a "$_log"))
+        jq -r '.status.phase' mch.json 2> >(tee -a "$_log") >/dev/null || {
+            logf "$_log" "WARN Encountered unexpected error parsing MCH JSON. Will retry (${_elapsed}/${_timeout}s)"
+            continue
+        }
+
+        _mch_status=$(jq -r '.status.phase' mch.json 2> >(tee -a "$_log"))
         if [[ "$_mch_status" == "Running" ]]; then
             logf "$_log" "Deploy $_cluster: MCH CR is ready after ${_elapsed}s"
             break
@@ -873,6 +862,7 @@ deploy_with_timeout() {
             break
         fi
     done
+    log "Deploy $_cluster: Deployment pid $_pid exited (${_elapsed}/${_timeout}s)"
 }
 
 # Function to gracefully terminate deployments if main script exits
@@ -898,7 +888,6 @@ done
 trap _exit EXIT
 
 # Wait for deployments to finish.
-log "Waiting for ${#waitgroup[@]} deployment(s)."
 wait "${waitgroup[@]}"
 
 # Done waiting. Disable EXIT trap.

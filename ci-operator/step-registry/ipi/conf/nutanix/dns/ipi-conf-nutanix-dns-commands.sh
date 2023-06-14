@@ -42,6 +42,8 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
             --output text)"
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
+# api-int record is needed just for Windows nodes
+# TODO: Remove the api-int entry in future
 echo "$(date -u --rfc-3339=seconds) - Creating DNS records ..."
 cat > "${SHARED_DIR}"/dns-create.json <<EOF
 {
@@ -50,6 +52,14 @@ cat > "${SHARED_DIR}"/dns-create.json <<EOF
     "Action": "UPSERT",
     "ResourceRecordSet": {
       "Name": "api.${cluster_domain}.",
+      "Type": "A",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "${API_VIP}"}]
+      }
+    },{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+      "Name": "api-int.${cluster_domain}.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${API_VIP}"}]
@@ -67,6 +77,8 @@ EOF
 
 echo "$(date -u --rfc-3339=seconds) - Creating batch file to destroy DNS records"
 
+# api-int record is needed for Windows nodes
+# TODO: Remove the api-int entry in future
 cat > "${SHARED_DIR}"/dns-delete.json <<EOF
 {
 "Comment": "Delete public OpenShift DNS records for Nutanix IPI CI install",
@@ -74,6 +86,14 @@ cat > "${SHARED_DIR}"/dns-delete.json <<EOF
     "Action": "DELETE",
     "ResourceRecordSet": {
       "Name": "api.${cluster_domain}.",
+      "Type": "A",
+      "TTL": 60,
+      "ResourceRecords": [{"Value": "${API_VIP}"}]
+      }
+    },{
+    "Action": "DELETE",
+    "ResourceRecordSet": {
+      "Name": "api-int.${cluster_domain}.",
       "Type": "A",
       "TTL": 60,
       "ResourceRecords": [{"Value": "${API_VIP}"}]

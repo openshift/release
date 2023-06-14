@@ -1,0 +1,69 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-rosa-4.12-nightly
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-qe-perfscale-ci-tests-rosa-network-perf
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "4.12"
+    test:
+    - chain: openshift-qe-network-perf
+    workflow: rosa-aws-sts
+- as: ocp-qe-perfscale-ci-tests-rosa-cluster-density
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "4.12"
+    test:
+    - ref: openshift-qe-cluster-density
+    workflow: rosa-aws-sts
+- as: ocp-qe-perfscale-ci-tests-rosa-cluster-density-v2
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "4.12"
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    workflow: rosa-aws-sts
+- as: ocp-qe-perfscale-ci-tests-rosa-node-density
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "4.12"
+      PODS_PER_NODE: "100"
+    test:
+    - ref: openshift-qe-node-density
+    workflow: rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: rosa-4.12-nightly

@@ -4,8 +4,6 @@ set -o errexit
 set -o nounset
 set -o pipefail
 
-SINGLE_NODE_AZURE_INSTANCE_TYPE="Standard_D32s_v3"
-
 echo "Updating install-config.yaml to a single ${SINGLE_NODE_AZURE_INSTANCE_TYPE} control plane node and 0 workers"
 
 pip3 install pyyaml --user
