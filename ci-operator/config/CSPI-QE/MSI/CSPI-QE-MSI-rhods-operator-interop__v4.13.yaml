@@ -1,4 +1,8 @@
 base_images:
+  addon-test-rhods:
+    name: ods-ci
+    namespace: ci
+    tag: latest
   cli:
     name: "4.13"
     namespace: ocp
@@ -27,23 +31,28 @@ tests:
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      CLUSTER_NAME: "ods-all-op-413"
-      OPENSHIFT_VERSION: "4.13"
-      COMPUTE_MACHINE_TYPE: "g4dn.2xlarge"
-      REPLICAS: "2"
       ADDON1_CONFIG: "managed-odh|notification-email=interop-qe-ms@redhat.com"
+      CLUSTER_NAME: "ods-all-op-413"
+      COMPUTE_MACHINE_TYPE: "g4dn.2xlarge"
+      OPENSHIFT_VERSION: "4.13"
       OPERATOR1_CONFIG: "gpu-operator|namespace=nvidia-gpu-operator"
       OPERATOR2_CONFIG: "servicemeshoperator"
       OPERATOR3_CONFIG: "serverless-operator|namespace=openshift-serverless"
       OPERATOR4_CONFIG: "openshift-pipelines-operator-rh|namespace=openshift-operators"
       OPERATOR5_CONFIG: "nfd|namespace=openshift-nfd"
+      REPLICAS: "2"
     post:
-      - operator-uninstall
-      - addon-uninstall
-      - rosa-aws-sts-deprovision
+    - ref: operator-uninstall
+    - ref: addon-uninstall
+    - chain: rosa-aws-sts-deprovision
     pre:
-      - rosa-aws-sts-provision
-      - addon-install
-      - operator-install
+    - chain: rosa-aws-sts-provision
+    - ref: addon-install
+    - ref: operator-install
     test:
-      - addon-test-rhods
+    - ref: addon-test-rhods
+zz_generated_metadata:
+  branch: rhods-operator-interop
+  org: CSPI-QE
+  repo: MSI
+  variant: v4.13
