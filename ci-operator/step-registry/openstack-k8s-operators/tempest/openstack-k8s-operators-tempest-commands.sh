@@ -34,7 +34,9 @@ tempest init openshift
 pushd ~/tempest/openshift
 
 TEMPEST_CONF_OVERRIDES=${TEMPEST_CONF_OVERRIDES:-}
-discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create identity.v3_endpoint_type public ${TEMPEST_CONF_OVERRIDES}
+
+discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create \
+identity.v3_endpoint_type public ${TEMPEST_CONF_OVERRIDES}
 
 # Generate skiplist and allow list
 ORG="openstack-k8s-operators"
