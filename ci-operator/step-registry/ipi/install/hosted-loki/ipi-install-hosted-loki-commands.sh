@@ -224,6 +224,7 @@ data:
         regex: __meta_kubernetes_pod_label_(.+)
     server:
       http_listen_port: 3101
+      log_level: warn
     target_config:
       sync_period: 10s
 EOF
