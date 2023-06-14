@@ -193,27 +193,37 @@ data:
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
-    - job_name: events
+    - job_name: kubernetes-events
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
       - cri: {}
       - match:
-          selector: '{namespace!="openshift-e2e-loki"}'
+          selector: '{podnamespace!="openshift-e2e-loki"}'
           action: drop
       - match:
           selector: '{app!="event-exporter"}'
           action: drop
+      - json: 
+          expressions:
+            metadata:
+      - json:
+          expressions:
+            namespace:
+          source: metadata
+      - labels:
+          namespace:
+      - static_labels:
+          type: kube-event
       - labelallow:
           - invoker
           - type
-      - static_labels:
-          type: kube-event
+          - namespace
       relabel_configs:
       - action: replace
         source_labels:
         - __meta_kubernetes_namespace
-        target_label: namespace
+        target_label: podnamespace
       - replacement: "/var/log/pods/*\$1/*.log"
         separator: "/"
         source_labels:
