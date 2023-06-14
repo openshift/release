@@ -199,7 +199,10 @@ data:
       pipeline_stages:
       - cri: {}
       - match:
-          selector: '{namespace!="openshift-e2e-loki", app!="event-exporter"}'
+          selector: '{namespace!="openshift-e2e-loki"}'
+          action: drop
+      - match:
+          selector: '{app!="event-exporter"}'
           action: drop
       - labelallow:
           - invoker
