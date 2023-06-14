@@ -7,13 +7,13 @@ set -o verbose
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-RUN_COMMAND="poetry run python app/cli.py operator --kubeconfig ${KUBECONFIG} --timeout ${TIMEOUT} "
+RUN_COMMAND="poetry run python app/cli.py operators --kubeconfig ${KUBECONFIG} --timeout ${TIMEOUT} "
 
 OPERATORS_CMD=""
 for i in {1..6}; do
   OPERATOR_VALUE=$(eval "echo $"OPERATOR$i"_CONFIG")
   if [[ -n $OPERATOR_VALUE ]]; then
-    OPERATORS_CMD+=" --operators ${OPERATOR_VALUE} "
+    OPERATORS_CMD+=" --operator ${OPERATOR_VALUE} "
   fi
 done
 
