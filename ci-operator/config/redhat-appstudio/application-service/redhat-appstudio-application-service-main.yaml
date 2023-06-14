@@ -1,3 +1,8 @@
+base_images:
+  hypershift-operator:
+    name: "4.12"
+    namespace: ocp
+    tag: hypershift-operator
 build_root:
   image_stream_tag:
     name: redhat-appstudio
@@ -23,13 +28,13 @@ tests:
 - as: application-service-e2e
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
     dependencies:
       COMPONENT_IMAGE: redhat-appstudio-has-image
     env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
       HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.19-multi
-      HYPERSHIFT_NODE_COUNT: "4"
+      HYPERSHIFT_INSTANCE_TYPE: m5.2xlarge
+      HYPERSHIFT_NODE_COUNT: "2"
     test:
     - ref: redhat-appstudio-e2e
     workflow: redhat-appstudio-install
