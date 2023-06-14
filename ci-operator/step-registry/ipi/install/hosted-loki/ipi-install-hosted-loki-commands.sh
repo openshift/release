@@ -199,7 +199,10 @@ data:
       pipeline_stages:
       - cri: {}
       - match:
-          selector: '{namespace!="openshift-e2e-loki", app!="event-exporter"}'
+          selector: '{namespace!="openshift-e2e-loki"}'
+          action: drop
+      - match:
+          selector: '{app!="event-exporter"}'
           action: drop
       - labelallow:
           - invoker
@@ -221,6 +224,7 @@ data:
         regex: __meta_kubernetes_pod_label_(.+)
     server:
       http_listen_port: 3101
+      log_level: warn
     target_config:
       sync_period: 10s
 EOF
