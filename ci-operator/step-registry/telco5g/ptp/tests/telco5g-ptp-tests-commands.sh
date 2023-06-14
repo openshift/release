@@ -333,7 +333,7 @@ if [[ $temp_status_dnbc != 0 || $temp_status_bc != 0 || $temp_status_oc != 0 ]];
   status=1
 fi
 
-# allows commands to fail without returning 
+# allows commands to fail without returning
 set +e
 
 # clean up, undeploy ptp-operator
@@ -357,6 +357,9 @@ python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_oc.xml -o 
 # merge junit files in to one
 junitparser merge ${ARTIFACT_DIR}/test_results_*xml ${ARTIFACT_DIR}/test_results_all.xml && \
 cp ${ARTIFACT_DIR}/test_results_all.xml ${ARTIFACT_DIR}/junit.xml
+
+# Create JSON reports for robots
+python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/test_results_all.xml -o ${ARTIFACT_DIR}/test_results.json
 
 # delete original separate junit files
 #rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/test_results_*xml
