@@ -26,7 +26,7 @@ USHIFT_HOST: ${IP_ADDRESS}
 USHIFT_USER: ${HOST_USER}
 SSH_PRIV_KEY: ${CLUSTER_PROFILE_DIR}/ssh-privatekey
 EOF
-/microshift/test/run.sh -o ${ARTIFACT_DIR} -i /tmp/variables.yaml -v /tmp/venv
+/go/src/github.com/openshift/microshift/test/run.sh -o ${ARTIFACT_DIR} -i /tmp/variables.yaml -v /tmp/venv
 
 # Bash e2e tests
 firewall::open_port() {
@@ -40,4 +40,4 @@ firewall::close_port() {
 export -f firewall::open_port
 export -f firewall::close_port
 
-USHIFT_IP="${IP_ADDRESS}" USHIFT_USER="${HOST_USER}" /microshift/e2e/main.sh run
+USHIFT_IP="${IP_ADDRESS}" USHIFT_USER="${HOST_USER}" /go/src/github.com/openshift/microshift/e2e/main.sh run
