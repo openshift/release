@@ -41,10 +41,18 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre-stableinitial
     test:
     - as: set-releases-release
-      commands: echo "${RELEASE_IMAGE_INTERMEDIATE} ${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/perfscale-override-upgrade
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/perfscale-override-upgrade
       dependencies:
       - env: RELEASE_IMAGE_INTERMEDIATE
         name: release:intermediate

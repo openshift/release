@@ -4,8 +4,8 @@ set -o nounset
 set -o pipefail
 set -x
 cat /etc/os-release
-#oc config view
-#oc projects
+oc config view
+oc projects
 pushd /tmp
 python3 --version
 python3 -m venv venv3
@@ -16,7 +16,7 @@ pip3 install -U datetime pyyaml
 pip3 list
 
 RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
-#CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
+CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
     echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
@@ -52,4 +52,4 @@ EUS_UPGRADE=${EUS_UPGRADE:=false}
 EUS_CHANNEL=${EUS_CHANNEL:="fast"} #fast,eus,candidate,stable
 echo TARGET_RELEASES is $TARGET_RELEASES
 ./upgrade.sh $TARGET_RELEASES -f $ENABLE_FORCE -s $SCALE -u $MAX_UNAVAILABLE -e $EUS_UPGRADE -c $EUS_CHANNEL
-
+sleep 3600
