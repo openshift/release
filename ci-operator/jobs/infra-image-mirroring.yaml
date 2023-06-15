@@ -960,6 +960,7 @@ periodics:
   labels:
     ci.openshift.io/area: supplemental-ci-private-images-redhat
     ci.openshift.io/role: infra
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-image-mirroring-supplemental-ci-private-images-redhat
   spec:
     containers:
@@ -969,8 +970,8 @@ periodics:
         set -o errexit
         failures=0
         for mapping in /etc/imagemirror/mapping_supplemental_ci_private_images_redhat_*; do
-          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes"
-          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes; then
+          echo "Running: oc image mirror -f=$mapping --skip-multiple-scopes --force=true"
+          if ! oc image mirror --keep-manifest-list -f="$mapping" --skip-multiple-scopes --force=true; then
             echo "ERROR: Failed to mirror images from $mapping"
             failures=$((failures+1))
           fi
