@@ -213,6 +213,13 @@ data:
           source: metadata
       - labels:
           namespace:
+      # We've extracted the namespace label, but we'll drop it if it's not an openshift namespace
+      # to limit cardinality. These events will still be logged, just not with a namespace label.
+      - match: 
+          selector: '{namespace!~"openshift-.*"}'
+          stages:
+          - labeldrop: 
+            - namespace
       - static_labels:
           type: kube-event
       - labelallow:
