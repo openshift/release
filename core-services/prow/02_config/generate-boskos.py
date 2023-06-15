@@ -184,6 +184,9 @@ CONFIG = {
     },
     'vsphere-quota-slice':{},
     'vsphere-8-quota-slice':{},
+    'vsphere-ibm-7-quota-slice':{
+        'default': 5
+    },
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
     'vsphere-connected-quota-slice':{},
