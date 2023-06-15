@@ -16,7 +16,7 @@ pip3 install -U datetime pyyaml
 pip3 list
 
 RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
-CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
+#CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
     echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
