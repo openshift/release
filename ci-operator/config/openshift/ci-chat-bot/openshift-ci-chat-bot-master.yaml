@@ -11,6 +11,10 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
+  sonar:
+    name: sonar-scanner-alpine
+    namespace: brawilli
+    tag: latest
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -53,6 +57,15 @@ tests:
   commands: make test
   container:
     from: src
+- as: sonar
+  commands: SONAR_TOKEN=$(cat /tmp/secret/TOKEN) SONAR_SCANNER_OPTS="-Dsonar.projectBaseDir=/home/prow/go/src/github.com/openshift/ci-chat-bot
+    -Dsonar.working.directory=/tmp/.scannerwork" sonar-scanner -X
+  container:
+    from: sonar
+  optional: true
+  secret:
+    mount_path: /tmp/secret
+    name: openshift-crt-sonar-token
 zz_generated_metadata:
   branch: master
   org: openshift
