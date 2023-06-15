@@ -14,16 +14,27 @@ pip3 --version
 pip3 install --upgrade pip
 pip3 install -U datetime pyyaml
 pip3 list
-#ES_PASSWORD=$(cat "/secret/password")
-#ES_USERNAME=$(cat "/secret/username")
+
 RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
+CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
+
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
     echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
     exit 1
 fi
-CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
-OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
-TARGET_RELEASES="$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --output=json | jq -r '.metadata.version')"
+TARGET_RELEASES=""
+if [[ -s "${SHARED_DIR}/perfscale-override-upgrade" ]]; then
+      ALL_IMAGES="$(< "${SHARED_DIR}/perfscale-override-upgrade")" &&
+      echo "Overriding upgrade target to ${ALL_IMAGES}"
+      for IMAGE in $ALL_IMAGES
+      do
+	      RELEASES_VERSION+=(`oc adm release info "${IMAGE}" --output=json | jq -r '.metadata.version'`)
+      done
+      TARGET_RELEASES=$(echo ${RELEASES_VERSION[@]}| tr -s ' ' ',')
+else
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
+      TARGET_RELEASES="$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --output=json | jq -r '.metadata.version')"
+fi
 echo  "-------------------------------------------------------------------------------------------"
 echo  Loaded Upgrade from [ $CURRENT_VERSION ] to [ $TARGET_RELEASES ]
 echo  "-------------------------------------------------------------------------------------------"
@@ -38,8 +49,6 @@ SCALE=${SCALE:=false}
 MAX_UNAVAILABLE=${MAX_UNAVAILABLE:=3}
 EUS_UPGRADE=${EUS_UPGRADE:=false}
 EUS_CHANNEL=${EUS_CHANNEL:="fast"} #fast,eus,candidate,stable
-
 echo TARGET_RELEASES is $TARGET_RELEASES
 ./upgrade.sh $TARGET_RELEASES -f $ENABLE_FORCE -s $SCALE -u $MAX_UNAVAILABLE -e $EUS_UPGRADE -c $EUS_CHANNEL
 
-#export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
