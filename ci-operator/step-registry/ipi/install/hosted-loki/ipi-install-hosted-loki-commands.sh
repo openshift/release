@@ -117,10 +117,6 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
-      # Ignore logs from non-openshift namespaces:
-      - match:
-          selector: '{namespace!~"openshift-.*"}'
-          action: drop
       - static_labels:
           type: pod
       # Ignore the logs from the event-exporter, they are handled via a separate job:
@@ -139,19 +135,29 @@ data:
                 namespace:
             - static_labels:
                 type: kube-event
-      - pack:
-          labels:
-          - app
-          - container
-          - host
-          - pod
+      # For anything that is outside an openshift- namespace, we will pack it into the entry to 
+      # dramatically improve cardinality. These would typically be temporary namespaces with random
+      # names created by e2e tests. We still keep their logs, you just don't get a fast label filter
+      # to find them globally by namespace.
+      - match:
+          selector: '{namespace!~"openshift-.*"}'
+          stages:
+          - pack:
+              labels:
+              - namespace
+      # If this entry is in an openshift- namespace, we don't pack the namespace.
+      - match:
+          selector: '{namespace=~"openshift-.*"}'
+          stages:
+          - pack:
+              labels:
+              - app
+              - container
+              - host
+              - pod
       - labelallow:
           - invoker
           - namespace
-          - app
-          - container
-          - host
-          - pod
           - type
       relabel_configs:
       - action: drop
