@@ -205,9 +205,9 @@ function sno_fixes {
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
-    export FEATURES="${FEATURES:-performance sriov sctp}"
+    export FEATURES="${FEATURES:-pao performance sriov sctp}"
 else
-    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
+    export FEATURES="${FEATURES:-pao sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
 fi
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
