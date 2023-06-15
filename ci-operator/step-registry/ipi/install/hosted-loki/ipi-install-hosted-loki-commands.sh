@@ -117,9 +117,11 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      # Ignore the logs from the event-exporter, they are handled via a separate job:
       - match:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
           action: drop
+      # Ignore logs from non-openshift namespaces:
       - match:
           selector: '{namespace!~"openshift-.*"}'
           action: drop
@@ -193,17 +195,20 @@ data:
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
+    # Job for Kube events (type="kube-event"), which come from a specific pod that logs them.
     - job_name: kubernetes-events
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
       - cri: {}
+      # Drop everything that doesn't match the event-exporter app and namespace:
       - match:
           selector: '{podnamespace!="openshift-e2e-loki"}'
           action: drop
       - match:
           selector: '{app!="event-exporter"}'
           action: drop
+      # Two json stages to access the nested metadata.namespace field:
       - json: 
           expressions:
             metadata:
