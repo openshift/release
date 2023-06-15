@@ -1,0 +1,64 @@
+base_images:
+  aks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aks-0.6.10
+  aro:
+    name: automation-flavors
+    namespace: stackrox
+    tag: aro-0.3.8
+  eks:
+    name: automation-flavors
+    namespace: stackrox
+    tag: eks-0.6.9
+  osd:
+    name: automation-flavors
+    namespace: stackrox
+    tag: osd-0.3.6
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.3.8
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.59
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: gke-qa-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+  timeout: 5h0m0s
+- as: gke-ui-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+  timeout: 5h0m0s
+- as: gke-nongroovy-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: gavin-e2e-no-bin-test
+  org: stackrox
+  repo: stackrox
