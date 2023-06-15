@@ -56,3 +56,13 @@ if [ -n "${FEATURE_SET}" ]; then
 featureSet: ${FEATURE_SET}
 EOF
 fi
+
+# FeatureGates must be a valid yaml list.
+# E.g. ['Feature1=true', 'Feature2=false']
+# Only supported in 4.14+.
+if [ -n "${FEATURE_GATES}" ]; then
+        echo "Adding 'featureGates: ...' to install-config.yaml"
+        cat >> "${out}" << EOF
+featureGates: ${FEATURE_GATES}
+EOF
+fi
