@@ -7,6 +7,7 @@
 5. [`periodic-openshift-release-fast-forward`](#periodic-openshift-release-fast-forward)
 6. [`periodic-check-gh-automation`](#periodic-check-gh-automation)
 7. [`periodic-openshift-release-private-org-sync`](#periodic-openshift-release-private-org-sync)
+8. [`periodic-openshift-release-merge-blockers`](#periodic-openshift-release-merge-blockers)
 
 ## `branch-ci-openshift-release-master-release-controller-annotate`
 
@@ -277,3 +278,19 @@ This could be due to a tag being created, and then subsequently deleted and re-c
 Reach out to the repo owner(s) to confirm that this is the case. If they have the permissions, they can delete the tag
 in
 the private repo themselves. Otherwise, utilize the bot account to delete the tag.
+
+## `periodic-openshift-release-merge-blockers`
+
+This jobs runs [`blocking-issue-creator`](https://github.com/openshift/ci-tools/blob/master/cmd/blocking-issue-creator) tool 
+to create [merge blocking issues](https://github.com/issues?q=is%3Aopen+is%3Aissue+archived%3Afalse+label%3Atide%2Fmerge-blocker+org%3Aopenshift).
+
+#### Useful Links
+- [Recent executions on Deck](https://prow.ci.openshift.org/?job=periodic-openshift-release-merge-blockers)
+- [infra-periodics.yaml (ProwJob configuration)](https://github.com/openshift/release/blob/master/ci-operator/jobs/infra-periodics.yaml)
+
+### Failed to publish merge blocking issues
+#### Symptom
+```
+level=fatal msg="Could not publish merge blocking issues." error="<nil>"
+```
+TODO
