@@ -17,6 +17,7 @@ pip3 list
 
 RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
 CURRENT_VERSION=$(oc get clusterversion -ojsonpath={..desired.version})
+OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
 
 if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
     echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
@@ -28,12 +29,10 @@ if [[ -s "${SHARED_DIR}/perfscale-override-upgrade" ]]; then
       echo "Overriding upgrade target to ${ALL_IMAGES}"
       for IMAGE in $ALL_IMAGES
       do
-	      RELEASES_VERSION+=("`oc adm release info "${IMAGE}" --output=json | jq -r '.metadata.version'`")
+	      RELEASES_VERSION+=("`oc adm release info ${IMAGE} --output=json | jq -r '.metadata.version'`")
       done
-      #RELEASES_VERSION_STR=$("echo ${RELEASES_VERSION[@]}")
       TARGET_RELEASES=$(echo "${RELEASES_VERSION[@]}"| tr -s ' ' ',')
 else
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
       TARGET_RELEASES="$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --output=json | jq -r '.metadata.version')"
 fi
 echo  "-------------------------------------------------------------------------------------------"
