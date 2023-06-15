@@ -28,7 +28,7 @@ if [[ -s "${SHARED_DIR}/perfscale-override-upgrade" ]]; then
       echo "Overriding upgrade target to ${ALL_IMAGES}"
       for IMAGE in $ALL_IMAGES
       do
-	      RELEASES_VERSION+=("`oc adm release info "${IMAGE}" --output=json | jq -r '.metadata.version'`")
+	      RELEASES_VERSION+=("`oc adm release info ${IMAGE} --output=json | jq -r '.metadata.version'`")
       done
       #RELEASES_VERSION_STR=$("echo ${RELEASES_VERSION[@]}")
       TARGET_RELEASES=$(echo "${RELEASES_VERSION[@]}"| tr -s ' ' ',')
