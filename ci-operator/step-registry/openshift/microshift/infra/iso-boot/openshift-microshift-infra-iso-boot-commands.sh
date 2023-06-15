@@ -7,8 +7,8 @@ IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
 HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
 
-SSH_EXTERNAL_PORT=7000
-API_EXTERNAL_PORT=6443
+SSH_EXTERNAL_BASE_PORT=7000
+API_EXTERNAL_BASE_PORT=6000
 
 echo "Using Host $IP_ADDRESS"
 
@@ -23,12 +23,20 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
-cat <<EOF > /tmp/boot.sh
+# number of VMs to create. This will change over time as we add more tests.
+NUM_VMS=1
+echo "${NUM_VMS}" > ${SHARED_DIR}/num_vms
+for (( i=0; i<$NUM_VMS; i++ ))
+do
+  API_EXTERNAL_PORT=$((API_EXTERNAL_BASE_PORT+$i))
+  SSH_EXTERNAL_PORT=$((SSH_EXTERNAL_BASE_PORT+$i))
+  VM_NAME="ushift-${i}"
+  cat <<EOF > /tmp/boot.sh
 #!/bin/bash
 set -xeuo pipefail
 cd ~/microshift
-./scripts/image-builder/create-vm.sh edge default \$(find _output/image-builder -name "*.iso")
-VMIPADDR=\$(./scripts/devenv-builder/manage-vm.sh ip -n edge)
+./scripts/image-builder/create-vm.sh ${VM_NAME} default \$(find _output/image-builder -name "*.iso")
+VMIPADDR=\$(./scripts/devenv-builder/manage-vm.sh ip -n ${VM_NAME})
 timeout 5m bash -c "until ssh -oStrictHostKeyChecking=accept-new redhat@\${VMIPADDR} 'echo hello'; do sleep 5; done"
 cat << EOF2 > /tmp/config.yaml
 apiServer:
@@ -48,11 +56,12 @@ sudo /sbin/iptables -t nat -I PREROUTING -p tcp --dport "${API_EXTERNAL_PORT}" -
 sudo /sbin/iptables -I FORWARD -o virbr0 -p tcp -d \${VMIPADDR} --dport 22 -j ACCEPT
 sudo /sbin/iptables -t nat -I PREROUTING -p tcp --dport "${SSH_EXTERNAL_PORT}" -j DNAT --to \${VMIPADDR}:22
 EOF
-chmod +x /tmp/boot.sh
+  chmod +x /tmp/boot.sh
 
-scp \
-  /tmp/boot.sh \
-  "${INSTANCE_PREFIX}:/tmp"
-ssh "${INSTANCE_PREFIX}" "/tmp/boot.sh"
-
-ssh -oStrictHostKeyChecking=accept-new -i ${CLUSTER_PROFILE_DIR}/ssh-privatekey "redhat@${IP_ADDRESS}" -p ${SSH_EXTERNAL_PORT} "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" > ${SHARED_DIR}/kubeconfig
+  scp /tmp/boot.sh "${INSTANCE_PREFIX}:/tmp"
+  ssh "${INSTANCE_PREFIX}" "/tmp/boot.sh"
+  ssh "redhat@${IP_ADDRESS}" -p ${SSH_EXTERNAL_PORT} "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" > ${SHARED_DIR}/kubeconfig_${i}
+  sed -i "s,:6443,:${API_EXTERNAL_PORT}," ${SHARED_DIR}/kubeconfig_${i}
+  echo "${SSH_EXTERNAL_PORT}" > ${SHARED_DIR}/ssh_port_${i}
+  echo "redhat" > ${SHARED_DIR}/user_${i}
+done
