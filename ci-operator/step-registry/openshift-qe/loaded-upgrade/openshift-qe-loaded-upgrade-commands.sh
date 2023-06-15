@@ -4,8 +4,8 @@ set -o nounset
 set -o pipefail
 set -x
 cat /etc/os-release
-oc config view
-oc projects
+#oc config view
+#oc projects
 pushd /tmp
 python3 --version
 python3 -m venv venv3
@@ -22,7 +22,7 @@ if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
     echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
     exit 1
 fi
-TARGET_RELEASES=""
+
 if [[ -s "${SHARED_DIR}/perfscale-override-upgrade" ]]; then
       ALL_IMAGES="$(< "${SHARED_DIR}/perfscale-override-upgrade")" &&
       echo "Overriding upgrade target to ${ALL_IMAGES}"
