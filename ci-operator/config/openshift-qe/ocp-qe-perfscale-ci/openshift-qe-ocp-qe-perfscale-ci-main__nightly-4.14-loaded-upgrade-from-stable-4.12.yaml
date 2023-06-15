@@ -45,11 +45,15 @@ tests:
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      CLEANUP_WHEN_FINISH: "false"
       CONTROL_PLANE_INSTANCE_TYPE: m5.2xlarge
+      WORKER_REPLICA_COUNT: "5"
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre-stableinitial
+    - chain: workers-scale
+    - chain: openshift-qe-cluster-density
     test:
     - as: set-releases-release
       commands: echo "${RELEASE_IMAGE_INTERMEDIATE},${RELEASE_IMAGE_LATEST}" > ${SHARED_DIR}/perfscale-override-upgrade
