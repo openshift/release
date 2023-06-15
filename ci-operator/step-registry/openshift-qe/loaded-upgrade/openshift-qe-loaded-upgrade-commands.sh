@@ -50,4 +50,21 @@ MAX_UNAVAILABLE=${MAX_UNAVAILABLE:=3}
 EUS_UPGRADE=${EUS_UPGRADE:=false}
 EUS_CHANNEL=${EUS_CHANNEL:="fast"} #fast,eus,candidate,stable
 echo TARGET_RELEASES is $TARGET_RELEASES
+IF_DEGRADED=$(oc get co -ojsonpath='{.items[*].status.conditions[?(@.type=="Degraded")].status}')
+IF_DEGRADED=$(echo $IF_DEGRADED | tr -s '[A-Z]' '[a-z]')
+
+echo "Check OCP Cluster Operator Status"
+RETRY=1
+while [[ $IF_DEGRADED == *true* ]];
+do
+	echo -n "."&&sleep 10
+	RETRY=$(($RETRY + 1 ))
+	if [[ $RETRY -eq 60 ]];then
+		echo "The cluster operator isn't ready, skipping upgrade"
+		echo "-----------------------------------------------------------"
+		oc get co
+		echo "-----------------------------------------------------------"
+		break
+	fi
+done
 ./upgrade.sh $TARGET_RELEASES -f $ENABLE_FORCE -s $SCALE -u $MAX_UNAVAILABLE -e $EUS_UPGRADE -c $EUS_CHANNEL
