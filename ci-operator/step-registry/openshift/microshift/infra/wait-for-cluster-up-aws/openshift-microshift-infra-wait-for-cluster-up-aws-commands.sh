@@ -50,7 +50,6 @@ EOF
 
 chmod +x "${HOME}"/start_microshift.sh
 
-scp -r /microshift/validate-microshift "${INSTANCE_PREFIX}":~/validate-microshift
 scp "${HOME}"/start_microshift.sh "${INSTANCE_PREFIX}":~/start_microshift.sh
 ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/start_microshift.sh"
 
