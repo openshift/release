@@ -67,3 +67,7 @@ scp \
   "${INSTANCE_PREFIX}:/tmp"
 
 ssh "${INSTANCE_PREFIX}" "sudo /tmp/install.sh"
+
+echo 1 >> ${SHARED_DIR}/num_vms
+echo ${HOST_USER} >> ${SHARED_DIR}/user_0
+echo 22 >> ${SHARED_DIR}/ssh_port_0
