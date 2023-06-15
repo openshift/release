@@ -30,8 +30,8 @@ if [[ -s "${SHARED_DIR}/perfscale-override-upgrade" ]]; then
       do
 	      RELEASES_VERSION+=("`oc adm release info "${IMAGE}" --output=json | jq -r '.metadata.version'`")
       done
-      RELEASES_VERSION_STR=$("echo ${RELEASES_VERSION[@]}")
-      TARGET_RELEASES=$("echo $RELEASES_VERSION_STR"| tr -s ' ' ',')
+      #RELEASES_VERSION_STR=$("echo ${RELEASES_VERSION[@]}")
+      TARGET_RELEASES=$(echo "${RELEASES_VERSION[@]}"| tr -s ' ' ',')
 else
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:=$RELEASE_IMAGE_LATEST}
       TARGET_RELEASES="$(oc adm release info "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}" --output=json | jq -r '.metadata.version')"
