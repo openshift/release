@@ -13,10 +13,9 @@ printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
 ls
 
-git clone https://github.com/redhat-chaos/krkn-hub.git
-pushd krkn-hub/cerberus
+pushd cerberus
 
-echo "kubeconfig loc $$KUBECONFIG"
+echo "kubeconfig loc $KUBECONFIG"
 
 export CERBERUS_KUBECONFIG=$KUBECONFIG
 export CERBERUS_WATCH_NAMESPACES="[^.*$]"
