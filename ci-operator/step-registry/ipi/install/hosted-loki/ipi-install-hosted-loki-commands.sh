@@ -119,7 +119,10 @@ data:
       - cri: {}
       - static_labels:
           type: pod
-      # Ignore the logs from the event-exporter, they are handled via a separate job:
+      # Special match for the logs from the event-exporter pod, which logs json lines for each kube event.
+      # For these we want to extract the namespace from metadata.namespace, rather than using the one
+      # from the pod which did the logging. (openshift-e2e-loki)
+      # This will allow us to search events globally with a namespace label that matches the actual event.
       - match:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
           stages:          
@@ -145,7 +148,11 @@ data:
           - pack:
               labels:
               - namespace
-      # If this entry is in an openshift- namespace, we don't pack the namespace.
+              - app
+              - container
+              - host
+              - pod
+      # If this entry is in an openshift- namespace, we don't pack the namespace (it remains a real label):
       - match:
           selector: '{namespace=~"openshift-.*"}'
           stages:
