@@ -1,0 +1,81 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-aws-414
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-qe-perfscale-ci-tests-kube-burner
+  cron: 0 12 * * 2
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      WORKER_REPLICA_COUNT: "20"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: workers-scale
+    workflow: openshift-qe-ocp-qe-perfscale-ci-tests
+- as: ocp-qe-perfscale-ci-tests-net-perf
+  cron: 0 9 * * 3
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      WORKER_REPLICA_COUNT: "20"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: workers-scale
+    workflow: openshift-qe-network-perf
+- as: ocp-qe-perfscale-router-perf-aws
+  cron: 0 9 * * 4
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      WORKER_REPLICA_COUNT: "20"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: workers-scale
+    workflow: openshift-qe-router-perf
+- as: ocp-qe-perfscale-node-density-heavy-aws
+  cron: 0 12 * * 1
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      PODS_PER_NODE: "200"
+      WORKER_REPLICA_COUNT: "20"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: workers-scale
+    workflow: openshift-qe-node-density-heavy
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: aws-4.14
