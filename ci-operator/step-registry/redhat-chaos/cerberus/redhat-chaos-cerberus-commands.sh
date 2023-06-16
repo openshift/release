@@ -15,8 +15,6 @@ printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
 ls
 
-pushd cerberus
-
 echo "kubeconfig loc $KUBECONFIG"
 
 export CERBERUS_KUBECONFIG=$KUBECONFIG
