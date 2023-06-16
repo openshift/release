@@ -40,6 +40,10 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
+- as: shell-unit-tests
+  steps:
+    test:
+    - ref: stackrox-initial
 - as: gke-qa-e2e-tests
   optional: true
   steps:
@@ -57,6 +61,114 @@ tests:
   steps:
     test:
     - ref: stackrox-stackrox-e2e-from-src
+- as: gke-sensor-integration-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+- as: gke-operator-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+- as: gke-upgrade-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+- as: gke-version-compatibility-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+  timeout: 5h0m0s
+- as: gke-race-condition-qa-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+  timeout: 5h0m0s
+- as: gke-scale-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+- as: eks-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-eks-e2e
+  timeout: 5h0m0s
+- as: osd-aws-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-aws-e2e
+  timeout: 5h0m0s
+- as: osd-gcp-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-osd-gcp-e2e
+  timeout: 5h0m0s
+- as: aro-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-aro-e2e
+  timeout: 5h0m0s
+- as: rosa-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-rosa-e2e
+  timeout: 5h0m0s
+- as: aks-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-aks-e2e
+  timeout: 5h0m0s
+- as: merge-shell-unit-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-initial
+- as: merge-gke-qa-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+  timeout: 5h0m0s
+- as: merge-gke-ui-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+  timeout: 5h0m0s
+- as: merge-gke-nongroovy-e2e-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+- as: merge-gke-sensor-integration-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+- as: merge-gke-upgrade-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+- as: merge-gke-version-compatibility-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-stackrox-e2e-from-src
+- as: powervs-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-powervs-e2e
+  timeout: 5h0m0s
+- as: nightly-powervs-qa-e2e-tests
+  cron: 0 7 * * *
+  steps:
+    workflow: stackrox-automation-flavors-powervs-e2e
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: gavin-e2e-no-bin-test
