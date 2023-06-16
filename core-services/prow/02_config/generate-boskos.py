@@ -249,6 +249,9 @@ CONFIG = {
     },
     'oci-edge-quota-slice': {
         'default': 50,
+    },
+    'aws-hypershift-quota-slice': {
+        'default': 30,
     }
 }
 
