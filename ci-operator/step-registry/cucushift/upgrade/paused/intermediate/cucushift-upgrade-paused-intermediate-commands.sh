@@ -294,6 +294,8 @@ export PATH=${OC_DIR}:$PATH
 export OC="run_command_oc_retries"
 
 SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
+SOURCE_MINOR_VERSION="$(echo "${SOURCE_VERSION}" | cut -f2 -d.)"
+export SOURCE_MINOR_VERSION
 export TARGET="${RELEASE_IMAGE_INTERMEDIATE}"
 TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${RELEASE_IMAGE_INTERMEDIATE}" --output=json | jq -r '.metadata.version')"
 export TARGET_VERSION
