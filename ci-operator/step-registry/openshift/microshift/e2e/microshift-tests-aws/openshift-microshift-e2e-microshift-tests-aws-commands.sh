@@ -25,6 +25,7 @@ cat << EOF >/tmp/variables.yaml
 USHIFT_HOST: ${IP_ADDRESS}
 USHIFT_USER: ${HOST_USER}
 SSH_PRIV_KEY: ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+SSH_PORT: 22
 EOF
 /microshift/test/run.sh -o ${ARTIFACT_DIR} -i /tmp/variables.yaml -v /tmp/venv
 
