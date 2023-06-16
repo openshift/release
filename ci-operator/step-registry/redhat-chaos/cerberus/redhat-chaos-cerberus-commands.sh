@@ -20,7 +20,7 @@ echo "kubeconfig loc $KUBECONFIG"
 export CERBERUS_KUBECONFIG=$KUBECONFIG
 export CERBERUS_WATCH_NAMESPACES="[^.*$]"
 export CERBERUS_IGNORE_PODS="[^installer*,^kube-burner*,^redhat-operators*,^certified-operators*,^collect-profiles*]"
-./prow_run.sh
+./cerberus/prow_run.sh
 rc=$?
 echo "Finished running cerberus scenarios"
 echo "Return code: $rc"
