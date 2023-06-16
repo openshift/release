@@ -25,6 +25,27 @@ oc new-project test-runner
 
 oc adm policy add-scc-to-user anyuid -z default
 
+htpasswd -c -B -b /tmp/users.htpasswd kubeadmin "$ADMIN_PASSWORD"
+
+oc create secret generic htpass-secret --from-file=htpasswd=/tmp/users.htpasswd -n openshift-config
+
+cat <<EOF > /tmp/htpasswd-oa.yaml
+apiVersion: config.openshift.io/v1
+kind: OAuth
+metadata:
+  name: cluster
+spec:
+  identityProviders:
+  - name: my_htpasswd_provider
+    mappingMethod: claim
+    type: HTPasswd
+    htpasswd:
+      fileData:
+        name: htpass-secret
+EOF
+
+oc apply -f /tmp/htpasswd-oa.yaml
+
 oc new-app --name test-runner --image="$FUSE_ONLINE_TEST_RUNNER" -e ADMIN_USERNAME=$ADMIN_USERNAME -e ADMIN_PASSWORD=$(cat $KUBEADMIN_PASSWORD_FILE) -e URL=$(oc whoami --show-server) -e NAMESPACE=$FUSE_ONLINE_NAMESPACE
 
 # sleep for testing
