@@ -5,6 +5,8 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
+ls /usr/bin
+
 while [ ! -f "${KUBECONFIG}" ]; do
   printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
   sleep 10
