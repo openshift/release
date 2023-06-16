@@ -292,7 +292,7 @@ for i in range(94,109):
 for i in range(56,60):
     CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(60,62):
+for i in range(60,64):
     CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
 
 for i in range(50,54):
