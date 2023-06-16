@@ -46,10 +46,18 @@ EOF
 
 oc apply -f /tmp/htpasswd-oa.yaml
 
-oc new-app --name test-runner --image="$FUSE_ONLINE_TEST_RUNNER" -e ADMIN_USERNAME=$ADMIN_USERNAME -e ADMIN_PASSWORD=$(cat $KUBEADMIN_PASSWORD_FILE) -e URL=$(oc whoami --show-server) -e NAMESPACE=$FUSE_ONLINE_NAMESPACE
+oc new-app --name test-runner --image="$FUSE_ONLINE_TEST_RUNNER" -e ADMIN_USERNAME=$ADMIN_USERNAME -e ADMIN_PASSWORD=$(cat $KUBEADMIN_PASSWORD_FILE) -e URL=$(oc whoami --show-server) -e NAMESPACE=$FUSE_ONLINE_NAMESPACE --restart=Never
 
-# sleep for testing
-sleep 1400
+POD_NAME=$(oc get pods -o jsonpath='{.items[0].metadata.name}')
+SOURCE_DIR="/home/seluser/syndesis-qe"
+DEST_DIR="/tmp/test-artifacts"
 
-# need to copy out the test run artifacts from /test-run-results
+oc wait --for=condition=Ready pod/"$POD_NAME" --timeout=-1s
+
+while oc get pod "$POD_NAME" | grep -q Running; do
+  oc rsync --compress=true "$POD_NAME:$SOURCE_DIR" "$DEST_DIR"
+  sleep 5
+done
+
+
 
