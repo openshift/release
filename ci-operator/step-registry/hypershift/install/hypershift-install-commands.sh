@@ -19,4 +19,5 @@ bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
 --external-dns-provider=aws \
 --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
 --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
+--metrics-set All \
 --wait-until-available
