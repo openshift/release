@@ -11,28 +11,42 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
-binary_build_commands: make build
+binary_build_commands: LD_FLAGS="-X github.com/jaegertracing/jaeger-operator/pkg/version.version=1.46.0
+  -X github.com/jaegertracing/jaeger-operator/pkg/version.buildDate=2023-06-28T14:39:00Z
+  -X github.com/jaegertracing/jaeger-operator/pkg/version.defaultJaeger=1.46.0" make
+  build
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
-canonical_go_repository: github.com/grafana/tempo-operator
 images:
-- context_dir: .
+- build_args:
+  - name: VERSION
+    value: 1.46.0
+  - name: JAEGER_VERSION
+    value: 1.46.0
+  - name: VERSION_DATE
+    value: "2023-06-28T14:39:00Z"
+  - name: VERSION_PKG
+    value: github.com/jaegertracing/jaeger-operator/pkg/version
+  context_dir: .
   dockerfile_path: Dockerfile
-  to: tempo-operator
+  to: jaeger-operator
+- context_dir: .
+  dockerfile_path: Dockerfile.asserts
+  to: jaeger-tests-asserts-e2e
 - context_dir: .
   dockerfile_path: tests/Dockerfile
-  to: tempo-tests-runner
+  to: jaeger-tests-runner
 operator:
   bundles:
-  - as: tempo-bundle
-    context_dir: ./bundle/openshift
+  - as: jaeger-bundle
+    context_dir: .
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: ghcr.io/grafana/tempo-operator/tempo-operator:v0.2.0
-    with: pipeline:tempo-operator
+  - pullspec: quay.io/jaegertracing/jaeger-operator:1.46.0
+    with: pipeline:jaeger-operator
 releases:
   latest:
     candidate:
@@ -45,23 +59,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: test
-  steps:
-    test:
-    - as: unit
-      commands: GOFLAGS="-mod=mod" make test
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-- as: tempo-e2e-tests
+- as: jaeger-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 2h0m0s
+    timeout: 3h0m0s
     version: "4.13"
   steps:
     env:
@@ -71,12 +75,12 @@ tests:
     - as: install
       cli: latest
       commands: |
-        oc create namespace tempo-operator
-        operator-sdk run bundle -n tempo-operator "$OO_BUNDLE"
-        oc wait --for condition=Available -n tempo-operator deployment tempo-operator-controller
+        oc create namespace jaeger-operator
+        operator-sdk run bundle -n jaeger-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n jaeger-operator deployment jaeger-operator
       dependencies:
       - env: OO_BUNDLE
-        name: tempo-bundle
+        name: jaeger-bundle
       from: operator-sdk
       resources:
         requests:
@@ -84,11 +88,11 @@ tests:
           memory: 400Mi
     - ref: operatorhub-subscribe-elasticsearch-operator
     - ref: operatorhub-subscribe-amq-streams
-    - ref: distributed-tracing-install-jaeger-product
     - ref: distributed-tracing-install-opentelemetry-product
-    - ref: distributed-tracing-tests-tempo
+    - ref: distributed-tracing-install-tempo-product
+    - ref: distributed-tracing-tests-jaeger
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
-  org: openshift
-  repo: grafana-tempo-operator
+  org: jaegertracing
+  repo: jaeger-operator
