@@ -291,6 +291,16 @@ Outputs:
     Value: !GetAtt RHELInstance.PublicIp
 EOF
 
+if aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
+    --query "Stacks[].Outputs[?OutputKey == 'InstanceId'].OutputValue" > /dev/null; then
+        echo "Appears that stack ${stack_name} already exists"
+
+        aws --region $REGION cloudformation delete-stack --stack-name "${stack_name}"
+        echo "Deleted stack ${stack_name}"
+
+        aws --region $REGION cloudformation wait stack-delete-complete --stack-name "${stack_name}"
+        echo "Waited for stack-delete-complete ${stack_name}"
+fi
 
 echo -e "==== Start to create rhel host ===="
 echo "${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
