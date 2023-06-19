@@ -51,6 +51,10 @@ if [[ "${STS_USE_PRIVATE_S3}" == "yes" ]]; then
   CCOCTL_OPTIONS=" $CCOCTL_OPTIONS --create-private-s3-bucket "
 fi
 
+if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
+  CCOCTL_OPTIONS=" $CCOCTL_OPTIONS --enable-tech-preview "
+fi
+
 # create required credentials infrastructure and installer manifests
 ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
 
@@ -64,3 +68,10 @@ echo -e "\n"
 # copy generated secret manifests from ccoctl target directory into shared directory
 cd "/tmp/manifests"
 for FILE in *; do cp $FILE "${MPREFIX}_$FILE"; done
+
+# for Shared VPC install, same ingress role name, it will be used in trust policy
+ingress_role_arn=$(grep -hE "role_arn.*ingress" * | awk '{print $3}')
+if [[ ${ingress_role_arn} != "" ]]; then
+  echo "Saving ingress role: ${ingress_role_arn}"
+  echo "${ingress_role_arn}" > ${SHARED_DIR}/sts_ingress_role_arn
+fi

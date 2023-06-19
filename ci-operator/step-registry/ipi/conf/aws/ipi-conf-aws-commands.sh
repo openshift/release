@@ -172,7 +172,7 @@ echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 
 existing_zones_setting=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
-if [[ ${existing_zones_setting} == "" ]]; then
+if [[ ${existing_zones_setting} == "" ]] && [[ ${ADD_ZONES} == "yes" ]]; then
   ZONES_COUNT=${ZONES_COUNT:-2}
   ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
