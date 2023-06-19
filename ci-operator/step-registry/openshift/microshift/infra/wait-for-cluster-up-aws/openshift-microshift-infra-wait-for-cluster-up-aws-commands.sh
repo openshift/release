@@ -53,7 +53,7 @@ chmod +x "${HOME}"/start_microshift.sh
 scp "${HOME}"/start_microshift.sh "${INSTANCE_PREFIX}":~/start_microshift.sh
 ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/start_microshift.sh"
 
-ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >/tmp/kubeconfig
+ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" > "${SHARED_DIR}/kubeconfig"
 
 # Disable exit-on-error and enable command logging with a timestamp
 set +e
@@ -64,7 +64,7 @@ retries=3
 while [ ${retries} -gt 0 ] ; do
   ((retries-=1))
 
-  KUBECONFIG=/tmp/kubeconfig oc wait \
+  KUBECONFIG="${SHARED_DIR}/kubeconfig" oc wait \
     pod \
     --for=condition=ready \
     -l='app.kubernetes.io/name=topolvm-csi-driver' \
@@ -74,7 +74,7 @@ while [ ${retries} -gt 0 ] ; do
 
   # Image pull operation sometimes get stuck for topolvm images
   # Delete topolvm pods to retry image pull operation
-  KUBECONFIG=/tmp/kubeconfig oc delete \
+  KUBECONFIG="${SHARED_DIR}/kubeconfig" oc delete \
     pod \
     -l='app.kubernetes.io/name=topolvm-csi-driver' \
     -n openshift-storage \
