@@ -90,6 +90,20 @@ tests:
   steps:
     cluster_profile: ibmcloud-qe
     workflow: cucushift-installer-rehearse-ibmcloud-ipi-proxy-private
+- as: ocp-qe-perfscale-ci-tests-net-perf
+  cron: '@yearly'
+  steps:
+    cluster_profile: vsphere-8
+    env:
+      WORKER_REPLICA_COUNT: "3"
+    post:
+    - chain: ipi-vsphere-post
+    pre:
+    - chain: ipi-conf-vsphere
+    - ref: ovn-conf
+    - chain: ipi-install-vsphere
+    - chain: workers-scale
+    workflow: openshift-qe-network-perf
 zz_generated_metadata:
   branch: master
   org: openshift
