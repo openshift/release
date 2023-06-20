@@ -6,7 +6,7 @@ set -o pipefail
 
 CR_PATH="/tmp/credrequests"
 MPREFIX="${SHARED_DIR}/manifest"
-cluster_id="${NAMESPACE}-${JOB_NAME_HASH}"
+cluster_id="${NAMESPACE}-${UNIQUE_HASH}"
 export ALIBABA_CLOUD_CREDENTIALS_FILE="${SHARED_DIR}/alibabacreds.ini"
 
 export HOME="${HOME:-/tmp/home}"

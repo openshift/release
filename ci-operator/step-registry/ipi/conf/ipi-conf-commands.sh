@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 out=${SHARED_DIR}/install-config.yaml
 

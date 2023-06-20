@@ -68,7 +68,7 @@ fi
 file /tmp/openshift-baremetal-install
 
 echo "[INFO] Processing the install-config.yaml..."
-# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
+# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
 yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "

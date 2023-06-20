@@ -16,7 +16,7 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
-CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
+CLUSTER_NAME=${NAMESPACE}-${UNIQUE_HASH}
 RESOURCE_GROUP=${CLUSTER_NAME}
 AZURE_AUTH_LOCATION="${SHARED_DIR}/osServicePrincipal.json"
 APP_ID=$(jq -r .clientId "${AZURE_AUTH_LOCATION}")
