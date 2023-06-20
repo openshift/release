@@ -1440,12 +1440,16 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-path=core-services/pr-reminder/_config.yaml
-        - --github-mapping-config-path=/etc/github-mapping/mapping.yaml
-        - --slack-token-path=/etc/slack/oauth_token
-        - --validate-only=true
+        - -c
+        - |
+          tar -C /tmp -xvzf /etc/github-mapping/users.yaml.tar.gz
+          /usr/bin/pr-reminder \
+            --config-path=core-services/pr-reminder/_config.yaml \
+            --github-users-file=/tmp/users.yaml \
+            --slack-token-path=/etc/slack/oauth_token \
+            --validate-only=true
         command:
-        - /usr/bin/pr-reminder
+        - /bin/bash
         image: registry.ci.openshift.org/ci/pr-reminder:latest
         imagePullPolicy: Always
         name: ""
