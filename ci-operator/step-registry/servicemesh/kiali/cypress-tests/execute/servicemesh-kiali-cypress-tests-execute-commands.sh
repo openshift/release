@@ -10,6 +10,10 @@ OCP_CRED_USR="kubeadmin"
 OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
 
 oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --insecure-skip-tls-verify=true
+
+echo "Installing Gateway API version v0.5.1"
+oc kustomize "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.5.1" | oc apply -f -
+
 hack/istio/install-testing-demos.sh -c oc -in ${SMCP_NAMESPACE}
 sleep 120
 
