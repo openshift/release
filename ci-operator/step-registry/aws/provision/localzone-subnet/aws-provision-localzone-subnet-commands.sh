@@ -120,7 +120,7 @@ Outputs:
     Value: !Ref LocalZoneSubnet
 EOF
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 # first private subnet
 if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
@@ -153,7 +153,7 @@ if [[ "$az_name" == "" ]] || [[ "$local_az_name" == "" ]] || [[ "$route_table_id
 fi
 
 
-STACK_NAME="${NAMESPACE}-${JOB_NAME_HASH}-localzone"
+STACK_NAME="${NAMESPACE}-${UNIQUE_HASH}-localzone"
 # save stack information to ${SHARED_DIR} for deprovision step
 echo ${STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 extra_options=" "
