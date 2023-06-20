@@ -120,7 +120,7 @@ EOF
 # camgi is a tool that creates an html document for investigating an OpenShift cluster
 # see https://github.com/elmiko/camgi.rs for more information
 function installCamgi() {
-    CAMGI_VERSION="0.8.1"
+    CAMGI_VERSION="0.9.0"
     pushd /tmp
 
     # no internet access in C2S/SC2S env, disable proxy

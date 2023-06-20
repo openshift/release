@@ -30,11 +30,6 @@ function create_tests_temp_skip_list_11 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-8433
-# TESTNAME
-metallb "Correct and incorrect MetalLB resources coexist"
-
 EOF
 }
 
@@ -49,11 +44,6 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 performance "Should have the correct RPS configuration"
 
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-8433
-# TESTNAME
-metallb "Correct and incorrect MetalLB resources coexist"
-
 EOF
 }
 
@@ -66,6 +56,11 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # bz### https://issues.redhat.com/browse/OCPBUGS-10424
 # TESTNAME
 performance "Check RPS Mask is applied to atleast one single rx queue on all veth interface"
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-14713
+# TESTNAME
+performance "Should not overwrite the banned CPU set on tuned restart"
 
 # SKIPTEST
 # bz### https://issues.redhat.com/browse/OCPBUGS-10927
@@ -110,7 +105,7 @@ function get_skip_tests {
     skip_list=""
     if [ -f "${SKIP_TESTS_FILE}" ]; then
         rm -f feature_skip_list.txt
-        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > feature_skip_list.txt
+        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > ${SHARED_DIR}/feature_skip_list.txt
         skip_list=""
         while read line;
         do
@@ -122,7 +117,7 @@ function get_skip_tests {
                     skip_list="${skip_list} ${test}"
                 fi
             fi
-        done < feature_skip_list.txt
+        done < ${SHARED_DIR}/feature_skip_list.txt
     fi
 
     echo "${skip_list}"
@@ -199,13 +194,20 @@ function check_commit_message_for_prs {
     fi
 }
 
+function sno_fixes {
+    echo "************ SNO fixes ************"
+    pushd $CNF_REPO_DIR
+    sed -i "s/role: worker-cnf/role: master/g" feature-configs/deploy/sctp/sctp_module_mc.yaml
+
+    popd
+}
 
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
-    export FEATURES="${FEATURES:-performance}"
+    export FEATURES="${FEATURES:-performance sriov sctp}"
 else
-    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}"
+    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
 fi
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
@@ -313,6 +315,8 @@ fi
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
     test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
     export ROLE_WORKER_CNF="master"
+    # Make local workarounds for SNO
+    sno_fixes
 fi
 export CNF_NODES="${test_nodes}"
 

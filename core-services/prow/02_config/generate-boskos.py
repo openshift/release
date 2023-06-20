@@ -116,7 +116,7 @@ CONFIG = {
     },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5,
-        'usgovtexas': 5 
+        'usgovtexas': 5
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 40,
@@ -186,7 +186,7 @@ CONFIG = {
     'vsphere-8-quota-slice':{},
     'vsphere-discon-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
-    'vsphere-connected-quota-slice':{},    
+    'vsphere-connected-quota-slice':{},
     'vsphere-multizone-quota-slice':{},
     'vsphere-platform-none-quota-slice':{},
     'osd-ephemeral-quota-slice': {
@@ -246,6 +246,9 @@ CONFIG = {
     },
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
+    },
+    'oci-edge-quota-slice': {
+        'default': 50,
     }
 }
 
@@ -289,7 +292,7 @@ for i in range(94,109):
 for i in range(56,60):
     CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(60,62):
+for i in range(60,64):
     CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
 
 for i in range(50,54):

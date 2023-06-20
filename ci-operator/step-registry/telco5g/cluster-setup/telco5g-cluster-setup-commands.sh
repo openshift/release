@@ -269,6 +269,24 @@ cat << EOF > $SHARED_DIR/check-cluster.yml
     shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'"
     register: ready_check
 
+  - name: Grab the kcli log from installer
+    shell: >-
+      kcli scp root@${CLUSTER_NAME}-installer:/var/log/cloud-init-output.log /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+    ignore_errors: true
+
+  - name: Grab the log from HV to artifacts
+    fetch:
+      src: /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+      dest: ${ARTIFACT_DIR}/cloud-init-output.log
+      flat: yes
+    ignore_errors: true
+
+  - name: Show last logs from cloud init if failed
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer 'tail -100 /var/log/cloud-init-output.log'
+    when: "'True' not in ready_check.stdout"
+    ignore_errors: true
+
   - name: Fail when cluster is not available
     shell: "echo Cluster ready: {{ ready_check.stdout }}"
     failed_when: "'True' not in ready_check.stdout"

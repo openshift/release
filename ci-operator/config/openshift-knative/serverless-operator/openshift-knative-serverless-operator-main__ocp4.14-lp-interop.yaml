@@ -7,10 +7,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
-  openshift_eventing-istio-src_knative-v1.8:
+  openshift_eventing-istio-src_knative-v1.9:
     name: eventing-istio-src
     namespace: openshift
-    tag: knative-v1.8
+    tag: knative-v1.9
   openshift_eventing-kafka-broker-src_knative-v1.9:
     name: eventing-kafka-broker-src
     namespace: openshift
@@ -38,9 +38,9 @@ images:
       paths:
       - destination_dir: .
         source_path: /usr/bin/oc
-    openshift_eventing-istio-src_knative-v1.8:
+    openshift_eventing-istio-src_knative-v1.9:
       as:
-      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.8
+      - registry.ci.openshift.org/openshift/eventing-istio-src:knative-v1.9
     openshift_eventing-kafka-broker-src_knative-v1.9:
       as:
       - registry.ci.openshift.org/openshift/eventing-kafka-broker-src:knative-v1.9
@@ -101,12 +101,24 @@ resources:
       memory: 200Mi
 tests:
 - as: operator-e2e-interop-aws-ocp414
-  cron: 0 6 23 11 *
+  cron: 0 6 * * 1
   remote_api: true
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        [
+         {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+         {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+         {"step": "gather-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+         {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+         {"step": "knative-eventing-kafka-broker-e2e", "failure_type": "test_failure", "classification": "knative-eventing-kafka-broker-e2e Test Failure", "jira_project": "SRVCOM", "jira_epic": "LPTOCPCI-290"},
+         {"step": "knative-serving-eventing-e2e", "failure_type": "test_failure", "classification": "knative-serving-eventing-e2e Test Failure", "jira_project": "SRVCOM", "jira_epic": "LPTOCPCI-290"},
+         {"step": "operator-e2e", "failure_type": "test_failure", "classification": "operator-e2e Test Failure", "jira_project": "SRVCOM", "jira_epic": "LPTOCPCI-290"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
     test:
     - as: operator-e2e
       commands: make test-e2e-with-kafka
@@ -156,7 +168,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: ipi-aws
+    workflow: firewatch-ipi-aws
   timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
