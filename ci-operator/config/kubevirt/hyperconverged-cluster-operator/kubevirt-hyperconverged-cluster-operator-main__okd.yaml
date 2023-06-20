@@ -7,6 +7,10 @@ base_images:
     name: "4.13"
     namespace: origin
     tag: cli
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.29.0
   hco-index:
     name: hyperconverged-cluster-index
     namespace: ci
@@ -101,17 +105,14 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: hco-e2e-image-index-gcp
+- as: hco-e2e-operator-sdk-gcp
   steps:
     cluster_profile: gcp-virtualization
     dependencies:
-      OO_INDEX: ci-index-hco-bundle
+      OO_BUNDLE: hco-bundle
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
-      OO_CHANNEL: 1.10.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: deploy-cr
       commands: |
@@ -134,19 +135,16 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-gcp
-- as: hco-e2e-image-index-aws
+    workflow: optional-operators-ci-operator-sdk-gcp
+- as: hco-e2e-operator-sdk-aws
   run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: aws-virtualization
     dependencies:
-      OO_INDEX: ci-index-hco-bundle
+      OO_BUNDLE: hco-bundle
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      OO_CHANNEL: 1.10.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: '!all'
     test:
     - as: deploy-cr
       commands: |
@@ -169,7 +167,7 @@ tests:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: hco-e2e-upgrade-index-aws
   run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:

@@ -1,0 +1,97 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: envoyproxy
+  namespace: ci
+spec:
+  tags:
+  - name: "1.25.3"
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: envoyproxy
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: envoyproxy:tp-1.25.3
+  source:
+    dockerfile: |
+      FROM registry.ci.openshift.org/openshift/centos:stream9
+      LABEL maintainer="jguzik@redhat.com"
+      RUN curl -L -o /bin/envoy https://github.com/envoyproxy/envoy/releases/download/v1.25.3/envoy-1.25.3-linux-x86_64 && chmod +x /bin/envoy
+      RUN curl -L -o /tmp/api_descriptor.pb https://github.com/kubernetes/test-infra/raw/master/prow/gangway/api_descriptor.pb
+      RUN echo $'static_resources: \n\
+        listeners: \n\
+        - name: listener1 \n\
+          address: \n\
+            socket_address: {address: 0.0.0.0, port_value: 32001} \n\
+          filter_chains: \n\
+          - filters: \n\
+            - name: envoy.filters.network.http_connection_manager \n\
+              typed_config: \n\
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager \n\
+                stat_prefix: grpc_json \n\
+                codec_type: AUTO \n\
+                route_config: \n\
+                  name: local_route \n\
+                  virtual_hosts: \n\
+                  - name: local_service \n\
+                    domains: ["*"] \n\
+                    routes: \n\
+                    - match: {prefix: "/v1/executions"} \n\
+                      route: {cluster: grpc_cluster, timeout: 60s} \n\
+                http_filters: \n\
+                - name: envoy.filters.http.lua \n\
+                  typed_config: \n\
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua \n\
+                    inline_code: | \n\
+                      function envoy_on_request(request_handle) \n\
+                          request_handle:headers():add("x-endpoint-api-consumer-type", "PROJECT") \n\
+                          request_handle:headers():add("x-endpoint-api-consumer-number", "1") \n\
+                      end \n\
+                - name: envoy.filters.http.grpc_json_transcoder \n\
+                  typed_config: \n\
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_json_transcoder.v3.GrpcJsonTranscoder \n\
+                    proto_descriptor: "/tmp/api_descriptor.pb" \n\
+                    services: ["Prow"] \n\
+                    match_incoming_request_route: true \n\
+                    print_options: \n\
+                      add_whitespace: true \n\
+                      always_print_primitive_fields: true \n\
+                      always_print_enums_as_ints: false \n\
+                      preserve_proto_field_names: true \n\
+                - name: envoy.filters.http.router \n\
+                  typed_config: \n\
+                    "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router \n\
+        clusters: \n\
+          - name: grpc_cluster \n\
+            connect_timeout: 0.25s \n\
+            type: STRICT_DNS \n\
+            lb_policy: ROUND_ROBIN \n\
+            http2_protocol_options: {} \n\
+            load_assignment: \n\
+              cluster_name: grpc_cluster \n\
+              endpoints: \n\
+                - lb_endpoints: \n\
+                    - endpoint: \n\
+                        address: \n\
+                          socket_address: \n\
+                            address: 127.0.0.1 \n\
+                            port_value: 32000' >> /tmp/config.yml
+      EXPOSE 32001
+      EXPOSE 32000
+      ENTRYPOINT ["/bin/envoy", "-c", "/tmp/config.yml"]
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: centos:stream9
+        namespace: openshift
+      imageOptimizationPolicy: SkipLayers
+    type: Docker

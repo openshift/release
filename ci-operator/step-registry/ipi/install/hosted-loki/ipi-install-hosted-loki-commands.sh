@@ -117,27 +117,55 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - static_labels:
+          type: pod
+      # Special match for the logs from the event-exporter pod, which logs json lines for each kube event.
+      # For these we want to extract the namespace from metadata.namespace, rather than using the one
+      # from the pod which did the logging. (openshift-e2e-loki)
+      # This will allow us to search events globally with a namespace label that matches the actual event.
       - match:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
-          action: drop
+          stages:          
+            # Two json stages to access the nested metadata.namespace field:
+            - json: 
+                expressions:
+                  metadata:
+            - json:
+                expressions:
+                  namespace:
+                source: metadata
+            - labels:
+                namespace:
+            - static_labels:
+                type: kube-event
+      # For anything that is outside an openshift- namespace, we will pack it into the entry to 
+      # dramatically improve cardinality. These would typically be temporary namespaces with random
+      # names created by e2e tests. We still keep their logs, you just don't get a fast label filter
+      # to find them globally by namespace.
       - match:
           selector: '{namespace!~"openshift-.*"}'
-          action: drop
-      - pack:
-          labels:
-          - app
-          - container
-          - host
-          - pod
+          stages:
+          - pack:
+              labels:
+              - namespace
+              - app
+              - container
+              - host
+              - pod
+      # If this entry is in an openshift- namespace, we don't pack the namespace (it remains a real label):
+      - match:
+          selector: '{namespace=~"openshift-.*"}'
+          stages:
+          - pack:
+              labels:
+              - app
+              - container
+              - host
+              - pod
       - labelallow:
           - invoker
           - namespace
-          - app
-          - container
-          - host
-          - pod
-      - static_labels:
-          type: pod
+          - type
       relabel_configs:
       - action: drop
         regex: ''
@@ -193,45 +221,6 @@ data:
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
-    - job_name: kubernetes-events
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - match:
-          selector: '{podnamespace!="openshift-e2e-loki"}'
-          action: drop
-      - match:
-          selector: '{app!="event-exporter"}'
-          action: drop
-      - json: 
-          expressions:
-            metadata:
-      - json:
-          expressions:
-            namespace:
-          source: metadata
-      - labels:
-          namespace:
-      - static_labels:
-          type: kube-event
-      - labelallow:
-          - invoker
-          - type
-          - namespace
-      relabel_configs:
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: podnamespace
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
     server:
       http_listen_port: 3101
       log_level: warn
