@@ -85,7 +85,7 @@ class ConfigFile:
         return safe_get_attr(self.raw_parsed_yaml, "build_root.image_stream_tag.tag")
 
     def dump_build_root(self):
-        return dump_dict_subset(self.raw_parsed_yaml or {}, ["build_root"])
+        return dump_dict_subset(self.raw_parsed_yaml, ["build_root"])
 
     @property
     def ocp_release(self):
@@ -98,7 +98,7 @@ class ConfigFile:
         return f"{version}@{channel}"
 
     def dump_ocp_release(self):
-        return dump_dict_subset(self.raw_parsed_yaml or {}, ["releases"])
+        return dump_dict_subset(self.raw_parsed_yaml, ["releases"])
 
 
 @dataclasses.dataclass
@@ -221,6 +221,7 @@ def safe_get_attr(raw_data, attr_key):
 
 
 def dump_dict_subset(src_dict, keys):
+    src_dict = src_dict or {}
     subset = {key: src_dict[key] for key in keys if key in src_dict}
     return yaml.safe_dump(subset)
 
