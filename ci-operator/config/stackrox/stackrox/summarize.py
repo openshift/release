@@ -69,6 +69,19 @@ class ConfigFile:
     def dump_build_root(self):
         return dump_dict_subset(self.raw_parsed_yaml or {}, ["build_root"])
 
+    @property
+    def ocp_release(self):
+        if not safe_get_attr(self.raw_parsed_yaml, "releases"):
+            return ""
+        version = safe_get_attr(self.raw_parsed_yaml, "releases.latest.release.version")
+        if not version:
+            return "?"
+        channel = safe_get_attr(self.raw_parsed_yaml, "releases.latest.release.channel") or "?"
+        return f"{version}@{channel}"
+
+    def dump_ocp_release(self):
+        return dump_dict_subset(self.raw_parsed_yaml or {}, ["releases"])
+
 
 @dataclasses.dataclass
 class JobEntry:
@@ -337,15 +350,6 @@ def render_summary_tables_impl(buffer, data):
     def emit(txt):
         buffer.write(txt)
 
-    def cell(tag, content, css_class=None, html_escape=True):
-        return f"""<{tag} class="{css_class}"><div>{html.escape(content) if html_escape else content}</div></{tag}>"""
-
-    def th(content, css_class=None):
-        return cell("th", content, css_class=css_class)
-
-    def td(content, css_class=None, html_escape=True):
-        return cell("td", content, css_class=css_class, html_escape=html_escape)
-
     def write_tr(items, css_class=None):
         emit(f"""<tr class="{css_class}">""")
         for i in items:
@@ -421,8 +425,10 @@ def render_summary_tables_impl(buffer, data):
              [td(c.branch or "", css_class="vertical-text natural-vertical-alignment") for c in data.configs])
 
     write_tr([td("build root tag", css_class="header-cell")] +
-             [td(render_build_root(c), css_class="rotatable-cell natural-vertical-alignment", html_escape=False)
-              for c in data.configs])
+             [render_vertically_collapsible_cell(c.build_root_tag, c.dump_build_root()) for c in data.configs])
+
+    write_tr([td("ocp release", css_class="header-cell")] +
+             [render_vertically_collapsible_cell(c.ocp_release, c.dump_ocp_release()) for c in data.configs])
 
     emit(f"""
             <tr><td class="header-cell">tests</td><td colspan="{len(data.configs)}"></td></tr>
@@ -443,11 +449,23 @@ def render_summary_tables_impl(buffer, data):
     #########################################################
 
 
+def cell(tag, content, css_class=None, html_escape=True):
+    return f"""<{tag} class="{css_class}"><div>{html.escape(content) if html_escape else content}</div></{tag}>"""
+
+
+def th(content, css_class=None):
+    return cell("th", content, css_class=css_class)
+
+
+def td(content, css_class=None, html_escape=True):
+    return cell("td", content, css_class=css_class, html_escape=html_escape)
+
+
 def render_load_error(error):
     if error is None:
         return """<i class="bi bi-check" title="no error"></i>"""
     btn_text = """<i class="bi bi-bug-fill" title="YAML load error"></i>"""
-    return render_collapsible(btn_text, html.escape(str(error)))
+    return render_icon_collapsible(btn_text, html.escape(str(error)))
 
 
 def render_test_entry(entry):
@@ -465,7 +483,7 @@ def render_test_entry(entry):
         btn_text += """<i class="bi bi-funnel-fill" title="Run if changed"></i>"""
     if btn_text == "":
         btn_text = """<i class="bi bi-hand-thumbs-up" title="no interesting flags"></i>"""
-    return render_collapsible(btn_text, yaml_dump)
+    return render_icon_collapsible(btn_text, yaml_dump)
 
 
 def render_job_entry(entry):
@@ -489,25 +507,15 @@ def render_job_entry(entry):
             </span>
         """
 
-    return render_collapsible(btn_text, entry.dump_all_interesting_attrs())
+    return render_icon_collapsible(btn_text, entry.dump_all_interesting_attrs())
 
 
-def render_build_root(config):
-    if not config.build_root_tag:
-        return ""
-    return f"""
-        {html.escape(config.build_root_tag)}
-        <div class="collapse">
-            <pre>{html.escape(config.dump_build_root())}</pre>
-        </div>
-    """
-
-
-def render_collapsible(button_text, contents):
+def render_icon_collapsible(button_text, contents):
     # This ensures each collapsible has a unique id because ids in HTML must be unique and besides that's how the button
     # knows what to expand and collapse.
-    render_collapsible.next_id = (render_collapsible.next_id if hasattr(render_collapsible, "next_id") else 0) + 1
-    id = f"collapse-id-{render_collapsible.next_id}"
+    render_icon_collapsible.next_id = \
+        (render_icon_collapsible.next_id if hasattr(render_icon_collapsible, "next_id") else 0) + 1
+    id = f"collapse-id-{render_icon_collapsible.next_id}"
 
     return f"""
         <button
@@ -522,6 +530,17 @@ def render_collapsible(button_text, contents):
             <pre>{html.escape(contents)}</pre>
         </div>
     """
+
+
+def render_vertically_collapsible_cell(short_text, details):
+    if not short_text:
+        return td("")
+    return td(f"""
+        {html.escape(short_text)}
+        <div class="collapse">
+            <pre>{html.escape(details)}</pre>
+        </div>
+        """, css_class="rotatable-cell natural-vertical-alignment", html_escape=False)
 
 
 def render_doc(title, table_content):
