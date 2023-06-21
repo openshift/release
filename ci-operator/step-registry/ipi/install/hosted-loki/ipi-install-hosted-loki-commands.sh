@@ -212,10 +212,10 @@ data:
       - pack:
           labels:
           - boot_id
-          - systemd_unit
           - host
       - labelallow:
           - invoker
+          - systemd_unit
       - static_labels:
           type: journal
       relabel_configs:
