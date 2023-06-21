@@ -12,6 +12,6 @@ for PROJECT in ${ALL_PROJECTS//","/" "}; do
   for FILE in ./$PROJECT/target/failsafe-reports/*.xml; do
     FILENAME=$(basename $FILE)
     echo $FILENAME
-    cp $FILE ${ARTIFACT_DIR}/$FILENAME
+    cp $FILE ${ARTIFACT_DIR}/junit_${FILENAME}
   done
 done
