@@ -62,6 +62,13 @@ class ConfigFile:
     def branch(self):
         return safe_get_attr(self.raw_parsed_yaml, "zz_generated_metadata.branch")
 
+    @property
+    def build_root_tag(self):
+        return safe_get_attr(self.raw_parsed_yaml, "build_root.image_stream_tag.tag")
+
+    def dump_build_root(self):
+        return dump_dict_subset(self.raw_parsed_yaml or {}, ["build_root"])
+
 
 @dataclasses.dataclass
 class JobEntry:
@@ -99,12 +106,9 @@ class JobEntry:
         if self.raw_entry is None:
             return ""
 
-        subset = {
-            key: self.raw_entry[key] for key in
-            ["always_run", "run_if_changed", "skip_if_only_changed", "skip_report", "max_concurrency"]
-            if key in self.raw_entry
-        }
-        return yaml.safe_dump(subset)
+        return dump_dict_subset(
+            self.raw_entry,
+            ["always_run", "run_if_changed", "skip_if_only_changed", "skip_report", "max_concurrency"])
 
 
 @dataclasses.dataclass
@@ -177,6 +181,11 @@ def safe_get_attr(raw_data, attr_key):
             return None
         location = location[key_part]
     return location
+
+
+def dump_dict_subset(src_dict, keys):
+    subset = {key: src_dict[key] for key in keys if key in src_dict}
+    return yaml.safe_dump(subset)
 
 
 #########################################################
@@ -350,11 +359,12 @@ def render_summary_tables_impl(buffer, data):
         <h4>Presubmit jobs summary</h4>
         <p><code>{html.escape(data.jobs_dir_relative)}</code></p>
         <table
-            class="table table-bordered table-hover table-striped disable-wrap rotatable-header sticky-header">
+            class="table table-bordered table-hover table-striped disable-wrap sticky-header">
             <thead>
     """)
 
-    write_tr([th("")] + [th(j.short_filename, css_class="natural-vertical-alignment") for j in data.jobs_files])
+    write_tr([th("")] +
+             [th(j.short_filename, css_class="natural-vertical-alignment rotatable-cell") for j in data.jobs_files])
 
     emit("""
             </thead>
@@ -388,11 +398,12 @@ def render_summary_tables_impl(buffer, data):
         <h4>Config summary</h4>
         <p><code>{html.escape(data.config_dir_relative)}</code></p>
         <table
-            class="table table-bordered table-hover table-striped disable-wrap rotatable-header sticky-header">
+            class="table table-bordered table-hover table-striped disable-wrap sticky-header">
             <thead>
         """)
 
-    write_tr([th("")] + [th(c.short_filename, css_class="natural-vertical-alignment") for c in data.configs])
+    write_tr([th("")] +
+             [th(c.short_filename, css_class="natural-vertical-alignment rotatable-cell") for c in data.configs])
 
     emit("""
             </thead>
@@ -404,6 +415,10 @@ def render_summary_tables_impl(buffer, data):
 
     write_tr([td("branch", css_class="header-cell")] +
              [td(c.branch or "", css_class="vertical-text natural-vertical-alignment") for c in data.configs])
+
+    write_tr([td("build root tag", css_class="header-cell")] +
+             [td(render_build_root(c), css_class="rotatable-cell natural-vertical-alignment", html_escape=False)
+              for c in data.configs])
 
     emit(f"""
             <tr><td class="header-cell">tests</td><td colspan="{len(data.configs)}"></td></tr>
@@ -473,6 +488,17 @@ def render_job_entry(entry):
     return render_collapsible(btn_text, entry.dump_all_interesting_attrs())
 
 
+def render_build_root(config):
+    if not config.build_root_tag:
+        return ""
+    return f"""
+        {html.escape(config.build_root_tag)}
+        <div class="collapse">
+            <pre>{html.escape(config.dump_build_root())}</pre>
+        </div>
+    """
+
+
 def render_collapsible(button_text, contents):
     # This ensures each collapsible has a unique id because ids in HTML must be unique and besides that's how the button
     # knows what to expand and collapse.
@@ -526,6 +552,12 @@ page = """
             writing-mode: vertical-rl;
             transform: rotate(180deg);
         }
+        .vertical-text button {
+            padding-left: 4px;
+            padding-right: 3px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
         .sticky-header thead th {
             /* Credits to https://stackoverflow.com/a/49510703/484050 */
             position: sticky;
@@ -564,22 +596,25 @@ page = """
     
     <!-- This page custom script -->
     <script>
-        function toggleVertical(elt) {
+        function toggleRotation(elt) {
             $(elt).toggleClass("vertical-text");
             let icon = $(elt).find("div button i");
+            let collapsibles = $(elt).find(".collapse");
             if ($(elt).hasClass("vertical-text")) {
-                icon.attr("class", "bi bi-arrows-angle-expand");
+                icon.attr("class", "bi bi-arrows-expand");
+                collapsibles.removeClass("show");
             } else {
-                icon.attr("class", "bi bi-arrows-angle-contract");
+                icon.attr("class", "bi bi-arrows-collapse");
+                collapsibles.addClass("show");
             }
         }
     
         $(document).ready(function() {
-            let headers = $(".rotatable-header th");
-            headers.children("div").prepend('<button type="button" class="btn btn-outline-secondary btn-sm"><i></i></button> ');
-            headers.each(function() { toggleVertical(this); });
-            headers.find("div button").on("click", function() {
-                toggleVertical($(this).closest("th"));
+            let rotatables = $(".rotatable-cell");
+            rotatables.children("div").prepend('<button type="button" class="btn btn-outline-secondary btn-sm"><i></i></button> ');
+            rotatables.each(function() { toggleRotation(this); });
+            rotatables.find("div button").on("click", function() {
+                toggleRotation($(this).closest(".rotatable-cell"));
             });
         });
     </script>
