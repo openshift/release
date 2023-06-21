@@ -630,6 +630,7 @@ page = """
             transform: rotate(180deg);
         }
         .vertical-text button {
+            /* Makes icon-button look a bit more square when text is rotated. */
             padding-left: 4px;
             padding-right: 3px;
             padding-top: 8px;
