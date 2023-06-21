@@ -28,7 +28,7 @@ class BaseImageEntry:
 
     @property
     def tag(self):
-        return safe_get_attr(self.raw_entry, "tag")
+        return safe_get_attr(self.raw_entry, "tag", coalesce_to="?")
 
 
 @dataclasses.dataclass
@@ -79,7 +79,7 @@ class ConfigFile:
 
     @property
     def branch(self):
-        return safe_get_attr(self.raw_parsed_yaml, "zz_generated_metadata.branch")
+        return safe_get_attr(self.raw_parsed_yaml, "zz_generated_metadata.branch", coalesce_to="")
 
     @property
     def build_root_tag(self):
@@ -95,7 +95,7 @@ class ConfigFile:
         version = safe_get_attr(self.raw_parsed_yaml, "releases.latest.release.version")
         if not version:
             return "?"
-        channel = safe_get_attr(self.raw_parsed_yaml, "releases.latest.release.channel") or "?"
+        channel = safe_get_attr(self.raw_parsed_yaml, "releases.latest.release.channel", coalesce_to="?")
         return f"{version}@{channel}"
 
     def dump_ocp_release(self):
@@ -204,7 +204,7 @@ class Data:
         return [c.base_images for c in self.configs]
 
 
-def safe_get_attr(raw_data, attr_key):
+def safe_get_attr(raw_data, attr_key, coalesce_to=None):
     """
     Traverses `raw_data` data structure of nested maps and returns an attribute pointed by `attr_key`.
     I.e. this is some kind of poor-man's XPath.
@@ -218,13 +218,17 @@ def safe_get_attr(raw_data, attr_key):
         if key_part not in location:
             return None
         location = location[key_part]
-    return location
+    return coalesce(location, default=coalesce_to)
 
 
 def dump_dict_subset(src_dict, keys):
-    src_dict = src_dict or {}
+    src_dict = coalesce(src_dict, {})
     subset = {key: src_dict[key] for key in keys if key in src_dict}
     return yaml.safe_dump(subset)
+
+
+def coalesce(val, default):
+    return val if val is not None else default
 
 
 #########################################################
@@ -293,7 +297,7 @@ def sort_by_short_names(items):
 def populate_unordered_tests(configs):
     for c in configs:
         c.unordered_entries = []
-        for raw_test in safe_get_attr(c.raw_parsed_yaml, "tests") or []:
+        for raw_test in safe_get_attr(c.raw_parsed_yaml, "tests", coalesce_to=[]):
             te = TestEntry(raw_entry=raw_test)
             if te.name:
                 c.unordered_entries.append(te)
@@ -302,7 +306,7 @@ def populate_unordered_tests(configs):
 def populate_unordered_jobs(jobs_files):
     for j in jobs_files:
         j.unordered_entries = []
-        presubmits_dict = safe_get_attr(j.raw_parsed_yaml, "presubmits") or {}
+        presubmits_dict = safe_get_attr(j.raw_parsed_yaml, "presubmits", coalesce_to={})
         if len(presubmits_dict) == 0:
             continue
         if len(presubmits_dict) > 1:
@@ -319,7 +323,7 @@ def populate_unordered_jobs(jobs_files):
 
 def populate_base_image_entries(configs):
     for c in configs:
-        base_images_raw = safe_get_attr(c.raw_parsed_yaml, "base_images") or {}
+        base_images_raw = safe_get_attr(c.raw_parsed_yaml, "base_images", coalesce_to={})
         unordered_entries = []
         for name, image_raw in base_images_raw.items():
             unordered_entries.append(BaseImageEntry(name=name, raw_entry=image_raw))
@@ -461,7 +465,7 @@ def render_summary_tables_impl(buffer, data):
              [td(render_load_error(c.load_error), html_escape=False) for c in data.configs])
 
     write_tr([td("branch", css_class="header-cell")] +
-             [td(c.branch or "", css_class="vertical-text natural-vertical-alignment") for c in data.configs])
+             [td(c.branch, css_class="vertical-text natural-vertical-alignment") for c in data.configs])
 
     write_tr([td("ocp release", css_class="header-cell")] +
              [render_vertically_collapsible_cell(c.ocp_release, c.dump_ocp_release()) for c in data.configs])
@@ -583,7 +587,7 @@ def render_icon_collapsible(button_text, contents):
 def render_base_image_entry(entry):
     if not entry:
         return td("")
-    return render_vertically_collapsible_cell(entry.tag or "?", yaml.safe_dump(entry.raw_entry))
+    return render_vertically_collapsible_cell(entry.tag, yaml.safe_dump(entry.raw_entry))
 
 
 def render_vertically_collapsible_cell(short_text, details):
