@@ -17,12 +17,17 @@ BASE_DOMAIN_RESOURCE_GROUP_NAME=$(fgrep 'baseDomainResourceGroupName:' ${CONFIG}
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
 # jq is not available in the ci image...
-# AZURE_AUTH_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
-AZURE_AUTH_SUBSCRIPTION_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep subscriptionId | cut -d ":" -f2)
-# AZURE_AUTH_CLIENT_ID="$(jq -r .clientId ${AZURE_AUTH_LOCATION})"
-AZURE_AUTH_CLIENT_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep clientId | cut -d ":" -f2)
-# AZURE_AUTH_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
-AZURE_AUTH_CLIENT_SECRET=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep clientSecret | cut -d ":" -f2)
+# AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
+AZURE_SUBSCRIPTION_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep subscriptionId | cut -d ":" -f2)
+# AZURE_TENANT_ID="$(jq -r .tenantId ${AZURE_AUTH_LOCATION})"
+AZURE_TENANT_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep tenantId | cut -d ":" -f2)
+export AZURE_TENANT_ID
+# AZURE_CLIENT_ID="$(jq -r .clientId ${AZURE_AUTH_LOCATION})"
+AZURE_CLIENT_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep clientId | cut -d ":" -f2)
+export AZURE_CLIENT_ID
+# AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
+AZURE_CLIENT_SECRET=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep clientSecret | cut -d ":" -f2)
+export AZURE_CLIENT_SECRET
 
 # extract azure credentials requests from the release image
 oc registry login
@@ -32,41 +37,11 @@ oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credreque
 ccoctl azure create-all \
   --name="${CLUSTER_NAME}" \
   --region="${REGION}" \
-  --subscription-id="${AZURE_AUTH_SUBSCRIPTION_ID}" \
+  --subscription-id="${AZURE_SUBSCRIPTION_ID}" \
   --credentials-requests-dir="/tmp/credrequests" \
   --dnszone-resource-group-name="${BASE_DOMAIN_RESOURCE_GROUP_NAME}" \
   --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
   --output-dir="/tmp"
-
-# revert non-compatible operators to use clientSecret authentication
-# TODO: remove this block once all operators are compatible
-CREDS="/tmp/credrequests"
-for file in ${MPREFIX}/*-credentials.yaml; do
-  _name=$(fgrep 'name:' $file | tr -d " " | cut -d ":" -f2)
-  _namespace=$(fgrep 'namespace:' $file | tr -d " " | cut -d ":" -f2)
-  # continue when either variable is empty
-  if [ -z "$_name" ] || [ -z "$_namespace" ]; then continue; fi
-  # loop through creds for the matching credential
-  for file2 in ${CREDS}/*; do
-    if grep "$_name" "$file2" > /dev/null && grep "$_namespace" "$file2" > /dev/null; then
-      # determine if the cred has serviceAccountNames configured
-      if grep 'serviceAccountNames:' $file2 > /dev/null; then
-        echo "${file}: using federatedToken"
-      else
-        echo "${file}: reverted to use clientSecret"
-        # revert to using clientSecret
-        python -c "import yaml; \
-  path = '${file}'; \
-  data = yaml.full_load(open(path)); \
-  data['stringData']['azure_client_id'] = '${AZURE_AUTH_CLIENT_ID}'; \
-  data['stringData']['azure_client_secret'] = '${AZURE_AUTH_CLIENT_SECRET}'; \
-  del data['stringData']['azure_federated_token_file']; \
-  open(path, 'w').write(yaml.dump(data, default_flow_style=False));"
-      fi
-      break
-    fi
-  done
-done
 
 # Output authentication file for ci logs
 echo "Cluster authentication:"
