@@ -356,7 +356,9 @@ def render_summary_tables_impl(buffer, data):
     #### Presubmits
 
     emit(f"""
-        <h4>Presubmit jobs summary</h4>
+        <h4 id="presubmit-jobs-summary">Presubmit jobs summary
+            <a class="anchor-link" href="#presubmit-jobs-summary">#</a>
+        </h4>
         <p><code>{html.escape(data.jobs_dir_relative)}</code></p>
         <table
             class="table table-bordered table-hover table-striped disable-wrap sticky-header">
@@ -395,7 +397,9 @@ def render_summary_tables_impl(buffer, data):
     #### Configs
 
     emit(f"""
-        <h4>Config summary</h4>
+        <h4 id="config-summary">Config summary
+            <a class="anchor-link" href="#config-summary">#</a>
+        </h4>
         <p><code>{html.escape(data.config_dir_relative)}</code></p>
         <table
             class="table table-bordered table-hover table-striped disable-wrap sticky-header">
@@ -582,6 +586,14 @@ page = """
         .header-cell {
             text-align:center;
             font-weight:bold;
+        }
+        .anchor-link {
+            opacity: 0;
+            transition: color 0.15s ease-in-out,opacity 0.15s ease-in-out;
+            text-decoration: none;
+        }
+        .anchor-link:focus, .anchor-link:hover {
+            opacity: 1;
         }
     </style>
     
