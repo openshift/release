@@ -22,6 +22,22 @@ import yaml
 
 
 @dataclasses.dataclass
+class BaseImageEntry:
+    name: str
+    raw_entry: typing.Any
+
+    @property
+    def tag(self):
+        return safe_get_attr(self.raw_entry, "tag")
+
+
+@dataclasses.dataclass
+class BaseImageEntries:
+    unordered_entries: typing.List[BaseImageEntry] = None
+    ordered_entries: typing.List[BaseImageEntry] = None
+
+
+@dataclasses.dataclass
 class TestEntry:
     raw_entry: typing.Any
 
@@ -57,6 +73,8 @@ class ConfigFile:
 
     unordered_entries: typing.List[TestEntry] = None
     ordered_entries: typing.List[TestEntry] = None
+
+    base_images: BaseImageEntries = None
 
     @property
     def branch(self):
@@ -145,6 +163,8 @@ class Data:
     all_test_names: typing.List[str] = None
     configs: typing.List[ConfigFile] = None
 
+    all_base_image_names: typing.List[str] = None
+
     all_job_names: typing.List[str] = None
     jobs_files: typing.List[JobsFile] = None
 
@@ -177,6 +197,10 @@ class Data:
         abs_dir_parts = dir.resolve().parts
         idx = abs_dir_parts.index("ci-operator")
         return "/".join(abs_dir_parts[idx:])
+
+    @property
+    def base_images(self):
+        return [c.base_images for c in self.configs]
 
 
 def safe_get_attr(raw_data, attr_key):
@@ -211,17 +235,21 @@ def load_and_massage_data(dir):
     d.configs = load_raw_yamls(d.config_dir, constructor_fn=ConfigFile)
     assign_short_filenames(d.configs)
     d.configs = sort_by_short_names(d.configs)
-    assign_unordered_tests(d.configs)
-    d.all_test_names = extract_and_sort_unique_names(d.configs)
+    populate_unordered_tests(d.configs)
+    d.all_test_names = extract_and_sort_unique_names(d.configs, use_stackrox_sort_key=True)
     assign_ordered_entries(d.all_test_names, d.configs)
+
+    populate_base_image_entries(d.configs)
+    d.all_base_image_names = extract_and_sort_unique_names(d.base_images, use_stackrox_sort_key=False)
+    assign_ordered_entries(d.all_base_image_names, d.base_images)
 
     d.jobs_files = load_raw_yamls(d.jobs_dir, constructor_fn=JobsFile)
     # Postsubmits and periodics have much less degree of customization, so we filter them out.
     d.jobs_files = filter_out_all_but_presubmits_jobs_files(d.jobs_files)
     assign_short_filenames(d.jobs_files)
     d.jobs_files = sort_by_short_names(d.jobs_files)
-    assign_unordered_jobs(d.jobs_files)
-    d.all_job_names = extract_and_sort_unique_names(d.jobs_files)
+    populate_unordered_jobs(d.jobs_files)
+    d.all_job_names = extract_and_sort_unique_names(d.jobs_files, use_stackrox_sort_key=True)
     assign_ordered_entries(d.all_job_names, d.jobs_files)
 
     d.git_describe_output = describe_git(d.config_dir)
@@ -260,7 +288,7 @@ def sort_by_short_names(items):
     return sorted(items, key=lambda c: c.short_filename)
 
 
-def assign_unordered_tests(configs):
+def populate_unordered_tests(configs):
     for c in configs:
         c.unordered_entries = []
         for raw_test in safe_get_attr(c.raw_parsed_yaml, "tests") or []:
@@ -269,7 +297,7 @@ def assign_unordered_tests(configs):
                 c.unordered_entries.append(te)
 
 
-def assign_unordered_jobs(jobs_files):
+def populate_unordered_jobs(jobs_files):
     for j in jobs_files:
         j.unordered_entries = []
         presubmits_dict = safe_get_attr(j.raw_parsed_yaml, "presubmits") or {}
@@ -287,7 +315,16 @@ def assign_unordered_jobs(jobs_files):
                 j.unordered_entries.append(je)
 
 
-def extract_and_sort_unique_names(items):
+def populate_base_image_entries(configs):
+    for c in configs:
+        base_images_raw = safe_get_attr(c.raw_parsed_yaml, "base_images") or {}
+        unordered_entries = []
+        for name, image_raw in base_images_raw.items():
+            unordered_entries.append(BaseImageEntry(name=name, raw_entry=image_raw))
+        c.base_images = BaseImageEntries(unordered_entries=unordered_entries)
+
+
+def extract_and_sort_unique_names(items, use_stackrox_sort_key=False):
     """
     Collects and orders unique names of each entry in unordered_entries of each item.
     Works both with ConfigFile/TestEntry and JobsFile/JobEntry.
@@ -304,7 +341,7 @@ def extract_and_sort_unique_names(items):
     for x in items:
         for y in x.unordered_entries:
             all_names_set.add(y.name)
-    return sorted(all_names_set, key=stackrox_sort_key)
+    return sorted(all_names_set, key=stackrox_sort_key if use_stackrox_sort_key else None)
 
 
 def assign_ordered_entries(all_names, items):
@@ -424,11 +461,20 @@ def render_summary_tables_impl(buffer, data):
     write_tr([td("branch", css_class="header-cell")] +
              [td(c.branch or "", css_class="vertical-text natural-vertical-alignment") for c in data.configs])
 
+    write_tr([td("ocp release", css_class="header-cell")] +
+             [render_vertically_collapsible_cell(c.ocp_release, c.dump_ocp_release()) for c in data.configs])
+
     write_tr([td("build root tag", css_class="header-cell")] +
              [render_vertically_collapsible_cell(c.build_root_tag, c.dump_build_root()) for c in data.configs])
 
-    write_tr([td("ocp release", css_class="header-cell")] +
-             [render_vertically_collapsible_cell(c.ocp_release, c.dump_ocp_release()) for c in data.configs])
+    emit(f"""
+            <tr><td class="header-cell">base images</td><td colspan="{len(data.configs)}"></td></tr>
+        """)
+
+    for i_row in range(len(data.all_base_image_names)):
+        write_tr(
+            [td(data.all_base_image_names[i_row], css_class="right-aligned")] +
+            [render_base_image_entry(c.base_images.ordered_entries[i_row]) for c in data.configs])
 
     emit(f"""
             <tr><td class="header-cell">tests</td><td colspan="{len(data.configs)}"></td></tr>
@@ -530,6 +576,12 @@ def render_icon_collapsible(button_text, contents):
             <pre>{html.escape(contents)}</pre>
         </div>
     """
+
+
+def render_base_image_entry(entry):
+    if not entry:
+        return td("")
+    return render_vertically_collapsible_cell(entry.tag or "?", yaml.safe_dump(entry.raw_entry))
 
 
 def render_vertically_collapsible_cell(short_text, details):
