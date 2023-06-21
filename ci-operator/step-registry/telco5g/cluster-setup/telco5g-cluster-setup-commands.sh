@@ -326,7 +326,8 @@ cat << EOF > $SHARED_DIR/send-mail.yml
         port: 25
         from: telco5g-ci@redhat.com (Upstream CI reporter)
         to: CNF devel <cnf-devel@redhat.com>
-        subject: [US/CI] RESULTPH job ${JOB_NAME:-'unknown'}
+        subject: >-
+          [US CI] RESULTPH job ${JOB_NAME:-'unknown'}
         subtype: html
         body: "{{ report['content'] | b64decode }}"
 
