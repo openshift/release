@@ -239,11 +239,11 @@ def load_and_massage_data(dir):
     d.configs = sort_by_short_names(d.configs)
     populate_unordered_tests(d.configs)
     d.all_test_names = extract_and_sort_unique_names(d.configs, use_stackrox_sort_key=True)
-    assign_ordered_entries(d.all_test_names, d.configs)
+    populate_ordered_entries(d.all_test_names, d.configs)
 
     populate_base_image_entries(d.configs)
     d.all_base_image_names = extract_and_sort_unique_names(d.base_images, use_stackrox_sort_key=False)
-    assign_ordered_entries(d.all_base_image_names, d.base_images)
+    populate_ordered_entries(d.all_base_image_names, d.base_images)
 
     d.jobs_files = load_raw_yamls(d.jobs_dir, constructor_fn=JobsFile)
     # Postsubmits and periodics have much less degree of customization, so we filter them out.
@@ -252,7 +252,7 @@ def load_and_massage_data(dir):
     d.jobs_files = sort_by_short_names(d.jobs_files)
     populate_unordered_jobs(d.jobs_files)
     d.all_job_names = extract_and_sort_unique_names(d.jobs_files, use_stackrox_sort_key=True)
-    assign_ordered_entries(d.all_job_names, d.jobs_files)
+    populate_ordered_entries(d.all_job_names, d.jobs_files)
 
     d.git_describe_output = describe_git(d.config_dir)
 
@@ -346,7 +346,7 @@ def extract_and_sort_unique_names(items, use_stackrox_sort_key=False):
     return sorted(all_names_set, key=stackrox_sort_key if use_stackrox_sort_key else None)
 
 
-def assign_ordered_entries(all_names, items):
+def populate_ordered_entries(all_names, items):
     """Makes each item's ordered_entries to match the size and positions of elements in `all_names`."""
     for x in items:
         result = [None] * len(all_names)
