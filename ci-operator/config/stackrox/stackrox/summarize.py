@@ -33,6 +33,7 @@ class BaseImageEntry:
 
 @dataclasses.dataclass
 class BaseImageEntries:
+    """`base_images` attribute of config YAML file (the one under `ci-operator/config/**` directory)."""
     unordered_entries: typing.List[BaseImageEntry] = None
     ordered_entries: typing.List[BaseImageEntry] = None
 
