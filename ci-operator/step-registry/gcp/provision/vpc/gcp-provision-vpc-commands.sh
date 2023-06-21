@@ -30,7 +30,7 @@ cp -t "${dir}" \
 ## Create the VPC
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 REGION="${LEASED_RESOURCE}"
 MASTER_SUBNET_CIDR='10.0.0.0/19'
 WORKER_SUBNET_CIDR='10.0.32.0/19'

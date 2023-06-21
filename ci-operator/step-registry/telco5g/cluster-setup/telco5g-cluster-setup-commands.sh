@@ -104,6 +104,7 @@ ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.y
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
 PLAN_NAME="${CLUSTER_NAME}_ci"
+echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
@@ -303,6 +304,31 @@ cat << EOF > $SHARED_DIR/destroy-cluster.yml
     shell: kcli delete plan -y ${PLAN_NAME}
     args:
       chdir: ~/kcli-openshift4-baremetal
+
+EOF
+
+cat << EOF > $SHARED_DIR/send-mail.yml
+---
+- name: Send mail report
+  hosts: bastion
+  gather_facts: false
+  tasks:
+
+    - name: Get content of the file
+      slurp:
+        src: ${ARTIFACT_DIR}/mail_report.html
+      register: report
+      delegate_to: localhost
+
+    - name: Sending an e-mail
+      mail:
+        host: smtp.corp.redhat.com
+        port: 25
+        from: telco5g-ci@redhat.com (Upstream CI reporter)
+        to: CNF devel <cnf-devel@redhat.com>
+        subject: [US/CI] RESULTPH job ${JOB_NAME:-'unknown'}
+        subtype: html
+        body: "{{ report['content'] | b64decode }}"
 
 EOF
 
