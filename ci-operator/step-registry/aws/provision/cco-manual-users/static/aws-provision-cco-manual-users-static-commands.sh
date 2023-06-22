@@ -99,7 +99,7 @@ function remove_tech_preview_feature_from_manifests()
 }
 
 oc registry login
-prefix="${NAMESPACE}-${JOB_NAME_HASH}-`echo $RANDOM`"
+prefix="${NAMESPACE}-${UNIQUE_HASH}-`echo $RANDOM`"
 cr_yaml_d=`mktemp -d`
 cr_json_d=`mktemp -d`
 resources_d=`mktemp -d`

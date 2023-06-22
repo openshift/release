@@ -42,9 +42,9 @@ tests:
   steps:
     cluster_profile: aws-2
     env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_TYPE: m6i.4xlarge
       HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.19-multi
-      HYPERSHIFT_NODE_COUNT: "6"
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: redhat-appstudio-e2e
     workflow: redhat-appstudio-install
@@ -153,6 +153,26 @@ tests:
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
 - always_run: false
+  as: max-concurrency-basic
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: max-concurrency-basic
+    test:
+    - ref: redhat-appstudio-load-test-max-concurrency
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: max-concurrency-advanced
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: max-concurrency-advanced
+    test:
+    - ref: redhat-appstudio-load-test-max-concurrency
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
   as: load-test-ci-5u-20t
   steps:
     cluster_profile: aws
@@ -174,6 +194,32 @@ tests:
     cluster_profile: aws
     env:
       SCENARIO: ci-1u-100t
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-tekton-tuning-base
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: tekton-tuning-base
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-tekton-tuning-tuned
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: tekton-tuning-tuned
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
+- always_run: false
+  as: load-test-ci-max-concurrency-basic-tekton-tuned
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: max-concurrency-basic-tekton-tuned
+    test:
+    - ref: redhat-appstudio-load-test-max-concurrency
     workflow: redhat-appstudio-load-test
   timeout: 8h0m0s
 zz_generated_metadata:

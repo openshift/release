@@ -7,17 +7,14 @@ set -o verbose
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-RUN_COMMAND="
-    --kubeconfig ${KUBECONFIG} \
-    --timeout ${TIMEOUT} \
-    "
+RUN_COMMAND="poetry run python app/cli.py operators --kubeconfig ${KUBECONFIG} "
 
 OPERATORS_CMD=""
-for i in {1..6}; do
-  OPERATOR_VALUE=$(eval "echo $"OPERATOR$i"_CONFIG")
-  if [[ -n $OPERATOR_VALUE ]]; then
-    OPERATORS_CMD+=" --operators ${OPERATOR_VALUE}"
-  fi
+for operator_value in $(env | grep -E '^OPERATOR[0-9]+_CONFIG'); do
+    operator_value=$(echo "$operator_value" | sed -E  's/^OPERATOR[0-9]+_CONFIG=//')
+    if  [ "${operator_value}" ]; then
+      OPERATORS_CMD+=" --operator ${operator_value} "
+    fi
 done
 
 RUN_COMMAND="${RUN_COMMAND} ${OPERATORS_CMD}"
@@ -26,8 +23,8 @@ if [ -n "${PARALLEL}" ]; then
     RUN_COMMAND+=" --parallel"
 fi
 
-echo "$RUN_COMMAND"
+RUN_COMMAND+=" install"
 
-poetry run python app/cli.py operator \
-    ${RUN_COMMAND} \
-    install
+echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
+
+${RUN_COMMAND}

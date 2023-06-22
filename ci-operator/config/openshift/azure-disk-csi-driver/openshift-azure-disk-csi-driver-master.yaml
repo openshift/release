@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/kubernetes-sigs/azuredisk-csi-driver
@@ -55,6 +59,12 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi
+- as: e2e-azure-csi-extended
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-Disk-CSI-Driver\]
+    workflow: openshift-e2e-azure-csi-extended
 zz_generated_metadata:
   branch: master
   org: openshift

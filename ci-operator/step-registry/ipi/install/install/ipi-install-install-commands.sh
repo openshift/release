@@ -403,6 +403,10 @@ dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
 mkdir -p ~/.ssh
@@ -449,10 +453,6 @@ if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   wait "$!"
   inject_promtail_service
 fi
-
-echo "install-config.yaml"
-echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 if [ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-}" == "true" ]; then
 	echo "Cluster will be created with public subnets only"

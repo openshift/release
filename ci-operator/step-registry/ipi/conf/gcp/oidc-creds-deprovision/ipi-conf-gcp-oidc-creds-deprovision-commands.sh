@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-infra_name=${NAMESPACE}-${JOB_NAME_HASH}
+infra_name=${NAMESPACE}-${UNIQUE_HASH}
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"

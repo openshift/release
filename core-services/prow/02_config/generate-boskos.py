@@ -185,6 +185,7 @@ CONFIG = {
     'vsphere-quota-slice':{},
     'vsphere-8-quota-slice':{},
     'vsphere-discon-quota-slice':{},
+    'vsphere-dis-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
     'vsphere-connected-quota-slice':{},
     'vsphere-multizone-quota-slice':{},
@@ -219,6 +220,12 @@ CONFIG = {
     },
     'ibmcloud-qe-quota-slice': {
         'jp-tok': 10,
+    },
+    'ibmcloud-multi-ppc64le-quota-slice': {
+        'jp-osa': 3,
+    },
+    'ibmcloud-multi-s390x-quota-slice': {
+        'ca-tor': 3,
     },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
@@ -292,8 +299,11 @@ for i in range(94,109):
 for i in range(56,60):
     CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(60,62):
+for i in range(60,64):
     CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
+
+for i in range(230,235):
+    CONFIG['vsphere-dis-quota-slice']['devqe-segment-{}-disconnected'.format(i)] = 1
 
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
