@@ -222,6 +222,23 @@ EOF
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 
+if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
+  mapfile -t local_zones < <(aws --region "${aws_source_region}" ec2 describe-availability-zones \
+    --filter Name=state,Values=available Name=zone-type,Values=local-zone \
+    | jq -r '.AvailabilityZones[].ZoneName' | sort -u | tail -n 1)
+  local_zones_str="[ $(join_by , "${local_zones[@]}") ]"
+  PATCH_EDGE="${SHARED_DIR}/install-config-edge.yaml.patch"
+  cat > "${PATCH_EDGE}" << EOF
+compute:
+- architecture: ${architecture}
+  name: edge
+  platform:
+    aws:
+      zones: ${local_zones_str}
+EOF
+  yq-go m -x -i "${CONFIG}" "${PATCH_EDGE}"
+fi
+
 printf '%s' "${USER_TAGS:-}" | while read -r TAG VALUE
 do
   printf 'Setting user tag %s: %s\n' "${TAG}" "${VALUE}"
