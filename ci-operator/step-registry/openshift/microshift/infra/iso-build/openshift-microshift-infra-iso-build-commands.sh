@@ -48,6 +48,10 @@ chmod +x /tmp/iso.sh
 
 tar czf /tmp/microshift.tgz /microshift
 
+
+sleep 120m
+exit 1
+
 scp \
   /rpms.tar \
   /tmp/iso.sh \
