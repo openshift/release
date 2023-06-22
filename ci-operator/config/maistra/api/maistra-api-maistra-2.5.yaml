@@ -1,0 +1,59 @@
+build_root:
+  image_stream_tag:
+    name: maistra-builder
+    namespace: ci
+    tag: "2.5"
+  use_build_cache: true
+resources:
+  '*':
+    limits:
+      memory: 2Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: api-unit-2-5
+  commands: |
+    make test \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
+  container:
+    from: src
+- as: api-gencheck-2-5
+  commands: |
+    make gen-check \
+    GOBIN="/gobin" \
+    GOCACHE="/tmp/cache" \
+    GOMODCACHE="/tmp/cache" \
+    XDG_CACHE_HOME="/tmp/cache"
+  container:
+    from: src
+- as: api-update-istio-2-5
+  commands: |
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio \
+      -f /creds-github/token \
+      "-c UPDATE_BRANCH=${PULL_BASE_SHA} bin/update_maistra_deps.sh" \
+      '-t [maistra-2.5] Automator: Update maistra/api dependency' \
+      -m update_api_istio-2.5 \
+      -b maistra-2.5
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
+zz_generated_metadata:
+  branch: maistra-2.5
+  org: maistra
+  repo: api
