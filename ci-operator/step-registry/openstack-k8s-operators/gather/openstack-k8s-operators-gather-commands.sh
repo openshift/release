@@ -26,9 +26,11 @@ function gen_pods_debug_cmd {
   local cmd
   if [ -z "${2}" ]; then
     cmd=("echo 'Logs for pod: {}'; oc -n ${1} describe pod {} > {}-describe.log; oc -n ${1} logs --prefix=true --all-containers=true {} >> {}-containers.log")
+    cmd+=("; if oc -n ${1} describe pod {} | grep -q 'State:.*Terminated'; then oc -n ${1} logs --prefix=true --previous --all-containers=true {} >> {}-previous-containers.log; fi")
   else
     create_out_dir ${2}
     cmd=("echo 'Logs for pod: {}'; oc -n ${1} describe pod {} > ${2}/{}-describe.log; oc -n ${1} logs --prefix=true --all-containers=true {} >> ${2}/{}-containers.log")
+    cmd+=("; if oc -n ${1} describe pod {} | grep -q 'State:.*Terminated'; then oc -n ${1} logs --prefix=true --previous --all-containers=true {} >> ${2}/{}-previous-containers.log; fi")
   fi
   echo "${cmd[@]}"
 }
