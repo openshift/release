@@ -16,20 +16,50 @@ CONFIG="${SHARED_DIR}/install-config.yaml"
 BASE_DOMAIN_RESOURCE_GROUP_NAME=$(fgrep 'baseDomainResourceGroupName:' ${CONFIG} | cut -d ":" -f2 | tr -d " ")
 
 AZURE_AUTH_LOCATION="${CLUSTER_PROFILE_DIR}/osServicePrincipal.json"
+if [ ! -f "$AZURE_AUTH_LOCATION" ]; then
+    echo "File not found: $AZURE_AUTH_LOCATION"
+    exit 1
+fi
+
 # jq is not available in the ci image...
 # AZURE_SUBSCRIPTION_ID="$(jq -r .subscriptionId ${AZURE_AUTH_LOCATION})"
-AZURE_SUBSCRIPTION_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep subscriptionId | cut -d ":" -f2)
+AZURE_SUBSCRIPTION_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\" ' | tr "," "\n" | grep subscriptionId | cut -d ":" -f2)
+if [ -z "$AZURE_SUBSCRIPTION_ID" ]; then
+    echo "AZURE_SUBSCRIPTION_ID is empty"
+    exit 1
+fi
+
 # AZURE_TENANT_ID="$(jq -r .tenantId ${AZURE_AUTH_LOCATION})"
-AZURE_TENANT_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep tenantId | cut -d ":" -f2)
+AZURE_TENANT_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\" ' | tr "," "\n" | grep tenantId | cut -d ":" -f2)
 export AZURE_TENANT_ID
+if [ -z "$AZURE_TENANT_ID" ]; then
+    echo "AZURE_TENANT_ID is empty"
+    exit 1
+fi
+
 # AZURE_CLIENT_ID="$(jq -r .clientId ${AZURE_AUTH_LOCATION})"
-AZURE_CLIENT_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep clientId | cut -d ":" -f2)
+AZURE_CLIENT_ID=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\" ' | tr "," "\n" | grep clientId | cut -d ":" -f2)
 export AZURE_CLIENT_ID
+if [ -z "$AZURE_CLIENT_ID" ]; then
+    echo "AZURE_CLIENT_ID is empty"
+    exit 1
+fi
+
 # AZURE_CLIENT_SECRET="$(jq -r .clientSecret ${AZURE_AUTH_LOCATION})"
-AZURE_CLIENT_SECRET=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\"' | tr "," "\n" | grep clientSecret | cut -d ":" -f2)
+AZURE_CLIENT_SECRET=$(cat ${AZURE_AUTH_LOCATION} | tr -d '{}\" ' | tr "," "\n" | grep clientSecret | cut -d ":" -f2)
 export AZURE_CLIENT_SECRET
+if [ -z "$AZURE_CLIENT_SECRET" ]; then
+    echo "AZURE_CLIENT_SECRET is empty"
+    exit 1
+fi
 
 # extract azure credentials requests from the release image
+HOME="${HOME:-/tmp/home}"
+export HOME
+XDG_RUNTIME_DIR="${HOME}/run"
+export XDG_RUNTIME_DIR
+mkdir -p "${XDG_RUNTIME_DIR}"
+
 oc registry login
 oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST}"
 
