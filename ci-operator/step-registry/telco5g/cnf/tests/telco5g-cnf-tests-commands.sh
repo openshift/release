@@ -85,6 +85,12 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
 
+# SKIPTEST
+# bz### waiting for vendoring update
+# TESTNAME
+performance "Should have the correct RPS configuration"
+
+
 EOF
 }
 
