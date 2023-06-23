@@ -26,4 +26,5 @@ ccoctl azure delete \
   --name="${CLUSTER_NAME}" \
   --region="${REGION}" \
   --subscription-id="${AZURE_SUBSCRIPTION_ID}" \
+  --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
   --delete-oidc-resource-group
