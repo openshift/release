@@ -315,10 +315,8 @@ EOF
 fi
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
-  mapfile -t local_zones < <(aws --region "${aws_source_region}" ec2 describe-availability-zones \
-    --filter Name=state,Values=available Name=zone-type,Values=local-zone \
-    | jq -r '.AvailabilityZones[].ZoneName' | sort -u | tail -n 1)
-  local_zones_str="[ $(join_by , "${local_zones[@]}") ]"
+  local_zone=$(aws --region "${aws_source_region}" ec2 describe-availability-zones --all-availability-zones --filter Name=state,Values=available Name=zone-type,Values=local-zone | jq -r '.AvailabilityZones[].ZoneName' | shuf | tail -n 1)
+  local_zones_str="[ $local_zone ]"
   patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
   cat > "${patch_edge}" << EOF
 compute:
