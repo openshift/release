@@ -209,8 +209,8 @@ function get_time_left {
     now=$(date +%s)
     then=$(cat $SHARED_DIR/start_time)
     minutes_passed=$(( (now - then) / 60 ))
-    # the job has 4 hours to run, leave 10 minutes for reports etc
-    time_left=$(( 215 - minutes_passed ))
+    # the job has 4 hours to run, leave 20 minutes for image preparation
+    time_left=$(( 220 - minutes_passed ))
     echo $time_left
 }
 
@@ -359,8 +359,17 @@ if [[ ${val_status} -ne 0 ]]; then
 fi
 # if validations passed and RUN_TESTS set, run the tests
 if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
-    echo "************ Running e2e tests ************"
-    FEATURES=$TEST_RUN_FEATURES FEATURES_ENVIRONMENT="ci" make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
+    echo "************ Running e2e tests configsuite ************"
+    TEST_SUITES=configsuite FEATURES=$TEST_RUN_FEATURES FEATURES_ENVIRONMENT="ci" make functests 2>&1 | tee ${SHARED_DIR}/cnf-setup-run.log || status=$?
+    if [[ ${status} -eq 0 ]]; then
+        echo "************ Running cnf tests ************"
+        # Only if job is running in CI and not in 4.11 or 4.12 version
+        if [[ -n "${JOB_SPEC-}" ]] && [[ "$T5CI_VERSION" != "4.11" ]] && [[ "$T5CI_VERSION" != "4.12" ]]; then
+            time_left=$(get_time_left)
+            export GINKGO_PARAMS="${GINKGO_PARAMS} --ginkgo.timeout ${time_left}m"
+        fi
+        TEST_SUITES=cnftests FEATURES=$TEST_RUN_FEATURES FEATURES_ENVIRONMENT="ci" make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
+    fi
 fi
 popd
 

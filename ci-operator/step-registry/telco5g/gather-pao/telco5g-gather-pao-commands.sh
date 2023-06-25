@@ -41,6 +41,7 @@ set +e
 set -x
 cp ${SHARED_DIR}/cnf-tests-run.log ${ARTIFACT_DIR}/cnf-tests-run.log || true
 cp ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/cnf-validations-run.log || true
+cp ${SHARED_DIR}/cnf-setup-run.log ${ARTIFACT_DIR}/cnf-setup-run.log || true
 
 python3 -m venv ${SHARED_DIR}/myenv
 source ${SHARED_DIR}/myenv/bin/activate
