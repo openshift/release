@@ -3,10 +3,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR:=""}
 export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 
+CLUSTER_NAME=${CLUSTER_NAME:=""}
 platform_type=$(oc get infrastructure cluster -o=jsonpath={.status.platformStatus.type})
 platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
 export CLUSTER_NAME=$(oc get machineset -n openshift-machine-api -o=go-template='{{(index (index .items 0).metadata.labels "machine.openshift.io/cluster-api-cluster" )}}')
