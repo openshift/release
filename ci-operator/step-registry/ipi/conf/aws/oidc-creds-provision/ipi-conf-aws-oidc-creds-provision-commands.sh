@@ -16,8 +16,34 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
-oc registry login
-oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+
+build_pull_secret="/tmp/build_pull_secret"
+oc registry login --to=${build_pull_secret}
+
+# Merge two pull secret file
+#
+# for build triggered by Prow job, build0x's secret from ${build_pull_secret} is required.
+# for build triggered by Prow API, registry.ci.openshift.org and quay.io's secrets from ${CLUSTER_PROFILE_DIR}/pull-secret is required.
+
+new_pull_secret="/tmp/new_pull_secret"
+curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
+
+/tmp/jq -s '.[0] * .[1]' ${CLUSTER_PROFILE_DIR}/pull-secret ${build_pull_secret} > ${new_pull_secret}
+
+echo "build_pull_secret entries:"
+/tmp/jq -r '.auths | keys | .[]' ${build_pull_secret}
+
+echo "default pull secret entries:"
+/tmp/jq -r '.auths | keys | .[]' ${CLUSTER_PROFILE_DIR}/pull-secret
+
+echo "new_pull_secret entries:"
+/tmp/jq -r '.auths | keys | .[]' ${new_pull_secret}
+
+# Extracting credentials requests
+#
+echo "Extracting credentials requests from ${RELEASE_IMAGE_LATEST}"
+oc adm release -a "${new_pull_secret}" extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
 
 # Create extra efs csi driver iam resources, it's optional only for efs csi driver related tests on sts clusters
 if [[ "${CREATE_EFS_CSI_DRIVER_IAM}" == "yes" ]]; then
