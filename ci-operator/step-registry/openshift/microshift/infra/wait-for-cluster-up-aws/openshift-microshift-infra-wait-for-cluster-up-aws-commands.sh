@@ -59,7 +59,7 @@ ssh "${INSTANCE_PREFIX}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_
 # Disable exit-on-error and enable command logging with a timestamp
 set +e
 set -x
-PS4='+ $(date "+%T.%N")\011 '
+PS4='+ $(date "+%T.%N")\011'
 
 retries=3
 while [ ${retries} -gt 0 ] ; do
