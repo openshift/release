@@ -3,6 +3,34 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: ansible
+  assisted-image-service:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-service-index:
+    name: assisted-service-index
+    namespace: edge-infrastructure
+    tag: ocm-2.8
+  assisted-service-scripts:
+    name: ocm-2.8
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   aws-efs-csi-operator-create-efs:
     name: "4.13"
     namespace: ocp
@@ -2181,6 +2209,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-upi
+- as: baremetalds-assisted-hypershift-agent-mgmt-p2-f7
+  cron: 49 3 8,16,23,30 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      INDEX_IMAGE: assisted-service-index
+    env:
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent
 - as: baremetalds-ipi-ovn-ipv4-fips-p1-f4
   cron: 27 17 1,5,9,13,17,22,27 * *
   steps:
