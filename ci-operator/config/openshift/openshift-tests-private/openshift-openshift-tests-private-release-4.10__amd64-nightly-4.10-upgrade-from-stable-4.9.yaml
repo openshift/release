@@ -355,8 +355,9 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-upi
-- as: gcp-ipi-disconnected-private-p2-f28
-  cron: 13 19 3 * *
+- as: gcp-ipi-disconnected-private-workload-identity-p2-f28
+  cron: 22 0 12 * *
+  remote_api: true
   steps:
     cluster_profile: gcp-qe
     env:
@@ -368,7 +369,7 @@ tests:
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
+    workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
 - as: gcp-ipi-ovn-ipsec-p2-f28
   cron: 24 7 13 * *
   steps:
@@ -391,17 +392,6 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-realtime-kernel-p2-f28
-  cron: 12 22 23 * *
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @gcp-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @gcp-ipi and not @fips'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-gcp-ipi-realtime-kernel
 - as: gcp-ipi-workers-rhel8-p2-f28
   cron: 26 23 29 * *
   steps:
@@ -414,6 +404,19 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-workers-rhel8
+- as: gcp-ipi-workload-identity-rt-p2-f28
+  cron: 47 5 3 * *
+  remote_api: true
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      RT_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @gcp-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @gcp-ipi and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
 - as: gcp-upi-p3-f28
   cron: 4 10 27 * *
   steps:
