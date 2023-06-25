@@ -9,13 +9,13 @@ export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 
 CLUSTER_NAME=${CLUSTER_NAME:=""}
-platform_type=$(oc get infrastructure cluster -o=jsonpath={.status.platformStatus.type})
+platform_type=$(oc get infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
 platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
-export CLUSTER_NAME=$(oc get machineset -n openshift-machine-api -o=go-template='{{(index (index .items 0).metadata.labels "machine.openshift.io/cluster-api-cluster" )}}')
+CLUSTER_NAME=$(oc get machineset -n openshift-machine-api -o=go-template='{{(index (index .items 0).metadata.labels "machine.openshift.io/cluster-api-cluster" )}}')
 PROVISION_OR_TEARDOWN=${PROVISION_OR_TEARDOWN:="PROVISION"}
 case ${platform_type} in
      aws)
-        export NETWORK_NAME=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name,PrivateIpAddress,PublicIpAddress, PrivateDnsName, VpcId]' --output text | column -t  | grep $CLUSTER_NAME  | awk '{print $7}' | grep -v '^$' | sort -u)
+        NETWORK_NAME=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name,PrivateIpAddress,PublicIpAddress, PrivateDnsName, VpcId]' --output text | column -t  | grep $CLUSTER_NAME  | awk '{print $7}' | grep -v '^$' | sort -u)
         if [[ $PROVISION_OR_TEARDOWN == "PROVISION" ]]; then
 	   echo "Set seurity group rules for $NETWORK_NAME on $platform_type"
 
@@ -57,9 +57,9 @@ case ${platform_type} in
        if [[ $PROVISION_OR_TEARDOWN == "PROVISION" ]]; then
          # create azure profile
          az login --service-principal -u `cat $AZURE_AUTH_LOCATION | jq -r '.clientId'` -p "`cat $AZURE_AUTH_LOCATION | jq -r '.clientSecret'`" --tenant `cat $AZURE_AUTH_LOCATION | jq -r '.tenantId'`
-         az account set --subscription `cat $AZURE_AUTH_LOCATION | jq -r '.subscriptionId'`
+         az account set --subscription "`cat $AZURE_AUTH_LOCATION | jq -r '.subscriptionId'`"
 
-         export NETWORK_NAME=$(az network nsg list -g  $CLUSTER_NAME-rg --query "[].name" -o tsv | grep "nsg")
+         NETWORK_NAME=$(az network nsg list -g  $CLUSTER_NAME-rg --query "[].name" -o tsv | grep "nsg")
 
          echo "Add Firewall Rules for $platform_type"
          az network nsg rule create -g $CLUSTER_NAME-rg --name scale-ci-icmp --nsg-name  $NETWORK_NAME --priority 100 --access Allow --description "scale-ci allow Icmp" --protocol Icmp --destination-port-ranges "*"
@@ -87,13 +87,13 @@ case ${platform_type} in
          # login to service account
          gcloud auth activate-service-account `cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.client_email'`  --key-file=$GCP_SHARED_CREDENTIALS_FILE --project=`cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.project_id'`
          gcloud auth list
-         gcloud config set account `cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.client_email'`
+         gcloud config set account "`cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.client_email'`"
 
-         export NETWORK_NAME=$(gcloud compute networks list  | grep $CLUSTER_NAME | awk '{print $1}')
+         NETWORK_NAME=$(gcloud compute networks list  | grep $CLUSTER_NAME | awk '{print $1}')
 
          if [[ $NETWORK_NAME == "" ]]; then
              sub_cluster_name=$(echo ${CLUSTER_NAME%-*})
-             export NETWORK_NAME=$(gcloud compute networks list  | grep $sub_cluster_name | awk '{print $1}')
+             NETWORK_NAME=$(gcloud compute networks list  | grep $sub_cluster_name | awk '{print $1}')
 
          fi
          echo $NETWORK_NAME
