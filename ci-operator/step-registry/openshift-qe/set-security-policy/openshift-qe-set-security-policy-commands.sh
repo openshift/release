@@ -3,18 +3,21 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+platform_type=$(oc get infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
+platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
+CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR:=""}
-export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+
 export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
 export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 
 CLUSTER_NAME=${CLUSTER_NAME:=""}
-platform_type=$(oc get infrastructure cluster -ojsonpath='{.status.platformStatus.type}')
-platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
 CLUSTER_NAME=$(oc get machineset -n openshift-machine-api -o=go-template='{{(index (index .items 0).metadata.labels "machine.openshift.io/cluster-api-cluster" )}}')
 PROVISION_OR_TEARDOWN=${PROVISION_OR_TEARDOWN:="PROVISION"}
 case ${platform_type} in
      aws)
+        export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+        export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
         NETWORK_NAME=$(aws ec2 describe-instances --query 'Reservations[*].Instances[*].[InstanceId,Tags[?Key==`Name`].Value|[0],State.Name,PrivateIpAddress,PublicIpAddress, PrivateDnsName, VpcId]' --output text | column -t  | grep $CLUSTER_NAME  | awk '{print $7}' | grep -v '^$' | sort -u)
         if [[ $PROVISION_OR_TEARDOWN == "PROVISION" ]]; then
 	   echo "Set seurity group rules for $NETWORK_NAME on $platform_type"
