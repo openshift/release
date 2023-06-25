@@ -42,9 +42,9 @@ source ${SHARED_DIR}/azurestack-login-script.sh
 az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
 
 oc registry login
-oc adm release extract --credentials-requests --cloud=azure --to=/tmp/credentials-request "$RELEASE_IMAGE_LATEST" || ret=$?
+oc adm release extract --credentials-requests --cloud=azure --to=/tmp/credentials-request "$RELEASE_IMAGE_LATEST"
 
-echo "status: $ret"
+echo "Debug"
 
 ls /tmp/credentials-request
 files=$(ls /tmp/credentials-request)
