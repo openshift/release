@@ -56,7 +56,7 @@ case ${platform_type} in
      azure)
        if [[ $PROVISION_OR_TEARDOWN == "PROVISION" ]]; then
          # create azure profile
-         az login --service-principal -u `cat $AZURE_AUTH_LOCATION | jq -r '.clientId'` -p "`cat $AZURE_AUTH_LOCATION | jq -r '.clientSecret'`" --tenant `cat $AZURE_AUTH_LOCATION | jq -r '.tenantId'`
+         az login --service-principal -u "`cat $AZURE_AUTH_LOCATION | jq -r '.clientId'`" -p "`cat $AZURE_AUTH_LOCATION | jq -r '.clientSecret'`" --tenant "`cat $AZURE_AUTH_LOCATION | jq -r '.tenantId'`"
          az account set --subscription "`cat $AZURE_AUTH_LOCATION | jq -r '.subscriptionId'`"
 
          NETWORK_NAME=$(az network nsg list -g  $CLUSTER_NAME-rg --query "[].name" -o tsv | grep "nsg")
@@ -85,7 +85,7 @@ case ${platform_type} in
      gcp)
 
          # login to service account
-         gcloud auth activate-service-account `cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.client_email'`  --key-file=$GCP_SHARED_CREDENTIALS_FILE --project=`cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.project_id'`
+         gcloud auth activate-service-account "`cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.client_email'`"  --key-file=$GCP_SHARED_CREDENTIALS_FILE --project="`cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.project_id'`"
          gcloud auth list
          gcloud config set account "`cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.client_email'`"
 
