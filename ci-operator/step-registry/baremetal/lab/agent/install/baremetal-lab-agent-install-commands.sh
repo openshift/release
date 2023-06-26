@@ -339,7 +339,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   echo "Power on ${bmc_address//.*/} (${name})..."
-  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${vendor}"
+  #reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${vendor}"
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
