@@ -23,7 +23,7 @@ spec:
   rwx_supported: "$RWX_SUPPORTED"
 EOF
 
-# Check if Tack is deployed
+# Check if Tackle is deployed
 
 # Sleep for 5 seconds to wait for the resource to be created
 sleep 5
