@@ -7,18 +7,18 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
-binary_build_commands: make manager
+binary_build_commands: make build
 build_root:
   from_repository: true
-canonical_go_repository: sigs.k8s.io/cluster-api-provider-ibmcloud
+canonical_go_repository: github.com/openshift/cluster-olm-operator
 images:
-- dockerfile_path: openshift/Dockerfile.openshift
+- dockerfile_path: Dockerfile
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: ibmcloud-cluster-api-controllers
+  to: cluster-olm-operator
 promotion:
   name: 4.14-priv
   namespace: ocp-private
@@ -34,31 +34,21 @@ releases:
       namespace: ocp-private
 resources:
   '*':
+    limits:
+      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-ibmcloud-techpreview
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: ibmcloud
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-ibmcloud
-- as: unit
-  commands: openshift/unit-tests.sh
+- as: lint
+  commands: make lint
   container:
     from: src
-- as: govet
-  commands: make vet
-  container:
-    from: src
-- as: generate
-  commands: make generate
+- as: deps
+  commands: make verify-deps
   container:
     from: src
 zz_generated_metadata:
   branch: main
   org: openshift-priv
-  repo: cluster-api-provider-ibmcloud
+  repo: cluster-olm-operator

@@ -7,18 +7,18 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
-binary_build_commands: make manager
+binary_build_commands: make build
 build_root:
   from_repository: true
-canonical_go_repository: sigs.k8s.io/cluster-api-provider-azure
+canonical_go_repository: github.com/openshift/cluster-olm-operator
 images:
-- dockerfile_path: openshift/Dockerfile.openshift
+- dockerfile_path: Dockerfile
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-  to: azure-cluster-api-controllers
+  to: cluster-olm-operator
 promotion:
   name: 4.15-priv
   namespace: ocp-private
@@ -39,30 +39,16 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: openshift/unit-tests.sh
 tests:
-- as: unit
-  commands: openshift/unit-tests.sh
+- as: lint
+  commands: make lint
   container:
     from: src
-- as: e2e-azure
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure
-- as: e2e-azure-techpreview
-  optional: true
-  steps:
-    cluster_profile: azure4
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-azure
-- as: e2e-azure-serial
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure-serial
+- as: deps
+  commands: make verify-deps
+  container:
+    from: src
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv
-  repo: cluster-api-provider-azure
+  repo: cluster-olm-operator
