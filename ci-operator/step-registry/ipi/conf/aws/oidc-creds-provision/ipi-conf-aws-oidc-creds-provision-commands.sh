@@ -27,18 +27,22 @@ oc registry login --to=${build_pull_secret}
 # for build triggered by Prow API, registry.ci.openshift.org and quay.io's secrets from ${CLUSTER_PROFILE_DIR}/pull-secret is required.
 
 new_pull_secret="/tmp/new_pull_secret"
-curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
+# curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
 
-/tmp/jq -s '.[0] * .[1]' ${CLUSTER_PROFILE_DIR}/pull-secret ${build_pull_secret} > ${new_pull_secret}
+# /tmp/jq -s '.[0] * .[1]' ${CLUSTER_PROFILE_DIR}/pull-secret ${build_pull_secret} > ${new_pull_secret}
+jq -s '.[0] * .[1]' ${CLUSTER_PROFILE_DIR}/pull-secret ${build_pull_secret} > ${new_pull_secret}
 
 echo "build_pull_secret entries:"
-/tmp/jq -r '.auths | keys | .[]' ${build_pull_secret}
+# /tmp/jq -r '.auths | keys | .[]' ${build_pull_secret}
+jq -r '.auths | keys | .[]' ${build_pull_secret}
 
 echo "default pull secret entries:"
-/tmp/jq -r '.auths | keys | .[]' ${CLUSTER_PROFILE_DIR}/pull-secret
+# /tmp/jq -r '.auths | keys | .[]' ${CLUSTER_PROFILE_DIR}/pull-secret
+jq -r '.auths | keys | .[]' ${CLUSTER_PROFILE_DIR}/pull-secret
 
 echo "new_pull_secret entries:"
-/tmp/jq -r '.auths | keys | .[]' ${new_pull_secret}
+# /tmp/jq -r '.auths | keys | .[]' ${new_pull_secret}
+jq -r '.auths | keys | .[]' ${new_pull_secret}
 
 # Extracting credentials requests
 #
