@@ -249,11 +249,11 @@ if [ "${masters}" -eq 1 ]; then
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 platform:
   none: {}
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: 0
+# compute:
+# - architecture: ${architecture}
+#   hyperthreading: Enabled
+#   name: worker
+#   replicas: 0
 "
 fi
 
@@ -270,11 +270,11 @@ platform:
 "
   else
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
-compute:
-- architecture: ${architecture}
-  hyperthreading: Enabled
-  name: worker
-  replicas: ${workers}
+# compute:
+# - architecture: ${architecture}
+#   hyperthreading: Enabled
+#   name: worker
+#   replicas: ${workers}
 platform:
   baremetal:
     apiVIPs:
