@@ -16,8 +16,11 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
 oc registry login
-oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
+oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 # Create extra efs csi driver iam resources, it's optional only for efs csi driver related tests on sts clusters
 if [[ "${CREATE_EFS_CSI_DRIVER_IAM}" == "yes" ]]; then
