@@ -1,13 +1,13 @@
 periodics:
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: 0 6 * * 1
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: interop-v1.10
-    org: chetna14manku
+  - base_ref: release-v1.11
+    org: openshift-pipelines
     repo: release-tests
   labels:
     ci-operator.openshift.io/cloud: aws
@@ -16,9 +16,18 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-chetna14manku-release-tests-interop-v1.10-openshift-pipelines-ocp4.14-lp-interop-openshift-pipelines-interop-aws
-  prowjob_defaults:
-    tenant_id: gangway-api
+  name: periodic-ci-openshift-pipelines-release-tests-release-v1.11-openshift-pipelines-ocp4.14-lp-interop-openshift-pipelines-interop-aws
+  reporter_config:
+    slack:
+      channel: '#tektoncd-pipeline-ci'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
