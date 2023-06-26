@@ -105,3 +105,5 @@ if [[ ${ingress_role_arn} != "" ]]; then
   echo "Saving ingress role: ${ingress_role_arn}"
   echo "${ingress_role_arn}" > ${SHARED_DIR}/sts_ingress_role_arn
 fi
+
+exit 1
