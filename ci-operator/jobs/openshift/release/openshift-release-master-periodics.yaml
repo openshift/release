@@ -16176,8 +16176,6 @@ periodics:
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-release-master-ci-4.14-e2e-gcp-ovn
-  prowjob_defaults:
-    tenant_id: gangway-api
   spec:
     containers:
     - args:
@@ -79831,6 +79829,46 @@ periodics:
       secret:
         items:
         - key: sa.config-updater.build05.config
+          path: kubeconfig
+        secretName: config-updater
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
+    ci.openshift.io/build-farm: build08
+    ci.openshift.io/generator: cluster-init
+    ci.openshift.io/role: infra
+  name: periodic-openshift-release-master-build08-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir=clusters/build-clusters/build08
+      - --as=
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+      - --confirm=true
+      command:
+      - applyconfig
+      image: applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.build08.config
           path: kubeconfig
         secretName: config-updater
 - agent: kubernetes
