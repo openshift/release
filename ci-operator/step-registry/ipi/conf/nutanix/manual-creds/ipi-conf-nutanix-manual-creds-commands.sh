@@ -27,9 +27,12 @@ credentials:
     prismElements: null
 EOF
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
 # Extract credential requests
 oc registry login
-oc adm release extract --credentials-requests --cloud=nutanix --to "${CR_DIR}" "${RELEASE_IMAGE_LATEST}"
+oc adm release extract --credentials-requests --cloud=nutanix --to "${CR_DIR}" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 echo "Extracted credentials requests:"
 ls -l "${CR_DIR}"
