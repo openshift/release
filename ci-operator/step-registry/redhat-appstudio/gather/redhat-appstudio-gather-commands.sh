@@ -114,8 +114,6 @@ queue ${ARTIFACT_DIR}/clusterregistrars.json  oc --insecure-skip-tls-verify --re
 queue ${ARTIFACT_DIR}/gitopsservices.json  oc --insecure-skip-tls-verify --request-timeout=5s get gitopsservices.pipelines.openshift.io -o json
 
 
-# Must gather steps to collect OpenShift logs
-#mkdir -p ${ARTIFACT_DIR}/must-gather-appstudio
-#oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --image-stream=openshift/must-gather --image=quay.io/openshift-pipeline/must-gather --dest-dir ${ARTIFACT_DIR}/must-gather-appstudio > ${ARTIFACT_DIR}/must-gather-appstudio/must-gather.log
+# Must gather steps to collect OpenShift network logs
 mkdir -p ${ARTIFACT_DIR}/must-gather-network-appstudio
 oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-network-appstudio -- gather_network_logs > ${ARTIFACT_DIR}/must-gather-network-appstudio/must-gather-network.log
