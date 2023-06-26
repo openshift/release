@@ -59,6 +59,7 @@ cat > packing-test-infra.yaml <<-EOF
             ServerAliveInterval 90
             LogLevel ERROR
             IdentityFile {{ lookup('env', 'SSH_KEY_FILE') }}
+            ConnectionAttempts 10
     - name: Create ansible configuration
       ansible.builtin.copy:
         dest: "{{ SHARED_DIR }}/ansible.cfg"
@@ -70,6 +71,9 @@ cat > packing-test-infra.yaml <<-EOF
           verbosity = 2
           stdout_callback = yaml
           bin_ansible_callbacks = True
+
+          [ssh_connection]
+          retries = 10
 EOF
 
 ansible-playbook packing-test-infra.yaml
