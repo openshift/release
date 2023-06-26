@@ -8,8 +8,6 @@ platform_type=$(echo $platform_type | tr -s 'A-Z' 'a-z')
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR:=""}
 
-export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
-export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 
 CLUSTER_NAME=${CLUSTER_NAME:=""}
 CLUSTER_NAME=$(oc get machineset -n openshift-machine-api -o=go-template='{{(index (index .items 0).metadata.labels "machine.openshift.io/cluster-api-cluster" )}}')
@@ -33,14 +31,7 @@ case ${platform_type} in
 		  aws ec2 authorize-security-group-ingress --group-id $security_group --ip-permissions IpProtocol=tcp,FromPort=32768,ToPort=60999,IpRanges="[{CidrIp=0.0.0.0/0,Description='PerfScale Testing'}]"
 		  aws ec2 authorize-security-group-ingress --group-id $security_group --ip-permissions IpProtocol=udp,FromPort=32768,ToPort=60999,IpRanges="[{CidrIp=0.0.0.0/0,Description='PerfScale Testing'}]"
 
-                  #aws ec2 authorize-security-group-ingress --group-id $security_group --protocol tcp --port 22 --cidr 0.0.0.0/0 
-                  #aws ec2 authorize-security-group-ingress --group-id $security_group --protocol tcp --port 2022 --cidr 0.0.0.0/0
-                  #aws ec2 authorize-security-group-ingress --group-id $security_group --protocol tcp --port 20000-20109 --cidr 0.0.0.0/0
-                  #aws ec2 authorize-security-group-ingress --group-id $security_group --protocol udp --port 20000-20109 --cidr 0.0.0.0/0
-                  #aws ec2 authorize-security-group-ingress --group-id $security_group --protocol tcp --port 32768-60999 --cidr 0.0.0.0/0
-                  #aws ec2 authorize-security-group-ingress --group-id $security_group --protocol udp --port 32768-60999 --cidr 0.0.0.0/0
 		  aws ec2 describe-security-groups --group-ids $security_group  --query "SecurityGroups[*].IpPermissions[*].{IpProtocol:IpProtocol,IpRanges:IpRanges[0].CidrIp,FromPort:FromPort,ToPort:ToPort}" --output table
-		  #aws ec2 describe-security-groups --group-ids $security_group  --query "SecurityGroups[*].IpPermissions[*].{From_IpRanges:IpRanges[0].CidrIp,IpProtocol:IpProtoco,FromPort:FromPort,ToPort:ToPort}" --output table
            done
         fi
         if [[ $PROVISION_OR_TEARDOWN == "TEARDOWN" ]]; then
@@ -57,6 +48,7 @@ case ${platform_type} in
        fi
           ;;
      azure)
+       export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
        if [[ $PROVISION_OR_TEARDOWN == "PROVISION" ]]; then
          # create azure profile
          az login --service-principal -u "`cat $AZURE_AUTH_LOCATION | jq -r '.clientId'`" -p "`cat $AZURE_AUTH_LOCATION | jq -r '.clientSecret'`" --tenant "`cat $AZURE_AUTH_LOCATION | jq -r '.tenantId'`"
@@ -87,6 +79,7 @@ case ${platform_type} in
           ;;
      gcp)
 
+         export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
          # login to service account
          gcloud auth activate-service-account "`cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.client_email'`"  --key-file=$GCP_SHARED_CREDENTIALS_FILE --project="`cat $GCP_SHARED_CREDENTIALS_FILE | jq -r '.project_id'`"
          gcloud auth list
