@@ -1,0 +1,37 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- build_args:
+  - name: DOCKER_BUILDKIT
+    value: "1"
+  - name: BUILDKIT_PROGRESS
+    value: plain
+  - name: PROTOC_VERSION
+    value: "23.2"
+  context_dir: .
+  dockerfile_path: Dockerfile
+  from: src
+  to: text-generation-inference
+promotion:
+  namespace: opendatahub-io
+  tag: latest
+resources:
+  '*':
+    limits:
+      memory: 9Gi
+    requests:
+      cpu: 100m
+      memory: 2000Mi
+tests:
+- as: unit
+  commands: |
+    sleep 7200
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: opendatahub-io
+  repo: text-generation-inference
