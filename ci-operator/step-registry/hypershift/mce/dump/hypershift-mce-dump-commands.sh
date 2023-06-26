@@ -2,6 +2,10 @@
 
 set -exuo pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 arch=$(arch)
 if [ "$arch" == "x86_64" ]; then
   downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/hypershift.tar.gz ${downURL}
