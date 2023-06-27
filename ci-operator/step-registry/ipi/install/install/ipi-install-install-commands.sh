@@ -428,6 +428,7 @@ aws|aws-arm64|aws-usgov)
 esac
 
 sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+echo '  upstream: https://api.integration.openshift.com/api/upgrades_info/v1/graph' >> "${dir}/manifests/cvo-overrides.yaml"
 
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
