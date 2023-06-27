@@ -16,9 +16,12 @@ export GCP_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/gce.json
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 PROJECT="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
 echo "> Extract gcp credentials requests from the release image"
 oc registry login
-oc adm release extract --credentials-requests --cloud=gcp --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
+oc adm release extract --credentials-requests --cloud=gcp --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 echo "> Output gcp credentials requests to directory: /tmp/credrequests"
 ls "/tmp/credrequests"
