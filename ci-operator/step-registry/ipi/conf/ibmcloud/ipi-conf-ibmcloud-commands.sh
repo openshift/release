@@ -51,6 +51,7 @@ credentialsMode: Manual
 platform:
   ibmcloud:
     region: ${REGION}
+    resourceGroupName: ibmcloud-multi-s390x-rg
 controlPlane:
   name: master
   platform:
