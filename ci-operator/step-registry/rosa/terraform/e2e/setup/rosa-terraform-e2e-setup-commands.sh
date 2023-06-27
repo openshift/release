@@ -7,8 +7,8 @@ set -o xtrace
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-cp -r /root/terraform-provider-ocm ~/
-cd ~/terraform-provider-ocm
+cp -r /root/terraform-provider-rhcs ~/
+cd ~/terraform-provider-rhcs
 
 export GOCACHE="/tmp/cache"
 export GOMODCACHE="/tmp/cache"
@@ -36,7 +36,7 @@ export TF_VARS
 GATEWAY_URL=$(echo "${TF_VARS}" | grep 'url' | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
 export GATEWAY_URL
 
-export TF_FOLDER_SAVE="${TF_FOLDER:-ci/e2e/terraform_provider_ocm_files}"
+export TF_FOLDER_SAVE="${TF_FOLDER:-ci/e2e/terraform_provider_rhcs_files}"
 
 export ARCHIVE_NAME=account-roles-terraform-archive
 export TF_FOLDER=ci/e2e/account_roles_files
