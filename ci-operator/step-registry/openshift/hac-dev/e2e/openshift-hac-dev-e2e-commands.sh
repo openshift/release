@@ -3,8 +3,6 @@
 export HOME WORKSPACE CHROME_IMAGE CHROME_TAG
 HOME=/tmp
 WORKSPACE=$(pwd)
-CHROME_IMAGE="quay.io/cloudservices/insights-chrome-frontend"
-CHROME_TAG="f5f1929"
 
 #Vault Secrets
 export HAC_KC_SSO_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC CYPRESS_VC_KUBECONFIG
@@ -87,7 +85,6 @@ bonfire deploy -c "$CONFIG_DIR/config.yaml" \
         --frontends true \
         --source=appsre \
         --clowd-env ${ENV_NAME} \
-        --set-image-tag ${CHROME_IMAGE}=${CHROME_TAG} \
         --namespace ${NAMESPACE} \
         --timeout 1200
 
