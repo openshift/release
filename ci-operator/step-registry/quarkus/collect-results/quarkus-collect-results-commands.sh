@@ -6,8 +6,6 @@ set -o pipefail
 
 shopt -s nullglob
 
-sleep 3600
-
 echo "Copying results and xmls to ${ARTIFACT_DIR}"
 ALL_PROJECTS=${PROJECTS:?Can not retrieve the list of projects}
 for PROJECT in ${ALL_PROJECTS//","/" "}; do
