@@ -336,7 +336,7 @@ items:
       # openshift/release, causing this image to build ~100x a day. If you change the following
       # Dockerfile, please ensure you run `oc start-build` yourself once the new version is applied.
       dockerfile: |
-        FROM quay.io/centos/centos:stream8
+        FROM quay.io/centos/centos:stream9
 
         ENV VERSION=1.19 \
             GOCACHE=/go/.cache \
@@ -346,12 +346,14 @@ items:
             LOGNAME=deadbeef
         ENV PATH=$PATH:$GOROOT/bin:$GOPATH/bin
 
-        RUN yum install -y epel-release && \
+        RUN dnf install -y epel-release && \
             rpm -V epel-release && \
-            INSTALL_PKGS="bc bind-utils bsdtar device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glib2-devel hostname iptables jq krb5-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl rsync socat systemd-devel tar tito tree util-linux wget which xfsprogs zip" && \
-            yum install -y $INSTALL_PKGS && \
+            dnf upgrade -y --refresh && \
+            dnf config-manager --set-enabled crb && \
+            INSTALL_PKGS="bc bind-utils bsdtar device-mapper device-mapper-persistent-data e2fsprogs ethtool file findutils gcc git glib2-devel hostname iptables-nft jq krb5-devel libseccomp-devel libvirt-devel lsof make mercurial nmap-ncat openssl rsync socat systemd-devel tar tito tree util-linux wget which xfsprogs zip" && \
+            dnf install -y $INSTALL_PKGS && \
             rpm -V $INSTALL_PKGS && \
-            yum clean all && \
+            dnf clean all && \
             touch /os-build-image && \
             git config --system user.name origin-release-container && \
             git config --system user.email origin-release@redhat.com
@@ -372,11 +374,11 @@ items:
             chmod g+xw -R $(go env GOROOT)
 
         ENV VAULT_DISABLE_MLOCK true
-        RUN yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
-            yum install -y vault-1.7.0-1 && \
+        RUN dnf config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo && \
+            dnf install -y vault-1.7.0-1 && \
             setcap cap_ipc_lock= /usr/bin/vault
 
-        RUN yum install -y nodejs && npm install -g typescript
+        RUN dnf install -y nodejs && npm install -g typescript
         RUN npm config set cache /go/.npm --global
 
         COPY ./app /go/bin/boskos
@@ -388,14 +390,14 @@ items:
       dockerStrategy:
         from:
           kind: ImageStreamTag
-          name: centos:stream8
-          namespace: origin
+          name: centos:stream9
+          namespace: openshift
         imageOptimizationPolicy: SkipLayers
       type: Docker
     triggers:
     - imageChange:
         from:
           kind: ImageStreamTag
-          name: centos:stream8
-          namespace: origin
+          name: centos:stream9
+          namespace: openshift
       type: ImageChange

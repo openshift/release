@@ -20,22 +20,56 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
+- as: qa-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-gcp
+  timeout: 5h0m0s
+- as: fips-qa-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: ocp-qa-e2e-tests
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-gcp
+  timeout: 5h0m0s
+- as: core-bpf-qa-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: gcp
+    env:
+      TEST_SUITE: ocp-core-bpf-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-gcp
+  timeout: 5h0m0s
 - as: operator-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
     env:
       TEST_SUITE: ocp-operator-e2e-tests
     test:
     - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: ipi-gcp
   timeout: 5h0m0s
-- as: qa-e2e-tests
-  postsubmit: true
+- as: sensor-integration-tests
+  optional: true
   steps:
     cluster_profile: aws
     env:
-      TEST_SUITE: ocp-qa-e2e-tests
+      TEST_SUITE: ocp-sensor-integration-tests
     test:
     - ref: stackrox-e2e
     workflow: ipi-aws
@@ -43,12 +77,12 @@ tests:
 - as: ui-e2e-tests
   postsubmit: true
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
     env:
       TEST_SUITE: ocp-ui-e2e-tests
     test:
     - ref: stackrox-e2e
-    workflow: ipi-aws
+    workflow: ipi-gcp
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: nightlies

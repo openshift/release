@@ -131,7 +131,7 @@ fi
 # Debug echo "Remote Libvirt=${REMOTE_LIBVIRT_URI}"
 write_shared_dir REMOTE_LIBVIRT_URI ${REMOTE_LIBVIRT_URI}
 
-CLUSTER_NAME="${LEASED_RESOURCE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${LEASED_RESOURCE}-${UNIQUE_HASH}"
 write_shared_dir CLUSTER_NAME ${CLUSTER_NAME}
 
 # Test the remote connection

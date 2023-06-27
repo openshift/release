@@ -25,7 +25,7 @@ function ibmcloud_login {
 #####################################
 ibmcloud_login
 #create the bastion host based on the info (ibmcloud-provision-vpc ${SHARED_DIR}/customer_vpc_subnets.yaml), output ip info to ${SHARED_DIR}/bastion-info.yaml
-cluster_name="${NAMESPACE}-${JOB_NAME_HASH}"
+cluster_name="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_info_yaml="${SHARED_DIR}/bastion-info.yaml"
 
 bastion_name="${cluster_name}-bastion"

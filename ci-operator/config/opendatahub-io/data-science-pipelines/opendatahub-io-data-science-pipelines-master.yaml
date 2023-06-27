@@ -25,6 +25,15 @@ images:
 - context_dir: .
   dockerfile_path: frontend/Dockerfile
   to: ds-pipelines-frontend
+- context_dir: .
+  dockerfile_path: backend/metadata_writer/Dockerfile
+  to: ds-pipelines-metadata-writer
+- context_dir: .
+  dockerfile_path: third-party/metadata_envoy/Dockerfile
+  to: ds-pipelines-metadata-envoy
+- context_dir: .
+  dockerfile_path: third-party/ml-metadata/Dockerfile
+  to: ds-pipelines-metadata-grpc
 - context_dir: tests/
   dockerfile_path: Dockerfile
   to: data-science-pipelines-tests
@@ -104,6 +113,123 @@ tests:
       SOURCE_IMAGE_REF: ds-pipelines-frontend
     env:
       IMAGE_REPO: ds-pipelines-frontend
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: image-mirror-metadata-writer
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-metadata-writer
+    env:
+      IMAGE_REPO: ds-pipelines-metadata-writer
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: image-mirror-metadata-envoy
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-metadata-envoy
+    env:
+      IMAGE_REPO: ds-pipelines-metadata-envoy
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: image-mirror-metadata-grpc
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-metadata-grpc
+    env:
+      IMAGE_REPO: ds-pipelines-metadata-grpc
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-persistenceagent
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-persistenceagent
+    env:
+      IMAGE_REPO: ds-pipelines-persistenceagent
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-api-server
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-api-server
+    env:
+      IMAGE_REPO: ds-pipelines-api-server
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-scheduledworkflow
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-scheduledworkflow
+    env:
+      IMAGE_REPO: ds-pipelines-scheduledworkflow
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-cacheserver
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-cacheserver
+    env:
+      IMAGE_REPO: ds-pipelines-cacheserver
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-viewercontroller
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-viewercontroller
+    env:
+      IMAGE_REPO: ds-pipelines-viewercontroller
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-artifact-manager
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-artifact-manager
+    env:
+      IMAGE_REPO: ds-pipelines-artifact-manager
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-frontend
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-frontend
+    env:
+      IMAGE_REPO: ds-pipelines-frontend
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-metadata-writer
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-metadata-writer
+    env:
+      IMAGE_REPO: ds-pipelines-metadata-writer
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-metadata-envoy
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-metadata-envoy
+    env:
+      IMAGE_REPO: ds-pipelines-metadata-envoy
+      RELEASE_VERSION: main
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-metadata-grpc
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: ds-pipelines-metadata-grpc
+    env:
+      IMAGE_REPO: ds-pipelines-metadata-grpc
       RELEASE_VERSION: main
     workflow: opendatahub-io-ci-image-mirror
 - as: unit

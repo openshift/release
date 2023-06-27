@@ -11,7 +11,8 @@ echo "************  assisted oci teardown command ************"
 fix_uid.sh
 
 cd "${ANSIBLE_PLAYBOOK_DIRECTORY}"
-ansible-playbook --extra-vars "@vars/ci.yml" \
+ansible-playbook --inventory "${SHARED_DIR}/inventory" \
+                 --extra-vars "@vars/ci.yml" \
                  --extra-vars "@vars/ci_oci_infrastucture.yml" \
                  --extra-vars "${ANSIBLE_EXTRA_VARS}" \
                  "${ANSIBLE_PLAYBOOK_DESTROY_INFRA}"

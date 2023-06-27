@@ -509,6 +509,42 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-node-labels-periodic
+  cron: 50 00 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_WORKER_AGENTS=2
+        NUMBER_OF_DAY2_HOSTS=1
+        MANIFEST_FILES='{"mcp.yaml":"machine_config_pool.yaml", "mc.yaml":"machine_config.yaml"}'
+        NODE_LABELS='{"ostest-extraworker-3":{"node-role.kubernetes.io/infra":""}, "ostest-extraworker-5":{"node-role.kubernetes.io/infra":""}}'
+        MACHINE_CONFIG_POOLS='{"ostest-extraworker-5":"infra","ostest-extraworker-3":"infra"}'
+        TEST_TO_RUN='node-labels'
+      NUM_EXTRA_WORKERS: "6"
+    workflow: assisted-baremetal-operator-ztp
+- as: e2e-ai-operator-ztp-node-labels
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_WORKER_AGENTS=2
+        NUMBER_OF_DAY2_HOSTS=1
+        MANIFEST_FILES='{"mcp.yaml":"machine_config_pool.yaml", "mc.yaml":"machine_config.yaml"}'
+        NODE_LABELS='{"ostest-extraworker-3":{"node-role.kubernetes.io/infra":""}, "ostest-extraworker-5":{"node-role.kubernetes.io/infra":""}}'
+        MACHINE_CONFIG_POOLS='{"ostest-extraworker-5":"infra","ostest-extraworker-3":"infra"}'
+        TEST_TO_RUN='node-labels'
+      NUM_EXTRA_WORKERS: "6"
+    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
   steps:
     cluster_profile: packet-assisted
@@ -821,14 +857,6 @@ tests:
       ASSISTED_CONFIG: |
         DEPLOY_TARGET=onprem
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-8
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.8
-        OPENSHIFT_INSTALL_RELEASE_IMAGE=""
-    workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-9
   steps:
     cluster_profile: packet-assisted
@@ -926,6 +954,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=metallb
+        METALLB_API_IP=10.0.0.1
+        METALLB_INGRESS_IP=10.0.0.2
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-mce-4-10
   optional: true
@@ -947,16 +977,6 @@ tests:
         OLM_OPERATORS=mce
         NUM_MASTERS=1
         NUM_WORKERS=0
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ocs
-  run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=ocs
-        OPENSHIFT_VERSION=4.8
-      PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
@@ -1113,6 +1133,22 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
       PLATFORM: nutanix
     workflow: assisted-nutanix
+- as: e2e-ai-operator-ztp-remove-node-periodic
+  cron: 45 02 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    dependencies:
+      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        SPOKE_CONTROLPLANE_AGENTS=3
+        SPOKE_WORKER_AGENTS=2
+        REMOVE_SPOKE_NODE=true
+      DEVSCRIPTS_CONFIG: |
+        REDFISH_EMULATOR_IGNORE_BOOT_DEVICE=False
+      NUM_EXTRA_WORKERS: "5"
+    workflow: assisted-baremetal-operator-ztp
 zz_generated_metadata:
   branch: master
   org: openshift

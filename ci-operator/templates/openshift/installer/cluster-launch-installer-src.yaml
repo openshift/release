@@ -107,6 +107,8 @@ objects:
         value: /tmp/artifacts
       - name: HOME
         value: /tmp/home
+      - name: XDG_RUNTIME_DIR
+        value: /tmp/home/run
       - name: IMAGE_FORMAT
         value: ${IMAGE_FORMAT}
       - name: KUBECONFIG
@@ -123,7 +125,7 @@ objects:
         trap 'touch /tmp/shared/exit' EXIT
         trap 'jobs -p | xargs -r kill || true; exit 0' TERM
 
-        mkdir -p "${HOME}"
+        mkdir -p "${HOME}" "${XDG_RUNTIME_DIR}"
 
         # wait for the API to come up
         while true; do
@@ -218,7 +220,7 @@ objects:
       - name: GOOGLE_CLOUD_KEYFILE_JSON
         value: /etc/openshift-installer/gce.json
       - name: CLUSTER_NAME
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: ${NAMESPACE}-${UNIQUE_HASH}
       - name: CLUSTER_VARIANT
         value: ${CLUSTER_VARIANT}
       - name: BASE_DOMAIN
@@ -237,6 +239,8 @@ objects:
         value: test
       - name: HOME
         value: /tmp
+      - name: XDG_RUNTIME_DIR
+        value: /tmp/run
       - name: INSTALL_INITIAL_RELEASE
       - name: RELEASE_IMAGE_INITIAL
       command:
@@ -250,6 +254,7 @@ objects:
         trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
         cp "$(command -v openshift-install)" /tmp
         mkdir ${ARTIFACT_DIR}/installer
+        mkdir -p "${XDG_RUNTIME_DIR}"
 
         function has_variant() {
           regex="(^|,)$1($|,)"
@@ -268,7 +273,7 @@ objects:
 
           # mirror the release image and override the release image to point to the mirrored one
           mkdir /tmp/.docker && cp /etc/openshift-installer/pull-secret /tmp/.docker/config.json
-          oc registry login
+          oc registry login --to /tmp/.docker/config.json
           MIRROR_BASE=$( oc get is release -o 'jsonpath={.status.publicDockerImageRepository}' )
           oc adm release new --from-release ${RELEASE_IMAGE_LATEST} --to-image ${MIRROR_BASE}-scratch:release --mirror ${MIRROR_BASE}-scratch || echo 'ignore: the release could not be reproduced from its inputs'
           oc adm release mirror --from ${MIRROR_BASE}-scratch:release --to ${MIRROR_BASE} --to-release-image ${MIRROR_BASE}:mirrored
@@ -737,7 +742,7 @@ objects:
       - name: ARTIFACT_DIR
         value: /tmp/artifacts
       - name: INSTANCE_PREFIX
-        value: ${NAMESPACE}-${JOB_NAME_HASH}
+        value: ${NAMESPACE}-${UNIQUE_HASH}
       - name: TYPE
         value: ${CLUSTER_TYPE}
       - name: AWS_SHARED_CREDENTIALS_FILE
@@ -746,6 +751,8 @@ objects:
         value: /etc/openshift-installer/osServicePrincipal.json
       - name: GOOGLE_CLOUD_KEYFILE_JSON
         value: /etc/openshift-installer/gce.json
+      - name: XDG_RUNTIME_DIR
+        value: /tmp/run
       - name: KUBECONFIG
         value: /tmp/artifacts/installer/auth/kubeconfig
       command:
@@ -777,7 +784,7 @@ objects:
           export PATH=$PATH:/tmp/shared
 
           echo "Gathering artifacts ..."
-          mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network
+          mkdir -p ${ARTIFACT_DIR}/pods ${ARTIFACT_DIR}/nodes ${ARTIFACT_DIR}/metrics ${ARTIFACT_DIR}/bootstrap ${ARTIFACT_DIR}/network "${XDG_RUNTIME_DIR}"
 
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.metadata.name}{"\n"}{end}' > /tmp/nodes
           oc --insecure-skip-tls-verify --request-timeout=5s get nodes -o jsonpath --template '{range .items[*]}{.spec.providerID}{"\n"}{end}' | sed 's|.*/||' > /tmp/node-provider-IDs

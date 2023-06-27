@@ -35,10 +35,6 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_rhel-8-golang-1.19-openshift-4.13:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
   openshift_release_golang-1.18:
     name: release
     namespace: openshift
@@ -59,32 +55,6 @@ images:
     COPY . .
   from: src
   to: assisted-installer-agent-src
-- dockerfile_literal: |
-    FROM test-bin AS builder
-    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    COPY --from=builder /usr/bin/golangci-lint /usr/bin/golangci-lint
-    COPY --from=builder /go/src/github.com/openshift/assisted-installer-agent /go/src/github.com/openshift/assisted-installer-agent
-    WORKDIR /go/src/github.com/openshift/assisted-installer-agent
-    ENV GO111MODULE=on
-    ENV GOFLAGS=""
-    RUN go install golang.org/x/tools/cmd/goimports@v0.1.0 && \
-      go install github.com/onsi/ginkgo/ginkgo@v1.16.1 && \
-      go install github.com/golang/mock/mockgen@v1.6.0 && \
-      go install github.com/vektra/mockery/v2@v2.9.6 && \
-      go install gotest.tools/gotestsum@v1.6.3 && \
-      go install github.com/axw/gocov/gocov@latest && \
-      go install github.com/AlekSi/gocov-xml@latest
-    RUN go mod vendor
-    RUN mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
-    RUN dnf install -y gcc nmstate-devel nmstate-libs && dnf clean all
-  inputs:
-    ocp_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    test-bin:
-      as:
-      - test-bin
-  to: assisted-test-bin
 promotion:
   name: ocm-2.9
   namespace: edge-infrastructure
@@ -129,17 +99,16 @@ tests:
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
-    export "GOROOT=$(go env GOROOT)"
     make lint
   container:
-    from: assisted-test-bin
+    from: test-bin
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: assisted-test-bin
+    from: test-bin
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
@@ -149,7 +118,7 @@ tests:
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: assisted-test-bin
+    from: test-bin
   postsubmit: true
   secret:
     mount_path: /tmp/secret
@@ -214,16 +183,6 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
         OPENSHIFT_VERSION=4.12
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ocs
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=ocs
-        OPENSHIFT_VERSION=4.8
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
