@@ -14,10 +14,13 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
 # extract ccoctl from the release image
 oc registry login
 # extract alibabacloud credentials requests from the release image
-oc --loglevel 10 adm release extract --credentials-requests --cloud=alibabacloud --to="${CR_PATH}" "${RELEASE_IMAGE_LATEST}"
+oc --loglevel 10 adm release extract --credentials-requests --cloud=alibabacloud --to="${CR_PATH}" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 # create required credentials infrastructure and installer manifests for workload identity
 ccoctl alibabacloud create-ram-users \
