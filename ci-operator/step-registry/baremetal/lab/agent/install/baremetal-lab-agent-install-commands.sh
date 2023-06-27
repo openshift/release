@@ -139,6 +139,7 @@ function reset_host() {
   local vendor="${4:-ampere}"
   ipmi_boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo force_pxe || echo force_cdrom)
   sushy_boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo PXE || echo VCD-DVD)
+  echo "BOOT_MODE is ${BOOT_MODE} , Sushy boot device is ${sushy_boot_selection}"
   echo "Resetting the host ${bmc_address}..."
   case "${vendor}" in
     ampere)
@@ -154,7 +155,7 @@ function reset_host() {
          '{"ShareParameters":{"Target":"ALL"},"ImportBuffer":
             "<SystemConfiguration><Component FQDD=\"iDRAC.Embedded.1\">
             <Attribute Name=\"ServerBoot.1#BootOnce\">Enabled</Attribute>
-            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">'"$sushy_boot_selection"'</Attribute>
+            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">VCD-DVD</Attribute>
             </Component></SystemConfiguration>"}'
     ;;
     *)
