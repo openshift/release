@@ -339,12 +339,12 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
   echo "Power on ${bmc_address//.*/} (${name})..."
-  #reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${vendor}"
+  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${vendor}"
 done
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
-sleep 900
+#echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
+#sleep 900
 echo "Launching 'wait-for bootstrap-complete' installation step....."
 # The installer uses the rendezvous IP for checking the bootstrap phase.
 # The rendezvous IP is in the internal net in our lab.
