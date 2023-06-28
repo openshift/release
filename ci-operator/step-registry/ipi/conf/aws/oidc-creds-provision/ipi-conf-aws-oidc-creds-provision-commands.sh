@@ -6,7 +6,7 @@ set -o pipefail
 
 MPREFIX="${SHARED_DIR}/manifest"
 TPREFIX="${SHARED_DIR}/tls"
-infra_name=${NAMESPACE}-${JOB_NAME_HASH}
+infra_name=${NAMESPACE}-${UNIQUE_HASH}
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 REGION="${LEASED_RESOURCE}"
 
@@ -16,8 +16,11 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
 oc registry login
-oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "$RELEASE_IMAGE_LATEST"
+oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 # Create extra efs csi driver iam resources, it's optional only for efs csi driver related tests on sts clusters
 if [[ "${CREATE_EFS_CSI_DRIVER_IAM}" == "yes" ]]; then
@@ -51,6 +54,10 @@ if [[ "${STS_USE_PRIVATE_S3}" == "yes" ]]; then
   CCOCTL_OPTIONS=" $CCOCTL_OPTIONS --create-private-s3-bucket "
 fi
 
+if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
+  CCOCTL_OPTIONS=" $CCOCTL_OPTIONS --enable-tech-preview "
+fi
+
 # create required credentials infrastructure and installer manifests
 ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
 
@@ -64,3 +71,10 @@ echo -e "\n"
 # copy generated secret manifests from ccoctl target directory into shared directory
 cd "/tmp/manifests"
 for FILE in *; do cp $FILE "${MPREFIX}_$FILE"; done
+
+# for Shared VPC install, same ingress role name, it will be used in trust policy
+ingress_role_arn=$(grep -hE "role_arn.*ingress" * | awk '{print $3}')
+if [[ ${ingress_role_arn} != "" ]]; then
+  echo "Saving ingress role: ${ingress_role_arn}"
+  echo "${ingress_role_arn}" > ${SHARED_DIR}/sts_ingress_role_arn
+fi

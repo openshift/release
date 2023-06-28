@@ -28,7 +28,7 @@ EOF
 
 function exit_with_failure(){
   # TODO: update message to reflect job name/link
-  MESSAGE="ofcir: ${1:-"Failed to create ci resource: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"}"
+  MESSAGE="ofcir: ${1:-"Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"}"
   echo $MESSAGE
   cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
   <testsuite name="metal infra" tests="1" failures="1">
@@ -108,4 +108,4 @@ if [[ ! "$RELEASE_IMAGE_LATEST" =~ build05 ]] ; then
     echo "WARNING: Attempting to contact lab ofcir API from the wrong cluster, must be build05 to succeed"
 fi
 getCIR && exit_with_success
-exit_with_failure "Failed to create ci resource: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+exit_with_failure "Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"

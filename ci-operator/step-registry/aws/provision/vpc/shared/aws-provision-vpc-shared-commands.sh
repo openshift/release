@@ -8,6 +8,12 @@ set -o pipefail
 trap 'save_stack_events_to_artifacts' EXIT TERM INT
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  CLUSTER_CREATOR_USER_ARN=$(aws sts get-caller-identity | jq -r '.Arn')
+  CLUSTER_CREATOR_AWS_ACCOUNT_NO=$(echo $CLUSTER_CREATOR_USER_ARN | awk -F ":" '{print $5}')
+  echo "Using shared account, cluster creator account: ${CLUSTER_CREATOR_AWS_ACCOUNT_NO:0:6}***"
+  export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred_shared_account"
+fi
 
 EXPIRATION_DATE=$(date -d '4 hours' --iso=minutes --utc)
 TAGS="Key=expirationDate,Value=${EXPIRATION_DATE}"
@@ -19,6 +25,16 @@ function save_stack_events_to_artifacts()
   set +o errexit
   aws --region ${REGION} cloudformation describe-stack-events --stack-name ${STACK_NAME} --output json > "${ARTIFACT_DIR}/stack-events-${STACK_NAME}.json"
   set -o errexit
+}
+
+function aws_add_param_to_json() {
+    local k="$1"
+    local v="$2"
+    local param_json="$3"
+    if [ ! -e "$param_json" ]; then
+        echo -n '[]' > "$param_json"
+    fi
+    cat <<< "$(jq  --arg k "$k" --arg v "$v" '. += [{"ParameterKey":$k, "ParameterValue":$v}]' "$param_json")" > "$param_json"
 }
 
 cat > /tmp/01_vpc.yaml << EOF
@@ -46,6 +62,11 @@ Parameters:
     Default: 12
     Description: "Size of each subnet to create within the availability zones. (Min: 5 = /27, Max: 13 = /19)"
     Type: Number
+  ResourceSharePrincipals:
+    ConstraintDescription: ResourceSharePrincipals
+    Default: ""
+    Description: "ResourceSharePrincipals"
+    Type: String
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -70,6 +91,7 @@ Metadata:
 Conditions:
   DoAz3: !Equals [3, !Ref AvailabilityZoneCount]
   DoAz2: !Or [!Equals [2, !Ref AvailabilityZoneCount], Condition: DoAz3]
+  ShareSubnets: !Not [ !Equals ['', !Ref ResourceSharePrincipals] ]
 
 Resources:
   VPC:
@@ -294,6 +316,47 @@ Resources:
         - !Ref 'AWS::Region'
         - .s3
       VpcId: !Ref VPC
+  ResourceShareSubnets:
+    Type: "AWS::RAM::ResourceShare"
+    Condition: ShareSubnets
+    Properties:
+      Name: !Join [ "-", [ !Ref "AWS::StackName", "resource-share" ] ]
+      ResourceArns:
+        - !Join
+            - ''
+            - [ 'arn:', !Ref "AWS::Partition", ':ec2:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':subnet/', !Ref PrivateSubnet ]
+        - !Join
+            - ''
+            - [ 'arn:', !Ref "AWS::Partition", ':ec2:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':subnet/', !Ref PublicSubnet ]
+        - !If
+            - DoAz2
+            - !Join
+              - ''
+              - [ 'arn:', !Ref "AWS::Partition", ':ec2:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':subnet/', !Ref PrivateSubnet2 ]
+            - !Ref "AWS::NoValue"
+        - !If
+            - DoAz2
+            - !Join
+              - ''
+              - [ 'arn:', !Ref "AWS::Partition", ':ec2:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':subnet/', !Ref PublicSubnet2 ]
+            - !Ref "AWS::NoValue"
+        - !If
+            - DoAz3
+            - !Join
+              - ''
+              - [ 'arn:', !Ref "AWS::Partition", ':ec2:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':subnet/', !Ref PrivateSubnet3 ]
+            - !Ref "AWS::NoValue"
+        - !If
+            - DoAz3
+            - !Join
+              - ''
+              - [ 'arn:', !Ref "AWS::Partition", ':ec2:', !Ref 'AWS::Region', ':', !Ref 'AWS::AccountId', ':subnet/', !Ref PublicSubnet3 ]
+            - !Ref "AWS::NoValue"
+      Principals:
+        - !Ref ResourceSharePrincipals
+      Tags:
+        - Key: Name
+          Value: !Join [ "-", [ !Ref "AWS::StackName", "resource-share" ] ]
 
 Outputs:
   VpcId:
@@ -321,13 +384,24 @@ then
   ZONES_COUNT=3
 fi
 
-STACK_NAME="${NAMESPACE}-${JOB_NAME_HASH}-vpc"
-echo ${STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
+STACK_NAME="${NAMESPACE}-${UNIQUE_HASH}-vpc"
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  echo ${STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list_shared_account"
+else
+  echo ${STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
+fi
+
+vpc_params="${ARTIFACT_DIR}/vpc_params.json"
+aws_add_param_to_json "AvailabilityZoneCount" ${ZONES_COUNT} "$vpc_params"
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  aws_add_param_to_json "ResourceSharePrincipals" ${CLUSTER_CREATOR_AWS_ACCOUNT_NO} "$vpc_params"
+fi
+
 aws --region "${REGION}" cloudformation create-stack \
   --stack-name "${STACK_NAME}" \
   --template-body "$(cat /tmp/01_vpc.yaml)" \
   --tags "${TAGS}" \
-  --parameters "ParameterKey=AvailabilityZoneCount,ParameterValue=${ZONES_COUNT}" &
+  --parameters file://${vpc_params} &
 
 wait "$!"
 echo "Created stack"

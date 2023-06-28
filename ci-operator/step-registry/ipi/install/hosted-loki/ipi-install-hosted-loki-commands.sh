@@ -117,24 +117,59 @@ data:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - static_labels:
+          type: pod
+      # Special match for the logs from the event-exporter pod, which logs json lines for each kube event.
+      # For these we want to extract the namespace from metadata.namespace, rather than using the one
+      # from the pod which did the logging. (openshift-e2e-loki)
+      # This will allow us to search events globally with a namespace label that matches the actual event.
       - match:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
-          action: drop
-      - pack:
-          labels:
-          - app
-          - container
-          - host
-          - pod
+          stages:
+            # Two json stages to access the nested metadata.namespace field:
+            - json:
+                expressions:
+                  metadata:
+            - json:
+                expressions:
+                  namespace:
+                source: metadata
+            - labels:
+                namespace:
+            - static_labels:
+                type: kube-event
+      # For anything that is outside an openshift- namespace, we will pack it into the entry to
+      # dramatically improve cardinality. These would typically be temporary namespaces with random
+      # names created by e2e tests. We still keep their logs, you just don't get a fast label filter
+      # to find them globally by namespace.
+      #
+      # We had to resort to a fixed list here because there are a lot of openshift-RAND namespaces created.
+      # (must-gather, debug, amq, test, etc) If you want your namespaces to get it's own indexed namespace
+      # label, add it here, in alphabetical order, and to the near identical line below with =~ instead of !~.
+      - match:
+          selector: '{namespace!~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-package-operator|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
+          stages:
+          - pack:
+              labels:
+              - namespace
+              - app
+              - container
+              - host
+              - pod
+      # If this entry is in an openshift- namespace, we don't pack the namespace (it remains a real label):
+      - match:
+          selector: '{namespace=~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-package-operator|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
+          stages:
+          - pack:
+              labels:
+              - app
+              - container
+              - host
+              - pod
       - labelallow:
           - invoker
           - namespace
-          - app
-          - container
-          - host
-          - pod
-      - static_labels:
-          type: pod
+          - type
       relabel_configs:
       - action: drop
         regex: ''
@@ -181,43 +216,18 @@ data:
       - pack:
           labels:
           - boot_id
-          - systemd_unit
           - host
       - labelallow:
           - invoker
+          - systemd_unit
       - static_labels:
           type: journal
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
-    - job_name: events
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - match:
-          selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
-          stages:
-          - static_labels:
-              type: kube-event
-      - labelallow:
-          - invoker
-          - type
-      relabel_configs:
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
     server:
       http_listen_port: 3101
+      log_level: warn
     target_config:
       sync_period: 10s
 EOF

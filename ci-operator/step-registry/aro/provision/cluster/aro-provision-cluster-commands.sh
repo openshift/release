@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-CLUSTER=${CLUSTER:="${NAMESPACE}-${JOB_NAME_HASH}"}
+CLUSTER=${CLUSTER:="${NAMESPACE}-${UNIQUE_HASH}"}
 RESOURCEGROUP=${RESOURCEGROUP:=$(cat "${SHARED_DIR}/resourcegroup")}
 VNET=${VNET:=$(cat "$SHARED_DIR/vnet")}
 LOCATION=${LOCATION:=${LEASED_RESOURCE}}

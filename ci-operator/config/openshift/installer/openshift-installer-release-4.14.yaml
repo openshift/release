@@ -1,26 +1,26 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra
   base:
@@ -47,10 +47,6 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
-  rhel-7:
-    name: builder
-    namespace: ocp
-    tag: rhel-7-golang-1.16-openshift-4.10
 build_root:
   from_repository: true
 images:
@@ -75,8 +71,8 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: libvirt-installer
-- dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: rhel-7
+- dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+  from: base
   inputs:
     ocp_4.10_cli:
       as:
@@ -260,6 +256,16 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sharednetwork
+  timeout: 6h0m0s
+- as: e2e-aws-ovn-localzones
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-local-zones
   timeout: 6h0m0s
 - as: e2e-aws-ovn-imdsv2
   optional: true

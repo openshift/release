@@ -8,6 +8,8 @@ echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
@@ -83,6 +85,7 @@ ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.y
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
+echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
@@ -257,6 +260,32 @@ cat << EOF > ~/check-cluster.yml
     fail:
       msg: Installation has failed
     when: "'True' not in ready_check.stdout"
+
+EOF
+
+cat << EOF > $SHARED_DIR/send-mail.yml
+---
+- name: Send mail report
+  hosts: bastion
+  gather_facts: false
+  tasks:
+
+    - name: Get content of the file
+      slurp:
+        src: ${ARTIFACT_DIR}/mail_report.html
+      register: report
+      delegate_to: localhost
+
+    - name: Sending an e-mails
+      mail:
+        host: smtp.corp.redhat.com
+        port: 25
+        from: telco5g-ci@redhat.com (Upstream CI reporter)
+        to: CNF devel <cnf-devel@redhat.com>
+        subject: >-
+          [US CI] RESULTPH SNO job ${JOB_NAME:-'unknown'}
+        subtype: html
+        body: "{{ report['content'] | b64decode }}"
 
 EOF
 

@@ -39,7 +39,10 @@ export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}/containers"
-config_file="${XDG_RUNTIME_DIR}/containers/auth.json"
+
+# we need to store credentials in $HOME/.docker/config.json for pre 4.10 oc
+config_file="$HOME/.docker/config.json"
+mkdir -p "$HOME/.docker"
 cat "$REGISTRY_TOKEN_FILE" > "$config_file" || {
     echo "ERROR Could not read registry secret file"
     echo "      From: $REGISTRY_TOKEN_FILE"
@@ -47,7 +50,7 @@ cat "$REGISTRY_TOKEN_FILE" > "$config_file" || {
 }
 if [[ ! -r "$REGISTRY_TOKEN_FILE" ]]; then
     echo "ERROR Registry authentication file not found: $REGISTRY_TOKEN_FILE"
-    echo "      Is the auth.json in a different location?"
+    echo "      Is the $config_file in a different location?"
     exit 1
 fi
 oc registry login
@@ -137,7 +140,7 @@ if [[ "${BUNDLE_CHANNELS}" == *"alpha"* ]]; then
     OPERATOR_SKIPS=""
     for version in ${skips}; do
         OPERATOR_SKIPS="${OPERATOR_SKIPS} assisted-service-operator.v${version##*\/}"
-    done 
+    done
 else
     echo "   use previous version to determine the versions we skip"
     OPERATOR_SKIPS=$(/tmp/yq eval ".spec.skips | .[]" "${CO_OPERATOR_DIR}/${PREV_OPERATOR_VERSION}/${CSV}")

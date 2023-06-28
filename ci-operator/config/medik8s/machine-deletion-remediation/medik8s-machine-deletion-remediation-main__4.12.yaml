@@ -3,6 +3,10 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
+  operator-sdk:
+    name: "4.13"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make manager
 build_root:
   from_repository: true
@@ -14,6 +18,7 @@ operator:
   bundles:
   - as: machine-deletion-remediation-bundle
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/medik8s/machine-deletion-remediation-operator:latest
     with: pipeline:machine-deletion-remediation-operator
@@ -35,26 +40,40 @@ tests:
   commands: make test
   container:
     from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-machine-deletion-remediation-bundle
     env:
-      OO_CHANNEL: candidate
-      OO_INSTALL_NAMESPACE: mdr-install
-      OO_PACKAGE: machine-deletion-remediation
-      OO_TARGET_NAMESPACES: '!all'
+      INSTALL_NAMESPACE: mdr-install
     test:
-    - as: e2e
-      commands: make test-e2e
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment machine-deletion-remediation-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: machine-deletion-remediation-bundle
+      env:
+      - name: INSTALL_NAMESPACE
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: export OPERATOR_NS="$INSTALL_NAMESPACE" && make test-e2e
+      env:
+      - name: INSTALL_NAMESPACE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: medik8s

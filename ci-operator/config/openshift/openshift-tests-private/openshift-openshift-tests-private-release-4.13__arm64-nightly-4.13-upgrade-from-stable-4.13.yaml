@@ -76,7 +76,6 @@ resources:
 tests:
 - as: aws-ipi-byo-iam-role-p2-f28
   cron: 46 21 19 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -97,7 +96,6 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
 - as: aws-ipi-byo-route53-p2-f28
   cron: 43 0 25 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -116,53 +114,8 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
-- as: aws-ipi-disconnected-cco-manual-sts-ep-p2-f28
-  cron: 14 19 8 * *
-  remote_api: true
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.13 and @aws-ipi and
-        not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.13 and @aws-ipi and
-        not @fips'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-disconnected-cco-manual-sts-p2-f28
-  cron: 43 4 30 * *
-  remote_api: true
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      OCP_ARCH: arm64
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.13 and @aws-ipi and
-        not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.13 and @aws-ipi and
-        not @fips'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
 - as: aws-ipi-disconnected-private-p1-f28
   cron: 54 3 13 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -182,9 +135,50 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: aws-ipi-disconnected-sts-ep-p2-f28
+  cron: 49 11 19 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.13 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.13 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: aws-ipi-disconnected-sts-p2-f28
+  cron: 31 5 30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:arm64-target
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@arm64 and @upgrade-check and @4.13 and @aws-ipi and
+        not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@arm64 and @upgrade-prepare and @4.13 and @aws-ipi and
+        not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service
 - as: aws-ipi-imdsv2-p2-f28
   cron: 11 2 14 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -205,7 +199,6 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-imdsv2
 - as: aws-ipi-ingress-lbtype-nlb-p1-f28
   cron: 15 0 13 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -226,7 +219,6 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
 - as: aws-ipi-ovn-ipsec-p1-f28
   cron: 57 15 7 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -245,9 +237,8 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-proxy-cco-manual-sts-p1-f28
-  cron: 11 3 26 * *
-  remote_api: true
+- as: aws-ipi-proxy-sts-p1-f28
+  cron: 49 7 23 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -268,7 +259,6 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: aws-ipi-usertags-p2-f28
   cron: 35 15 10 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -289,7 +279,6 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-usertags
 - as: azure-ipi-fullyprivate-proxy-p1-f28
   cron: 32 10 15 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -309,7 +298,6 @@ tests:
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: azure-ipi-ovn-ipsec-p1-f28
   cron: 26 14 26 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -329,7 +317,6 @@ tests:
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
 - as: azure-ipi-resourcegroup-p3-f28
   cron: 24 8 27 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -349,7 +336,6 @@ tests:
     workflow: cucushift-installer-rehearse-azure-ipi-resourcegroup
 - as: azure-upi-p3-f28
   cron: 6 0 24 * *
-  remote_api: true
   steps:
     cluster_profile: azure-arm64-qe
     dependencies:

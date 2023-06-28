@@ -3,8 +3,6 @@
 export HOME WORKSPACE CHROME_IMAGE CHROME_TAG
 HOME=/tmp
 WORKSPACE=$(pwd)
-CHROME_IMAGE="quay.io/cloudservices/insights-chrome-frontend"
-CHROME_TAG="f5f1929"
 
 #Vault Secrets
 export HAC_KC_SSO_URL HAC_KC_USERNAME HAC_KC_PASSWORD HAC_KC_REGISTRATION CYPRESS_GH_TOKEN CYPRESS_GH_PASSWORD CYPRESS_QUAY_TOKEN CYPRESS_RP_HAC CYPRESS_VC_KUBECONFIG
@@ -87,7 +85,6 @@ bonfire deploy -c "$CONFIG_DIR/config.yaml" \
         --frontends true \
         --source=appsre \
         --clowd-env ${ENV_NAME} \
-        --set-image-tag ${CHROME_IMAGE}=${CHROME_TAG} \
         --namespace ${NAMESPACE} \
         --timeout 1200
 
@@ -101,7 +98,7 @@ python keycloak.py $HAC_KC_SSO_URL $HAC_KC_USERNAME $HAC_KC_PASSWORD $B64_USER $
 
 export CYPRESS_PERIODIC_RUN CYPRESS_HAC_BASE_URL CYPRESS_USERNAME CYPRESS_PASSWORD CYPRESS_RP_TOKEN
 CYPRESS_PERIODIC_RUN=true
-CYPRESS_HAC_BASE_URL=https://${HOSTNAME}/hac/stonesoup
+CYPRESS_HAC_BASE_URL=https://${HOSTNAME}/application-pipeline
 CYPRESS_USERNAME=`echo ${B64_USER} | base64 -d`
 CYPRESS_PASSWORD=`echo ${B64_PASS} | base64 -d`
 CYPRESS_RP_TOKEN=${CYPRESS_RP_HAC}

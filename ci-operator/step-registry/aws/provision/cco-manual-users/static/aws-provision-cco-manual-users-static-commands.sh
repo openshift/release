@@ -98,18 +98,20 @@ function remove_tech_preview_feature_from_manifests()
     return 0
 }
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
 oc registry login
-prefix="${NAMESPACE}-${JOB_NAME_HASH}-`echo $RANDOM`"
+prefix="${NAMESPACE}-${UNIQUE_HASH}-`echo $RANDOM`"
 cr_yaml_d=`mktemp -d`
 cr_json_d=`mktemp -d`
 resources_d=`mktemp -d`
 credentials_requests_files=`mktemp`
-echo "extracting CR from image $RELEASE_IMAGE_LATEST"
+echo "extracting CR from image ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 oc version --client
-REPO=$(oc -n ${NAMESPACE} get is release -o json | jq -r '.status.publicDockerImageRepository')
-cmd="oc adm release extract ${REPO}:latest --credentials-requests --cloud=aws --to '$cr_yaml_d'"
+cmd="oc adm release extract ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --credentials-requests --cloud=aws --to '$cr_yaml_d'"
 oc image info ${RELEASE_IMAGE_LATEST}  || true
-oc image info ${REPO}:latest || true
+oc image info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} || true
 run_command "${cmd}" || exit 1
 
 if [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/manifest_feature_gate.yaml ]]; then
