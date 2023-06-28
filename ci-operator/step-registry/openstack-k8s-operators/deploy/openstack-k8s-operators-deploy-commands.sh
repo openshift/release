@@ -100,6 +100,9 @@ fi
 make ceph DATA_SIZE=2Gi TIMEOUT=90
 sleep 30
 
+# Find worker where ceph is running and spawn glance/cinder/manila pod on the same node.
+WORKER=$(oc -n ${NS_SERVICES} get pod ceph -o jsonpath='{.spec.nodeSelector.kubernetes\.io/hostname}')
+
 # Deploy openstack services with the sample from the PR under test
 make openstack_deploy_prep NETWORK_ISOLATION=false
 
@@ -168,6 +171,10 @@ patches:
             backup_ceph_pool = backups
             backup_ceph_user = openstack
     - op: add
+      path: /spec/cinder/template/nodeSelector
+      value:
+        kubernetes.io/hostname: "$WORKER"
+    - op: add
       path: /spec/glance/template/customServiceConfig
       value: |
             [DEFAULT]
@@ -180,6 +187,16 @@ patches:
             rbd_store_user=openstack
             rbd_store_pool=images
             store_description=ceph_glance_store
+    - op: add
+      path: /spec/glance/template/glanceAPIInternal
+      value:
+        nodeSelector:
+          kubernetes.io/hostname: "$WORKER"
+    - op: add
+      path: /spec/glance/template/glanceAPIExternal
+      value:
+        nodeSelector:
+          kubernetes.io/hostname: "$WORKER"
 $(if [[ "${SERVICE_NAME}" == "IRONIC" ]]; then
   cat <<IRONIC_EOF
     - op: add
@@ -207,6 +224,10 @@ $(if [[ "${SERVICE_NAME}" == "MANILA" ]]; then
             cephfs_cluster_name=ceph
             cephfs_volume_mode=0755
             cephfs_protocol_helper_type=CEPHFS
+    - op: add
+      path: /spec/manila/template/nodeSelector
+      value:
+        kubernetes.io/hostname: "$WORKER"
 MANILA_EOF
 fi)
   target:
