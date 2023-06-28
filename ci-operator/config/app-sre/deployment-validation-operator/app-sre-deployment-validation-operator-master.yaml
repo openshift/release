@@ -1,6 +1,6 @@
 base_images:
   operator-sdk:
-    name: "4.12"
+    name: "4.13"
     namespace: origin
     tag: operator-sdk
 build_root:
@@ -12,7 +12,6 @@ operator:
   bundles:
   - as: my-bundle
     dockerfile_path: build/Dockerfile
-    skip_building_index: true
 resources:
   '*':
     limits:
@@ -52,14 +51,14 @@ tests:
   commands: make validate
   container:
     from: src
-- as: deployment-validation-operator-e2e-tests
+- as: e2e-in-cluster-build-4.13
   cluster_claim:
     architecture: amd64
-    cloud: aws
+    cloud: ci-ocp-4-10-amd64-aws-us-east-1
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   steps:
     test:
     - as: install
@@ -67,7 +66,7 @@ tests:
       commands: |
         oc create namespace deployment-validation-operator
         operator-sdk run bundle -n deployment-validation-operator "$OO_BUNDLE"
-        oc wait --for condition=Available -n deployment-validation-operator deployment-operator
+        oc wait --for condition=Available -n deployment-validation-operator deployment operator
       dependencies:
       - env: OO_BUNDLE
         name: my-bundle
