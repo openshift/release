@@ -103,7 +103,7 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
             --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
             --output text)"
   echo "${bastion_hosted_zone_id}" > "${SHARED_DIR}/bastion-hosted-zone.txt"
- 
+
   dns_create_str=""
   dns_delete_str=""
   dns_target='"TTL": 60,"ResourceRecords": [{"Value": "'${bastion_ip}'"}]'
