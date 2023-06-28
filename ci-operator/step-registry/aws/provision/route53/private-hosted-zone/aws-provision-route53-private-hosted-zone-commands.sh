@@ -67,6 +67,9 @@ EOF
 
   cmd="aws --region $REGION iam create-policy --policy-name ${POLICY_NAME} --policy-document '$(cat $POLICY_DOC | jq -c)' > ${POLICY_OUT}"
   eval "${cmd}"
+  echo "Creaetd policy ${POLICY_NAME} with policy doc:"
+  cat ${POLICY_DOC}
+
   POLICY_ARN=$(cat ${POLICY_OUT} | jq -r '.Policy.Arn')
   echo "Created ${POLICY_ARN}"
   echo ${POLICY_ARN} > ${SHARED_DIR}/shared_install_policy_arn
@@ -118,5 +121,16 @@ EOF
   
   # TODO: narrow down the permission
   aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn 'arn:aws:iam::aws:policy/ResourceGroupsandTagEditorFullAccess'
+  echo "Attched arn:aws:iam::aws:policy/ResourceGroupsandTagEditorFullAccess to ${ROLE_NAME}"
   aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+  echo "Attched arn:aws:iam::aws:policy/AmazonRoute53FullAccess to ${ROLE_NAME}"
 fi
+
+echo "Inline policies of ${ROLE_NAME}"
+aws --region $REGION iam list-role-policies --role-name ${ROLE_NAME}
+echo "Attached policies of ${ROLE_NAME}"
+aws --region $REGION iam list-attached-role-policies --role-name ${ROLE_NAME}
+
+
+echo "sleep 900 for debugging"
+sleep 900
