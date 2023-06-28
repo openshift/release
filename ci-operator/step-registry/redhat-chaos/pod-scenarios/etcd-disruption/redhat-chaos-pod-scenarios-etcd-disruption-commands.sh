@@ -5,10 +5,7 @@ set -o pipefail
 set -x
 cat /etc/os-release
 
-
 oc config view
-
-oc config view --kubeconfig ${SHARED_DIR}/kubeconfig
 
 oc projects
 python3 --version
