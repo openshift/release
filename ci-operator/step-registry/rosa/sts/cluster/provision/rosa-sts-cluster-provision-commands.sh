@@ -56,7 +56,7 @@ else
   exit 1
 fi
 
-# Check whether the cluster with the same cluster name existes.
+# Check whether the cluster with the same cluster name exists.
 OLD_CLUSTER=$(rosa list clusters | { grep  ${CLUSTER_NAME} || true; })
 if [[ ! -z "$OLD_CLUSTER" ]]; then
   # Previous cluster was orphaned somehow. Shut it down.
@@ -180,7 +180,7 @@ fi
 
 PROXY_SWITCH=""
 if [[ "$ENABLE_PROXY" == "true" ]]; then
-  # Get the proxy information from the previous steps, and replace the vaule here
+  # Get the proxy information from the previous steps, and replace the value here
   proxy_private_url=$(< "${SHARED_DIR}/proxy_private_url")
   TRUST_BUNDLE_FILE="bundle_file"
   if [[ -z "${proxy_private_url}" ]] || [[ -z "${TRUST_BUNDLE_FILE}" ]]; then
