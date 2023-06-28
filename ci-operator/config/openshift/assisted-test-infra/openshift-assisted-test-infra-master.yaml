@@ -308,6 +308,8 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=metallb
+        METALLB_API_IP=10.0.0.1
+        METALLB_INGRESS_IP=10.0.0.2
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-periodic
   cron: 30 02 */1 * 0-5
@@ -748,6 +750,19 @@ tests:
     workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-periodic
   cluster: build01
+  interval: 24h
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-4-13-periodic
+  cluster: build01
   interval: 48h
   steps:
     cluster_profile: nutanix
@@ -757,6 +772,7 @@ tests:
         MAKEFILE_TARGET=test
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
         ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.13
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-metal-assisted-day2-arm-workers

@@ -22,6 +22,23 @@ import yaml
 
 
 @dataclasses.dataclass
+class BaseImageEntry:
+    name: str
+    raw_entry: typing.Any
+
+    @property
+    def tag(self):
+        return safe_get_attr(self.raw_entry, "tag", coalesce_to="?")
+
+
+@dataclasses.dataclass
+class BaseImageEntries:
+    """`base_images` attribute of config YAML file (the one under `ci-operator/config/**` directory)."""
+    unordered_entries: typing.List[BaseImageEntry] = None
+    ordered_entries: typing.List[BaseImageEntry] = None
+
+
+@dataclasses.dataclass
 class TestEntry:
     raw_entry: typing.Any
 
@@ -58,9 +75,31 @@ class ConfigFile:
     unordered_entries: typing.List[TestEntry] = None
     ordered_entries: typing.List[TestEntry] = None
 
+    base_images: BaseImageEntries = None
+
     @property
     def branch(self):
-        return safe_get_attr(self.raw_parsed_yaml, "zz_generated_metadata.branch")
+        return safe_get_attr(self.raw_parsed_yaml, "zz_generated_metadata.branch", coalesce_to="")
+
+    @property
+    def build_root_tag(self):
+        return safe_get_attr(self.raw_parsed_yaml, "build_root.image_stream_tag.tag")
+
+    def dump_build_root(self):
+        return dump_dict_subset(self.raw_parsed_yaml, ["build_root"])
+
+    @property
+    def ocp_release(self):
+        if not safe_get_attr(self.raw_parsed_yaml, "releases"):
+            return ""
+        version = safe_get_attr(self.raw_parsed_yaml, "releases.latest.release.version")
+        if not version:
+            return "?"
+        channel = safe_get_attr(self.raw_parsed_yaml, "releases.latest.release.channel", coalesce_to="?")
+        return f"{version}@{channel}"
+
+    def dump_ocp_release(self):
+        return dump_dict_subset(self.raw_parsed_yaml, ["releases"])
 
 
 @dataclasses.dataclass
@@ -99,12 +138,9 @@ class JobEntry:
         if self.raw_entry is None:
             return ""
 
-        subset = {
-            key: self.raw_entry[key] for key in
-            ["always_run", "run_if_changed", "skip_if_only_changed", "skip_report", "max_concurrency"]
-            if key in self.raw_entry
-        }
-        return yaml.safe_dump(subset)
+        return dump_dict_subset(
+            self.raw_entry,
+            ["always_run", "run_if_changed", "skip_if_only_changed", "skip_report", "max_concurrency"])
 
 
 @dataclasses.dataclass
@@ -127,6 +163,8 @@ class Data:
 
     all_test_names: typing.List[str] = None
     configs: typing.List[ConfigFile] = None
+
+    all_base_image_names: typing.List[str] = None
 
     all_job_names: typing.List[str] = None
     jobs_files: typing.List[JobsFile] = None
@@ -161,8 +199,12 @@ class Data:
         idx = abs_dir_parts.index("ci-operator")
         return "/".join(abs_dir_parts[idx:])
 
+    @property
+    def base_images(self):
+        return [c.base_images for c in self.configs]
 
-def safe_get_attr(raw_data, attr_key):
+
+def safe_get_attr(raw_data, attr_key, coalesce_to=None):
     """
     Traverses `raw_data` data structure of nested maps and returns an attribute pointed by `attr_key`.
     I.e. this is some kind of poor-man's XPath.
@@ -176,7 +218,17 @@ def safe_get_attr(raw_data, attr_key):
         if key_part not in location:
             return None
         location = location[key_part]
-    return location
+    return coalesce(location, default=coalesce_to)
+
+
+def dump_dict_subset(src_dict, keys):
+    src_dict = coalesce(src_dict, {})
+    subset = {key: src_dict[key] for key in keys if key in src_dict}
+    return yaml.safe_dump(subset)
+
+
+def coalesce(val, default):
+    return val if val is not None else default
 
 
 #########################################################
@@ -189,18 +241,22 @@ def load_and_massage_data(dir):
     d.configs = load_raw_yamls(d.config_dir, constructor_fn=ConfigFile)
     assign_short_filenames(d.configs)
     d.configs = sort_by_short_names(d.configs)
-    assign_unordered_tests(d.configs)
-    d.all_test_names = extract_and_sort_unique_names(d.configs)
-    assign_ordered_entries(d.all_test_names, d.configs)
+    populate_unordered_tests(d.configs)
+    d.all_test_names = extract_and_sort_unique_names(d.configs, use_stackrox_sort_key=True)
+    populate_ordered_entries(d.all_test_names, d.configs)
+
+    populate_base_image_entries(d.configs)
+    d.all_base_image_names = extract_and_sort_unique_names(d.base_images, use_stackrox_sort_key=False)
+    populate_ordered_entries(d.all_base_image_names, d.base_images)
 
     d.jobs_files = load_raw_yamls(d.jobs_dir, constructor_fn=JobsFile)
     # Postsubmits and periodics have much less degree of customization, so we filter them out.
     d.jobs_files = filter_out_all_but_presubmits_jobs_files(d.jobs_files)
     assign_short_filenames(d.jobs_files)
     d.jobs_files = sort_by_short_names(d.jobs_files)
-    assign_unordered_jobs(d.jobs_files)
-    d.all_job_names = extract_and_sort_unique_names(d.jobs_files)
-    assign_ordered_entries(d.all_job_names, d.jobs_files)
+    populate_unordered_jobs(d.jobs_files)
+    d.all_job_names = extract_and_sort_unique_names(d.jobs_files, use_stackrox_sort_key=True)
+    populate_ordered_entries(d.all_job_names, d.jobs_files)
 
     d.git_describe_output = describe_git(d.config_dir)
 
@@ -238,19 +294,19 @@ def sort_by_short_names(items):
     return sorted(items, key=lambda c: c.short_filename)
 
 
-def assign_unordered_tests(configs):
+def populate_unordered_tests(configs):
     for c in configs:
         c.unordered_entries = []
-        for raw_test in safe_get_attr(c.raw_parsed_yaml, "tests") or []:
+        for raw_test in safe_get_attr(c.raw_parsed_yaml, "tests", coalesce_to=[]):
             te = TestEntry(raw_entry=raw_test)
             if te.name:
                 c.unordered_entries.append(te)
 
 
-def assign_unordered_jobs(jobs_files):
+def populate_unordered_jobs(jobs_files):
     for j in jobs_files:
         j.unordered_entries = []
-        presubmits_dict = safe_get_attr(j.raw_parsed_yaml, "presubmits") or {}
+        presubmits_dict = safe_get_attr(j.raw_parsed_yaml, "presubmits", coalesce_to={})
         if len(presubmits_dict) == 0:
             continue
         if len(presubmits_dict) > 1:
@@ -265,7 +321,16 @@ def assign_unordered_jobs(jobs_files):
                 j.unordered_entries.append(je)
 
 
-def extract_and_sort_unique_names(items):
+def populate_base_image_entries(configs):
+    for c in configs:
+        base_images_raw = safe_get_attr(c.raw_parsed_yaml, "base_images", coalesce_to={})
+        unordered_entries = []
+        for name, image_raw in base_images_raw.items():
+            unordered_entries.append(BaseImageEntry(name=name, raw_entry=image_raw))
+        c.base_images = BaseImageEntries(unordered_entries=unordered_entries)
+
+
+def extract_and_sort_unique_names(items, use_stackrox_sort_key=False):
     """
     Collects and orders unique names of each entry in unordered_entries of each item.
     Works both with ConfigFile/TestEntry and JobsFile/JobEntry.
@@ -282,10 +347,10 @@ def extract_and_sort_unique_names(items):
     for x in items:
         for y in x.unordered_entries:
             all_names_set.add(y.name)
-    return sorted(all_names_set, key=stackrox_sort_key)
+    return sorted(all_names_set, key=stackrox_sort_key if use_stackrox_sort_key else None)
 
 
-def assign_ordered_entries(all_names, items):
+def populate_ordered_entries(all_names, items):
     """Makes each item's ordered_entries to match the size and positions of elements in `all_names`."""
     for x in items:
         result = [None] * len(all_names)
@@ -328,15 +393,6 @@ def render_summary_tables_impl(buffer, data):
     def emit(txt):
         buffer.write(txt)
 
-    def cell(tag, content, css_class=None, html_escape=True):
-        return f"""<{tag} class="{css_class}"><div>{html.escape(content) if html_escape else content}</div></{tag}>"""
-
-    def th(content, css_class=None):
-        return cell("th", content, css_class=css_class)
-
-    def td(content, css_class=None, html_escape=True):
-        return cell("td", content, css_class=css_class, html_escape=html_escape)
-
     def write_tr(items, css_class=None):
         emit(f"""<tr class="{css_class}">""")
         for i in items:
@@ -347,14 +403,17 @@ def render_summary_tables_impl(buffer, data):
     #### Presubmits
 
     emit(f"""
-        <h4>Presubmit jobs summary</h4>
+        <h4 id="presubmit-jobs-summary">Presubmit jobs summary
+            <a class="anchor-link" href="#presubmit-jobs-summary">#</a>
+        </h4>
         <p><code>{html.escape(data.jobs_dir_relative)}</code></p>
         <table
-            class="table table-bordered table-hover table-striped disable-wrap rotatable-header sticky-header">
+            class="table table-bordered table-hover table-striped disable-wrap sticky-header">
             <thead>
     """)
 
-    write_tr([th("")] + [th(j.short_filename, css_class="natural-vertical-alignment") for j in data.jobs_files])
+    write_tr([th("")] +
+             [th(j.short_filename, css_class="natural-vertical-alignment rotatable-cell") for j in data.jobs_files])
 
     emit("""
             </thead>
@@ -385,14 +444,17 @@ def render_summary_tables_impl(buffer, data):
     #### Configs
 
     emit(f"""
-        <h4>Config summary</h4>
+        <h4 id="config-summary">Config summary
+            <a class="anchor-link" href="#config-summary">#</a>
+        </h4>
         <p><code>{html.escape(data.config_dir_relative)}</code></p>
         <table
-            class="table table-bordered table-hover table-striped disable-wrap rotatable-header sticky-header">
+            class="table table-bordered table-hover table-striped disable-wrap sticky-header">
             <thead>
         """)
 
-    write_tr([th("")] + [th(c.short_filename, css_class="natural-vertical-alignment") for c in data.configs])
+    write_tr([th("")] +
+             [th(c.short_filename, css_class="natural-vertical-alignment rotatable-cell") for c in data.configs])
 
     emit("""
             </thead>
@@ -403,7 +465,22 @@ def render_summary_tables_impl(buffer, data):
              [td(render_load_error(c.load_error), html_escape=False) for c in data.configs])
 
     write_tr([td("branch", css_class="header-cell")] +
-             [td(c.branch or "", css_class="vertical-text natural-vertical-alignment") for c in data.configs])
+             [td(c.branch, css_class="vertical-text natural-vertical-alignment") for c in data.configs])
+
+    write_tr([td("ocp release", css_class="header-cell")] +
+             [render_vertically_collapsible_cell(c.ocp_release, c.dump_ocp_release()) for c in data.configs])
+
+    write_tr([td("build root tag", css_class="header-cell")] +
+             [render_vertically_collapsible_cell(c.build_root_tag, c.dump_build_root()) for c in data.configs])
+
+    emit(f"""
+            <tr><td class="header-cell">base images</td><td colspan="{len(data.configs)}"></td></tr>
+        """)
+
+    for i_row in range(len(data.all_base_image_names)):
+        write_tr(
+            [td(data.all_base_image_names[i_row], css_class="right-aligned")] +
+            [render_base_image_entry(c.base_images.ordered_entries[i_row]) for c in data.configs])
 
     emit(f"""
             <tr><td class="header-cell">tests</td><td colspan="{len(data.configs)}"></td></tr>
@@ -424,11 +501,23 @@ def render_summary_tables_impl(buffer, data):
     #########################################################
 
 
+def cell(tag, content, css_class=None, html_escape=True):
+    return f"""<{tag} class="{css_class}"><div>{html.escape(content) if html_escape else content}</div></{tag}>"""
+
+
+def th(content, css_class=None):
+    return cell("th", content, css_class=css_class)
+
+
+def td(content, css_class=None, html_escape=True):
+    return cell("td", content, css_class=css_class, html_escape=html_escape)
+
+
 def render_load_error(error):
     if error is None:
         return """<i class="bi bi-check" title="no error"></i>"""
     btn_text = """<i class="bi bi-bug-fill" title="YAML load error"></i>"""
-    return render_collapsible(btn_text, html.escape(str(error)))
+    return render_icon_collapsible(btn_text, html.escape(str(error)))
 
 
 def render_test_entry(entry):
@@ -446,7 +535,7 @@ def render_test_entry(entry):
         btn_text += """<i class="bi bi-funnel-fill" title="Run if changed"></i>"""
     if btn_text == "":
         btn_text = """<i class="bi bi-hand-thumbs-up" title="no interesting flags"></i>"""
-    return render_collapsible(btn_text, yaml_dump)
+    return render_icon_collapsible(btn_text, yaml_dump)
 
 
 def render_job_entry(entry):
@@ -470,14 +559,15 @@ def render_job_entry(entry):
             </span>
         """
 
-    return render_collapsible(btn_text, entry.dump_all_interesting_attrs())
+    return render_icon_collapsible(btn_text, entry.dump_all_interesting_attrs())
 
 
-def render_collapsible(button_text, contents):
+def render_icon_collapsible(button_text, contents):
     # This ensures each collapsible has a unique id because ids in HTML must be unique and besides that's how the button
     # knows what to expand and collapse.
-    render_collapsible.next_id = (render_collapsible.next_id if hasattr(render_collapsible, "next_id") else 0) + 1
-    id = f"collapse-id-{render_collapsible.next_id}"
+    render_icon_collapsible.next_id = \
+        (render_icon_collapsible.next_id if hasattr(render_icon_collapsible, "next_id") else 0) + 1
+    id = f"collapse-id-{render_icon_collapsible.next_id}"
 
     return f"""
         <button
@@ -492,6 +582,23 @@ def render_collapsible(button_text, contents):
             <pre>{html.escape(contents)}</pre>
         </div>
     """
+
+
+def render_base_image_entry(entry):
+    if not entry:
+        return td("")
+    return render_vertically_collapsible_cell(entry.tag, yaml.safe_dump(entry.raw_entry))
+
+
+def render_vertically_collapsible_cell(short_text, details):
+    if not short_text:
+        return td("")
+    return td(f"""
+        {html.escape(short_text)}
+        <div class="collapse">
+            <pre>{html.escape(details)}</pre>
+        </div>
+        """, css_class="rotatable-cell natural-vertical-alignment", html_escape=False)
 
 
 def render_doc(title, table_content):
@@ -526,6 +633,13 @@ page = """
             writing-mode: vertical-rl;
             transform: rotate(180deg);
         }
+        .vertical-text button {
+            /* Makes icon-button look a bit more square when text is rotated. */
+            padding-left: 4px;
+            padding-right: 3px;
+            padding-top: 8px;
+            padding-bottom: 8px;
+        }
         .sticky-header thead th {
             /* Credits to https://stackoverflow.com/a/49510703/484050 */
             position: sticky;
@@ -551,6 +665,14 @@ page = """
             text-align:center;
             font-weight:bold;
         }
+        .anchor-link {
+            opacity: 0;
+            transition: color 0.15s ease-in-out,opacity 0.15s ease-in-out;
+            text-decoration: none;
+        }
+        .anchor-link:focus, .anchor-link:hover {
+            opacity: 1;
+        }
     </style>
     
     <title>HERE_GOES_TITLE</title>
@@ -564,22 +686,25 @@ page = """
     
     <!-- This page custom script -->
     <script>
-        function toggleVertical(elt) {
+        function toggleRotation(elt) {
             $(elt).toggleClass("vertical-text");
             let icon = $(elt).find("div button i");
+            let collapsibles = $(elt).find(".collapse");
             if ($(elt).hasClass("vertical-text")) {
-                icon.attr("class", "bi bi-arrows-angle-expand");
+                icon.attr("class", "bi bi-arrows-expand");
+                collapsibles.removeClass("show");
             } else {
-                icon.attr("class", "bi bi-arrows-angle-contract");
+                icon.attr("class", "bi bi-arrows-collapse");
+                collapsibles.addClass("show");
             }
         }
     
         $(document).ready(function() {
-            let headers = $(".rotatable-header th");
-            headers.children("div").prepend('<button type="button" class="btn btn-outline-secondary btn-sm"><i></i></button> ');
-            headers.each(function() { toggleVertical(this); });
-            headers.find("div button").on("click", function() {
-                toggleVertical($(this).closest("th"));
+            let rotatables = $(".rotatable-cell");
+            rotatables.children("div").prepend('<button type="button" class="btn btn-outline-secondary btn-sm"><i></i></button> ');
+            rotatables.each(function() { toggleRotation(this); });
+            rotatables.find("div button").on("click", function() {
+                toggleRotation($(this).closest(".rotatable-cell"));
             });
         });
     </script>
