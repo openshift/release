@@ -7,15 +7,24 @@ set -o verbose
 
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
+RUN_COMMAND="poetry run python app/cli.py addons --cluster ${CLUSTER_NAME} --token ${OCM_TOKEN} --api-host ${API_HOST} "
 
-poetry run python app/cli.py addon \
-    --addons "${ADDON1_CONFIG}" \
-    --addons "${ADDON2_CONFIG}" \
-    --addons "${ADDON3_CONFIG}" \
-    --addons "${ADDON4_CONFIG}" \
-    --cluster "${CLUSTER_NAME}" \
-    --token "${OCM_TOKEN}" \
-    --api-host "${API_HOST}" \
-    --timeout "${TIMEOUT}" \
-    --parallel "${PARALLEL}" \
-    uninstall
+ADDONS_CMD=""
+for addon_value in $(env | grep -E '^ADDON[0-9]+_CONFIG'); do
+    addon_value=$(echo "$addon_value" | sed -E  's/^ADDON[0-9]+_CONFIG=//')
+    if  [ "${addon_value}" ]; then
+      ADDONS_CMD+=" --addon ${addon_value} "
+    fi
+done
+
+RUN_COMMAND="${RUN_COMMAND} ${ADDONS_CMD}"
+
+if [ -n "${PARALLEL}" ]; then
+    RUN_COMMAND+=" --parallel"
+fi
+
+RUN_COMMAND+=" uninstall"
+
+echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
+
+${RUN_COMMAND}

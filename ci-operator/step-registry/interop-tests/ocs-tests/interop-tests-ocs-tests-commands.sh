@@ -49,7 +49,7 @@ FINISH_TIME=$(date "+%s")
 DIFF_TIME=$((FINISH_TIME-START_TIME))
 set +x
 
-if [[ ${DIFF_TIME} -le 3600 ]]; then
+if [[ ${DIFF_TIME} -le 1800 ]]; then
     echo ""
     echo " 🚨  The tests finished too quickly (took only: ${DIFF_TIME} sec), pausing here to give us time to debug"
     echo "  😴 😴 😴"

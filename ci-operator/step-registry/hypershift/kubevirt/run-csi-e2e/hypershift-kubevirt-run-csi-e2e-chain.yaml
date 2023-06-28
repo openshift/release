@@ -9,6 +9,8 @@ chain:
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(echo -n clusters-${CLUSTER_NAME}|sed 's#\.#-#g')"
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       export TEST_PROVIDER='{"type":"kubevirt"}'
+      export TEST_CSI_DRIVER_MANIFEST="kubevirt-driver.yaml"
+      curl -L -o ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/master/hack/test-driver.yaml
       sed -i 's/FromExistingClassName: kubevirt/FromExistingClassName: kubevirt-csi-infra-default/' ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       cat ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
       export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
@@ -21,7 +23,6 @@ chain:
         --junit-dir "${ARTIFACT_DIR}/junit"
     timeout: 14400s
     env:
-    - name: TEST_CSI_DRIVER_MANIFEST
     - name: TEST_ARGS
       default: ""
       documentation: |-

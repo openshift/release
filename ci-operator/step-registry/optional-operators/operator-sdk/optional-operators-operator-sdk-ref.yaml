@@ -1,0 +1,31 @@
+ref:
+  as: optional-operators-operator-sdk
+  from: cli-operator-sdk
+  commands: optional-operators-operator-sdk-commands.sh
+  resources:
+    requests:
+      cpu: 300m
+      memory: 300Mi
+  env:
+  - name: OO_INSTALL_NAMESPACE
+    documentation: The namespace into which the operator and catalog will be installed.
+  - name: OO_INSTALL_MODE
+    documentation: |-
+      The install-mode flag value of the operator-sdk run bundle command. The format is the install-mode name + list of 
+      comma separated list of namespaces (for some mode type).
+      values can be:
+      
+      * `OwnNamespace` - indicates that the operator can be a member of an `OperatorGroup` that selects its own namespace. Must not contain list of namespaces.
+      * `SingleNamespace=<namespace name>` - indicates that the operator can be a member of an `OperatorGroup` that selects one namespace. Must contain one and only one namespace. the namespace must be different than the `OO_INSTALL_NAMESPACE`.
+      * `MultiNamespace=<namespace name 1>[,<namespace name 2>[,...]]` - indicates that the operator can be a member of an `OperatorGroup` that selects more than one namespace. The namespace list must not be empty.
+      * `AllNamespaces` - (default) indicates that the operator can be a member of an `OperatorGroup` that selects all namespaces (target namespace set is the empty string ""). Must not contain list of namespaces.
+    default: "AllNamespaces"
+  - name: OO_INSTALL_TIMEOUT_MINUTES
+    documentation: how long (in minutes) to wait for the installation, before giving up.
+    default: "10"
+  dependencies:
+  - name: ci-bundle
+    env: OO_BUNDLE
+  documentation: |-
+    The subscribe step installs an optional operator from a provided
+    bundle image, using operator-sdk.

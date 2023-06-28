@@ -9,6 +9,8 @@ echo "************ telco cluster setup command ************"
 #Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 #Set ssh path and permissions for connection to hypervisor
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
@@ -27,6 +29,7 @@ CLUSTER_HV_IP="10.8.34.218"
 
 export KCLI_PARAM="-P tag=${T5CI_VERSION} -P version=nightly"
 
+echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 #Check connectivity
 ping ${CLUSTER_HV_IP} -c 10 || true
 echo "exit" | curl telnet://${CLUSTER_HV_IP}:22 && echo "SSH port is opened"|| echo "status = $?"
@@ -181,6 +184,30 @@ kind: MachineConfig
 metadata:
   labels:
     machineconfiguration.openshift.io/role: worker
+  name: 98-worker-chrony-configuration
+spec:
+  config:
+    ignition:
+      config: {}
+      security:
+        tls: {}
+      timeouts: {}
+      version: 3.1.0
+    networkd: {}
+    passwd: {}
+    storage:
+      files:
+      - contents:
+          source: data:text/plain;charset=utf-8;base64,ICAgIHBvb2wgY2xvY2sucmVkaGF0LmNvbSBpYnVyc3QKICAgIGRyaWZ0ZmlsZSAvdmFyL2xpYi9jaHJvbnkvZHJpZnQKICAgIG1ha2VzdGVwIDEuMCAzCiAgICBydGNzeW5jCiAgICBsb2dkaXIgL3Zhci9sb2cvY2hyb255Cg==
+        mode: 420
+        overwrite: true
+        path: /etc/chrony.conf
+---
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
   name: 99-disable-chronyd
 spec:
   config:
@@ -258,10 +285,10 @@ EOT
 }
 
 log_chronyd_status() {
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc version
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc version || true
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf30.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf31.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
+  KUBECONFIG=$SHARED_DIR/kubeconfig oc debug node/cnfdf32.telco5gran.eng.rdu2.redhat.com -- chroot /host systemctl status chronyd || true
 }
 
 

@@ -27,7 +27,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-test-0.3.58
+    tag: stackrox-test-0.3.59
 releases:
   latest:
     release:
@@ -57,6 +57,11 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: gke-nongroovy-e2e-tests
+  optional: true
+  steps:
+    test:
+    - ref: stackrox-e2e
+- as: gke-sensor-integration-tests
   optional: true
   steps:
     test:
@@ -140,6 +145,11 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
+- as: merge-gke-sensor-integration-tests
+  postsubmit: true
+  steps:
+    test:
+    - ref: stackrox-e2e
 - as: merge-gke-upgrade-tests
   postsubmit: true
   steps:
@@ -159,6 +169,16 @@ tests:
   cron: 0 7 * * *
   steps:
     workflow: stackrox-automation-flavors-powervs-e2e
+  timeout: 5h0m0s
+- as: ibmcloudz-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-ibmcloudz-e2e
+  timeout: 5h0m0s
+- as: nightly-ibmcloudz-qa-e2e-tests
+  cron: 0 7 * * *
+  steps:
+    workflow: stackrox-automation-flavors-ibmcloudz-e2e
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: master

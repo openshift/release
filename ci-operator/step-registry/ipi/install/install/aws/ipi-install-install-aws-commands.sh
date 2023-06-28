@@ -21,6 +21,12 @@ function populate_artifact_dir() {
     s/X-Auth-Token.*/X-Auth-Token REDACTED/;
     s/UserData:.*,/UserData: REDACTED,/;
     ' "${dir}/.openshift_install.log" > "${ARTIFACT_DIR}/.openshift_install.log"
+  sed -i '
+    s/password: .*/password: REDACTED/;
+	s/X-Auth-Token.*/X-Auth-Token REDACTED/;
+	s/UserData:.*,/UserData: REDACTED,/;
+	' "${dir}/terraform.txt"
+  tar -czvf "${ARTIFACT_DIR}/terraform.tar.gz" --remove-files "${dir}/terraform.txt"
 }
 
 function prepare_next_steps() {
@@ -203,7 +209,10 @@ fi
 # ---------------------------------------------------------
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-TF_LOG=debug openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+TF_LOG_PATH="${dir}/terraform.txt"
+export TF_LOG_PATH
+
+openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
 
 set +e
 wait "$!"
@@ -307,7 +316,7 @@ EOF
   fi
 
   APPS_DNS_STACK_NAME="${CLUSTER_NAME}-apps-dns"
-  echo ${APPS_DNS_STACK_NAME} > "${SHARED_DIR}/apps_dns_stack_name"
+  echo ${APPS_DNS_STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
   REGION="${LEASED_RESOURCE}"
 
   private_route53_hostzone_name="${CLUSTER_NAME}.${BASE_DOMAIN}"
@@ -316,7 +325,6 @@ EOF
 
   if [ "${CLUSTER_TYPE}" == "aws" ] || [ "${CLUSTER_TYPE}" == "aws-arm64" ]; then
     router_lb_hostzone_id=$(aws --region ${REGION} elb describe-load-balancers | jq -r ".LoadBalancerDescriptions[] | select(.DNSName == \"${router_lb}\").CanonicalHostedZoneNameID")
-    echo ${APPS_DNS_STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
     aws --region "${REGION}" cloudformation create-stack --stack-name ${APPS_DNS_STACK_NAME} \
       --template-body 'file:///tmp/ingress_app.yml' \
       --parameters \
@@ -349,7 +357,7 @@ EOF
   echo "Waited for stack $APPS_DNS_STACK_NAME"
 
   # completing installation
-  TF_LOG=debug openshift-install --dir="${dir}" wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
+  openshift-install --dir="${dir}" wait-for install-complete 2>&1 | grep --line-buffered -v 'password\|X-Auth-Token\|UserData:' &
   wait "$!"
   ret="$?"
 

@@ -6,7 +6,7 @@ set -o pipefail
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 AZURE_REGION="${LEASED_RESOURCE}"
 echo "Azure region: ${AZURE_REGION}"

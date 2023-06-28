@@ -5,7 +5,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
+INSTANCE_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring VM on GCP..."
 mkdir -p "${HOME}"/.ssh

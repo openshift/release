@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/build
     decorate: true
     decoration_config:
@@ -54,7 +54,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/check-api-changes
     decorate: true
     decoration_config:
@@ -110,7 +110,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/check-commits-count
     decorate: true
     decoration_config:
@@ -158,7 +158,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/ci-bundle-hub-operator-bundle
     decorate: true
     decoration_config:
@@ -207,7 +207,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/ci-bundle-operator-bundle
     decorate: true
     decoration_config:
@@ -256,16 +256,16 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
-    context: ci/prow/e2e-in-cluster-build
+    cluster: build04
+    context: ci/prow/e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-rh-ecosystem-edge-kernel-module-management-main-e2e-in-cluster-build
-    rerun_command: /test e2e-in-cluster-build
+    name: pull-ci-rh-ecosystem-edge-kernel-module-management-main-e2e
+    rerun_command: /test e2e
     spec:
       containers:
       - args:
@@ -274,7 +274,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=e2e-in-cluster-build
+        - --target=e2e
         command:
         - ci-operator
         image: ci-operator:latest
@@ -313,13 +313,76 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-in-cluster-build,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
+    context: ci/prow/e2e-hub
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-rh-ecosystem-edge-kernel-module-management-main-e2e-hub
+    rerun_command: /test e2e-hub
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=e2e-hub
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: hive-hive-credentials
+        secret:
+          secretName: hive-hive-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-hub,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -368,7 +431,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -417,7 +480,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build04
     context: ci/prow/unit-tests
     decorate: true
     decoration_config:
