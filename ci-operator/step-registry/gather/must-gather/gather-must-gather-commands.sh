@@ -120,7 +120,7 @@ EOF
 # camgi is a tool that creates an html document for investigating an OpenShift cluster
 # see https://github.com/elmiko/camgi.rs for more information
 function installCamgi() {
-    CAMGI_VERSION="0.8.1"
+    CAMGI_VERSION="0.9.0"
     pushd /tmp
 
     # no internet access in C2S/SC2S env, disable proxy
@@ -193,7 +193,7 @@ cat >> ${SHARED_DIR}/custom-links.txt << EOF
 <script>
 let kaas = document.createElement('a');
 kaas.href="https://kaas.dptools.openshift.org/?search="+document.referrer;
-kaas.title="KaaS is a service to spawn a fake API service that parses must-gather data. As a result, users can pass Prow CI URL to the service, fetch generated kubeconfig and use kubectl/oc/k9s/openshift-console to investigate the state of the cluster at the time must-gather was collected."
+  kaas.title="KaaS is a service to spawn a fake API service that parses must-gather data. As a result, users can pass Prow CI URL to the service, fetch generated kubeconfig and use kubectl/oc/k9s/openshift-console to investigate the state of the cluster at the time must-gather was collected. Note, on Chromium-based browsers you'll need to fill-in the Prow URL manually. Security settings prevent getting the referrer automatically."
 kaas.innerHTML="KaaS";
 kaas.target="_blank";
 document.getElementById("wrapper").append(kaas);

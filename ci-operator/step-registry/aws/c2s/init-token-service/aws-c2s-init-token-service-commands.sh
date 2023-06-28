@@ -150,9 +150,11 @@ function remove_tech_preview_feature_from_manifests()
 # ------------------------------
 
 cr_yaml_d=$(mktemp -d)
-echo "extracting CR from image $RELEASE_IMAGE_LATEST"
+echo "extracting CR from image ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
-oc adm release extract ${RELEASE_IMAGE_LATEST} --credentials-requests --cloud=aws --to "${cr_yaml_d}" || exit 1
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+oc adm release extract ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --credentials-requests --cloud=aws --to "${cr_yaml_d}" || exit 1
 
 echo "Extracted CR files:"
 ls $cr_yaml_d

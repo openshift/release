@@ -1,0 +1,42 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  ocp-addons-operators-cli:
+    name: ocp-addons-operators-cli
+    namespace: ci
+    tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: qetest-rosa-addon
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      ADDON1_CONFIG: name=reference-addon
+      API_HOST: stage
+      CHANNEL_GROUP: candidate
+      CLUSTER_NAME: ref-add-413
+      OPENSHIFT_VERSION: "4.13"
+      PARALLEL: "true"
+    test:
+    - ref: addon-install
+    - ref: addon-uninstall
+    workflow: rosa-aws-sts
+zz_generated_metadata:
+  branch: qe-test-addon
+  org: CSPI-QE
+  repo: MSI
+  variant: v4.13

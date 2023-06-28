@@ -4,7 +4,12 @@ set -euox pipefail
 echo "Set KUBECONFIG to Hive cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
-AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
+AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ ! -f "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" ]]; then
+  echo "AWS credentials file ${AWS_GUEST_INFRA_CREDENTIALS_FILE} not found"
+  exit 1
+fi
+
 DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
 
 if [[ $HYPERSHIFT_GUEST_INFRA_OCP_ACCOUNT == "true" ]]; then

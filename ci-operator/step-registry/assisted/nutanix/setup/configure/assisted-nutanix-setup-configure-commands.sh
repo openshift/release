@@ -58,5 +58,5 @@ export NUTANIX_SUBNET_NAME="${subnet_name}"
 export API_VIP="${API_VIP}"
 export INGRESS_VIP="${INGRESS_VIP}"
 export BASE_DOMAIN="${base_domain}"
-export CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+export CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 EOF

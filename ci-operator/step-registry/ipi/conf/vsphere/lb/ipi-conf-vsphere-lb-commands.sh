@@ -44,7 +44,7 @@ then
     fi
 fi
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 # Load array created in setup-vips:
 # 0: API

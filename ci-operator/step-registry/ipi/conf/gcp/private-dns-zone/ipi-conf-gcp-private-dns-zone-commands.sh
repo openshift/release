@@ -7,7 +7,7 @@ set -o pipefail
 CONFIG="${SHARED_DIR}/install-config.yaml"
 PATCH="${SHARED_DIR}/install-config-patch.yaml"
 
-CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
+CLUSTER_NAME=${NAMESPACE}-${UNIQUE_HASH}
 CLUSTER_PVTZ_PROJECT="$(< ${SHARED_DIR}/cluster-pvtz-project)"
 
 cat > "${PATCH}" << EOF

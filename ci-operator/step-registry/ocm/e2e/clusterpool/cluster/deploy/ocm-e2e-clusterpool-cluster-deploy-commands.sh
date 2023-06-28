@@ -784,13 +784,14 @@ deploy() {
         fi
 
         # Get MCH name
-        KUBECONFIG="$_kc" oc -n $NAMESPACE get multiclusterhub -o name > mch_name 2> >(tee -a "$_log") || {
+        KUBECONFIG="$_kc" oc -n $NAMESPACE get multiclusterhub -o name 2> >(tee -a "$_log") > mch_name || {
             logf "$_log" "WARN Deploy $_cluster: Error getting MCH name. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
 
         # Check that MCH name isn't empty
         _mch_name=$(cat mch_name)
+        logf "$_log" "Deploy $_cluster: Found MCH name '$_mch_name'"
         if [[ -z "$_mch_name" ]]; then
             logf "$_log" "WARN Deploy $_cluster: MCH not created yet. Will retry (${_elapsed}/${_timeout}s)"
             continue
@@ -798,13 +799,18 @@ deploy() {
 
         # Get MCH status
         KUBECONFIG="$_kc" oc -n $NAMESPACE get "$_mch_name" \
-            -o json > mch.json 2> >(tee -a "$_log") || {
+            -o json 2> >(tee -a "$_log") > mch.json || {
             logf "$_log" "WARN Deploy $_cluster: Error getting MCH status. Will retry (${_elapsed}/${_timeout}s)"
             continue
         }
 
         # Check MCH status
-        _mch_status=$(jq -r .status.phase mch.json 2> >(tee -a "$_log"))
+        jq -r '.status.phase' mch.json 2> >(tee -a "$_log") >/dev/null || {
+            logf "$_log" "WARN Encountered unexpected error parsing MCH JSON. Will retry (${_elapsed}/${_timeout}s)"
+            continue
+        }
+
+        _mch_status=$(jq -r '.status.phase' mch.json 2> >(tee -a "$_log"))
         if [[ "$_mch_status" == "Running" ]]; then
             logf "$_log" "Deploy $_cluster: MCH CR is ready after ${_elapsed}s"
             break
@@ -856,6 +862,7 @@ deploy_with_timeout() {
             break
         fi
     done
+    log "Deploy $_cluster: Deployment pid $_pid exited (${_elapsed}/${_timeout}s)"
 }
 
 # Function to gracefully terminate deployments if main script exits
@@ -881,7 +888,6 @@ done
 trap _exit EXIT
 
 # Wait for deployments to finish.
-log "Waiting for ${#waitgroup[@]} deployment(s)."
 wait "${waitgroup[@]}"
 
 # Done waiting. Disable EXIT trap.

@@ -5,10 +5,7 @@ base_images:
     tag: stream8
 binary_build_commands: make build
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.11
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: os
@@ -17,7 +14,7 @@ operator:
   bundles:
   - dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/medik8s/fence-agents-remediation-operator:latest
+  - pullspec: quay.io/medik8s/fence-agents-remediation-operator:.*
     with: pipeline:fence-agents-remediation
 releases:
   latest:
@@ -42,6 +39,7 @@ tests:
       OO_TARGET_NAMESPACES: '!all'
     test:
     - as: e2e
+      cli: latest
       commands: export OPERATOR_NS="far-install" && make test-e2e
       from: src
       resources:

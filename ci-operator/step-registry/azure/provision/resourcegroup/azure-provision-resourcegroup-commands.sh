@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-RG_NAME="${NAMESPACE}-${JOB_NAME_HASH}-rg"
+RG_NAME="${NAMESPACE}-${UNIQUE_HASH}-rg"
 
 REGION="${LEASED_RESOURCE}"
 echo "Azure region: ${REGION}"

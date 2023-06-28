@@ -349,7 +349,7 @@ then
   ZONES_COUNT=3
 fi
 
-STACK_NAME="${NAMESPACE}-${JOB_NAME_HASH}-vpc"
+STACK_NAME="${NAMESPACE}-${UNIQUE_HASH}-vpc"
 echo ${STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 aws --region "${REGION}" cloudformation create-stack \
   --stack-name "${STACK_NAME}" \

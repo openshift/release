@@ -150,7 +150,7 @@ if [ "${IMAGE_ID}" == "" ]; then
    fi
 fi
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_name="${CLUSTER_NAME}-bastion"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
 if [[ ! -f "${bastion_ignition_file}" ]]; then

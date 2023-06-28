@@ -31,6 +31,7 @@ presubmits:
         - --ignore=redhat-openshift-ecosystem/certified-operators-prod
         - --ignore=redhat-openshift-ecosystem/preflight
         - --ignore=redhat-openshift-ecosystem/cvp
+        - --ignore=insights-qe/iqe-cost-management-plugin
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -559,6 +560,55 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: app.ci
+    context: ci/build-farm/build08-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build08
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build08-dry
+    rerun_command: /test build08-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build08
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build08.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build08-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: build03
     context: ci/prow/ci-operator-config
     decorate: true
@@ -713,7 +763,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20230531-c07ee56d8f
+        image: gcr.io/k8s-prow/checkconfig:v20230621-2a6a094857
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -1440,12 +1490,16 @@ presubmits:
     spec:
       containers:
       - args:
-        - --config-path=core-services/pr-reminder/_config.yaml
-        - --github-mapping-config-path=/etc/github-mapping/mapping.yaml
-        - --slack-token-path=/etc/slack/oauth_token
-        - --validate-only=true
+        - -c
+        - |
+          tar -C /tmp -xvzf /etc/github-mapping/users.yaml.tar.gz
+          /usr/bin/pr-reminder \
+            --config-path=core-services/pr-reminder/_config.yaml \
+            --github-users-file=/tmp/users.yaml \
+            --slack-token-path=/etc/slack/oauth_token \
+            --validate-only=true
         command:
-        - /usr/bin/pr-reminder
+        - /bin/bash
         image: registry.ci.openshift.org/ci/pr-reminder:latest
         imagePullPolicy: Always
         name: ""
