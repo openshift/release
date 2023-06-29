@@ -42,7 +42,23 @@ do
 set -xeuo pipefail
 
 cd ~/microshift
-./scripts/image-builder/create-vm.sh ${VM_NAME} default \$(find _output/image-builder -name "*.iso")
+./scripts/devenv-builder/manage-vm.sh config
+
+ISO_FILE=\$(find ~/microshift/_output/image-builder -name "*.iso")
+sudo bash -c " \
+  cd /var/lib/libvirt/images/ && \
+  virt-install \
+      --name ${VM_NAME} \
+      --vcpus 2 \
+      --memory 3072 \
+      --disk path=./${VM_NAME}.qcow2,size=20 \
+      --network network=default,model=virtio \
+      --events on_reboot=restart \
+      --cdrom "\${ISO_FILE}" \
+      --noautoconsole \
+      --wait \
+"
+
 VM_IP=\$(./scripts/devenv-builder/manage-vm.sh ip -n ${VM_NAME})
 timeout 5m bash -c "until ssh -oStrictHostKeyChecking=accept-new redhat@\${VM_IP} 'echo hello'; do sleep 5; done"
 
