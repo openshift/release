@@ -45,8 +45,11 @@ done
 
 echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
 
+echo "#####"
 oc whoami
 oc whoami -t
+echo "#####"
+
 
 ## Login to the (hypershift) cluster
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
