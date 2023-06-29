@@ -21,6 +21,8 @@ export KUBECONFIG=/tmp/config
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE
 export ENABLE_ALERTS=False
+
+
 ./prow/container-scenarios/prow_run.sh
 rc=$?
 echo "Finished running container scenarios"
