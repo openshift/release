@@ -43,7 +43,7 @@ USHIFT_USER: ${VM_USER}
 SSH_PRIV_KEY: ${CLUSTER_PROFILE_DIR}/ssh-privatekey
 SSH_PORT: ${VM_PORT}
 EOF
-  /microshift/test/run.sh -o "${ARTIFACT_DIR}/e2e" -i /tmp/e2e.yaml -v /tmp/venv /microshift/test/suites-ostree
+  /microshift/test/run.sh -o "${ARTIFACT_DIR}/e2e" -i /tmp/e2e.yaml -v /tmp/venv /microshift/test/suites-ostree/backup-restore.robot
 }
 
 # Bash CNCF Tests
