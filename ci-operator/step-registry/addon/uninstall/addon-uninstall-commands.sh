@@ -14,11 +14,14 @@ RUN_COMMAND="poetry run python app/cli.py addons --cluster ${CLUSTER_NAME} --tok
 ADDONS_CMD=""
 for addon_value in $(env | grep -E '^ADDON[0-9]+_CONFIG'); do
     addon_value=$(echo "$addon_value" | sed -E  's/^ADDON[0-9]+_CONFIG=//')
+    echo "addon_value= ${addon_value}"
     if  [ "${addon_value}" ]; then
       ADDONS_CMD+=" --addon ${addon_value} "
     fi
 done
-
+echo "ADDONS_CMD: ${ADDONS_CMD}"
+# Validate - fix ADDONS_CMD if needed
+sleep 1h
 RUN_COMMAND="${RUN_COMMAND} ${ADDONS_CMD}"
 
 if [ -n "${PARALLEL}" ]; then
