@@ -12,16 +12,13 @@ export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export OCM_TOKEN
 
 ADDONS_CMD=""
-for addon_value in $(env | grep -E '^ADDON[0-9]+_CONFIG'); do
+for addon_value in $(env | grep -E '^ADDON[0-9]+_CONFIG' | sort  --version-sort); do
     addon_value=$(echo "$addon_value" | sed -E  's/^ADDON[0-9]+_CONFIG=//')
-    echo "addon_value= ${addon_value}"
     if  [ "${addon_value}" ]; then
       ADDONS_CMD+=" --addon ${addon_value} "
     fi
 done
 echo "ADDONS_CMD: ${ADDONS_CMD}"
-# Validate - fix ADDONS_CMD if needed
-sleep 1h
 RUN_COMMAND="${RUN_COMMAND} ${ADDONS_CMD}"
 
 if [ -n "${PARALLEL}" ]; then
