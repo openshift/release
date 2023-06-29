@@ -5,8 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
+OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 BREW_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/brew-token)
 RUN_COMMAND="poetry run python app/cli.py addons --cluster ${CLUSTER_NAME} --token ${OCM_TOKEN} --api-host ${API_HOST} "
 export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
