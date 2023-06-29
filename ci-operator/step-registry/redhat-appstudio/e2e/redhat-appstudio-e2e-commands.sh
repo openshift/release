@@ -26,7 +26,7 @@ OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
 OAUTH_REDIRECT_PROXY_URL=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/oauth-redirect-proxy-url)
-CYPRESS_GH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/cypress-gh-user) 
+CYPRESS_GH_USER=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/cypress-gh-user)
 CYPRESS_GH_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/cypress-gh-password)
 CYPRESS_GH_2FA_CODE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/cypress-gh-2fa-code)
 SPI_GITHUB_CLIENT_ID=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/spi-github-client-id)
@@ -50,7 +50,10 @@ do :
     fi
     PREVIOUS_RATE_REMAINING="${GH_RATE_REMAINING}"
 done
-
+echo "#####"
+oc whoami
+oc whoami -t
+echo "#####"
 echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
 
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
