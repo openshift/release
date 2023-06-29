@@ -45,6 +45,9 @@ done
 
 echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
 
+oc whoami
+oc whoami -t
+
 ## Login to the (hypershift) cluster
 yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
 if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
