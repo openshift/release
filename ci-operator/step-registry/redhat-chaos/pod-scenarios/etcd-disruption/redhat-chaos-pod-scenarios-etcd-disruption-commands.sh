@@ -4,7 +4,9 @@ set -o nounset
 set -o pipefail
 set -x
 cat /etc/os-release
+
 oc config view
+
 oc projects
 python3 --version
 pushd /tmp
@@ -20,6 +22,8 @@ export KUBECONFIG=/tmp/config
 
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE 
+
+oc get nodes --kubeconfig $KRKN_KUBE_CONFIG
 
 echo $ENABLE_ALERTS
 ./prow/pod-scenarios/prow_run.sh
