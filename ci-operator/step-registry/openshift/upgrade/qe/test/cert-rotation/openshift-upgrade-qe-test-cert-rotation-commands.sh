@@ -95,9 +95,11 @@ baseDomin=$(oc get dns.config cluster -o=jsonpath='{.spec.baseDomain}')
 defaultIngressDomin=$(oc get ingresscontroller default  -o=jsonpath='{.status.domain}' -n openshift-ingress-operator)
 currentPath=$(pwd)
 workPath="/tmp/replcertforingress"
-sudo mkdir $workPath; sudo chmod 664 $workPath; cd $workPath
-echo "[cus]" >> tem.conf
-echo "subjectAltName = DNS:*.$defaultIngressDomin" >> tem.conf
+mkdir $workPath; chmod 664 $workPath; cd $workPath
+cat > tmp.conf << EOF
+[cus]
+subjectAltName = DNS:*.$defaultIngressDomin
+EOF
 
 ## create root ca for cluster proxy and certification for default ingress controller
 openssl req -newkey rsa:$keyLength -nodes -sha256 -keyout $proxyKey -x509 -days 30 -subj "/CN=$baseDomin" -out $proxyCert
@@ -117,7 +119,7 @@ oc patch ingresscontroller.operator default --type=merge -p '{"spec":{"defaultCe
 oc -n openshift-ingress-operator delete secrets/router-ca
 
 ## remove workPath folder
-cd $currentPath; sudo rm -rf $workPath
+cd $currentPath; rm -rf $workPath
 
 ## restart the Ingress Operator
 oldPod=$(oc -n openshift-ingress-operator get pods  -l name=ingress-operator -o=jsonpath='{.items[0].metadata.name}')
