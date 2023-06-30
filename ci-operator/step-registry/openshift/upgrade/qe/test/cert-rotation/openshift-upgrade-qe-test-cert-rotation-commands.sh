@@ -56,7 +56,7 @@ EOF
 openssl req -newkey rsa:$keyLength -nodes -sha256 -keyout $proxyKey -x509 -days 30 -subj "/CN=$baseDomin" -out $proxyCert
 openssl genrsa -out $cusIngressKey $keyLength
 openssl req -new -key $cusIngressKey  -subj "/CN=$defaultIngressDomin" -addext "subjectAltName = DNS:*.$defaultIngressDomin" -out  $cusIngressCsr
-openssl x509 -req -days 30 -CA $proxyCert -CAkey $proxyKey -CAserial caproxy.srl -CAcreateserial -extfile  tem.conf -extensions cus -in $cusIngressCsr -out $cusIngressCert
+openssl x509 -req -days 30 -CA $proxyCert -CAkey $proxyKey -CAserial caproxy.srl -CAcreateserial -extfile  tmp.conf -extensions cus -in $cusIngressCsr -out $cusIngressCert
 
 ## create a config map and update the cluster-wide proxy configuration with the newly created config map
 oc create configmap custom-ca --from-file=ca-bundle.crt=$workPath/$proxyCert -n openshift-config
@@ -66,15 +66,15 @@ oc patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"custo
 oc create secret tls custom-secret --cert=$workPath/$cusIngressCert --key=$workPath/$cusIngressKey -n openshift-ingress
 oc patch ingresscontroller.operator default --type=merge -p '{"spec":{"defaultCertificate": {"name": "custom-secret"}}}' -n openshift-ingress-operator
 
-## Delete the router-ca secret.
-oc -n openshift-ingress-operator delete secrets/router-ca
+## get ingress-operator pod name and secrets/router-ca created time
+oldPod=$(oc -n openshift-ingress-operator get pods  -l name=ingress-operator -o=jsonpath='{.items[0].metadata.name}')
+oldRouterCaTime=$(oc -n openshift-ingress-operator get secrets/router-ca -o=jsonpath='{.metadata.creationTimestamp}')
 
 ## remove workPath folder
 cd $currentPath; rm -rf $workPath
 
-## restart the Ingress Operator
-oldPod=$(oc -n openshift-ingress-operator get pods  -l name=ingress-operator -o=jsonpath='{.items[0].metadata.name}')
-oldRouterCaTime=$(oc -n openshift-ingress-operator get secrets/router-ca -o=jsonpath='{.metadata.creationTimestamp}')
+## delete secrets/router-ca and restart the Ingress Operator
+oc -n openshift-ingress-operator delete secrets/router-ca
 oc -n openshift-ingress-operator delete pods -l name=ingress-operator
 oc adm wait-for-stable-cluster
 
