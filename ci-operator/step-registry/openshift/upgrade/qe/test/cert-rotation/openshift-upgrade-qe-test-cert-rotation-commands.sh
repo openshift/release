@@ -9,7 +9,7 @@ function extract_oc(){
     echo -e "Extracting oc\n"
     local retry=5 tmp_oc="/tmp/client-2"
     mkdir -p ${tmp_oc}
-    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${RELEASE_IMAGE_TARGET});
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${RELEASE_IMAGE_TARGET})
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
@@ -22,13 +22,8 @@ function extract_oc(){
     return 0
 }
 
-version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
-major_rel=$(echo $version | cut -d '.' -f1)
-minor_rel=$(echo $version | cut -d '.' -f2)
-if [[ ${major_rel} -eq 4 && ${minor_rel} -lt 10 ]];then
-    echo "version is less than 4.10, extract oc client from 4.10 release image"
-    extract_oc
-fi
+# This step is executed after upgrade to target, oc client of target release should use as many new versions as possible, make sure new feature cert-rotation of oc amd is supported
+extract_oc
 
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
 
@@ -75,11 +70,14 @@ oc adm ocp-certificates regenerate-leaf -n openshift-kube-apiserver secrets chec
 oc adm wait-for-stable-cluster
 
 # create new admin.kubeconfig
-oc config new-admin-kubeconfig > /tmp/admin.kubeconfig
-oc --kubeconfig=/tmp/admin.kubeconfig whoami
+oc config new-admin-kubeconfig > "${SHARED_DIR}/admin.kubeconfig"
+oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
 
 # revoke old trust for the signers we have regenerated
 oc adm ocp-certificates remove-old-trust -n openshift-kube-apiserver-operator configmaps kube-apiserver-to-kubelet-client-ca kube-control-plane-signer-ca loadbalancer-serving-ca localhost-serving-ca service-network-serving-ca  --created-before=${start_date}
 oc adm wait-for-stable-cluster
 oc adm reboot-machine-config-pool mcp/worker mcp/master
 oc adm wait-for-node-reboot nodes --all
+
+# replace the old kubeocnfig with the new
+cp "${SHARED_DIR}/admin.kubeconfig" "${SHARED_DIR}/kubeconfig"
