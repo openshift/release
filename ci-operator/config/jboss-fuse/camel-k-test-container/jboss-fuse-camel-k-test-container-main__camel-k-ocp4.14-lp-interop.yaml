@@ -28,11 +28,20 @@ resources:
 tests:
 - as: camel-k-interop-aws
   cron: 0 6 * * 1
-  remote_api: true
   steps:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "gather-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "camel-k-interop-tests", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "CMLK", "jira_epic": "LPTOCPCI-290"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
       OPERATORS: |
         [
             {"name": "red-hat-camel-k", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
@@ -40,7 +49,7 @@ tests:
     test:
     - ref: install-operators
     - ref: camel-k-interop-tests
-    workflow: ipi-aws
+    workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: main
   org: jboss-fuse
