@@ -47,7 +47,7 @@ defaultIngressDomin=$(oc get ingresscontroller default  -o=jsonpath='{.status.do
 currentPath=$(pwd)
 workPath="/tmp/replcertforingress"
 mkdir $workPath; cd $workPath
-cat > tmp.conf << EOF
+cat <<EOF > tmp.conf
 [cus]
 subjectAltName = DNS:*.$defaultIngressDomin
 EOF
