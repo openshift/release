@@ -5,7 +5,14 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-ls /usr/bin
+
+pwd 
+ls
+
+
+ls /root/cerberus
+
+/root/cerberus/start_cerberus.py --help
 
 while [ ! -f "${KUBECONFIG}" ]; do
   printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
@@ -13,13 +20,15 @@ while [ ! -f "${KUBECONFIG}" ]; do
 done
 printf "%s: acquired %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
 
-ls
 
 echo "kubeconfig loc $KUBECONFIG"
 
 export CERBERUS_KUBECONFIG=$KUBECONFIG
 export CERBERUS_WATCH_NAMESPACES="[^.*$]"
 export CERBERUS_IGNORE_PODS="[^installer*,^kube-burner*,^redhat-operators*,^certified-operators*,^collect-profiles*]"
+
+
+
 ./cerberus/prow_run.sh
 rc=$?
 echo "Finished running cerberus scenarios"
