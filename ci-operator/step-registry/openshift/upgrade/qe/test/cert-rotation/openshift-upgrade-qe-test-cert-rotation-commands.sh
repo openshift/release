@@ -95,7 +95,7 @@ baseDomin=$(oc get dns.config cluster -o=jsonpath='{.spec.baseDomain}')
 defaultIngressDomin=$(oc get ingresscontroller default  -o=jsonpath='{.status.domain}' -n openshift-ingress-operator)
 currentPath=$(pwd)
 workPath="/tmp/replcertforingress"
-mkdir $workPath; chmod 664 $workPath; cd $workPath
+mkdir $workPath; cd $workPath
 cat > tmp.conf << EOF
 [cus]
 subjectAltName = DNS:*.$defaultIngressDomin
