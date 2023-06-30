@@ -1,0 +1,71 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mtr-interop-aws
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "gather-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OPERATORS: |
+        [
+            {"name": "mtc-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-migration", "operator_group": "mtc-operator-group", "target_namespaces": "openshift-migration"}
+        ]
+    post:
+    - ref: osd-ccs-cluster-deprovision
+    - ref: gather-aws-console
+    - ref: gather-must-gather
+    - ref: gather-extra
+    - ref: gather-audit-logs
+    - ref: ipi-deprovision-deprovision
+    - ref: firewatch-report-issues
+    pre:
+    - ref: osd-ccs-cluster-provision-aws
+    - ref: osd-ccs-conf-machine-pool
+    - ref: osd-ccs-conf-idp-htpasswd
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: osd-ccs-cluster-operators-wait-ready
+    - ref: ipi-conf
+    - ref: ipi-conf-telemetry
+    - ref: ipi-conf-aws
+    - ref: ipi-install-monitoringpvc
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - ref: ipi-install-hosted-loki
+    - ref: ipi-install-install
+    - ref: ipi-install-times-collection
+    test:
+    - ref: install-operators
+zz_generated_metadata:
+  branch: main
+  org: rhpit
+  repo: interop-tests
+  variant: multi-cluster-poc-ocp4.14-lp-interop
