@@ -7,10 +7,14 @@ set -o xtrace
 
 
 pwd 
-ls
+ls -la
+
+whoami
 
 
-ls /root/cerberus
+ls -la /root
+
+ls -la /root/cerberus
 
 /root/cerberus/start_cerberus.py --help
 
