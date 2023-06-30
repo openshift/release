@@ -60,7 +60,7 @@ sudo bash -c " \
 "
 
 VM_IP=\$(./scripts/devenv-builder/manage-vm.sh ip -n ${VM_NAME})
-timeout 5m bash -c "until ssh -oStrictHostKeyChecking=accept-new redhat@\${VM_IP} 'echo hello'; do sleep 5; done"
+timeout 8m bash -c "until ssh -oStrictHostKeyChecking=accept-new redhat@\${VM_IP} 'echo hello'; do sleep 5; done"
 
 cat << EOF2 > /tmp/config.yaml
 apiServer:
@@ -93,8 +93,8 @@ set -xeuo pipefail
 cd ~/microshift
 VM_IP=\$(./scripts/devenv-builder/manage-vm.sh ip -n ${VM_NAME})
 
-timeout 5m bash -c "until ssh redhat@\${VM_IP} hostname; do sleep 5; done"
-timeout 5m bash -c "date; until ssh redhat@\${VM_IP} \"sudo systemctl status greenboot-healthcheck | grep 'active (exited)'\"; do sleep 5; done; date"
+timeout 8m bash -c "until ssh redhat@\${VM_IP} hostname; do sleep 5; done"
+timeout 8m bash -c "date; until ssh redhat@\${VM_IP} \"sudo systemctl status greenboot-healthcheck | grep 'active (exited)'\"; do sleep 5; done; date"
 
 # Setup external access with port forwarding to allow running commands and tests from the CI container.
 sudo /sbin/iptables -I FORWARD -o virbr0 -p tcp -d \${VM_IP} --dport 6443 -j ACCEPT
