@@ -5,7 +5,7 @@ set -o nounset
 set -o pipefail
 set -o xtrace
 
-
+ls /usr/bin
 pwd 
 ls -la
 
