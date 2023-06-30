@@ -23,11 +23,6 @@ fi
 
 ami_id=${EC2_AMI}
 instance_type=${EC2_INSTANCE_TYPE}
-host_device_name="/dev/xvdc"
-
-if [[ "$EC2_INSTANCE_TYPE" =~ a1.* ]] || [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+g.* ]]; then
-  host_device_name="/dev/nvme1n1"
-fi
 
 function save_stack_events_to_shared()
 {
@@ -73,9 +68,6 @@ Parameters:
   PublicKeyString:
     Type: String
     Description: The public key used to connect to the EC2 instance
-  HostDeviceName:
-    Type: String
-    Description: Disk device name to create pvs and vgs
 
 Metadata:
   AWS::CloudFormation::Interface:
@@ -254,7 +246,7 @@ Resources:
           Iops: 16000
       - DeviceName: /dev/sdc
         Ebs:
-          VolumeSize: "120"
+          VolumeSize: "200"
           VolumeType: gp3
           Iops: 16000
       PrivateDnsNameOptions:
@@ -263,17 +255,29 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          echo "====== Authorizing public key ======" | tee -a /tmp/init_output.txt
+
+          log_output_file=/tmp/init_output.txt
+
+          echo "====== Authorizing public key ======" | tee -a "\$log_output_file"
           echo "\${PublicKeyString}" >> /home/ec2-user/.ssh/authorized_keys
-          echo "====== Running DNF Install ======" | tee -a /tmp/init_output.txt
-          sudo dnf install -y lvm2 |& tee -a /tmp/init_output.txt
+
+          echo "====== Running DNF Install ======" | tee -a "\$log_output_file"
+          sudo dnf install -y lvm2 jq |& tee -a "\$log_output_file"
+
+          echo "====== Getting Disk Path ======" | tee -a "\$log_output_file"
+          pv_location=\$(sudo lsblk -Jd | jq -r '.blockdevices[] | select(.size == "200G") | "/dev/\(.name)"')
+          echo "discovered pv location of (\$pv_location)" | tee -a "\$log_output_file"
 
           # NOTE: wrappig script vars with {} since the cloudformation will see
           # them as cloudformation vars instead.
-          echo "====== Creating PV ======" | tee -a /tmp/init_output.txt
-          sudo pvcreate "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
-          echo "====== Creating VG ======" | tee -a /tmp/init_output.txt
-          sudo vgcreate rhel "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
+          echo "====== Creating PV ======" | tee -a "\$log_output_file"
+          sudo pvcreate "\$pv_location" |& tee -a "\$log_output_file"
+
+          echo "====== Creating VG ======" | tee -a "\$log_output_file"
+          sudo vgcreate rhel "\$pv_location" |& tee -a "\$log_output_file"
+
+          echo "====== Creating Thin Pool ======" | tee -a "\$log_output_file"
+          sudo lvcreate -L 10G --thinpool thin rhel |& tee -a "\$log_output_file"
 
 Outputs:
   InstanceId:
@@ -307,7 +311,6 @@ aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" 
         ParameterKey=HostInstanceType,ParameterValue="${instance_type}"  \
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
-        ParameterKey=HostDeviceName,ParameterValue="${host_device_name}" \
         ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)" &
 
 wait "$!"
