@@ -11,12 +11,11 @@ ls -la
 
 whoami
 
-
 ls -la /root
 
 ls -la /root/cerberus
 
-/root/cerberus/start_cerberus.py --help
+cat /root/cerberus/start_cerberus.py
 
 while [ ! -f "${KUBECONFIG}" ]; do
   printf "%s: waiting for %s\n" "$(date --utc --iso=s)" "${KUBECONFIG}"
