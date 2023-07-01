@@ -38,6 +38,19 @@ sudo subscription-manager register \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
 
 cd ~/microshift
+
+# Force using the new branch
+sudo dnf install -y git
+sudo chown -R ${HOST_USER} .
+git remote add dhellmann https://github.com/dhellmann/microshift.git
+git fetch dhellmann
+git switch -c build-multiple-images-for-ci dhellmann/build-multiple-images-for-ci
+git show
+# Add my ssh key
+mkdir -p ~/.ssh/
+echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCeOj7GqCWvoeCE4e3CC1Sc2oonw07aoOYoaXLlz9iyI99gC0OT3kqTEY8SYXO+IS8n3CudrswP6ueK0jpdMgihWXJhwni08m7+ZNEBb/4FltznSNUK2bQ0Rj9qGzUkYD3/PhP04bVODEGRRnAGo5MBrj//B5GoEYs5zUDi3E4S3S/J3A9wFGyIDKsKR4yHSDTlpynjoDbtgfJpyDOyw9gYlXGZlLQclRCgPeN74P5UV7UoK1aiE/v66N9kBn3FIUKerqY605R/RUrFxQ4jiF+TKGJrnmBlebhOnME89HAvRxobdJ6jIMy+LE0uR0AhHQF8wCtftz/pQoGAa54qxocQHO4N1MTrZLnuFXyhTOxS+4NEOSzsJ9eP/Ut7MqaYnXyRgBeDamVm2li1GmXAbmR0a8O/GukKtXHOV06haQPtoGWZp44/c6DX6LeTLWTi2bqbAI4vhQRwYAa0+opcAX944jF2E5GBDwhOUH6jZtNebHP1SDBgGviPeoBA+AmAZ6c= dhellmann@redhat.com" >> ~/.ssh/authorized_keys
+chmod 444 ~/.ssh/authorized_keys
+
 # Get firewalld and repos in place. Use scripts to get the right repos
 # for each branch.
 ./scripts/devenv-builder/configure-vm.sh --no-build-deps --force-firewall /tmp/pull-secret
