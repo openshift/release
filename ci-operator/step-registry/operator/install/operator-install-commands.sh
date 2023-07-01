@@ -16,7 +16,6 @@ for operator_value in $(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort  --version
       OPERATORS_CMD+=" --operator ${operator_value} "
     fi
 done
-echo "OPERATORS_CMD: ${OPERATORS_CMD}"
 RUN_COMMAND="${RUN_COMMAND} ${OPERATORS_CMD}"
 
 if [ -n "${PARALLEL}" ]; then
