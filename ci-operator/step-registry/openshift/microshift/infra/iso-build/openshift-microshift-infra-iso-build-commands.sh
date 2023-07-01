@@ -55,7 +55,25 @@ chmod 444 ~/.ssh/authorized_keys
 # for each branch.
 ./scripts/devenv-builder/configure-vm.sh --no-build --force-firewall /tmp/pull-secret
 ./scripts/image-builder/configure.sh
+
+# Build ISO for multi-node tests
 ./scripts/image-builder/build.sh -pull_secret_file /tmp/pull-secret -microshift_rpms ~/rpms -authorized_keys_file /tmp/ssh-publickey -open_firewall_ports 6443:tcp
+
+# Make sure libvirtd is running. We do this here, instead of the boot
+# phase,because some of the other scripts use virsh.
+./scripts/devenv-builder/manage-vm.sh config
+
+# Re-build from source.
+rm -rf ./_output/rpmbuild
+make rpm
+
+# Set up for scenario tests
+cd ~/microshift/test/
+timeout 20m ./bin/create_local_repo.sh
+timeout 20m ./bin/start_osbuild_workers.sh 5
+timeout 20m ./bin/build_images.sh
+timeout 20m ./bin/download_images.sh
+
 EOF
 chmod +x /tmp/iso.sh
 
