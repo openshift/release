@@ -53,7 +53,7 @@ chmod 444 ~/.ssh/authorized_keys
 
 # Get firewalld and repos in place. Use scripts to get the right repos
 # for each branch.
-./scripts/devenv-builder/configure-vm.sh --no-build-deps --force-firewall /tmp/pull-secret
+./scripts/devenv-builder/configure-vm.sh --no-build --force-firewall /tmp/pull-secret
 ./scripts/image-builder/configure.sh
 ./scripts/image-builder/build.sh -pull_secret_file /tmp/pull-secret -microshift_rpms ~/rpms -authorized_keys_file /tmp/ssh-publickey -open_firewall_ports 6443:tcp
 EOF
