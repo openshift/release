@@ -7,8 +7,11 @@ IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
 HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
 
+# May need to update openshift-microshift-infra-aws-ec2-commands.sh to
+# open other ports if changing these settings.
 SSH_EXTERNAL_BASE_PORT=7000
-API_EXTERNAL_BASE_PORT=6000
+API_EXTERNAL_BASE_PORT=7100
+LB_EXTERNAL_BASE_PORT=7500
 
 echo "Using Host $IP_ADDRESS"
 
@@ -42,7 +45,6 @@ do
 set -xeuo pipefail
 
 cd ~/microshift
-./scripts/devenv-builder/manage-vm.sh config
 
 ISO_FILE=\$(find ~/microshift/_output/image-builder -name "*.iso")
 sudo bash -c " \
@@ -127,3 +129,19 @@ do
   echo "${SSH_EXTERNAL_PORT}" > "${SHARED_DIR}/vm_ssh_port_${i}"
   echo "redhat" > "${SHARED_DIR}/vm_user_${i}"
 done
+
+# Install the settings for the scenario runner.  The ssh keys have
+# already been copied into place in the iso-build step.
+SETTINGS_FILE="${SHARED_DIR}/scenario_settings.sh"
+cat <<EOF >"${SETTINGS_FILE}"
+PUBLIC_IP=${IP_ADDRESS}
+SSH_PUBLIC_KEY=~/.ssh/id_rsa.pub
+SSH_PRIVATE_KEY=~/.ssh/id_rsa
+EOF
+scp "${SETTINGS_FILE}" "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/test/"
+
+# Run the in-repo ci phase script to create the VMs for the test scenarios.
+ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh ${API_EXTERNAL_PORT} ${SSH_EXTERNAL_PORT} ${LB_EXTERNAL_BASE_PORT}"
+
+# Copy the scenario info directory from the host to our artifact directory.
+scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
