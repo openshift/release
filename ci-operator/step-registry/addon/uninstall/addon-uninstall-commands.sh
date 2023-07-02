@@ -18,6 +18,7 @@ for addon_value in $(env | grep -E '^ADDON[0-9]+_CONFIG' | sort  --version-sort)
       ADDONS_CMD+=" --addon ${addon_value} "
     fi
 done
+
 RUN_COMMAND="${RUN_COMMAND} ${ADDONS_CMD}"
 
 if [ -n "${PARALLEL}" ]; then
