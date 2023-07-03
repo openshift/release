@@ -309,32 +309,6 @@ cat << EOF > $SHARED_DIR/destroy-cluster.yml
 
 EOF
 
-cat << EOF > $SHARED_DIR/send-mail.yml
----
-- name: Send mail report
-  hosts: bastion
-  gather_facts: false
-  tasks:
-
-    - name: Get content of the file
-      slurp:
-        src: ${ARTIFACT_DIR}/mail_report.html
-      register: report
-      delegate_to: localhost
-
-    - name: Sending an e-mail
-      mail:
-        host: smtp.corp.redhat.com
-        port: 25
-        from: telco5g-ci@redhat.com (Upstream CI reporter)
-        to: CNF devel <cnf-devel@redhat.com>
-        subject: >-
-          [US CI] RESULTPH job ${JOB_NAME:-'unknown'}
-        subtype: html
-        body: "{{ report['content'] | b64decode }}"
-
-EOF
-
 # PROCEED_AFTER_FAILURES is used to allow the pipeline to continue past cluster setup failures for information gathering.
 # CNF tests do not require this extra gathering and thus should fail immdiately if the cluster is not available.
 # It is intentionally set to a string so that it can be evaluated as a command (either /bin/true or /bin/false)
