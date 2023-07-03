@@ -135,6 +135,7 @@ EOF
     cd /usr/share/ansible/openshift-ansible
     git stash || true
     git checkout "$openshift_ansible_branch"
+    git pull || true
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
 }

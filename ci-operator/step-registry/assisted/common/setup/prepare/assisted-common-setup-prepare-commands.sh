@@ -6,13 +6,12 @@ set -o pipefail
 
 echo "************ assisted common setup prepare command ************"
 
-# Get packet | vsphere configuration
+# source common configuration, if missing, fallback on packet configuration
 # shellcheck source=/dev/null
-if source "${SHARED_DIR}/packet-conf.sh"; then
+if ! source "${SHARED_DIR}/ci-machine-config.sh"; then
+  source "${SHARED_DIR}/packet-conf.sh"
   export IP
   export SSH_KEY_FILE="${CLUSTER_PROFILE_DIR}/packet-ssh-key"
-else
-  source "${SHARED_DIR}/ci-machine-config.sh"
 fi
 
 mkdir -p build/ansible

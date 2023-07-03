@@ -456,6 +456,36 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: kubernetes-nmstate
+  cron: 30 5 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: kubernetes-nmstate
+      commands: |
+        rebasebot --source https://github.com/nmstate/kubernetes-nmstate:main \
+                  --dest openshift/kubernetes-nmstate:master \
+                  --rebase openshift-networking/kubernetes-nmstate:rebase-bot-master \
+                  --github-app-id 352928 \
+                  --github-app-key /secrets/metal-net-merge-bot/private-key \
+                  --github-cloner-id 352930 \
+                  --github-cloner-key /secrets/metal-net-cloner-bot/private-key \
+                  --git-username metal-net-bot \
+                  --git-email metal-networking@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/metal-net-merge-bot
+        name: metal-net-merge-bot-private-key
+        namespace: test-credentials
+      - mount_path: /secrets/metal-net-cloner-bot
+        name: metal-net-cloner-bot-private-key
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
 - as: unit
   commands: make deps && make unittests
   container:

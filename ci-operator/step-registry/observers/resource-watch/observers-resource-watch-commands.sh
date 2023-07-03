@@ -22,7 +22,7 @@ function cleanup() {
 
   exit 0
 }
-trap cleanup EXIT
+trap cleanup SIGINT SIGTERM EXIT
 
 # $KUBECONFIG could not be available when the observer first starts
 echo "waiting for $KUBECONFIG or $KUBECONFIGMINIMAL to exist"
@@ -47,6 +47,6 @@ then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-openshift-tests run-resourcewatch --v=4 --kubeconfig $KUBECONFIG --namespace default > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
+openshift-tests run-resourcewatch > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
 openshift-tests run-monitor --artifact-dir $STORE_PATH > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
 wait

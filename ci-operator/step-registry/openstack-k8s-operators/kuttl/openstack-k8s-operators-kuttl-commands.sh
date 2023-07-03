@@ -32,6 +32,7 @@ fi
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${SERVICE_NAME}-operator
 export KUTTL_REPORT=kuttl-test-${SERVICE_NAME}.json
+export NETWORK_ISOLATION=false
 if [ ${SERVICE_NAME} == "openstack-ansibleee" ]; then
     # the service_name needs to be different to use in the image url than in
     # the environment variables

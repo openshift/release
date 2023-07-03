@@ -32,17 +32,15 @@ if [[ $DEBUG = "true" ]] ; then
 	echo "TEST_NAME: $TEST_NAME"
 	echo "YAML_FILE: $YAML_FILE"
 fi
-if ! [[ "$TEST_NAME" =~ p[1-3]-f[0-9]+ ]] ; then
-	echo "test_name must match [a-z0-9-]-p[1-3]-f[0-9]+(-.*)?"
+if ! [[ "$TEST_NAME" =~ (p[1-3])?-f[0-9]+ ]] ; then
+	echo "test_name must match [a-z0-9-](-p[1-3])?-f[0-9]+(-.*)?"
 	display_usage
 	exit 2
 fi
 
-FN_TMP="${TEST_NAME#*-p[1-3]-f}"
-FN="${FN_TMP%%-*}"
+FN="$(echo $TEST_NAME | sed -E 's/.*-f([0-9]+)(.*)?/\1/')"
 NUMBERS="$(echo $TEST_NAME $YAML_FILE | md5sum | tr -d [0a-z])"
 if [[ $DEBUG = "true" ]] ; then
-	echo "FN_TMP: $FN_TMP"
 	echo "FN: $FN"
 	echo "NUMBERS: $NUMBERS"
 fi
