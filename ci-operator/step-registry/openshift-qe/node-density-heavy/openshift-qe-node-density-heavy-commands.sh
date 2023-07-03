@@ -27,6 +27,6 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.json kubelet.json etcd.json crio.json nodeMasters-max.json nodeWorkers.json"
 export GEN_CSV=true
 export GSHEET_KEY_LOCATION="${CLUSTER_PROFILE_DIR}/gce.json"
-export EMAIL_ID_FOR_RESULTS_SHEET='qili@redhat.com'
+export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
 ./run.sh
