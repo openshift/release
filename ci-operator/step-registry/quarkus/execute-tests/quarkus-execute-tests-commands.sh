@@ -16,6 +16,7 @@ oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --
 
 # export maven env variable
 export _JAVA_OPTIONS=-Duser.home=$HOME
+PROJECTS=config,lifecycle-application,http/http-minimum,http/http-minimum-reactive,sql-db/sql-app,monitoring/microprofile-opentracing
 
 # Execute tests
 source "/root/.sdkman/bin/sdkman-init.sh"
