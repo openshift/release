@@ -261,24 +261,6 @@ Resources:
           echo "====== Authorizing public key ======" | tee -a "\$log_output_file"
           echo "\${PublicKeyString}" >> /home/ec2-user/.ssh/authorized_keys
 
-          echo "====== Running DNF Install ======" | tee -a "\$log_output_file"
-          sudo dnf install -y lvm2 jq |& tee -a "\$log_output_file"
-
-          echo "====== Getting Disk Path ======" | tee -a "\$log_output_file"
-          pv_location=\$(sudo lsblk -Jd | jq -r '.blockdevices[] | select(.size == "200G") | "/dev/\(.name)"')
-          echo "discovered pv location of (\$pv_location)" | tee -a "\$log_output_file"
-
-          # NOTE: wrappig script vars with {} since the cloudformation will see
-          # them as cloudformation vars instead.
-          echo "====== Creating PV ======" | tee -a "\$log_output_file"
-          sudo pvcreate "\$pv_location" |& tee -a "\$log_output_file"
-
-          echo "====== Creating VG ======" | tee -a "\$log_output_file"
-          sudo vgcreate rhel "\$pv_location" |& tee -a "\$log_output_file"
-
-          echo "====== Creating Thin Pool ======" | tee -a "\$log_output_file"
-          sudo lvcreate -L 10G --thinpool thin rhel |& tee -a "\$log_output_file"
-
 Outputs:
   InstanceId:
     Description: RHEL Host Instance ID
