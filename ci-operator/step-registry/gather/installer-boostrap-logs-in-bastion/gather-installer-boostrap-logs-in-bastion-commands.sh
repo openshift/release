@@ -1,8 +1,8 @@
 #!/bin/bash
 
-set -o nounset
-set -o errexit
-set -o pipefail
+# set -o nounset
+# set -o errexit
+# set -o pipefail
 
 set -x
 
@@ -114,9 +114,15 @@ run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/chowners
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "chmod +x /tmp/chownership.sh ; /tmp/chownership.sh"
 run_scp_to_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "${ssh_key}" "/tmp/"
 
+
+sleep 14400
+
+
+
 run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "rm -f /tmp/installer/metadata.json"
 
-run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/openshift-install gather bootstrap --dir /tmp/installer --key /tmp/${ssh_key_file_name} --log-level debug 2> /tmp/gather.log; rm -f /tmp/${ssh_key_file_name}"
+run_ssh_cmd "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/openshift-install gather bootstrap --dir /tmp/installer --key /tmp/${ssh_key_file_name} --log-level debug 2> /tmp/gather.log"
+
 
 run_scp_from_remote "${ssh_key}" "${bastion_user}" "${bastion_dns}" "/tmp/gather.log" "${ARTIFACT_DIR}/"
 run_scp_from_remote "${ssh_key}" ${bastion_user} ${bastion_dns} "/tmp/installer/log-bundle-*.tar.gz" "${ARTIFACT_DIR}/"
