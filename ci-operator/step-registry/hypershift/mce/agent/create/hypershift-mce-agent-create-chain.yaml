@@ -1,0 +1,89 @@
+chain:
+  as: hypershift-mce-agent-create
+  steps:
+    - as: create-hostedcluster
+      cli: latest
+      commands: |-
+        set -exuo pipefail
+        
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
+
+        arch=$(arch)
+        if [ "$arch" == "x86_64" ]; then
+          downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/hypershift.tar.gz ${downURL}
+          cd /tmp && tar -xvf /tmp/hypershift.tar.gz
+          chmod +x /tmp/hypershift
+          cd -
+        fi
+
+        CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        CLUSTER_NAMESPACE="local-cluster"
+        echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+        
+        oc annotate sc assisted-service storageclass.kubernetes.io/is-default-class=true
+        
+        oc create ns "${CLUSTER_NAMESPACE}-${CLUSTER_NAME}"
+        BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
+        echo "extract secret/pull-secret"
+        oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+        
+        # Enable wildcard routes on the management cluster
+        oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
+          '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
+
+
+        echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+        /tmp/hypershift create cluster agent \
+          --name=${CLUSTER_NAME} \
+          --pull-secret=/tmp/.dockerconfigjson \
+          --agent-namespace="${CLUSTER_NAMESPACE}-${CLUSTER_NAME}" \
+          --base-domain=${BASEDOMAIN} \
+          --namespace "${CLUSTER_NAMESPACE}" \
+          --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN}
+
+        oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
+        oc apply -f - <<EOF
+        apiVersion: cluster.open-cluster-management.io/v1
+        kind: ManagedCluster
+        metadata:
+          annotations:
+            import.open-cluster-management.io/hosting-cluster-name: local-cluster
+            import.open-cluster-management.io/klusterlet-deploy-mode: Hosted
+            open-cluster-management/created-via: other
+          labels:
+            cloud: auto-detect
+            cluster.open-cluster-management.io/clusterset: default
+            name: ${CLUSTER_NAME}
+            vendor: OpenShift
+          name: ${CLUSTER_NAME}
+        spec:
+          hubAcceptsClient: true
+          leaseDurationSeconds: 60
+        EOF
+        
+        echo "Waiting for cluster to become available"
+        oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
+        echo "Cluster became available, creating kubeconfig"
+        /tmp/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+
+      from_image:
+        namespace: ocp
+        name: "4.13"
+        tag: upi-installer
+      grace_period: 5m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 50m0s
+      credentials:
+        - mount_path: /etc/ci-pull-credentials
+          name: ci-pull-credentials
+          namespace: test-credentials
+      dependencies:
+        - name: "release:latest"
+          env: RELEASE_IMAGE_LATEST
+        - name: hypershift-operator
+          env: HYPERSHIFT_RELEASE_LATEST
