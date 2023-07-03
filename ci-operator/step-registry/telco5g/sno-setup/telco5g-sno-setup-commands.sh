@@ -263,32 +263,6 @@ cat << EOF > ~/check-cluster.yml
 
 EOF
 
-cat << EOF > $SHARED_DIR/send-mail.yml
----
-- name: Send mail report
-  hosts: bastion
-  gather_facts: false
-  tasks:
-
-    - name: Get content of the file
-      slurp:
-        src: ${ARTIFACT_DIR}/mail_report.html
-      register: report
-      delegate_to: localhost
-
-    - name: Sending an e-mails
-      mail:
-        host: smtp.corp.redhat.com
-        port: 25
-        from: telco5g-ci@redhat.com (Upstream CI reporter)
-        to: CNF devel <cnf-devel@redhat.com>
-        subject: >-
-          [US CI] RESULTPH SNO job ${JOB_NAME:-'unknown'}
-        subtype: html
-        body: "{{ report['content'] | b64decode }}"
-
-EOF
-
 #Set status and run playbooks
 status=0
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
