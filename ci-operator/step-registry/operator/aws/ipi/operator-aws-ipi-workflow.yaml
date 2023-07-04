@@ -3,12 +3,17 @@ workflow:
   steps:
     allow_best_effort_post_steps: true
     env:
-      COMPUTE_NODE_REPLICAS: "6"
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: "m5.4xlarge"
+      PARALLEL: "true"
     post:
-    - ref: operator-uninstall
-    - chain: ipi-aws-post
+    - ref: osd-ccs-cluster-deprovision
     pre:
-    - chain: ipi-aws-pre
+    - ref: osd-ccs-cluster-provision-aws
+    - ref: osd-ccs-conf-machine-pool
+    - ref: osd-ccs-conf-idp-htpasswd
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: osd-ccs-cluster-operators-wait-ready
     - ref: operator-install
   documentation: |-
     This workflow provision an OpenShift cluster with a default configuration on AWS. 
