@@ -61,17 +61,6 @@ tests:
     make test GINKGO_ARGS='--no-color'
   container:
     from: src
-- as: glance-operator-build-deploy
-  cluster_claim:
-    architecture: amd64
-    cloud: vexxhost
-    owner: openstack-k8s-operators
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  optional: true
-  steps:
-    workflow: openstack-k8s-operators-test-build-deploy
 - as: precommit-check
   commands: |
     export SKIP=no-commit-to-branch
@@ -92,7 +81,7 @@ tests:
     cloud: vexxhost
     owner: openstack-k8s-operators
     product: ocp
-    timeout: 1h20m0s
+    timeout: 1h0m0s
     version: "4.10"
   steps:
     env:
@@ -109,6 +98,19 @@ tests:
   optional: true
   steps:
     workflow: openstack-k8s-operators-test-build-deploy-kuttl
+- as: glance-operator-build-deploy-kuttl-tempest
+  cluster_claim:
+    architecture: amd64
+    cloud: vexxhost
+    owner: openstack-k8s-operators
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  optional: true
+  steps:
+    env:
+      TEMPEST_REGEX: tempest.api.image.v2
+    workflow: openstack-k8s-operators-test-build-deploy-kuttl-tempest
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators
