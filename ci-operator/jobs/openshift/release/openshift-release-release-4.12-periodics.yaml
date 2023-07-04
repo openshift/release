@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -100,7 +100,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   interval: 48h
   labels:
@@ -326,7 +326,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   decorate: true
   interval: 48h
   labels:
@@ -437,7 +437,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   interval: 24h
   labels:
@@ -537,7 +537,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   decoration_config:
     timeout: 8h0m0s
@@ -675,7 +675,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   interval: 48h
   labels:
@@ -777,7 +777,7 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build01
+  cluster: build03
   decorate: true
   interval: 24h
   labels:
@@ -876,13 +876,13 @@ periodics:
       secret:
         secretName: ci-pull-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   decorate: true
   extra_refs:
   - base_ref: main
     org: openshift
     repo: osde2e
-  interval: 24h
+  interval: 720h
   labels:
     ci-operator.openshift.io/variant: ocp-4.12
     job-release: "4.12"
@@ -927,13 +927,13 @@ periodics:
       secret:
         secretName: osde2e-trt-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   decorate: true
   extra_refs:
   - base_ref: main
     org: openshift
     repo: osde2e
-  interval: 24h
+  interval: 720h
   labels:
     ci-operator.openshift.io/variant: ocp-4.12
     job-release: "4.12"
@@ -978,13 +978,13 @@ periodics:
       secret:
         secretName: osde2e-trt-credentials
 - agent: kubernetes
-  cluster: build04
+  cluster: build02
   decorate: true
   extra_refs:
   - base_ref: main
     org: openshift
     repo: osde2e
-  interval: 24h
+  interval: 720h
   labels:
     ci-operator.openshift.io/variant: ocp-4.12
     job-release: "4.12"
@@ -1032,3 +1032,54 @@ periodics:
     - name: osde2e-trt-credentials
       secret:
         secretName: osde2e-trt-credentials
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  interval: 24h
+  labels:
+    ci-operator.openshift.io/variant: ocp-4.12
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: release-openshift-ocp-rosa-hcp-nightly-4.12
+  spec:
+    containers:
+    - args:
+      - test
+      - --secret-locations
+      - $(SECRET_LOCATIONS)
+      - --configs
+      - $(CONFIGS)
+      command:
+      - /osde2e
+      env:
+      - name: SECRET_LOCATIONS
+        value: /usr/local/osde2e-common,/usr/local/osde2e-hypershift-credentials
+      - name: CONFIGS
+        value: hypershift
+      - name: INSTALL_LATEST_NIGHTLY
+        value: "4.12"
+      image: quay.io/app-sre/osde2e
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /usr/local/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /usr/local/osde2e-hypershift-credentials
+        name: osde2e-hypershift-credentials
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: osde2e-hypershift-credentials
+      secret:
+        secretName: osde2e-hypershift-credentials

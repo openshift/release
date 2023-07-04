@@ -10,7 +10,7 @@ SOURCE=redhat-operators
 SOURCE_NAMESPACE=openshift-marketplace
 
 if [ -n "${QUAY_OPERATOR_INDEX_IMAGE-}" ]; then
-    INDEX_IMAGE_DIGEST=$(oc image info "$QUAY_OPERATOR_INDEX_IMAGE" -o json | jq -r .digest)
+    INDEX_IMAGE_DIGEST=$(oc image info --show-multiarch "$QUAY_OPERATOR_INDEX_IMAGE" -o json | jq -r 'if type=="array" then .[0].listDigest else .digest end')
     INDEX_IMAGE="${QUAY_OPERATOR_INDEX_IMAGE##%%:*}@$INDEX_IMAGE_DIGEST"
 
     echo >&2 "Index image $QUAY_OPERATOR_INDEX_IMAGE is resolved into $INDEX_IMAGE"
