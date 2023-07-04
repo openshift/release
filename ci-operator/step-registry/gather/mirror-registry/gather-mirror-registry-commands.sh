@@ -30,3 +30,6 @@ for port in "${registry_ports[@]}"; do
   ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@"${BASTION_IP}" \
       "sudo journalctl -u poc-registry-${port}" > "${ARTIFACT_DIR}/poc-registry-${port}.service"
 done
+
+ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@"${BASTION_IP}" \
+      "sudo df -m" > "${ARTIFACT_DIR}/disk-space-usage"

@@ -9,6 +9,8 @@ echo "************ telco cluster setup command ************"
 #Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 #Set ssh path and permissions for connection to hypervisor
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
@@ -27,6 +29,7 @@ CLUSTER_HV_IP="10.8.34.218"
 
 export KCLI_PARAM="-P tag=${T5CI_VERSION} -P version=nightly"
 
+echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 #Check connectivity
 ping ${CLUSTER_HV_IP} -c 10 || true
 echo "exit" | curl telnet://${CLUSTER_HV_IP}:22 && echo "SSH port is opened"|| echo "status = $?"

@@ -39,7 +39,7 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 pull_secret=$(<"${SHARED_DIR}/pull-secrets")
 
 # Create cluster-name.txt
-echo "${NAMESPACE}-${JOB_NAME_HASH}" >"${SHARED_DIR}"/cluster-name.txt
+echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
 cluster_name=$(<"${SHARED_DIR}"/cluster-name.txt)
 
 # Add build01 secrets if the mirror registry secrets are not available.

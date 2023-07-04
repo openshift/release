@@ -137,12 +137,14 @@ function reset_host() {
   local bmc_user="${2}"
   local bmc_pass="${3}"
   local vendor="${4:-ampere}"
+  ipmi_boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo force_pxe || echo force_cdrom)
+  sushy_boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo PXE || echo VCD-DVD)
   echo "Resetting the host ${bmc_address}..."
   case "${vendor}" in
     ampere)
       ipmitool -I lanplus -H "$bmc_address" \
         -U "$bmc_user" -P "$bmc_pass" \
-        chassis bootparam set bootflag "force_cdrom" options=PEF,watchdog,reset,power
+        chassis bootparam set bootflag "$ipmi_boot_selection" options=PEF,watchdog,reset,power
     ;;
     dell)
       # this is how sushy does it
@@ -152,7 +154,7 @@ function reset_host() {
          '{"ShareParameters":{"Target":"ALL"},"ImportBuffer":
             "<SystemConfiguration><Component FQDD=\"iDRAC.Embedded.1\">
             <Attribute Name=\"ServerBoot.1#BootOnce\">Enabled</Attribute>
-            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">VCD-DVD</Attribute>
+            <Attribute Name=\"ServerBoot.1#FirstBootDevice\">'"$sushy_boot_selection"'</Attribute>
             </Component></SystemConfiguration>"}'
     ;;
     *)
@@ -207,7 +209,7 @@ if [ "${DISCONNECTED}" == "true" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 
-# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
+# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
@@ -286,19 +288,39 @@ case "${BOOT_MODE}" in
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the ISO image into the bastion host..."
   scp "${SSHOPTS[@]}" "${INSTALL_DIR}/agent.$gnu_arch.iso" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}.${gnu_arch}.iso"
+  echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
+  # shellcheck disable=SC2154
+  for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+    # shellcheck disable=SC1090
+    . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+    if [ "${transfer_protocol_type}" == "cifs" ]; then
+      IP_ADDRESS="$(dig +short "${AUX_HOST}")"
+      iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
+    else
+      # Assuming HTTP or HTTPS
+      iso_path="${transfer_protocol_type}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
+    fi
+    mount_virtual_media "${bmc_address}" "${redfish_user}" "${redfish_password}" \
+      "${iso_path}" "${transfer_protocol_type}" &
+  done
+
+  wait
+  if [ -f /tmp/virtual_media_mount_failed ]; then
+    echo "Failed to mount the ISO image in one or more hosts"
+    exit 1
+  fi
 ;;
 "pxe")
-  ### TODO: dropped support but keeping here as it might be useful soon
   ### Create pxe files
   echo -e "\nCreating PXE files..."
   oinst agent create pxe-files
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent-vmlinuz* \
-    "root@${AUX_HOST}:/opt/tftpboot/${CLUSTER_NAME}/vmlinux_${gnu_arch}"
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent-initrd* \
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent.*-vmlinuz* \
+    "root@${AUX_HOST}:/opt/tftpboot/${CLUSTER_NAME}/vmlinuz_${gnu_arch}"
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent.*-initrd* \
     "root@${AUX_HOST}:/opt/tftpboot/${CLUSTER_NAME}/initramfs_${gnu_arch}.img"
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent-rootfs* \
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent.*-rootfs* \
     "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
 ;;
 *)
@@ -311,31 +333,6 @@ export KUBECONFIG="$INSTALL_DIR/auth/kubeconfig"
 echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
-
-### Mount the image in the hosts via virtual media
-### We cannot mount the ISO image before it gets created. Therefore, despite the increased complexity of this step,
-### we need to do it here
-echo -e "\nMounting the ISO image in the hosts via virtual media and powering on the hosts..."
-# shellcheck disable=SC2154
-for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
-  # shellcheck disable=SC1090
-  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  if [ "${transfer_protocol_type}" == "cifs" ]; then
-    IP_ADDRESS="$(dig +short "${AUX_HOST}")"
-    iso_path="${IP_ADDRESS}/isos/${CLUSTER_NAME}.${arch}.iso"
-  else
-    # Assuming HTTP or HTTPS
-    iso_path="${transfer_protocol_type}://${AUX_HOST}/${CLUSTER_NAME}.${arch}.iso"
-  fi
-  mount_virtual_media "${bmc_address}" "${redfish_user}" "${redfish_password}" \
-   "${iso_path}" "${transfer_protocol_type}" &
-done
-
-wait
-if [ -f /tmp/virtual_media_mount_failed ]; then
-  echo "Failed to mount the ISO image in one or more hosts"
-  exit 1
-fi
 
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do

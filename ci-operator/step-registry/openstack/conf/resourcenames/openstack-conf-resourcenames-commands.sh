@@ -134,7 +134,7 @@ cat <<< "$BASTION_FLAVOR"                > "${SHARED_DIR}/BASTION_FLAVOR"
 # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
 # Now it looks like "ci-op-rl6z646h-65230".
 # We will remove "ci-op-" prefix from there to keep just last 14 characters. and it cannot start with a "-"
-UNSAFE_CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+UNSAFE_CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 cat <<< "${UNSAFE_CLUSTER_NAME/ci-??-/}" > "${SHARED_DIR}/CLUSTER_NAME"
 
 cat <<EOF

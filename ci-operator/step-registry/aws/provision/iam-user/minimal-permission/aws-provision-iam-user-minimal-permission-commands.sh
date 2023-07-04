@@ -10,7 +10,7 @@ trap 'rm -f /tmp/aws_cred_output /tmp/pull-secret' EXIT TERM INT
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION="${LEASED_RESOURCE}"
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 function run_command() {
     local cmd="$1"

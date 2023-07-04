@@ -1,0 +1,193 @@
+build_root:
+  project_image:
+    dockerfile_path: ci-builder/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  to: ssp-operator-container
+- dockerfile_path: validator.Dockerfile
+  to: template-validator-container
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unittests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
+  steps:
+    test:
+    - as: unittests
+      commands: export GOFLAGS= && make unittest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: e2e-functests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-functests
+      cli: latest
+      commands: |
+        export GOFLAGS=
+        ./automation/e2e-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      env:
+      - default: release-v0.18
+        name: CI_BRANCH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+  timeout: 8h0m0s
+- as: e2e-upgrade-functests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: e2e-upgrade-functests
+      cli: latest
+      commands: |
+        export GOFLAGS=
+        ./automation/e2e-upgrade-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      env:
+      - default: release-v0.18
+        name: CI_BRANCH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+  timeout: 8h0m0s
+- as: e2e-single-node-functests
+  skip_if_only_changed: ^\.github/|^docs/|\.[mM][dD]$|^.gitignore$|^OWNERS$|^PROJECT$|^LICENSE$
+  steps:
+    cluster_profile: gcp-virtualization
+    test:
+    - as: e2e-single-node-functests
+      cli: latest
+      commands: |
+        export TOPOLOGY_MODE=SingleReplica
+        export GOFLAGS=
+        ./automation/e2e-functests/run.sh
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      env:
+      - default: release-v0.18
+        name: CI_BRANCH
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp-single-node
+  timeout: 8h0m0s
+- as: win10-pipeline-example-test
+  run_if_changed: (^data/tekton-pipelines/.*|^data/tekton-tasks/.*|^internal/tekton-bundle/.*|^internal/operands/tekton-pipelines/.*|^internal/operands/tekton-tasks/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win10-pipeline-example-test
+      commands: export TARGET=windows10 && ./automation/e2e-tekton/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win11-pipeline-example-test
+  run_if_changed: (^data/tekton-pipelines/.*|^data/tekton-tasks/.*|^internal/tekton-bundle/.*|^internal/operands/tekton-pipelines/.*|^internal/operands/tekton-tasks/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      commands: export TARGET=windows11 && ./automation/e2e-tekton/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: win2k22-pipeline-example-test
+  run_if_changed: (^data/tekton-pipelines/.*|^data/tekton-tasks/.*|^internal/tekton-bundle/.*|^internal/operands/tekton-pipelines/.*|^internal/operands/tekton-tasks/.*)$
+  steps:
+    cluster_profile: gcp-virtualization
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-4
+    test:
+    - as: win11-pipeline-example-test
+      commands: export TARGET=windows2k22 && ./automation/e2e-tekton/example-pipelines-test.sh
+      credentials:
+      - mount_path: /tmp/secrets
+        name: common-templates-container-disk-puller
+        namespace: test-credentials
+      dependencies:
+      - env: CI_OPERATOR_IMG
+        name: ssp-operator-container
+      - env: CI_VALIDATOR_IMG
+        name: template-validator-container
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: release-v0.18
+  org: kubevirt
+  repo: ssp-operator

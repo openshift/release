@@ -30,6 +30,11 @@ function create_tests_temp_skip_list_11 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-13684
+# TESTNAME
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
+
 EOF
 }
 
@@ -202,13 +207,33 @@ function sno_fixes {
     popd
 }
 
+function get_time_left {
+    # Use it later for calculation of time left
+    # Keep in mind the step starts after image preparation in cluster
+    now=$(date +%s)
+    then=$(cat $SHARED_DIR/start_time)
+    minutes_passed=$(( (now - then) / 60 ))
+    # the job has 4 hours to run, leave 10 minutes for reports etc
+    time_left=$(( 215 - minutes_passed ))
+    echo $time_left
+}
+
+
+
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
+
+# if set - to run tests and/or validations
+export RUN_TESTS="${RUN_TESTS:-true}"
+export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
     export FEATURES="${FEATURES:-performance sriov sctp}"
 else
     export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
 fi
+export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
+export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
+
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
@@ -266,24 +291,24 @@ popd
 # Skiplist common for all releases
 create_tests_skip_list_file
 
-# Skiplist according to each release
+# Skiplist according to each release and add flakey parameter for Ginkgo v1 and v2
 if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
     create_tests_temp_skip_list_11
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
 
 fi
 if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
     create_tests_temp_skip_list_12
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
 
 fi
 if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
     create_tests_temp_skip_list_13
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
+    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 fi
 if [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_14
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
+    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
@@ -322,10 +347,25 @@ export CNF_NODES="${test_nodes}"
 
 pushd $CNF_REPO_DIR
 status=0
+val_status=0
+
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
-FEATURES_ENVIRONMENT="ci" make functests-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
+# if RUN_VALIDATIONS set, run validations
+if $RUN_VALIDATIONS; then
+    echo "************ Running validations ************"
+    FEATURES=$VALIDATIONS_FEATURES FEATURES_ENVIRONMENT="ci" make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log || val_status=$?
+fi
+# set overall status to fail if validations failed
+if [[ ${val_status} -ne 0 ]]; then
+    status=${val_status}
+fi
+# if validations passed and RUN_TESTS set, run the tests
+if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
+    echo "************ Running e2e tests ************"
+    FEATURES=$TEST_RUN_FEATURES FEATURES_ENVIRONMENT="ci" make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
+fi
 popd
 
 set +e
@@ -345,7 +385,7 @@ pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
 ls ${ARTIFACT_DIR}/validation_junit*xml && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
 [[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.html
 # Run validation parser
-[[ -f ${SHARED_DIR}/cnf-tests-run.log ]] && python ${SHARED_DIR}/telco5gci/parse_log.py --test-type validations --path ${SHARED_DIR}/cnf-tests-run.log --output-file ${ARTIFACT_DIR}/parsed-validations.json
+[[ -f ${SHARED_DIR}/cnf-validations-run.log ]] && python ${SHARED_DIR}/telco5gci/parse_log.py --test-type validations --path ${SHARED_DIR}/cnf-validations-run.log --output-file ${ARTIFACT_DIR}/parsed-validations.json
 [[ -f ${ARTIFACT_DIR}/parsed-validations.json ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/parsed-validations.json -f json -o ${ARTIFACT_DIR}/parsed_validations.html
 # Create JSON reports for robots
 [[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.json

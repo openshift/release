@@ -50,16 +50,7 @@ INSTALL_MODE_ARG=""
 if [[ -n ${OO_INSTALL_MODE} ]]; then
   INSTALL_MODE_ARG=--install-mode="${INSTALL_MODE_ARG}"
 fi
-
-echo "Downloading the operator-sdk"
-ARCH=$(case $(uname -m) in x86_64) echo -n amd64 ;; aarch64) echo -n arm64 ;; *) echo -n "$(uname -m)" ;; esac)
-OS=$(uname | awk '{print tolower($0)}')
-OPERATOR_SDK_DL_URL="https://github.com/operator-framework/operator-sdk/releases/download/${OPERATOR_SDK_VERSION}/operator-sdk_${OS}_${ARCH}"
-
 (
-cd /tmp
-curl -L "${OPERATOR_SDK_DL_URL}" -o operator-sdk
-chmod +x operator-sdk
-
-./operator-sdk run bundle "${OO_BUNDLE}" -n "${OO_INSTALL_NAMESPACE}" --verbose ${INSTALL_MODE_ARG} --timeout="${OO_INSTALL_TIMEOUT_MINUTES}m"
+  cd /tmp
+  operator-sdk run bundle "${OO_BUNDLE}" -n "${OO_INSTALL_NAMESPACE}" --verbose ${INSTALL_MODE_ARG} --timeout="${OO_INSTALL_TIMEOUT_MINUTES}m"
 )

@@ -16,7 +16,7 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
-CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
+CLUSTER_NAME=${NAMESPACE}-${UNIQUE_HASH}
 RESOURCE_GROUP=${CLUSTER_NAME}
 AZURE_AUTH_LOCATION="${SHARED_DIR}/osServicePrincipal.json"
 APP_ID=$(jq -r .clientId "${AZURE_AUTH_LOCATION}")
@@ -41,8 +41,10 @@ source ${SHARED_DIR}/azurestack-login-script.sh
 
 az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 oc registry login
-oc adm release extract --credentials-requests --cloud=azure --to=/tmp/credentials-request "$RELEASE_IMAGE_LATEST"
+oc adm release extract --credentials-requests --cloud=azure --to=/tmp/credentials-request "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 ls /tmp/credentials-request
 files=$(ls /tmp/credentials-request)

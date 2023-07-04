@@ -72,11 +72,15 @@ tests:
 - as: e2e-aws-ovn-techpreview
   steps:
     cluster_profile: aws
-    workflow: openshift-e2e-aws-capi
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
 - as: e2e-aws-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
       commands: make e2e
@@ -84,17 +88,21 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: openshift-e2e-aws-capi
+    workflow: openshift-e2e-aws
 - as: e2e-gcp-ovn-techpreview
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
-    workflow: openshift-e2e-gcp-capi
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-gcp
 - as: e2e-gcp-capi-techpreview
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: gcp
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     test:
     - as: test
       commands: make e2e
@@ -102,13 +110,29 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: openshift-e2e-gcp-capi
+    workflow: openshift-e2e-gcp
 - as: e2e-azure-ovn-techpreview
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: azure4
-    workflow: openshift-e2e-azure-capi
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-azure
+- as: e2e-vsphere-capi-techpreview
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      commands: make e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-vsphere
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

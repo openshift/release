@@ -135,6 +135,7 @@ EOF
     cd /usr/share/ansible/openshift-ansible
     git stash || true
     git checkout "$openshift_ansible_branch"
+    git pull || true
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
 }
@@ -179,6 +180,12 @@ function extract_oc(){
     which oc
     oc version --client
     return 0
+}
+
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function run_command_oc() {
@@ -395,7 +402,7 @@ function check_signed() {
     digest="$(echo "${TARGET}" | cut -f2 -d@)"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror2.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
