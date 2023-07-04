@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -eux
 
 shopt -s nullglob
 
@@ -13,11 +14,15 @@ OCP_CRED_USR="kubeadmin"
 OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
 oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --insecure-skip-tls-verify=true
 
+# source sdkman
+set +o nounset #disable strict mode
+source "/root/.sdkman/bin/sdkman-init.sh"
+set -o nounset #enable back strict mode
+
 # export maven env variable
 export _JAVA_OPTIONS=-Duser.home=$HOME
 
 # Execute tests
-source "/root/.sdkman/bin/sdkman-init.sh"
 mvn -B -V clean verify -fae \
     -Dmaven.repo.local=$PWD/local-repo \
     -Dquarkus.platform.group-id=$QUARKUS_PLATFORM_GROUP_ID \
@@ -31,8 +36,7 @@ mvn -B -V clean verify -fae \
 # Copy test reports into $ARTIFACT_DIR
 echo "Copying results and xmls to ${ARTIFACT_DIR}"
 PROJECTS=config,lifecycle-application,http/http-minimum,http/http-minimum-reactive,sql-db/sql-app,monitoring/microprofile-opentracing
-ALL_PROJECTS=${PROJECTS:?Can not retrieve the list of projects}
-for PROJECT in ${ALL_PROJECTS//","/" "}; do
+for PROJECT in ${PROJECTS//","/" "}; do
   for FILE in ./$PROJECT/target/failsafe-reports/*.xml; do
     FILENAME=$(basename $FILE)
     echo $FILENAME
