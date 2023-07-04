@@ -1,28 +1,37 @@
-base_images:
-  ubi_minimal:
-    name: ubi-minimal
-    namespace: ocp
-    tag: "8"
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.13
 images:
-- context_dir: .
+- build_args:
+  - name: DOCKER_BUILDKIT
+    value: "1"
+  - name: BUILDKIT_PROGRESS
+    value: plain
+  - name: PROTOC_VERSION
+    value: "23.2"
+  context_dir: .
   dockerfile_path: Dockerfile
   from: src
-  to: text-gen-server
+  to: text-generation-inference
 promotion:
   namespace: opendatahub-io
   tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
 resources:
   '*':
     limits:
-      memory: 4Gi
+      cpu: "24"
+      memory: 16Gi
     requests:
-      cpu: 100m
-      memory: 200Mi
+      cpu: "24"
+      memory: 16Gi
 zz_generated_metadata:
   branch: main
   org: opendatahub-io
