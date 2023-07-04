@@ -113,6 +113,7 @@ oc apply -f "${SHARED_DIR}/sriov-worker-machineset.yaml"
 
 echo "Scaling up worker to 1"
 oc scale --replicas=1 machinesets.machine.openshift.io "${WORKER_MACHINESET}" -n openshift-machine-api
+sleep 5000
 wait_for_worker_machines
 
 echo "Disable mastersSchedulable since we now have a dedicated worker node"
