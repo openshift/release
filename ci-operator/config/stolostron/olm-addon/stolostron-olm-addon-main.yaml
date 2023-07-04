@@ -1,0 +1,67 @@
+base_images:
+  stolostron_builder_go1.19-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    stolostron_builder_go1.19-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
+  to: olm-addon-controller
+- dockerfile_path: cleaner-Dockerfile
+  inputs:
+    stolostron_builder_go1.19-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
+  to: olm-addon-cleaner
+promotion:
+  name: "2.9"
+  namespace: stolostron
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build BUILDFLAGS:='-race'
+tests:
+- as: unit
+  commands: |
+    export SELF="make -f Makefile"
+    export HOME="/tmp"
+    make -f Makefile unit
+  container:
+    from: src
+- as: e2e
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-cicd-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: e2e
+      commands: |
+        ./cicd/prow-e2e-kind.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: olm-addon
