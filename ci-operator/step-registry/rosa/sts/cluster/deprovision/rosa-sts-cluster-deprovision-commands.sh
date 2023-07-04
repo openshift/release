@@ -37,6 +37,8 @@ if [[ -z "$CLUSTER_ID" ]]; then
   CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-name")
 fi
 
+sleep 86400
+
 echo "Deleting cluster-id: ${CLUSTER_ID}"
 rosa delete cluster -c "${CLUSTER_ID}" -y
 while rosa describe cluster -c "${CLUSTER_ID}" ; do
