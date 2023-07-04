@@ -43,7 +43,7 @@ USHIFT_USER: ${VM_USER}
 SSH_PRIV_KEY: ${CLUSTER_PROFILE_DIR}/ssh-privatekey
 SSH_PORT: ${VM_PORT}
 EOF
-  /microshift/test/run.sh -o "${ARTIFACT_DIR}/e2e" -i /tmp/e2e.yaml -v /tmp/venv /microshift/test/suites-ostree
+  /microshift/test/run.sh -o "${ARTIFACT_DIR}/e2e" -i /tmp/e2e.yaml -v /tmp/venv /microshift/test/suites-ostree/backup-restore.robot
 }
 
 # Bash CNCF Tests
@@ -165,6 +165,21 @@ EOF
 ######################################################################
 # If more tests are to be run in parallel the code should go in here #
 ######################################################################
+
+# Copy the scenario settings from the remote host back here so the
+# test runner has access to them.
+scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
+
+# Run the scenario tests, if the phase script exists
+# (we can clean this up after the main PR lands)
+cd /microshift/test || true
+if [ -f ./bin/ci_phase_test.sh ]; then
+    ./bin/ci_phase_test.sh
+fi
+
+# Copy the scenario settings from the remote host here *again* to
+# include the log files and other outputs.
+scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
 # VM mapping
 # e2e:  vm0

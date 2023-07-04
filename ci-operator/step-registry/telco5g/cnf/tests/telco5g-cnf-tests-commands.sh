@@ -4,7 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-~/fix_uid.sh
 
 function create_tests_skip_list_file {
 # List of test cases to ignore due to open bugs
@@ -30,6 +29,11 @@ function create_tests_temp_skip_list_11 {
 # List of temporarly skipped tests for 4.11
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-13684
+# TESTNAME
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
 
 EOF
 }
@@ -390,22 +394,6 @@ ls ${ARTIFACT_DIR}/validation_junit*xml && python ${SHARED_DIR}/telco5gci/j2html
 
 junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
 
-# Generate mail HTML report
-[[ -f ${ARTIFACT_DIR}/junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2mailhtml.py ${ARTIFACT_DIR}/junit.xml -o ${ARTIFACT_DIR}/mail_report.html
-
-# Change to FAILURE if status is not 0
-if [[ ${status} -ne 0 ]]; then
-    sed -i 's/RESULTPH/FAILURE/g' $SHARED_DIR/send-mail.yml
-else
-    sed -i 's/RESULTPH/SUCCESS/g' $SHARED_DIR/send-mail.yml
-fi
-if [[ "$PROW_JOB_ID" != *"nightly"* ]] && [[ "$JOB_TYPE" == "periodic" ]] && [[ -n "${JOB_SPEC-}" ]]; then
-SSH_PKEY_PATH=/var/run/ci-key/cikey
-SSH_PKEY=~/key
-[[ -e $SSH_PKEY_PATH ]] && cp $SSH_PKEY_PATH $SSH_PKEY && chmod 600 $SSH_PKEY
-
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/bastion_inventory -vv $SHARED_DIR/send-mail.yml
-fi
 rm -rf ${SHARED_DIR}/myenv
 set +x
 set -e
