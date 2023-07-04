@@ -1,31 +1,38 @@
 apiVersion: hive.openshift.io/v1
 kind: ClusterPool
 metadata:
-  name: stackrox-ocp-4-13-cluster-pool # name is not relevant but of course must be unique
-  namespace: stackrox-ocp-4-13-cluster-pool
-  labels: # architecture, cloud, owner, product, version are used to filter out a pool when a job claims a cluster
+  creationTimestamp: null
+  labels:
     architecture: amd64
     cloud: aws
-    product: ocp
     owner: stackrox
+    product: ocp
     version: "4.13"
-    version_lower: "4.13.0-0" # optional: lower bound for automatically updated imageset; required if version_upper is set
-    version_upper: "4.14.0-0" # optional: upper bound for automatically updated imageset; required if version_lower is set
+    version_lower: 4.13.0-0
+    version_upper: 4.14.0-0
+  name: stackrox-ocp-4-13-cluster-pool
+  namespace: stackrox-cluster-pools
 spec:
-  baseDomain: ocp-4-13.osci-pools.rox.systems # the base domain to install the cluster
+  baseDomain: ocp-4-13.osci-pools.rox.systems
+  hibernationConfig: null
   imageSetRef:
-    name: ocp-release-4.13.4-x86-64-for-4.13.0-0-to-4.14.0-0 # the name of the imageSet which determines the image to install the cluster; will be automatically updated if `version_*` labels are set
+    name: ocp-release-4.13.4-x86-64-for-4.13.0-0-to-4.14.0-0
   installConfigSecretTemplateRef:
-    name: stackrox-ocp-4-13-install-config # the name of the secret with an installation config for the installer
-  skipMachinePools: true
+    name: stackrox-ocp-4-13-install-config
+  labels:
+    tp.openshift.io/owner: stackrox
+  maxSize: 10
   platform:
     aws:
       credentialsSecretRef:
-        name: stackrox-ocp-4-13-cluster-pool-credentials # the name of the secret with the credentials of the cloud account
+        name: stackrox-ocp-4-13-cluster-pool-credentials
       region: us-west-2
   pullSecretRef:
     name: pull-secret
-
-  # TODO: set as appropriate, check quotas
-  size: 1 # the number of clusters that Hive should keep provisioned and waiting for use.
-  maxSize: 10 # the maximum number of clusters that can exist at the same time.
+  runningCount: 1
+  size: 1
+  skipMachinePools: true
+status:
+  ready: 0
+  size: 0
+  standby: 0
