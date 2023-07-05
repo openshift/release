@@ -27,6 +27,12 @@ extract_oc
 
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
 
+if test -f "${SHARED_DIR}/proxy-conf.sh"
+then
+    # shellcheck disable=SC1091
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # ensure we're stable to start
 oc adm wait-for-stable-cluster --minimum-stable-period=5s
 
