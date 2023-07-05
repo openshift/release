@@ -172,10 +172,19 @@ scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/sce
 
 # Run the scenario tests, if the phase script exists
 # (we can clean this up after the main PR lands)
-cd /microshift/test || true
+
+#TODO temporary clone. Remove to use the one from home dir.
+cat > /tmp/tests.sh << EOF
+git clone -b USHIFT-1387 https://github.com/pacevedom/microshift /tmp/microshift
+cd /tmp/microshift/test || true
 if [ -f ./bin/ci_phase_test.sh ]; then
-    ./bin/ci_phase_test.sh
+  ./bin/ci_phase_test.sh
 fi
+EOF
+chmod +x /tmp/tests.sh
+
+scp /tmp/tests.sh "${INSTANCE_PREFIX}:/tmp"
+ssh "${INSTANCE_PREFIX}" "/tmp/tests.sh"
 
 # Copy the scenario settings from the remote host here *again* to
 # include the log files and other outputs.
