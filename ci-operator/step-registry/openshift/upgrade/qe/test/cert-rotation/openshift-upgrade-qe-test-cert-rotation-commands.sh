@@ -126,6 +126,8 @@ oc adm wait-for-stable-cluster
 
 # create new admin.kubeconfig
 oc config new-admin-kubeconfig > "${SHARED_DIR}/admin.kubeconfig"
+oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami || true
+sleep 2
 oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
 
 # revoke old trust for the signers we have regenerated
