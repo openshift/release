@@ -7,13 +7,16 @@ workflow:
       REPLICAS: "2"
       DISABLE_WORKLOAD_MONITORING: "false"
       PROXY_SWITCH: "true"
+      ENABLE_PROXY: "true"
     pre:
     - ref: aws-provision-vpc-shared
     - chain: aws-provision-bastionhost
+    - ref: rosa-sts-account-roles-create
     - ref: rosa-sts-cluster-provision
     - ref: rosa-conf-idp-htpasswd
     post:
     - ref: rosa-sts-cluster-deprovision
+    - ref: rosa-sts-account-roles-delete
     - ref: aws-deprovision-s3buckets
     - ref: aws-deprovision-stacks
   documentation: |-
