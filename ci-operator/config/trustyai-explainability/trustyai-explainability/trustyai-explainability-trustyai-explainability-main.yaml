@@ -1,0 +1,55 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- context_dir: tests/
+  dockerfile_path: Dockerfile
+  from: os
+  to: trustyai-explainability-ci-tests
+promotion:
+  additional_images:
+    latest: trustyai-explainability-ci-tests
+  name: trustyai-explainability-ci-tests
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+tests:
+- as: trustyai-explainability-e2e
+  run_if_changed: ^(tests/*|explainability-service/*|explainability-core/*|explainability-connectors/*|Dockerfile|pom.xml)
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      commands: $HOME/peak/installandtest.sh
+      from: trustyai-explainability-ci-tests
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: main
+  org: trustyai-explainability
+  repo: trustyai-explainability

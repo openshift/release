@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 00 05 * * 1-5
   decorate: true
   decoration_config:
@@ -13,6 +13,16 @@ periodics:
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-maistra-test-infra-main-merge-upstream-istio-2.4
+  reporter_config:
+    slack:
+      channel: '#istio-notifications'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -54,7 +64,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 00 05 * * 1-5
   decorate: true
   decoration_config:
@@ -108,7 +118,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build03
   cron: 00 05 * * 1-5
   decorate: true
   decoration_config:

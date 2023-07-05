@@ -8,13 +8,27 @@ export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 BUCKET_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 echo "create bucket name: $BUCKET_NAME ,region $HYPERSHIFT_AWS_REGION"
 if [ "$HYPERSHIFT_AWS_REGION" == "us-east-1" ]; then
-    aws s3api create-bucket --acl public-read --bucket "$BUCKET_NAME" \
-        --region us-east-1 || true
+    aws s3api create-bucket --bucket "$BUCKET_NAME" \
+        --region us-east-1
 else
-    aws s3api create-bucket --acl public-read --bucket "$BUCKET_NAME" \
+    aws s3api create-bucket --bucket "$BUCKET_NAME" \
         --create-bucket-configuration LocationConstraint="$HYPERSHIFT_AWS_REGION" \
-        --region "$HYPERSHIFT_AWS_REGION" || true
+        --region "$HYPERSHIFT_AWS_REGION"
 fi
+aws s3api delete-public-access-block --bucket "$BUCKET_NAME"
+export BUCKET_NAME=$BUCKET_NAME
+echo '{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+        "Effect": "Allow",
+        "Principal": "*",
+        "Action": "s3:GetObject",
+        "Resource": "arn:aws:s3:::${BUCKET_NAME}/*"
+        }
+    ]
+}' | envsubst > /tmp/bucketpolicy.json
+aws s3api put-bucket-policy --bucket "$BUCKET_NAME" --policy file:///tmp/bucketpolicy.json
 
 echo "Create a hypershift-operator IAM user in the management account"
 echo '{
@@ -78,3 +92,4 @@ access_key=$(aws iam create-access-key --user-name=hypershift-operator)
 accessKeyID=$(echo "$access_key" | jq -r '.AccessKey.AccessKeyId')
 secureKey=$(echo "$access_key" | jq -r '.AccessKey.SecretAccessKey')
 echo -e "[default]\naws_access_key_id=$accessKeyID\naws_secret_access_key=$secureKey" > $SHARED_DIR/.awsprivatecred
+echo "config awsprivatecred successfully"

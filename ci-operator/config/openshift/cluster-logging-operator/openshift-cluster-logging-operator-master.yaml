@@ -1,8 +1,8 @@
 base_images:
   base:
-    name: "4.13"
-    namespace: ocp
-    tag: base
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.20-openshift-4.14
   elasticsearch-operator:
     name: "5.8"
     namespace: logging
@@ -32,7 +32,7 @@ base_images:
     namespace: logging
     tag: logging-eventrouter
   logging-fluentd:
-    name: v1.14.x
+    name: ruby31-v1.14.x
     namespace: logging
     tag: logging-fluentd
   logging-kibana6:
@@ -40,7 +40,7 @@ base_images:
     namespace: logging
     tag: logging-kibana6
   logging-vector:
-    name: v0.21-rh
+    name: "5.8"
     namespace: logging
     tag: vector
   logging-view-plugin:
@@ -55,7 +55,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: rhel-9-release-golang-1.20-openshift-4.14
 images:
 - from: base
   to: cluster-logging-operator
@@ -84,11 +84,14 @@ promotion:
   name: "5.8"
   namespace: logging
 releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
   latest:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.13"
+    integration:
+      name: "4.14"
+      namespace: ocp
 resources:
   '*':
     requests:
@@ -105,8 +108,9 @@ tests:
     from: src
   timeout: 15m0s
 - as: e2e-target
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -144,7 +148,7 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: openshift-e2e-gcp
+    workflow: ipi-aws
   timeout: 5h0m0s
 - as: e2e-ocp-target-minus-one
   cluster_claim:
@@ -153,8 +157,9 @@ tests:
     owner: cvp
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   optional: true
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -204,6 +209,7 @@ tests:
     timeout: 1h0m0s
     version: "4.12"
   optional: true
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -248,10 +254,11 @@ tests:
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: cvp
+    owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
     version: "4.12"
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
     - as: test
@@ -286,8 +293,9 @@ tests:
     workflow: generic-claim
 - as: functional-target
   optional: true
+  skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: gcp
+    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -318,7 +326,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: openshift-e2e-gcp
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: master
   org: openshift

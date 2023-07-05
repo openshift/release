@@ -15,10 +15,6 @@ images:
   dockerfile_path: Dockerfile
   from: jupyter-minimal-ubi8-python-3.8
   to: jupyter-datascience-ubi8-python-3.8
-- context_dir: jupyter/pytorch/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-datascience-ubi8-python-3.8
-  to: jupyter-pytorch-ubi8-python-3.8
 - context_dir: cuda/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: base-ubi8-python-3.8
@@ -35,6 +31,10 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-jupyter-datascience-ubi8-python-3.8
   to: cuda-jupyter-tensorflow-ubi8-python-3.8
+- context_dir: jupyter/pytorch/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: cuda-jupyter-datascience-ubi8-python-3.8
+  to: jupyter-pytorch-ubi8-python-3.8
 - context_dir: runtimes/datascience/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: base-ubi8-python-3.8
@@ -58,10 +58,6 @@ images:
   dockerfile_path: Dockerfile
   from: jupyter-minimal-ubi9-python-3.9
   to: jupyter-datascience-ubi9-python-3.9
-- context_dir: jupyter/pytorch/ubi9-python-3.9
-  dockerfile_path: Dockerfile
-  from: jupyter-datascience-ubi9-python-3.9
-  to: jupyter-pytorch-ubi9-python-3.9
 - context_dir: cuda/ubi9-python-3.9
   dockerfile_path: Dockerfile
   from: base-ubi9-python-3.9
@@ -78,6 +74,10 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-jupyter-datascience-ubi9-python-3.9
   to: cuda-jupyter-tensorflow-ubi9-python-3.9
+- context_dir: jupyter/pytorch/ubi9-python-3.9
+  dockerfile_path: Dockerfile
+  from: cuda-jupyter-datascience-ubi9-python-3.9
+  to: jupyter-pytorch-ubi9-python-3.9
 - context_dir: jupyter/trustyai/ubi9-python-3.9
   dockerfile_path: Dockerfile
   from: jupyter-datascience-ubi9-python-3.9
@@ -94,6 +94,32 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-ubi9-python-3.9
   to: runtime-cuda-tensorflow-ubi9-python-3.9
+- context_dir: base/c9s-python-3.9
+  dockerfile_path: Dockerfile
+  to: base-c9s-python-3.9
+- context_dir: codeserver/c9s-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-c9s-python-3.9
+  to: codeserver-c9s-python-3.9
+- context_dir: rstudio/c9s-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-c9s-python-3.9
+  to: rstudio-c9s-python-3.9
+- context_dir: cuda/c9s-python-3.9
+  dockerfile_path: Dockerfile
+  from: base-c9s-python-3.9
+  to: cuda-c9s-python-3.9
+- context_dir: rstudio/c9s-python-3.9
+  dockerfile_path: Dockerfile
+  from: cuda-c9s-python-3.9
+  to: cuda-rstudio-c9s-python-3.9
+- context_dir: base/anaconda-python-3.8
+  dockerfile_path: Dockerfile
+  to: base-anaconda-python-3.8
+- context_dir: jupyter/datascience/anaconda-python-3.8
+  dockerfile_path: Dockerfile
+  from: base-anaconda-python-3.8
+  to: jupyter-datascience-anaconda-python-3.8
 promotion:
   namespace: opendatahub-io
   tag: latest
@@ -556,6 +582,116 @@ tests:
       IMAGE_REPO: workbench-images
       RELEASE_VERSION: runtime-cuda-tensorflow-ubi9-python-3.9
     workflow: opendatahub-io-ci-image-mirror
+- as: notebook-base-c9s-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: base-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: base-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-base-c9s-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: base-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: base-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-codeserver-c9s-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: codeserver-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: codeserver-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-codeserver-c9s-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: codeserver-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: codeserver-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-rstudio-c9s-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rstudio-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: rstudio-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-rstudio-c9s-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: rstudio-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: rstudio-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-c9s-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: cuda-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-c9s-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: cuda-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-rstudio-c9s-python-3-9-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-rstudio-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: cuda-rstudio-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-cuda-rstudio-c9s-python-3-9-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: cuda-rstudio-c9s-python-3.9
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: cuda-rstudio-c9s-python-3.9
+    workflow: opendatahub-io-ci-image-mirror
+- as: jupyter-datascience-anaconda-python-3-8-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-datascience-anaconda-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-datascience-anaconda-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
 - as: notebooks-e2e-tests
   skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
   steps:
@@ -879,6 +1015,57 @@ tests:
       dependencies:
       - env: RUNTIME_TENSORFLOW_IMAGE
         name: runtime-cuda-tensorflow-ubi9-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: codeserver-c9s-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project codeserver-c9s-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${CODE_SERVER_IMAGE}"
+        make deploy-c9s-codeserver-c9s-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-codeserver-image image=codeserver-c9s-python-3.9
+        make undeploy-c9s-codeserver-c9s-python-3.9
+      dependencies:
+      - env: CODE_SERVER_IMAGE
+        name: codeserver-c9s-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: rstudio-c9s-python-3.9-test-e2e
+      cli: latest
+      commands: |
+        oc new-project rstudio-c9s-python-3-9
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${R_STUDIO_IMAGE}"
+        make deploy-c9s-rstudio-c9s-python-3.9 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make validate-rstudio-image image=rstudio-c9s-python-3.9
+        make undeploy-c9s-rstudio-c9s-python-3.9
+      dependencies:
+      - env: R_STUDIO_IMAGE
+        name: rstudio-c9s-python-3.9
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-datascience-anaconda-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-datascience-anaconda-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_ANACONDA_IMAGE}"
+        make deploy8-jupyter-datascience-anaconda-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-datascience-anaconda-python-3.8
+        make undeploy8-jupyter-datascience-anaconda-python-3.8
+      dependencies:
+      - env: JUPYTER_ANACONDA_IMAGE
+        name: jupyter-datascience-anaconda-python-3.8
       from: src
       resources:
         requests:

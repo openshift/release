@@ -2,20 +2,11 @@
 
 set -o nounset
 set -o pipefail
-
-
-# Make sure jq is installed
-if ! command -v jq; then
-    # TODO move to image
-    curl -sL https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 > /tmp/jq
-    chmod +x /tmp/jq
-fi
-
 set -o errexit
 
 
 RESOURCE_DUMP_DIR="${ARTIFACT_DIR}/ibmcloud-gather-resources"
-CLUSTER_FILTER="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_FILTER="${NAMESPACE}-${UNIQUE_HASH}"
 declare -a MAIN_RESOURCES=(floating-ip image instance lb public-gateway sg subnet volume vpc)
 
 
@@ -63,20 +54,16 @@ function command_retry {
     return 1
 }
 
-function checkCli() {
-  export IBMCLOUD_CLI=ibmcloud
-  export IBMCLOUD_HOME=/output  
-  echo "check IBMCLOUD_CLI: ${IBMCLOUD_CLI}..."
-  command -v ${IBMCLOUD_CLI}
-  ${IBMCLOUD_CLI} --version
-  ${IBMCLOUD_CLI} plugin list
-}
-
 # IBM Cloud CLI login
 function ibmcloud_login {
-    echo "Try to login..."
-    "${IBMCLOUD_CLI}" login -r ${LEASED_RESOURCE} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+  export IBMCLOUD_CLI=ibmcloud
+  export IBMCLOUD_HOME=/output
+  region="${LEASED_RESOURCE}"
+  export region
+  echo "Try to login..."
+  "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
+
 
 # Gather load-balancer resources
 function gather_lb_resources {
@@ -137,7 +124,7 @@ function gather_cis {
         echo -e "# ibmcloud cis domains\n"
         command_retry "${IBMCLOUD_CLI}" cis domains --per-page 50 | awk -v filter="${DOMAIN_ID}" '$0 ~ filter'
 	echo -e "## ibmcloud cis dns-records ${DOMAIN_ID}\n"
-	# DNS Record Names do not contain the $JOB_NAME_HASH, so we filter on the $NAMESPACE only
+	# DNS Record Names do not contain the $UNIQUE_HASH, so we filter on the $NAMESPACE only
 	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter'
 	echo -e "## ibmcloud cis dns-record ${DOMAIN_ID} <dns-record>\n"
 	command_retry "${IBMCLOUD_CLI}" cis dns-records "${DOMAIN_ID}" | awk -v filter="${NAMESPACE}" '$0 ~ filter {print $1}' | xargs -I % sh -c "${IBMCLOUD_CLI} cis dns-record ${DOMAIN_ID} %"
@@ -161,8 +148,6 @@ function gather_resources {
     gather_cos
     gather_cis
 }
-
-checkCli
 
 ibmcloud_login
 

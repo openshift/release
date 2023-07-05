@@ -21,7 +21,7 @@ vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
 VCENTER_AUTH_PATH=/var/run/vault/vsphere/secrets.sh
 
 LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
-# For leases >= than 88, run on the IBM Cloud 
+# For leases >= than 88, run on the IBM Cloud
 if [ ${LEASE_NUMBER} -ge 88 ] && [ ${LEASE_NUMBER} -lt 200 ]; then
   echo Scheduling job on IBM Cloud instance
   VCENTER_AUTH_PATH=/var/run/vault/ibmcloud/secrets.sh
@@ -46,7 +46,7 @@ if [ ${LEASE_NUMBER} -ge 200 ]; then
   vsphere_url="vcenter.ibmc.devcluster.openshift.com"
   vsphere_datacenter="IBMCdatacenter"
   cloud_where_run="IBM8"
-  dns_server="10.177.56.78"
+  dns_server="192.168.${LEASE_NUMBER}.1"
   vsphere_resource_pool="/IBMCdatacenter/host/IBMCcluster/Resources/ipi-ci-clusters"
   vsphere_cluster="IBMCcluster"
   vsphere_datastore="vsanDatastore"
@@ -101,6 +101,10 @@ fi
 # 4. skip the templates with ova
 # 5. Power off and delete the virtual machine
 
+# disable error checking in this section
+# randomly delete may fail, this shouldn't cause an immediate issue
+# but should eventually be cleaned up.
+set +e
 for i in "${!DATACENTERS[@]}"; do
   echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED_RESOURCE} in DC ${DATACENTERS[$i]} and destroy"
   DATACENTER=$(echo -n ${DATACENTERS[$i]} |  tr -d '\n')
@@ -110,13 +114,4 @@ for i in "${!DATACENTERS[@]}"; do
       jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |\
       xargs -I {} --no-run-if-empty govc vm.destroy {}
 done
-
-
-# The release controller starts four CI jobs concurrently: UPI, IPI, parallel and serial
-# We are currently having high CPU ready time in the vSphere CI cluster and this
-# does not help the situation. For periodics create a slight random delay
-# before continuing job progression.
-
-if [[ "${JOB_TYPE}" = "periodic" ]]; then
-    sleep "$(( RANDOM % 240 + 60 ))"s
-fi
+set -e

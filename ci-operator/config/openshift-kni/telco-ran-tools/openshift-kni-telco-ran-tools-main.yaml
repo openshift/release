@@ -1,13 +1,13 @@
 base_images:
   tools:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: tools
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.19
 images:
 - dockerfile_path: Dockerfile
   from: tools
@@ -18,12 +18,12 @@ promotion:
 releases:
   initial:
     integration:
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -37,6 +37,25 @@ tests:
     make ci-job-unit
   container:
     from: src
+- as: regression
+  steps:
+    test:
+    - as: test
+      commands: |
+        export HOME=$( mktemp -d )
+        export TEST_FOLDER=$( mktemp -d )
+        mkdir -p ${HOME}/.docker
+        cp /tmp/pull-secret/.dockerconfigjson ${HOME}/.docker/config.json
+        /usr/local/bin/regression-suite.sh --folder ${TEST_FOLDER}
+      credentials:
+      - mount_path: /tmp/pull-secret
+        name: ci-pull-credentials
+        namespace: test-credentials
+      from: telco-ran-tools
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: main
   org: openshift-kni

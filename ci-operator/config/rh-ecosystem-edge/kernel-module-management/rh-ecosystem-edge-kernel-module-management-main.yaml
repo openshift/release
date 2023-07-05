@@ -2,7 +2,7 @@ base_images:
   go-builder:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.18-openshift-4.12
+    tag: rhel-9-golang-1.19-openshift-4.13
   golangci-lint:
     name: golangci-lint
     namespace: ci
@@ -16,7 +16,7 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
 images:
 - build_args:
   - name: TARGET
@@ -30,17 +30,23 @@ images:
   to: kernel-module-management-operator-hub
 - dockerfile_path: Dockerfile.signimage
   inputs:
-    ubi8-minimal-entitled:
+    ubi9-minimal-entitled:
       as:
-      - registry.access.redhat.com/ubi8/ubi-minimal:8.7
+      - registry.access.redhat.com/ubi9/ubi-minimal:9.2
   to: kernel-module-management-signimage
 - dockerfile_path: Dockerfile.must-gather
   to: kernel-module-management-must-gather
 - dockerfile_literal: |
-    FROM ubi8-minimal
+    FROM ubi9-minimal
     RUN rm -rf /etc/yum.repos.d/*
-    RUN curl http://base-4-12-rhel8.ocp.svc > /etc/yum.repos.d/base-4-12-rhel8.repo
-  to: ubi8-minimal-entitled
+    RUN curl http://base-4-13-rhel9.ocp.svc > /etc/yum.repos.d/base-4-13-rhel9.repo
+  to: ubi9-minimal-entitled
+- dockerfile_literal: |
+    FROM src
+    RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && \
+      chmod +x /usr/bin/yq
+  from: src
+  to: e2e-hub-yq
 operator:
   bundles:
   - as: operator-bundle
@@ -58,7 +64,8 @@ operator:
     with: pipeline:kernel-module-management-signimage
 promotion:
   excluded_images:
-  - ubi8-minimal-entitled
+  - ubi9-minimal-entitled
+  - e2e-hub-yq
   namespace: edge-infrastructure
   tag: latest
   tag_by_commit: true
@@ -75,7 +82,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit-tests-pr
+- as: unit-tests
   steps:
     test:
     - as: run-and-upload-codecov
@@ -92,7 +99,7 @@ tests:
       resources:
         requests:
           memory: 1Gi
-- as: unit-tests-main
+- as: unit-tests-postsubmit
   postsubmit: true
   steps:
     test:
@@ -139,7 +146,7 @@ tests:
         requests:
           cpu: 1000m
           memory: 500Mi
-- as: e2e-in-cluster-build
+- as: e2e
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -154,7 +161,7 @@ tests:
       commands: |
         oc create namespace openshift-kmm
         operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-kmm deployment kmm-operator-controller-manager
+        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: operator-bundle
@@ -169,6 +176,33 @@ tests:
         oc project default
         SKIP_MAKE_DEPLOY=true ./ci/prow/e2e-incluster-build
       from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: e2e-hub
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        oc project default
+        ./ci/prow/e2e-hub-spoke-incluster-build
+      dependencies:
+      - env: IMG
+        name: kernel-module-management-operator
+      - env: HUB_IMG
+        name: kernel-module-management-operator-hub
+      from: e2e-hub-yq
       resources:
         requests:
           cpu: 1000m

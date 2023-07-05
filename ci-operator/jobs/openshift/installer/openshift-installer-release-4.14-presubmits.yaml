@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/agent-integration-tests
     decorate: true
     labels:
@@ -53,7 +53,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/aro-unit
     decorate: true
     labels:
@@ -331,7 +331,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-alibaba
     decorate: true
     decoration_config:
@@ -704,6 +704,82 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-aws-ovn-imdsv2,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.14$
+    - ^release-4\.14-
+    cluster: build01
+    context: ci/prow/e2e-aws-ovn-localzones
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-local-zones
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.14-e2e-aws-ovn-localzones
+    optional: true
+    rerun_command: /test e2e-aws-ovn-localzones
+    run_if_changed: aws
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-aws-ovn-localzones-cluster-profile
+        - --target=e2e-aws-ovn-localzones
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-aws-ovn-localzones-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-local-zones
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-aws-ovn-localzones,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -1313,7 +1389,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -1388,7 +1464,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-resourcegroup
     decorate: true
     decoration_config:
@@ -1464,7 +1540,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-shared-vpc
     decorate: true
     decoration_config:
@@ -1540,7 +1616,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-upi
     decorate: true
     decoration_config:
@@ -1615,7 +1691,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-azurestack
     decorate: true
     decoration_config:
@@ -1691,7 +1767,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-azurestack-upi
     decorate: true
     decoration_config:
@@ -2403,7 +2479,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-ibmcloud-ovn
     decorate: true
     decoration_config:
@@ -2559,7 +2635,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -3019,7 +3095,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
@@ -3249,8 +3325,8 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
-    context: ci/prow/e2e-openstack-externallb-techpreview
+    cluster: build03
+    context: ci/prow/e2e-openstack-externallb
     decorate: true
     decoration_config:
       timeout: 6h0m0s
@@ -3259,9 +3335,9 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: openstack-vh-mecha-central
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.14-e2e-openstack-externallb-techpreview
+    name: pull-ci-openshift-installer-release-4.14-e2e-openstack-externallb
     optional: true
-    rerun_command: /test e2e-openstack-externallb-techpreview
+    rerun_command: /test e2e-openstack-externallb
     spec:
       containers:
       - args:
@@ -3270,8 +3346,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-openstack-externallb-techpreview-cluster-profile
-        - --target=e2e-openstack-externallb-techpreview
+        - --secret-dir=/usr/local/e2e-openstack-externallb-cluster-profile
+        - --target=e2e-openstack-externallb
         command:
         - ci-operator
         image: ci-operator:latest
@@ -3287,7 +3363,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/e2e-openstack-externallb-techpreview-cluster-profile
+        - mountPath: /usr/local/e2e-openstack-externallb-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -3318,13 +3394,13 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-openstack-externallb-techpreview,?($|\s.*)
+    trigger: (?m)^/test( | .* )e2e-openstack-externallb,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-openstack-kuryr
     decorate: true
     decoration_config:
@@ -3475,7 +3551,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/e2e-openstack-proxy
     decorate: true
     decoration_config:
@@ -3703,86 +3779,6 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
-    context: ci/prow/e2e-ovirt-sdn
-    decorate: true
-    decoration_config:
-      timeout: 6h0m0s
-    labels:
-      ci-operator.openshift.io/cloud: ovirt
-      ci-operator.openshift.io/cloud-cluster-profile: ovirt
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-installer-release-4.14-e2e-ovirt-sdn
-    optional: true
-    rerun_command: /test e2e-ovirt-sdn
-    run_if_changed: ovirt
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-ovirt-sdn-cluster-profile
-        - --target=e2e-ovirt-sdn
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-ovirt-sdn-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        projected:
-          sources:
-          - secret:
-              name: cluster-secrets-ovirt
-          - configMap:
-              name: cluster-profile-ovirt
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-ovirt-sdn,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-4\.14$
-    - ^release-4\.14-
     cluster: vsphere
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
@@ -3853,6 +3849,81 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-vsphere-ovn,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.14$
+    - ^release-4\.14-
+    cluster: vsphere
+    context: ci/prow/e2e-vsphere-static-ovn
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-8
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-release-4.14-e2e-vsphere-static-ovn
+    optional: true
+    rerun_command: /test e2e-vsphere-static-ovn
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-vsphere-static-ovn-cluster-profile
+        - --target=e2e-vsphere-static-ovn
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-vsphere-static-ovn-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-vsphere
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-vsphere-static-ovn,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -4085,7 +4156,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/gofmt
     decorate: true
     labels:
@@ -4133,7 +4204,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/golint
     decorate: true
     labels:
@@ -4181,7 +4252,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/govet
     decorate: true
     labels:
@@ -4229,7 +4300,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -4662,7 +4733,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/okd-images
     decorate: true
     labels:
@@ -5096,7 +5167,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/okd-scos-images
     decorate: true
     labels:
@@ -5145,7 +5216,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/okd-scos-unit
     decorate: true
     labels:
@@ -5196,7 +5267,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/okd-scos-verify-codegen
     decorate: true
     labels:
@@ -5246,7 +5317,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/okd-unit
     decorate: true
     labels:
@@ -5296,7 +5367,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/okd-verify-codegen
     decorate: true
     labels:
@@ -5420,7 +5491,7 @@ presubmits:
     branches:
     - ^release-4.14$
     - ^release-4.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/shellcheck
     decorate: true
     labels:
@@ -5449,7 +5520,7 @@ presubmits:
     branches:
     - ^release-4.14$
     - ^release-4.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/tf-fmt
     decorate: true
     labels:
@@ -5479,7 +5550,7 @@ presubmits:
     branches:
     - ^release-4.14$
     - ^release-4.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/tf-lint
     decorate: true
     labels:
@@ -5508,7 +5579,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -5556,7 +5627,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/verify-codegen
     decorate: true
     labels:
@@ -5603,7 +5674,7 @@ presubmits:
     branches:
     - ^release-4\.14$
     - ^release-4\.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/verify-vendor
     decorate: true
     labels:
@@ -5651,7 +5722,7 @@ presubmits:
     branches:
     - ^release-4.14$
     - ^release-4.14-
-    cluster: build04
+    cluster: build03
     context: ci/prow/yaml-lint
     decorate: true
     labels:

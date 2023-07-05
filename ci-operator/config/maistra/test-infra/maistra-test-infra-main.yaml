@@ -22,6 +22,11 @@ resources:
       cpu: "2"
       memory: 4Gi
 tests:
+- as: lint
+  commands: |
+    make lint
+  container:
+    from: src
 - as: sync-upstream-envoy-2.3
   commands: |
     ./tools/automator-main.sh \
@@ -82,143 +87,6 @@ tests:
   secrets:
   - mount_path: /creds-github
     name: github-token
-- as: test-infra-build-containers-2-1
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  run_if_changed: ^docker/maistra-.*builder_2\.1\.Dockerfile|^docker/scripts
-  steps:
-    env:
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.1
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: build-containers-2-1
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          make build-containers-2.1
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    - as: build-proxy-containers-2-1
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          make maistra-proxy-builder_2.1
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
-- as: test-infra-push-containers-2-1
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  postsubmit: true
-  run_if_changed: ^docker/maistra-.*builder_2\.1\.Dockerfile|^docker/scripts
-  steps:
-    env:
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.1
-      MAISTRA_NAMESPACE: maistra-e2e-test
-      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
-    test:
-    - as: copy-src
-      cli: latest
-      commands: |
-        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
-        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 20m0s
-    - as: push-containers-2-1
-      cli: latest
-      commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-        entrypoint \
-        sh -c \
-        "docker login -u='maistra-dev+prow' \
-        -p=${QUAY_PASS} quay.io; \
-        make maistra-builder_2.1.push"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    - as: push-proxy-containers-2-1
-      cli: latest
-      commands: |
-        export QUAY_PASS=$(cat /maistra-secrets/password)
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-        entrypoint \
-        sh -c \
-        "docker login -u='maistra-dev+prow' \
-        -p=${QUAY_PASS} quay.io; \
-        make maistra-proxy-builder_2.1.push"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      from: src
-      resources:
-        requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
 - as: test-infra-build-containers-2-2
   cluster_claim:
     architecture: amd64
@@ -263,7 +131,7 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-claim
 - as: test-infra-push-containers-2-2
   cluster_claim:
     architecture: amd64
@@ -317,7 +185,7 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-claim
 - as: test-infra-build-containers-2-3
   cluster_claim:
     architecture: amd64
@@ -362,7 +230,7 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-claim
 - as: test-infra-push-containers-2-3
   cluster_claim:
     architecture: amd64
@@ -416,7 +284,7 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-claim
 - as: test-infra-build-containers-2-4
   cluster_claim:
     architecture: amd64
@@ -461,7 +329,7 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-claim
 - as: test-infra-push-containers-2-4
   cluster_claim:
     architecture: amd64
@@ -515,7 +383,106 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-claim
+- as: test-infra-build-containers-2-5
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  run_if_changed: ^docker/maistra-builder_2\.5\.Dockerfile|^docker/scripts
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: build-containers-2-5
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          make build-containers-2.5
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-claim
+- as: test-infra-push-containers-2-5
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.10"
+  postsubmit: true
+  run_if_changed: ^docker/maistra-builder_2\.5\.Dockerfile|^docker/scripts
+  steps:
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.4
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
+    - as: push-containers-2-5
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+        entrypoint \
+        sh -c \
+        "docker login -u='maistra-dev+prow' \
+        -p=${QUAY_PASS} quay.io; \
+        make maistra-builder_2.5.push"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: "2"
+          memory: 2Gi
+      timeout: 1h0m0s
+    workflow: servicemesh-istio-e2e-claim
 - as: test-infra-build-containers-3-0
   cluster_claim:
     architecture: amd64
@@ -560,7 +527,7 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-claim
 - as: test-infra-push-containers-3-0
   cluster_claim:
     architecture: amd64
@@ -614,7 +581,7 @@ tests:
           cpu: "2"
           memory: 2Gi
       timeout: 1h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-claim
 zz_generated_metadata:
   branch: main
   org: maistra

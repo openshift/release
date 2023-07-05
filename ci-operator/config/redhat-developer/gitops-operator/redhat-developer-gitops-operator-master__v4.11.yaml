@@ -8,8 +8,7 @@ base_images:
     namespace: origin
     tag: operator-sdk
 build_root:
-  project_image:
-    dockerfile_path: openshift-ci/build-root/Dockerfile
+  from_repository: true
 images:
 - context_dir: openshift-ci/build-root/source-image
   from: src
@@ -19,6 +18,9 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: oc-bin-image
+- dockerfile_path: openshift-ci/build-root/Dockerfile
+  from: oc-bin-image
+  to: dependencies
 - context_dir: .
   from: src
   to: gitops-operator
@@ -54,6 +56,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.11"
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     test:
     - as: install
@@ -72,7 +75,7 @@ tests:
       commands: |
         scripts/openshift-CI-kuttl-tests.sh
         make e2e-tests-sequential
-      from: oc-bin-image
+      from: dependencies
       resources:
         requests:
           cpu: "2"
@@ -86,6 +89,7 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.11"
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     test:
     - as: install
@@ -104,19 +108,20 @@ tests:
       commands: |
         scripts/openshift-CI-kuttl-tests.sh
         make e2e-tests-parallel
-      from: oc-bin-image
+      from: dependencies
       resources:
         requests:
           cpu: "2"
           memory: 6Gi
     workflow: generic-claim
 - as: e2e
+  skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     cluster_profile: aws
     test:
     - as: e2e-steps
       commands: scripts/openshiftci-presubmit-all-tests.sh
-      from: oc-bin-image
+      from: dependencies
       resources:
         requests:
           cpu: "2"

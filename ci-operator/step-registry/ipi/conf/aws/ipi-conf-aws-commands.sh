@@ -145,7 +145,7 @@ if [[ "${SIZE_VARIANT}" == "compact" ]]; then
 fi
 
 # Generate working availability zones from the region
-mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
+mapfile -t AVAILABILITY_ZONES < <(aws --region "${aws_source_region}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq -r '.AvailabilityZones[] | select(.State == "available") | .ZoneName' | sort -u)
 # Generate availability zones with OpenShift Installer required instance types
 
 if [[ "${COMPUTE_NODE_TYPE}" == "${BOOTSTRAP_NODE_TYPE}" && "${COMPUTE_NODE_TYPE}" == "${CONTROL_PLANE_INSTANCE_TYPE}" ]]; then ## all regions are the same
@@ -172,7 +172,7 @@ echo "${MAX_ZONES_COUNT}" >> "${SHARED_DIR}/maxzonescount"
 
 existing_zones_setting=$(yq-go r "${CONFIG}" 'controlPlane.platform.aws.zones')
 
-if [[ ${existing_zones_setting} == "" ]]; then
+if [[ ${existing_zones_setting} == "" ]] && [[ ${ADD_ZONES} == "yes" ]]; then
   ZONES_COUNT=${ZONES_COUNT:-2}
   ZONES=("${ZONES[@]:0:${ZONES_COUNT}}")
   ZONES_STR="[ $(join_by , "${ZONES[@]}") ]"
@@ -312,4 +312,19 @@ EOF
 
   yq-go m -x -i "${CONFIG}" "${METADATA_AUTH_PATCH}"
   cp "${METADATA_AUTH_PATCH}" "${ARTIFACT_DIR}/"
+fi
+
+if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
+  local_zone=$(aws --region "${aws_source_region}" ec2 describe-availability-zones --all-availability-zones --filter Name=state,Values=available Name=zone-type,Values=local-zone | jq -r '.AvailabilityZones[].ZoneName' | shuf | tail -n 1)
+  local_zones_str="[ $local_zone ]"
+  patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
+  cat > "${patch_edge}" << EOF
+compute:
+- architecture: ${architecture}
+  name: edge
+  platform:
+    aws:
+      zones: ${local_zones_str}
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_edge}"
 fi

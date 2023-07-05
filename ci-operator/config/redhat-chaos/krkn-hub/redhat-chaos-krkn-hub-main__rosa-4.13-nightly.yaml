@@ -1,0 +1,41 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream9
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: prow/Dockerfile
+  from: os
+  to: krkn-hub-rosa
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-qe-perfscale-ci-tests-rosa
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      OPENSHIFT_VERSION: "4.13"
+    test:
+    - chain: redhat-chaos-krkn-hub-tests
+    workflow: rosa-aws-sts
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: krkn-hub
+  variant: rosa-4.13-nightly

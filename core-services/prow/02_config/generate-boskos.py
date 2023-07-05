@@ -35,17 +35,12 @@ CONFIG = {
         'us-east-1': 10,
         'us-east-2': 10,
     },
-    'aws-cspi-qe-vpn-quota-slice': {
-        'us-east-1': 10,
-        'us-east-2': 10,
-    },
     'aws-managed-cspi-qe-quota-slice': {
         'us-east-1': 10,
         'us-east-2': 10,
     },
     'aws-qe-quota-slice': {
-        'us-east-1': 20,
-        'us-east-2': 5,
+        'us-east-1': 25,
         'ap-northeast-1': 5,
     },
     'aws-sd-qe-quota-slice': {
@@ -74,6 +69,9 @@ CONFIG = {
     'aws-local-zones-quota-slice': {
         'us-east-1': 2,
         'us-west-2': 2
+    },
+    'aws-perf-qe-quota-slice': {
+        'us-west-2': 3,
     },
     'azure4-quota-slice': {
         'centralus': 33,
@@ -117,7 +115,8 @@ CONFIG = {
         'westus': 6
     },
     'azuremag-qe-quota-slice': {
-        'usgovvirginia': 10
+        'usgovvirginia': 5,
+        'usgovtexas': 5
     },
     'equinix-ocp-metal-quota-slice': {
         'default': 40,
@@ -185,10 +184,13 @@ CONFIG = {
     },
     'vsphere-quota-slice':{},
     'vsphere-8-quota-slice':{},
+    'vsphere-ibm-7-quota-slice':{
+        'default': 5
+    },
     'vsphere-discon-quota-slice':{},
+    'vsphere-dis-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
     'vsphere-connected-quota-slice':{},
-    'vsphere-ibm-7-quota-slice':{},
     'vsphere-multizone-quota-slice':{},
     'vsphere-platform-none-quota-slice':{},
     'osd-ephemeral-quota-slice': {
@@ -222,6 +224,12 @@ CONFIG = {
     'ibmcloud-qe-quota-slice': {
         'jp-tok': 10,
     },
+    'ibmcloud-multi-ppc64le-quota-slice': {
+        'jp-osa': 3,
+    },
+    'ibmcloud-multi-s390x-quota-slice': {
+        'ca-tor': 3,
+    },
     'alibabacloud-quota-slice': {
         'us-east-1': 10,
     },
@@ -248,6 +256,9 @@ CONFIG = {
     },
     'gcp-virtualization-quota-slice': {
         'us-central1': 50,
+    },
+    'oci-edge-quota-slice': {
+        'default': 50,
     }
 }
 
@@ -285,17 +296,17 @@ for i in range(1, 7):
 for i in range(89,93):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(94,106):
+for i in range(94,109):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
-
-for i in range(109,112):
-    CONFIG['vsphere-ibm-7-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(56,60):
     CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(60,62):
+for i in range(60,64):
     CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
+
+for i in range(230,235):
+    CONFIG['vsphere-dis-quota-slice']['devqe-segment-{}-disconnected'.format(i)] = 1
 
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
@@ -307,6 +318,8 @@ for i in range(151,158):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(200,204):
+    CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
+for i in range(205,214):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 config = {

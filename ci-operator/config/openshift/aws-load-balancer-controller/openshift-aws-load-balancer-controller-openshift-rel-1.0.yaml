@@ -1,0 +1,50 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.18-openshift-4.12
+binary_build_commands: make controller
+build_root:
+  from_repository: true
+canonical_go_repository: sigs.k8s.io/aws-load-balancer-controller
+images:
+- dockerfile_path: Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+  to: aws-load-balancer-controller
+promotion:
+  namespace: aws-load-balancer-operator
+  tag: "1.0"
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: go test -race ./pkg/... ./webhooks/...
+  container:
+    from: src
+zz_generated_metadata:
+  branch: openshift-rel-1.0
+  org: openshift
+  repo: aws-load-balancer-controller

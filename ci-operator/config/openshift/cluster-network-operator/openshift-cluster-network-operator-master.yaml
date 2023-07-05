@@ -10,7 +10,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.48.0
+    tag: v1.53.1
   hypershift-operator:
     name: "4.14"
     namespace: ocp
@@ -19,30 +19,25 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.14
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-network-operator
 promotion:
   name: "4.14"
   namespace: ocp
 releases:
-  hosted-ocp-previous:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.13"
   initial:
     integration:
       name: "4.14"
@@ -139,7 +134,7 @@ tests:
 - as: e2e-vsphere-ovn-dualstack
   optional: true
   steps:
-    cluster_profile: vsphere-ibm-7
+    cluster_profile: vsphere
     env:
       TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for pod-Service\|
         Services Secondary IP Family \[LinuxOnly\] should function for node-Service\|

@@ -31,7 +31,7 @@ echo "VpcId: $VpcId"
 PublicSubnet="$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')"
 echo "PublicSubnet: $PublicSubnet"
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${CLUSTER_NAME}-bas"
 s3_bucket_name="${CLUSTER_NAME}-s3"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
@@ -218,11 +218,11 @@ Resources:
           - "UseIgnition"
           - - DeviceName: /dev/xvda
               Ebs:
-                VolumeSize: "120"
+                VolumeSize: "500"
                 VolumeType: gp2
           - - DeviceName: /dev/sda1
               Ebs:
-                VolumeSize: "120"
+                VolumeSize: "500"
                 VolumeType: gp2
       UserData:
         !If

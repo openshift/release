@@ -39,7 +39,7 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 pull_secret=$(<"${SHARED_DIR}/pull-secrets")
 
 # Create cluster-name.txt
-echo "${NAMESPACE}-${JOB_NAME_HASH}" >"${SHARED_DIR}"/cluster-name.txt
+echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
 cluster_name=$(<"${SHARED_DIR}"/cluster-name.txt)
 
 # Add build01 secrets if the mirror registry secrets are not available.
@@ -197,23 +197,18 @@ agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 echo "uploading ${agent_iso} to iso-datastore.."
 
 for ((i = 0; i < 3; i++)); do
-  /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}" &
+  /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}" || true
   result=$?
   if [[ $result -eq 0 ]]; then
     echo "$(date -u --rfc-3339=seconds) - Agent ISO has been uploaded successfully!!"
     break
   else
     echo "$(date -u --rfc-3339=seconds) - Failed to upload agent iso. Retrying..."
-    sleep 2
+    sleep 1
   fi
 done
 if [[ $result -ne 0 ]]; then
   echo "Agent ISO upload failed after 3 attempts!!!"
-fi
-
-/tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}" &
-if ! wait $!; then
-  echo "$(date -u --rfc-3339=seconds) - Failed to upload agent iso!"
   exit 1
 fi
 

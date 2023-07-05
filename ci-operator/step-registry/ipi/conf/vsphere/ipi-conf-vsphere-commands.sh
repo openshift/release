@@ -24,11 +24,11 @@ declare -a vips
 mapfile -t vips < "${SHARED_DIR}/vips.txt"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
+STATIC_IPS="${SHARED_DIR}"/static-ip-hosts.txt
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 
 MACHINE_POOL_OVERRIDES=""
-
 RESOURCE_POOL_DEF=""
 set +o errexit
 VERSION=$(echo "${JOB_NAME}" | grep -o -E '4\.[0-9]+')
@@ -99,6 +99,11 @@ cat >> "${CONFIG}" << EOF
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
 EOF
+fi
+
+if [ -f ${STATIC_IPS} ]; then
+  echo "$(date -u --rfc-3339=seconds) - static IPs defined, appending to platform spec"
+  cat ${STATIC_IPS} >> ${CONFIG}
 fi
 
 cat >> "${CONFIG}" << EOF

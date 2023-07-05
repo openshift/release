@@ -47,6 +47,26 @@ EOT
     check_pod
 }
 
+# Function to check if an update of the pull-secret is required for HostedCluster NodePool
+function check_update_pullsecret() {
+    UPDATED_COUNT=0
+    workers=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{","}{end}')
+    IFS="," read -r -a workers_arr <<< "$workers"
+    COUNT=${#workers_arr[*]}
+
+    for worker in ${workers_arr[*]}; do
+        count=$(oc debug -n kube-system node/${worker} -- chroot /host/ bash -c 'cat /var/lib/kubelet/config.json' | grep -c jiazha@redhat.com || true)
+        if [ $count -gt 0 ] ; then
+            UPDATED_COUNT=$((UPDATED_COUNT + 1))
+        fi
+    done
+
+    if [ "$UPDATED_COUNT" == "$COUNT" ] ; then
+        echo "don't need to update HostedCluster NodePool's pull-secret"
+        exit 0
+    fi
+}
+
 if [[ $SKIP_HYPERSHIFT_PULL_SECRET_UPDATE == "true" ]]; then
   echo "SKIP ....."
   exit 0
@@ -55,6 +75,9 @@ fi
 if [ ! -f "${SHARED_DIR}/nested_kubeconfig" ]; then
   exit 1
 fi
+
+export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
+check_update_pullsecret
 
 export KUBECONFIG="${SHARED_DIR}/kubeconfig"
 CLUSTER_NAME=$(oc get hostedclusters -n "$HYPERSHIFT_NAMESPACE" -o=jsonpath='{.items[0].metadata.name}')
@@ -81,7 +104,7 @@ oc patch hostedclusters -n "$HYPERSHIFT_NAMESPACE" "$CLUSTER_NAME" --type=merge 
 
 echo "check day-2 pull-secret update"
 export KUBECONFIG="${SHARED_DIR}/nested_kubeconfig"
-RETRIES=30
+RETRIES=45
 for i in $(seq ${RETRIES}); do
   UPDATED_COUNT=0
   workers=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{","}{end}')

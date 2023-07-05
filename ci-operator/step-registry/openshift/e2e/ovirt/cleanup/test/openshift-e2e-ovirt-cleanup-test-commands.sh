@@ -85,6 +85,9 @@ cat > ovirt_remove_old_resources.yaml <<-EOF
       templates_to_exclude:
         - Blank
         - centos-7
+        - fedora
+        - fedora-36
+        - fedora-36-gh-runner
     pre_tasks:
       - name: download CA file from engine
         get_url:

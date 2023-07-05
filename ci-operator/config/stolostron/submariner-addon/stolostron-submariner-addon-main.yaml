@@ -3,10 +3,6 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  golangci-lint:
-    name: golangci-lint
-    namespace: ci
-    tag: v1.48.0
   stolostron_builder_go1.20-linux:
     name: builder
     namespace: stolostron
@@ -26,7 +22,7 @@ images:
       - registry.ci.openshift.org/stolostron/builder:go1.20-linux
   to: submariner-addon
 promotion:
-  name: "2.8"
+  name: "2.9"
   namespace: stolostron
 releases:
   initial:
@@ -41,7 +37,7 @@ releases:
 resources:
   '*':
     limits:
-      memory: 6Gi
+      memory: 8Gi
     requests:
       cpu: 100m
       memory: 300Mi
@@ -95,7 +91,7 @@ tests:
   postsubmit: true
   steps:
     env:
-      DESTINATION_BRANCH: release-2.8
+      DESTINATION_BRANCH: release-2.9
     workflow: ocm-ci-fastforward
 - as: golangci-lint
   commands: |
@@ -103,7 +99,7 @@ tests:
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     make golangci-lint SHELL=/bin/bash
   container:
-    from: golangci-lint
+    from: bin
 zz_generated_metadata:
   branch: main
   org: stolostron

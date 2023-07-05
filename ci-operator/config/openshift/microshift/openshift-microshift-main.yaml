@@ -15,11 +15,12 @@ build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: rhel-8-release-golang-1.19-openshift-4.13
+    tag: rhel-9-release-golang-1.20-openshift-4.14
 images:
 - dockerfile_literal: |
     FROM src
-    RUN pip3 install --upgrade pip && \
+    RUN dnf install -y python3-pip && \
+      pip3 install --upgrade pip && \
       pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
     ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
     ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
@@ -37,7 +38,8 @@ images:
 - dockerfile_literal: |
     FROM src as rpms
     RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
-    RUN make rpm && TARGET_ARCH=aarch64 make rpm
+    # Disable cgo when cross-compiling because it is not supported.
+    RUN make rpm && TARGET_ARCH=aarch64 CGO_ENABLED=0 make rpm
     RUN tar cvf /rpms.tar -C _output/rpmbuild/RPMS/ .
 
     FROM test-runtime
@@ -120,13 +122,21 @@ tests:
   container:
     from: src
   run_if_changed: ^(rpm/*|packaging/.*|Makefile)
+- as: test-rebase
+  cluster: build02
+  optional: true
+  run_if_changed: ^(assets/.*|scripts/auto-rebase/.*|go\.mod)
+  steps:
+    env:
+      DRY_RUN: "y"
+    workflow: openshift-microshift-rebase
 - as: e2e-openshift-conformance-reduced
   cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-07f5ac8ddbcfbb96e
+      EC2_AMI: ami-02b8534ff4b424939
     workflow: openshift-microshift-e2e-openshift-conformance-reduced-aws
 - as: e2e-openshift-conformance-reduced-arm
   cluster: build02
@@ -135,28 +145,47 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-0c231be9fb222349e
+      EC2_AMI: ami-06df7225cc50ee1a3
       EC2_INSTANCE_TYPE: c7g.4xlarge
     workflow: openshift-microshift-e2e-openshift-conformance-reduced-aws
 - as: microshift-e2e
   cluster: build02
-  optional: true
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-07f5ac8ddbcfbb96e
+      EC2_AMI: ami-02b8534ff4b424939
     workflow: openshift-microshift-e2e-microshift-tests-aws
 - as: microshift-e2e-arm
   cluster: build02
   optional: true
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
+  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
   steps:
     cluster_profile: aws
     env:
-      EC2_AMI: ami-0c231be9fb222349e
+      EC2_AMI: ami-06df7225cc50ee1a3
       EC2_INSTANCE_TYPE: c7g.4xlarge
     workflow: openshift-microshift-e2e-microshift-tests-aws
+- always_run: false
+  as: microshift-metal-tests
+  cluster: build02
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-02b8534ff4b424939
+      EC2_INSTANCE_TYPE: c5n.metal
+    workflow: openshift-microshift-e2e-metal-tests
+- always_run: false
+  as: microshift-metal-tests-arm
+  cluster: build02
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-06df7225cc50ee1a3
+      EC2_INSTANCE_TYPE: c6g.metal
+    workflow: openshift-microshift-e2e-metal-tests
 - as: rebase-on-nightlies
   cron: 0 5 * * 1-5
   steps:

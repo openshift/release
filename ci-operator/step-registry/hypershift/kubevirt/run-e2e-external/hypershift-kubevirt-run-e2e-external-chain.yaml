@@ -9,6 +9,12 @@ chain:
           echo "External infra test suite is not supported in this version and skipped."
           exit 0
         fi
+      
+        STORAGE_CLASS_FLAG=""
+        if [[ -n ${ETCD_STORAGE_CLASS} ]]; then
+          STORAGE_CLASS_FLAG="--e2e.etcd-storage-class=${ETCD_STORAGE_CLASS}"
+        fi
+      
         # run (pseudo) external infra e2e test
         oc create ns guest-infra-ns
         bin/test-e2e \
@@ -22,6 +28,7 @@ chain:
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
                   --e2e.kubevirt-infra-kubeconfig=/tmp/secret/kubeconfig \
+                  ${STORAGE_CLASS_FLAG} \
                   --e2e.kubevirt-infra-namespace=guest-infra-ns
 
     credentials:
@@ -32,7 +39,7 @@ chain:
       - env: OCP_IMAGE_LATEST
         name: release:latest
       - env: OCP_IMAGE_PREVIOUS
-        name: release:hosted-ocp-previous
+        name: release:initial
       - env: CI_HYPERSHIFT_OPERATOR
         name: pipeline:hypershift-operator
     env:
@@ -40,6 +47,8 @@ chain:
         name: KUBECONFIG
       - default: "true"
         name: RUN_EXTERNAL_INFRA_TEST
+      - default: ""
+        name: ETCD_STORAGE_CLASS
     from: test-bin
     grace_period: 30m0s
     resources:

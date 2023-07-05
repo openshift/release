@@ -42,19 +42,15 @@ build_root:
     tag: golang-1.18
 releases:
   arm64-latest:
-    prerelease:
+    release:
       architecture: arm64
-      product: ocp
-      version_bounds:
-        lower: 4.12.0-0
-        upper: 4.13.0-0
+      channel: candidate
+      version: "4.12"
   latest:
-    prerelease:
+    release:
       architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.12.0-0
-        upper: 4.13.0-0
+      channel: candidate
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -63,9 +59,8 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-ipi-disconnected-cco-manual-sts-ep-p2-f28
-  cron: 27 0 17 * *
-  remote_api: true
+- as: aws-ipi-disconnected-sts-ep-p2-f28
+  cron: 41 1 4 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -78,25 +73,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-ovn-fips-p2-f28
-  cron: 46 1 20 * *
-  remote_api: true
-  steps:
-    cluster_profile: aws-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      FIPS_ENABLED: "true"
-      OCP_ARCH: arm64
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn
-- as: aws-ipi-proxy-cco-manual-sts-p2-f28
-  cron: 14 2 12 * *
-  remote_api: true
+- as: aws-ipi-proxy-sts-p2-f28
+  cron: 11 21 17 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -111,7 +89,6 @@ tests:
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
 - as: azure-ipi-disconnected-fullyprivate-p2-f28
   cron: 3 8 24 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -123,24 +100,8 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-fips-p2-f28
-  cron: 4 1 18 * *
-  remote_api: true
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      FIPS_ENABLED: "true"
-      OCP_ARCH: arm64
-    test:
-    - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-fullyprivate-proxy-p2-f28
   cron: 16 14 6 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -154,7 +115,6 @@ tests:
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
 - as: baremetalds-ipi-ovn-ipv4-p2-f14
   cron: 29 5 2,17 * *
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:

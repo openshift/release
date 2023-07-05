@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.12"
     namespace: ocp
     tag: cli
 build_root:
@@ -12,8 +12,8 @@ build_root:
 releases:
   latest:
     release:
-      channel: fast
-      version: "4.10"
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -52,18 +52,13 @@ tests:
   container:
     from: src
 - as: istio-operator-push-image-2-3
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws-2
     env:
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -94,6 +89,7 @@ tests:
           -p=${QUAY_PASS} quay.io; \
           make push \
           IMAGE=quay.io/maistra-dev/istio-ubi8-operator:PR-${PULL_NUMBER}"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow
@@ -108,10 +104,34 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 20m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: update-charts-in-2-4
+  commands: |
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export GOFLAGS="-mod=vendor"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -b maistra-2.4 \
+      -f /creds-github/token \
+      '-c make clean update-charts-2.2 update-charts-2.3' \
+      '-t [maistra-2.4] Automator: Update charts from previous versions' \
+      -m update_charts_from_previous_versions_2.2_2.3
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
 zz_generated_metadata:
   branch: maistra-2.3
   org: maistra

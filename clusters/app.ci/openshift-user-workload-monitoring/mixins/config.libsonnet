@@ -13,6 +13,7 @@
       'osde2e.json': '4238b58e99c5470481c2050f823e4fb9',
       'configresolver.json': '703f0ccf02cc4339a374b52eb10f653b',
       'clusterpool.json': '22491886c1e19dde8d2984bca82154c1',
+      'ci-chat-bot.json': '63182a3ee8939d9b5c54b5c5ce97134c',
     },
     alertManagerReceivers: {
       'build-cop': {

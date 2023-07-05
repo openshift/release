@@ -96,9 +96,10 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: envoyproxy
-          image: registry.ci.openshift.org/ci/envoyproxy:latest
+          imagePullPolicy: IfNotPresent
+          image: registry.ci.openshift.org/ci/envoyproxy:tp-1.26.2
         - name: gangway
-          image: gcr.io/k8s-prow/gangway:v20230503-c908df2ce7
+          image: gcr.io/k8s-prow/gangway:v20230628-f13bc80c8a
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -182,9 +183,15 @@ objects:
             - configMap:
                 name: job-config-master-periodics
             - configMap:
+                name: job-config-main-periodics
+            - configMap:
                 name: job-config-master-postsubmits
             - configMap:
+                name: job-config-main-postsubmits
+            - configMap:
                 name: job-config-master-presubmits
+            - configMap:
+                name: job-config-main-presubmits
             - configMap:
                 name: job-config-1.x
             - configMap:
@@ -263,3 +270,6 @@ objects:
   - kind: ServiceAccount
     namespace: ocpci-lp-interop
     name: periodic-job-bot
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: cert-manager-operator-dev

@@ -1,0 +1,80 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  kiali-cypress-tests-runner:
+    name: kiali-cypress-tests
+    namespace: ci
+    tag: v1.57
+  kiali-int-tests-runner:
+    name: kiali-int-tests
+    namespace: ci
+    tag: v1.57
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: maistra-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: servicemesh-interop-aws
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "gather-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "jira_epic": "LPTOCPCI-290"},
+          {"step": "servicemesh-smcp-install", "failure_type": "all", "classification": "Infrastructure Provisioning - SMCP Install", "jira_project": "OSSM", "jira_epic": "LPTOCPCI-290", "jira_component": "Customer Impact"},
+          {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Cypress Test Execution", "jira_project": "OSSM", "jira_epic": "LPTOCPCI-290", "jira_component": "Customer Impact"},
+          {"step": "servicemesh-kiali-cypress-tests-execute", "failure_type": "test_failure", "classification": "Kiali Cypress Test Failure", "jira_project": "OSSM", "jira_epic": "LPTOCPCI-290", "jira_component": "Customer Impact"},
+          {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "pod_failure", "classification": "Kiali Integration Test Execution", "jira_project": "OSSM", "jira_epic": "LPTOCPCI-290", "jira_component": "Customer Impact"},
+          {"step": "servicemesh-kiali-int-tests-execute", "failure_type": "test_failure", "classification": "Kiali Integration Test Failure", "jira_project": "OSSM", "jira_epic": "LPTOCPCI-290", "jira_component": "Customer Impact"},
+          {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "pod_failure", "classification": "Maistra Test Execution", "jira_project": "OSSM", "jira_epic": "LPTOCPCI-290", "jira_component": "Customer Impact"},
+          {"step": "servicemesh-maistra-test-tool-execute", "failure_type": "test_failure", "classification": "Maistra Test Failure", "jira_project": "OSSM", "jira_epic": "LPTOCPCI-290", "jira_component": "Customer Impact"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_FAIL_WITH_TEST_FAILURES: "true"
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OPERATORS: |
+        [
+            {"name": "elasticsearch-operator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "jaeger-product", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "kiali-ossm", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"},
+            {"name": "servicemeshoperator", "source": "redhat-operators", "channel": "stable", "install_namespace": "openshift-operators"}
+        ]
+      SMCP_VERSION: "2.3"
+      TEST_GROUP: interop
+    test:
+    - ref: install-operators
+    - ref: servicemesh-maistra-test-tool-execute
+    - ref: servicemesh-smcp-install
+    - ref: servicemesh-kiali-int-tests-execute
+    - ref: servicemesh-kiali-cypress-tests-execute
+    workflow: firewatch-ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: maistra
+  repo: maistra-test-tool
+  variant: servicemesh-ocp4.14-lp-interop

@@ -43,6 +43,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: csi-external-snapshotter
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -119,7 +123,7 @@ tests:
       OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
     env:
       CLUSTERCSIDRIVER: filestore.csi.storage.gke.io
-      OO_CHANNEL: preview
+      OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: openshift-cluster-csi-drivers
       OO_PACKAGE: gcp-filestore-csi-driver-operator
       OO_TARGET_NAMESPACES: '!all'
@@ -127,6 +131,20 @@ tests:
       TEST_SUITE: openshift/csi
       TRUECONDITIONS: GCPFilestoreDriverControllerServiceControllerAvailable GCPFilestoreDriverNodeServiceControllerAvailable
     workflow: openshift-e2e-gcp-csi-filestore
+- as: operator-e2e-extended
+  optional: true
+  steps:
+    cluster_profile: gcp-qe
+    dependencies:
+      OO_INDEX: ci-index-gcp-filestore-csi-driver-operator-bundle
+    env:
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;~LSO&;STORAGE&
+      TEST_SCENARIOS: \[CSI-Driver\]|\[GCP-Filestore-CSI-Driver\]|\[GCP-Filestore-CSI-Driver-Operator\]
+    workflow: openshift-e2e-gcp-csi-filestore-extended
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

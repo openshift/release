@@ -341,26 +341,25 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )build,?($|\s.*)
   - agent: kubernetes
-    always_run: false
+    always_run: true
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
     cluster: build03
-    context: ci/prow/ci-index
+    context: ci/prow/ci-index-wmco-bundle
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-windows-machine-config-operator-release-4.15-ci-index
-    rerun_command: /test ci-index
-    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+    name: pull-ci-openshift-windows-machine-config-operator-release-4.15-ci-index-wmco-bundle
+    rerun_command: /test ci-index-wmco-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=ci-index-wmco-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -387,7 +386,7 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index-wmco-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -487,6 +486,7 @@ presubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=[release:latest]
+        - --target=wmco-bundle
         command:
         - ci-operator
         image: ci-operator:latest

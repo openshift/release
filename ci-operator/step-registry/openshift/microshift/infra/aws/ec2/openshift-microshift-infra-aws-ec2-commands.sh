@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -x
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -11,7 +12,7 @@ trap 'save_stack_events_to_shared' EXIT TERM INT
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 REGION="${EC2_REGION:-$LEASED_RESOURCE}"
-JOB_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+JOB_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${JOB_NAME}"
 cf_tpl_file="${SHARED_DIR}/${JOB_NAME}-cf-tpl.yaml"
 
@@ -100,6 +101,8 @@ Resources:
     Type: AWS::EC2::VPC
     Properties:
       CidrBlock: !Ref VpcCidr
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
       Tags:
         - Key: Name
           Value: RHELVPC
@@ -216,7 +219,12 @@ Resources:
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 6443
-        ToPort: 6443
+        ToPort: 6453
+        CidrIp: 0.0.0.0/0
+      # Range for all dynamic port-forwarding for scenario tests, see boot phase for use
+      - IpProtocol: tcp
+        FromPort: 7000
+        ToPort: 8000
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 30000
@@ -254,6 +262,9 @@ Resources:
           VolumeSize: "120"
           VolumeType: gp3
           Iops: 16000
+      PrivateDnsNameOptions:
+        EnableResourceNameDnsARecord: true
+        HostnameType: resource-name
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
@@ -268,6 +279,8 @@ Resources:
           sudo pvcreate "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
           echo "====== Creating VG ======" | tee -a /tmp/init_output.txt
           sudo vgcreate rhel "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
+          echo "====== Creating Thin Pool ======" | tee -a /tmp/init_output.txt
+          sudo lvcreate -L 10G --thinpool thin rhel |& tee -a /tmp/init_output.txt
 
 Outputs:
   InstanceId:
@@ -281,6 +294,16 @@ Outputs:
     Value: !GetAtt RHELInstance.PublicIp
 EOF
 
+if aws --region "${REGION}" cloudformation describe-stacks --stack-name "${stack_name}" \
+    --query "Stacks[].Outputs[?OutputKey == 'InstanceId'].OutputValue" > /dev/null; then
+        echo "Appears that stack ${stack_name} already exists"
+
+        aws --region $REGION cloudformation delete-stack --stack-name "${stack_name}"
+        echo "Deleted stack ${stack_name}"
+
+        aws --region $REGION cloudformation wait stack-delete-complete --stack-name "${stack_name}"
+        echo "Waited for stack-delete-complete ${stack_name}"
+fi
 
 echo -e "==== Start to create rhel host ===="
 echo "${stack_name}" >> "${SHARED_DIR}/to_be_removed_cf_stack_list"

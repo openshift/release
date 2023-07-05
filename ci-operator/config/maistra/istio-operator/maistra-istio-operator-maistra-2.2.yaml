@@ -32,6 +32,30 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
+- as: update-charts-in-2-4
+  commands: |
+    # load test-infra automator.sh script
+    git clone https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export GOFLAGS="-mod=vendor"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -b maistra-2.4 \
+      -f /creds-github/token \
+      '-c make clean update-charts-2.2' \
+      '-t [maistra-2.4] Automator: Update charts from previous versions' \
+      -m update_charts_from_previous_versions_2.2
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
 zz_generated_metadata:
   branch: maistra-2.2
   org: maistra

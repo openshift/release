@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 binary_build_commands: 'make '
 build_root:
   from_repository: true
@@ -58,6 +62,17 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi-file-nfs
+- as: e2e-azure-file-csi-extended
+  optional: true
+  steps:
+    cluster_profile: azure-qe
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[Azure-File-CSI-Driver\]|\[Azure-File-CSI-Driver-Operator\]
+    workflow: openshift-e2e-azure-csi-extended
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

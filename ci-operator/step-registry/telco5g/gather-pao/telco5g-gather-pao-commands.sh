@@ -36,6 +36,29 @@ if [[ ! -e ${SHARED_DIR}/cluster_name ]]; then
     echo "Cluster doesn't exist, job failed, no need to run gather"
     exit 1
 fi
+##############################################################################
+set +e
+set -x
+cp ${SHARED_DIR}/cnf-tests-run.log ${ARTIFACT_DIR}/cnf-tests-run.log || true
+cp ${SHARED_DIR}/cnf-validations-run.log ${ARTIFACT_DIR}/cnf-validations-run.log || true
+
+python3 -m venv ${SHARED_DIR}/myenv
+source ${SHARED_DIR}/myenv/bin/activate
+git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci
+pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
+# Parse ginkgo output and create JSON file
+[[ -f ${SHARED_DIR}/cnf-tests-run.log ]] && python ${SHARED_DIR}/telco5gci/parse_log.py --test-type all --path ${SHARED_DIR}/cnf-tests-run.log --output-file ${ARTIFACT_DIR}/parsed-cnftests.json
+[[ -f ${SHARED_DIR}/cnf-validations-run.log ]] && python ${SHARED_DIR}/telco5gci/parse_log.py --test-type validations --path ${SHARED_DIR}/cnf-validations-run.log --output-file ${ARTIFACT_DIR}/parsed-validations.json
+[[ -f ${SHARED_DIR}/cnf-tests-run.log ]] && python ${SHARED_DIR}/telco5gci/parse_log.py --test-type tests --path ${SHARED_DIR}/cnf-tests-run.log --output-file ${ARTIFACT_DIR}/parsed-tests.json
+# Create HTML reports for humans/aliens
+[[ -f ${ARTIFACT_DIR}/parsed-cnftests.json ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/parsed-cnftests.json -f json -o ${ARTIFACT_DIR}/parsed-cnftests.html
+[[ -f ${ARTIFACT_DIR}/parsed-validations.json ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/parsed-validations.json -f json -o ${ARTIFACT_DIR}/parsed_validations.html
+[[ -f ${ARTIFACT_DIR}/parsed-tests.json ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/parsed-tests.json -f json -o ${ARTIFACT_DIR}/parsed-tests.html
+
+rm -rf ${SHARED_DIR}/myenv
+set +x
+set -e
+##############################################################################
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy

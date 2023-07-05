@@ -26,9 +26,11 @@ tests:
   optional: true
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.4-multi
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.19-multi
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: redhat-appstudio-install-rhtap
     - ref: redhat-appstudio-hac-e2e
@@ -36,38 +38,24 @@ tests:
 - as: appstudio-e2e-tests
   skip_if_only_changed: ^docs/|^\.github/|^\.tekton/|^components/(authentication|quality-dashboard|hac-pact-broker|tekton-ci)/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.4-multi
+      COMPUTE_NODE_TYPE: m6i.4xlarge
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.19-multi
+      HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: redhat-appstudio-e2e
     workflow: redhat-appstudio-install
 - as: appstudio-e2e-tests-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
   cron: 0 */24 * * *
   steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m6i.4xlarge
     test:
     - ref: redhat-appstudio-e2e
-    workflow: redhat-appstudio-claim
-- as: hacbs-e2e-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
-  cron: 0 2 * * *
-  steps:
-    test:
-    - ref: redhat-appstudio-e2e
-    workflow: redhat-appstudio-claim
+    workflow: ipi-aws
 zz_generated_metadata:
   branch: main
   org: redhat-appstudio

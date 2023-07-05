@@ -1,205 +1,374 @@
 #!/bin/bash
 
-if [[ "$JOB_TYPE" == "periodic" ]]; then
-  exit 1
-fi
-
+set -x
 set -o nounset
 set -o errexit
 set -o pipefail
 
-function create_tests_skip_list_file {
-# List of test cases to skip for all releases
-cat <<EOF >"${SKIP_TESTS_FILE}"
-# <feature> <test name>
+build_images(){
+oc delete namespace openshift-ptp || true
+oc create namespace openshift-ptp -o yaml | oc label -f - pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged || true
+echo $KUBECONFIG
+jobdefinition='---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: privileged-rights
+  namespace: openshift-ptp
+rules:
+- apiGroups:
+  - security.openshift.io
+  resourceNames:
+  - privileged
+  resources:
+  - securitycontextconstraints
+  verbs:
+  - use
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  managedFields:
+  name: privileged-rights
+  namespace: openshift-ptp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: privileged-rights
+subjects:
+- kind: ServiceAccount
+  name: builder
+  namespace: openshift-ptp
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: podman
+  namespace: openshift-ptp
+spec:
+  restartPolicy: Never
+  serviceAccountName: builder
+  containers:
+    - name: priv
+      image: quay.io/podman/stable
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          yum install jq git wget podman-docker -y
+          yum groupinstall "Development Tools" -y
+          wget https://go.dev/dl/go1.20.4.linux-amd64.tar.gz
+          rm -rf /usr/local/go && tar -C /usr/local -xzf go1.20.4.linux-amd64.tar.gz
+          export PATH=$PATH:/usr/local/go/bin
+          go version
+          pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
+          podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+          set -x
 
-# SKIPTEST
-# bz### we can stop testing N3000
-# TESTNAME
-ptp "Some long running PTP test for example"
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          cd ptp-operator
+          export IMG=PTP_IMAGE
+          sed -i "s@golang:1.19@docker.io/library/golang:1.19@g" Dockerfile
+          sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
+          make docker-build
+          podman push ${IMG} --tls-verify=false
+          cd ..
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - mountPath: /var/run/secrets/openshift.io/push
+          name: dockercfg
+          readOnly: true
+  volumes:
+    - name: dockercfg
+      defaultMode: 384
+      secret:
+      '
 
-EOF
+jobdefinition=$(sed "s#OPERATOR_VERSION#${PTP_UNDER_TEST_BRANCH}#" <<< "$jobdefinition")
+jobdefinition=$(sed "s#PTP_IMAGE#${IMG}#" <<< "$jobdefinition")
+#oc label ns openshift-ptp --overwrite pod-security.kubernetes.io/enforce=privileged
+
+retry_with_timeout 400 5 oc -n openshift-ptp get sa builder
+dockercgf=$(oc -n openshift-ptp get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
+jobdefinition="${jobdefinition} secretName: ${dockercgf}"
+echo "$jobdefinition"
+echo "$jobdefinition" | oc apply -f -
+
+success=0
+iterations=0
+sleep_time=10
+max_iterations=72 # results in 12 minutes timeout
+until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]
+do
+  run_status=$(oc -n openshift-ptp get pod podman -o json | jq '.status.phase' | tr -d '"')
+   if [ "$run_status" == "Succeeded" ]; then
+          success=1
+          break
+   fi
+   iterations=$((iterations+1))
+   sleep $sleep_time
+done
+
+if [[ $success -eq 1 ]]; then
+  echo "[INFO] index build succeeded"
+else
+  echo "[ERROR] index build failed"
+  exit 1
+fi
+
+# print the build logs
+oc -n openshift-ptp logs podman
+
 }
 
+# Define the function to retry a command with a timeout
+retry_with_timeout() {
+  local timeout=$1
+  local interval=$2
+  local command="${*:3}"
+  echo command=$command
+  local start_time
+  start_time=$(date +%s)
+  local end_time=$((start_time + timeout))
+  while true; do
+    # Run the command
+    ${command} && return 0
 
-function create_tests_temp_skip_list_11 {
-# List of temporarly skipped tests for 4.11
-cat <<EOF >>"${SKIP_TESTS_FILE}"
-# <feature> <test name>
-
-EOF
-}
-
-
-function create_tests_temp_skip_list_12 {
-# List of temporarly skipped tests for 4.12
-cat <<EOF >>"${SKIP_TESTS_FILE}"
-# <feature> <test name>
-
-EOF
-}
-
-function create_tests_temp_skip_list_13 {
-# List of temporarly skipped tests for 4.13
-cat <<EOF >>"${SKIP_TESTS_FILE}"
-# <feature> <test name>
-
-EOF
-}
-
-function create_tests_temp_skip_list_14 {
-# List of temporarly skipped tests for 4.14
-cat <<EOF >>"${SKIP_TESTS_FILE}"
-# <feature> <test name>
-
-# SKIPTEST
-# bz### Link to OCPBUGS in JIRA
-# TESTNAME
-ptp "Some PTP test to skip for 4.14 release only"
-
-EOF
-}
-
-# Whether node is Baremetal or not (virtual for example)
-# We are interested in Baremetal nodes only for testing
-function is_bm_node {
-    node=$1
-
-    machine=$(oc get "${node}" -o json | jq '.metadata.annotations' | grep "machine.openshift.io/machine" | cut -d ":" -f2 | tr -d '", ')
-    machine_ns=$(echo "${machine}" | cut -d "/" -f1)
-    machine_name=$(echo "${machine}" | cut -d "/" -f2)
-    bmh=$(oc get machine -n "${machine_ns}" "${machine_name}" -o json | jq '.metadata.annotations' | grep "metal3.io/BareMetalHost" | cut -d ":" -f2 | tr -d '", ')
-    bmh_ns=$(echo "${bmh}" | cut -d "/" -f1)
-    bmh_name=$(echo "${bmh}" | cut -d "/" -f2)
-    manufacturer=$(oc get bmh -n "${bmh_ns}" "${bmh_name}" -o json | jq '.status.hardware.systemVendor.manufacturer')
-    # if the system manufacturer is not Red Hat, that's a BM node
-    if [[ "${manufacturer}" != *"Red Hat"* ]]; then
-        return 0
+    # Check if the timeout has expired
+    local current_time
+    current_time=$(date +%s)
+    if [ ${current_time} -gt ${end_time} ]; then
+      return 1
     fi
-    return 1
+
+    # Sleep for the specified interval before retrying
+    sleep ${interval}
+  done
 }
 
-function get_skip_tests {
+# print RTC logs
+print_time() {
+# Get the list of nodes in the cluster
+NODES=$(oc get nodes -l node-role.kubernetes.io/worker -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}')
 
-    skip_list=""
-    if [ -f "${SKIP_TESTS_FILE}" ]; then
-        rm -f feature_skip_list.txt
-        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > feature_skip_list.txt
-        skip_list=""
-        while read line;
-        do
-            test=$(echo "${line}" | cut -d " " -f2- | tr " " .)
-            if [ ! -z "${test}" ]; then
-                if [ "${skip_list}" == "" ]; then
-                    skip_list="${test}"
-                else
-                    skip_list="${skip_list} ${test}"
-                fi
-            fi
-        done < feature_skip_list.txt
-    fi
-
-    echo "${skip_list}"
+# Loop through each node
+for node in $NODES; do
+    echo "Processing node: $node"
+    oc debug node/$node -- chroot /host sh -c "date;sudo hwclock"
+done
 }
 
-source $SHARED_DIR/main.env
-
-export FEATURES="${FEATURES:-ptp}"
-export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
-export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
-export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
-
-export CNF_REPO="${CNF_REPO:-https://github.com/openshift-kni/cnf-features-deploy.git}"
-export CNF_BRANCH="${CNF_BRANCH:-master}"
+set_events_output_file() {
+  sed -i -E 's@(event_output_file:\s*)(.*)@event_output_file: '${ARTIFACT_DIR}'/event_log_'${PTP_TEST_MODE}'.csv@g' ${SHARED_DIR}/test-config.yaml
+}
 
 echo "************ telco5g cnf-tests commands ************"
 
-
-if [[ "$T5CI_VERSION" == "4.14" ]]; then
-    export CNF_BRANCH="master"
-else
-    export CNF_BRANCH="release-${T5CI_VERSION}"
+if [[ -n "${E2E_TESTS_CONFIG:-}" ]]; then
+    readarray -t config <<< "${E2E_TESTS_CONFIG}"
+    for var in "${config[@]}"; do
+        if [[ ! -z "${var}" ]]; then
+            if [[ "${var}" == *"CNF_E2E_TESTS"* ]]; then
+                CNF_E2E_TESTS="$(echo "${var}" | cut -d'=' -f2)"
+            elif [[ "${var}" == *"CNF_ORIGIN_TESTS"* ]]; then
+                CNF_ORIGIN_TESTS="$(echo "${var}" | cut -d'=' -f2)"
+            fi
+        fi
+    done
 fi
 
-cnf_dir=$(mktemp -d -t cnf-XXXXX)
-cd "$cnf_dir" || exit 1
+export CNF_E2E_TESTS
+export CNF_ORIGIN_TESTS
+export TEST_BRANCH="master"
+export PTP_UNDER_TEST_BRANCH="master"
+export KUBECONFIG=$SHARED_DIR/kubeconfig
 
-echo "running on branch ${CNF_BRANCH}"
-git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
-cd cnf-features-deploy
-oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
+temp_dir=$(mktemp -d -t cnf-XXXXX)
+
+cd "$temp_dir" || exit 1
+
+# deploy ptp
+echo "deploying ptp-operator on branch ${PTP_UNDER_TEST_BRANCH}"
+
+# build ptp operator and create catalog
+export IMG=image-registry.openshift-image-registry.svc:5000/openshift-ptp/ptp-operator:latest
+build_images
+
+# deploy ptp-operator
+
+git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+
+cd ptp-operator-under-test
+
+# force downloading fresh images 
+grep -r "imagePullPolicy: IfNotPresent" --files-with-matches | awk '{print  "sed -i -e \"s@imagePullPolicy: IfNotPresent@imagePullPolicy: Always@g\" " $1 }' | bash
+
+# deploy ptp-operator
+make deploy
+
+# wait until the linuxptp-daemon pods are ready
+retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
+
+# patching to add events
+oc patch ptpoperatorconfigs.ptp.openshift.io default -nopenshift-ptp --patch '{"spec":{"ptpEventConfig":{"enableEventPublisher":true, "storageType":"emptyDir"}}}' --type=merge
+
+# wait for the linuxptp-daemon to be deployed
+retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopenshift-ptp
+
+# Run ptp conformance test
 cd -
+echo "running conformance tests from branch ${TEST_BRANCH}"
+git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
-# Skiplist common for all releases
-create_tests_skip_list_file
+cd ptp-operator-conformance-test
 
-# Skiplist according to each release
-if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
-    create_tests_temp_skip_list_11
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+# configuration
+cat <<'EOF' > ${SHARED_DIR}/test-config.yaml
+---
+global:
+ maxoffset: 100
+ minoffset: -100
+soaktest:
+  disable_all: false
+  event_output_file: "./event-output.csv"
+  duration: 10
+  failure_threshold: 2
+  master_offset:
+    spec:
+      enable: true
+      duration: 10
+      failure_threshold: 20
+    desc: "This test measures the master offset check"
+  slave_clock_sync:
+    spec:
+      enable: true
+      duration: 5
+      failure_threshold: 1
+    desc: "The test measures number of PTP time sync faults, and fails if > failure_threshold"
+  cpu_utilization:
+    spec:
+      enable: true
+      duration: 5
+      failure_threshold: 3
+      custom_params:
+        prometheus_rate_time_window: "60s"
+        node:
+          cpu_threshold_mcores: 100
+        pod:
+          - pod_type: "ptp-operator"
+            cpu_threshold_mcores: 30
 
-fi
-if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
-    create_tests_temp_skip_list_12
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+          - pod_type: "linuxptp-daemon"
+            cpu_threshold_mcores: 80
 
-fi
-if [[ "$CNF_BRANCH" == *"4.13"* ]] || [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
-    create_tests_temp_skip_list_13
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
-fi
-cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
+          - pod_type: "linuxptp-daemon"
+            container: "cloud-event-proxy"
+            cpu_threshold_mcores: 30
 
-export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
+          - pod_type: "linuxptp-daemon"
+            container: "linuxptp-daemon-container"
+            cpu_threshold_mcores: 40
+    desc: "The test measures PTP CPU usage and fails if >15mcores"
+EOF
 
-skip_tests=$(get_skip_tests)
+# Set output directory
+export JUNIT_OUTPUT_DIR=${ARTIFACT_DIR}
 
-worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
---selector='!node-role.kubernetes.io/master' -o name)
-if [ -z "${worker_nodes}" ]; then
-    echo "[ERROR]: No worker nodes found in cluster"
-    exit 1
-fi
-# get BM workers for testing
-test_nodes=""
-for node in ${worker_nodes}; do
-    if is_bm_node "${node}"; then
-        test_nodes="${test_nodes} ${node}"
-    fi
-done
+temp_status_dnbc=0
+temp_status_bc=0
+temp_status_oc=0
 
-if [ -z "${test_nodes}" ]; then
-    echo "[ERROR]: No BM worker nodes found in cluster"
-    exit 1
-fi
+export PTP_LOG_LEVEL=debug
+export SKIP_INTERFACES=eno8303np0,eno8403np1,eno8503np2,eno8603np3,eno12409,eno8303,ens7f0np0,ens7f1np1,eno8403,ens6f0np0,ens6f1np1,eno8303np0,eno8403np1,eno8503np2,eno8603np3
+export PTP_TEST_CONFIG_FILE=${SHARED_DIR}/test-config.yaml
 
-export CNF_NODES="${test_nodes}"
+# wait before first run
+# wait more to let openshift complete initialization
+sleep 300
 
-cd cnf-features-deploy
+# get RTC logs
+print_time
+
+# Running Dual NIC BC scenario
+export PTP_TEST_MODE=dualnicbc
+export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
+set_events_output_file
+make functests || temp_status_dnbc=$?
+
+# wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
+sleep 60
+
+# get RTC logs
+print_time
+
+# Running BC scenario
+export PTP_TEST_MODE=bc
+export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
+set_events_output_file
+make functests || temp_status_bc=$?
+
+# wait for old linuxptp-daemon pods to be deleted to avoid remaining ptp GM interference
+sleep 60
+
+# get RTC logs
+print_time
+
+# Running OC scenario
+export PTP_TEST_MODE=oc
+export JUNIT_OUTPUT_FILE=test_results_${PTP_TEST_MODE}.xml
+set_events_output_file
+make functests || temp_status_oc=$?
+
+# get RTC logs
+print_time
+
+# saving overall status (all success=0, any failure=1)
 status=0
-if [[ -n "$skip_tests" ]]; then
-    export SKIP_TESTS="${skip_tests}"
+if [[ $temp_status_dnbc != 0 || $temp_status_bc != 0 || $temp_status_oc != 0 ]]; then
+  echo  "status for Dual NIC BC scenario = $temp_status_dnbc"
+  echo  "status for BC scenario = $temp_status_bc"
+  echo  "status for OC scenario = $temp_status_oc"
+  status=1
 fi
-FEATURES_ENVIRONMENT="ci" make functests-on-ci || status=$?
+
+# allows commands to fail without returning
+set +e
+
+# clean up, undeploy ptp-operator
+make undeploy
+
+# publishing results
 cd -
 
-set +e
 python3 -m venv ${SHARED_DIR}/myenv
 source ${SHARED_DIR}/myenv/bin/activate
 git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci
 pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
+
 # Create HTML reports for humans/aliens
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.html
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.html
+python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_*xml -o ${ARTIFACT_DIR}/test_results_all.html
+
+python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_dualnicbc.xml -o ${ARTIFACT_DIR}/test_results_dualnicbc.html
+python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_bc.xml -o ${ARTIFACT_DIR}/test_results_bc.html
+python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/test_results_oc.xml -o ${ARTIFACT_DIR}/test_results_oc.html
+
+# merge junit files in to one
+junitparser merge ${ARTIFACT_DIR}/test_results_*xml ${ARTIFACT_DIR}/test_results_all.xml && \
+cp ${ARTIFACT_DIR}/test_results_all.xml ${ARTIFACT_DIR}/junit.xml
+
 # Create JSON reports for robots
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.json
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.json
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.json
+python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/test_results_all.xml -o ${ARTIFACT_DIR}/test_results.json
 
-junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
+# delete original separate junit files
+#rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/test_results_*xml
 
-rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
+# delete temp directory
+rm -rf $temp_dir
+
+# cancel "allows commands to fail without returning"
 set -e
 
+# return saved status
 exit ${status}

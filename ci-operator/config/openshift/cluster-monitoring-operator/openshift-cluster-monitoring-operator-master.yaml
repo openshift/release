@@ -65,7 +65,7 @@ tests:
   container:
     from: src
 - as: versions
-  commands: INTERACTIVE=false make versions && git diff --exit-code
+  commands: make check-versions
   container:
     from: src
   optional: true
@@ -75,6 +75,13 @@ tests:
     from: src
 - as: unit
   commands: make test-unit
+  container:
+    from: src
+- as: golangci-lint
+  commands: |
+    export GOCACHE=/tmp/
+    export GOLANGCI_LINT_CACHE=/tmp/.cache
+    make golangci-lint
   container:
     from: src
 - as: e2e-aws-ovn

@@ -5,7 +5,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
-INSTANCE_PREFIX="${NAMESPACE}-${JOB_NAME_HASH}"
+INSTANCE_PREFIX="${NAMESPACE}-${UNIQUE_HASH}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring VM on GCP..."
 mkdir -p "${HOME}"/.ssh
@@ -37,10 +37,10 @@ gcloud compute firewall-rules create "${INSTANCE_PREFIX}" \
   --network "${INSTANCE_PREFIX}" \
   --allow tcp:22,icmp
 
-# image-family openshift4-libvirt must exist in ${GOOGLE_PROJECT_ID} for this template
+# image-family openshift4-libvirt-rhel9 must exist in ${GOOGLE_PROJECT_ID} for this template
 # for more info see here: https://github.com/ironcladlou/openshift4-libvirt-gcp/blob/rhel8/IMAGES.md
 gcloud compute instances create "${INSTANCE_PREFIX}" \
-  --image-family openshift4-libvirt \
+  --image-family openshift4-libvirt-rhel9 \
   --zone "${GOOGLE_COMPUTE_ZONE}" \
   --machine-type n2-standard-16 \
   --boot-disk-type pd-ssd \

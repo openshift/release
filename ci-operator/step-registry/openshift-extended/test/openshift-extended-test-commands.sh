@@ -23,6 +23,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 test -n "${KUBECONFIG:-}" && echo "${KUBECONFIG}" || echo "no KUBECONFIG is defined"
 test -f "${KUBECONFIG}" && (ls -l "${KUBECONFIG}" || true) || echo "kubeconfig file does not exist"
 ls -l ${SHARED_DIR}/kubeconfig || echo "no kubeconfig in shared_dir"
+ls -l ${SHARED_DIR}/kubeadmin-password && echo "kubeadmin passwd exists" || echo "no kubeadmin passwd in shared_dir"
 
 # create link for oc to kubectl
 mkdir -p "${HOME}"
@@ -150,8 +151,12 @@ openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
     export TEST_PROVIDER='{"type":"openstack"}';;
+ibmcloud)
+    export TEST_PROVIDER='{"type":"ibmcloud"}'
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe)
     export TEST_PROVIDER='{"type":"nutanix"}';;

@@ -20,6 +20,16 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
+# Robot Framework setup and execution.
+cat << EOF >/tmp/variables.yaml
+USHIFT_HOST: ${IP_ADDRESS}
+USHIFT_USER: ${HOST_USER}
+SSH_PRIV_KEY: ${CLUSTER_PROFILE_DIR}/ssh-privatekey
+SSH_PORT: 22
+EOF
+/microshift/test/run.sh -o ${ARTIFACT_DIR} -i /tmp/variables.yaml -v /tmp/venv
+
+# Bash e2e tests
 firewall::open_port() {
   echo "no-op for aws"
 }

@@ -10,9 +10,10 @@ ${SHARED_DIR}/login_script.sh
 
 instance_name=$(<"${SHARED_DIR}/gcp-instance-ids.txt")
 USE_CONMONRS=${USE_CONMONRS:-false}
+EVENTED_PLEG=${EVENTED_PLEG:-false}
 
 timeout --kill-after 10m 400m gcloud compute ssh --zone="${ZONE}" ${instance_name} -- bash - << EOF 
     REPO_DIR="/home/deadbeef/cri-o"
     cd "\${REPO_DIR}/contrib/test/ci"
-    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow USE_CONMONRS=$USE_CONMONRS" --connection=local -vvv --tags e2e
+    ansible-playbook e2e-main.yml -i hosts -e "TEST_AGENT=prow USE_CONMONRS=$USE_CONMONRS EVENTED_PLEG=$EVENTED_PLEG" --connection=local -vvv --tags e2e
 EOF
