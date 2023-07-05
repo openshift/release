@@ -7,18 +7,34 @@ build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
+- dockerfile_path: openshift/ci-operator/knative-images/dispatcher/Dockerfile
+  to: knative-eventing-kafka-broker-dispatcher
+- dockerfile_path: openshift/ci-operator/knative-images/heartbeats/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-kafka-broker-heartbeats
 - dockerfile_path: openshift/ci-operator/knative-images/kafka-controller/Dockerfile
   inputs:
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-kafka-broker-kafka-controller
+- dockerfile_path: openshift/ci-operator/knative-images/migrate/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-kafka-broker-migrate
 - dockerfile_path: openshift/ci-operator/knative-images/post-install/Dockerfile
   inputs:
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-kafka-broker-post-install
+- dockerfile_path: openshift/ci-operator/knative-images/receiver/Dockerfile
+  to: knative-eventing-kafka-broker-receiver
 - dockerfile_path: openshift/ci-operator/knative-images/webhook-kafka/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -115,29 +131,25 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-kafka-broker-test-wathola-sender
-- dockerfile_path: openshift/ci-operator/static-images/dispatcher/Dockerfile
-  to: knative-eventing-kafka-broker-dispatcher
-- dockerfile_path: openshift/ci-operator/static-images/receiver/Dockerfile
-  to: knative-eventing-kafka-broker-receiver
 promotion:
   additional_images:
     eventing-kafka-broker-src: src
-  name: knative-nightly
   namespace: openshift
+  tag: knative-v1.10
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: test-conformance-aws-ocp-410
+- as: test-conformance-aws-ocp-412
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.12"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -165,10 +177,18 @@ tests:
       cli: latest
       commands: make test-conformance
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -201,24 +221,20 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-conformance-aws-ocp-410-continuous
+- as: test-conformance-aws-ocp-412-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.12"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -247,10 +263,18 @@ tests:
       cli: latest
       commands: make test-conformance
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -283,24 +307,20 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-aws-ocp-410
+- as: test-e2e-aws-ocp-412
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.12"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -328,10 +348,18 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -364,24 +392,20 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-e2e-aws-ocp-410-continuous
+- as: test-e2e-aws-ocp-412-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.12"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -410,10 +434,18 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -446,24 +478,20 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-reconciler-aws-ocp-410
+- as: test-reconciler-aws-ocp-412
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.12"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -491,10 +519,18 @@ tests:
       cli: latest
       commands: make test-reconciler
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -527,24 +563,20 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: test-reconciler-aws-ocp-410-continuous
+- as: test-reconciler-aws-ocp-412-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.12"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -573,10 +605,18 @@ tests:
       cli: latest
       commands: make test-reconciler
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
+        name: knative-eventing-kafka-broker-dispatcher
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
+        name: knative-eventing-kafka-broker-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
         name: knative-eventing-kafka-broker-webhook-kafka
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_COMMITTED_OFFSET
@@ -609,10 +649,6 @@ tests:
         name: knative-eventing-kafka-broker-test-wathola-receiver
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_SENDER
         name: knative-eventing-kafka-broker-test-wathola-sender
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_DISPATCHER
-        name: knative-eventing-kafka-broker-dispatcher
-      - env: KNATIVE_EVENTING_KAFKA_BROKER_RECEIVER
-        name: knative-eventing-kafka-broker-receiver
       from: src
       resources:
         requests:
@@ -620,7 +656,7 @@ tests:
       timeout: 4h0m0s
     workflow: generic-claim
 zz_generated_metadata:
-  branch: release-next
+  branch: release-v1.10
   org: openshift-knative
   repo: eventing-kafka-broker
-  variant: "410"
+  variant: "412"
