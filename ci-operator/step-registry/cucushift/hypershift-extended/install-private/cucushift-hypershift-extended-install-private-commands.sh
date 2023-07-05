@@ -10,7 +10,7 @@ bin/hypershift install --hypershift-image="${HYPERSHIFT_RELEASE_LATEST}" \
 --oidc-storage-provider-s3-region=${HYPERSHIFT_AWS_REGION} \
 --enable-validating-webhook \
 --private-platform=AWS \
---aws-private-creds=${SHARED_DIR}/.awsprivatecred \
+--aws-private-creds=/etc/hypershift-pool-aws-credentials/awsprivatecred \
 --aws-private-region="${HYPERSHIFT_AWS_REGION}" \
 --wait-until-available
 
