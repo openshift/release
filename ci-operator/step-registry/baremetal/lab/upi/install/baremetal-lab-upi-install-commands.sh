@@ -223,6 +223,7 @@ yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED
 baseDomain: ${BASE_DOMAIN}
 metadata:
   name: ${CLUSTER_NAME}
+fips: true
 platform:
   none: {}
 controlPlane:

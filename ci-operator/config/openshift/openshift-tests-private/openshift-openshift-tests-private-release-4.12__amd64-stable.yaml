@@ -40,8 +40,8 @@ releases:
   latest:
     release:
       architecture: amd64
-      channel: candidate
-      version: "4.12"
+      channel: stable
+      version: "4.12.22"
 resources:
   '*':
     limits:
@@ -264,6 +264,23 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: baremetal-upi-ovn-ipv4-p1-f14
+  cluster: build05
+  cron: 30 21 7,21 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@amd64 and @baremetal-upi and @network-ovnkubernetes and not
+        @fips'
+      TAG_VERSION: '@4.14'
+      SLEEP_DURATION: 36h
+      architecture: amd64
+      masters: "3"
+      workers: "2"
+    test:
+      - ref: wait
+    workflow: baremetal-lab-upi
 zz_generated_metadata:
   branch: release-4.12
   org: openshift
