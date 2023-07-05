@@ -187,6 +187,13 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
     echo -e "The http_proxy, the http_proxy and the additional_trust_bundle_file are mandatory."
     exit 1
   fi
+  PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
+  PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  if [[ -z "${PUBLIC_SUBNET_IDs}" ]] || [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
+    echo -e "The public_subnet_ids and the the privated_subnet_ids are mandatory when using the proxy."
+    exit 1
+  fi
+  SUBNET_ID_SWITCH="--subnet-ids ${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
   PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url} --additional-trust-bundle-file ${TRUST_BUNDLE_FILE}"
 fi
 
