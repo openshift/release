@@ -1662,7 +1662,6 @@ tests:
 - as: baremetal-pxe-sno-agent-ipv4-static-connected-p1-f14
   cluster: build05
   cron: 30 14 3,17 * *
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -1684,7 +1683,6 @@ tests:
 - as: baremetal-pxe-compact-agent-ipv4-static-connected-p1-f14
   cluster: build05
   cron: 30 14 4,18 * *
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -1706,7 +1704,6 @@ tests:
 - as: baremetal-pxe-ha-agent-ipv4-static-connected-p1-f14
   cluster: build05
   cron: 30 14 5,19 * *
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -1725,6 +1722,69 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-pxe
+- as: baremetal-compact-agent-ipv4-dynamic-connected-p1-f7
+  cluster: build05
+  cron: 30 15 * * 2
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@baremetal-upi and @arm64 and @network-ovnkubernetes and not
+        @fips'
+      RESERVE_BOOTSTRAP: "false"
+      TAG_VERSION: '@4.14'
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-dynamic
+- as: baremetal-compact-agent-ipv4-static-connected-p1-f7
+  cluster: build05
+  cron: 30 15 * * 1
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@baremetal-upi and @arm64 and @network-ovnkubernetes and not
+        @fips'
+      RESERVE_BOOTSTRAP: "false"
+      TAG_VERSION: '@4.14'
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-static
+- as: baremetal-compact-agent-ipv4-static-disconnected-proxy-p1-f7
+  cluster: build05
+  cron: 30 15 * * 3
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@baremetal-upi and @arm64 and @network-ovnkubernetes and not
+        @fips and @proxy'
+      RESERVE_BOOTSTRAP: "false"
+      TAG_VERSION: '@4.14'
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-static-disconnected-proxy
 zz_generated_metadata:
   branch: release-4.14
   org: openshift
