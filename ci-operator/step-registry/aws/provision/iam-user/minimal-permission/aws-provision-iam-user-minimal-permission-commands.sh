@@ -252,6 +252,11 @@ if (( ocp_minor_version >= 11 && ocp_major_version == 4 )); then
   echo "s3:GetBucketPolicy" >> "${PERMISION_LIST}"
 fi
 
+# additional permisions for 4.14+, https://issues.redhat.com/browse/OCPBUGS-15582
+if (( ocp_minor_version >= 14 && ocp_major_version == 4 )); then
+  echo "sts:AssumeRole" >> "${PERMISION_LIST}"
+fi
+
 # generte policy file
 
 PERMISION_JSON="${ARTIFACT_DIR}/permision_list.json"

@@ -124,7 +124,14 @@ then
 fi
 
 case "${CLUSTER_TYPE}" in
-aws|aws-arm64|aws-usgov) export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred;;
+aws|aws-arm64|aws-usgov)
+  if [[ -f "${SHARED_DIR}/aws_minimal_permission" ]]; then
+    echo "Setting AWS credential with minimal permision for installer"
+    export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_minimal_permission
+  else
+    export AWS_SHARED_CREDENTIALS_FILE=${CLUSTER_PROFILE_DIR}/.awscred
+  fi
+  ;;
 aws-c2s|aws-sc2s) export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_temp_creds;;
 *) >&2 echo "Unsupported cluster type '${CLUSTER_TYPE}'"
 esac
