@@ -107,6 +107,8 @@ oc adm ocp-certificates regenerate-leaf -n openshift-config-managed secrets kube
 
 # distribute trust across all known clients
 # update our local CA bundle so that when new serving certs are used for kube-apiserver we will trust them
+oc config refresh-ca-bundle || true
+sleep 2
 oc config refresh-ca-bundle
 # produce a new kubelet bootstrap kubeconfig (used to create the first CSR and establishes ca bundle)
 oc config new-kubelet-bootstrap-kubeconfig > /tmp/bootstrap.kubeconfig
@@ -126,6 +128,8 @@ oc adm wait-for-stable-cluster
 
 # create new admin.kubeconfig
 oc config new-admin-kubeconfig > "${SHARED_DIR}/admin.kubeconfig"
+oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami || true
+sleep 2
 oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
 
 # revoke old trust for the signers we have regenerated
