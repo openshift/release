@@ -2,19 +2,26 @@ workflow:
   as: operator-aws-osd
   steps:
     env:
-      CLUSTER_VERSION: "4.13"
       API_HOST: stage
       CHANNEL_GROUP: candidate
       COMPUTE_MACHINE_TYPE: m5.4xlarge
-      COMPUTE_NODES: "2"
+      MACHINE_POOL_INSTANCE_TYPE: "m5.2xlarge"
+      COMPUTE_NODES: "3"
       PARALLEL: "true"
-    post:
-    - ref: operator-uninstall
-    - chain: osd-delete
+      MULTI_AZ: "true"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "true"
     pre:
-    - chain: osd-create
-    - ref: operator-install
+      - ref: osd-ccs-cluster-provision-aws
+      - ref: osd-ccs-conf-machine-pool
+      - ref: osd-ccs-conf-idp-htpasswd
+      - ref: osd-ccs-conf-idp-htpasswd-multi-users
+      - ref: osd-ccs-cluster-operators-wait-ready
+      - ref: operator-install
+    post:
+      - ref: osd-ccs-cluster-deprovision
   documentation: |-
-    This workflow provision an OSD cluster.
+    This workflow installs an OSD cluster with the specified configures using the lastest nightly build.
+    The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
     It then install required operators on the cluster.
-    After finish testing, the addons will be deleted and cluster will be deprovisioned.
+    After finish testing, the cluster will be deprovsioned.
