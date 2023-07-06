@@ -30,6 +30,11 @@ function create_tests_temp_skip_list_11 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-13684
+# TESTNAME
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
+
 EOF
 }
 
@@ -389,7 +394,7 @@ ls ${ARTIFACT_DIR}/validation_junit*xml && python ${SHARED_DIR}/telco5gci/j2html
 
 junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
 
-rm -rf ${SHARED_DIR}/myenv
+rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
 set +x
 set -e
 
