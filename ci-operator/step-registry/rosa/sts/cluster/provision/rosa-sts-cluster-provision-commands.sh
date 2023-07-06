@@ -194,7 +194,8 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
     exit 1
   fi
   SUBNET_ID_SWITCH="--subnet-ids ${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
-  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url} --additional-trust-bundle-file ${TRUST_BUNDLE_FILE}"
+  #PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url} --additional-trust-bundle-file ${TRUST_BUNDLE_FILE}"
+  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url}"
 fi
 
 DRY_RUN_SWITCH=""
