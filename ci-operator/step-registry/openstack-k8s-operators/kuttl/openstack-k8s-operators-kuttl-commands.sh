@@ -56,6 +56,12 @@ fi
 # changes in the PR)
 export ${SERVICE_NAME^^}_REPO=/go/src/github.com/${ORG}/${BASE_OP}
 
+# If provided, use a different namespace for kuttl tests
+if [ -n "$NS_KUTTL" ]; then
+  export ${SERVICE_NAME^^}_KUTTL_NAMESPACE=${NS_KUTTL}
+  export NAMESPACE=${NS_KUTTL}
+fi
+
 # Use built META_OPERATOR bundle image
 export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:${PR_SHA}
 

@@ -168,7 +168,7 @@ cp -r /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/ ${BASE_DIR}
 create_openstack_namespace
 
 # Secret for pulling containers from docker.io
-DOCKER_REGISTRY_SECRET=pull-docker-secret
+DOCKER_REGISTRY_SECRET=pull-docker-secret-build
 oc create secret generic ${DOCKER_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/docker/config.json --type=kubernetes.io/dockerconfigjson
 
 # Secret for pushing containers - openstack namespace
