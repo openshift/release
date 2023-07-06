@@ -91,8 +91,13 @@ then
     echo "new secret router-ca is not created or old secret router-ca is not deleted" && exit 1
 fi
 
-# Let's start with the MCO cert rotation
-oc adm ocp-certificates regenerate-machine-config-server-serving-cert
+# WARNING: On some platforms this step may prevent new nodes from joining the cluster.
+workerUserData="$(oc -n openshift-machine-api get secret/worker-user-data -o=jsonpath='{.data.userData}' | base64 -d)" || true
+workerUserDataManaged="$(oc -n openshift-machine-api get secret/worker-user-data-managed -o=jsonpath='{.data.userData}' | base64 -d)" || true
+if ( echo "$workerUserData" "$workerUserDataManaged" | grep 'api-int' ) ; then
+  # Let's start with the MCO cert rotation
+  oc adm ocp-certificates regenerate-machine-config-server-serving-cert
+fi
 
 # A few preparatory rotations, these give us 30 days to complete the rotation after generating new roots of trust
 oc adm ocp-certificates regenerate-leaf -n openshift-config-managed secrets kube-controller-manager-client-cert-key kube-scheduler-client-cert-key
