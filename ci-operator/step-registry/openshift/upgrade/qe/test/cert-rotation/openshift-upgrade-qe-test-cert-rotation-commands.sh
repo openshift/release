@@ -27,6 +27,11 @@ extract_oc
 
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
 
+if test -f "${SHARED_DIR}/proxy-conf.sh" ;then
+    # shellcheck disable=SC1091
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 # ensure we're stable to start
 oc adm wait-for-stable-cluster --minimum-stable-period=5s
 
@@ -104,10 +109,19 @@ oc adm wait-for-stable-cluster
 
 # generate new client certs for kcm and ks
 oc adm ocp-certificates regenerate-leaf -n openshift-config-managed secrets kube-controller-manager-client-cert-key kube-scheduler-client-cert-key
+oc adm wait-for-stable-cluster
 
 # distribute trust across all known clients
 # update our local CA bundle so that when new serving certs are used for kube-apiserver we will trust them
-oc config refresh-ca-bundle
+# If hits 'error: failed to update CA bundle: using system CA bundle to verify server, not allowing refresh to overwrite', retry 3 times
+if oc config refresh-ca-bundle ;then
+    :
+elif sleep 3;oc config refresh-ca-bundle ;then
+    :
+else
+    sleep 5
+    oc config refresh-ca-bundle
+fi
 # produce a new kubelet bootstrap kubeconfig (used to create the first CSR and establishes ca bundle)
 oc config new-kubelet-bootstrap-kubeconfig > /tmp/bootstrap.kubeconfig
 oc whoami --kubeconfig=/tmp/bootstrap.kubeconfig --server="$(oc get infrastructure/cluster -ojsonpath='{ .status.apiServerURL }')"
@@ -126,7 +140,14 @@ oc adm wait-for-stable-cluster
 
 # create new admin.kubeconfig
 oc config new-admin-kubeconfig > "${SHARED_DIR}/admin.kubeconfig"
-oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
+# If hits the 'error: You must be logged in to the server (Unauthorized)', retry 2 times
+# Detail see https://issues.redhat.com/browse/OCPBUGS-15793
+if oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
+    :
+else
+    sleep 2
+    oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
+fi
 
 # revoke old trust for the signers we have regenerated
 oc adm ocp-certificates remove-old-trust -n openshift-kube-apiserver-operator configmaps kube-apiserver-to-kubelet-client-ca kube-control-plane-signer-ca loadbalancer-serving-ca localhost-serving-ca service-network-serving-ca  --created-before=${start_date}
