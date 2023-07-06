@@ -1,8 +1,8 @@
 #!/bin/bash
 
 set -o nounset
-# set -o errexit
-# set -o pipefail
+set -o errexit
+set -o pipefail
 
 set -x
 
@@ -25,10 +25,8 @@ function check_mirror_registry_response()
 
     while (( try < max_retries )); do
         echo "Checking mirror registry response code ${try}/${max_retries}"
-        http_code=$(curl -o /dev/null -I -k -s -w "%{http_code}" "https://${BASTION_PUBLIC_ADDRESS}:5000")
-        curl_ret=$?
-        if [[ "${curl_ret}" != "0" ]] || [[ "${http_code}" != "200" ]]; then
-            echo "curl exit code: ${curl_ret}"
+        http_code=$(curl -o /dev/null -I -k -s -w "%{http_code}" "https://${BASTION_PUBLIC_ADDRESS}:5000" || true)
+        if [[ "${http_code}" != "200" ]]; then
             echo "curl http return code: ${http_code}"
             sleep ${interval}
         else
