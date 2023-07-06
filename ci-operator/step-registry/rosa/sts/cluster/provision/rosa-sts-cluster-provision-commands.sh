@@ -180,22 +180,28 @@ fi
 
 PROXY_SWITCH=""
 if [[ "$ENABLE_PROXY" == "true" ]]; then
-  # Get the proxy information from the previous steps, and replace the vaule here
+  # Get the proxy information from the previous steps, and replace the value here
   proxy_private_url=$(< "${SHARED_DIR}/proxy_private_url")
-  TRUST_BUNDLE_FILE="bundle_file"
-  if [[ -z "${proxy_private_url}" ]] || [[ -z "${TRUST_BUNDLE_FILE}" ]]; then
-    echo -e "The http_proxy, the http_proxy and the additional_trust_bundle_file are mandatory."
+  TRUST_BUNDLE_FILE="${SHARED_DIR}/bundle_file"
+  if [[ -z "${proxy_private_url}" ]]; then
+    echo -e "The http_proxy, and https_proxy URLs are mandatory when specifying use of proxy."
     exit 1
+  fi
+  if [[ -f "${TRUST_BUNDLE_FILE}" ]]; then
+    echo -e "Using proxy with requested additional trust bundle"
+    PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url} --additional-trust-bundle-file ${TRUST_BUNDLE_FILE}"
+  else
+    echo -e "Using proxy with no additional trust bundle provided"
+    PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url}"
   fi
   PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
   PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  # fixme, list of subnets returned only work for multi az cluster need to remove subnets for single az
   if [[ -z "${PUBLIC_SUBNET_IDs}" ]] || [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
-    echo -e "The public_subnet_ids and the the privated_subnet_ids are mandatory when using the proxy."
+    echo -e "The public_subnet_ids and the the private_subnet_ids are mandatory when using the proxy."
     exit 1
   fi
   SUBNET_ID_SWITCH="--subnet-ids ${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
-  #PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url} --additional-trust-bundle-file ${TRUST_BUNDLE_FILE}"
-  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url}"
 fi
 
 DRY_RUN_SWITCH=""
@@ -238,6 +244,12 @@ echo "  Enable customer managed key: ${ENABLE_CUSTOMER_MANAGED_KEY}"
 echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
+if [[ "$ENABLE_PROXY" == "true" ]]; then
+  echo "  Using proxy."
+fi
+if [[ "$ENABLE_PROXY" == "true" ]] && [[ -f "$TRUST_BUNDLE_FILE" ]]; then
+  echo "  Using proxy with additional trust bundle."
+fi
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
   echo "  Min replicas: ${MIN_REPLICAS}"
