@@ -62,7 +62,7 @@ export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:
 if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   if [ ! -d "${HOME}/install_yamls" ]; then
     cd ${HOME}
-    git clone https://github.com/openstack-k8s-operators/install_yamls.git
+    git clone -b operator-wait https://github.com/kajinamit/install_yamls.git
   fi
 
   cd ${HOME}/install_yamls

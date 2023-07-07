@@ -47,7 +47,7 @@ fi
 
 if [ ! -d "${BASE_DIR}/install_yamls" ]; then
   cd ${BASE_DIR}
-  git clone https://github.com/openstack-k8s-operators/install_yamls.git
+  git clone -b operator-wait https://github.com/kajinamit/install_yamls.git
 fi
 
 cd ${BASE_DIR}/install_yamls
