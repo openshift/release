@@ -215,9 +215,11 @@ export RUN_TESTS="${RUN_TESTS:-true}"
 export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
-    export FEATURES="${FEATURES:-performance sriov sctp}"
+    export VALIDATIONS_FEATURES="sriov sctp dpdk"
+    export FEATURES="${FEATURES:-dpdk}"
 else
-    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
+    export VALIDATIONS_FEATURES="sriov sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni dpdk"
+    export FEATURES="${FEATURES:-dpdk}"
 fi
 export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
 export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
