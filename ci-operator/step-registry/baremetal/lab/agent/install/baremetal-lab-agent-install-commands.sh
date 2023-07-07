@@ -334,6 +334,10 @@ echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 
+date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
+echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
+sleep 900
+
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -342,9 +346,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${vendor}"
 done
 
-date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
-sleep 900
+
 echo "Launching 'wait-for bootstrap-complete' installation step....."
 # The installer uses the rendezvous IP for checking the bootstrap phase.
 # The rendezvous IP is in the internal net in our lab.
