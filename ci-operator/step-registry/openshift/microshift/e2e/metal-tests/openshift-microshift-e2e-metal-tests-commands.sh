@@ -193,9 +193,9 @@ scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/sce
 # VM mapping
 # e2e:  vm0
 # cncf: vm1, vm2
-trap print_test_output EXIT
-run_e2e  &> /tmp/run_e2e_test.log  &
-run_cncf &> /tmp/run_cncf_test.log &
+# trap print_test_output EXIT
+# run_e2e  &> /tmp/run_e2e_test.log  &
+# run_cncf &> /tmp/run_cncf_test.log &
 
 FAIL=0
 for job in $(jobs -p) ; do

@@ -47,7 +47,7 @@ cd ~/microshift
 
 ./test/bin/ci_phase_iso_build.sh
 
-./scripts/image-builder/build.sh -pull_secret_file "\${PULL_SECRET}" -microshift_rpms ~/rpms -authorized_keys_file ~/.ssh/id_rsa.pub -open_firewall_ports 6443:tcp
+# ./scripts/image-builder/build.sh -pull_secret_file "\${PULL_SECRET}" -microshift_rpms ~/rpms -authorized_keys_file ~/.ssh/id_rsa.pub -open_firewall_ports 6443:tcp
 EOF
 chmod +x /tmp/iso.sh
 
