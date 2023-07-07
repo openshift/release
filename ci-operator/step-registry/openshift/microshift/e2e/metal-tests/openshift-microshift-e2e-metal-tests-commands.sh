@@ -166,6 +166,8 @@ EOF
 # If more tests are to be run in parallel the code should go in here #
 ######################################################################
 
+trap "scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info ${ARTIFACT_DIR}" EXIT
+
 # Copy the scenario settings from the remote host back here so the
 # test runner has access to them.
 scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
@@ -173,9 +175,8 @@ scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/sce
 # Run the scenario tests, if the phase script exists
 # (we can clean this up after the main PR lands)
 
-#TODO temporary clone. Remove to use the one from home dir.
 cat > /tmp/tests.sh << EOF
-cd ~/microshift/test || true
+cd ~/microshift/test
 if [ -f ./bin/ci_phase_test.sh ]; then
   ./bin/ci_phase_test.sh
 fi
@@ -184,10 +185,6 @@ chmod +x /tmp/tests.sh
 
 scp /tmp/tests.sh "${INSTANCE_PREFIX}:/tmp"
 ssh "${INSTANCE_PREFIX}" "/tmp/tests.sh"
-
-# Copy the scenario settings from the remote host here *again* to
-# include the log files and other outputs.
-scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
 # VM mapping
 # e2e:  vm0
