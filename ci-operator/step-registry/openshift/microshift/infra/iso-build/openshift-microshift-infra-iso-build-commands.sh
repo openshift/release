@@ -31,9 +31,9 @@ if ! sudo subscription-manager status >&/dev/null; then
 fi
 
 chmod 0755 ~
-mkdir ~/rpms
-tar -xf /tmp/rpms.tar -C ~/rpms
-tar -xf /tmp/microshift.tgz -C ~
+#mkdir ~/rpms
+#tar -xf /tmp/rpms.tar -C ~/rpms
+#tar -xf /tmp/microshift.tgz -C ~
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
@@ -43,6 +43,9 @@ chmod 0400 ~/.ssh/id_rsa*
 export PULL_SECRET="\${HOME}/.pull-secret.json"
 cp /tmp/pull-secret "\${PULL_SECRET}"
 
+#TODO remove this and use the tar above
+sudo dnf install -y git
+git clone -b USHIFT-1387 https://github.com/pacevedom/microshift ~/microshift
 cd ~/microshift
 
 ./test/bin/ci_phase_iso_build.sh

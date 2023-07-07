@@ -26,6 +26,7 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
+#TODO commenting for speed.
 # # Number of VMs to create.
 # # This will change over time as we add more tests.
 # NUM_VMS=3
