@@ -1,6 +1,17 @@
 #!/bin/bash
 set -xeuo pipefail
 
+function download_oc(){
+    local filename='openshift-client-linux-410-latest.tar.gz'
+    local tmp_bin_path='/tmp/oc-bin/'
+    curl --output /tmp/${filename} --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz
+    mkdir -p "$tmp_bin_path"
+    tar -xvzf /tmp/${filename} --directory="$tmp_bin_path"
+    export PATH=${tmp_bin_path}:$PATH
+    which oc
+    oc version --client
+}
+
 function extract_oc(){
     mkdir -p /tmp/client
     export OC_DIR="/tmp/client"
@@ -23,7 +34,13 @@ function extract_oc(){
 }
 
 # This step is executed after upgrade to target, oc client of target release should use as many new versions as possible, make sure new feature cert-rotation of oc amd is supported
-extract_oc
+minor_version="$(oc version --client -o json  | jq -r '.clientVersion.gitVersion' | cut -d '.' -f2)"
+if [[ -n "$minor_version" && "$minor_version" -lt 10 ]] ; then
+    echo "Y version is less than 10, using oc 4.10 directly"
+    download_oc
+else
+    extract_oc
+fi
 
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
 
