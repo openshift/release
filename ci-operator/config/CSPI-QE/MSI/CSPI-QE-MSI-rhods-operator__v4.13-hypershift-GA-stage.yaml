@@ -7,6 +7,14 @@ base_images:
     name: ocp-addons-operators-cli
     namespace: ci
     tag: latest
+  rhods-addon-tests:
+    name: ods-ci
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
 releases:
   latest:
     candidate:
@@ -21,29 +29,21 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: sanity-rosa-rhods-gpu-servicemesh
+- as: sanity-rosa-rhods-hypershift-fips
   cron: 0 12 * * 6
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      API_HOST: stage
-      CHANNEL_GROUP: candidate
-      CLUSTER_NAME: rhods-gpu-sm413
-      COMPUTE_MACHINE_TYPE: g4dn.2xlarge
-      ENABLE_AUTOSCALING: "false"
-      MIN_REPLICAS: "2"
-      MULTI_AZ: "false"
+      COMPUTE_MACHINE_TYPE: m5.4xlarge
+      FIPS: "true"
       OPENSHIFT_VERSION: "4.13"
       OPERATOR1_CONFIG: name=rhods-operator;namespace=redhat-ods-operator
-      OPERATOR2_CONFIG: name=servicemeshoperator
-      OPERATOR3_CONFIG: name=gpu-operator;namespace=nvidia-gpu-operator;source=certified-operators
-      PARALLEL: "true"
+      REPLICAS: "6"
     test:
-    - ref: operator-install
-    - ref: operator-uninstall
-    workflow: rosa-aws-sts
+    - ref: addon-tests-rhods
+    workflow: operator-hypershift
 zz_generated_metadata:
-  branch: rhods-gpu-servicemesh-operators
+  branch: rhods-operator
   org: CSPI-QE
   repo: MSI
-  variant: v4.13-GA
+  variant: v4.13-hypershift-GA-stage
