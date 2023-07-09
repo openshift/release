@@ -394,7 +394,7 @@ ls ${ARTIFACT_DIR}/validation_junit*xml && python ${SHARED_DIR}/telco5gci/j2html
 
 junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
 
-rm -rf ${SHARED_DIR}/myenv
+rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
 set +x
 set -e
 
