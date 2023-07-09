@@ -4,6 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+ls -la $SHARED_DIR
+touch $SHARED_DIR/test.txt
+whoami
+sleep 30m
+
+
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
