@@ -4,8 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+set -e
+set -x
 ls -la $SHARED_DIR
 touch $SHARED_DIR/test.txt
+mkdir $SHARED_DIR/test
+ls -la $SHARED_DIR
 id
 sleep 30m
 

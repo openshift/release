@@ -72,6 +72,10 @@ oc logs $pod | tee $ARTIFACT_DIR/RT-$test.log
 ls -la $SHARED_DIR
 touch $SHARED_DIR/test.txt
 id
+# Fix user IDs in a container
+~/fix_uid.sh
+touch $SHARED_DIR/test.txt
+ls -la $SHARED_DIR
 sleep 30m
 
 if [ "$SNO_CLUSTER" = "true" ]; then
