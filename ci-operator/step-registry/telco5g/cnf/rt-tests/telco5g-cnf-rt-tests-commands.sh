@@ -69,6 +69,7 @@ oc wait $pod --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m
 oc logs $pod | tee $ARTIFACT_DIR/RT-$test.log
 }
 
+sleep 1h
 
 if [ "$SNO_CLUSTER" = "true" ]; then
   RTenable master
