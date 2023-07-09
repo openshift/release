@@ -4,13 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-set -e
-set -x
-echo $SHARED_DIR
-ls -la $SHARED_DIR
-id
-
-
 echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh

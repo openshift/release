@@ -70,17 +70,16 @@ oc logs $pod | tee $ARTIFACT_DIR/RT-$test.log
 }
 
 set -x
-set -e
-echo $SHARED_DIR
-ls -la $SHARED_DIR
-touch $SHARED_DIR/test.txt
-id
 # Fix user IDs in a container
 ~/fix_uid.sh
-touch $SHARED_DIR/test.txt
+ls -la $SHARED_DIR
+cp $SHARED_DIR/kubeconfig $SHARED_DIR/kubeconfig-test
+ls -la $SHARED_DIR
+chmod 666 $SHARED_DIR/kubeconfig
 ls -la $SHARED_DIR
 id
-sleep 30m
+oc get pods
+oc project default
 
 if [ "$SNO_CLUSTER" = "true" ]; then
   RTenable master
@@ -88,9 +87,9 @@ else
   RTenable worker
 fi
 
-cp $SHARED_DIR/kubeconfig /tmp/kubeconfig
-export KUBECONFIG=/tmp/kubeconfig
-oc project default
+# cp $SHARED_DIR/kubeconfig /tmp/kubeconfig
+# export KUBECONFIG=/tmp/kubeconfig
+# oc project default
 
 RTtest "[\"pi_stress\", \"--duration=40\", \"--groups=1\"]"
 RTtest "[\"rteval\", \"--duration=40\"]"
