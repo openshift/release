@@ -6,7 +6,7 @@ set -o pipefail
 
 ls -la $SHARED_DIR
 touch $SHARED_DIR/test.txt
-whoami
+id
 sleep 30m
 
 

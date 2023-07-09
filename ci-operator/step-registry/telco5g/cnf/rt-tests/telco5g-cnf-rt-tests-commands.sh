@@ -71,7 +71,7 @@ oc logs $pod | tee $ARTIFACT_DIR/RT-$test.log
 
 ls -la $SHARED_DIR
 touch $SHARED_DIR/test.txt
-whoami
+id
 sleep 30m
 
 if [ "$SNO_CLUSTER" = "true" ]; then
