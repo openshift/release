@@ -207,7 +207,7 @@ CONFIG = {
         'eu-west-2': 8
     },
     'hypershift-quota-slice': {
-        'default': 15,
+        'default': 30,
     },
     'powervs-1-quota-slice': {
         'mon01': 1,
