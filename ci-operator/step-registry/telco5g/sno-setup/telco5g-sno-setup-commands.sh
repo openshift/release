@@ -6,12 +6,9 @@ set -o pipefail
 
 set -e
 set -x
-ls -la $SHARED_DIR
-touch $SHARED_DIR/test.txt
-mkdir $SHARED_DIR/test
+echo $SHARED_DIR
 ls -la $SHARED_DIR
 id
-sleep 30m
 
 
 echo "************ telco cluster setup command ************"

@@ -69,6 +69,9 @@ oc wait $pod --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m
 oc logs $pod | tee $ARTIFACT_DIR/RT-$test.log
 }
 
+set -x
+set -e
+echo $SHARED_DIR
 ls -la $SHARED_DIR
 touch $SHARED_DIR/test.txt
 id
@@ -76,6 +79,7 @@ id
 ~/fix_uid.sh
 touch $SHARED_DIR/test.txt
 ls -la $SHARED_DIR
+id
 sleep 30m
 
 if [ "$SNO_CLUSTER" = "true" ]; then
