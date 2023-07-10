@@ -215,6 +215,31 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-vsphere
+  optional: true
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        # Creds for the `ci` user in the hive-team cluster
+        # TODO: Get a CI-owned account: DPTP-2348
+        # sleep for 20 minutes
+        echo "starting to sleep, go check the IP addresses!"
+        sleep 1200
+        echo "done sleeping"
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-vsphere-ovn-hybrid-custom-vxlan-port
 zz_generated_metadata:
   branch: master
   org: openshift
