@@ -52,7 +52,7 @@
         channel: '#kubevirt-ci-monitoring',
         notify: 'build-officer',
       },
-      crt: {
+      'crt': {
         team: 'crt',
         channel: '#ops-crt',
       },
