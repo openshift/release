@@ -1,0 +1,21 @@
+workflow:
+  as: rosa-aws-sts-proxy
+  steps:
+    env:
+      HOSTED_CP: "false"
+      COMPUTE_MACHINE_TYPE: "m5.2xlarge"
+      REPLICAS: "2"
+      DISABLE_WORKLOAD_MONITORING: "false"
+      MULTI_AZ: "false"
+      ZONES_COUNT: "1"
+      ENABLE_PROXY: "true"
+    pre:
+    - chain: rosa-aws-sts-provision-proxy
+    post:
+    - ref: rosa-sts-cluster-deprovision
+    - ref: rosa-sts-account-roles-delete
+    - ref: aws-deprovision-s3buckets
+    - ref: aws-deprovision-stacks
+  documentation: |-
+    This workflow installs a single AZ rosa sts cluster configured to use a proxy. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    After finish testing, the cluster will be deprovsioned. If a multi AZ cluster is desired, set ZONES_COUNT and REPLICAS to 3 and MULTI_AZ to true.
