@@ -40,7 +40,7 @@ if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -lt 160 ]; then
 fi
 
 # For leases >= 200, run on the IBM Cloud vSphere 8 env
-if [ ${LEASE_NUMBER} -ge 200 ]; then
+if [ ${LEASE_NUMBER} -ge 200 ] && [ ${LEASE_NUMBER} -lt 221 ]; then
   echo Scheduling job on IBM Cloud instance
   VCENTER_AUTH_PATH=/var/run/vault/vsphere8-secrets/secrets.sh
   vsphere_url="vcenter.ibmc.devcluster.openshift.com"
@@ -49,6 +49,19 @@ if [ ${LEASE_NUMBER} -ge 200 ]; then
   dns_server="192.168.${LEASE_NUMBER}.1"
   vsphere_resource_pool="/IBMCdatacenter/host/IBMCcluster/Resources/ipi-ci-clusters"
   vsphere_cluster="IBMCcluster"
+  vsphere_datastore="vsanDatastore"
+fi
+
+# For leases >= 221, run on the IBM Cloud vSphere env
+if [ ${LEASE_NUMBER} -ge 221 ]; then
+  echo Scheduling job on IBM Cloud instance
+  VCENTER_AUTH_PATH=/var/run/vault/devqe-secrets/secrets.sh
+  vsphere_url="vcenter.devqe.ibmc.devcluster.openshift.com"
+  vsphere_datacenter="DEVQEdatacenter"
+  cloud_where_run="IBMC-DEVQE"
+  dns_server="192.168.${LEASE_NUMBER}.1"
+  vsphere_resource_pool="/DEVQEdatacenter/host/DEVQEcluster/Resources/ipi-ci-clusters"
+  vsphere_cluster="DEVQEcluster"
   vsphere_datastore="vsanDatastore"
 fi
 
