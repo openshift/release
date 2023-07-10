@@ -69,16 +69,6 @@ oc wait $pod --for=jsonpath='{.status.phase}'=Succeeded --timeout=10m
 oc logs $pod | tee $ARTIFACT_DIR/RT-$test.log
 }
 
-set -x
-# Fix user IDs in a container
-# ~/fix_uid.sh
-oc project
-oc project default
-ls -la $SHARED_DIR
-chmod 666 $SHARED_DIR/kubeconfig
-ls -la $SHARED_DIR
-id
-oc project default
 
 if [ "$SNO_CLUSTER" = "true" ]; then
   RTenable master
@@ -86,10 +76,7 @@ else
   RTenable worker
 fi
 
-# cp $SHARED_DIR/kubeconfig /tmp/kubeconfig
-# export KUBECONFIG=/tmp/kubeconfig
-# oc project default
-
+oc project default
 RTtest "[\"pi_stress\", \"--duration=40\", \"--groups=1\"]"
 RTtest "[\"rteval\", \"--duration=40\"]"
 RTtest "[\"deadline_test\", \"-t 1\", \"-i 100000\"]"
