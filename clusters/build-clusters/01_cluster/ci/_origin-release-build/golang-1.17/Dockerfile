@@ -33,7 +33,7 @@ RUN \
     go install github.com/tools/godep@latest && \
     go install golang.org/x/lint/golint@latest && \
     go install github.com/openshift/release/tools/gotest2junit@latest && \
-    go install github.com/openshift/imagebuilder/cmd/imagebuilder@latest && \
+    go install github.com/openshift/imagebuilder/cmd/imagebuilder@v1.2.3 && \
     go install gotest.tools/gotestsum@latest && \
     mv $GOPATH/bin/* /usr/bin/ && \
     rm -rf $GOPATH/* $GOPATH/.cache && \
