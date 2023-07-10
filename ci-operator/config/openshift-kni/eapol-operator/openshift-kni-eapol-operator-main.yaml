@@ -1,6 +1,30 @@
+base_images:
+  authenticator-base:
+    name: "4.14"
+    namespace: ocp
+    tag: base-rhel9
+  operator-base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "9"
 build_root:
   project_image:
     dockerfile_path: images/build-root/Dockerfile
+images:
+- dockerfile_path: Dockerfile
+  from: operator-base
+  inputs:
+    root:
+      as:
+      - golang:1.20
+  to: eapol-operator
+- dockerfile_path: Dockerfile.authenticator
+  from: authenticator-base
+  inputs:
+    root:
+      as:
+      - golang:1.20
+  to: eapol-authenticator
 promotion:
   name: 0.0.1
   namespace: ocp-kni
