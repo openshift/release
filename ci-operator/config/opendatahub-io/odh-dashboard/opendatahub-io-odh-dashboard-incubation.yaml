@@ -7,38 +7,22 @@ images:
 - context_dir: .
   dockerfile_path: Dockerfile
   to: odh-dashboard-image
-promotion:
-  namespace: opendatahub-io
-  tag: latest
-releases:
-  latest:
-    release:
-      architecture: amd64
-      channel: fast
-      version: "4.10"
 resources:
   '*':
     requests:
       cpu: 200m
       memory: 400Mi
 tests:
-- as: odh-dashboard-image-mirror
-  postsubmit: true
+- as: odh-dashboard-image-mirror-nightly
+  cron: 0 2 * * *
   steps:
     dependencies:
       SOURCE_IMAGE_REF: odh-dashboard-image
     env:
       IMAGE_REPO: odh-dashboard
-      RELEASE_VERSION: main
-    workflow: opendatahub-io-ci-image-mirror
-- as: odh-dashboard-pr-image-mirror
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: odh-dashboard-image
-    env:
-      IMAGE_REPO: odh-dashboard
+      IMAGE_TAG: nightly
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
-  branch: main
+  branch: incubation
   org: opendatahub-io
   repo: odh-dashboard
