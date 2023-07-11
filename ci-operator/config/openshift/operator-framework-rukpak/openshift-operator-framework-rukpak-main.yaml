@@ -6,7 +6,7 @@ base_images:
 build_root:
   from_repository: true
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: openshift/Dockerfile
   from: base
   to: olm-rukpak
 promotion:
@@ -35,29 +35,15 @@ tests:
   container:
     from: src
 - as: lint
-  commands: make lint
+  commands: |
+    export XDG_CACHE_HOME=/tmp/.cache
+    make lint
   container:
     from: src
 - as: unit
   commands: make test-unit
   container:
     from: src
-- as: e2e
-  optional: true
-  steps:
-    cluster_profile: gcp
-    test:
-    - as: test
-      cli: latest
-      commands: make e2e
-      dependencies:
-      - env: OLM_RUKPAK_IMAGE
-        name: olm-rukpak
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
 - as: openshift-e2e-aws
   steps:
     cluster_profile: aws
