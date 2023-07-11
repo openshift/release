@@ -26,4 +26,4 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 export ES_INDEX='router-test-results'
 
 # Start the Workload
-CONFIG=config/aws-standard.yml ./run.sh ITERATIONS=5 WORKLOAD=cluster-density-v2 ./run.sh
+CONFIG=config/aws-standard.yml ./run.sh ITERATIONS=5
