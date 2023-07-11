@@ -3,6 +3,7 @@ workflow:
   steps:
     env:
       API_HOST: stage
+      ROSA_LOGIN_ENV: staging
       CHANNEL_GROUP: candidate
       COMPUTE_MACHINE_TYPE: m5.4xlarge
       ENABLE_AUTOSCALING: "false"
@@ -11,9 +12,17 @@ workflow:
       REPLICAS: "2"
       ZONES_COUNT: "1"
       PARALLEL: "true"
+      FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      FIREWATCH_CONFIG: |
+        [
+         {"step": "*", "failure_type": "all", "classification": "Infrastructure", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-380"}
+        ]
+      FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
     post:
     - ref: operator-uninstall
     - chain: rosa-aws-sts-deprovision-byo-vpc
+    - ref : firewatch-report-issues
     pre:
     - chain: rosa-aws-sts-provision-byo-vpc
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
