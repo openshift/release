@@ -18,8 +18,13 @@ source "${SHARED_DIR}/vsphere_context.sh"
 
 third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
-echo "$(date -u --rfc-3339=seconds) - retrieving IPAM controller CI configuration"
+echo "$(date -u --rfc-3339=seconds) - installing IPPools CRD..."
+curl -k https://raw.githubusercontent.com/rvanderp3/machine-ipam-controller/main/hack/ippools.crd.yaml | oc create -f -
 
+echo "$(date -u --rfc-3339=seconds) - allowing time for CRD to be picked up by the API..."
+sleep 30
+
+echo "$(date -u --rfc-3339=seconds) - retrieving IPAM controller CI configuration"
 oc project openshift-machine-api
 
 curl -k https://raw.githubusercontent.com/rvanderp3/machine-ipam-controller/main/hack/ci-resources.yaml | oc process -p THIRD_OCTET="${third_octet}" --local=true -f - | oc create -f -
@@ -49,7 +54,7 @@ oc scale machineset.machine.openshift.io --replicas=2 ${MACHINESET_NAME} -n open
 VALID_STATIC_IP=("192.168.${third_octet}.129" "192.168.${third_octet}.130" "192.168.${third_octet}.131")
 
 echo "$(date -u --rfc-3339=seconds) - validating static IPs are applied to applicable nodes"
-for retries in {1..16}; do  
+for retries in {1..40}; do  
     NODES_VALIDATED=0
     readarray NODEREF_ARRAY <<< "$(oc get machines.machine.openshift.io -n openshift-machine-api -l ipam=true -o=json | jq -r .items[].status.nodeRef.name)"
     if [[ ${#NODEREF_ARRAY[@]} -lt 2 ]]; then
