@@ -6,7 +6,19 @@ set -o pipefail
 
 # This script creates a basic SMCP cr with given version in given namespace.
 # SMCP_VERSION and SMCP_NAMESPACE env variables are required
-# oc client is expected to be logged in
+
+CONSOLE_URL=$(cat $SHARED_DIR/console.url)
+OCP_API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
+OCP_CRED_USR="kubeadmin"
+OCP_CRED_PSW="$(cat ${SHARED_DIR}/kubeadmin-password)"
+
+oc login ${OCP_API_URL} --username=${OCP_CRED_USR} --password=${OCP_CRED_PSW} --insecure-skip-tls-verify=true
+
+if [ ${GATEWAY_API_ENABLED} = "true" ]
+then
+  echo "Installing Gateway API version v0.5.1"
+  oc kustomize "github.com/kubernetes-sigs/gateway-api/config/crd/experimental?ref=v0.5.1" | oc apply -f -
+fi
 
 smcp_name="basic-smcp"
 
@@ -60,6 +72,9 @@ spec:
       enabled: true
     prometheus:
       enabled: true
+  techPreview:
+    gatewayAPI:
+      enabled: ${GATEWAY_API_ENABLED}
 EOF
 
 oc wait --for condition=Ready smcp/${smcp_name} -n ${SMCP_NAMESPACE} --timeout=180s
