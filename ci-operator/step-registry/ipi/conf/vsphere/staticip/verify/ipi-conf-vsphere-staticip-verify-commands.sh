@@ -20,6 +20,8 @@ third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED
 
 echo "$(date -u --rfc-3339=seconds) - retrieving IPAM controller CI configuration"
 
+oc project openshift-machine-api
+
 curl -k https://raw.githubusercontent.com/rvanderp3/machine-ipam-controller/main/hack/ci-resources.yaml | oc process -p THIRD_OCTET="${third_octet}" --local=true -f - | oc create -f -
 
 echo "$(date -u --rfc-3339=seconds) - applying ippool configuration to compute machineset"
