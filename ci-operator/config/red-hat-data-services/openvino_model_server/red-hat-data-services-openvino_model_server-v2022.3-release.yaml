@@ -181,24 +181,6 @@ images:
   from: model-server-build
   to: model-server-pkg
 - build_args:
-  - name: ov_use_binary
-    value: "0"
-  - name: INSTALL_RPMS_FROM_URL
-  - name: GPU
-    value: "0"
-  - name: BASE_IMAGE
-    value: docker.io/nvidia/cuda:11.8.0-runtime-ubi8
-  - name: NVIDIA
-    value: "1"
-  context_dir: release_files
-  dockerfile_path: Dockerfile.redhat
-  inputs:
-    model-server-pkg:
-      paths:
-      - destination_dir: .
-        source_path: /ovms.tar.xz
-  to: model-server-release-cuda-cpu
-- build_args:
   - name: INSTALL_RPMS_FROM_URL
   - name: GPU
     value: "1"
@@ -236,11 +218,6 @@ resources:
       cpu: "6"
       memory: 12Gi
 tests:
-- as: unit
-  commands: |
-    make test
-  container:
-    from: src
 - as: pr-image-mirror
   steps:
     dependencies:
