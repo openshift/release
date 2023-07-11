@@ -3,6 +3,14 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: base
+  openshift_release_golang-1.15:
+    name: release
+    namespace: openshift
+    tag: golang-1.15
+  openshift_release_golang-1.16:
+    name: release
+    namespace: openshift
+    tag: golang-1.16
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -11,16 +19,16 @@ images:
 - dockerfile_path: images/ci/Dockerfile
   from: base
   inputs:
-    root:
+    openshift_release_golang-1.16:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+      - registry.ci.openshift.org/openshift/release:golang-1.16
   to: cluster-resource-override-admission-operator
 - dockerfile_path: images/operator-registry/Dockerfile.registry.ci
   from: base
   inputs:
-    root:
+    openshift_release_golang-1.15:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.20
+      - registry.ci.openshift.org/openshift/release:golang-1.15
   to: cluster-resource-override-admission-operator-registry
 promotion:
   name: 4.15-priv
