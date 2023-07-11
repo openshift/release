@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
   cert-manager-cainjector:
     name: cert-manager-cainjector
     namespace: ci
@@ -19,16 +15,24 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.19-openshift-4.13
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
-  from: base
+  from: ubi
   inputs:
     ocp_builder_rhel-9-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
+    ubi:
+      as:
+      - registry.access.redhat.com/ubi9-minimal:9.2
+      - registry.access.redhat.com/ubi9-minimal:9.1.0
   to: cert-manager-operator
 operator:
   bundles:
