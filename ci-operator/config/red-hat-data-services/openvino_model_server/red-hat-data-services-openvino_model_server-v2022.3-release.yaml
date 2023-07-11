@@ -213,10 +213,16 @@ images:
       paths:
       - destination_dir: .
         source_path: /ovms.tar.xz
-  to: model-server-release-cuda-intel-gpu
+  to: openvino_model_server
 promotion:
-  name: model-server-release-cuda-intel-gpu
+  name: openvino_model_server
   namespace: red-hat-data-services
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -229,6 +235,37 @@ resources:
     requests:
       cpu: "6"
       memory: 12Gi
+tests:
+- as: unit
+  commands: |
+    make test
+  container:
+    from: src
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: openvino_model_server
+    env:
+      IMAGE_REPO: openvino_model_server
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: openvino_model_server
+    env:
+      IMAGE_REPO: openvino_model_server
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- as: nightly-image-mirror
+  cron: 0 0 5 * * ?
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: openvino_model_server
+    env:
+      IMAGE_REPO: openvino_model_server
+      RELEASE_VERSION: nightly
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: v2022.3-release
   org: red-hat-data-services
