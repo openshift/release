@@ -174,21 +174,3 @@ cd /microshift/test || true
 if [ -f ./bin/ci_phase_test.sh ]; then
     ./bin/ci_phase_test.sh
 fi
-
-# VM mapping
-# e2e:  vm0
-# cncf: vm1, vm2
-trap print_test_output EXIT
-run_e2e  &> /tmp/run_e2e_test.log  &
-run_cncf &> /tmp/run_cncf_test.log &
-
-FAIL=0
-for job in $(jobs -p) ; do
-  echo "Waiting for job: $job"
-  wait "$job" || ((FAIL+=1))
-done
-
-if [ "$FAIL" != "0" ]; then
-  echo "Tests failed. Check junit for details"
-  exit 1
-fi
