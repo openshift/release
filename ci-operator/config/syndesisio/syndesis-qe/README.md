@@ -4,7 +4,7 @@
 - [General Information](#general-information)
 - [Purpose](#purpose)
 - [Process](#process)
-    - [Cluster Provisioning and Deprovisioning: `ipi-aws`](#cluster-provisioning-and-deprovisioning-ipi-aws)
+    - [Cluster Provisioning and Deprovisioning: `firewatch-ipi-aws`](#cluster-provisioning-and-deprovisioning-ipi-aws)
     - [Test Setup, Execution, and Reporting Results - `fuse-online-interop-aws`](#test-setup-execution-and-reporting-results---fuse-online-interop-aws)
 - [Prerequisite(s)](#prerequisites)
     - [Environment Variables](#environment-variables)
@@ -24,13 +24,13 @@ To provision the necessary infrastructure and using that infrastructure to execu
 The Fuse Online Interop scenario can be broken into the following basic steps:
 
 1. Provision a test cluster on AWS.
-2. Install the Fuse Online operator and deploy `syndesis-qe`.
-3. Execute tests and archive results.
+2. Create user admin with cluster admin role.
+3. Install Fuse Online operator, deploy. Setup `syndesis-qe`, execute tests and archive results.
 4. Deprovision a test cluster.
 
 ### Cluster Provisioning and Deprovisioning: `ipi-aws`
 
-Please see the [`ipi-aws`](https://steps.ci.openshift.org/workflow/ipi-aws) documentation for more information on this workflow. This workflow is not maintained by the Interop QE team.
+Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/firewatch-ipi-aws) documentation for more information on this workflow. This workflow is not maintained by the Interop QE team.
 
 ### Test Setup, Execution, and Reporting Results - `fuse-online-interop-aws`
 
@@ -44,11 +44,11 @@ Following the test cluster being provisioned, the following steps are executed i
 
 - `BASE_DOMAIN`
     - **Definition**: A fully-qualified domain or subdomain name. The base domain of the cloud provider is used for setting baseDomain variable of the install configuration of the cluster.
-    - **If left empty**: The [`ipi-aws` workflow](../../../step-registry/ipi/aws/ipi-aws-workflow.yaml) will fail.
+    - **If left empty**: The [`firewatch-ipi-aws` workflow](../../../step-registry/firewatch/ipi/aws/firewatch-ipi-aws-workflow.yaml) will fail.
 
 ### Custom Images
 
 - `fuse-online-test-runner`
-    - [Dockerfile](https://github.com/syndesisio/syndesis-qe/blob/1.15.x/docker/Dockerfile)
+    - [Image](http://quay.io/fuse_qe/syndesisqe-tests:1.15.x)
     - The custom image for this step uses the [`alpine/git`](https://hub.docker.com/r/alpine/git) copied into `/tmp/syndesis-qe`.
 
