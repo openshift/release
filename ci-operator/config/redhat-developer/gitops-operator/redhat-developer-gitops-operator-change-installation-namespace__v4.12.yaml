@@ -58,14 +58,20 @@ tests:
     version: "4.12"
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
+    env:
+      INSTALL_NAMESPACE: openshift-gitops-operator
     test:
     - as: install
       cli: latest
-      commands: "operator-sdk run bundle -n openshift-gitops-operator \"$OO_BUNDLE\"\noc
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" \"$OO_BUNDLE\"\noc
         get pods -n openshift-gitops-operator \n"
       dependencies:
       - env: OO_BUNDLE
         name: gitops-operator-bundle
+      env:
+      - name: INSTALL_NAMESPACE
       from: operator-sdk
       resources:
         requests:
