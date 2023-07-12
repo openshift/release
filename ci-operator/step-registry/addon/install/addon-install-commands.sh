@@ -12,11 +12,12 @@ RUN_COMMAND="poetry run python app/cli.py addons --cluster ${CLUSTER_NAME} --tok
 export OCM_TOKEN
 
 # Modify temp aws config file with defaulted region variable
-# TODO AWS_REGION set
+# TODO set AWS_REGION
 AWS_REGION=$LEASED_RESOURCE
 export AWS_CONFIG_FILE="/tmp/.aws_config"
 cat "${CLUSTER_PROFILE_DIR}/.awscred" >> $AWS_CONFIG_FILE
-echo $AWS_REGION >> $AWS_CONFIG_FILE
+echo " " | tee -a $AWS_CONFIG_FILE > /dev/null
+echo "region=${AWS_REGION}" | tee -a $AWS_CONFIG_FILE > /dev/null
 
 
 ADDONS_CMD=""
@@ -41,5 +42,4 @@ RUN_COMMAND+=" install"
 
 echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
 
-sleep 1h
 ${RUN_COMMAND}
