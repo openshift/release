@@ -20,7 +20,7 @@ pushd e2e-benchmarking/workloads/ingress-perf
 
 # ES Configuration
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-export ES_INDEX='router-test-results'
+export ES_INDEX="ingress-performance"
 
 # Start the Workload
 ./run.sh
