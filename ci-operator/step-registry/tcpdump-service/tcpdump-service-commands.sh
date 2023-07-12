@@ -57,7 +57,7 @@ spec:
           [Service]
           Type=oneshot
           ExecStart=rpm-ostree usroverlay
-          ExecStart=rpm -ihv http://mirror.centos.org/centos/8-stream/AppStream/x86_64/os/Packages/tcpdump-4.9.3-3.el8.x86_64.rpm
+          ExecStart=rpm -ihv https://mirror.stream.centos.org/9-stream/AppStream/x86_64/os/Packages/tcpdump-4.99.0-6.el9.x86_64.rpm
           RemainAfterExit=yes
 
           [Install]
