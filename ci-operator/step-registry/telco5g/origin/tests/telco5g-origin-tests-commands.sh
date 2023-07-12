@@ -46,6 +46,7 @@ status=0
 FEATURES_ENVIRONMENT="ci" make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
 cd -
 
+false # fail
 
 set +e
 python3 -m venv ${SHARED_DIR}/myenv
