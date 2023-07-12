@@ -60,7 +60,7 @@ update:
 	$(MAKE) template-allowlist
 
 template-allowlist:
-	./hack/generate-template-allowlist.sh
+	VOLUME_MOUNT_FLAGS="${VOLUME_MOUNT_FLAGS}" ./hack/generate-template-allowlist.sh
 
 release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
