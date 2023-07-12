@@ -39,6 +39,7 @@ OCM_VERSION=$(ocm version)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
 ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+sleep 1h
 
 # Check whether the cluster with the same cluster name existes.
 OLD_CLUSTER_ID=$(ocm list clusters --columns=id --parameter search="name is '${CLUSTER_NAME}'" | tail -n 1)
@@ -137,7 +138,6 @@ fi
 echo "${CLUSTER_PAYLOAD}" | jq -c | ocm post /api/clusters_mgmt/v1/clusters > "${ARTIFACT_DIR}/cluster.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
-sleep 1h
 mkdir -p "${SHARED_DIR}"
 CLUSTER_ID=$(cat "${ARTIFACT_DIR}/cluster.txt" | jq '.id' | tr -d '"')
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
