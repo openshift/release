@@ -49,7 +49,7 @@ COLLECTIVE_OCP_TOKEN=$(cat $SECRETS_DIR/alc/collective-ocp-token)
 export COLLECTIVE_OCP_TOKEN
 
 # run the test execution script
-./../execute_alc_interop_commands.sh || :
+bash +x ./../execute_alc_interop_commands.sh || :
 
 # Copy the test cases results to an external directory
 cp -r ../tests/cypress/results $ARTIFACT_DIR/
