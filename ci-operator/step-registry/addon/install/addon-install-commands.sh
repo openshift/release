@@ -9,16 +9,10 @@ CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 BREW_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/brew-token)
 RUN_COMMAND="poetry run python app/cli.py addons --cluster ${CLUSTER_NAME} --token ${OCM_TOKEN} --api-host ${API_HOST} "
+export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export OCM_TOKEN
-
-# Modify temp aws config file with defaulted region variable
 # TODO set AWS_REGION
-AWS_REGION=$LEASED_RESOURCE
-export AWS_CONFIG_FILE="/tmp/.aws_config"
-cat "${CLUSTER_PROFILE_DIR}/.awscred" >> $AWS_CONFIG_FILE
-echo " " | tee -a $AWS_CONFIG_FILE > /dev/null
-echo "region=${AWS_REGION}" | tee -a $AWS_CONFIG_FILE > /dev/null
-
+export AWS_REGION=$LEASED_RESOURCE
 
 ADDONS_CMD=""
 for addon_value in $(env | grep -E '^ADDON[0-9]+_CONFIG' | sort  --version-sort); do
