@@ -140,8 +140,7 @@ SSH_PRIVATE_KEY=~/.ssh/id_rsa
 EOF
 scp "${SETTINGS_FILE}" "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/test/"
 
+trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info ${ARTIFACT_DIR}' EXIT
+
 # Run the in-repo ci phase script to create the VMs for the test scenarios.
 ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh ${API_EXTERNAL_PORT} ${SSH_EXTERNAL_PORT} ${LB_EXTERNAL_BASE_PORT}"
-
-# Copy the scenario info directory from the host to our artifact directory.
-scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"

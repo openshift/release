@@ -311,7 +311,7 @@ for i in range(230,235):
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(55,56):
+for i in range(223,224):
     CONFIG['vsphere-connected-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(151,158):
