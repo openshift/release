@@ -137,6 +137,7 @@ fi
 echo "${CLUSTER_PAYLOAD}" | jq -c | ocm post /api/clusters_mgmt/v1/clusters > "${ARTIFACT_DIR}/cluster.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
+sleep 1h
 mkdir -p "${SHARED_DIR}"
 CLUSTER_ID=$(cat "${ARTIFACT_DIR}/cluster.txt" | jq '.id' | tr -d '"')
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
