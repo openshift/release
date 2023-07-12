@@ -13,6 +13,7 @@ echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSI
 ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 
 # Deprovision cluster
+sleep 1h
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 echo "Deleting cluster: ${CLUSTER_ID}"
 
