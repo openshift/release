@@ -305,8 +305,24 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-cert-rotation
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
-- as: aws-ipi-ovn-hypershift-control-plane-p1-f7
-  cron: 15 19 4,11,18,26 * *
+- as: aws-ipi-ovn-hypershift-inplace-p1-f7
+  cron: 55 4 4,11,19,27 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EXTRA_ARGS: --node-upgrade-type=InPlace
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @aws-ipi and @hypershift-hosted
+        and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @aws-ipi and @hypershift-hosted
+        and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-ovn-hypershift-replace-p1-f7
+  cron: 39 0 8,16,23,30 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -318,7 +334,7 @@ tests:
         and not @fips'
     test:
     - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-hypershift-control-plane
+    - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-ingress-nlb-p2-f28
   cron: 48 4 7 * *
@@ -715,7 +731,7 @@ tests:
 - as: vsphere-ipi-disconnected-registry-pvc-p2-f28
   cron: 37 0 6 * *
   steps:
-    cluster_profile: vsphere-discon
+    cluster_profile: vsphere-dis
     env:
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-ipi and not @fips'
@@ -772,7 +788,7 @@ tests:
 - as: vsphere-ipi-proxy-fips-cert-rotation-p2-f14
   cron: 37 18 15,30 * *
   steps:
-    cluster_profile: vsphere-discon
+    cluster_profile: vsphere-dis
     env:
       FIPS_ENABLED: "true"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-ipi'
@@ -784,7 +800,7 @@ tests:
 - as: vsphere-ipi-proxy-fips-p2-f28
   cron: 49 2 30 * *
   steps:
-    cluster_profile: vsphere-discon
+    cluster_profile: vsphere-dis
     env:
       FIPS_ENABLED: "true"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-ipi'
@@ -796,7 +812,7 @@ tests:
 - as: vsphere-ipi-proxy-workers-rhel8-p2-f28
   cron: 44 22 10 * *
   steps:
-    cluster_profile: vsphere-discon
+    cluster_profile: vsphere-dis
     env:
       PLATFORM_VERSION: "8.6"
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-ipi and not @fips'
@@ -819,7 +835,7 @@ tests:
 - as: vsphere-upi-disconnected-sdn-workers-rhcos-rhel8-p2-f28
   cron: 38 8 20 * *
   steps:
-    cluster_profile: vsphere-discon
+    cluster_profile: vsphere-dis
     env:
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @vsphere-upi and @disconnected
@@ -833,7 +849,7 @@ tests:
 - as: vsphere-upi-disconnected-secureboot-fips-p2-f28
   cron: 19 11 27 * *
   steps:
-    cluster_profile: vsphere-discon
+    cluster_profile: vsphere-dis
     env:
       FIPS_ENABLED: "true"
       TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&

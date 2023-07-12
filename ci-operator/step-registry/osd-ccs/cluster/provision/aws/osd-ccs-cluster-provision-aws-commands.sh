@@ -87,6 +87,7 @@ echo "  Openshift version: ${OPENSHIFT_VERSION}"
 echo "  Channel group: ${CHANNEL_GROUP}"
 echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
+echo "  Fips: ${FIPS}"
 
 # Cluster payload
 # Using the default aws credentials but not the user osdCcsAdmin's credentials to provision cluster
@@ -128,6 +129,10 @@ CLUSTER_PAYLOAD=$(echo -e '{
     "secret_access_key": "'${AWS_SECRET_ACCESS_KEY}'"
   }
 }')
+
+if [[ "$FIPS" == "true" ]]; then
+  CLUSTER_PAYLOAD=$(echo "${CLUSTER_PAYLOAD}" | jq '. +={"fips":true}')
+fi
 
 echo "${CLUSTER_PAYLOAD}" | jq -c | ocm post /api/clusters_mgmt/v1/clusters > "${ARTIFACT_DIR}/cluster.txt"
 
