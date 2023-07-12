@@ -33,6 +33,7 @@ fi
 chmod 0755 ~
 mkdir ~/rpms
 tar -xf /tmp/rpms.tar -C ~/rpms
+find ~/rpms
 tar -xf /tmp/microshift.tgz -C ~
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
