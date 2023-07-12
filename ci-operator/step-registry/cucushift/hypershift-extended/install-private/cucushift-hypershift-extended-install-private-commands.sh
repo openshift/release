@@ -12,6 +12,9 @@ bin/hypershift install --hypershift-image="${HYPERSHIFT_RELEASE_LATEST}" \
 --private-platform=AWS \
 --aws-private-creds=/etc/hypershift-pool-aws-credentials/awsprivatecred \
 --aws-private-region="${HYPERSHIFT_AWS_REGION}" \
+--external-dns-credentials=${CLUSTER_PROFILE_DIR}/.awscred \
+--external-dns-provider=aws \
+--external-dns-domain-filter=hypershift-ext.qe.devcluster.openshift.com \
 --wait-until-available
 
 echo "" > ${SHARED_DIR}/.awsprivatecred
