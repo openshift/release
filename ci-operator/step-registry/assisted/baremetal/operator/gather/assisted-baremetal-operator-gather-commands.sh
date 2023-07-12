@@ -25,6 +25,8 @@ function getlogs() {
 # Gather logs regardless of what happens after this
 trap getlogs EXIT
 
+sleep 1h
+
 echo "### Gathering logs..."
 # shellcheck disable=SC2087
 timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOF"
