@@ -299,6 +299,12 @@ for i in range(89,93):
 for i in range(94,109):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
+for i in range(130,133):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(134,140):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
 for i in range(56,60):
     CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
 

@@ -7,6 +7,10 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -78,12 +82,15 @@ tests:
         tests/e2e/route tests/e2e/targetallocator-features tests/e2e/prometheus-config-validation
         tests/e2e/smoke-targetallocator tests/e2e-openshift/otlp-metrics-traces
     test:
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-jaeger-product
+    - ref: distributed-tracing-install-tempo-product
     - as: install
       cli: latest
       commands: |
-        oc create namespace opentelemetry-operator
-        operator-sdk run bundle -n opentelemetry-operator "$OO_BUNDLE"
-        oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-operators "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-operators deployment opentelemetry-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle
@@ -92,10 +99,6 @@ tests:
         requests:
           cpu: 1000m
           memory: 400Mi
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-amq-streams
-    - ref: distributed-tracing-install-jaeger-product
-    - ref: distributed-tracing-install-tempo-product
     - ref: distributed-tracing-tests-opentelemetry
     workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:

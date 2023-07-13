@@ -23,8 +23,6 @@ To provision the necessary infrastructure and using that infrastructure to execu
 
 The OpenTelemetry Operator scenario can be broken into the following basic steps:
 
-The OpenTelemetry Operator scenario can be broken into the following basic steps:
-
 Testing released version of OpenTelemetry operator with unreleased OpenShift version.
 
 1. Build the containerized OpenTelemetry tests executor image.
