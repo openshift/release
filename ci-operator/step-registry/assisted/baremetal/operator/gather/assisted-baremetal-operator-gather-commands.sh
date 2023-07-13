@@ -33,10 +33,10 @@ oc get node -o json  | jq '.items[] | { name: .metadata.name, address: .status.a
 
 jq -c '.[]' $HOSTFILE | while read item
 do
-  NAME=$(jq .name <<< $item)
+  NODENAME=$(jq .name <<< $item)
   HOSTIP=$(jq .ip <<< $item)
   
-  export REPORT_PATH=/host/tmp/artifacts/sos-node/$name
+  export REPORT_PATH=/host/tmp/artifacts/sos-node/$NODENAME
   mkdir -p $REPORT_PATH 
 
   timeout -s 9 30m ssh "${SSHOPTS[@]}" "core@$HOSTIP" DISCONNECTED="${DISCONNECTED:-}" bash - << EOF
