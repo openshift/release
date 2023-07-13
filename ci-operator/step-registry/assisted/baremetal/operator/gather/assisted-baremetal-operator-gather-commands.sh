@@ -25,7 +25,28 @@ function getlogs() {
 # Gather logs regardless of what happens after this
 trap getlogs EXIT
 
-sleep 1h
+
+echo '#### Gathering Sos reports from all Nodes'
+export HOSTFILE=/tmp/artifacts/hosts.json
+
+oc get node -o json  | jq '.items[] | { name: .metadata.name, address: .status.addresses[0].address }' | tee $HOSTFILE
+
+jq -c '.[]' $HOSTFILE | while read item
+do
+  NAME=$(jq .name <<< $item)
+  HOSTIP=$(jq .ip <<< $item)
+  
+  export REPORT_PATH=/host/tmp/artifacts/sos-node/$name
+  mkdir -p $REPORT_PATH 
+
+  timeout -s 9 30m ssh "${SSHOPTS[@]}" "core@$HOSTIP" DISCONNECTED="${DISCONNECTED:-}" bash - << EOF
+toolbox 'sos report --batch --tmp-dir /host/$REPORT_PATH --all-logs \
+  -o logs,crio,container_log,containers_common,openshift.host,openshift.podlogs,crio.logs,crio.all,boot.all-images
+EOF
+
+done
+
+scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
 
 echo "### Gathering logs..."
 # shellcheck disable=SC2087
