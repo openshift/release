@@ -41,7 +41,7 @@ do
 
   timeout -s 9 30m ssh "${SSHOPTS[@]}" "core@$HOSTIP" DISCONNECTED="${DISCONNECTED:-}" bash - << EOF
 toolbox 'sos report --batch --tmp-dir /host/$REPORT_PATH --all-logs \
-  -o logs,crio,container_log,containers_common,openshift.host,openshift.podlogs,crio.logs,crio.all,boot.all-images
+  -o logs,crio,container_log,containers_common,openshift.host,openshift.podlogs,crio.logs,crio.all,boot.all-images'
 EOF
 
 done
