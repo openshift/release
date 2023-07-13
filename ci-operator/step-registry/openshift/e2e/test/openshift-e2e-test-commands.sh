@@ -139,7 +139,13 @@ aws|aws-arm64)
 azure4|azure-arm64) export TEST_PROVIDER=azure;;
 azurestack)
     export TEST_PROVIDER="none"
+    echo "debug1: $AZURE_AUTH_LOCATION"
     export AZURE_AUTH_LOCATION=${SHARED_DIR}/osServicePrincipal.json
+    echo "debug2: $AZURE_AUTH_LOCATION"
+    if [[ -f "${CLUSTER_PROFILE_DIR}/ca.pem" ]]; then
+        export REQUESTS_CA_BUNDLE="${CLUSTER_PROFILE_DIR}/ca.pem"
+        export SSL_CERT_FILE="${CLUSTER_PROFILE_DIR}/ca.pem"
+    fi
     ;;
 vsphere)
     # shellcheck disable=SC1090
@@ -177,6 +183,8 @@ ibmcloud*)
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
+
+echo "debug3: $AZURE_AUTH_LOCATION"
 
 mkdir -p /tmp/output
 cd /tmp/output
@@ -455,6 +463,9 @@ do
 done
 
 echo "[$(date)] All imagestreams are imported."
+
+echo "debug: sleep 3600"
+sleep 3600
 
 case "${TEST_TYPE}" in
 upgrade-conformance)
