@@ -23,8 +23,6 @@ To provision the necessary infrastructure and using that infrastructure to execu
 
 The Tempo Operator scenario can be broken into the following basic steps:
 
-The Tempo Operator scenario can be broken into the following basic steps:
-
 Testing released Tempo operator version with unreleased OpenShift version.
 
 1. Build the Tempo Operator image.
