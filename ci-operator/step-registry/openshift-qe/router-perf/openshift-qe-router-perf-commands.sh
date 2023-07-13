@@ -13,7 +13,7 @@ source ./venv_qe/bin/activate
 
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
-GSHEET_KEY_LOCATION="/secret/ga-gsheet/gcp-sa-account"
+GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
 export GSHEET_KEY_LOCATION
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
