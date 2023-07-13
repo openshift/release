@@ -80,6 +80,7 @@ chain:
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
         --release-image ${RELEASE_IMAGE} \
+        --ssh-key=${CLUSTER_PROFILE_DIR}/ssh-publickey \
         --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
         --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)"
 
@@ -88,6 +89,11 @@ chain:
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+      
+      if [ "$(oc get hostedcluster/${CLUSTER_NAME} -n clusters -o=jsonpath='{.spec.platform.aws.endpointAccess}')" == "Private" ]; then
+        exit 0
+      fi
+      
       echo "Waiting for clusteroperators to be ready"
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       until \
