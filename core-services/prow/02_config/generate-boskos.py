@@ -73,6 +73,12 @@ CONFIG = {
     'aws-perf-qe-quota-slice': {
         'us-west-2': 3,
     },
+    'aws-perfscale-qe-quota-slice': {
+        'us-west-2': 10,
+    },
+    'aws-perfscale-lrc-qe-quota-slice': {
+        'us-west-2': 5,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
