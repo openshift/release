@@ -23,7 +23,4 @@ trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-image
 
 # Run the scenario tests, if the phase script exists
 # (we can clean this up after the main PR lands)
-cd /microshift/test || true
-if [ -f ./bin/ci_phase_test.sh ]; then
-    ./bin/ci_phase_test.sh
-fi
+ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/microshift/bin/ci_phase_test.sh"
