@@ -30,6 +30,8 @@ if [[ -n "$SKIP_TESTS_TO_REMOVE" ]]; then
   rm -rf $SKIP_TESTS_TO_REMOVE
 fi
 
+sleep 21600
+
 # Execute OpenTelemetry e2e tests
 KUBECONFIG=$KUBECONFIG kuttl test \
   --report=xml \
