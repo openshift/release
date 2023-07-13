@@ -501,6 +501,9 @@ wait "$!"
 ret="$?"
 set -e
 
+# jiwei debug
+cp "${dir}/auth/kubeconfig" "${ARTIFACT_DIR}"
+
 if [ "$ret" -ne 0 ]; then
   set +e
   # Attempt to gather bootstrap logs.

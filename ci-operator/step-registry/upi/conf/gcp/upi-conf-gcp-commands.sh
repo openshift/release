@@ -77,6 +77,9 @@ fi
 
 echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
+# jiwei debug
+cp "${dir}/install-config.yaml" "${ARTIFACT_DIR}"
+
 ### Create manifests
 echo "Creating manifests..."
 openshift-install --dir="${dir}" create manifests &
