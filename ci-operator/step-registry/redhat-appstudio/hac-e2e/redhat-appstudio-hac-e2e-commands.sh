@@ -53,7 +53,8 @@ EOF
 
 # Install HAC in ephemeral cluster
 
-curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/main/hack/hac/installHac.sh -o installHac.sh
+#curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/main/hack/hac/installHac.sh -o installHac.sh
+curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/1699c7889806b0328dfc9d86bac626fdcf3c5acc/hack/hac/installHac.sh -o installHac.sh
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
 oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
