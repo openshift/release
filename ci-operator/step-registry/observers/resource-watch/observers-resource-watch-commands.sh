@@ -8,27 +8,30 @@ export STORE_PATH="${ARTIFACT_DIR}/resource-watch-store"
 export REPOSITORY_PATH="${ARTIFACT_DIR}/resource-watch-store/repo"
 
 function cleanup() {
-  echo "killing resource watch"
+  local signal=$1
+  echo "killing resource watch at $(date), signal=${signal}"
   CHILDREN=$(jobs -p)
   if test -n "${CHILDREN}"
   then
     kill ${CHILDREN} && wait
   fi
 
-  # Ensure the STORE_PATH dir exists to avoid this function from exiting with it's own
-  # error. The dir should be there so make a log to indicate when it's not.
-  if [[ ! -d "$STORE_PATH" ]]; then
-    echo "${STORE_PATH} resource-watch dir does not exist"
-    mkdir -p "$STORE_PATH"
-  fi
-  tar -czC $STORE_PATH -f "${ARTIFACT_DIR}/resource-watch-store.tar.gz" .
-  rm -rf $STORE_PATH
+  echo "Artifact dir:"
+  ls -l ${ARTIFACT_DIR}
 
-  echo "ended resource watch gracefully"
+  echo "repo dir"
+  ls -l ${STORE_PATH}
+  tar -czC $STORE_PATH -f "${ARTIFACT_DIR}/resource-watch-store.tar.gz" .
+
+  echo "${signal}: ended resource watch gracefully"
 
   exit 0
 }
-trap cleanup EXIT
+
+# Make traps for each type of signal so we know what signal was trapped.
+trap 'cleanup SIGINT' SIGINT
+trap 'cleanup SIGTERM' SIGTERM
+trap 'cleanup EXIT' EXIT
 
 # $KUBECONFIG could not be available when the observer first starts
 echo "waiting for $KUBECONFIG or $KUBECONFIGMINIMAL to exist"
@@ -54,5 +57,11 @@ then
 fi
 
 openshift-tests run-resourcewatch > "${ARTIFACT_DIR}/run-resourcewatch.log" 2>&1 &
+resourcewatch_pid=$!
+echo "Started openshift-tests run-resourcewatch with PID $resourcewatch_pid"
+
 openshift-tests run-monitor --artifact-dir $STORE_PATH > "${ARTIFACT_DIR}/run-monitor.log" 2>&1 &
+runmonitor_pid=$!
+echo "Started openshift-tests run-monitor with PID $runmonitor_pid"
+
 wait
