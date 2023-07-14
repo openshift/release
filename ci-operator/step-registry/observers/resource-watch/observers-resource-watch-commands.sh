@@ -15,6 +15,12 @@ function cleanup() {
     kill ${CHILDREN} && wait
   fi
 
+  # Ensure the STORE_PATH dir exists to avoid this function from exiting with it's own
+  # error. The dir should be there so make a log to indicate when it's not.
+  if [[ ! -d "$STORE_PATH" ]]; then
+    echo "${STORE_PATH} resource-watch dir does not exist"
+    mkdir -p "$STORE_PATH"
+  fi
   tar -czC $STORE_PATH -f "${ARTIFACT_DIR}/resource-watch-store.tar.gz" .
   rm -rf $STORE_PATH
 
