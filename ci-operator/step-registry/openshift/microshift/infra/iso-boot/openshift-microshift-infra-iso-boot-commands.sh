@@ -30,9 +30,8 @@ chmod 0600 "${HOME}/.ssh/config"
 # already been copied into place in the iso-build step.
 SETTINGS_FILE="${SHARED_DIR}/scenario_settings.sh"
 cat <<EOF >"${SETTINGS_FILE}"
-PUBLIC_IP=${IP_ADDRESS}
-SSH_PUBLIC_KEY=~/.ssh/id_rsa.pub
-SSH_PRIVATE_KEY=~/.ssh/id_rsa
+SSH_PUBLIC_KEY=\${HOME}/.ssh/id_rsa.pub
+SSH_PRIVATE_KEY=\${HOME}/.ssh/id_rsa
 EOF
 scp "${SETTINGS_FILE}" "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/test/"
 
