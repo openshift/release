@@ -42,4 +42,6 @@ export SMALL_SCALE_CLIENTS_MIX='1 125'
 export GEN_CSV='true'
 
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
-./ingress-performance.sh
+
+rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
+./ingress-performance.sh  |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
