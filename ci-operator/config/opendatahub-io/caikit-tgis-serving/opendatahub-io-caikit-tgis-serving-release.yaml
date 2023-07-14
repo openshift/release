@@ -1,0 +1,52 @@
+base_images:
+  base:
+    name: text-generation-inference
+    namespace: opendatahub-io
+    tag: stable
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: .
+  dockerfile_path: Dockerfile
+  from: base
+  to: caikit-tgis-serving
+promotion:
+  namespace: opendatahub-io
+  tag: stable
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: caikit-tgis-serving
+    env:
+      IMAGE_REPO: caikit-tgis-serving
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: caikit-tgis-serving
+    env:
+      IMAGE_REPO: caikit-tgis-serving
+      RELEASE_VERSION: stable
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: release
+  org: opendatahub-io
+  repo: caikit-tgis-serving
