@@ -10,6 +10,9 @@ mkdir /tmp/kuttl-manifests
 #Copy the opentelemetry-operator repo files to a writable directory by kuttl
 cp -R /tmp/opentelemetry-operator /tmp/opentelemetry-tests && cd /tmp/opentelemetry-tests
 
+#Set Target Allocator image in test files.
+TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
+
 # Remove test cases to be skipped from the test run
 IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
 SKIP_TESTS_TO_REMOVE=""

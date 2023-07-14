@@ -63,6 +63,10 @@ Use to execute the `OpenTelemetry E2E tests` [opentelemetry-e2e-tests](https://g
   - **Definition**: Space seperated test cases to skip from the test run. Example "tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation".
   - **If left empty**: All the e2e tests are run.
 
+- `TARGETALLOCATOR_IMG`
+  - **Definition**: The Target Allocator image used in testing".
+  - **If left empty**: No image is set.
+
 ### Other:
 
 ## Custom Image:
