@@ -21,9 +21,4 @@ chmod 0600 "${HOME}/.ssh/config"
 
 trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info ${ARTIFACT_DIR}' EXIT
 
-# Run the scenario tests, if the phase script exists
-# (we can clean this up after the main PR lands)
-cd /microshift/test || true
-if [ -f ./bin/ci_phase_test.sh ]; then
-    ./bin/ci_phase_test.sh
-fi
+ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/microshift/test/bin/ci_phase_test.sh"
