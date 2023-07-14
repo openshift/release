@@ -82,31 +82,6 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: istio-operator-integration-test-3-0
-      cli: latest
-      commands: |
-        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
-          entrypoint \
-          sh -c \
-          "export KUBECONFIG=/work/ci-kubeconfig; \
-          kubectl get pod -n ${MAISTRA_NAMESPACE}; \
-          make deploy \
-          make test.integration.ocp"
-        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
-      credentials:
-      - mount_path: /maistra-secrets
-        name: maistra-dev-prow
-        namespace: test-credentials
-      env:
-      - name: MAISTRA_NAMESPACE
-      - name: MAISTRA_SC_POD
-      - name: XDG_CACHE_HOME
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 100Mi
-      timeout: 2h0m0s
     - as: istio-operator-push-image-3-0
       cli: latest
       commands: |
@@ -130,6 +105,31 @@ tests:
       - name: GOCACHE
       - name: GOBIN
       - name: GOMODCACHE
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    - as: istio-operator-integration-test-3-0
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          sh -c \
+          "export KUBECONFIG=/work/ci-kubeconfig; \
+          kubectl get pod -n ${MAISTRA_NAMESPACE}; \
+          make deploy \
+          make test.integration.ocp"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
       from: src
       resources:
         requests:
