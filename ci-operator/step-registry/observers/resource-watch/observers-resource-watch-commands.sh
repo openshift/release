@@ -7,24 +7,32 @@ set -o pipefail
 export STORE_PATH="${ARTIFACT_DIR}/resource-watch-store"
 export REPOSITORY_PATH="${ARTIFACT_DIR}/resource-watch-store/repo"
 
+cleanup_executed=false
+
 function cleanup() {
-  local signal=$1
-  echo "killing resource watch at $(date), signal=${signal}"
-  CHILDREN=$(jobs -p)
-  if test -n "${CHILDREN}"
-  then
-    kill ${CHILDREN} && wait
+  if ! $cleanup_executed; then
+
+    # Avoid the cleanup happening more than once.
+    cleanup_executed=true
+
+    local signal=$1
+    echo "killing resource watch at $(date), signal=${signal}"
+    CHILDREN=$(jobs -p)
+    if test -n "${CHILDREN}"
+    then
+      kill ${CHILDREN} && wait
+    fi
+
+    echo "Artifact dir:"
+    ls -l ${ARTIFACT_DIR}
+
+    echo "Resource watch store dir:"
+    ls -l ${STORE_PATH}
+    tar -czC $STORE_PATH -f "${ARTIFACT_DIR}/resource-watch-store.tar.gz" .
+    rm -rf ${STORE_PATH}
+
+    echo "${signal}: ended resource watch gracefully"
   fi
-
-  echo "Artifact dir:"
-  ls -l ${ARTIFACT_DIR}
-
-  echo "repo dir"
-  ls -l ${STORE_PATH}
-  tar -czC $STORE_PATH -f "${ARTIFACT_DIR}/resource-watch-store.tar.gz" .
-
-  echo "${signal}: ended resource watch gracefully"
-
   exit 0
 }
 
