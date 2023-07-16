@@ -207,7 +207,7 @@ CONFIG = {
         'eu-west-2': 8
     },
     'hypershift-quota-slice': {
-        'default': 15,
+        'default': 30,
     },
     'powervs-1-quota-slice': {
         'mon01': 1,
@@ -299,6 +299,12 @@ for i in range(89,93):
 for i in range(94,109):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
+for i in range(130,133):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
+for i in range(134,140):
+    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+
 for i in range(56,60):
     CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
 
@@ -311,7 +317,7 @@ for i in range(230,235):
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(55,56):
+for i in range(223,224):
     CONFIG['vsphere-connected-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(151,158):

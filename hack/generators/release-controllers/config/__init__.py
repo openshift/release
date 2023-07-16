@@ -26,6 +26,9 @@ class RCPaths:
         self.path_rc_deployments = self.path_base.joinpath('clusters/app.ci/release-controller')
         self.path_rc_rpms = self.path_base.joinpath('clusters/build-clusters/common/release-controller')
 
+        # CRT Resources
+        self.path_crt_resources = self.path_base.joinpath('clusters/app.ci/crt')
+
         # TRT Resources
         self.path_trt_resources = self.path_base.joinpath('clusters/app.ci/trt')
 
