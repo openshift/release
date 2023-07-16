@@ -6,6 +6,8 @@ set -o pipefail
 
 echo "************ baremetalds assisted operator gather command ************"
 
+sleep 2h
+
 if [[ ! -e "${SHARED_DIR}/server-ip" ]]; then
   echo "No server IP found; skipping log gathering."
   exit 0
