@@ -6,7 +6,7 @@ set -o pipefail
 set -o verbose
 
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
-RUN_COMMAND="poetry run python app/cli.py --action ${ACTION} --clusters-install-data-directory ${CLUSTER_INSTALL_DATA_DIRECTORY}"
+RUN_COMMAND="poetry run python app/cli.py --action ${ACTION} --clusters-install-data-directory ${CLUSTER_INSTALL_DATA_DIRECTORY} "
 
 export OCM_TOKEN
 
@@ -20,7 +20,7 @@ for cluster_value in $(env | grep -E '^CLUSTER[0-9]+_CONFIG' | sort  --version-s
     fi
 done
 
-RUN_COMMAND="${RUN_COMMAND} ${CLUSTERS_CMD} "
+RUN_COMMAND+="${CLUSTERS_CMD} "
 
 if [[ -n "${OCM_ENVIRONMENT}" ]]; then
     RUN_COMMAND+=" --ocm-env=${S3_BUCKET_NAME} "
