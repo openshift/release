@@ -57,4 +57,4 @@ EOF
 }
 
 set_proxy
-#create_platform_operator
+create_platform_operator
