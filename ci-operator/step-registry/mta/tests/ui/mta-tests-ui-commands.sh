@@ -31,5 +31,5 @@ cp /tmp/tackle-ui-tests/cypress/reports/junitreport.xml $ARTIFACT_DIR/junit_tack
 if [ -d "/tmp/tackle-ui-tests/cypress/screenshots/" ]; then
     echo "Archiving  /tmp/tackle-ui-tests/cypress/screenshots/* to ARTIFACT_DIR/screenshots"
     mkdir -p $ARTIFACT_DIR/screenshots
-    cp  /tmp/tackle-ui-tests/cypress/screenshots/* $ARTIFACT_DIR/screenshots/
+    cp -r /tmp/tackle-ui-tests/cypress/screenshots/* $ARTIFACT_DIR/screenshots/
 fi

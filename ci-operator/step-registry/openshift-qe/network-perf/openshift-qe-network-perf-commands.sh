@@ -24,4 +24,7 @@ oc delete ns netperf --wait=true --ignore-not-found=true
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
 export TOLERANCE=90
-WORKLOAD=full-run.yaml ./run.sh
+
+rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
+
+WORKLOAD=full-run.yaml ./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"

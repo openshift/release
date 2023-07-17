@@ -1,0 +1,60 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- build_args:
+  - name: MANIFEST_RELEASE
+    value: feature-rearchitecture
+  context_dir: .
+  dockerfile_path: Dockerfiles/Dockerfile
+  from: os
+  to: opendatahub-operator
+operator:
+  bundles:
+  - dockerfile_path: Dockerfiles/bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/opendatahub/opendatahub-operator:dev-0.0.1
+    with: pipeline:opendatahub-operator
+releases:
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: opendatahub-operator-pr-image-mirror
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator
+    env:
+      IMAGE_REPO: opendatahub-operator
+    workflow: opendatahub-io-ci-image-mirror
+- as: opendatahub-operator-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: opendatahub-operator
+    env:
+      IMAGE_REPO: opendatahub-operator
+      RELEASE_VERSION: feature-rearchitecture
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: feature-rearchitecture
+  org: opendatahub-io
+  repo: opendatahub-operator
