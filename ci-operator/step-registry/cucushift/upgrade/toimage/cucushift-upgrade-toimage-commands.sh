@@ -474,7 +474,7 @@ function check_upgrade_status() {
         fi
     done
     if (( wait_upgrade <= 0 )); then
-        echo >&2 "Upgrade timeout, exiting" && return 1
+        echo -e "Upgrade timeout, exiting\n" && return 1
     fi
 }
 
