@@ -1816,12 +1816,13 @@ tests:
   steps:
     cluster_profile: azurestack-qe
     env:
-      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes'
       FIPS_ENABLED: "true"
-      TAG_VERSION: '@4.12'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-stack-ipi
+      SLEEP_DURATION: 3h
+    post:
+    - ref: cucushift-installer-wait
+    - chain: cucushift-installer-rehearse-azure-stack-ipi-deprovision
+    pre:
+    - chain: cucushift-installer-rehearse-azure-stack-ipi-provision
 - as: azure-stack-ipi-fips-p3-f28-destructive
   cluster: build01
   cron: 12 13 15 * *
