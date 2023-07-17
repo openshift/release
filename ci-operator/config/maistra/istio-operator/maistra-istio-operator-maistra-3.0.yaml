@@ -71,8 +71,6 @@ tests:
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
         oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
-        oc cp "${KUBECONFIG}" "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/ci-kubeconfig
-        oc cp `which oc` "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/bin
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
@@ -117,9 +115,11 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
+          oc cp "${KUBECONFIG}" "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/ci-kubeconfig; \
+          oc cp `which oc` "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/bin; \
           "export KUBECONFIG=/work/ci-kubeconfig; \
           kubectl get pod -n ${MAISTRA_NAMESPACE}; \
-          make deploy \
+          make deploy; \
           make test.integration.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
