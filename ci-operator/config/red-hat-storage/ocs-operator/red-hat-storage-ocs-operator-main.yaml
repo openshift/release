@@ -4,9 +4,15 @@ build_root:
     namespace: openshift
     tag: rhel-9-release-golang-1.20-openshift-4.14
 images:
-- dockerfile_path: Dockerfile
+- build_args:
+  - name: LDFLAGS
+    value: -X github.com/red-hat-storage/ocs-operator/v4/version.Version=4.14.0
+  dockerfile_path: Dockerfile
   to: ocs-operator
-- dockerfile_path: metrics/Dockerfile
+- build_args:
+  - name: LDFLAGS
+    value: -X github.com/red-hat-storage/ocs-operator/v4/version.Version=4.14.0
+  dockerfile_path: metrics/Dockerfile
   to: ocs-metrics-exporter
 operator:
   bundles:
@@ -35,7 +41,6 @@ tests:
   container:
     from: src
 - as: ocs-operator-bundle-e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
     test:

@@ -49,6 +49,14 @@ fi
 # For leases >= than 151 and < 160, pull from alternate DNS which has context
 # relevant to NSX-T segments.
 if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -lt 160 ]; then
+  echo Scheduling job on IBM Cloud instance
+  VCENTER_AUTH_PATH=/var/run/vault/ibmcloud/secrets.sh
+  vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
+  vsphere_datacenter="IBMCloud"
+  cloud_where_run="IBM"
+  vsphere_resource_pool="/IBMCloud/host/vcs-ci-workload/Resources"
+  vsphere_cluster="vcs-ci-workload"
+  vsphere_datastore="vsanDatastore"
   dns_server="192.168.133.73"
 fi
 

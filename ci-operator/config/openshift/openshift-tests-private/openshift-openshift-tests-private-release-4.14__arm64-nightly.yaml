@@ -1590,6 +1590,22 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-usertags
+- as: azure-ipi-workload-identity-tp-p1-f14
+  cron: 17 17 9,24 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      FEATURE_SET: TechPreviewNoUpgrade
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-cco-manual-workload-identity
 - as: azure-upi-p3-f28
   cron: 17 17 19 * *
   steps:
@@ -1803,6 +1819,27 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-disconnected-proxy
+- as: baremetal-sno-agent-ipv4-static-connected-p1-f7
+  cluster: build05
+  cron: 30 21 * * 2
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@baremetal-upi and @arm64 and @network-ovnkubernetes and @singlenode
+        and not @fips'
+      RESERVE_BOOTSTRAP: "false"
+      TAG_VERSION: '@4.14'
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-static
 zz_generated_metadata:
   branch: release-4.14
   org: openshift
