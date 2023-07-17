@@ -7,12 +7,7 @@ build_root:
   from_repository: true
 images:
 - dockerfile_path: build/Dockerfile
-  to: unused
-operator:
-  bundles:
-  - as: my-bundle
-    dockerfile_path: build/Dockerfile
-    skip_building_index: true
+  to: dvo-operator
 resources:
   '*':
     limits:
@@ -65,12 +60,13 @@ tests:
     - as: install
       cli: latest
       commands: |
+        python hack/generate-operator-bundle-contents.py -n deployment-validation-operator -c testing -i pipeline:dvo-operator -t latest -o bundle/manifests/ --no-nodeAffinity
         oc create namespace deployment-validation-operator
-        operator-sdk run bundle -n deployment-validation-operator "$OO_BUNDLE"
+        operator-sdk generate bundle --package=deployment-validation-operator --input-dir=bundle/manifests --metadata
+        podman build -f bundle.Dockerfile -t quay.io/jfula/dvo-bundle-test
+        podman push quay.io/jfula/dvo-bundle-test
+        operator-sdk run bundle quay.io/jfula/dvo-bundle-test:latest --namespace deployment-validation-operator --skip-tls
         oc wait --for condition=Available -n deployment-validation-operator deployment-operator
-      dependencies:
-      - env: OO_BUNDLE
-        name: my-bundle
       from: operator-sdk
       resources:
         requests:
