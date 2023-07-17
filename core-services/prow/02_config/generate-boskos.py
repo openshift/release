@@ -259,6 +259,9 @@ CONFIG = {
     },
     'oci-edge-quota-slice': {
         'default': 50,
+    },
+    'aws-perfscale-quota-slice': {
+        'us-west-2': 10,
     }
 }
 
