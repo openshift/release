@@ -29,16 +29,28 @@ trap getlogs EXIT
 
 
 echo '#### Gathering Sos reports from all Nodes'
-export HOSTFILE=/tmp/artifacts/hosts.json
 
-oc get node -o json  | jq '.items[] | { name: .metadata.name, address: .status.addresses[0].address }' | tee $HOSTFILE
+timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOFTOP"
+
+export SOS_BASEDIR=/tmp/artifacts/sos
+export HOSTFILE=${SOS_BASEDIR}/virtual_hosts.json
+
+mkdir -p ${SOS_BASEDIR}
+VIRTUAL_HOST=[]
+
+for HOSTS in $(virsh list --name | grep 'master\|worker')
+do
+  _HOST="{ \"name\": \"$HOSTS\", \"address\": \"$(virsh domifaddr --domain $HOSTS | tail -n +3 | awk '{ print $4 }')\" }"                                                                
+  VIRTUAL_HOST=$(echo $VIRTUAL_HOST | jq -r ". += [$_HOST]")
+done
+echo $VIRTUAL_HOST | tee "${HOSTFILE}"
 
 jq -c '.[]' $HOSTFILE | while read item
 do
   NODENAME=$(jq .name <<< $item)
   HOSTIP=$(jq .ip <<< $item)
   
-  export REPORT_PATH=/host/tmp/artifacts/sos-node/$NODENAME
+  export REPORT_PATH=${SOS_BASEDIR}/$NODENAME
   mkdir -p $REPORT_PATH 
 
   timeout -s 9 30m ssh "${SSHOPTS[@]}" "core@$HOSTIP" DISCONNECTED="${DISCONNECTED:-}" bash - << EOF
@@ -47,6 +59,8 @@ toolbox 'sos report --batch --tmp-dir /host/$REPORT_PATH --all-logs \
 EOF
 
 done
+
+EOFTOP
 
 scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
 
