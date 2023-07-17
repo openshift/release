@@ -5,7 +5,6 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 suffix=$(head /dev/urandom | tr -dc a-z0-9 | head -c 4)
@@ -24,7 +23,6 @@ if [[ "$MULTI_AZ" == "true" ]]; then
 fi
 COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
 
-sleep 1h
 # Obtain aws credentials
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -42,6 +40,7 @@ OCM_VERSION=$(ocm version)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
 ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
+
 
 # Check whether the cluster with the same cluster name existes.
 OLD_CLUSTER_ID=$(ocm list clusters --columns=id --parameter search="name is '${CLUSTER_NAME}'" | tail -n 1)
