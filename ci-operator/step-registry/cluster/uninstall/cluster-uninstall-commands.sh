@@ -13,7 +13,7 @@ export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 export OCM_TOKEN
 
-RUN_COMMAND="poetry run python app/cli.py --action destroy --clusters-install-data-directory ${SHARED_DIR}/clusters-data  --ocm-token=$OCM_TOKEN "
+RUN_COMMAND="poetry run python app/cli.py --action destroy --clusters-install-data-directory ${ARTIFACT_DIR}/clusters-data  --ocm-token=$OCM_TOKEN "
 
 CLUSTERS_CMD=""
 NUM_CLUSTERS=0
@@ -50,5 +50,3 @@ fi
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
 
 ${RUN_COMMAND}
-
-sleep 50000
