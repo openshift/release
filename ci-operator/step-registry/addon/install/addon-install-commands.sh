@@ -12,7 +12,8 @@ RUN_COMMAND="poetry run python app/cli.py addons --cluster ${CLUSTER_NAME} --tok
 export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export OCM_TOKEN
 # TODO set AWS_REGION?
-export AWS_REGION=$LEASED_RESOURCE
+# export AWS_REGION=$LEASED_RESOURCE
+export AWS_REGION="test_region"
 
 ADDONS_CMD=""
 for addon_value in $(env | grep -E '^ADDON[0-9]+_CONFIG' | sort  --version-sort); do
