@@ -1,10 +1,10 @@
 base_images:
   base:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: base
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: cli
   openshift_eventing-istio-src_knative-v1.9:
@@ -90,7 +90,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -99,12 +99,12 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-aws-ovn-ocp-412-continuous
+- as: e2e-sno-413-continuous
   cron: 0 0 * * 0
   steps:
-    cluster_profile: aws
+    cluster_profile: gcp
     test:
-    - as: serverless-e2e
+    - as: operator-e2e
       commands: make install-mesh test-e2e-with-kafka
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
@@ -120,9 +120,10 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: openshift-e2e-aws-ovn
+    workflow: openshift-e2e-gcp-single-node
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 4.12-aws-ovn
+  variant: 4.13-single-node
