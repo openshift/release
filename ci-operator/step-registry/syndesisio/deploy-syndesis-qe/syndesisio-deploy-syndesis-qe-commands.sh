@@ -3,7 +3,6 @@
 set -u
 set -e
 set -o pipefail
-set -x
 
 URL=$(oc whoami --show-server)
 export URL
