@@ -12,10 +12,10 @@ cat >> "${SHARED_DIR}/install-config.yaml" << EOF
 baseDomain: $base_domain
 controlPlane:
   name: "master"
-  replicas: 3
+  replicas: $MASTER_REPLICAS
 compute:
 - name: "worker"
-  replicas: 0
+  replicas: $WORKER_REPLICAS
 platform:
   none: {}
 EOF
