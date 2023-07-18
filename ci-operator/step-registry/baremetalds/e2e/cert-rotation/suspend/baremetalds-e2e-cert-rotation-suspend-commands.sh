@@ -31,6 +31,10 @@ SSH=${SSH:-ssh ${SSH_OPTS}}
 SETTLE_TIMEOUT=5m
 COMMAND_TIMEOUT=15m
 
+for kubeconfig in $(find ${KUBECONFIG} -type f); do
+  export KUBECONFIG=${kubeconfig}
+done
+
 control_nodes=( $( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' ) )
 
 # Compute nodes seem to be protected with firewall?
