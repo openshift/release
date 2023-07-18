@@ -31,9 +31,9 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
 # SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-8433
+# bz### https://issues.redhat.com/browse/OCPBUGS-13684
 # TESTNAME
-metallb "Correct and incorrect MetalLB resources coexist"
+sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
 
 EOF
 }
@@ -49,11 +49,6 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 # TESTNAME
 performance "Should have the correct RPS configuration"
 
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-8433
-# TESTNAME
-metallb "Correct and incorrect MetalLB resources coexist"
-
 EOF
 }
 
@@ -68,9 +63,9 @@ cat <<EOF >>"${SKIP_TESTS_FILE}"
 performance "Check RPS Mask is applied to atleast one single rx queue on all veth interface"
 
 # SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-11750
+# bz### https://issues.redhat.com/browse/OCPBUGS-14713
 # TESTNAME
-tuningcni "sysctl allowlist update should start a pod with custom sysctl only after adding sysctl to allowlist"
+performance "Should not overwrite the banned CPU set on tuned restart"
 
 # SKIPTEST
 # bz### https://issues.redhat.com/browse/OCPBUGS-10927
@@ -84,11 +79,6 @@ function create_tests_temp_skip_list_14 {
 # List of temporarly skipped tests for 4.14
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-11046
-# TESTNAME
-tuningcni "sysctl allowlist update should start a pod with custom sysctl only after adding sysctl to allowlist"
 
 # SKIPTEST
 # bz### https://issues.redhat.com/browse/OCPBUGS-10927
@@ -120,7 +110,7 @@ function get_skip_tests {
     skip_list=""
     if [ -f "${SKIP_TESTS_FILE}" ]; then
         rm -f feature_skip_list.txt
-        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > feature_skip_list.txt
+        grep --text -E "^[^#]" "${SKIP_TESTS_FILE}" > ${SHARED_DIR}/feature_skip_list.txt
         skip_list=""
         while read line;
         do
@@ -132,21 +122,127 @@ function get_skip_tests {
                     skip_list="${skip_list} ${test}"
                 fi
             fi
-        done < feature_skip_list.txt
+        done < ${SHARED_DIR}/feature_skip_list.txt
     fi
 
     echo "${skip_list}"
 }
 
-source $SHARED_DIR/main.env
+# Checkout the pull request branch
+# $1 - github organization
+# $2 - github repository
+# $3 - pull request number
+function checkout_pr_branch() {
+    set -x
+    local org="$1"
+    local repo="$2"
+    local pr_number="$3"
+    # Fetch the pull request branch
+    git fetch --force origin --update-head-ok "pull/$pr_number/head:pr/$pr_number"
+    # Check out the pull request branch
+    git checkout "pr/$pr_number"
+    git reset --hard HEAD
+    set +x
+}
 
-export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni ptp}" # next: ovs_qos
+# Check if we are running on a pull request and checkout the pull request branch
+# $1 - github organization
+# $2 - github repository
+# PULL_URL - pull request URL the job is running on, from main.env file - calculated from CI environment variables
+# PR_URLS - additional pull request URLs.
+function check_for_pr() {
+    set -x
+    local org="$1"
+    local repo="$2"
+    # Check if current org and repo are in PULL_URL
+    if [[ -n "${PULL_URL-}" && "${PULL_URL-}" == *"github.com/$org/$repo"* ]]; then
+        # Extract the pull request number from the URL
+        pr_number=$(echo "${PULL_URL-}" | cut -d'/' -f7)
+        checkout_pr_branch "$org" "$repo" "$pr_number"
+    # Check additional PRs from environment variable
+    elif [[ -n "$PR_URLS" && "$PR_URLS" == *"github.com/$org/$repo"* ]]; then
+        # Extract the pull request URL with org and repo from PR_URLS list
+        TEST_CNF_TESTS_PR=$(echo "$PR_URLS" | grep -Eo "https://github.com/$org/$repo/\S+")
+        # Remove the first and last quotes from the URL
+        TEST_CNF_TESTS_PR=${TEST_CNF_TESTS_PR%\"}
+        TEST_CNF_TESTS_PR=${TEST_CNF_TESTS_PR#\"}
+        # Extract the pull request number from the URL
+        pr_number=$(echo "$TEST_CNF_TESTS_PR" | cut -d'/' -f7)
+        checkout_pr_branch "$org" "$repo" "$pr_number"
+    else
+        echo "The given pull request URL doesn't match the expected repository and organization: PULL_URL=${PULL_URL-}"
+    fi
+    set +x
+    }
+
+# Check if we are running on a pull request and check commit message for Depends-On
+# If Depends-On is found, extract the pull request URL with org and repo from commit message
+# For example: Depends-On: https://github.com/openshift-kni/cnf-features-deploy/pull/1394
+function check_commit_message_for_prs {
+    set -x
+    EXTRACTED_PRS=""
+    # Check if we in CI mode
+    if [[ -n "${JOB_NAME-}" && -n "${PULL_URL-}" && "${JOB_NAME-}" == *"rehears"* ]]; then
+        # Get the commit message from Github of current PR if exists
+        API_PR_URL=$(echo "${PULL_URL-}" | sed "s@github.com@api.github.com/repos@" | sed "s/pull/pulls/")
+        COMMIT_MESSAGE=$(curl -s "$API_PR_URL" | jq -r '.body')
+        # Check if we have Depends-On: in commit message
+        if [[ "$COMMIT_MESSAGE" == *"Depends-On:"* ]]; then
+            # Extract the pull request URL with org and repo from commit message
+            EXTRACTED_PRS=$(echo "$COMMIT_MESSAGE" | grep -oP 'Depends-On:\s*\S+' | sed "s/Depends-On:\s*//g" | xargs)
+            if [[ $EXTRACTED_PRS == *"https"* ]]; then
+                export PR_URLS="${PR_URLS} ${EXTRACTED_PRS}"
+                # Trim spaces from PR_URLS
+                export PR_URLS=${PR_URLS## }
+            fi
+        fi
+    fi
+}
+
+function sno_fixes {
+    echo "************ SNO fixes ************"
+    pushd $CNF_REPO_DIR
+    sed -i "s/role: worker-cnf/role: master/g" feature-configs/deploy/sctp/sctp_module_mc.yaml
+
+    popd
+}
+
+function get_time_left {
+    # Use it later for calculation of time left
+    # Keep in mind the step starts after image preparation in cluster
+    now=$(date +%s)
+    then=$(cat $SHARED_DIR/start_time)
+    minutes_passed=$(( (now - then) / 60 ))
+    # the job has 4 hours to run, leave 10 minutes for reports etc
+    time_left=$(( 215 - minutes_passed ))
+    echo $time_left
+}
+
+
+
+[[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
+
+# if set - to run tests and/or validations
+export RUN_TESTS="${RUN_TESTS:-true}"
+export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
+
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+    export FEATURES="${FEATURES:-performance sriov sctp}"
+else
+    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
+fi
+export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
+export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
+
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
 export XT_U32TEST_HAS_NON_CNF_WORKERS="${XT_U32TEST_HAS_NON_CNF_WORKERS:-false}"
 
 export CNF_REPO="${CNF_REPO:-https://github.com/openshift-kni/cnf-features-deploy.git}"
 export CNF_BRANCH="${CNF_BRANCH:-master}"
+# List of PRs to test
+export PR_URLS="${PR_URLS:-}"
+check_commit_message_for_prs || true  # Ignore errors, we don't want to fail the job if we can't get the commit message
 
 echo "************ telco5g cnf-tests commands ************"
 
@@ -168,40 +264,51 @@ export CNF_ORIGIN_TESTS
 
 if [[ "$T5CI_VERSION" == "4.14" ]]; then
     export CNF_BRANCH="master"
+    export CNF_TESTS_IMAGE="cnf-tests:4.14"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
+    export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
 fi
 
-cnf_dir=$(mktemp -d -t cnf-XXXXX)
-cd "$cnf_dir" || exit 1
+CNF_REPO_DIR=${CNF_REPO_DIR:-"$(mktemp -d -t cnf-XXXXX)/cnf-features-deploy"}
 
-echo "running on branch ${CNF_BRANCH}"
-git clone -b "${CNF_BRANCH}" "${CNF_REPO}" cnf-features-deploy
-cd cnf-features-deploy
+# Check if cnf-features-deploy repository exists
+# If not, clone it
+if [[ ! -d "${CNF_REPO_DIR}" ]]; then
+    echo "cnf-features-deploy repository not found, cloning it to ${CNF_REPO_DIR}"
+    mkdir -p "$CNF_REPO_DIR"
+    echo "running on branch ${CNF_BRANCH}"
+    git clone -b "${CNF_BRANCH}" "${CNF_REPO}" $CNF_REPO_DIR
+fi
+
+pushd $CNF_REPO_DIR
+echo "Checking out pull request for repository cnf-features-deploy if exists"
+check_for_pr "openshift-kni" "cnf-features-deploy"
+
 oc patch OperatorHub cluster --type json -p '[{"op": "add", "path": "/spec/disableAllDefaultSources", "value": true}]'
-cd -
+popd
 
 # Skiplist common for all releases
 create_tests_skip_list_file
 
-# Skiplist according to each release
+# Skiplist according to each release and add flakey parameter for Ginkgo v1 and v2
 if [[ "$CNF_BRANCH" == *"4.11"* ]]; then
     create_tests_temp_skip_list_11
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
 
 fi
 if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
     create_tests_temp_skip_list_12
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed'
+    export GINKGO_PARAMS="-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.progress -ginkgo.reportPassed -ginkgo.flakeAttempts 4"
 
 fi
 if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
     create_tests_temp_skip_list_13
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
+    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 fi
 if [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_14
-    export GINKGO_PARAMS='-ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events'
+    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
@@ -209,52 +316,86 @@ export TESTS_REPORTS_PATH="${ARTIFACT_DIR}/"
 
 skip_tests=$(get_skip_tests)
 
-worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
---selector='!node-role.kubernetes.io/master' -o name)
-if [ -z "${worker_nodes}" ]; then
-    echo "[ERROR]: No worker nodes found in cluster"
-    exit 1
-fi
-# get BM workers for testing
-test_nodes=""
-for node in ${worker_nodes}; do
-    if is_bm_node "${node}"; then
-        test_nodes="${test_nodes} ${node}"
+if [[ "$T5CI_JOB_TYPE" != "sno-cnftests" ]]; then
+    worker_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' \
+    --selector='!node-role.kubernetes.io/master' -o name)
+    if [ -z "${worker_nodes}" ]; then
+        echo "[ERROR]: No worker nodes found in cluster"
+        exit 1
     fi
-done
+    # get BM workers for testing
+    test_nodes=""
+    for node in ${worker_nodes}; do
+        if is_bm_node "${node}"; then
+            test_nodes="${test_nodes} ${node}"
+        fi
+    done
 
-if [ -z "${test_nodes}" ]; then
-    echo "[ERROR]: No BM worker nodes found in cluster"
-    exit 1
+    if [ -z "${test_nodes}" ]; then
+        echo "[ERROR]: No BM worker nodes found in cluster"
+        exit 1
+    fi
 fi
 
+if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
+    test_nodes=$(oc get nodes --selector='node-role.kubernetes.io/worker' -o name)
+    export ROLE_WORKER_CNF="master"
+    # Make local workarounds for SNO
+    sno_fixes
+fi
 export CNF_NODES="${test_nodes}"
 
-cd cnf-features-deploy
+pushd $CNF_REPO_DIR
 status=0
+val_status=0
+
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
 fi
-FEATURES_ENVIRONMENT="ci" make functests-on-ci || status=$?
-cd -
+# if RUN_VALIDATIONS set, run validations
+if $RUN_VALIDATIONS; then
+    echo "************ Running validations ************"
+    FEATURES=$VALIDATIONS_FEATURES FEATURES_ENVIRONMENT="ci" make feature-deploy-on-ci 2>&1 | tee ${SHARED_DIR}/cnf-validations-run.log || val_status=$?
+fi
+# set overall status to fail if validations failed
+if [[ ${val_status} -ne 0 ]]; then
+    status=${val_status}
+fi
+# if validations passed and RUN_TESTS set, run the tests
+if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
+    echo "************ Running e2e tests ************"
+    FEATURES=$TEST_RUN_FEATURES FEATURES_ENVIRONMENT="ci" make functests 2>&1 | tee ${SHARED_DIR}/cnf-tests-run.log || status=$?
+fi
+popd
 
 set +e
+set -x
 python3 -m venv ${SHARED_DIR}/myenv
 source ${SHARED_DIR}/myenv/bin/activate
 git clone https://github.com/openshift-kni/telco5gci ${SHARED_DIR}/telco5gci
+
+# Check if telco5gci pull request exists and checkout the pull request branch if so
+pushd ${SHARED_DIR}/telco5gci
+check_for_pr "openshift-kni" "telco5gci"
+popd
+
 pip install -r ${SHARED_DIR}/telco5gci/requirements.txt
 # Create HTML reports for humans/aliens
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.html
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
-python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.html
+[[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.html
+ls ${ARTIFACT_DIR}/validation_junit*xml && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.html
+[[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.html
+# Run validation parser
+[[ -f ${SHARED_DIR}/cnf-validations-run.log ]] && python ${SHARED_DIR}/telco5gci/parse_log.py --test-type validations --path ${SHARED_DIR}/cnf-validations-run.log --output-file ${ARTIFACT_DIR}/parsed-validations.json
+[[ -f ${ARTIFACT_DIR}/parsed-validations.json ]] && python ${SHARED_DIR}/telco5gci/j2html.py ${ARTIFACT_DIR}/parsed-validations.json -f json -o ${ARTIFACT_DIR}/parsed_validations.html
 # Create JSON reports for robots
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/cnftests-junit*xml -o ${ARTIFACT_DIR}/test_results.json
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/validation_junit*xml -o ${ARTIFACT_DIR}/validation_results.json
-python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/setup_junit_*xml -o ${ARTIFACT_DIR}/setup_results.json
+[[ -f ${ARTIFACT_DIR}/cnftests-junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/cnftests-junit.xml -o ${ARTIFACT_DIR}/test_results.json
+[[ -f ${ARTIFACT_DIR}/validation_junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/validation_junit.xml -o ${ARTIFACT_DIR}/validation_results.json
+[[ -f ${ARTIFACT_DIR}/setup_junit.xml ]] && python ${SHARED_DIR}/telco5gci/junit2json.py ${ARTIFACT_DIR}/setup_junit.xml -o ${ARTIFACT_DIR}/setup_results.json
 
 junitparser merge ${ARTIFACT_DIR}/cnftests-junit*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/junit.xml
 
-rm -rf ${SHARED_DIR}/myenv ${ARTIFACT_DIR}/setup_junit_*xml ${ARTIFACT_DIR}/validation_junit*xml ${ARTIFACT_DIR}/cnftests-junit_*xml
+rm -rf ${SHARED_DIR}/myenv ${SHARED_DIR}/telco5gci
+set +x
 set -e
 
 exit ${status}

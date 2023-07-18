@@ -13,7 +13,7 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi8
       USER root
-      RUN yum install -y python39 make diffutils openssl git curl && \
+      RUN yum install -y python39 make diffutils openssl git && \
           yum clean all && rm -rf /var/cache/dnf/*
       ENV XDG_DATA_HOME=/.local
       WORKDIR pelorus
@@ -30,17 +30,6 @@ resources:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: unit
-  steps:
-    test:
-    - as: unit
-      commands: |
-        make lint
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
 - as: e2e-openshift
   steps:
     cluster_profile: aws

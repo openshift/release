@@ -16,14 +16,21 @@ then
   exit 0
 fi
 
+if [[ "$JOB_NAME" =~ .*proxy.* ]]
+then
+  echo "Clusters using a proxy are not yet supported for loki"
+  exit 0
+fi
 
 export PROMTAIL_IMAGE="quay.io/openshift-cr/promtail"
 export PROMTAIL_VERSION="v2.4.1"
-export LOKI_ENDPOINT=https://observatorium-mst.api.stage.openshift.com/api/logs/v1/dptp/loki/api/v1
+# openshift-trt taken from the tenants list in the LokiStack CR on DPCR:
+export LOKI_ENDPOINT=https://logging-loki-openshift-operators-redhat.apps.cr.j7t7.p1.openshiftapps.com/api/logs/v1/openshift-trt/loki/api/v1
+
+# TODO: may be deprecated, moved to: https://github.com/resmoio/kubernetes-event-exporter
 export KUBERNETES_EVENT_EXPORTER_IMAGE="ghcr.io/opsgenie/kubernetes-event-exporter"
 export KUBERNETES_EVENT_EXPORTER_VERSION="v0.11"
 
-GRAFANACLOUND_USERNAME=$(cat /var/run/loki-grafanacloud-secret/client-id)
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME}/${BUILD_ID}"
 
 cat >> "${SHARED_DIR}/manifest_01_ns.yml" << EOF
@@ -99,88 +106,70 @@ data:
           min_period: 1s
         batchsize: 102400
         batchwait: 10s
-        basic_auth:
-          username: ${GRAFANACLOUND_USERNAME}
-          password_file: /etc/promtail-grafanacom-secrets/password
+        bearer_token_file: /tmp/shared/prod_bearer_token
         timeout: 10s
-        url: https://logs-prod3.grafana.net/api/prom/push
+        url: ${LOKI_ENDPOINT}/push
     positions:
       filename: "/run/promtail/positions.yaml"
     scrape_configs:
-    - job_name: kubernetes
+    - job_name: kubernetes-pods
       kubernetes_sd_configs:
       - role: pod
       pipeline_stages:
       - cri: {}
+      - static_labels:
+          type: pod
+      # Special match for the logs from the event-exporter pod, which logs json lines for each kube event.
+      # For these we want to extract the namespace from metadata.namespace, rather than using the one
+      # from the pod which did the logging. (openshift-e2e-loki)
+      # This will allow us to search events globally with a namespace label that matches the actual event.
       - match:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
-          action: drop
-      - labeldrop:
-        - filename
-      - pack:
-          labels:
-          - namespace
-          - pod_name
-          - container_name
-          - app
+          stages:
+            # Two json stages to access the nested metadata.namespace field:
+            - json:
+                expressions:
+                  metadata:
+            - json:
+                expressions:
+                  namespace:
+                source: metadata
+            - labels:
+                namespace:
+            - static_labels:
+                type: kube-event
+      # For anything that is outside an openshift- namespace, we will pack it into the entry to
+      # dramatically improve cardinality. These would typically be temporary namespaces with random
+      # names created by e2e tests. We still keep their logs, you just don't get a fast label filter
+      # to find them globally by namespace.
+      #
+      # We had to resort to a fixed list here because there are a lot of openshift-RAND namespaces created.
+      # (must-gather, debug, amq, test, etc) If you want your namespaces to get it's own indexed namespace
+      # label, add it here, in alphabetical order, and to the near identical line below with =~ instead of !~.
+      - match:
+          selector: '{namespace!~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-package-operator|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
+          stages:
+          - pack:
+              labels:
+              - namespace
+              - app
+              - container
+              - host
+              - pod
+      # If this entry is in an openshift- namespace, we don't pack the namespace (it remains a real label):
+      - match:
+          selector: '{namespace=~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-package-operator|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
+          stages:
+          - pack:
+              labels:
+              - app
+              - container
+              - host
+              - pod
       - labelallow:
-          - host
           - invoker
-          - audit
-      relabel_configs:
-      - action: drop
-        regex: ''
-        source_labels:
-        - __meta_kubernetes_pod_annotation_kubernetes_io_config_mirror
-      - source_labels:
-        - __meta_kubernetes_pod_label_name
-        target_label: __service__
-      - source_labels:
-        - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_name
-        target_label: pod_name
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_pod_container_name
-        target_label: container_name
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
-    - job_name: kubernetes-pods-static
-      pipeline_stages:
-      - cri: {}
-      - labeldrop:
-        - filename
-      - pack:
-          labels:
           - namespace
-          - pod_name
-          - container_name
-          - app
-      - labelallow:
-          - host
-          - invoker
-      kubernetes_sd_configs:
-      - role: pod
+          - type
       relabel_configs:
       - action: drop
         regex: ''
@@ -190,15 +179,11 @@ data:
         - __meta_kubernetes_pod_label_name
         target_label: __service__
       - source_labels:
+        - __meta_kubernetes_pod_label_app
+        target_label: app
+      - source_labels:
         - __meta_kubernetes_pod_node_name
-        target_label: __host__
-      - action: replace
-        replacement:
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_namespace
-        - __service__
-        target_label: job
+        target_label: host
       - action: replace
         source_labels:
         - __meta_kubernetes_namespace
@@ -206,11 +191,11 @@ data:
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_name
-        target_label: pod_name
+        target_label: pod
       - action: replace
         source_labels:
         - __meta_kubernetes_pod_container_name
-        target_label: container_name
+        target_label: container
       - replacement: /var/log/pods/*\$1/*.log
         separator: /
         source_labels:
@@ -228,87 +213,51 @@ data:
       - labeldrop:
         - filename
         - stream
-      - pack:
-          labels:
-          - boot_id
-          - systemd_unit
+      - match:
+          # To get labels for a new systemd_unit exclude it by adding it in the selector here and include
+          # it by adding it in the selector below.  For any systemd_units, besides these, we will pack
+          # (i.e., no label) to avoid high cardinality.
+          selector: '{systemd_unit!~"auditd.service|crio.service|kubelet.service|NetworkManager.service|ovs-vswitchd.service|ovs-configuration.service|ovsdb-server.service"}'
+          stages:
+          - pack:
+              labels:
+              - boot_id
+              - systemd_unit
+              - host
+      - match:
+          # These systemd_units will get a systemd_unit label; if you add one, be sure to monitor number of
+          # Active Streams in Loki Dashboard to avoid over burdening our instance of Promtail/Loki.
+          selector: '{systemd_unit=~"auditd.service|crio.service|kubelet.service|NetworkManager.service|ovs-vswitchd.service|ovs-configuration.service|ovsdb-server.service"}'
+          stages:
+          - pack:
+              labels:
+              - boot_id
+              - host
       - labelallow:
-          - host
           - invoker
+          - systemd_unit
+      - static_labels:
+          type: journal
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
-    - job_name: kubeapi-audit
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: kube-apiserver
-          __path__: /var/log/kube-apiserver/audit.log
-    - job_name: openshift-apiserver
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: openshift-apiserver
-          __path__: /var/log/openshift-apiserver/audit.log
-    - job_name: oauth-apiserver-audit
-      static_configs:
-      - targets:
-        - localhost
-        labels:
-          audit: oauth-apiserver
-          __path__: /var/log/oauth-apiserver/audit.log
-    - job_name: events
-      kubernetes_sd_configs:
-      - role: pod
-      pipeline_stages:
-      - cri: {}
-      - match:
-          selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
-          stages:
-          - static_labels:
-              audit: events
-      - labelallow:
-          - host
-          - invoker
-          - audit
-      relabel_configs:
-      - action: replace
-        source_labels:
-        - __meta_kubernetes_namespace
-        target_label: namespace
-      - replacement: "/var/log/pods/*\$1/*.log"
-        separator: "/"
-        source_labels:
-        - __meta_kubernetes_pod_uid
-        - __meta_kubernetes_pod_container_name
-        target_label: __path__
-      - action: labelmap
-        regex: __meta_kubernetes_pod_label_(.+)
     server:
       http_listen_port: 3101
+      log_level: warn
     target_config:
       sync_period: 10s
 EOF
+
 cat >> "${SHARED_DIR}/manifest_creds.yml" << EOF
 apiVersion: v1
 kind: Secret
 metadata:
-  name: promtail-creds
+  name: promtail-prod-creds
   namespace: openshift-e2e-loki
 data:
   client-id: "$(cat /var/run/loki-secret/client-id | base64 -w 0)"
   client-secret: "$(cat /var/run/loki-secret/client-secret | base64 -w 0)"
-EOF
-cat >> "${SHARED_DIR}/manifest_grafanacom_creds.yml" << EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: promtail-grafanacom-creds
-  namespace: openshift-e2e-loki
-data:
-  password: "$(cat /var/run/loki-grafanacloud-secret/client-secret | base64 -w 0)"
+  audience: "$(cat /var/run/loki-secret/audience | base64 -w 0)"
 EOF
 cat >> "${SHARED_DIR}/manifest_ds.yml" << EOF
 apiVersion: apps/v1
@@ -337,7 +286,7 @@ spec:
       containers:
       - command:
         - promtail
-        - -client.external-labels=host=\$(HOSTNAME),invoker=\$(INVOKER)
+        - -client.external-labels=invoker=\$(INVOKER)
         - -config.file=/etc/promtail/promtail.yaml
         env:
         - name: HOSTNAME
@@ -382,8 +331,6 @@ spec:
         volumeMounts:
         - mountPath: "/etc/promtail"
           name: config
-        - mountPath: "/etc/promtail-grafanacom-secrets"
-          name: grafanacom-secrets
         - mountPath: "/run/promtail"
           name: run
         - mountPath: "/var/lib/docker/containers"
@@ -392,18 +339,11 @@ spec:
         - mountPath: "/var/log/pods"
           name: pods
           readOnly: true
-        - mountPath: "/var/log/kube-apiserver"
-          name: auditlogs-kube-apiserver
-          readOnly: true
-        - mountPath: "/var/log/openshift-apiserver"
-          name: auditlogs-openshift-apiserver
-          readOnly: true
-        - mountPath: "/var/log/oauth-apiserver"
-          name: auditlogs-oauth-apiserver
-          readOnly: true
         - mountPath: "/var/log/journal"
           name: journal
           readOnly: true
+        - mountPath: "/tmp/shared"
+          name: shared-data
       - args:
         - --https-address=:9001
         - --provider=openshift
@@ -432,6 +372,38 @@ spec:
           name: proxy-tls
         - mountPath: /etc/tls/cookie-secret
           name: cookie-secret
+      - name: prod-bearer-token
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        args:
+        - --oidc.audience=\$(AUDIENCE)
+        - --oidc.client-id=\$(CLIENT_ID)
+        - --oidc.client-secret=\$(CLIENT_SECRET)
+        - --oidc.issuer-url=https://sso.redhat.com/auth/realms/redhat-external
+        - --margin=10m
+        - --file=/tmp/shared/prod_bearer_token
+        env:
+          - name: CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: client-id
+          - name: CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: client-secret
+          - name: AUDIENCE
+            valueFrom:
+              secretKeyRef:
+                name: promtail-prod-creds
+                key: audience
+        volumeMounts:
+        - mountPath: "/tmp/shared"
+          name: shared-data
+        image: quay.io/observatorium/token-refresher
       serviceAccountName: loki-promtail
       terminationGracePeriodSeconds: 180
       tolerations:
@@ -441,9 +413,6 @@ spec:
       - configMap:
           name: loki-promtail
         name: config
-      - secret:
-          secretName: promtail-grafanacom-creds
-        name: grafanacom-secrets
       - hostPath:
           path: "/run/promtail"
         name: run
@@ -456,15 +425,6 @@ spec:
       - hostPath:
           path: "/var/log/journal"
         name: journal
-      - hostPath:
-          path: "/var/log/kube-apiserver"
-        name: auditlogs-kube-apiserver
-      - hostPath:
-          path: "/var/log/openshift-apiserver"
-        name: auditlogs-openshift-apiserver
-      - hostPath:
-          path: "/var/log/oauth-apiserver"
-        name: auditlogs-oauth-apiserver
       - name: proxy-tls
         secret:
           defaultMode: 420
@@ -473,6 +433,8 @@ spec:
         secret:
           defaultMode: 420
           secretName: cookie-secret
+      - name: shared-data
+        emptyDir: {}
   updateStrategy:
     type: RollingUpdate
     rollingUpdate:
@@ -694,8 +656,14 @@ echo "Promtail manifests created, the cluster can be found at https://grafana-lo
 
 
 if [[ -f "/usr/bin/python3" ]]; then
+  # Try to prepopulate the loki time window to match the job (with some leeway), so the user is never staring at no logs when they're actually there.
+  # Note that this step runs prior to install, so we use a window 2 hours before now (to be ridiculously safe) and 8 hours after, which should cover
+  # the runtime of just about any job. There's no risk over overloading the UI or seeing logs you don't want because we filter by invoker (this job).
+  LOKI_EPOCH_MILLIS_FROM="$(date -d '-2 hours' +%s%N | cut -b1-13)"
+  LOKI_EPOCH_MILLIS_TO="$(date -d '+8 hours' +%s%N | cut -b1-13)"
+
   ENCODED_INVOKER="$(python3 -c "import urllib.parse; print(urllib.parse.quote('${OPENSHIFT_INSTALL_INVOKER}'))")"
   cat >> ${SHARED_DIR}/custom-links.txt << EOF
-  <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%5B%22now-24h%22,%22now%22,%22Grafana%20Cloud%22,%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%7C%20unpack%22%7D%5D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">Loki</a>&nbsp;<a target="_blank" href="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
+  <a target="_blank" href="https://grafana-loki.ci.openshift.org/explore?orgId=1&left=%7B%22datasource%22:%22PCEB727DF2F34084E%22,%22queries%22:%5B%7B%22expr%22:%22%7Binvoker%3D%5C%22${ENCODED_INVOKER}%5C%22%7D%20%22,%22refId%22:%22A%22,%22editorMode%22:%22code%22,%22queryType%22:%22range%22%7D%5D,%22range%22:%7B%22from%22:%22${LOKI_EPOCH_MILLIS_FROM}%22,%22to%22:%22${LOKI_EPOCH_MILLIS_TO}%22%7D%7D" title="Loki is a log aggregation system for examining CI logs. This is most useful with upgrades, which do not contain pre-upgrade logs in the must-gather.">Loki</a>&nbsp;<a target="_blank" href="https://gist.github.com/vrutkovs/ef7cc9bca50f5f49d7eab831e3f082d8" title="Cheat sheet for Loki search queries">Loki cheat sheet</a>
 EOF
 fi

@@ -223,7 +223,7 @@ function install_required_tools() {
   export HOME=/tmp
 
   if [ ! -f /tmp/IBM_CLOUD_CLI_amd64.tar.gz ]; then
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.15.0/IBM_Cloud_CLI_2.15.0_amd64.tar.gz
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/2.16.1/IBM_Cloud_CLI_2.16.1_amd64.tar.gz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz
 
     if [ ! -f /tmp/Bluemix_CLI/bin/ibmcloud ]; then
@@ -387,6 +387,32 @@ function check_resources() {
   fi
 }
 
+function delete_network() {
+  NETWORK_NAME=$1
+  echo "delete_network(${NETWORK_NAME})"
+
+  (
+    while read UUID
+    do
+      echo ibmcloud pi network-delete ${UUID}
+      ibmcloud pi network-delete ${UUID}
+    done
+  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID')
+
+  for (( TRIES=0; TRIES<20; TRIES++ ))
+  do
+    LINES=$(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("'${NETWORK_NAME}'")) | .networkID' | wc -l)
+    echo "LINES=${LINES}"
+    if (( LINES == 0 ))
+    then
+      return 0
+    fi
+    sleep 15s
+  done
+
+  return 1
+}
+
 function destroy_resources() {
   #
   # TODO: Remove after infra bugs are fixed
@@ -454,15 +480,20 @@ EOF
   done
 
   #
-  # Clean up leftover networks
+  # Clean up leftover networks from a previous OpenShift cluster
   #
-  (
-    while read UUID
-    do
-      echo ibmcloud pi network-delete ${UUID}
-      ibmcloud pi network-delete ${UUID}
-    done
-  ) < <(ibmcloud pi networks --json | jq -r '.networks[] | select(.name|test("rdr-multiarch-'${POWERVS_ZONE}'")) | .networkID')
+  if ! delete_network "rdr-multiarch-${POWERVS_ZONE}"
+  then
+      DESTROY_SUCCEEDED=false
+  fi
+
+  #
+  # Clean up the public-192_168_XXX_XX-XX-VLAN_XXXX network
+  #
+  if ! delete_network "public-192_168"
+  then
+      DESTROY_SUCCEEDED=false
+  fi
 
   if ! ${DESTROY_SUCCEEDED}
   then
@@ -884,18 +915,6 @@ openshift-install --dir="${dir}" create cluster 2>&1 | grep --line-buffered -v '
 ret=${PIPESTATUS[0]}
 echo "ret=${ret}"
 echo "8<--------8<--------8<--------8<-------- END: create cluster 8<--------8<--------8<--------8<--------"
-
-if [ ${ret} -gt 0 ]; then
-  echo "8<--------8<--------8<--------8<-------- BEGIN: hack-for-kube-controller-manager 8<--------8<--------8<--------8<--------"
-  echo "DATE=$(date --utc '+%Y-%m-%dT%H:%M:%S%:z')"
-  OUTPUT=$(oc get co/kube-controller-manager -o json | jq -r '.status.conditions[]| select(.type == "Degraded").message')
-  echo "OUTPUT=${OUTPUT}"
-  if [[ "${OUTPUT}" == MissingStaticPodControllerDegraded* ]]; then
-    echo "Patching kubecontrollermanager cluster!"
-    oc patch kubecontrollermanager cluster -p='{"spec": {"forceRedeploymentReason": "recovery-'"$( date --rfc-3339=ns )"'"}}' --type=merge
-  fi
-  echo "8<--------8<--------8<--------8<-------- END: hack-for-kube-controller-manager 8<--------8<--------8<--------8<--------"
-fi
 
 if [ ${ret} -gt 0 ]; then
   echo "8<--------8<--------8<--------8<-------- BEGIN: wait-for install-complete 8<--------8<--------8<--------8<--------"

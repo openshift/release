@@ -48,10 +48,12 @@ if [ -f "${remove_resources_by_cli}" ]; then
     sh -x "${remove_resources_by_cli}"
 fi
 
-rg_file="${SHARED_DIR}/resourcegroup"
-if [ -f "${rg_file}" ]; then
-    existing_rg=$(cat "${rg_file}")
-    if [ "$(az group exists -n "${existing_rg}")" == "true" ]; then
-	az group delete -y -n "${existing_rg}"
+rg_files="${SHARED_DIR}/resourcegroup ${SHARED_DIR}/RESOURCE_GROUP_NAME"
+for rg_file in ${rg_files}; do
+    if [ -f "${rg_file}" ]; then
+        existing_rg=$(cat "${rg_file}")
+        if [ "$(az group exists -n "${existing_rg}")" == "true" ]; then
+            az group delete -y -n "${existing_rg}"
+        fi
     fi
-fi
+done

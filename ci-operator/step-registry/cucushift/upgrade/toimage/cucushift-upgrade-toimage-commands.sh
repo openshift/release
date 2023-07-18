@@ -115,8 +115,32 @@ function rhel_repo(){
       replace: "{{ target_repo_version }}"
   - name: Clean up yum cache
     command: yum clean all
+  - name: Import GPG key on RHEL machines for the following upgrade task - Install downloaded packages
+    ignore_errors: true
+    rpm_key:
+      state: present
+      key: /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 EOF
 
+    version_info="$(oc version | grep Server | sed -E 's/.*: ([4-9].[0-9]+)/\1/' | cut -d '.' -f 1,2)"
+    openshift_ansible_branch='master'
+    if [[ "$version_info" =~ [4-9].[0-9]+ ]] ; then
+        openshift_ansible_branch="release-${version_info}"
+        minor_version="${version_info##*.}"
+        if [[ -n "$minor_version" ]] && [[ $minor_version -le 10 ]] ; then
+            source /opt/python-env/ansible2.9/bin/activate
+        else
+            source /opt/python-env/ansible-core/bin/activate
+        fi
+        ansible --version
+    else
+        echo "WARNING: version_info is $version_info"
+    fi
+    echo -e "Using openshift-ansible branch $openshift_ansible_branch\n"
+    cd /usr/share/ansible/openshift-ansible
+    git stash || true
+    git checkout "$openshift_ansible_branch"
+    git pull || true
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
     ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /tmp/repo.yaml -vvv
 }
@@ -126,8 +150,8 @@ function rhel_upgrade(){
     echo "Upgrading RHEL nodes"
     echo "Validating parsed Ansible inventory"
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
-    echo "Running RHEL worker upgrade"
-    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" playbooks/upgrade.yml -vvv
+    echo -e "\nRunning RHEL worker upgrade"
+    ansible-playbook -i "${SHARED_DIR}/ansible-hosts" /usr/share/ansible/openshift-ansible/playbooks/upgrade.yml -vvv
 
     echo "Check K8s version on the RHEL node"
     master_0=$(oc get nodes -l node-role.kubernetes.io/master -o jsonpath='{range .items[0]}{.metadata.name}{"\n"}{end}')
@@ -150,7 +174,7 @@ function extract_oc(){
     echo -e "Extracting oc\n"
     local retry=5 tmp_oc="/tmp/client-2"
     mkdir -p ${tmp_oc}
-    while ! (oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
@@ -161,6 +185,12 @@ function extract_oc(){
     which oc
     oc version --client
     return 0
+}
+
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function run_command_oc() {
@@ -377,7 +407,7 @@ function check_signed() {
     digest="$(echo "${TARGET}" | cut -f2 -d@)"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror2.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -485,17 +515,15 @@ echo "Upgrade targets are ${TARGET_RELEASES[*]}"
 export OC="run_command_oc"
 
 # Target version oc will be extract in the /tmp/client directory, use it first
-mkdir -p /tmp/client /tmp/jq
+mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
-export JQ_DIR="/tmp/jq"
-export PATH=${OC_DIR}:${JQ_DIR}:$PATH
+export PATH=${OC_DIR}:$PATH
 
-curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o ${JQ_DIR}/jq && chmod +x ${JQ_DIR}/jq
 
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
-    TARGET_VERSION="$(oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"

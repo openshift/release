@@ -1,3 +1,8 @@
+base_images:
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   project_image:
     dockerfile_literal: |
@@ -43,6 +48,58 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: acceptance-lp-interop
+  cron: 0 6 23 11 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      BASE_DOMAIN: cspilp.interop.ccitredhat.com
+    test:
+    - as: sbo-acceptance-tests
+      cli: latest
+      commands: |
+        export CATSRC_NAME=redhat-operators
+        export OPERATOR_CHANNEL=stable
+        export OPERATOR_PACKAGE=rh-service-binding-operator
+        export SKIP_REGISTRY_LOGIN=true
+        ./install.sh
+        export TEST_ACCEPTANCE_START_SBO=remote
+        export EXTRA_BEHAVE_ARGS="--tags=~@crdv1beta1 --tags=~@olm-descriptors --tags=~@upgrade-with-olm --tags=~@disable-openshift-4.13 --tags=~@disable-openshift-4.12 --tags=~@disable-openshift-4.8+ --tags=~@disable-openshift-4.9+ --tags=~@disable-openshift-4.10+ --tags=~@disable-openshift-4.11+ --tags=~@disable-openshift-4.12+ --tags=~@disable-openshift-4.13+"
+        make -k VERBOSE=2 -o registry-login test-acceptance test-acceptance-artifacts
+        rename TESTS junit_TESTS /logs/artifacts/acceptance-tests/TESTS*.xml
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: acceptance-lp-rosa-hypershift
+  cron: 0 10 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure AWS", "jira_project": "LPTOCPCI"},
+          {"step": "gather-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI"},
+          {"step": "osd-*", "failure_type": "all", "classification": "User Setup", "jira_project": "LPTOCPCI"},
+          {"step": "rosa-*", "failure_type": "all", "classification":  "Cluster Creation", "jira_project": "LPTOCPCI"},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI"},
+          {"step": "cucushift-hypershift-*", "failure_type": "all", "classification": "Cluster Health Check", "jira_project": "LPTOCPCI"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.13"
+      OPERATORS: |
+        [
+            {"name": "rh-service-binding-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-operators"}
+        ]
+      REGION: us-west-2
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: install-operators
+    - ref: cucushift-hypershift-extended-health-check
+    workflow: firewatch-rosa-aws-sts-hypershift
 zz_generated_metadata:
   branch: release-v1.3.x
   org: redhat-developer

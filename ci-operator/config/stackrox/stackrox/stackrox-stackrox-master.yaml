@@ -27,7 +27,7 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-test-0.3.57
+    tag: stackrox-test-0.3.59
 releases:
   latest:
     release:
@@ -56,18 +56,12 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: gke-postgres-ui-e2e-tests
-  optional: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
 - as: gke-nongroovy-e2e-tests
   optional: true
   steps:
     test:
     - ref: stackrox-e2e
-- as: gke-postgres-nongroovy-e2e-tests
+- as: gke-sensor-integration-tests
   optional: true
   steps:
     test:
@@ -88,18 +82,6 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: gke-postgres-qa-e2e-tests
-  optional: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: gke-postgres-upgrade-tests
-  optional: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
 - as: gke-race-condition-qa-e2e-tests
   optional: true
   steps:
@@ -107,11 +89,6 @@ tests:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: gke-scale-tests
-  optional: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-- as: gke-postgres-scale-tests
   optional: true
   steps:
     test:
@@ -154,18 +131,10 @@ tests:
 - as: merge-gke-qa-e2e-tests
   postsubmit: true
   steps:
-    env:
-      QA_TEST_TARGET: test
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: merge-gke-ui-e2e-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: merge-gke-postgres-ui-e2e-tests
   postsubmit: true
   steps:
     test:
@@ -176,7 +145,7 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-gke-postgres-nongroovy-e2e-tests
+- as: merge-gke-sensor-integration-tests
   postsubmit: true
   steps:
     test:
@@ -191,18 +160,6 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-gke-postgres-qa-e2e-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: merge-gke-postgres-upgrade-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
 - as: powervs-qa-e2e-tests
   optional: true
   steps:
@@ -212,6 +169,16 @@ tests:
   cron: 0 7 * * *
   steps:
     workflow: stackrox-automation-flavors-powervs-e2e
+  timeout: 5h0m0s
+- as: ibmcloudz-qa-e2e-tests
+  optional: true
+  steps:
+    workflow: stackrox-automation-flavors-ibmcloudz-e2e
+  timeout: 5h0m0s
+- as: nightly-ibmcloudz-qa-e2e-tests
+  cron: 0 7 * * *
+  steps:
+    workflow: stackrox-automation-flavors-ibmcloudz-e2e
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: master

@@ -5,8 +5,7 @@ base_images:
     tag: cli
 binary_build_commands: make bin
 build_root:
-  project_image:
-    dockerfile_path: openshift-ci/build-root/Dockerfile
+  from_repository: true
 images:
 - context_dir: openshift-ci/build-root/source-image
   from: src
@@ -16,6 +15,9 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: oc-bin-image
+- dockerfile_path: openshift-ci/build-root/Dockerfile
+  from: oc-bin-image
+  to: dependencies
 releases:
   initial:
     integration:
@@ -60,7 +62,7 @@ tests:
         name: KAM_SSH_PUBLIC_KEY_FILE
       - default: /var/run/kam-data/gitlab-token/gitlab-token
         name: KAM_GITLAB_TOKEN_FILE
-      from: oc-bin-image
+      from: dependencies
       resources:
         requests:
           cpu: "2"

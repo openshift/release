@@ -19,7 +19,7 @@ then
   gcloud config set project "${PROJECT_NAME}"
 fi
 
-infra_name=${NAMESPACE}-${JOB_NAME_HASH}
+infra_name=${NAMESPACE}-${UNIQUE_HASH}
 working_dir=`mktemp -d`
 pushd "${working_dir}"
 

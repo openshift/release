@@ -1,0 +1,43 @@
+base_images:
+  os:
+    name: centos
+    namespace: openshift
+    tag: stream9
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: prow/Dockerfile
+  from: os
+  to: krkn-hub-rosa-hp
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-qe-perfscale-ci-tests-rosa-hp
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    env:
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-east-2
+      ROSA_LOGIN_ENV: production
+    test:
+    - ref: redhat-chaos-pod-scenarios-random-system-pods
+    workflow: rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: main
+  org: redhat-chaos
+  repo: krkn-hub
+  variant: rosa-4.12-nightly

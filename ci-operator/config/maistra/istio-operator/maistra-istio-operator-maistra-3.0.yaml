@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.12"
     namespace: ocp
     tag: cli
 build_root:
@@ -12,8 +12,8 @@ build_root:
 releases:
   latest:
     release:
-      channel: fast
-      version: "4.10"
+      channel: stable
+      version: "4.12"
 resources:
   '*':
     limits:
@@ -24,7 +24,7 @@ resources:
 tests:
 - as: maistra-istio-operator-unit-3-0
   commands: |
-    make compile test \
+    make test \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
@@ -54,18 +54,13 @@ tests:
     from: src
   timeout: 20m0s
 - as: istio-operator-push-image-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
   steps:
+    cluster_profile: aws-2
     env:
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -94,8 +89,9 @@ tests:
           sh -c \
           "docker login -u='maistra-dev+prow' \
           -p=${QUAY_PASS} quay.io; \
-          make push \
+          make docker-build docker-push \
           IMAGE=quay.io/maistra-dev/istio-ubi9-operator:PR-${PULL_NUMBER}"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow
@@ -110,23 +106,17 @@ tests:
       from: src
       resources:
         requests:
-          cpu: "2"
-          memory: 2Gi
-      timeout: 20m0s
-    workflow: servicemesh-istio-e2e-aws
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: nightly-images-3-0
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 4h0m0s
-    version: "4.12"
   cron: 00 03 * * *
   steps:
+    cluster_profile: aws-2
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
-      MAISTRA_MC_POD: not-used
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
     test:
@@ -149,23 +139,25 @@ tests:
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
+        export GITHUB_TOKEN=$(cat /creds-github/token)
         # login to quay.io in the privileged pod
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           docker login -u='maistra-dev+prow' \
           -p=${QUAY_PASS} quay.io
-        # build and push images
+        # build and push images and publish the bundle into OperatorHub
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
-          sh -c ' \
-          export REPO=quay.io/maistra-dev/istio-ubi9-operator; \
-          export IMAGE=$REPO:3.0-latest; \
-          make -e COMMUNITY=false clean image; \
-          docker tag $IMAGE $REPO:3.0-nightly-`date -I`; \
-          docker push $IMAGE; \
-          docker push $REPO:3.0-nightly-`date -I`'
+          sh -c \
+          "git config --global user.email 'dgrimm@redhat.com'; \
+           git config --global user.name 'Daniel Grimm'; \
+           make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
       - mount_path: /maistra-secrets
         name: maistra-dev-prow
+        namespace: test-credentials
+      - mount_path: /creds-github
+        name: workflow-github
         namespace: test-credentials
       env:
       - name: MAISTRA_NAMESPACE
@@ -176,7 +168,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-aws
+    workflow: servicemesh-istio-e2e-profile
 zz_generated_metadata:
   branch: maistra-3.0
   org: maistra

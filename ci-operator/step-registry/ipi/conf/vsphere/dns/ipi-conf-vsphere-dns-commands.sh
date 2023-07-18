@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
@@ -48,37 +48,11 @@ hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
 echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 
 if [ "${JOB_NAME_SAFE}" = "launch" ]; then
-  # If this is a `launch` and we are in the multi-zone range, we also
-  # 
-  if [ $((${LEASED_RESOURCE//[!0-9]/})) -ge 151 ]; then
-    if [ $((${LEASED_RESOURCE//[!0-9]/})) -le 154 ]; then
-    # Configure DNS direct to respective VIP
-    api_dns_target='"TTL": 60,
-      "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.48.190.22"}]'
-    apps_dns_target='"TTL": 60,
-      "ResourceRecords": [{"Value": "'${vips[1]}'"}, {"Value": "169.48.190.22"}]'
-    fi
-  else   
-    # Configure DNS target as previously configured NLB
-    nlb_arn=$(<"${SHARED_DIR}"/nlb_arn.txt)
-    nlb_dnsname="$(aws elbv2 describe-load-balancers \
-              --load-balancer-arns ${nlb_arn} \
-              --query 'LoadBalancers[0].DNSName' \
-              --output text)"
-    nlb_hosted_zone_id="$(aws elbv2 describe-load-balancers \
-              --load-balancer-arns ${nlb_arn} \
-              --query 'LoadBalancers[0].CanonicalHostedZoneId' \
-              --output text)"
-
-    # Both API and *.apps pipe through same NLB
-    api_dns_target='"AliasTarget": {
-          "HostedZoneId": "'${nlb_hosted_zone_id}'",
-          "DNSName": "'${nlb_dnsname}'",
-          "EvaluateTargetHealth": false
-          }'
-    apps_dns_target=$api_dns_target
-  fi 
-
+  # setup DNS records for clusterbot to point to the IBM VIP
+  api_dns_target='"TTL": 60,
+    "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.48.190.22"}]'
+  apps_dns_target='"TTL": 60,
+    "ResourceRecords": [{"Value": "169.48.190.22"}]'
 else
   # Configure DNS direct to respective VIP
   api_dns_target='"TTL": 60,

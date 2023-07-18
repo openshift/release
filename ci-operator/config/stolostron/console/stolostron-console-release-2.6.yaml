@@ -63,6 +63,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: console
+    env:
+      IMAGE_REPO: console
     workflow: ocm-ci-image-mirror
 - as: latest-image-mirror
   postsubmit: true
@@ -70,6 +72,7 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: console
     env:
+      IMAGE_REPO: console
       IMAGE_TAG: latest-2.6
     workflow: ocm-ci-image-mirror
 - as: publish
@@ -83,6 +86,8 @@ tests:
     test:
     - as: publish
       commands: |-
+        export OSCI_COMPONENT_NAME=console
+        export OSCI_COMPONENT_VERSION=2.6.0
         export OSCI_PUBLISH_DELAY="0"
         export SELF="make -f Makefile.prow"
         make -f Makefile.prow osci/publish

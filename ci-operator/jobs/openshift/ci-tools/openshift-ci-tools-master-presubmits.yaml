@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/breaking-changes
     decorate: true
     labels:
@@ -53,7 +53,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/checkconfig
     decorate: true
     labels:
@@ -100,7 +100,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/codegen
     decorate: true
     labels:
@@ -143,11 +143,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )codegen,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e
     decorate: true
     labels:
@@ -194,7 +194,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/e2e-oo
     decorate: true
     labels:
@@ -242,7 +242,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/format
     decorate: true
     labels:
@@ -289,7 +289,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/frontend-checks
     decorate: true
     labels:
@@ -336,7 +336,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
@@ -383,7 +383,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/integration
     decorate: true
     labels:
@@ -430,7 +430,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     labels:
@@ -496,7 +496,7 @@ presubmits:
         env:
         - name: BOOTSTRAP_BINARY
           value: /tmp/ci-secret-bootstrap
-        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.18
+        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.19
         imagePullPolicy: Always
         name: ""
         resources:
@@ -509,7 +509,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/secret-generator-validation
     decorate: true
     extra_refs:
@@ -532,7 +532,7 @@ presubmits:
         - run
         - -race
         - ./cmd/ci-secret-generator
-        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.18
+        image: image-registry.openshift-image-registry.svc:5000/openshift/release:golang-1.19
         imagePullPolicy: Always
         name: ""
         resources:
@@ -544,7 +544,71 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
+    context: ci/prow/snyk-code
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-master-snyk-code
+    optional: true
+    rerun_command: /test snyk-code
+    spec:
+      containers:
+      - args:
+        - analyse-code
+        command:
+        - make
+        env:
+        - name: SNYK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: api-token
+              name: snyk-credentials
+        image: snyk-cli:go1.19
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: "1"
+    trigger: (?m)^/test( | .* )snyk-code,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/snyk-deps
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ci-tools-master-snyk-deps
+    optional: true
+    rerun_command: /test snyk-deps
+    spec:
+      containers:
+      - args:
+        - analyse-deps
+        command:
+        - make
+        env:
+        - name: SNYK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: api-token
+              name: snyk-credentials
+        image: snyk-cli:go1.19
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: "1"
+    trigger: (?m)^/test( | .* )snyk-deps,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -587,11 +651,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )unit,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/validate-test-infra
     decorate: true
     extra_refs:
@@ -607,6 +671,7 @@ presubmits:
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ci-tools-master-validate-test-infra
+    optional: true
     rerun_command: /test validate-test-infra
     spec:
       containers:
@@ -624,7 +689,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build05
     context: ci/prow/validate-vendor
     decorate: true
     labels:
@@ -666,67 +731,3 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )validate-vendor,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build04
-    context: ci/prow/snyk-code
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-snyk-code
-    optional: true
-    rerun_command: /test snyk-code
-    spec:
-      containers:
-      - args:
-        - analyse-code
-        command:
-        - make
-        env:
-        - name: SNYK_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: api-token
-              name: snyk-credentials
-        image: snyk-cli:go1.18
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: "1"
-    trigger: (?m)^/test( | .* )snyk-code,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build04
-    context: ci/prow/snyk-deps
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-snyk-deps
-    optional: true
-    rerun_command: /test snyk-deps
-    spec:
-      containers:
-      - args:
-        - analyse-deps
-        command:
-        - make
-        env:
-        - name: SNYK_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: api-token
-              name: snyk-credentials
-        image: snyk-cli:go1.18
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: "1"
-    trigger: (?m)^/test( | .* )snyk-deps,?($|\s.*)

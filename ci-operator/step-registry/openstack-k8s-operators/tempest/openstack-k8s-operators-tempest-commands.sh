@@ -2,16 +2,18 @@
 
 set -ex
 
+NS_SERVICES=${NS_SERVICES:-"openstack"}
+
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
 
-oc project openstack
+oc project "${NS_SERVICES}"
 
 # Create clouds.yaml file to be used in further tests.
 mkdir -p ~/.config/openstack
 
 cat > ~/.config/openstack/clouds.yaml << EOF
-$(oc get cm openstack-config -n openstack -o json | jq -r '.data["clouds.yaml"]')
+$(oc get cm openstack-config -o json | jq -r '.data["clouds.yaml"]')
 EOF
 export OS_CLOUD=default
 KEYSTONE_SECRET_NAME=$(oc get keystoneapi keystone -o json | jq -r .spec.secret)
@@ -31,7 +33,10 @@ tempest init openshift
 
 pushd ~/tempest/openshift
 
-discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create identity.v3_endpoint_type public
+TEMPEST_CONF_OVERRIDES=${TEMPEST_CONF_OVERRIDES:-}
+
+discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create \
+identity.v3_endpoint_type public ${TEMPEST_CONF_OVERRIDES}
 
 # Generate skiplist and allow list
 ORG="openstack-k8s-operators"
@@ -53,7 +58,12 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
     fi
     BASE_OP=${EXTRA_REF_REPO}
 fi
+SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g')
 
+# NOTE: if manila is deployed, build a default share required by tempest
+if [[ "${SERVICE_NAME}" == "MANILA" ]]; then
+    oc exec -it pod/openstackclient -- openstack share type create default false
+fi
 
 set +e
 
@@ -92,4 +102,7 @@ if [ -f stestr_results.html ]; then
     cp stestr_results.html ${ARTIFACT_DIR}
 fi
 
+if [ -f tempest.log ]; then
+    cp tempest.log ${ARTIFACT_DIR}
+fi
 exit $EXIT_CODE

@@ -12,24 +12,20 @@ function run_command() {
 
 # IBM Cloud CLI login
 function ibmcloud_login {
-  echo "Try to login..."
-  "${IBMCLOUD_CLI}" login -r ${LEASED_RESOURCE} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
-}
-
-function checkCli() {
   export IBMCLOUD_CLI=ibmcloud
   export IBMCLOUD_HOME=/output
-  echo "check IBMCLOUD_CLI: ${IBMCLOUD_CLI}..."
-  command -v ${IBMCLOUD_CLI}
-  ${IBMCLOUD_CLI} --version
-  ${IBMCLOUD_CLI} plugin list
+  region="${LEASED_RESOURCE}"
+  export region
+  echo "Try to login..."
+  "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
+
 #####################################
 ##############Initialize#############
 #####################################
-checkCli
+ibmcloud_login
 #create the bastion host based on the info (ibmcloud-provision-vpc ${SHARED_DIR}/customer_vpc_subnets.yaml), output ip info to ${SHARED_DIR}/bastion-info.yaml
-cluster_name="${NAMESPACE}-${JOB_NAME_HASH}"
+cluster_name="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_info_yaml="${SHARED_DIR}/bastion-info.yaml"
 
 bastion_name="${cluster_name}-bastion"
@@ -51,13 +47,11 @@ if [[ ! -f "${VPC_CONFIG}" ]]; then
 fi
 echo "Reading variables from ${VPC_CONFIG}..."
 vpcName=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.vpcName')
-region="${LEASED_RESOURCE}"
+
 resource_group=$(yq-go r "${VPC_CONFIG}" 'platform.ibmcloud.resourceGroupName')
 echo "Using region: ${region}  resource_group: ${resource_group} vpc: ${vpcName}"
 
-ibmcloud_login
-
-${IBMCLOUD_CLI} target -g ${resource_group} -r ${region}
+${IBMCLOUD_CLI} target -g ${resource_group}
 
 subnet=$(${IBMCLOUD_CLI} is vpc ${vpcName} --show-attached --output JSON | jq -c -r '[.subnets[] | select(.name|test("control-plane")) | .name][0]')
 

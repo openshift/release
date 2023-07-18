@@ -37,35 +37,27 @@ build_root:
     namespace: openshift
     tag: golang-1.18
 releases:
-  initial:
-    release:
-      architecture: amd64
-      channel: fast
-      version: "4.10"
-  initial-arm64:
-    release:
-      architecture: arm64
-      channel: fast
-      version: "4.10"
   intermediate:
-    release:
+    candidate:
       architecture: amd64
-      channel: fast
+      product: ocp
+      stream: nightly
       version: "4.11"
   intermediate-arm64:
-    release:
+    candidate:
       architecture: arm64
-      channel: fast
+      product: ocp
+      stream: nightly
       version: "4.11"
   latest:
     release:
       architecture: amd64
-      channel: fast
+      channel: candidate
       version: "4.10"
   latest-arm64:
     release:
       architecture: arm64
-      channel: fast
+      channel: candidate
       version: "4.10"
   target:
     candidate:
@@ -90,10 +82,8 @@ tests:
   steps:
     cluster_profile: aws-qe
     dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:initial-arm64
-      RELEASE_IMAGE_INITIAL: release:initial-arm64
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest-arm64
       RELEASE_IMAGE_INTERMEDIATE: release:intermediate-arm64
-      RELEASE_IMAGE_LATEST: release:latest-arm64
       RELEASE_IMAGE_TARGET: release:target-arm64
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
@@ -110,7 +100,7 @@ tests:
         not @fips'
     test:
     - ref: cucushift-installer-check
-    - chain: cucushift-upgrade-paused
+    - chain: openshift-upgrade-qe-test-paused
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
 zz_generated_metadata:
   branch: release-4.12

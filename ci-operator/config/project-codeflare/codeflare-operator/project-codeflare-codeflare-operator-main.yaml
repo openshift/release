@@ -6,7 +6,6 @@ build_root:
 releases:
   latest:
     release:
-      architecture: amd64
       channel: fast
       version: "4.12"
 resources:
@@ -18,10 +17,18 @@ resources:
       memory: 200Mi
 test_binary_build_commands: GOFLAGS="" go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 tests:
-- as: codeflare-operator-unit
-  commands: GOFLAGS="" make test-unit
-  container:
-    from: test-bin
+- as: e2e-hypershift
+  steps:
+    cluster_profile: aws-2
+    test:
+    - as: codeflare-operator-unit
+      commands: GOFLAGS="" make test-unit
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: hypershift-hostedcluster-workflow
 zz_generated_metadata:
   branch: main
   org: project-codeflare

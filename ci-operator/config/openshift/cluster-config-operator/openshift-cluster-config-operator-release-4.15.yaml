@@ -3,10 +3,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.14
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
@@ -14,9 +14,9 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-config-operator
 promotion:
   name: "4.15"
@@ -57,6 +57,12 @@ tests:
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-ovn-techpreview
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws
 - as: e2e-gcp
   optional: true

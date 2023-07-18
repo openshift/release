@@ -21,13 +21,10 @@ if [ -f "/var/run/cluster-secrets/${CLUSTER_TYPE}/squid-credentials.txt" ]; then
 	cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/squid-credentials.txt" "${SHARED_DIR}/squid-credentials.txt"
 fi
 
-is_openshift_version_gte() {
-	declare release_image ocp_version
-	release_image="$(openshift-install version | sed -n 's/^release image\s\+\(.*\)$/\1/p' | tr -d '\n')"
-	ocp_version="$(oc adm release info "$release_image" -o json | jq -r '.metadata.version' | tr -d '\n')"
-	info "Detected OCP version: ${ocp_version}"
-	printf '%s\n%s' "$1" "$ocp_version" | sort -C -V
-}
+declare -r \
+	METHOD_APPCREDS='application-credentials' \
+	METHOD_PASSWORD='password' \
+	METHOD_DEFAULT='version-default'
 
 # new_application_credentials creates a new application credential set and
 # merges it to the provided clouds.yaml.
@@ -59,28 +56,45 @@ new_application_credentials() {
 		" "$OS_CLIENT_CONFIG_FILE"
 }
 
-# Setting a default authentication method based on version number
-if [[ "$OPENSTACK_AUTHENTICATION_METHOD" == "version-default" ]]; then
-	if is_openshift_version_gte "4.13"; then
-		info 'Detected version gte 4.13: setting application credentials authentication.'
-		OPENSTACK_AUTHENTICATION_METHOD='application-credentials'
-	else
-		info 'Detected version lt 4.13: setting password authentication.'
-		OPENSTACK_AUTHENTICATION_METHOD='password'
-	fi
-fi
+# If both 'oc' and 'openshift-install' exist in $PATH, then apply OCP
+# authentication method selection. Otherwise, default to application
+# credentials.
+if command -v oc &> /dev/null && command -v openshift-install &> /dev/null; then
+	is_openshift_version_gte() {
+		declare release_image ocp_version
+		release_image="$(openshift-install version | sed -n 's/^release image\s\+\(.*\)$/\1/p' | tr -d '\n')"
+		ocp_version="$(oc adm release info "$release_image" -o json | jq -r '.metadata.version' | tr -d '\n')"
+		info "Detected OCP version: ${ocp_version}"
+		printf '%s\n%s' "$1" "$ocp_version" | sort -C -V
+	}
 
-# Setting a default authentication method based on version number
-if [[ "$OPENSTACK_AUTHENTICATION_METHOD" == "application-credentials" ]]; then
-	if ! is_openshift_version_gte "4.12"; then
+	# Loudly crash if "application-credentials" was explicitly set on an incompatible OCP version
+	if [[ "$OPENSTACK_AUTHENTICATION_METHOD" == "$METHOD_APPCREDS" ]] && ! is_openshift_version_gte "4.12"; then
 		info 'Detected OPENSTACK_AUTHENTICATION_METHOD=application-credentials in combination with an incompatible OCP version: exiting with an error.'
 		exit 1
 	fi
+
+	if [[ "$OPENSTACK_AUTHENTICATION_METHOD" == "$METHOD_DEFAULT" ]]; then
+		if is_openshift_version_gte "4.13"; then
+			info 'Detected version gte 4.13: setting application credentials authentication.'
+			OPENSTACK_AUTHENTICATION_METHOD='application-credentials'
+		else
+			info 'Detected version lt 4.13: setting password authentication.'
+			OPENSTACK_AUTHENTICATION_METHOD='password'
+		fi
+	fi
+
+else
+	if [[ "$OPENSTACK_AUTHENTICATION_METHOD" == "$METHOD_DEFAULT" ]]; then
+		info 'Defaulting to application credentials for non-OCP jobs.'
+		OPENSTACK_AUTHENTICATION_METHOD="$METHOD_APPCREDS"
+	fi
 fi
+
 
 info "The environment variable OPENSTACK_AUTHENTICATION_METHOD is set to '${OPENSTACK_AUTHENTICATION_METHOD}'."
 case "$OPENSTACK_AUTHENTICATION_METHOD" in
-	"application-credentials")
+	"$METHOD_APPCREDS")
 		new_application_credentials "$clouds_yaml" > "${SHARED_DIR}/clouds.yaml"
 		info "Generated application credentials with ID $(yq -r ".clouds.\"${OS_CLOUD}\".auth.application_credential_id" "${SHARED_DIR}/clouds.yaml")"
 
@@ -94,7 +108,7 @@ case "$OPENSTACK_AUTHENTICATION_METHOD" in
 		fi
 
 		;;
-	"password")
+	"$METHOD_PASSWORD")
 		if [[ "$(yq -r ".clouds.\"${OS_CLOUD}\".auth_type" "$clouds_yaml")" == 'v3applicationcredential' ]]; then
 			info 'The original clouds.yaml does not contain a password. Exiting.'
 			exit 1

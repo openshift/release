@@ -10,7 +10,7 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.48.0
+    tag: v1.53.1
   hypershift-operator:
     name: 4.14-priv
     namespace: ocp-private
@@ -19,31 +19,26 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.14
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cluster-network-operator
 images:
-- dockerfile_path: Dockerfile.rhel7
+- dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-network-operator
 promotion:
   name: 4.14-priv
   namespace: ocp-private
 releases:
-  hosted-ocp-previous:
-    candidate:
-      product: ocp
-      stream: ci
-      version: "4.13"
   initial:
     integration:
       name: 4.14-priv
@@ -127,6 +122,8 @@ tests:
 - as: e2e-aws-ovn-windows
   steps:
     cluster_profile: aws
+    env:
+      WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid
@@ -138,7 +135,7 @@ tests:
 - as: e2e-vsphere-ovn-dualstack
   optional: true
   steps:
-    cluster_profile: vsphere-ibm-7
+    cluster_profile: vsphere
     env:
       TEST_SKIPS: Services Secondary IP Family \[LinuxOnly\] should function for pod-Service\|
         Services Secondary IP Family \[LinuxOnly\] should function for node-Service\|
@@ -252,6 +249,7 @@ tests:
     workflow: openshift-e2e-aws-single-node
 - as: e2e-hypershift-ovn
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
 - as: lint
   commands: |

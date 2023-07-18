@@ -147,8 +147,12 @@ openstack*)
     # shellcheck disable=SC1090
     source "${SHARED_DIR}/cinder_credentials.sh"
     export TEST_PROVIDER='{"type":"openstack"}';;
+ibmcloud)
+    export TEST_PROVIDER='{"type":"ibmcloud"}'
+    IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
+    export IC_API_KEY;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-equinix-ocp-metal|equinix-ocp-metal-qe)
+equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
     export TEST_PROVIDER='{"type":"skeleton"}';;
 nutanix|nutanix-qe)
     export TEST_PROVIDER='{"type":"nutanix"}';;

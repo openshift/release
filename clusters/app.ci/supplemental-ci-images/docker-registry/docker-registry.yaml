@@ -1,0 +1,61 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: docker-registry
+  namespace: ci
+  annotations:
+    description: "https://hub.docker.com/_/registry"
+spec:
+  tags:
+  - annotations:
+      openshift.io/imported-from: docker.io/library/registry:2.8.1
+    name: "2.8.1"
+    from:
+      kind: DockerImage
+      name: docker.io/library/registry:2.8.1
+---
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: docker-registry
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: docker-registry:tp-2.8.1
+  source:
+    dockerfile: |
+      FROM registry.ci.openshift.org/ci/docker-registry:2.8.1
+      RUN apk add --no-cache apache2-utils
+      RUN echo $'#!/bin/sh \n\
+       \n\
+      set -e \n\
+      secret_path=/etc/quay-io-pull-credentials \n\
+      export REGISTRY_PROXY_USERNAME=$(head -n 1 "${secret_path}/quay_io_username") \n\
+      export REGISTRY_PROXY_PASSWORD=$(head -n 1 "${secret_path}/quay_io_password") \n\
+      htpasswd -Bbn ${REGISTRY_PROXY_USERNAME} ${REGISTRY_PROXY_PASSWORD} > /tmp/htpasswd \n\
+      registry serve /etc/docker-registry/config.yml & \n\
+      pid=$! \n\
+      while true \n\
+      do \n\
+        quay_io_username=$(head -n 1 "${secret_path}/quay_io_username") \n\
+        quay_io_password=$(head -n 1 "${secret_path}/quay_io_password") \n\
+        if [ "$REGISTRY_PROXY_USERNAME" != "$quay_io_username" ] || [ "$REGISTRY_PROXY_PASSWORD" != "$quay_io_password" ]; then \n\
+            kill $pid \n\
+            break \n\
+        fi \n\
+        sleep 30 \n\
+      done \n\
+      echo "finished" ' >> /tp-entrypoint.sh && chmod +x /tp-entrypoint.sh
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: docker-registry:2.8.1
+        namespace: ci
+      imageOptimizationPolicy: SkipLayers
+    type: Docker

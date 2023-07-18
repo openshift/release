@@ -6,16 +6,18 @@ workflow:
     env:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
-      CONTROL_PLANE_INSTANCE_TYPE: m4.xlarge
     post:
+    - ref: hypershift-mce-dump
     - chain: gather-core-dump
     - chain: hypershift-mce-kubevirt-destroy
     - chain: ipi-aws-post
     test:
     - chain: hypershift-conformance
+    - chain: hypershift-kubevirt-run-csi-e2e
     pre:
     - chain: ipi-aws-ovn-pre
     - chain: ipi-install
+    - ref: hypershift-kubevirt-install-odf
     - ref: hypershift-kubevirt-install
     - ref: hypershift-mce-install
     - chain: hypershift-mce-kubevirt-create

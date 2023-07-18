@@ -2,6 +2,7 @@
 
 set -ex
 
+META_OPERATOR="openstack-operator"
 ORG="openstack-k8s-operators"
 
 # We don't want to use OpenShift-CI build cluster namespace
@@ -31,6 +32,7 @@ fi
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${SERVICE_NAME}-operator
 export KUTTL_REPORT=kuttl-test-${SERVICE_NAME}.json
+export NETWORK_ISOLATION=false
 if [ ${SERVICE_NAME} == "openstack-ansibleee" ]; then
     # the service_name needs to be different to use in the image url than in
     # the environment variables
@@ -54,6 +56,8 @@ fi
 # changes in the PR)
 export ${SERVICE_NAME^^}_REPO=/go/src/github.com/${ORG}/${BASE_OP}
 
+# Use built META_OPERATOR bundle image
+export OPENSTACK_BUNDLE_IMG=${REGISTRY}/${ORGANIZATION}/${META_OPERATOR}-bundle:${PR_SHA}
 
 if [ -f "/go/src/github.com/${ORG}/${BASE_OP}/kuttl-test.yaml" ]; then
   if [ ! -d "${HOME}/install_yamls" ]; then

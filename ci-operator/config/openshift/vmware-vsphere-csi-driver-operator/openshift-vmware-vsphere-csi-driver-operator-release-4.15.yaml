@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 build_root:
   from_repository: true
 images:
@@ -63,6 +67,17 @@ tests:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-csi
+- as: e2e-vsphere-csi-extended
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[vSphere CSI Driver\]|\[vSphere-CSI-Driver-Operator\]
+    workflow: openshift-e2e-vsphere-csi-extended
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

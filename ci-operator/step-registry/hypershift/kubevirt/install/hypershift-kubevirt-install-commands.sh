@@ -126,6 +126,8 @@ metadata:
   name: kubevirt-hyperconverged
   namespace: openshift-cnv
 spec:
+  featureGates:
+    enableCommonBootImageImport: false
   logVerbosityConfig:
     kubevirt:
       virtLauncher: 8

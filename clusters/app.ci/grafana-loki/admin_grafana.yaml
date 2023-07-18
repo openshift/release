@@ -72,6 +72,64 @@ spec:
               mountPath: /etc/grafana/provisioning/datasources
             - name: grafana-var-lib
               mountPath: /var/lib/grafana
+        - name: token-refresher
+          args:
+            - --oidc.audience=$(AUDIENCE)
+            - --oidc.client-id=$(CLIENT_ID)
+            - --oidc.client-secret=$(CLIENT_SECRET)
+            - --oidc.issuer-url=$(ISSUER_URL)
+            - --upstream.url=$(RECEIVER_URL)
+            - --upstream.read-timeout=5s
+            - --upstream.write-timeout=10m
+          env:
+            - name: AUDIENCE
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-sso-redhat-oidc-credentials
+                  key: audience
+            - name: CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-sso-redhat-oidc-credentials
+                  key: client-id
+            - name: CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-sso-redhat-oidc-credentials
+                  key: client-secret
+            - name: RECEIVER_URL
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-sso-redhat-oidc-credentials
+                  key: receiver-url
+            - name: ISSUER_URL
+              value: "https://sso.redhat.com/auth/realms/redhat-external"
+          image: quay.io/observatorium/token-refresher:master-2023-04-03-2207107
+          resources:
+            requests:
+              cpu: 50m
+              memory: 200Mi
+            limits:
+              cpu: 100m
+              memory: 500Mi
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8081
+            failureThreshold: 5
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /live
+              port: 8081
+            failureThreshold: 5
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            successThreshold: 1
+            timeoutSeconds: 10
       restartPolicy: Always
       terminationGracePeriodSeconds: 30
       dnsPolicy: ClusterFirst

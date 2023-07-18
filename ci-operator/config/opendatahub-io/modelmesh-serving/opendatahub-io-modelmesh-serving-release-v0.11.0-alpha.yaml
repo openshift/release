@@ -1,3 +1,8 @@
+base_images:
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
 build_root:
   project_image:
     dockerfile_path: Dockerfile.develop
@@ -9,13 +14,15 @@ images:
     value: ci-test-img
   context_dir: .
   dockerfile_path: Dockerfile
-  from: src
+  from: ubi_minimal
   inputs:
     root:
       as:
       - ${DEV_IMAGE}
   to: modelmesh-serving
 promotion:
+  additional_images:
+    modelmesh-serving-develop: src
   namespace: opendatahub-io
   tag: v0.11.0-alpha
 releases:
@@ -32,14 +39,14 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: modelmesh-serving-unit
+- as: unit
   commands: |
     export HOME=/go
     make test
   container:
     from: src
   run_if_changed: ^(apis/.*|controllers/.*|pkg/.*|main\.go|Dockerfile|go\.mod|go\.sum)
-- as: modelmesh-serving-fvt
+- as: fvt
   run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum)
   steps:
     cluster_profile: gcp
@@ -62,7 +69,27 @@ tests:
           cpu: 2000m
           memory: 3Gi
     workflow: ipi-gcp
-- as: modelmesh-serving-pr-image-mirror
+- as: fvt-odh-manifests
+  run_if_changed: ^(opendatahub/odh-manifests)
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+    test:
+    - as: fvt-odh-manifests
+      commands: |
+        export HOME=/go
+        STABLE_MANIFESTS=true CONTROLLERNAMESPACE=modelmesh-serving NAMESPACE=modelmesh-serving NAMESPACESCOPEMODE=true CUSTOM_IMG=odh-modelmesh-controller=${PR_MODELMESH_SERVING_IMAGE} make e2e-test-for-odh
+      dependencies:
+      - env: PR_MODELMESH_SERVING_IMAGE
+        name: modelmesh-serving
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: ipi-aws
+- as: pr-image-mirror
   run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|version|go\.mod|go\.sum)
   steps:
     dependencies:
@@ -70,7 +97,7 @@ tests:
     env:
       IMAGE_REPO: modelmesh-controller
     workflow: opendatahub-io-ci-image-mirror
-- as: modelmesh-serving-stable-image-mirror
+- as: stable-image-mirror
   postsubmit: true
   run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|version|go\.mod|go\.sum)
   steps:
@@ -80,7 +107,7 @@ tests:
       IMAGE_REPO: modelmesh-controller
       RELEASE_VERSION: stable
     workflow: opendatahub-io-ci-image-mirror
-- as: modelmesh-serving-upstream-version-image-mirror
+- as: upstream-version-image-mirror
   postsubmit: true
   run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|version|go\.mod|go\.sum)
   steps:

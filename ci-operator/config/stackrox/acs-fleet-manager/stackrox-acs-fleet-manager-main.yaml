@@ -3,10 +3,10 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  openshift_release_golang-1.19:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+  stolostron_builder_go1.20-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
 build_root:
   image_stream_tag:
     name: release
@@ -16,23 +16,23 @@ build_root:
 images:
 - dockerfile_path: Dockerfile
   inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
     src:
       paths:
       - destination_dir: ./
         source_path: /go/src/github.com/stackrox/acs-fleet-manager/.
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
   to: acs-fleet-manager
 - dockerfile_path: .openshift-ci/e2e-runtime/Dockerfile
   inputs:
-    openshift_release_golang-1.19:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
     src:
       paths:
       - destination_dir: ./
         source_path: /go/src/github.com/stackrox/acs-fleet-manager/.
+    stolostron_builder_go1.20-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
   to: e2e-runtime
 releases:
   initial:

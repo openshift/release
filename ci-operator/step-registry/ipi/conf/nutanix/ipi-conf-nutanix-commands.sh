@@ -21,6 +21,42 @@ if [[ ! -z "${OVERRIDE_RHCOS_IMAGE}" ]]; then
     RHCOS_PATCH=$(printf "\n    ClusterOSImage: %s" "${OVERRIDE_RHCOS_IMAGE}")
 fi
 
+if [[ "${SIZE_VARIANT}" == "compact" ]]; then
+    MACHINE_POOL_OVERRIDES="
+compute:
+- name: worker
+  replicas: 0
+controlPlane:
+  name: master
+  replicas: 3
+  platform:
+    nutanix:
+      cpus: 8
+      memoryMiB: 32768
+      osDisk:
+        diskSizeGiB: 120"
+else
+    MACHINE_POOL_OVERRIDES="
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  platform:
+    nutanix:
+      cpus: 4
+      coresPerSocket: 1
+      memoryMiB: 16384
+      osDisk:
+        diskSizeGiB: 120
+  replicas: 3
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  platform: {}
+  replicas: 3"
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Adding platform data to install-config.yaml"
 
 # Populate install-config with Nutanix specifics
@@ -42,7 +78,7 @@ platform:
         address: ${PE_HOST}
         port: ${PE_PORT}
       uuid: ${PE_UUID}
-    subnetUUIDs: 
+    subnetUUIDs:
     - ${SUBNET_UUID}
 networking:
   clusterNetwork:
@@ -52,22 +88,5 @@ networking:
   - cidr: 10.0.0.0/16
   serviceNetwork:
   - 172.30.0.0/16
-compute:
-- architecture: amd64
-  hyperthreading: Enabled
-  name: worker
-  platform:
-    nutanix:
-      cpus: 4
-      coresPerSocket: 1
-      memoryMiB: 16384
-      osDisk:
-        diskSizeGiB: 120
-  replicas: 3
-controlPlane:
-  architecture: amd64
-  hyperthreading: Enabled
-  name: master
-  platform: {}
-  replicas: 3
+$MACHINE_POOL_OVERRIDES
 EOF

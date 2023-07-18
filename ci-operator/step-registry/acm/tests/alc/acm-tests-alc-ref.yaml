@@ -1,0 +1,47 @@
+ref:
+  as: acm-tests-alc
+  from: application-ui-test
+  commands: acm-tests-alc-commands.sh
+  timeout: 28800s
+  resources:
+    requests:
+      cpu: '1'
+      memory: 3Gi
+  credentials:
+    - namespace: test-credentials
+      name: acm-alc-credentials
+      mount_path: /tmp/secrets/alc
+    - namespace: test-credentials
+      name: acm-ci-credentials
+      mount_path: /tmp/secrets/ci 
+  env:
+  - name: CYPRESS_OC_CLUSTER_USER
+    default: "kubeadmin"
+    documentation: |-
+      Hub cluster username
+  - name: ANSIBLE_URL
+    default: "https://acmqe-test-ansible.install.dev09.red-chesterfield.com"
+    documentation: |-
+      Ansible host url
+  - name: CYPRESS_OBJECTSTORE_PRIVATE_URL
+    default: "http://minio-minio.apps.hivemind-b.aws.red-chesterfield.com/alc-qe-bucket"
+    documentation: |-
+      URL to private object store
+  - name: CYPRESS_TEST_MODE
+    default: "integration"
+    documentation: |-
+      Test mode to use for test execution (ex: upgrade, integration)
+  - name: TEST_TAGS
+    default: "@ocpInterop"
+    documentation: |-
+      grepTags parameter to use for test execution 
+  - name: CYPRESS_CLEANUP
+    default: "true"
+    documentation: |-
+      Clean-up all application resources: default value = true 
+  - name: BROWSER
+    default: "chrome"
+    documentation: |-
+      Set browser for cypress
+  documentation: |-
+    Executes ACM Application life cycle tests which will create/modify/delete applications in the ACM QE teams managed clusters (please inform owners of this step prior to use).

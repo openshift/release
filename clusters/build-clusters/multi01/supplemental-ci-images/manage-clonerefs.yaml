@@ -1,0 +1,87 @@
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  name: managed-clonerefs
+  namespace: ci
+spec:
+  lookupPolicy:
+    local: true
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  name: manage-clonerefs-arm64
+  namespace: ci
+spec:
+  nodeSelector:
+    kubernetes.io/arch: arm64
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: managed-clonerefs:latest
+      namespace: ci
+  runPolicy: Serial
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  source:
+    dockerfile: |-
+      FROM --platform=linux/arm64 gcr.io/k8s-prow/git:latest
+      ADD ./clonerefs /clonerefs
+    images:
+    - from:
+        kind: ImageStreamTag
+        name: clonerefs:latest
+      paths:
+      - destinationDir: .
+        sourcePath: /ko-app/clonerefs
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      imageOptimizationPolicy: SkipLayers
+      noCache: true
+      pullSecret:
+        name: registry-pull-credentials
+    type: Docker
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: clonerefs-manager
+  namespace: ci
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: clonerefs-manager-binding
+  namespace: ci
+roleRef:
+  kind: Role
+  apiGroup: rbac.authorization.k8s.io
+  name: builder
+subjects:
+- kind: ServiceAccount
+  namespace: ci
+  name: clonerefs-manager
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: builder
+rules:
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - buildconfigs/instantiate
+  verbs:
+  - create
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - builds
+  verbs:
+  - list
+  - get
+  - watch

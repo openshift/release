@@ -43,9 +43,21 @@ tests:
     test:
     - as: managed-gitops-e2e-step
       commands: scripts/openshiftci-presubmit-e2e-tests.sh
+      credentials:
+      - mount_path: /var/run/github-username
+        name: github-username
+        namespace: test-credentials
+      - mount_path: /var/run/github-pat
+        name: github-pat
+        namespace: test-credentials
       dependencies:
       - env: CI_IMAGE
         name: gitops-service-image
+      env:
+      - default: /var/run/github-username/github-username
+        name: GITHUB_USERNAME
+      - default: /var/run/github-pat/github-pat
+        name: GITHUB_PERSONAL_ACCESS_TOKEN
       from: src
       resources:
         requests:

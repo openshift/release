@@ -104,6 +104,7 @@ queue ${ARTIFACT_DIR}/subscriptions.json oc --insecure-skip-tls-verify --request
 queue ${ARTIFACT_DIR}/oc_cmds/subscriptions oc --insecure-skip-tls-verify --request-timeout=5s get subscriptions --all-namespaces
 queue ${ARTIFACT_DIR}/clusterserviceversions.json oc --insecure-skip-tls-verify --request-timeout=5s get clusterserviceversions --all-namespaces -o json
 queue ${ARTIFACT_DIR}/oc_cmds/clusterserviceversions oc --insecure-skip-tls-verify --request-timeout=5s get clusterserviceversions --all-namespaces
+queue ${ARTIFACT_DIR}/releaseinfo.json oc --insecure-skip-tls-verify --request-timeout=5s adm release info -o json
 
 FILTER=gzip queue ${ARTIFACT_DIR}/openapi.json.gz oc --insecure-skip-tls-verify --request-timeout=5s get --raw /openapi/v2
 
@@ -256,6 +257,11 @@ if [[ -n "${prometheus}" ]]; then
 else
 	echo "Unable to find a Prometheus pod to snapshot."
 fi
+
+echo "Adding debug tools link to sippy for intervals"
+cat >> ${SHARED_DIR}/custom-links.txt << EOF
+<a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+EOF
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.
 # Load whatever timestamps we can, generate the metrics script, and then send it to the

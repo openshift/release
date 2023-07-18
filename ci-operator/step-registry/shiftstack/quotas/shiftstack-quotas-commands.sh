@@ -4,7 +4,7 @@ set -Eeuo pipefail
 
 export OS_CLOUD
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
-MIN_PERCENTAGE=${MIN_PERCENTAGE:-15}
+MIN_PERCENTAGE=${MIN_PERCENTAGE:-10}
 
 message() {
 	echo 'Quotas are low on '"$CLOUD_NAME"'.\n```'

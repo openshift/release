@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
   cert-manager-cainjector:
     name: cert-manager-cainjector
     namespace: ci
@@ -19,12 +15,16 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.19-openshift-4.13
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
-  from: base
+  from: ubi
   inputs:
     ocp_builder_rhel-9-golang-1.19-openshift-4.13:
       as:
@@ -44,8 +44,11 @@ operator:
   - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.11.1
     with: cert-manager-cainjector
 promotion:
-  name: "4.14"
-  namespace: ocp
+  additional_images:
+    cert-manager-operator-bundle: cert-manager-operator-bundle
+  namespace: ci
+  tag: latest
+  tag_by_commit: true
 releases:
   initial:
     integration:

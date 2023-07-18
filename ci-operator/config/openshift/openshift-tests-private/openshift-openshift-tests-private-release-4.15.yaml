@@ -3,10 +3,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: cli
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.14
   tools:
     name: "4.15"
     namespace: ocp
@@ -20,14 +20,14 @@ build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.14
 images:
 - dockerfile_path: images/Dockerfile
   from: tools
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: tests-private
 - dockerfile_literal: |
     FROM src
@@ -48,7 +48,7 @@ images:
 - dockerfile_literal: |
     FROM bin
     RUN sh -c 'echo -e "[azure-cli]\nname=Azure CLI\nbaseurl=https://packages.microsoft.com/yumrepos/azure-cli\nenabled=1\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" >/etc/yum.repos.d/azure-cli.repo' && \
-        PACKAGES="azure-cli openssh-clients httpd-tools skopeo" && \
+        PACKAGES="azure-cli openssh-clients httpd-tools skopeo java-11-openjdk-headless" && \
         yum update -y && \
         yum install --setopt=tsflags=nodocs -y $PACKAGES && yum clean all && rm -rf /var/cache/yum/* && \
         chmod g+w /etc/passwd
@@ -104,7 +104,7 @@ tests:
   optional: true
 - as: e2e-aws
   optional: true
-  skip_if_only_changed: (frontend/)|(test/extended/(disaster_recovery|hypershift|psap/hypernto|winc|testdata)/)
+  skip_if_only_changed: (frontend/)|(test/extended/(disaster_recovery|hypershift|kata|psap/hypernto|winc|testdata|cluster_operator/hive|ocm_terraform|rosacli|util)/)|include\.go$
   steps:
     cluster_profile: aws
     test:
@@ -131,7 +131,11 @@ tests:
         curl -s -k -L ${CLIENTURL}/opm-linux.tar.gz -o opm.tar.gz && tar -C ${HOME} -xzvf opm.tar.gz && rm -fr opm.tar.gz
         curl -s -k -L ${CLIENTURL}/oc-mirror.tar.gz -o om.tar.gz && tar -C ${HOME} -xzvf om.tar.gz && chmod +x ${HOME}/oc-mirror && rm -f om.tar.gz
 
-        curl -s -k -L ${MIRROR2URL}/x86_64/clients/operator-sdk/pre-release/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz
+        SDKURL=${MIRROR2URL}/x86_64/clients/operator-sdk/pre-release
+        curl -s -k -L ${MIRROR2URL}/x86_64/clients/operator-sdk/ -o sdk.html
+        optsdkver=$(grep -E "<a href=\"4\.14" sdk.html |cut -d"\"" -f2|cut -d"/" -f1|sort -V|tail -1) && echo ${optsdkver}
+        if [ "V${optsdkver}V" != "VV"  ]; then SDKURL=${MIRROR2URL}/x86_64/clients/operator-sdk/${optsdkver}; fi
+        curl -s -k -L ${SDKURL}/operator-sdk-linux-x86_64.tar.gz -o opt-sdk.tar.gz
         tar -C ${HOME} -xzvf opt-sdk.tar.gz && mv ${HOME}/x86_64/operator-sdk ${HOME} && rm -fr opt-sdk.tar.gz ${HOME}/x86_64
 
         oc image extract quay.io/openshifttest/hypershift-client:latest --file=/hypershift && mv hypershift "${HOME}" && chmod 755 "${HOME}"/hypershift
@@ -214,6 +218,19 @@ tests:
     test:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-winc
+- as: debug-winc-gcp-ipi
+  optional: true
+  run_if_changed: test/extended/winc/
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FORCE_SUCCESS_EXIT: "no"
+      TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;Smokerun&
+      TEST_SCENARIOS: Windows_Containers
+      TEST_TIMEOUT: "50"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

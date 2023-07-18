@@ -115,7 +115,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-lvm-operator-main-lvm-operator-bundle-e2e-aws
-    optional: true
     rerun_command: /test lvm-operator-bundle-e2e-aws
     spec:
       containers:
@@ -195,6 +194,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/lvm-operator-codecov-token
         - --target=unit-test
         command:
         - ci-operator
@@ -208,6 +208,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/lvm-operator-codecov-token
+          name: lvm-operator-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -216,6 +219,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: lvm-operator-codecov-token
+        secret:
+          secretName: lvm-operator-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

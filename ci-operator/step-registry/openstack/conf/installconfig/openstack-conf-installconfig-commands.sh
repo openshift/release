@@ -11,7 +11,6 @@ OPENSTACK_EXTERNAL_NETWORK="${OPENSTACK_EXTERNAL_NETWORK:-$(<"${SHARED_DIR}/OPEN
 OPENSTACK_CONTROLPLANE_FLAVOR="${OPENSTACK_CONTROLPLANE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR")}"
 OPENSTACK_COMPUTE_FLAVOR="${OPENSTACK_COMPUTE_FLAVOR:-$(<"${SHARED_DIR}/OPENSTACK_COMPUTE_FLAVOR")}"
 ZONES="${ZONES:-$(<"${SHARED_DIR}/ZONES")}"
-ZONES_COUNT="${ZONES_COUNT:-0}"
 WORKER_REPLICAS="${WORKER_REPLICAS:-3}"
 
 API_IP=$(<"${SHARED_DIR}/API_IP")
@@ -21,19 +20,7 @@ PULL_SECRET=$(<"${CLUSTER_PROFILE_DIR}/pull-secret")
 SSH_PUB_KEY=$(<"${CLUSTER_PROFILE_DIR}/ssh-publickey")
 
 IFS=' ' read -ra ZONES <<< "$ZONES"
-MAX_ZONES_COUNT=${#ZONES[@]}
-
-if [ "${ZONES_COUNT}" -gt 1 ]; then
-	# For now, we only support a cluster within a single AZ.
-	# This will change in the future.
-	echo "Wrong ZONE_COUNT: can only be 0 or 1, got ${ZONES_COUNT}"
-	exit 1
-fi
-if [ "${ZONES_COUNT}" -gt "${MAX_ZONES_COUNT}" ]; then
-	echo "Too many zones were requested: ${ZONES_COUNT}; only ${MAX_ZONES_COUNT} are available: ${ZONES[*]}"
-	exit 1
-fi
-
+ZONES_COUNT=${#ZONES[@]}
 ZONES_JSON="$(echo -n "${ZONES[@]:0:${ZONES_COUNT}}" | jq -cRs '(. / " ")')"
 echo "OpenStack Availability Zones: '${ZONES_JSON}'"
 
@@ -97,7 +84,6 @@ case "$CONFIG_TYPE" in
 		if [[ -f "${SHARED_DIR}/LB_HOST" ]]; then
     			yq --yaml-output --in-place ".
     			    | .platform.openstack.loadBalancer.type = \"UserManaged\"
-    			    | .featureSet = \"TechPreviewNoUpgrade\"
     			" "$INSTALL_CONFIG"
 		fi
 		;;
@@ -114,13 +100,6 @@ if [[ "${ZONES_COUNT}" -gt '0' ]]; then
 		| .compute[0].platform.openstack.rootVolume.type = \"tripleo\"
 		| .compute[0].platform.openstack.rootVolume.size = 30
 		| .compute[0].platform.openstack.rootVolume.zones = ${ZONES_JSON}
-	" "$INSTALL_CONFIG"
-fi
-
-if [[ -f "${SHARED_DIR}/failure_domain.json" ]]; then
-	yq --yaml-output --in-place ".
-		| .controlPlane.platform.openstack += $(<"${SHARED_DIR}/failure_domain.json")
-		| .featureSet = \"TechPreviewNoUpgrade\"
 	" "$INSTALL_CONFIG"
 fi
 
@@ -144,6 +123,13 @@ if [ "${FIPS_ENABLED:-}" = "true" ]; then
 	" "$INSTALL_CONFIG"
 fi
 
+if [ -n "${FEATURE_SET}" ]; then
+        echo "Adding 'featureSet: ...' to install-config.yaml"
+	yq --yaml-output --in-place ".
+		| .featureSet = \"${FEATURE_SET}\"
+	" "$INSTALL_CONFIG"
+fi
+
 # Regenerate install-config.yaml to fill in unset values with default values.
 # Note that this triggers some validation against the OpenStack infrastructure.
 (
@@ -163,15 +149,3 @@ if "proxy" in data:
     data["proxy"] = "redacted"
 print(yaml.dump(data))
 ' "$INSTALL_CONFIG" > "${ARTIFACT_DIR}/install-config.yaml"
-
-# Remove the ports created in openstack-provision-machinesubnet-commands.sh
-# since the installer will create them again, based on install-config.yaml.
-if [[ ${OPENSTACK_PROVIDER_NETWORK} != "" ]]; then
-	echo "Provider network detected: cleaning up reserved ports"
-	for p in api ingress; do
-		if openstack port show "${CLUSTER_NAME}-${CONFIG_TYPE}-${p}" >/dev/null; then
-			echo "Port exists for ${CLUSTER_NAME}-${CONFIG_TYPE}-${p}: removing it"
-			openstack port delete "${CLUSTER_NAME}-${CONFIG_TYPE}-${p}"
-		fi
-	done
-fi

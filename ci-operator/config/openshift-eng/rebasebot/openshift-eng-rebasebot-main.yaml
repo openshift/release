@@ -6,9 +6,9 @@ build_root:
       # Install go toolset
       USER root
 
-      ENV GO_VERSION=1.19
+      ENV GO_VERSION=1.20
       RUN curl -Ls https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz | \
-      tar -C /usr/local -zxvf - go/bin go/pkg/linux_amd64 go/pkg/tool
+      tar -C /usr/local -zxvf - go/bin go/pkg/tool
       ENV PATH="/usr/local/go/bin:$PATH"
 
       USER default
@@ -180,6 +180,7 @@ tests:
         rebasebot --source https://github.com/kubernetes/cloud-provider-gcp:master \
                   --dest openshift/cloud-provider-gcp:master \
                   --rebase openshift-cloud-team/cloud-provider-gcp:rebase-bot-master \
+                  --update-go-modules \
                   --slack-webhook /secrets/rebasebot/slack-webhook \
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
@@ -270,6 +271,213 @@ tests:
       credentials:
       - mount_path: /secrets/rebasebot
         name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openstack-sushy
+  cron: 00 10 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: openstack-sushy
+      commands: |
+        rebasebot --source https://github.com/openstack/sushy:master \
+                  --dest openshift/openstack-sushy:master \
+                  --rebase openshift-metal3/openstack-sushy:ironic-bot-master \
+                  --github-app-id 259896 \
+                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
+                  --github-cloner-id 318353 \
+                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
+                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
+                  --git-username ironic-bot \
+                  --git-email metal-platform@redhat.com
+      credentials:
+      - mount_path: /secrets/slack-hooks
+        name: metal-platform-slack-hooks
+        namespace: test-credentials
+      - mount_path: /secrets/ironic-bot
+        name: metal-platform-bot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openstack-ironic
+  cron: 10 10 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: openstack-ironic
+      commands: |
+        rebasebot --source https://github.com/openstack/ironic:master \
+                  --dest openshift/openstack-ironic:master \
+                  --rebase openshift-metal3/openstack-ironic:ironic-bot-master \
+                  --github-app-id 259896 \
+                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
+                  --github-cloner-id 318353 \
+                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
+                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
+                  --git-username ironic-bot \
+                  --git-email metal-platform@redhat.com
+      credentials:
+      - mount_path: /secrets/slack-hooks
+        name: metal-platform-slack-hooks
+        namespace: test-credentials
+      - mount_path: /secrets/ironic-bot
+        name: metal-platform-bot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openstack-ironic-python-agent
+  cron: 20 10 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: openstack-ironic-python-agent
+      commands: |
+        rebasebot --source https://github.com/openstack/ironic-python-agent:master \
+                  --dest openshift/openstack-ironic-python-agent:master \
+                  --rebase openshift-metal3/openstack-ironic-python-agent:ironic-bot-master \
+                  --github-app-id 259896 \
+                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
+                  --github-cloner-id 318353 \
+                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
+                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
+                  --git-username ironic-bot \
+                  --git-email metal-platform@redhat.com
+      credentials:
+      - mount_path: /secrets/slack-hooks
+        name: metal-platform-slack-hooks
+        namespace: test-credentials
+      - mount_path: /secrets/ironic-bot
+        name: metal-platform-bot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openstack-ironic-inspector
+  cron: 30 10 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: openstack-ironic-inspector
+      commands: |
+        rebasebot --source https://github.com/openstack/ironic-inspector:master \
+                  --dest openshift/openstack-ironic-inspector:master \
+                  --rebase openshift-metal3/openstack-ironic-inspector:ironic-bot-master \
+                  --github-app-id 259896 \
+                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
+                  --github-cloner-id 318353 \
+                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
+                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
+                  --git-username ironic-bot \
+                  --git-email metal-platform@redhat.com
+      credentials:
+      - mount_path: /secrets/slack-hooks
+        name: metal-platform-slack-hooks
+        namespace: test-credentials
+      - mount_path: /secrets/ironic-bot
+        name: metal-platform-bot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: openstack-ironic-lib
+  cron: 40 10 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: openstack-ironic-lib
+      commands: |
+        rebasebot --source https://github.com/openstack/ironic-lib:master \
+                  --dest openshift/openstack-ironic-lib:master \
+                  --rebase openshift-metal3/openstack-ironic-lib:ironic-bot-master \
+                  --github-app-id 259896 \
+                  --github-app-key /secrets/ironic-bot/ironic-merge-bot-key \
+                  --github-cloner-id 318353 \
+                  --github-cloner-key /secrets/ironic-bot/ironic-cloner-bot-key \
+                  --slack-webhook /secrets/slack-hooks/team-ocp-metal-platform \
+                  --git-username ironic-bot \
+                  --git-email metal-platform@redhat.com
+      credentials:
+      - mount_path: /secrets/slack-hooks
+        name: metal-platform-slack-hooks
+        namespace: test-credentials
+      - mount_path: /secrets/ironic-bot
+        name: metal-platform-bot-credentials
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: kubernetes-autoscaler
+  cron: 20 13 * * Mon,Thu
+  steps:
+    test:
+    - as: kubernetes-autoscaler
+      commands: |
+        rebasebot --source https://github.com/kubernetes/autoscaler:master \
+                  --dest openshift/kubernetes-autoscaler:master \
+                  --rebase openshift-cloud-team/kubernetes-autoscaler:rebase-bot-master \
+                  --slack-webhook /secrets/rebasebot/slack-webhook \
+                  --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
+                  --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
+                  --git-username cloud-team-rebase-bot \
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
+      credentials:
+      - mount_path: /secrets/rebasebot
+        name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: kubernetes-nmstate
+  cron: 30 5 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: kubernetes-nmstate
+      commands: |
+        rebasebot --source https://github.com/nmstate/kubernetes-nmstate:main \
+                  --dest openshift/kubernetes-nmstate:master \
+                  --rebase openshift-networking/kubernetes-nmstate:rebase-bot-master \
+                  --github-app-id 352928 \
+                  --github-app-key /secrets/metal-net-merge-bot/private-key \
+                  --github-cloner-id 352930 \
+                  --github-cloner-key /secrets/metal-net-cloner-bot/private-key \
+                  --git-username metal-net-bot \
+                  --git-email metal-networking@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/metal-net-merge-bot
+        name: metal-net-merge-bot-private-key
+        namespace: test-credentials
+      - mount_path: /secrets/metal-net-cloner-bot
+        name: metal-net-cloner-bot-private-key
         namespace: test-credentials
       from: rebasebot
       resources:

@@ -1,0 +1,18 @@
+workflow:
+  as: firewatch-rosa-aws-sts-hypershift
+  steps:
+    env:
+      HOSTED_CP: "true"
+      ZONES_COUNT: "1"
+      COMPUTE_MACHINE_TYPE: "m5.2xlarge"
+      REPLICAS: "3"
+      DISABLE_WORKLOAD_MONITORING: "false"
+    pre:
+    - chain: rosa-aws-sts-provision-byo-vpc
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    post:
+    - chain: rosa-aws-sts-deprovision-byo-vpc
+    - ref: firewatch-report-issues
+  documentation: |-
+    An extension of the rosa-aws-sts-hypershift workflow, which installs a rosa hypershift cluster. The cluster is set with htpasswd idp, and the login information is stored under $SHARED_DIR/api.login.
+    After testing is finished the cluster will be deprovisioned.

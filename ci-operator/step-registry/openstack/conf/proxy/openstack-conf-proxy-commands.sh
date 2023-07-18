@@ -19,6 +19,15 @@ export no_proxy="redhat.io,quay.io,redhat.com,svc,github.com,githubusercontent.c
 EOF
 }
 
+if [[ -f "${SHARED_DIR}/BASTION_FIP" ]]; then
+    if [[ ! -f "${SHARED_DIR}/SQUID_AUTH" ]]; then
+        echo "ERROR: SQUID_AUTH not found in shared dir"
+        exit 1
+    fi
+    echo "Ephemeral proxy detected: $(<"${SHARED_DIR}/BASTION_FIP")"
+    write_proxy_config "$(<"${SHARED_DIR}/SQUID_AUTH")" "$(<"${SHARED_DIR}/BASTION_FIP")"
+    exit 0
+fi
 
 # Some of our cluster profiles already have a proxy configured,
 # so we don't need to create a new one, and can use the existing.
@@ -27,16 +36,6 @@ if [[ -f "${SHARED_DIR}/squid-credentials.txt" ]]; then
     proxy_host=$(yq -r ".clouds.${OS_CLOUD}.auth.auth_url" "$OS_CLIENT_CONFIG_FILE" | cut -d/ -f3 | cut -d: -f1)
     echo "Permanent proxy detected: $proxy_host"
     write_proxy_config "$(<"${SHARED_DIR}/squid-credentials.txt")" "${proxy_host}"
-    exit 0
-fi
-
-if [[ -f "${SHARED_DIR}/BASTION_FIP" ]]; then
-    if [[ ! -f "${SHARED_DIR}/SQUID_AUTH" ]]; then
-        echo "ERROR: SQUID_AUTH not found in shared dir"
-        exit 1
-    fi
-    echo "Ephemeral proxy detected: $(<"${SHARED_DIR}/BASTION_FIP")"
-    write_proxy_config "$(<"${SHARED_DIR}/SQUID_AUTH")" "$(<"${SHARED_DIR}/BASTION_FIP")"
     exit 0
 fi
 

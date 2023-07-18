@@ -5,6 +5,7 @@ DEFAULT_ORG="openstack-k8s-operators"
 DEFAULT_REGISTRY="quay.io"
 OPENSTACK_OPERATOR="openstack-operator"
 BASE_DIR=${HOME:-"/alabama"}
+NS_SERVICES=${NS_SERVICES:-"openstack"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
@@ -67,6 +68,11 @@ while true; do
   sleep 10
 done
 
+# Get default env values from Makefile
+DBSERVICE=$(make --eval $'var:\n\t@echo $(DBSERVICE)' NETWORK_ISOLATION=false var)
+DBSERVICE_CONTAINER=$(make --eval $'var:\n\t@echo $(DBSERVICE_CONTAINER)' NETWORK_ISOLATION=false var)
+OPENSTACK_CTLPLANE=$(make --eval $'var:\n\t@echo $(OPENSTACK_CTLPLANE)' NETWORK_ISOLATION=false var)
+OPENSTACK_CTLPLANE_FILE=$(basename $OPENSTACK_CTLPLANE)
 
 # Deploy openstack operator
 make openstack OPENSTACK_IMG=${OPENSTACK_OPERATOR_INDEX} NETWORK_ISOLATION=false
@@ -88,10 +94,10 @@ sh -c 'oc wait --for=condition=Available deployment {} --timeout=-1s'
 
 # Export OPENSTACK_CR if testing openstack-operator changes
 if [[ "$SERVICE_NAME" == "OPENSTACK" ]]; then
-  export ${SERVICE_NAME}_CR=/go/src/github.com/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}/config/samples/core_v1beta1_openstackcontrolplane.yaml
+  export ${SERVICE_NAME}_CR=/go/src/github.com/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}/${OPENSTACK_CTLPLANE}
 fi
 
-make ceph TIMEOUT=90
+make ceph DATA_SIZE=2Gi TIMEOUT=90
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
@@ -101,7 +107,7 @@ cat <<EOF >${BASE_DIR}/install_yamls/out/openstack/openstack/cr/kustomization.ya
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- ./core_v1beta1_openstackcontrolplane.yaml
+- ./$(echo ${OPENSTACK_CTLPLANE_FILE})
 namespace: openstack
 patches:
 - patch: |-
@@ -220,10 +226,13 @@ sleep 60
 oc get OpenStackControlPlane openstack -o json | jq -r '.status.conditions[].type' | \
 timeout ${TIMEOUT_SERVICES_READY} xargs -d '\n' -I {} sh -c 'echo testing condition={}; oc wait openstackcontrolplane.core.openstack.org/openstack --for=condition={} --timeout=-1s'
 
+# Basic validations after deploying
+oc project "${NS_SERVICES}"
+
 # Create clouds.yaml file to be used in further tests.
 mkdir -p ~/.config/openstack
 cat > ~/.config/openstack/clouds.yaml << EOF
-$(oc get cm openstack-config -n openstack -o json | jq -r '.data["clouds.yaml"]')
+$(oc get cm openstack-config -o json | jq -r '.data["clouds.yaml"]')
 EOF
 export OS_CLOUD=default
 KEYSTONE_SECRET_NAME=$(oc get keystoneapi keystone -o json | jq -r .spec.secret)
@@ -233,10 +242,13 @@ export OS_PASSWORD
 
 # Post tests for mariadb-operator
 # Check to confirm they we can login into mariadb container and show databases.
-MARIADB_SECRET_NAME=$(oc get mariadb openstack -o json | jq -r .spec.secret)
+MARIADB_SECRET_NAME=$(oc get ${DBSERVICE} openstack -o json | jq -r .spec.secret)
 MARIADB_PASSWD=$(oc get secret ${MARIADB_SECRET_NAME} -o json | jq -r .data.DbRootPassword | base64 -d)
-oc exec -it  pod/mariadb-openstack -- mysql -uroot -p${MARIADB_PASSWD} -e "show databases;"
+oc exec -it  pod/${DBSERVICE_CONTAINER} -- mysql -uroot -p${MARIADB_PASSWD} -e "show databases;"
 
 # Post tests for keystone-operator
 # Check to confirm you can issue a token.
 openstack token issue
+
+# Dump keystone catalog endpoints
+openstack endpoint list

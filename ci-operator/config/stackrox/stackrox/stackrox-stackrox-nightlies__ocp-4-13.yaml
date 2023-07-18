@@ -7,15 +7,12 @@ build_root:
   image_stream_tag:
     name: apollo-ci
     namespace: stackrox
-    tag: stackrox-test-0.3.57
+    tag: stackrox-test-0.3.59
 releases:
   latest:
-    prerelease:
-      architecture: amd64
-      product: ocp
-      version_bounds:
-        lower: 4.13.0-0
-        upper: 4.14.0-0
+    release:
+      channel: fast
+      version: "4.13"
 resources:
   '*':
     requests:
@@ -23,15 +20,79 @@ resources:
       memory: 4000Mi
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
-- as: operator-e2e-tests
+- as: qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
   postsubmit: true
   steps:
-    cluster_profile: aws
+    env:
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: fips-qa-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: gcp
+    env:
+      FIPS_ENABLED: "true"
+      TEST_SUITE: ocp-qa-e2e-tests
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: fips-check
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-gcp
+  timeout: 5h0m0s
+- as: core-bpf-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  postsubmit: true
+  steps:
+    env:
+      TEST_SUITE: ocp-core-bpf-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+  timeout: 5h0m0s
+- as: operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  postsubmit: true
+  steps:
     env:
       TEST_SUITE: ocp-operator-e2e-tests
     test:
     - ref: stackrox-e2e
-    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: ui-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  postsubmit: true
+  steps:
+    env:
+      TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: nightlies

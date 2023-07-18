@@ -7,8 +7,15 @@ chain:
         - name: HYPERSHIFT_NODE_COUNT
           default: "3"
           documentation: "The number nodes to automatically create and join to the cluster."
+        - name: ENABLE_ICSP
+          default: "false"
+          documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_iscp.yaml)"
       commands: |-
         set -exuo pipefail
+        
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
 
         arch=$(arch)
         if [ "$arch" == "x86_64" ]; then
@@ -22,6 +29,15 @@ chain:
 
         CLUSTER_NAMESPACE=local-cluster-${CLUSTER_NAME}
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+        
+        PULL_SECRET_PATH="/etc/ci-pull-credentials/.dockerconfigjson"
+        ICSP_COMMAND=""
+        if [[ $ENABLE_ICSP == "true" ]]; then
+          ICSP_COMMAND=$(echo "--image-content-sources ${SHARED_DIR}/mgmt_iscp.yaml")
+          echo "extract secret/pull-secret"
+          oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+          PULL_SECRET_PATH="/tmp/.dockerconfigjson"
+        fi
       
         # Enable wildcard routes on the management cluster
         oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
@@ -29,13 +45,13 @@ chain:
 
 
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-        /tmp/hypershift create cluster kubevirt \
+        /tmp/hypershift create cluster kubevirt ${ICSP_COMMAND} \
           --name ${CLUSTER_NAME} \
           --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
           --memory 16Gi \
           --cores 4 \
           --namespace local-cluster \
-          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
+          --pull-secret ${PULL_SECRET_PATH}
 
         oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
         oc apply -f - <<EOF
@@ -61,6 +77,10 @@ chain:
         oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
         echo "Cluster became available, creating kubeconfig"
         /tmp/hypershift create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+
+        if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "BareMetal" ]; then
+          exit 0
+        fi 
 
         echo "Waiting for nested cluster's node count to reach the desired replicas count in the NodePool"
         until \

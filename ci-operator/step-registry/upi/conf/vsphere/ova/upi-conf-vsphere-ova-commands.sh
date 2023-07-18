@@ -28,7 +28,7 @@ DATACENTERS=("$GOVC_DATACENTER")
 DATASTORES=("$GOVC_DATASTORE")
 CLUSTERS=("$vsphere_cluster")
 
-# If testing a zonal install, the template also needs to be available in the 
+# If testing a zonal install, the template also needs to be available in the
 # secondary datacenter
 if [ -f "${SHARED_DIR}/ova-datacenters" ]; then
     if [ -f "${SHARED_DIR}/ova-datastores" ]; then
@@ -39,6 +39,10 @@ if [ -f "${SHARED_DIR}/ova-datacenters" ]; then
     fi
 fi
 
+
+govc_version=$(govc version)
+
+echo "$(date -u --rfc-3339=seconds) - govc version: ${govc_version}"
 
 echo "$(date -u --rfc-3339=seconds) - Checking if RHCOS OVA needs to be downloaded from ${ova_url}..."
 
@@ -104,16 +108,27 @@ EOF
         echo "$(date -u --rfc-3339=seconds) - Skipping ova import due to image already existing."
     fi
 
+    echo "$(date -u --rfc-3339=seconds) - Configured Resource Pool: ${GOVC_RESOURCE_POOL}"
+    echo "$(date -u --rfc-3339=seconds) - Configured Leased Resource: ${LEASED_RESOURCE}"
+    echo "$(date -u --rfc-3339=seconds) - Configured OVA Network as MOB ID: ${OVA_NETWORK}"
+    echo "$(date -u --rfc-3339=seconds) - Configured Datastore: ${GOVC_DATASTORE}"
+
     hw_versions=(15 17 18 19)
     if [[ ${vsphere_version} -eq 8 ]]; then
         hw_versions=(20)
     fi
+
     for hw_version in "${hw_versions[@]}"; do
+        govc_vm_info=$(govc vm.info "${vm_template}-hw${hw_version}")
+        echo "$(date -u --rfc-3339=seconds) - govc_vm_info ${govc_vm_info}"
         if [[ "$(govc vm.info "${vm_template}-hw${hw_version}" | wc -c)" -eq 0 ]]
         then
             echo "$(date -u --rfc-3339=seconds) - Cloning and upgrading ${vm_template} to hw version ${hw_version}..."
-            govc vm.clone -net=${LEASED_RESOURCE} -on=false -cluster=$CLUSTER -vm="${vm_template}" "${vm_template}-hw${hw_version}"
+            echo "$(date -u --rfc-3339=seconds) - Configured Cluster for clone: ${CLUSTER}"
+
+            govc vm.clone -ds=${GOVC_DATASTORE} -pool=${GOVC_RESOURCE_POOL} -on=false -vm="${vm_template}" "${vm_template}-hw${hw_version}"
             govc vm.upgrade -vm="${vm_template}-hw${hw_version}" -version=${hw_version}
+
         else
             echo "$(date -u --rfc-3339=seconds) - Skipping ova import for hw${hw_version} due to image already existing."
         fi

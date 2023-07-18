@@ -1,0 +1,47 @@
+ref:
+  as: rosa-terraform-e2e-tests-upload-polarion
+  from_image:
+    namespace: ci
+    name: telco-bastion
+    tag: latest
+  grace_period: 10m
+  commands: rosa-terraform-e2e-tests-upload-polarion-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 300Mi
+  timeout: 2h0m0s
+  credentials:
+  - namespace: test-credentials    
+    name: proxy-ip
+    mount_path: /var/run/proxy-ip
+  - namespace: test-credentials
+    name: proxy-pkey
+    mount_path: /var/run/proxy-pkey
+  env:
+  - name: POLARION_PROPERTIES
+    default: |
+      targets:
+        polarion:
+          config:
+            project: OSE
+          processing:
+            testsuite_properties:
+              polarion-testrun-id: ''
+              polarion-testrun-title: ''
+              polarion-custom-subteam: ''
+              polarion-custom-casecomponent: ''
+              polarion-custom-pillar: ''
+              polarion-custom-env_iaas_cloud_provider: ''
+              polarion-custom-version: ''
+              polarion-custom-products: ''
+              polarion-custom-plannedin: ''
+              polarion-custom-description: ''
+              polarion-custom-trigger: ''
+              polarion-custom-build: ''
+              polarion-custom-tags: ''
+  - name: POLARION_STEP_RESULTS
+    default: 'artifacts/e2e-periodic/openshift-extended-test/artifacts/junit'
+
+  documentation: |-
+    This will upload results to polarion

@@ -1,0 +1,52 @@
+base_images:
+  coreos-centos-stream8:
+    name: stream8
+    namespace: coreos
+    tag: "8"
+  openshift_release_golang-1.19:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+build_root:
+  project_image:
+    dockerfile_path: Dockerfile.openshift-appliance-build
+canonical_go_repository: github.com/openshift/appliance
+images:
+- dockerfile_path: Dockerfile.openshift-appliance
+  from: coreos-centos-stream8
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: agent-preinstall-image-builder
+promotion:
+  disabled: true
+  name: 4.14-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.14-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.14-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: |
+  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
+tests:
+- as: lint
+  commands: |
+    make lint
+  container:
+    from: test-bin
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-priv
+  repo: appliance

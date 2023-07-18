@@ -13,6 +13,14 @@ images:
   dockerfile_path: Dockerfile
   from: os
   to: odh-manifests-tests
+- context_dir: must-gather/
+  dockerfile_path: Dockerfile
+  to: must-gather-latest
+promotion:
+  additional_images:
+    latest: odh-manifests-tests
+  name: odh-manifests-tests
+  namespace: ocp
 releases:
   initial:
     integration:
@@ -58,6 +66,24 @@ tests:
           cpu: 1000m
           memory: 2Gi
     workflow: ipi-gcp
+- as: odh-manifests-must-gather-pr-image
+  run_if_changed: ^(must-gather/.*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: must-gather-latest
+    env:
+      IMAGE_REPO: must-gather
+    workflow: opendatahub-io-ci-image-mirror
+- as: odh-manifests-must-gather
+  postsubmit: true
+  run_if_changed: ^(must-gather/.*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: must-gather-latest
+    env:
+      IMAGE_REPO: must-gather
+      RELEASE_VERSION: stable
+    workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
   branch: master
   org: opendatahub-io

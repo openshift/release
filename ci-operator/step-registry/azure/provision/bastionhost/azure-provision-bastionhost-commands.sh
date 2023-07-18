@@ -34,7 +34,7 @@ function wait_public_dns() {
 # dump out from 'openshift-install coreos print-stream-json' on 4.10.0-rc.1
 bastion_source_vhd_uri="${BASTION_VHD_URI}"
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_name="${CLUSTER_NAME}-bastion"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
 
@@ -116,7 +116,7 @@ echo "azure vhd uri: ${bastion_source_vhd_uri}"
 echo "Create a Storage Account for bastion vhd"
 # 'account_name' must have length less than 24, so hardcode the basion sa name
 sa_name_prefix=$(echo "${NAMESPACE}" | sed "s/ci-op-//" | sed 's/[-_]//g')
-sa_name="${sa_name_prefix}${JOB_NAME_HASH}basa"
+sa_name="${sa_name_prefix}${UNIQUE_HASH}basa"
 run_command "az storage account create -g ${bastion_rg} --name ${sa_name} --kind Storage --sku Standard_LRS" &&
 account_key=$(az storage account keys list -g ${bastion_rg} --account-name ${sa_name} --query "[0].value" -o tsv) || exit 3
 

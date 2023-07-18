@@ -18,6 +18,14 @@ items:
     - pullrequestpayloadqualificationruns
     verbs:
     - create
+    - list
+  - apiGroups:
+    - prow.k8s.io
+    resources:
+    - prowjobs
+    verbs:
+    - update
+    - get
 - apiVersion: rbac.authorization.k8s.io/v1
   kind: RoleBinding
   metadata:
@@ -95,7 +103,7 @@ items:
           - name: github-app-credentials
             mountPath: /etc/github
             readOnly: true
-          - name: master
+          - name: configs
             mountPath: /etc/configs/master
             readOnly: true
           - name: tmp
@@ -122,8 +130,12 @@ items:
         - name: github-app-credentials
           secret:
             secretName: openshift-prow-github-app
-        - name: master
-          configMap:
-            name: ci-operator-master-configs
+        - name: configs
+          projected:
+            sources:
+            - configMap:
+                name: ci-operator-master-configs
+            - configMap:
+                name: ci-operator-main-configs
         - name: tmp
           emptyDir: {}

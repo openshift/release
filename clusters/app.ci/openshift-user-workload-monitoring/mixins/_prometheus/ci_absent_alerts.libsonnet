@@ -32,7 +32,7 @@
               message: 'The service %s has been down for 10 minutes.' % name,
             },
           }
-          for name in ["crier", 'ghproxy', 'jenkins-operator', 'kata-jenkins-operator', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", "pod-scaler-producer", 'retester']
+          for name in ["crier", 'ghproxy', 'kata-jenkins-operator', 'prow-controller-manager', 'sinker', 'tide', "dptp-controller-manager", "pod-scaler-producer", 'retester']
         ],
       },
     ],

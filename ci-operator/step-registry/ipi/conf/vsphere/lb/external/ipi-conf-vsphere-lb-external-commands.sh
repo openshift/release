@@ -10,7 +10,7 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
 

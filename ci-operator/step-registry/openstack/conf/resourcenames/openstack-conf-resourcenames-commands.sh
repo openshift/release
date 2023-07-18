@@ -35,7 +35,7 @@ declare -A compute_flavor=(
 	)
 
 declare -A compute_azs=(
-	['openstack-kuryr']=''
+	['openstack-kuryr']='az0'
 	['openstack-vexxhost']=''
         ['openstack-operators-vexxhost']=''
 	['openstack-vh-mecha-central']=''
@@ -45,7 +45,7 @@ declare -A compute_azs=(
 	)
 
 declare -A bastion_flavor=(
-	['openstack-kuryr']=''
+	['openstack-kuryr']='m1.small'
 	['openstack-vexxhost']='1vcpu_2gb'
         ['openstack-operators-vexxhost']='ci.m1.small'
 	['openstack-vh-mecha-central']='m1.small'
@@ -134,7 +134,7 @@ cat <<< "$BASTION_FLAVOR"                > "${SHARED_DIR}/BASTION_FLAVOR"
 # We have to truncate cluster name to 14 chars, because there is a limitation in the install-config
 # Now it looks like "ci-op-rl6z646h-65230".
 # We will remove "ci-op-" prefix from there to keep just last 14 characters. and it cannot start with a "-"
-UNSAFE_CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+UNSAFE_CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 cat <<< "${UNSAFE_CLUSTER_NAME/ci-??-/}" > "${SHARED_DIR}/CLUSTER_NAME"
 
 cat <<EOF

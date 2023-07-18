@@ -6,7 +6,7 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_name="${CLUSTER_NAME}-bastion"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
 if [[ ! -f "${bastion_ignition_file}" ]]; then
@@ -103,7 +103,7 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
             --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
             --output text)"
   echo "${bastion_hosted_zone_id}" > "${SHARED_DIR}/bastion-hosted-zone.txt"
- 
+
   dns_create_str=""
   dns_delete_str=""
   dns_target='"TTL": 60,"ResourceRecords": [{"Value": "'${bastion_ip}'"}]'

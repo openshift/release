@@ -1,16 +1,8 @@
 base_images:
-  base:
-    name: "4.13"
-    namespace: ocp
-    tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_4.13_cli:
-    name: "4.13"
-    namespace: ocp
-    tag: cli
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -30,40 +22,21 @@ build_root:
     tag: golang-1.18
 images:
 - dockerfile_path: Dockerfile.base
-  from: base
-  to: ovn-kubernetes-base
-- from: ovn-kubernetes-base
-  inputs:
-    ocp_4.13_cli:
-      as:
-      - registry.ci.openshift.org/ocp/4.13:cli
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: ovn-kubernetes
-- dockerfile_path: Dockerfile.microshift
-  from: ovn-kubernetes-base
-  inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-  to: ovn-kubernetes-microshift
-- dockerfile_path: Dockerfile.base.rhel9
   from: ocp_builder_rhel-9-base-openshift-4.13
   to: ovn-kubernetes-base-rhel-9
-- dockerfile_path: Dockerfile.rhel9
+- dockerfile_path: Dockerfile
   from: ovn-kubernetes-base-rhel-9
   inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
     ocp_builder_rhel-9-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
   to: ovn-kubernetes-rhel-9
-- dockerfile_path: Dockerfile.microshift.rhel9
+- dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base-rhel-9
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
     ocp_builder_rhel-9-golang-1.19-openshift-4.13:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
@@ -122,6 +95,8 @@ tests:
 - as: e2e-aws-ovn-windows
   steps:
     cluster_profile: aws
+    env:
+      WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid-toggle
@@ -198,6 +173,7 @@ tests:
 - as: e2e-aws-ovn-hypershift
   optional: true
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: unit
   commands: |

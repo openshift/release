@@ -11,10 +11,6 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: csi-livenessprobe
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -35,6 +31,10 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: csi-node-driver-registrar
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -43,9 +43,6 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -53,9 +50,9 @@ images:
 - dockerfile_path: Dockerfile.create_efs
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: aws-efs-csi-operator-create-efs
 operator:
   bundles:
@@ -116,6 +113,20 @@ tests:
       OO_CHANNEL: stable
       TEST_SUITE: openshift/csi
     workflow: openshift-e2e-aws-csi-efs
+- as: operator-e2e-extended
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+    workflow: openshift-e2e-aws-csi-efs-extended
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

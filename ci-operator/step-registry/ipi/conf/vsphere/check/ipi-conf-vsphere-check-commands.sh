@@ -21,8 +21,8 @@ vsphere_url="vcenter.sddc-44-236-21-251.vmwarevmc.com"
 VCENTER_AUTH_PATH=/var/run/vault/vsphere/secrets.sh
 
 LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
-# For leases >= than 88, run on the IBM Cloud 
-if [ ${LEASE_NUMBER} -ge 88 ] && [ ${LEASE_NUMBER} -lt 200 ]; then
+# For leases >= than 88, run on the IBM Cloud
+if [ ${LEASE_NUMBER} -ge 88 ] && [ ${LEASE_NUMBER} -lt 130 ]; then
   echo Scheduling job on IBM Cloud instance
   VCENTER_AUTH_PATH=/var/run/vault/ibmcloud/secrets.sh
   vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
@@ -33,22 +33,56 @@ if [ ${LEASE_NUMBER} -ge 88 ] && [ ${LEASE_NUMBER} -lt 200 ]; then
   vsphere_cluster="vcs-ci-workload"
   vsphere_datastore="vsanDatastore"
 fi
+# For leases >= than 130 and < 140, jobs are directed towards an overflow vSphere 7 vCenter 
+if [ ${LEASE_NUMBER} -ge 130 ] && [ ${LEASE_NUMBER} -lt 140 ]; then
+  VCENTER_AUTH_PATH=/var/run/vault/ibmcloud-2/secrets.sh
+  vsphere_url="v8c-2-vcenter.ocp2.dev.cluster.com"
+  vsphere_datacenter="IBMCloud"
+  cloud_where_run="IBM"
+  dns_server="10.38.76.172"
+  vsphere_resource_pool="/IBMCloud/host/vcs-ci-workload/Resources"
+  vsphere_cluster="vcs-ci-workload"
+  vsphere_datastore="vsanDatastore"
+fi
+
+
 # For leases >= than 151 and < 160, pull from alternate DNS which has context
 # relevant to NSX-T segments.
 if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -lt 160 ]; then
+  echo Scheduling job on IBM Cloud instance
+  VCENTER_AUTH_PATH=/var/run/vault/ibmcloud/secrets.sh
+  vsphere_url="ibmvcenter.vmc-ci.devcluster.openshift.com"
+  vsphere_datacenter="IBMCloud"
+  cloud_where_run="IBM"
+  vsphere_resource_pool="/IBMCloud/host/vcs-ci-workload/Resources"
+  vsphere_cluster="vcs-ci-workload"
+  vsphere_datastore="vsanDatastore"
   dns_server="192.168.133.73"
 fi
 
 # For leases >= 200, run on the IBM Cloud vSphere 8 env
-if [ ${LEASE_NUMBER} -ge 200 ]; then
+if [ ${LEASE_NUMBER} -ge 200 ] && [ ${LEASE_NUMBER} -lt 221 ]; then
   echo Scheduling job on IBM Cloud instance
   VCENTER_AUTH_PATH=/var/run/vault/vsphere8-secrets/secrets.sh
   vsphere_url="vcenter.ibmc.devcluster.openshift.com"
   vsphere_datacenter="IBMCdatacenter"
   cloud_where_run="IBM8"
-  dns_server="10.177.56.78"
+  dns_server="192.168.${LEASE_NUMBER}.1"
   vsphere_resource_pool="/IBMCdatacenter/host/IBMCcluster/Resources/ipi-ci-clusters"
   vsphere_cluster="IBMCcluster"
+  vsphere_datastore="vsanDatastore"
+fi
+
+# For leases >= 221, run on the IBM Cloud vSphere env
+if [ ${LEASE_NUMBER} -ge 221 ]; then
+  echo Scheduling job on IBM Cloud instance
+  VCENTER_AUTH_PATH=/var/run/vault/devqe-secrets/secrets.sh
+  vsphere_url="vcenter.devqe.ibmc.devcluster.openshift.com"
+  vsphere_datacenter="DEVQEdatacenter"
+  cloud_where_run="IBMC-DEVQE"
+  dns_server="192.168.${LEASE_NUMBER}.1"
+  vsphere_resource_pool="/DEVQEdatacenter/host/DEVQEcluster/Resources/ipi-ci-clusters"
+  vsphere_cluster="DEVQEcluster"
   vsphere_datastore="vsanDatastore"
 fi
 
@@ -101,6 +135,10 @@ fi
 # 4. skip the templates with ova
 # 5. Power off and delete the virtual machine
 
+# disable error checking in this section
+# randomly delete may fail, this shouldn't cause an immediate issue
+# but should eventually be cleaned up.
+set +e
 for i in "${!DATACENTERS[@]}"; do
   echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED_RESOURCE} in DC ${DATACENTERS[$i]} and destroy"
   DATACENTER=$(echo -n ${DATACENTERS[$i]} |  tr -d '\n')
@@ -110,13 +148,4 @@ for i in "${!DATACENTERS[@]}"; do
       jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |\
       xargs -I {} --no-run-if-empty govc vm.destroy {}
 done
-
-
-# The release controller starts four CI jobs concurrently: UPI, IPI, parallel and serial
-# We are currently having high CPU ready time in the vSphere CI cluster and this
-# does not help the situation. For periodics create a slight random delay
-# before continuing job progression.
-
-if [[ "${JOB_TYPE}" = "periodic" ]]; then
-    sleep "$(( RANDOM % 240 + 60 ))"s
-fi
+set -e

@@ -20,7 +20,7 @@ SSHOPTS=(-o 'ConnectTimeout=5'
 gnu_arch=$(echo "${architecture}" | sed 's/arm64/aarch64/;s/amd64/x86_64/')
 
 # The hostname of nodes and the cluster names have limited length for BM.
-# Other profiles add to the cluster_name the suffix "-${JOB_NAME_HASH}".
+# Other profiles add to the cluster_name the suffix "-${UNIQUE_HASH}".
 echo "${NAMESPACE}" > "${SHARED_DIR}/cluster_name"
 CLUSTER_NAME="${NAMESPACE}"
 

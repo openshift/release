@@ -4,19 +4,14 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-function checkCli() {
-    export IBMCLOUD_CLI=ibmcloud
-    export IBMCLOUD_HOME=/output
-    echo "check IBMCLOUD_CLI: ${IBMCLOUD_CLI}..."
-    command -v ${IBMCLOUD_CLI}
-    ${IBMCLOUD_CLI} --version
-    ${IBMCLOUD_CLI} plugin list
-}
-
 # IBM Cloud CLI login
 function ibmcloud_login {
-    echo "Try to login..."    
-    "${IBMCLOUD_CLI}" login -r ${LEASED_RESOURCE} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
+    export IBMCLOUD_CLI=ibmcloud
+    export IBMCLOUD_HOME=/output   
+    region="${LEASED_RESOURCE}"
+    export region
+    echo "Try to login..." 
+    "${IBMCLOUD_CLI}" login -r ${region} --apikey @"${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 }
 
 function create_resource_group() {
@@ -131,16 +126,12 @@ function attach_public_gateway_to_subnet() {
     "${IBMCLOUD_CLI}" is subnet-update ${subnetName} --vpc ${vpcName} --pgw ${pgwName} || return 1
 }
 
-checkCli
-
-
 ibmcloud_login
 
 ## Create the VPC
 echo "$(date -u --rfc-3339=seconds) - Creating the VPC..."
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
-region="${LEASED_RESOURCE}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 resource_group="${CLUSTER_NAME}-rg"
 

@@ -64,6 +64,7 @@ EOF
     # Deploy new operator group if operator group is defined
     if [[ -n "$operator_group" ]]; then
         if [[ -z "$operator_target_namespaces" ]]; then
+            echo "Deploying OperatorGroup ${operator_group} in to ${operator_install_namespace}"
             oc apply -f - <<EOF
             apiVersion: operators.coreos.com/v1
             kind: OperatorGroup
@@ -72,6 +73,7 @@ EOF
                 namespace: "${operator_install_namespace}"
 EOF
         else
+            echo "Deploying OperatorGroup ${operator_group} in to ${operator_install_namespace} with target namespaces: ${operator_target_namespaces}"
             oc apply -f - <<EOF
             apiVersion: operators.coreos.com/v1
             kind: OperatorGroup

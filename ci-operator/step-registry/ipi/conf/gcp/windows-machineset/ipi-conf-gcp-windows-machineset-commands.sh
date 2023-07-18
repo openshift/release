@@ -10,7 +10,7 @@ oc wait deployment windows-machine-config-operator -n openshift-windows-machine-
 # Ensure userDataSecret exist, fail otherwise. The userDataSecret is required and contains specific information to
 # customize the machine at first boot. For instance, the authorized public key for the SSH server to accept
 # incoming connections, firewall rules, etc.
-oc -n openshift-machine-api get secret "${WINDOWS_USER_DATA_SECRET}"
+timeout 3m bash -c 'until oc -n openshift-machine-api get secret "${WINDOWS_USER_DATA_SECRET}" 2> /dev/null; do echo -n "." && sleep 15; done'
 
 # Get machineset name to generate a generic template
 ref_machineset_name=$(oc -n openshift-machine-api get -o 'jsonpath={range .items[*]}{.metadata.name}{"\n"}{end}' machinesets | grep worker | head -n1)

@@ -80,7 +80,6 @@ periodics:
       - mountPath: /etc/build-farm-credentials
         name: build-farm-credentials
         readOnly: true
-    serviceAccountName: clonerefs-manager
     volumes:
     - name: slack
       secret:
@@ -132,7 +131,6 @@ periodics:
       - mountPath: /etc/build-farm-credentials
         name: build-farm-credentials
         readOnly: true
-    serviceAccountName: clonerefs-manager
     volumes:
     - name: slack
       secret:
@@ -156,14 +154,21 @@ periodics:
   spec:
     containers:
     - args:
-      - --config-path=/etc/config/_config.yaml
-      - --github-mapping-config-path=/etc/github-mapping/mapping.yaml
-      - --slack-token-path=/etc/slack/oauth_token
-      - --github-endpoint=http://ghproxy
-      - --github-endpoint=https://api.github.com
-      - --github-token-path=/etc/oauth/oauth
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        tar -C /tmp -xvzf /etc/github-users/users.yaml.tar.gz
+        /usr/bin/pr-reminder \
+        --config-path=/etc/config/_config.yaml \
+        --github-users-file=/tmp/users.yaml \
+        --slack-token-path=/etc/slack/oauth_token \
+        --github-endpoint=http://ghproxy \
+        --github-endpoint=https://api.github.com \
+        --github-token-path=/etc/oauth/oauth
       command:
-      - /usr/bin/pr-reminder
+      - /bin/bash
       image: registry.ci.openshift.org/ci/pr-reminder:latest
       imagePullPolicy: Always
       name: ""
@@ -177,8 +182,8 @@ periodics:
       - mountPath: /etc/config
         name: config
         readOnly: true
-      - mountPath: /etc/github-mapping
-        name: github-mapping
+      - mountPath: /etc/github-users
+        name: github-users
         readOnly: true
       - mountPath: /etc/oauth
         name: github-token
@@ -191,7 +196,7 @@ periodics:
       name: config
     - configMap:
         name: sync-rover-groups
-      name: github-mapping
+      name: github-users
     - name: github-token
       secret:
         secretName: github-credentials-openshift-bot
@@ -224,7 +229,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -266,7 +271,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -308,7 +313,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -350,7 +355,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -427,7 +432,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -473,7 +478,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -519,7 +524,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -569,7 +574,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -619,7 +624,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -668,7 +673,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -717,7 +722,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/commenter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -744,7 +749,7 @@ periodics:
     - args:
       - --config=/etc/config/labels.yaml
       - --confirm=true
-      - --orgs=openshift,cri-o,dora-metrics,operator-framework,openshift-priv,redhat-openshift-ecosystem,openshift-psap,openshift-metal3,shipwright-io,openshift-assisted,kcp-dev,konveyor,openshift-eng,package-operator
+      - --orgs=openshift,cri-o,dora-metrics,operator-framework,openshift-priv,redhat-openshift-ecosystem,openshift-psap,openshift-metal3,shipwright-io,openshift-assisted,openshift-eng,package-operator
       - --github-throttle-org=openshift:600:200
       - --github-throttle-org=cri-o:600:200
       - --github-throttle-org=dora-metrics:600:200
@@ -755,7 +760,6 @@ periodics:
       - --github-throttle-org=openshift-metal3:600:200
       - --github-throttle-org=shipwright-io:600:200
       - --github-throttle-org=openshift-assisted:600:200
-      - --github-throttle-org=kcp-dev:600:200
       - --github-throttle-org=konveyor:600:200
       - --github-throttle-org=openshift-eng:600:200
       - --github-app-id=$(GITHUB_APP_ID)
@@ -771,7 +775,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/label_sync:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/label_sync:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1074,7 +1078,7 @@ periodics:
       - --config=core-services/prow/02_config/_bumper.yaml
       command:
       - /ko-app/generic-autobumper
-      image: gcr.io/k8s-prow/generic-autobumper:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/generic-autobumper:v20230712-b85330a1e4
       imagePullPolicy: IfNotPresent
       name: autobump
       resources:
@@ -1096,7 +1100,7 @@ periodics:
   - base_ref: master
     org: openshift
     repo: release
-  - base_ref: openshift-4.13
+  - base_ref: openshift-4.14
     org: openshift
     repo: ocp-build-data
   labels:
@@ -1299,7 +1303,7 @@ periodics:
       - --github-enabled-org=openshift
       command:
       - /ko-app/branchprotector
-      image: gcr.io/k8s-prow/branchprotector:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/branchprotector:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1353,7 +1357,7 @@ periodics:
           secretKeyRef:
             key: appid
             name: openshift-prow-github-app
-      image: gcr.io/k8s-prow/branchprotector:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/branchprotector:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1410,7 +1414,7 @@ periodics:
       - --github-allowed-burst=600
       command:
       - /ko-app/peribolos
-      image: gcr.io/k8s-prow/peribolos:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/peribolos:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -1479,7 +1483,7 @@ periodics:
       - --kubeconfig-suffix=config
       command:
       - hack/config-bootstrapper.sh
-      image: gcr.io/k8s-prow/config-bootstrapper:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/config-bootstrapper:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2060,7 +2064,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/invitations-accepter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2092,7 +2096,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/invitations-accepter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2124,7 +2128,7 @@ periodics:
       - --dry-run=false
       command:
       - /ko-app/invitations-accepter
-      image: gcr.io/k8s-prow/invitations-accepter:v20230424-4981841b2f
+      image: gcr.io/k8s-prow/invitations-accepter:v20230712-b85330a1e4
       imagePullPolicy: Always
       name: ""
       resources:
@@ -2485,16 +2489,25 @@ periodics:
   name: periodic-github-ldap-user-group-creator
   spec:
     containers:
-    - command:
-      - /usr/bin/github-ldap-user-group-creator
-      - --kubeconfig-dir=/tmp/build-farm-credentials
-      - --kubeconfig-suffix=config
-      - --mapping-file=/etc/sync-rover-groups/mapping.yaml
-      - --groups-file=/etc/sync-rover-groups/groups.yaml
-      - --config-file=./core-services/sync-rover-groups/_config.yaml
-      - --peribolos-config=../config/org/config.yaml
-      - --log-level=debug
-      - --dry-run=false
+    - args:
+      - -c
+      - |
+        set -o errexit
+        set -o nounset
+        set -o pipefail
+        tar -C /tmp -xvzf /etc/sync-rover-groups/users.yaml.tar.gz
+        /usr/bin/github-ldap-user-group-creator \
+        --kubeconfig-dir=/tmp/build-farm-credentials \
+        --kubeconfig-suffix=config \
+        --groups-file=/etc/sync-rover-groups/groups.yaml \
+        --config-file=./core-services/sync-rover-groups/_config.yaml \
+        --github-users-file=/tmp/users.yaml \
+        --gcp-credentials-file=/etc/gcp-credentials/openshift-gce-devel-ci-infra-users-to-bigquery.json \
+        --peribolos-config=../config/org/config.yaml \
+        --log-level=debug \
+        --dry-run=false
+      command:
+      - /bin/bash
       image: registry.ci.openshift.org/ci/github-ldap-user-group-creator:latest
       imagePullPolicy: Always
       name: github-ldap-user-group-creator
@@ -2507,6 +2520,9 @@ periodics:
       - mountPath: /tmp/build-farm-credentials
         name: build-farm-credentials
         readOnly: true
+      - mountPath: /etc/gcp-credentials
+        name: gcp-credentials
+        readOnly: true
     serviceAccountName: github-ldap-user-group-creator
     volumes:
     - configMap:
@@ -2515,6 +2531,9 @@ periodics:
     - name: build-farm-credentials
       secret:
         secretName: github-ldap-user-group-creator
+    - name: gcp-credentials
+      secret:
+        secretName: openshift-gce-devel-ci-infra-users-to-bigquery-credentials
 - agent: kubernetes
   annotations:
     ci.openshift.io/description: This runs the check-gh-automation tool to verify
@@ -2554,6 +2573,7 @@ periodics:
       - --ignore=CSPI-QE
       - --ignore=redhat-openshift-ecosystem/certified-operators-prod
       - --ignore=redhat-openshift-ecosystem/preflight
+      - --ignore=insights-qe/iqe-cost-management-plugin
       command:
       - ./hack/check-gh-automation.sh
       env:
@@ -2706,14 +2726,6 @@ periodics:
         set -o pipefail
 
         leeway_percent=30
-
-        echo "Updating alerts data"
-        /usr/bin/job-run-aggregator analyze-historical-data \
-        --current ./pkg/synthetictests/allowedalerts/query_results.json \
-        --output-file ./pkg/synthetictests/allowedalerts/query_results.json \
-        --data-type alerts \
-        --leeway $leeway_percent \
-        --google-service-account-credential-file /etc/bigquery/token
 
         echo "Updating disruptions data"
         /usr/bin/job-run-aggregator analyze-historical-data \

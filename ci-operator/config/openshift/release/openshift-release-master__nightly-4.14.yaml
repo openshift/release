@@ -8,27 +8,27 @@ base_images:
     namespace: ocp
     tag: ansible
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-test-infra:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra
   aws-ebs-csi-driver-operator-test:
@@ -297,17 +297,17 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-proxy
 - as: e2e-vsphere-sdn
-  cron: 0 0/12 * * *
+  interval: 168h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-sdn
 - as: e2e-vsphere-ovn-techpreview
-  cron: 0 7/12 * * *
+  interval: 166h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
@@ -328,9 +328,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-aws-ovn
 - as: e2e-vsphere-ovn
-  interval: 168h
+  interval: 164h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -339,17 +339,17 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-ovn
 - as: e2e-vsphere-externallb-ovn
-  interval: 168h
+  interval: 162h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8
     observers:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-externallb
 - as: e2e-vsphere-ovn-serial
-  cron: 0 8/12 * * *
+  interval: 160h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -357,18 +357,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
-- as: e2e-vsphere-8-ovn
-  cron: 0 8/12 * * *
+- as: e2e-vsphere-ovn-techpreview-serial
+  interval: 158h
   steps:
     cluster_profile: vsphere-8
-    env:
-      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node
-    workflow: openshift-e2e-vsphere-ovn
-- as: e2e-vsphere-ovn-techpreview-serial
-  cron: 0 9/12 * * *
-  steps:
-    cluster_profile: vsphere
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -376,9 +368,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-serial
 - as: e2e-vsphere-ovn-upi
-  cron: 0 10/12 * * *
+  interval: 156h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -386,18 +378,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi
-- as: e2e-vsphere-8-ovn-upi
-  interval: 168h
+- as: e2e-vsphere-ovn-upi-serial
+  interval: 154h
   steps:
     cluster_profile: vsphere-8
-    env:
-      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node
-    workflow: openshift-e2e-vsphere-upi
-- as: e2e-vsphere-ovn-upi-serial
-  cron: 0 11/12 * * *
-  steps:
-    cluster_profile: vsphere
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -405,21 +389,10 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-upi-serial
-- as: e2e-vsphere-8-ovn-csi
-  cron: 0 11/12 * * *
+- as: e2e-vsphere-ovn-csi
+  interval: 154h
   steps:
     cluster_profile: vsphere-8
-    env:
-      TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
-        on the same node
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-vsphere-csi
-- as: e2e-vsphere-ovn-csi
-  interval: 168h
-  steps:
-    cluster_profile: vsphere
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -428,12 +401,12 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-vsphere-csi
 - as: e2e-vsphere-zones
-  cron: 0 6/12 * * *
+  interval: 152h
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-upi-zones
-  cron: 0 3/12 * * *
+  interval: 150h
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-upi-zones
@@ -447,32 +420,6 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-workers-rhel
-- as: e2e-ovirt-sdn
-  cron: 0 14,20 * * *
-  steps:
-    cluster_profile: ovirt
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-ovirt-conformance
-- as: e2e-ovirt-ovn
-  cron: 0 18 * * *
-  steps:
-    cluster_profile: ovirt
-    env:
-      NETWORK_TYPE: OVNKubernetes
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-ovirt-conformance
-- as: e2e-ovirt-csi
-  interval: 168h
-  steps:
-    cluster_profile: ovirt
-    observers:
-      enable:
-      - observers-resource-watch
-    workflow: openshift-e2e-ovirt-csi
 - as: e2e-gcp-libvirt-cert-rotation
   cron: '@daily'
   steps:
@@ -872,9 +819,23 @@ tests:
       enable:
       - observers-resource-watch
     workflow: telco5g-cnf
+- as: e2e-telco5g-sno-cnftests
+  cluster: build05
+  cron: 07 22 */1 * 1-5
+  steps:
+    env:
+      E2E_TESTS_CONFIG: |
+        CNF_E2E_TESTS=true
+        CNF_ORIGIN_TESTS=false
+      T5CI_JOB_TYPE: sno-cnftests
+      T5CI_VERSION: "4.14"
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: telco5g-sno-cnf
 - as: e2e-telco5g-ptp
   cluster: build05
-  cron: 37 13 */1 * 1-5
+  cron: 00 22 */1 * 1-5
   steps:
     env:
       T5CI_JOB_TYPE: ptp
@@ -884,7 +845,7 @@ tests:
       - observers-resource-watch
     workflow: telco5g-ptp
 - as: e2e-alibaba-ovn
-  interval: 168h
+  cron: '@weekly'
   steps:
     cluster_profile: alibabacloud
     env:
@@ -990,9 +951,9 @@ tests:
       - observers-resource-watch
     workflow: openshift-e2e-azure-etcd-scaling
 - as: e2e-vsphere-ovn-etcd-scaling
-  interval: 168h
+  interval: 148h
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-8
     observers:
       enable:
       - observers-resource-watch
@@ -1009,6 +970,35 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-graceful-shutdown
+- as: e2e-aws-ovn-shared-vpc-phz-techpreview
+  interval: 8h
+  steps:
+    cluster_profile: aws
+    env:
+      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-shared-vpc-phz
+- as: e2e-agent-compact-ipv4
+  cluster: build05
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+  timeout: 5h0m0s
+- as: e2e-agent-sno-ipv6
+  cluster: build05
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
+  timeout: 5h0m0s
+- as: e2e-agent-ha-dualstack
+  cluster: build05
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-ha-dualstack
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

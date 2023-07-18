@@ -10,12 +10,12 @@ suffix_endpoint=$(cat "${SHARED_DIR}/SUFFIX_ENDPOINT")
 
 # Login using the shared dir scripts created in the ipi-conf-azurestack-commands.sh
 chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
-${SHARED_DIR}/azurestack-login-script.sh
+source ${SHARED_DIR}/azurestack-login-script.sh
 
 # Hard-coded storage account info for PPE3 environment.
 # The resource group, storage account, & container are expected to exist.
-resource_group=rhcos-storage-rg
-storage_account=rhcosvhdsa
+resource_group=${RHCOS_VHD_RESOURCE_GROUP}
+storage_account=${RHCOS_VHD_STORAGE_ACCOUNT}
 account_key=$(az storage account keys list -g $resource_group --account-name $storage_account --query "[0].value" -o tsv)
 container=vhd
 
@@ -33,5 +33,12 @@ fi
 
 vhd_blob_url="https://$storage_account.blob.$suffix_endpoint/$container/$vhd_fn"
 
-# shellcheck disable=SC2016
-yq --arg url "${vhd_blob_url}" -i -y '.platform.azure.ClusterOSImage=$url' "${SHARED_DIR}/install-config.yaml"
+PATCH="/tmp/install-config-clusterosimage.yaml.patch"
+# create a patch with ClusterOSImage configuration
+cat > "${PATCH}" << EOF
+platform:
+  azure:
+    ClusterOSImage: ${vhd_blob_url}
+EOF
+# apply patch to install-config
+yq-go m -x -i "${SHARED_DIR}/install-config.yaml" "${PATCH}"

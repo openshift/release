@@ -96,11 +96,15 @@ tests:
   container:
     from: src
 - as: unit-test
-  commands: make test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make test
   container:
     from: test-bin
+  secret:
+    mount_path: /tmp/secret
+    name: lvm-operator-codecov-token
 - as: lvm-operator-bundle-e2e-aws
-  optional: true
   steps:
     cluster_profile: aws
     dependencies:

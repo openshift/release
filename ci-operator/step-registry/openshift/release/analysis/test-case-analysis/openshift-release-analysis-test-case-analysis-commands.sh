@@ -4,181 +4,79 @@ set -o nounset
 set +o errexit
 set -o pipefail
 
-MINIMUM_SUCCESSFUL_COUNT=2
-TEST_GROUP=install
+PIDS=""
 
-echo
-echo "********** Starting testcase analysis for:  aws-ovn-ipi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=aws \
-	--network=ovn \
-	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/aws-ovn-ipi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS=$!
+function run_analysis() {
+  analysis=$1
+  min_successful=$2
+  parameters=${*:3}
+  artifacts="${ARTIFACT_DIR}/$analysis"
+  mkdir -p "$artifacts"
 
-echo
-echo "********** Starting testcase analysis for:  aws-sdn-ipi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=aws \
-	--network=sdn \
-	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/aws-sdn-ipi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+  echo
+  echo "********** Starting testcase analysis for: ${analysis} "
+  echo
+  set -x
+  job-run-aggregator analyze-test-case \
+    --google-service-account-credential-file "${GOOGLE_SA_CREDENTIAL_FILE}" \
+    --payload-tag="${PAYLOAD_TAG}" \
+    --minimum-successful-count="${min_successful}" \
+    --job-start-time="${JOB_START_TIME}" \
+    --working-dir="${artifacts}" \
+    --timeout=4h30m \
+    $parameters \
+    --test-group="${TEST_GROUP}" > "${artifacts}/${analysis}.log" 2>&1  &
+  set +x
+  PIDS="$PIDS $!"
+  echo "PID is $!"
+}
 
-echo
-echo "********** Starting testcase analysis for:  azure-ovn-ipi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=azure \
-	--network=ovn \
-	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/azure-ovn-ipi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+# Read the configuration from the JOB_CONFIGURATION environment
+# variable. The variable is a list of configurations separated by
+# newline. Each individual configuration is in the format:
+#   NAME,MINIMUM_COUNT,PARAMETERS
+#
+# Example:
+#   aws-ovn-ipi,1,--platform=aws --network=ovn --infrastructure=ipi
 
-echo
-echo "********** Starting testcase analysis for:  gcp-sdn-ipi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=gcp \
-	--network=sdn \
-	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/gcp-sdn-ipi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+# Save original Internal Field Separator (IFS)
+OIFS="$IFS"
 
-echo
-echo "********** Starting testcase analysis for:  vsphere-ovn-ipi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=vsphere \
-	--network=ovn \
-	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/vsphere-ovn-ipi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+# Iterate over each line in JOB_CONFIGURATION
+while IFS=',' read -r name min_count args
+do
+  # If JOB_CONFIGURATION has a trailing newline, it'll end up with an
+  # empty entry and we need to skip it.
+  if [[ -z $name || -z $min_count ]];
+  then
+    continue
+  fi
 
-echo
-echo "********** Starting testcase analysis for:  vsphere-ovn-upi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=vsphere \
-	--network=ovn \
-	--infrastructure=upi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/vsphere-ovn-upi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+  # Split 'args' into an array
+  IFS=' ' read -r -a args_array <<< "$args"
 
-echo
-echo "********** Starting testcase analysis for:  vsphere-sdn-ipi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=vsphere \
-	--network=sdn \
-	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/vsphere-sdn-ipi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+  run_analysis "$name" "$min_count" "${args_array[@]}"
 
-echo
-echo "********** Starting testcase analysis for:  metal-ovn-ipi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=metal \
-	--network=ovn \
-	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/metal-ovn-ipi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+done <<< "$JOB_CONFIGURATION"
 
-echo
-echo "********** Starting testcase analysis for:  metal-sdn-ipi "
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=metal \
-	--network=sdn \
-	--infrastructure=ipi \
-	--minimum-successful-count=${MINIMUM_SUCCESSFUL_COUNT} \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/metal-sdn-ipi \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
-
-echo
-echo "********** Starting testcase analysis for aws proxy jobs"
-echo
-job-run-aggregator analyze-test-case \
-	--google-service-account-credential-file ${GOOGLE_SA_CREDENTIAL_FILE} \
-	--payload-tag=${PAYLOAD_TAG} \
-	--platform=aws \
-	--include-job-names=ovn-proxy \
-	--minimum-successful-count=1 \
-	--job-start-time=${JOB_START_TIME} \
-	--working-dir=${ARTIFACT_DIR}/aws-proxy \
-	--timeout=4h30m \
-	--test-group=${TEST_GROUP} &
-PIDS="$PIDS $!"
+# Restore original IFS
+IFS="$OIFS"
 
 echo "Waiting for pids to complete: $PIDS"
 ret=0
+saved_ret=0
 for pid in $PIDS
 do
-	echo "[$(date)] waiting for $pid"
-	wait "$pid"
-	if [ $? -gt 0 ]; then
-		ret=$?
-		echo "[$(date)] $pid finished with ret=$ret"
-	else
-		echo "[$(date)] $pid finished successfully"
-	fi
+  echo "[$(date)] waiting for $pid"
+  wait "$pid"
+  ret=$?
+  if [ $ret -gt 0 ]; then
+    echo "[$(date)] $pid finished with ret=$ret"
+    saved_ret=$ret
+  else
+    echo "[$(date)] $pid finished successfully"
+  fi
 done
 
-echo "Exiting with ret=${ret}"
-exit "${ret}"
+echo "Exiting with ret=${saved_ret}"
+exit "${saved_ret}"

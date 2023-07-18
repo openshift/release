@@ -156,7 +156,10 @@ case "$IAAS_PLATFORM" in
 	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.template" -n openshift-machine-api)
     ;;
   gcp)
-	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.disks[0].image}" -n openshift-machine-api)
+	# we need the value after family/
+	# in this example projects/windows-cloud/global/images/family/windows-2022-core
+	# windows_os_image_id needs to be windows-2022-core
+	windows_os_image_id=$(oc get machineset $winworker_machineset_name -o=jsonpath="{.spec.template.spec.providerSpec.value.disks[0].image}" -n openshift-machine-api | tr "/" "\n" | tail -n1)
     ;;
   *)
     echo "Cloud provider \"$IAAS_PLATFORM\" is not supported by WMCO"

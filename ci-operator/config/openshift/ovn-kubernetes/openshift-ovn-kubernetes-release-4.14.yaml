@@ -3,19 +3,31 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  hypershift-operator:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-operator
   ocp_4.14_base-rhel9:
     name: "4.14"
     namespace: ocp
     tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.14
   ocp_builder_rhel-9-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.19-openshift-4.14
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.18
+    tag: golang-1.19
 images:
 - dockerfile_path: Dockerfile.base
   inputs:
@@ -26,9 +38,12 @@ images:
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.19-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: ovn-kubernetes
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
@@ -36,6 +51,9 @@ images:
     ocp_builder_rhel-9-golang-1.19-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.14
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: ovn-kubernetes-microshift
 promotion:
   disabled: true
@@ -92,6 +110,8 @@ tests:
 - as: e2e-aws-ovn-windows
   steps:
     cluster_profile: aws
+    env:
+      WINDOWS_SERVER_VERSION: "2019"
     test:
     - ref: windows-e2e-operator-test
     workflow: ipi-aws-ovn-hybrid-toggle
@@ -151,12 +171,14 @@ tests:
 - as: e2e-aws-ovn-hypershift
   optional: true
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: unit
   commands: |
     cd go-controller
     PKGS=$(go list -mod vendor -f '{{if len .TestGoFiles}} {{.ImportPath}} {{end}}' ${PKGS:-./cmd/... ./pkg/... ./hybrid-overlay/...} | xargs)
-    # this package needs running as a container for TestNewClientset
+    # these packages need running as a container for TestNewClientset
+    PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util/batching"/ }
     PKGS=${PKGS//"github.com/ovn-org/ovn-kubernetes/go-controller/pkg/util"/ }
     PKGS=$PKGS make test NOROOT=TRUE
   container:
@@ -174,10 +196,14 @@ tests:
   container:
     from: src
 - as: e2e-aws-ovn-serial
-  optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-serial
+- as: e2e-aws-ovn-kubevirt
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: hypershift-kubevirt-conformance
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

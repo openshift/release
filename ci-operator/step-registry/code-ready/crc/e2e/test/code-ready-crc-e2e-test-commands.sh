@@ -3,7 +3,7 @@ set -euo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-INSTANCE_PREFIX="${NAMESPACE}"-"${JOB_NAME_HASH}"
+INSTANCE_PREFIX="${NAMESPACE}"-"${UNIQUE_HASH}"
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
 GOOGLE_COMPUTE_REGION="${LEASED_RESOURCE}"
 GOOGLE_COMPUTE_ZONE="$(< ${SHARED_DIR}/openshift_gcp_compute_zone)"
@@ -58,7 +58,7 @@ function run-tests() {
   export PULL_SECRET_FILE=--pull-secret-file="${HOME}"/pull-secret
   export BUNDLE_LOCATION=--bundle-location="${HOME}"/$(cat "${HOME}"/bundle)
   export CRC_BINARY=--crc-binary=/tmp/
-  make e2e GODOG_OPTS="--godog.tags='~@story_registry && @linux'"
+  make e2e GODOG_OPTS="--godog.tags='~@story_registry && @linux && ~@minimal'"
   if [[ $? -ne 0 ]]; then
     exit 1
     popd

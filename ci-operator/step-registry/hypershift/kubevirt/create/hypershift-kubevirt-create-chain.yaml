@@ -31,6 +31,10 @@ chain:
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
       bin/hypershift create kubeconfig --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+      
+      if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "BareMetal" ]; then
+        exit 0
+      fi
 
       echo "Waiting for nested cluster's node count to reach the desired replicas count in the NodePool"
       until \
@@ -43,7 +47,7 @@ chain:
 
       echo "Waiting for clusteroperators to be ready"
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
-
+      
       until \
         oc wait clusterversion/version --for='condition=Available=True' > /dev/null;  do
           echo "$(date --rfc-3339=seconds) Cluster Operators not yet ready"

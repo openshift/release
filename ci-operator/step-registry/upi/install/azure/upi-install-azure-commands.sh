@@ -276,9 +276,12 @@ az deployment group create -g $RESOURCE_GROUP \
   --parameters privateDNSZoneName="${CLUSTER_NAME}.${BASE_DOMAIN}" \
   --parameters baseName="$INFRA_ID" ${az_deployment_optional_parameters}
 
-MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig --query "privateIpAddress" -o tsv)
-MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig --query "privateIpAddress" -o tsv)
-MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-2-nic --name pipConfig --query "privateIpAddress" -o tsv)
+#on az version previouse to 2.45.0, property name is privateIpAddress
+#on 2.45.0+, it changes to privateIPAddress
+ip_keys='"privateIpAddress","privateIPAddress"'
+MASTER0_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-0-nic --name pipConfig | jq -r "with_entries(select(.key | IN($ip_keys))) | .[]")
+MASTER1_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-1-nic --name pipConfig | jq -r "with_entries(select(.key | IN($ip_keys))) | .[]")
+MASTER2_IP=$(az network nic ip-config show -g $RESOURCE_GROUP --nic-name ${INFRA_ID}-master-2-nic --name pipConfig | jq -r "with_entries(select(.key | IN($ip_keys))) | .[]")
 GATHER_BOOTSTRAP_ARGS="${GATHER_BOOTSTRAP_ARGS} --master ${MASTER0_IP} --master ${MASTER1_IP} --master ${MASTER2_IP}"
 
 echo "Deploying 06_workers"

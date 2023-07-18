@@ -56,7 +56,19 @@ spec:
         - --github-token-path=/etc/oauth/oauth
         - --job-config-path=/etc/job-config
         - --cache-file=/cache/backoff
+        - --cache-file-on-s3=true
         - --config-file=/etc/retester/_config.yaml
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: AWS_ACCESS_KEY_ID
+              name: retester-aws-credentials
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: AWS_SECRET_ACCESS_KEY
+              name: retester-aws-credentials
         ports:
         - name: metrics
           containerPort: 9090
@@ -70,8 +82,6 @@ spec:
         - name: job-config
           mountPath: /etc/job-config
           readOnly: true
-        - name: cache
-          mountPath: /cache
         - name: config
           mountPath: /etc/retester
           readOnly: true
@@ -94,9 +104,15 @@ spec:
           - configMap:
               name: job-config-master-periodics
           - configMap:
+              name: job-config-main-periodics
+          - configMap:
               name: job-config-master-postsubmits
           - configMap:
+              name: job-config-main-postsubmits
+          - configMap:
               name: job-config-master-presubmits
+          - configMap:
+              name: job-config-main-presubmits
           - configMap:
               name: job-config-1.x
           - configMap:
@@ -135,9 +151,6 @@ spec:
               name: job-config-4.14
           - configMap:
               name: job-config-4.15
-      - name: cache
-        persistentVolumeClaim:
-          claimName: retester
       - name: config
         configMap:
           name: retester-config
