@@ -18,7 +18,7 @@ ES_USERNAME=$(cat "/secret/username")
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 
-current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
+current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 export ITERATIONS=$((9*$current_worker_count))
 export WORKLOAD=cluster-density-v2
