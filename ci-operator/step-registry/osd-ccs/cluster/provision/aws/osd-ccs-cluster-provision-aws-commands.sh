@@ -3,7 +3,6 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-set -o verbose
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -27,7 +26,7 @@ COMPUTE_NODES=${COMPUTE_NODES:-$default_compute_nodes}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
-  # AWS_ACCOUNT_ID=$(cat "${AWSCRED}" | grep aws_account_id | tr -d ' ' | cut -d '=' -f 2)
+  AWS_ACCOUNT_ID=$(cat "${AWSCRED}" | grep aws_account_id | tr -d ' ' | cut -d '=' -f 2)
   AWS_ACCESS_KEY_ID=$(cat "${AWSCRED}" | grep aws_access_key_id | tr -d ' ' | cut -d '=' -f 2)
   AWS_SECRET_ACCESS_KEY=$(cat "${AWSCRED}" | grep aws_secret_access_key | tr -d ' ' | cut -d '=' -f 2)
 else
@@ -35,14 +34,11 @@ else
   exit 1
 fi
 
-sleep 1h
-
 # Log in
 OCM_VERSION=$(ocm version)
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 echo "Logging into ${OCM_LOGIN_ENV} with offline token using ocm cli ${OCM_VERSION}"
 ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
-
 
 # Check whether the cluster with the same cluster name existes.
 OLD_CLUSTER_ID=$(ocm list clusters --columns=id --parameter search="name is '${CLUSTER_NAME}'" | tail -n 1)
