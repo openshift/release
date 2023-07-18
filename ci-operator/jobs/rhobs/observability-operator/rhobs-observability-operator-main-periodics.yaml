@@ -20,6 +20,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/aws-qe-obo
       - --secret-dir=/secrets/osde2e-common
       - --secret-dir=/secrets/osde2e-credentials
       - --secret-dir=/secrets/osde2e-rosa-stage
@@ -34,6 +35,9 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /secrets/aws-qe-obo
+        name: aws-qe-obo
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -54,6 +58,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: aws-qe-obo
+      secret:
+        secretName: aws-qe-obo
     - name: osde2e-common
       secret:
         secretName: osde2e-common
