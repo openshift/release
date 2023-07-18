@@ -7,7 +7,7 @@ set -o verbose
 
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 export OCM_TOKEN
-RUN_COMMAND="poetry run python app/cli.py --action create --clusters-install-data-directory ${SHARED_DIR} --ocm-token=$OCM_TOKEN "
+RUN_COMMAND="poetry run python app/cli.py --action create --clusters-install-data-directory ${SHARED_DIR}/clusters-data --ocm-token=$OCM_TOKEN "
 
 CLUSTERS_CMD=""
 NUM_CLUSTERS=0
@@ -42,5 +42,7 @@ if [[ -n "${PULL_SECRET_NAME}" ]]; then
 fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
+
+sleep 50000
 
 ${RUN_COMMAND}

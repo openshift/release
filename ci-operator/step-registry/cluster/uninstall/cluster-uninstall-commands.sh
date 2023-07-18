@@ -7,7 +7,7 @@ set -o verbose
 
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 export OCM_TOKEN
-RUN_COMMAND="poetry run python app/cli.py --action destroy --clusters-install-data-directory ${SHARED_DIR}  --ocm-token=$OCM_TOKEN "
+RUN_COMMAND="poetry run python app/cli.py --action destroy --clusters-install-data-directory ${SHARED_DIR}/clusters-data  --ocm-token=$OCM_TOKEN "
 
 CLUSTERS_CMD=""
 NUM_CLUSTERS=0
