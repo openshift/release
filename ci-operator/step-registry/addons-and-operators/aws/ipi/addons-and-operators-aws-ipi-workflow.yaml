@@ -1,0 +1,20 @@
+workflow:
+  as: addons-and-operators-aws-ipi
+  steps:
+    allow_best_effort_post_steps: true
+    env:
+      COMPUTE_NODE_REPLICAS: "2"
+      COMPUTE_NODE_TYPE: "m5.4xlarge"
+      PARALLEL: "true"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - ref: operator-install
+    - ref: addon-install
+  documentation: |-
+    This workflow provision an OpenShift cluster with default configurations on AWS. 
+    The cluster is set with telemetry step generates a "${SHARED_DIR}/manifest_cluster-monitoring-config.yaml" manifest, and 
+    generates the AWS-specific install-config.yaml contents based on the cluster profile, located in "${SHARED_DIR}/install-config.yaml".
+    It then install required addons and operators on the cluster.
+    After finish testing, console logs from AWS instances will be gathered and the cluster will be deprovisioned.
