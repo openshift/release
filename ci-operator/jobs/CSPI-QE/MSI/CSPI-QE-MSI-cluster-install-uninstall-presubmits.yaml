@@ -5,12 +5,14 @@ presubmits:
     branches:
     - ^cluster-install-uninstall$
     - ^cluster-install-uninstall-
-    cluster: build01
+    cluster: build05
     context: ci/prow/v4.13-cluster-install-uninstall-hypershift
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/cloud: aws
+      ci-operator.openshift.io/cloud-cluster-profile: aws-managed-cspi-qe
       ci-operator.openshift.io/variant: v4.13
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -21,7 +23,9 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/usr/local/cluster-install-uninstall-hypershift-cluster-profile
         - --target=cluster-install-uninstall-hypershift
         - --variant=v4.13
         command:
@@ -33,6 +37,11 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /usr/local/cluster-install-uninstall-hypershift-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -44,6 +53,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-aws-managed-cspi-qe
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
