@@ -64,6 +64,7 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
   --annotations "prow.k8s.io/job=${JOB_NAME}" \
   --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
   --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m \
+  --annotations hypershift.openshift.io/cleanup-cloud-resources="false" \
   --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
   --additional-tags "prow.k8s.io/build-id=${BUILD_ID}"
 

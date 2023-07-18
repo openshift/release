@@ -1,30 +1,30 @@
 base_images:
-  base:
-    name: "4.14"
-    namespace: ocp
-    tag: base
   cert-manager-cainjector:
     name: cert-manager-cainjector
     namespace: ci
-    tag: v1.11.4
+    tag: v1.11.1
   cert-manager-controller:
     name: cert-manager-controller
     namespace: ci
-    tag: v1.11.4
+    tag: v1.11.1
   cert-manager-webhook:
     name: cert-manager-webhook
     namespace: ci
-    tag: v1.11.4
+    tag: v1.11.1
   ocp_builder_rhel-9-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.19-openshift-4.13
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/ci/Dockerfile
-  from: base
+  from: ubi
   inputs:
     ocp_builder_rhel-9-golang-1.19-openshift-4.13:
       as:
@@ -37,16 +37,18 @@ operator:
   substitutions:
   - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller:v1.11.4
+  - pullspec: quay.io/jetstack/cert-manager-controller:v1.11.1
     with: cert-manager-controller
-  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.11.4
+  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.11.1
     with: cert-manager-webhook
-  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.11.4
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.11.1
     with: cert-manager-cainjector
 promotion:
-  disabled: true
-  name: "4.14"
-  namespace: ocp
+  additional_images:
+    cert-manager-operator-bundle: cert-manager-operator-bundle
+  namespace: ci
+  tag: latest
+  tag_by_commit: true
 releases:
   initial:
     integration:
@@ -97,30 +99,6 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-aws
-- as: e2e-operator-upgrade
-  optional: true
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-cert-manager-operator-bundle
-    env:
-      OO_CHANNEL: stable-v1
-      OO_INSTALL_NAMESPACE: cert-manager-operator
-      OO_LATEST_CSV: cert-manager-operator.v1.11.1
-      OO_PACKAGE: cert-manager-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: test-upgrade
-      cli: latest
-      commands: make test-e2e
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: cert-manager-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: optional-operators-ci-aws-upgrade
 zz_generated_metadata:
   branch: master
   org: openshift

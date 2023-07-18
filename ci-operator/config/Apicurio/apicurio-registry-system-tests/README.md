@@ -1,4 +1,4 @@
-# Red Hat Integration - Service Registry Interoperability Tests (main - 2.3.x)<!-- omit from toc -->
+# Red Hat Integration - Service Registry Interoperability Tests (main - 2.4.x)<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [General Information](#general-information)

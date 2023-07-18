@@ -197,17 +197,17 @@ agent_iso=$(<"${SHARED_DIR}"/agent-iso.txt)
 echo "uploading ${agent_iso} to iso-datastore.."
 
 for ((i = 0; i < 3; i++)); do
-  /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}" || true
-  result=$?
-  if [[ $result -eq 0 ]]; then
+  if /tmp/govc datastore.upload -ds "${vsphere_datastore}" agent.x86_64.iso agent-installer-isos/"${agent_iso}"; then
     echo "$(date -u --rfc-3339=seconds) - Agent ISO has been uploaded successfully!!"
+    status=0
     break
   else
     echo "$(date -u --rfc-3339=seconds) - Failed to upload agent iso. Retrying..."
-    sleep 1
+    status=1
+    sleep 2
   fi
 done
-if [[ $result -ne 0 ]]; then
+if [ $status -ne 0 ]; then
   echo "Agent ISO upload failed after 3 attempts!!!"
   exit 1
 fi

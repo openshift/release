@@ -41,6 +41,16 @@ if [ -n "${BASELINE_CAPABILITY_SET}" ]; then
 capabilities:
   baselineCapabilitySet: ${BASELINE_CAPABILITY_SET}
 EOF
+        if [ -n "${ADDITIONAL_ENABLED_CAPABILITIES}" ]; then
+            cat >> "${out}" << EOF
+  additionalEnabledCapabilities:
+EOF
+            for item in ${ADDITIONAL_ENABLED_CAPABILITIES}; do
+                cat >> "${out}" << EOF
+    - ${item}
+EOF
+            done
+        fi
 fi
 
 if [ -n "${PUBLISH}" ]; then

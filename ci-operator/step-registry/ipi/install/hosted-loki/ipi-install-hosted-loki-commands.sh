@@ -213,13 +213,29 @@ data:
       - labeldrop:
         - filename
         - stream
-      - pack:
-          labels:
-          - boot_id
-          - systemd_unit
-          - host
+      - match:
+          # To get labels for a new systemd_unit exclude it by adding it in the selector here and include
+          # it by adding it in the selector below.  For any systemd_units, besides these, we will pack
+          # (i.e., no label) to avoid high cardinality.
+          selector: '{systemd_unit!~"auditd.service|crio.service|kubelet.service|NetworkManager.service|ovs-vswitchd.service|ovs-configuration.service|ovsdb-server.service"}'
+          stages:
+          - pack:
+              labels:
+              - boot_id
+              - systemd_unit
+              - host
+      - match:
+          # These systemd_units will get a systemd_unit label; if you add one, be sure to monitor number of
+          # Active Streams in Loki Dashboard to avoid over burdening our instance of Promtail/Loki.
+          selector: '{systemd_unit=~"auditd.service|crio.service|kubelet.service|NetworkManager.service|ovs-vswitchd.service|ovs-configuration.service|ovsdb-server.service"}'
+          stages:
+          - pack:
+              labels:
+              - boot_id
+              - host
       - labelallow:
           - invoker
+          - systemd_unit
       - static_labels:
           type: journal
       relabel_configs:

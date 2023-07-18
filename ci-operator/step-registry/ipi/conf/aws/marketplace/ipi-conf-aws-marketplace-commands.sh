@@ -28,8 +28,11 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
 oc registry login
-version=$(oc adm release info ${RELEASE_IMAGE_LATEST} -ojson | jq -r '.metadata.version')
+version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} -ojson | jq -r '.metadata.version')
 image_name_prefix="rhcos-`echo ${version} | awk -F '.' '{print $1$2}'`" # e.g. rhcos-48, rhcos-412
 
 jq --arg v "$image_name_prefix" '.Images[] | select(.Name | startswith($v))' "$aws_marketplace_images" | jq -s | jq -r '. | sort_by(.Name) | last' > $selected_image

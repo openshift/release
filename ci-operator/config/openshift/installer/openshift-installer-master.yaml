@@ -256,6 +256,15 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sharednetwork
   timeout: 6h0m0s
+- as: e2e-aws-ovn-shared-vpc-localzones
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+    workflow: openshift-e2e-aws-local-zones-byo-vpc
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-localzones
   optional: true
   run_if_changed: aws
@@ -263,7 +272,6 @@ tests:
     cluster_profile: aws-local-zones
     env:
       BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-local-zones
   timeout: 6h0m0s
 - as: e2e-aws-ovn-imdsv2
@@ -642,6 +650,18 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
+- as: e2e-agent-compact-ipv4-none-platform
+  cluster: build05
+  optional: true
+  run_if_changed: /agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        AGENT_PLATFORM_TYPE=none
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
@@ -652,6 +672,18 @@ tests:
       DEVSCRIPTS_CONFIG: |
         AGENT_E2E_TEST_SCENARIO=SNO_IPV6
         AGENT_USE_ZTP_MANIFESTS=true
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
+- as: e2e-agent-sno-ipv4-pxe
+  cluster: build05
+  optional: true
+  run_if_changed: /agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
+        AGENT_E2E_TEST_BOOT_MODE=PXE
     workflow: agent-e2e-generic
   timeout: 6h0m0s
 - as: e2e-agent-ha-dualstack
