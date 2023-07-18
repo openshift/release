@@ -6,7 +6,6 @@ set -o pipefail
 
 echo "************ baremetalds assisted operator gather command ************"
 
-sleep 2h
 
 if [[ ! -e "${SHARED_DIR}/server-ip" ]]; then
   echo "No server IP found; skipping log gathering."
@@ -27,39 +26,47 @@ function getlogs() {
 # Gather logs regardless of what happens after this
 trap getlogs EXIT
 
-
 echo '#### Gathering Sos reports from all Nodes'
 
-timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" DISCONNECTED="${DISCONNECTED:-}" bash - << "EOFTOP"
+timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOFTOP"
+    if [ $(virsh list --name |  tr -s '\n'  | wc -l) > 0 ]
+    then
+      export SOS_BASEDIR="/tmp/artifacts/sos"
+      export HOSTFILE="${SOS_BASEDIR}/virtual_hosts.json"
+      mkdir -p "${SOS_BASEDIR}"
+    
+      export VIRT_NET=$(virsh net-list --name  | grep -v default | tr -d "\n")
+      export TMP_HOSTFILE="/tmp/tmp_hostfile.json"
 
-export SOS_BASEDIR=/tmp/artifacts/sos
-export HOSTFILE=${SOS_BASEDIR}/virtual_hosts.json
+      echo "[]" > ${TMP_HOSTFILE}
+      virsh net-dhcp-leases --network "${VIRT_NET}" | grep 'master\|worker' | awk '{ printf("%s/%s\n", $6, $5) }' | while read -r line
+      do
+          _HOST=$( echo "$line" | cut -d"/" -f1 )
+          _IP=$( echo "$line" | cut -d"/" -f2 )
+    
+          jq """. += [{ \"host\" : \"${_HOST}\", \"address\" : \"${_IP}\" }]""" < ${TMP_HOSTFILE} > ${HOSTFILE}
+          cat "${HOSTFILE}" > "${TMP_HOSTFILE}"
+      done
+    
+      jq -c ".[]" ${HOSTFILE} | while read ITEM 
+      do
+        _HOST=$(echo ${ITEM} | jq -r .host )
+        _IP=$(echo ${ITEM} | jq -r .address )
 
-mkdir -p ${SOS_BASEDIR}
-VIRTUAL_HOST=[]
+        export REPORT_PATH="${SOS_BASEDIR}/${_HOST}"
+        mkdir -p ${REPORT_PATH}; chmod o+w ${REPORT_PATH} 
 
-for HOSTS in $(virsh list --name | grep 'master\|worker')
-do
-  _HOST="{ \"name\": \"$HOSTS\", \"address\": \"$(virsh domifaddr --domain $HOSTS | tail -n +3 | awk '{ print $4 }')\" }"                                                                
-  VIRTUAL_HOST=$(echo $VIRTUAL_HOST | jq -r ". += [$_HOST]")
-done
-echo $VIRTUAL_HOST | tee "${HOSTFILE}"
+        timeout -s 9 30m ssh -o StrictHostKeyChecking=off -l core $_IP REPORT_PATH="${SOS_BASEDIR}/${_HOST}" bash - << "EOF"
+          mkdir -p ${REPORT_PATH} 
+    
+          yes | toolbox "sos report --batch --tmp-dir ${REPORT_PATH} -k crio.all=on -k crio.logs=on -k openshift.host=on -k openshift.podlogs=on \
+              -o  openshift,openshift_ovn,crio,containers_common,host,containerd,logs"
 
-jq -c '.[]' $HOSTFILE | while read item
-do
-  NODENAME=$(jq .name <<< $item)
-  HOSTIP=$(jq .ip <<< $item)
-  
-  export REPORT_PATH=${SOS_BASEDIR}/$NODENAME
-  mkdir -p $REPORT_PATH 
-
-  timeout -s 9 30m ssh "${SSHOPTS[@]}" "core@$HOSTIP" DISCONNECTED="${DISCONNECTED:-}" bash - << EOF
-toolbox 'sos report --batch --tmp-dir /host/$REPORT_PATH --all-logs \
-  -o logs,crio,container_log,containers_common,openshift.host,openshift.podlogs,crio.logs,crio.all,boot.all-images'
+            sudo chmod -R +r "${REPORT_PATH}"
 EOF
-
-done
-
+        scp -o StrictHostKeyChecking=off -r "core@${_IP}:${REPORT_PATH}/*"  "${REPORT_PATH}"
+      done
+    fi
 EOFTOP
 
 scp -r "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*" "${ARTIFACT_DIR}"
