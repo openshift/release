@@ -262,6 +262,12 @@ function upgrade_paused() {
 
 # Preserve the && chaining in this function, because it is called from and AND-OR list so it doesn't get errexit.
 function suite() {
+    if [[ "${OCP_ARCH}" == "arm64" ]]; then
+        MAX_PARALLEL_TESTS=6
+    else
+        MAX_PARALLEL_TESTS=15
+    fi
+
     if [[ -n "${TEST_SKIPS}" ]]; then
         TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")" &&
         echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests &&
@@ -274,7 +280,7 @@ function suite() {
     openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
-        --max-parallel-tests 15 \
+        --max-parallel-tests ${MAX_PARALLEL_TESTS} \
         --junit-dir "${ARTIFACT_DIR}/junit" &
     wait "$!" &&
     set +x
