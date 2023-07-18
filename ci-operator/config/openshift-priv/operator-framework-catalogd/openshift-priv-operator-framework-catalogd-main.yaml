@@ -18,7 +18,13 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: olm-catalogd
+- context_dir: testdata/catalogs
+  dockerfile_path: test-catalog.Dockerfile
+  from: src
+  to: test-catalog
 promotion:
+  excluded_images:
+  - test-catalog
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -68,6 +74,17 @@ tests:
     cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: upstream-e2e
+      commands: make test-e2e
+      dependencies:
+      - env: TEST_CATALOG_IMAGE
+        name: test-catalog
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
     workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: main
