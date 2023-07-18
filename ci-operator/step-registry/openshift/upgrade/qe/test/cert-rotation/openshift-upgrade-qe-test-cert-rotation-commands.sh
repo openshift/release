@@ -2,11 +2,9 @@
 set -xeuo pipefail
 
 function download_oc(){
-    local filename='openshift-client-linux-410-latest.tar.gz'
     local tmp_bin_path='/tmp/oc-bin/'
-    curl --output /tmp/${filename} --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz
     mkdir -p "$tmp_bin_path"
-    tar -xvzf /tmp/${filename} --directory="$tmp_bin_path"
+    curl -sSL --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
     export PATH=${tmp_bin_path}:$PATH
     which oc
     oc version --client
@@ -34,6 +32,7 @@ function extract_oc(){
 }
 
 # This step is executed after upgrade to target, oc client of target release should use as many new versions as possible, make sure new feature cert-rotation of oc amd is supported
+major_version="$(oc version --client -o json  | jq -r '.clientVersion.gitVersion' | cut -d '.' -f1)"
 minor_version="$(oc version --client -o json  | jq -r '.clientVersion.gitVersion' | cut -d '.' -f2)"
 if [[ -n "$minor_version" && "$minor_version" -lt 10 ]] ; then
     echo "Y version is less than 10, using oc 4.10 directly"
@@ -165,14 +164,20 @@ oc config new-admin-kubeconfig > "${SHARED_DIR}/admin.kubeconfig"
 # Detail see https://issues.redhat.com/browse/OCPBUGS-15793
 if oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
     :
+elif sleep 10;oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
+    :
 else
-    sleep 2
+    sleep 30 
     oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
 fi
 
 # revoke old trust for the signers we have regenerated
 oc adm ocp-certificates remove-old-trust -n openshift-kube-apiserver-operator configmaps kube-apiserver-to-kubelet-client-ca kube-control-plane-signer-ca loadbalancer-serving-ca localhost-serving-ca service-network-serving-ca  --created-before=${start_date}
 oc adm wait-for-stable-cluster
+if [[ "X${major_version}" == "Xv4" && ${minor_version} -eq 8 ]];then
+    echo "OCP 4.8, need extra wait-for-stable-cluster!"
+    oc adm wait-for-stable-cluster
+fi
 oc adm reboot-machine-config-pool mcp/worker mcp/master
 oc adm wait-for-node-reboot nodes --all
 
