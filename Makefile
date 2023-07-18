@@ -2,12 +2,12 @@ SHELL=/usr/bin/env bash -o errexit
 
 .PHONY: help check check-boskos check-core check-services dry-core core dry-services services all update template-allowlist release-controllers checkconfig jobs ci-operator-config registry-metadata boskos-config prow-config validate-step-registry new-repo branch-cut prow-config multi-arch-gen
 
-export CONTAINER_ENGINE ?= docker
+export CONTAINER_ENGINE ?= podman
 export SKIP_PULL ?= false
 GO_ARCH ?= $(shell go env GOARCH)
 
 VOLUME_MOUNT_FLAGS = :z
-ifeq ($(CONTAINER_ENGINE), docker)
+ifeq ($(CONTAINER_ENGINE), podman)
 	USER=--user $(shell id -u):$(shell id -g)
 else
 	ifeq ($(shell uname -s), Darwin)
