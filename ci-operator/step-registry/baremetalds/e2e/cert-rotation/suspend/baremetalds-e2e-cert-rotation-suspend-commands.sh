@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "************ baremetalds SNO cert rotation suspend test command ************"
+echo "************ baremetalds cert rotation suspend test command ************"
 
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
@@ -31,25 +31,27 @@ SSH=${SSH:-ssh ${SSH_OPTS}}
 SETTLE_TIMEOUT=5m
 COMMAND_TIMEOUT=15m
 
-control_nodes=$( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
-compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+control_nodes=( $( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' ) )
+
+# Compute nodes seem to be protected with firewall?
+#compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
 function run-on {
   for n in ${1}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${2}; done
 }
 
 function run-on-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SSH} core@"${control_nodes[@]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+  timeout ${COMMAND_TIMEOUT} ${SSH} core@"${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
 function copy-file-from-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SCP} core@"${control_nodes[@]}:${1}" "${2}"
+  timeout ${COMMAND_TIMEOUT} ${SCP} core@"${control_nodes[0]}:${1}" "${2}"
 }
 
-ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
+ssh-keyscan -H ${control_nodes} >> ~/.ssh/known_hosts
 
 # Stop chrony service on all nodes
-run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
+run-on "${control_nodes}" "systemctl disable chronyd --now"
 
 # Backup lb-ext kubeconfig so that it could be compared to a new one
 KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
@@ -65,18 +67,18 @@ sudo timedatectl status
 
 # Skew clock on every node
 # TODO: Suspend, resume and make it resync time from host instead?
-run-on "${control_nodes} ${compute_nodes}" "timedatectl set-time ${SKEW} && timedatectl status"
+run-on "${control_nodes}" "timedatectl set-time ${SKEW} && timedatectl status"
 
 # Restart kubelet
-run-on "${control_nodes} ${compute_nodes}" "systemctl restart kubelet"
+run-on "${control_nodes}" "systemctl restart kubelet"
 
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-oc wait node --all --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT}
-until oc wait node --all --for condition=Ready --timeout=30s; do
+oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT}
+until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
   if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-    oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve
+    oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
   fi
   sleep 30
 done
