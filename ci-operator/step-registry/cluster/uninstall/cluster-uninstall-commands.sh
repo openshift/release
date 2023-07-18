@@ -6,7 +6,7 @@ set -o pipefail
 set -o verbose
 
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
-RUN_COMMAND="poetry run python app/cli.py --action ${ACTION} --clusters-install-data-directory ${CLUSTER_INSTALL_DATA_DIRECTORY} "
+RUN_COMMAND="poetry run python app/cli.py --action destroy --clusters-install-data-directory ${SHARED_DIR} "
 
 export OCM_TOKEN
 

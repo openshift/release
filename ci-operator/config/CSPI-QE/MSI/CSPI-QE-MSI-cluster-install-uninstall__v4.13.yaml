@@ -1,0 +1,26 @@
+base_images:
+  ocp-addons-operators-cli:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: cluster-install-uninstall-hypershift
+  steps:
+    env:
+      CLUSTER1_CONFIG: name=ci-hyper;platform=hypershift;region=us-west-2;version=4.13.4;compute-machine-type=m5.4xlarge;replicas=6;channel-group=candidate;expiration-time=4h;timeout=1h
+      OCM_ENVIRONMENT: stage
+    test:
+    - ref: cluster-install
+    - ref: cluster-uninstall
+zz_generated_metadata:
+  branch: cluster-install-uninstall
+  org: CSPI-QE
+  repo: MSI
+  variant: v4.13
