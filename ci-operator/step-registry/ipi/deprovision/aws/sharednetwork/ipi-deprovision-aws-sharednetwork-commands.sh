@@ -7,20 +7,33 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
-if test ! -f "${SHARED_DIR}/sharednetworkstackname"
-then
-  echo "No sharednetworkstackname, so unknown stack name, so unable to tear down."
-  exit 0
+REGION="${LEASED_RESOURCE}"
+
+function delete_stack() {
+  local stack_file_name
+  stack_file_name=$1
+
+  if test ! -f "${SHARED_DIR}/${stack_file_name}"
+  then
+    echo "Stack file ${stack_file_name} unknown or not found, so unable to tear down."
+    return
+  fi
+
+  stack_name="$(cat "${SHARED_DIR}/${stack_file_name}")"
+
+  # cleaning up after ourselves
+  echo "Deleting CloudFormation stack ${stack_name}"
+  aws --region "${REGION}" cloudformation delete-stack --stack-name "${stack_name}" &
+  wait "$!"
+
+  aws --region "${REGION}" cloudformation wait stack-delete-complete --stack-name "${stack_name}" &
+  wait "$!"
+
+  echo "${stack_name} stack delete complete"
+}
+
+if [[ "${AWS_EDGE_POOL_ENABLED-}" == "yes" ]]; then
+  delete_stack "sharednetwork_stackname_localzone"
 fi
 
-REGION="${LEASED_RESOURCE}"
-STACK_NAME="$(cat "${SHARED_DIR}/sharednetworkstackname")"
-
-# cleaning up after ourselves
-aws --region "${REGION}" cloudformation delete-stack --stack-name "${STACK_NAME}" &
-wait "$!"
-
-aws --region "${REGION}" cloudformation wait stack-delete-complete --stack-name "${STACK_NAME}" &
-wait "$!"
-
-echo "${STACK_NAME} stack delete complete"
+delete_stack "sharednetworkstackname"
