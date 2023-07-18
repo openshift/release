@@ -1,4 +1,4 @@
-# quarkus-qe-quarkus-test-suite<!-- omit from toc -->
+# quarkus-qe-quarkus-openshift-interop<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [General Information](#general-information)
@@ -12,7 +12,7 @@
 
 ## General Information
 
-- **TestRepository**: [quarkus-qe/quarkus-test-suite](https://github.com/quarkus-qe/quarkus-test-suite)
+- **TestRepository**: [quarkus-qe/quarkus-openshift-interop](https://github.com/quarkus-qe/quarkus-openshift-interop)
 
 ## Purpose
 
@@ -34,7 +34,7 @@ Please see the [`ipi-aws`](https://steps.ci.openshift.org/workflow/ipi-aws) docu
 
 Following the test cluster being provisioned, the following dockerfile is used to execute tests:
 
-- The dockerfile to build the image and execute tests is defined at https://github.com/quarkus-qe/quarkus-test-suite/blob/main/.openshift-interop/Dockerfile.
+- The dockerfile to build the image and execute tests is defined at https://github.com/quarkus-qe/quarkus-openshift-interop/blob/main/openshift-ci/Dockerfile.
 
 ## Prerequisite(s)
 
