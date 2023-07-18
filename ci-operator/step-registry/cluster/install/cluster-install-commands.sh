@@ -45,4 +45,4 @@ echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-toke
 
 sleep 50000
 
-${RUN_COMMAND}
+# ${RUN_COMMAND}
