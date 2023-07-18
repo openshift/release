@@ -74,11 +74,12 @@ compute:
       type: ${COMPUTE_NODE_TYPE}
 EOF
 
-if [ -z "${OUTBOUND_TYPE}" ]; then
-  echo "Outbound Type is not defined"
-else
-  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ]; then
-    echo "Writing 'outboundType: UserDefinedRouting' to install-config"
+case ${OUTBOUND_TYPE} in
+  "")
+    echo "OutboundType is not defined"
+    ;;
+  UserDefinedRouting | NatGateway | LoadBalancer)
+    echo "Writing 'outboundType: ${OUTBOUND_TYPE}' to install-config"
     PATCH="${SHARED_DIR}/install-config-outboundType.yaml.patch"
     cat > "${PATCH}" << EOF
 platform:
@@ -86,10 +87,11 @@ platform:
     outboundType: ${OUTBOUND_TYPE}
 EOF
     yq-go m -x -i "${CONFIG}" "${PATCH}"
-  else
+    ;;
+  *)
     echo "${OUTBOUND_TYPE} is not supported yet" || exit 1
-  fi
-fi
+    ;;
+esac
 
 printf '%s' "${USER_TAGS:-}" | while read -r TAG VALUE
 do
