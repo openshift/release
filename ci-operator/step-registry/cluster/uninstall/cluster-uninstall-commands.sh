@@ -5,8 +5,14 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
+
+export AWS_ACCESS_KEY_ID
+export AWS_SECRET_ACCESS_KEY
 export OCM_TOKEN
+
 RUN_COMMAND="poetry run python app/cli.py --action destroy --clusters-install-data-directory ${SHARED_DIR}/clusters-data  --ocm-token=$OCM_TOKEN "
 
 CLUSTERS_CMD=""
