@@ -199,11 +199,10 @@ echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
 ### Make control-plane nodes unschedulable
-echo "Making control-plane nodes unschedulable..."
 if [ "$CLUSTER_TOPOLOGY" = "compact" ]; then
     echo "Using compact mode [mastersSchedulable: true]"
 else
-    echo "Disabling compact mode. [mastersSchedulable: false]"
+    echo "Making control-plane nodes unschedulable... [mastersSchedulable: false]"
     sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluster-scheduler-02-config.yml
 fi
 
