@@ -1,0 +1,107 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-4.12-stable-prod
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.12"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: perfscale-rosa-hcp-3zones-cluster-density-v2-3nodes-periodic
+  cron: 0 0 1 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-west-2
+      REPLICAS: "3"
+      ROSA_LOGIN_ENV: production
+      ZONES_COUNT: "3"
+    test:
+    - ref: openshift-qe-cluster-density-v2
+    workflow: rosa-aws-sts-hypershift
+- always_run: false
+  as: perfscale-rosa-hcp-3zones-cluster-density-v2-3nodes
+  steps:
+    cluster_profile: aws-perf-qe
+    env:
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-west-2
+      REPLICAS: "3"
+      ROSA_LOGIN_ENV: production
+      ZONES_COUNT: "3"
+    test:
+    - chain: openshift-qe-cluster-density-v2
+    workflow: rosa-aws-sts-hypershift
+- always_run: false
+  as: perfscale-rosa-multiaz-ingress-perf-3nodes
+  steps:
+    cluster_profile: aws-qe
+    env:
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-east-2
+      ROSA_LOGIN_ENV: production
+    test:
+    - ref: openshift-qe-ingress-perf
+    workflow: rosa-aws-sts
+- always_run: false
+  as: perfscale-rosa-singleaz-network-perf-2nodes
+  steps:
+    cluster_profile: aws-qe
+    env:
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "false"
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-west-2
+      REPLICAS: "2"
+      ROSA_LOGIN_ENV: production
+    test:
+    - chain: openshift-qe-network-perf
+    workflow: rosa-aws-sts
+- as: perfscale-rosa-hcp-1zone-network-perf-2nodes-periodic
+  cron: 0 7 * * 1
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-west-2
+      REPLICAS: "2"
+      ZONES_COUNT: "1"
+    test:
+    - chain: openshift-qe-network-perf
+    workflow: rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: rosa-4.12-stable-prod
