@@ -48,5 +48,7 @@ if [[ -n "${PULL_SECRET_NAME}" ]]; then
 fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
-sleep 500000
+
 ${RUN_COMMAND}
+
+sleep 500000
