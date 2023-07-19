@@ -38,14 +38,6 @@ if [ "${PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
     RUN_COMMAND+=" --parallel"
 fi
 
-if [[ -n "${S3_BUCKET_NAME}" ]]; then
-    RUN_COMMAND+=" --s3-bucket-name=${S3_BUCKET_NAME} "
-fi
-
-if [[ -n "${S3_BUCKET_PATH}" ]]; then
-    RUN_COMMAND+=" --s3-bucket-path=${S3_BUCKET_PATH} "
-fi
-
 if [[ -n "${PULL_SECRET_NAME}" ]]; then
     RUN_COMMAND+=" --registry-config-file=/var/run/secrets/ci.openshift.io/cluster-profile/${PULL_SECRET_NAME} "
 fi
