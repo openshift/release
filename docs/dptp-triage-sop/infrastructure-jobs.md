@@ -277,3 +277,26 @@ This could be due to a tag being created, and then subsequently deleted and re-c
 Reach out to the repo owner(s) to confirm that this is the case. If they have the permissions, they can delete the tag
 in
 the private repo themselves. Otherwise, utilize the bot account to delete the tag.
+
+## `periodic-image-mirroring-supplemental-ci-images`
+This job mirrors images between two registries.
+Usually it mirror images from quay.io to registry.ci.openshift.org, and vice vesa.
+
+### Symptom
+```
+ error: unable to push manifest to registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2: errors:
+manifest blob unknown: blob unknown to registry
+manifest blob unknown: blob unknown to registry
+manifest blob unknown: blob unknown to registry
+manifest blob unknown: blob unknown to registry 
+```
+
+#### Culprit
+The manifest might be corrupted.
+
+#### Resolution
+Delete the `imagestream` with
+```
+oc --context app.ci -n ci delete is prom-metrics-linter --as system:admin
+```
+Then rerun the job.
