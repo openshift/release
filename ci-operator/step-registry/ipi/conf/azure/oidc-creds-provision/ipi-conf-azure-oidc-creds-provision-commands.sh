@@ -58,10 +58,14 @@ HOME="${HOME:-/tmp/home}"
 export HOME
 XDG_RUNTIME_DIR="${HOME}/run"
 export XDG_RUNTIME_DIR
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
 oc registry login
-oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST}"
+oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 # Create manual credentials using client secret for openshift-cluster-api.
 # This is a temp workaround until cluster-api supports workload identity
