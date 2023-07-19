@@ -20,7 +20,7 @@ pushd e2e-benchmarking/workloads/kube-burner
 
 export JOB_TIMEOUT=${JOB_TIMEOUT:=21600}
 
-current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
+current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 export WORKLOAD=${WORKLOAD:=networkpolicy-case1}
 case $WORKLOAD in
