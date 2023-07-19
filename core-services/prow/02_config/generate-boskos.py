@@ -320,8 +320,8 @@ for i in range(230,235):
 for i in range(50,54):
     CONFIG['vsphere-clusterbot-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(223,224):
-    CONFIG['vsphere-connected-quota-slice']['ci-segment-{}'.format(i)] = 1
+for i in range(223,229):
+    CONFIG['vsphere-connected-quota-slice']['devqe-segment-{}'.format(i)] = 1
 
 for i in range(151,158):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
