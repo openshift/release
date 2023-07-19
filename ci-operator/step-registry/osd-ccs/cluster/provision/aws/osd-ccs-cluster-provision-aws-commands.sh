@@ -3,6 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
+set -o verbose
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
@@ -141,6 +142,7 @@ mkdir -p "${SHARED_DIR}"
 CLUSTER_ID=$(cat "${ARTIFACT_DIR}/cluster.txt" | jq '.id' | tr -d '"')
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 echo "Waiting for cluster ready..."
 start_time=$(date +"%s")
