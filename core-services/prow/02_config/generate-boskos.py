@@ -119,7 +119,7 @@ CONFIG = {
         'usgovtexas': 5
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 40,
+        'default': 50,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
