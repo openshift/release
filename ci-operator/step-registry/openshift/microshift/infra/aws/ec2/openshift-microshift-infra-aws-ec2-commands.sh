@@ -219,12 +219,7 @@ Resources:
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 6443
-        ToPort: 6453
-        CidrIp: 0.0.0.0/0
-      # Range for all dynamic port-forwarding for scenario tests, see boot phase for use
-      - IpProtocol: tcp
-        FromPort: 7000
-        ToPort: 8000
+        ToPort: 6443
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 30000
