@@ -59,4 +59,6 @@ scp \
     /tmp/microshift.tgz \
     "${INSTANCE_PREFIX}:/tmp"
 
+trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs ${ARTIFACT_DIR}' EXIT
+
 ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh"
