@@ -24,9 +24,6 @@ fi
 
 export REPORT_DIR="${ARTIFACT_DIR}"
 
-cluster_id=`cat ${SHARED_DIR}/cluster-id`
-export CLUSTER_ID=$cluster-id
-
-/osde2e cleanup --configs ${CONFIGS} \
---secret-locations ${SECRET_LOCATIONS} \
---cluster-id ${CLUSTER_ID}
+/osde2e cleanup --configs "${CONFIGS}" \
+--secret-locations "${SECRET_LOCATIONS}" \
+--cluster-id "$(cat "${SHARED_DIR}/cluster-id")"

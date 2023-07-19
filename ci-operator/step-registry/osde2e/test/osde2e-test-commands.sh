@@ -18,5 +18,5 @@ fi
 
 export REPORT_DIR="${ARTIFACT_DIR}"
 
-/osde2e test --configs ${CONFIGS} \
---secret-locations ${SECRET_LOCATIONS}
+/osde2e test --configs "${CONFIGS}" \
+--secret-locations "${SECRET_LOCATIONS}"
