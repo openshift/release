@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+set -o pipefail
+
+scripts/openshift-CI-kuttl-tests.sh
+make e2e-tests-sequential IS_INTEROP="true"
