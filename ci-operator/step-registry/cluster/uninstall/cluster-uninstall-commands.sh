@@ -13,7 +13,7 @@ export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 export OCM_TOKEN
 
-RUN_COMMAND="poetry run python app/cli.py --action destroy --clusters-install-data-directory ${ARTIFACT_DIR}/clusters-data  --ocm-token=$OCM_TOKEN "
+RUN_COMMAND="poetry run python app/cli.py --action destroy --clusters-install-data-directory /tmp/clusters-data  --ocm-token=$OCM_TOKEN "
 
 CLUSTERS_CMD=""
 NUM_CLUSTERS=0

@@ -13,7 +13,7 @@ export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 export OCM_TOKEN
 
-RUN_COMMAND="poetry run python app/cli.py --action create --clusters-install-data-directory ${ARTIFACT_DIR}/clusters-data --ocm-token=$OCM_TOKEN "
+RUN_COMMAND="poetry run python app/cli.py --action create --clusters-install-data-directory /tmp/clusters-data --ocm-token=$OCM_TOKEN "
 
 CLUSTERS_CMD=""
 NUM_CLUSTERS=0
@@ -52,3 +52,6 @@ echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-toke
 ${RUN_COMMAND}
 
 sleep 500000
+
+# As SHARED_DIR can only store files, tar the output dirs and store as a file
+tar -zcvf ${SHARED_DIR}/clusters_data.tar.gz --exclude=*terraform /tmp/clusters-data
