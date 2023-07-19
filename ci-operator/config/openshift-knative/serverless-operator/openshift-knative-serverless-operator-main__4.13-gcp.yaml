@@ -1,16 +1,12 @@
 base_images:
   base:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: base
   cli:
-    name: "4.12"
+    name: "4.13"
     namespace: ocp
     tag: cli
-  cli-ocm:
-    name: cli-ocm
-    namespace: ci
-    tag: latest
   openshift_eventing-istio-src_knative-v1.9:
     name: eventing-istio-src
     namespace: openshift
@@ -94,7 +90,7 @@ releases:
   latest:
     release:
       channel: fast
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -103,23 +99,13 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-osd-412-continuous
+- as: e2e-gcp-ocp-413-continuous
   cron: 0 0 * * 0
   steps:
-    cluster_profile: osd-ephemeral
-    env:
-      CLUSTER_DURATION: "10800"
-      CLUSTER_VERSION: "4.12"
-      COMPUTE_NODES: "4"
-    post:
-    - chain: gather
-    - ref: osd-delete-delete
-    pre:
-    - ref: ipi-install-rbac
-    - ref: osd-create-create
+    cluster_profile: gcp
     test:
     - as: serverless-e2e
-      commands: make test-e2e-with-kafka test-upstream-e2e-no-upgrade
+      commands: make install-mesh test-e2e-with-kafka
       dependencies:
       - env: KNATIVE_OPENSHIFT_INGRESS
         name: knative-openshift-ingress
@@ -134,8 +120,9 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: main
   org: openshift-knative
   repo: serverless-operator
-  variant: 4.12-osd
+  variant: 4.13-gcp
