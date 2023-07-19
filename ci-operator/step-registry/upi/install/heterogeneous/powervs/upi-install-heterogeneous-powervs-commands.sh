@@ -15,6 +15,7 @@ if [ "${ADDITIONAL_WORKERS_DAY2}" != "true" ]; then
     exit 0
 fi
 
+echo "Additional worker vm type is ${ADDITIONAL_WORKER_VM_TYPE}"
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")
 BASE_DOMAIN=$(<"${CLUSTER_PROFILE_DIR}/base_domain")
 
