@@ -132,6 +132,8 @@ case $CLUSTER_TYPE in
 ;;
 *ibmcloud*)
   IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+  SERVICE_NAME=power-iaas
+  SERVICE_PLAN_NAME=power-virtual-server-group
   mkdir -p ${IBMCLOUD_HOME_FOLDER}
   if [ -z "$(command -v ibmcloud)" ]; then
     echo "ibmcloud CLI doesn't exist, installing"
@@ -144,7 +146,7 @@ case $CLUSTER_TYPE in
 
   ic version
   ic login --apikey @${CLUSTER_PROFILE_DIR}/ibmcloud-api-key -r ${REGION}
-  ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage
+  ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage power-iaas
 
   case $ADDITIONAL_WORKER_ARCHITECTURE in
   s390x)
@@ -154,45 +156,53 @@ case $CLUSTER_TYPE in
   x86_64 | amd64)
     OS_NAME=rhel-coreos-stable-amd64
   ;;
+  ppc64le)
+    OS_NAME=rhcos-414-92-202306140644-t1
   *)
     echo "Additional worker architecture \"${ADDITIONAL_WORKER_ARCHITECTURE}\" not supported for provider ibmcloud"
     exit 5
   esac
 
-  RESOURCE_GROUP=$(yq-v4 ".spec.template.spec.providerSpec.value.resourceGroup" <<< $MACHINE_SET)
-  RHCOS_IMAGE_NAME=${RESOURCE_GROUP}-rhcos-${ADDITIONAL_WORKER_ARCHITECTURE}
-  IMAGE_EXISTS=$(ic is images --output json | jq ".[] | select(.name == \"${RHCOS_IMAGE_NAME}\") | [ .name ] | length")
-  if [ "${IMAGE_EXISTS}" != "1" ]; then
-    echo "Image \"${RHCOS_IMAGE_NAME}\" does not exist, creating"
-    BUCKET_NAME=$RESOURCE_GROUP-vsi-image
-    RHCOS_IMAGE_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | yq-v4 ".data.stream | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.artifacts.ibmcloud.formats.[].disk.location")
-    if [ -z $RHCOS_IMAGE_URL ]; then
-      echo "Image location for architecture ${ADDITIONAL_WORKER_ARCHITECTURE} could not be found"
-      exit 5
-    fi
-    QCOW_GZ_BASENAME=$(basename ${RHCOS_IMAGE_URL})
-    QCOW_GZ_FILE_LOCATION=/tmp/${QCOW_GZ_BASENAME}
-    QCOW_NAME=$(basename -s .gz ${QCOW_GZ_BASENAME})
-    QCOW_FILE_LOCATION=/tmp/${QCOW_NAME}
-
-    echo "Downloading image from ${RHCOS_IMAGE_URL} (to ${QCOW_GZ_FILE_LOCATION})"
-    curl -s -L -o ${QCOW_GZ_FILE_LOCATION} ${RHCOS_IMAGE_URL}
-
-    echo "Extracting image"
-    gunzip -f ${QCOW_GZ_FILE_LOCATION}
-
-    echo "Uploading image to bucket ${BUCKET_NAME} under key ${QCOW_NAME}"
-    ic cos object-put --bucket ${BUCKET_NAME} --key ${QCOW_NAME} --body ${QCOW_FILE_LOCATION}
-    COS_URL="cos://${REGION}/${BUCKET_NAME}/${QCOW_NAME}"
-
-    echo "Creating image ${RHCOS_IMAGE_NAME} from ${COS_URL} with OS ${OS_NAME}"
-    ic is image-create ${RHCOS_IMAGE_NAME} --file ${COS_URL} --os-name ${OS_NAME} --resource-group-name ${RESOURCE_GROUP}
+  if [ "$ADDITIONAL_WORKER_ARCHITECTURE" == ppc64le ]; then
+    # create workspace for power from cli
+    ic resource service-instance-create ""
+    # add code for power
   else
-    echo "Image \"${RHCOS_IMAGE_NAME}\" exists, reusing"
-  fi
+    RESOURCE_GROUP=$(yq-v4 ".spec.template.spec.providerSpec.value.resourceGroup" <<< $MACHINE_SET)
+    RHCOS_IMAGE_NAME=${RESOURCE_GROUP}-rhcos-${ADDITIONAL_WORKER_ARCHITECTURE}
+    IMAGE_EXISTS=$(ic is images --output json | jq ".[] | select(.name == \"${RHCOS_IMAGE_NAME}\") | [ .name ] | length")
+    if [ "${IMAGE_EXISTS}" != "1" ]; then
+      echo "Image \"${RHCOS_IMAGE_NAME}\" does not exist, creating"
+      BUCKET_NAME=$RESOURCE_GROUP-vsi-image
+      RHCOS_IMAGE_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | yq-v4 ".data.stream | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.artifacts.ibmcloud.formats.[].disk.location")
+      if [ -z $RHCOS_IMAGE_URL ]; then
+        echo "Image location for architecture ${ADDITIONAL_WORKER_ARCHITECTURE} could not be found"
+        exit 5
+      fi
+      QCOW_GZ_BASENAME=$(basename ${RHCOS_IMAGE_URL})
+      QCOW_GZ_FILE_LOCATION=/tmp/${QCOW_GZ_BASENAME}
+      QCOW_NAME=$(basename -s .gz ${QCOW_GZ_BASENAME})
+      QCOW_FILE_LOCATION=/tmp/${QCOW_NAME}
 
-  MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.profile = \"${ADDITIONAL_WORKER_VM_TYPE}\"
-       | .spec.template.spec.providerSpec.value.image = \"${RHCOS_IMAGE_NAME}\"" <<< "$MACHINE_SET")
+      echo "Downloading image from ${RHCOS_IMAGE_URL} (to ${QCOW_GZ_FILE_LOCATION})"
+      curl -s -L -o ${QCOW_GZ_FILE_LOCATION} ${RHCOS_IMAGE_URL}
+
+      echo "Extracting image"
+      gunzip -f ${QCOW_GZ_FILE_LOCATION}
+
+      echo "Uploading image to bucket ${BUCKET_NAME} under key ${QCOW_NAME}"
+      ic cos object-put --bucket ${BUCKET_NAME} --key ${QCOW_NAME} --body ${QCOW_FILE_LOCATION}
+      COS_URL="cos://${REGION}/${BUCKET_NAME}/${QCOW_NAME}"
+
+      echo "Creating image ${RHCOS_IMAGE_NAME} from ${COS_URL} with OS ${OS_NAME}"
+      ic is image-create ${RHCOS_IMAGE_NAME} --file ${COS_URL} --os-name ${OS_NAME} --resource-group-name ${RESOURCE_GROUP}
+    else
+      echo "Image \"${RHCOS_IMAGE_NAME}\" exists, reusing"
+    fi
+
+    MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.profile = \"${ADDITIONAL_WORKER_VM_TYPE}\"
+         | .spec.template.spec.providerSpec.value.image = \"${RHCOS_IMAGE_NAME}\"" <<< "$MACHINE_SET")
+  fi
 ;;
 *)
   echo "Adding workers with a different ISA for jobs using the cluster type ${CLUSTER_TYPE} is not implemented yet..."
