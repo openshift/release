@@ -49,9 +49,11 @@ fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
 
+sleep 500000
+
 ${RUN_COMMAND}
 
-sleep 500000
+
 
 # As SHARED_DIR can only store files, tar the output dirs and store as a file
 tar -zcvf ${SHARED_DIR}/clusters_data.tar.gz --exclude=*terraform /tmp/clusters-data
