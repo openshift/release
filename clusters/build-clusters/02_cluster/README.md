@@ -89,7 +89,7 @@ The default one would be `default-route-openshift-image-registry.apps.build02.gc
 
 [Steps](https://docs.openshift.com/container-platform/4.4/registry/securing-exposing-registry.html):
 
-* [dns set up](https://cloud.ibm.com/docs/openshift?topic=openshift-openshift_routes): [No official doc yet](https://coreos.slack.com/archives/CCH60A77E/p1588774688400500).
+* [dns set up](https://cloud.ibm.com/docs/openshift?topic=openshift-openshift_routes): [No official doc yet](https://redhat-internal.slack.com/archives/CCH60A77E/p1588774688400500).
 
 ```
 oc --context build02 get svc -n openshift-ingress router-default 
