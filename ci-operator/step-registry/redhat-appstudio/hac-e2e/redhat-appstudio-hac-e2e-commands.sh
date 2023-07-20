@@ -92,6 +92,7 @@ TEST_RUN=0
 npm run cy:run -- --spec ./tests/basic-happy-path.spec.ts || TEST_RUN=1
 cp -a /tmp/e2e/cypress/* ${ARTIFACT_DIR}
 
+sleep 900
 ## Release bonfire namespace
 BONFIRE_NAMESPACE=$(oc get --kubeconfig=$HAC_KUBECONFIG NamespaceReservations -o jsonpath="{.items[?(@.status.namespace==\"$HAC_NAMESPACE\")].metadata.name}")
 oc patch --kubeconfig=$HAC_KUBECONFIG NamespaceReservations/"$BONFIRE_NAMESPACE" --type=merge --patch-file=/dev/stdin <<-EOF
