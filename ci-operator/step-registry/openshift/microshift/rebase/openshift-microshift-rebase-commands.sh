@@ -5,4 +5,9 @@ if [[ "$JOB_NAME" == rehearse* ]]; then
     export DRY_RUN=y
 fi
 
+echo "${KUBECONFIG}"
+cat "${KUBECONFIG}"
+
+oc config view
+
 ./scripts/auto-rebase/rebase_job_entrypoint.sh

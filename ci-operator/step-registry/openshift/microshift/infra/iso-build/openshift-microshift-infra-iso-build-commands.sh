@@ -31,7 +31,8 @@ if ! sudo subscription-manager status >&/dev/null; then
 fi
 
 chmod 0755 ~
-tar -xf /tmp/microshift.tgz -C ~
+tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
+
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
@@ -47,7 +48,7 @@ cd ~/microshift
 EOF
 chmod +x /tmp/iso.sh
 
-tar czf /tmp/microshift.tgz /microshift
+tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
     /tmp/iso.sh \
