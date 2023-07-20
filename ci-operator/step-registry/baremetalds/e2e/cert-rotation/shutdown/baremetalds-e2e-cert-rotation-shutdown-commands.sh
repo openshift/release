@@ -61,8 +61,13 @@ run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Shutdown nodes
-for vm in ( $( virsh list --all --name ) ); do
+VMS=( $( virsh list --all --name ) )
+for vm in ${VMS[@]}; do
   virsh shutdown ${vm}
+  until virsh domstate ${vm} | grep shut; do
+    echo "${vm} still running"
+    sleep 10
+  done
 done
 
 # Set date for host
@@ -71,8 +76,12 @@ sudo timedatectl set-time ${SKEW}
 sudo timedatectl status
 
 # Start nodes again
-for vm in ( $( virsh list --all --name ) ); do
+for vm in ${VMS[@]}; do
   virsh start ${vm}
+  until virsh domstate ${vm} | grep run; do
+    echo "${vm} still not yet running"
+    sleep 10
+  done
 done
 
 # Check that time on nodes has been updated
