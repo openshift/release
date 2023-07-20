@@ -118,7 +118,7 @@ if [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/ma
   remove_tech_preview_feature_from_manifests "${cr_yaml_d}" "TechPreviewNoUpgrade" || exit 1
 fi
 
-ls "${cr_yaml_d}" > "${credentials_requests_files}"
+ls -p "${cr_yaml_d}"/*.yaml | awk -F'/' '{print $NF}' > "${credentials_requests_files}"
 
 
 while IFS= read -r item

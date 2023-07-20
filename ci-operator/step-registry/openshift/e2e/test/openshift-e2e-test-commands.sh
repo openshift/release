@@ -225,6 +225,15 @@ function upgrade_conformance() {
     return $exit_code
 }
 
+# upgrade_rt runs the rt test suite, the upgrade, and the rt test suite again, and exits with an error if any calls fail
+function upgrade_rt() {
+    local exit_code=0 &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
+    upgrade || exit_code=$? &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
+    return $exit_code
+}
+
 function upgrade_paused() {
     set -x
     unset TEST_SUITE
@@ -456,6 +465,9 @@ upgrade)
     ;;
 upgrade-paused)
     upgrade_paused
+    ;;
+upgrade-rt)
+    upgrade_rt
     ;;
 suite-conformance)
     suite
