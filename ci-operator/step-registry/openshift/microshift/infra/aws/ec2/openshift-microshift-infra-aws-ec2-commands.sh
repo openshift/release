@@ -274,8 +274,6 @@ Resources:
           sudo pvcreate "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
           echo "====== Creating VG ======" | tee -a /tmp/init_output.txt
           sudo vgcreate rhel "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
-          echo "====== Creating Thin Pool ======" | tee -a /tmp/init_output.txt
-          sudo lvcreate -L 10G --thinpool thin rhel |& tee -a /tmp/init_output.txt
 
 Outputs:
   InstanceId:
