@@ -57,7 +57,7 @@ python3 -m venv .bonfire_venv
 source .bonfire_venv/bin/activate
 
 python3 -m pip install --upgrade pip 'setuptools<58' wheel
-python3 -m pip install --upgrade 'crc-bonfire>=4.10.4'
+python3 -m pip install --upgrade 'crc-bonfire==4.16.0'
 
 export KUBECONFIG_DIR KUBECONFIG
 KUBECONFIG_DIR="$WORKSPACE/.kube"
