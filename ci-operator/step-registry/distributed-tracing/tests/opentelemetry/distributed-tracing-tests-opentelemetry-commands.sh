@@ -10,6 +10,10 @@ mkdir /tmp/kuttl-manifests
 #Copy the opentelemetry-operator repo files to a writable directory by kuttl
 cp -R /tmp/opentelemetry-operator /tmp/opentelemetry-tests && cd /tmp/opentelemetry-tests
 
+#Set parameters for running the test cases on OpenShift
+TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
+sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/03-install.yaml
+
 # Remove test cases to be skipped from the test run
 IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
 SKIP_TESTS_TO_REMOVE=""
