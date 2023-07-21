@@ -11,6 +11,82 @@ BASE_DOMAIN="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
 which openshift-install
 openshift-install version
 
+function set-cluster-version-spec-update-service() {
+    local payload_version
+    payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+    echo "Release payload version: ${payload_version}"
+
+    if [[ ! -f ${dir}/manifests/cvo-overrides.yaml ]]; then
+        echo "No CVO overrides file found, will not configure OpenShift Update Service"
+        return
+    fi
+
+    # Using OSUS in upgrade jobs would be tricky (we would need to know the channel with both versions)
+    # and the use case has little benefits (not many jobs that update between two released versions)
+    # so we do not need to support it. We still need to channel clear to avoid tripping the
+    # CannotRetrieveUpdates alert on one of the versions.
+    # Not all steps that use this script expose OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE so we need to default it
+    # If we are in a step that exposes it and it differs from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE, we are likely
+    # running an upgrade job.
+    if [[ -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]] &&
+       [[ "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" != "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+        echo "This is likely an upgrade job (OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE differs from nonempty OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE)"
+        echo "Cluster cannot query OpenShift Update Service (OSUS/Cincinnati), cleaning the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        return
+    fi
+
+    # Determine architecture that Cincinnati would use: check metadata for release.openshift.io/architecture key
+    # and fall back to manifest-declared architecture
+    local payload_arch
+    payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
+    if [[ -z "${payload_arch}" ]]; then
+        echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.config.architecture}")"
+    fi
+    local payload_arch_param
+    if [[ -n "${payload_arch}" ]]; then
+        echo "Release payload architecture: ${payload_arch}"
+        payload_arch_param="&arch=${payload_arch}"
+    else
+        echo "Unable to determine payload architecture"
+        payload_arch_param=""
+    fi
+
+
+    local channel
+    if ! channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"; then
+        echo "No known OCP channel found in CVO manifest, clearing the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        return
+    fi
+
+    # The candidate channel is most likely to contain the versions we are interested in, so transfer the current channel
+    # into a candidate one.
+    echo "Original channel from CVO manifest: ${channel}"
+    local candidate_channel
+    candidate_channel="$(echo "${channel}" | sed -E 's/(stable|eus|fast)/candidate/')"
+    echo "Matching candidate channel: ${candidate_channel}"
+
+    # If the version is known to OSUS, it is safe for the CI cluster to query it, so we will query the integration OSUS
+    # instance maintained by OTA team. Otherwise, the cluster would trip the CannotRetrieveUpdates alert, so we need
+    # to clear the channel to make the cluster *not* query any OSUS instance.
+    local query
+    query="https://api.integration.openshift.com/api/upgrades_info/graph?channel=${candidate_channel}${payload_arch_param}"
+    echo "Querying $query for version ${payload_version}"
+    if curl --silent "$query" | grep --quiet '"version":"'"$payload_version"'"'; then
+        echo "Version ${payload_version} is available in ${candidate_channel}, cluster can query OpenShift Update Service (OSUS/Cincinnati)"
+        echo "Setting channel to $candidate_channel and upstream to https://api.integration.openshift.com/api/upgrades_info/graph "
+        sed -i "s|^  channel: .*|  channel: $candidate_channel|" "${dir}/manifests/cvo-overrides.yaml"
+        echo '  upstream: https://api.integration.openshift.com/api/upgrades_info/graph' >> "${dir}/manifests/cvo-overrides.yaml"
+    else
+        echo "Version ${payload_version} is not available in ${candidate_channel}"
+        echo "Cluster cannot query OpenShift Update Service (OSUS/Cincinnati)"
+        echo "Clearing the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+    fi
+}
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -42,7 +118,7 @@ function prepare_next_steps() {
       "${dir}/auth/kubeconfig" \
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
-  
+
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs
@@ -130,7 +206,7 @@ aws-c2s|aws-sc2s) export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_temp_cred
 esac
 
 
-# set CA_BUNDLE for C2S and SC2S 
+# set CA_BUNDLE for C2S and SC2S
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   export AWS_CA_BUNDLE=${SHARED_DIR}/additional_trust_bundle
 fi
@@ -164,7 +240,7 @@ fi
 if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
   if [[ -f "${SHARED_DIR}/manifest_localzone_machineset.yaml" ]]; then
     # Phase 0, inject manifests
-    
+
     # replace PLACEHOLDER_INFRA_ID PLACEHOLDER_AMI_ID
     echo "Local Zone is enabled, updating Infran ID and AMI ID ... "
     localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
@@ -184,10 +260,10 @@ if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
       done
     fi
   fi
-  
+
 fi
 
-sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+set-cluster-version-spec-update-service
 
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
@@ -354,8 +430,8 @@ EOF
       --capabilities CAPABILITY_NAMED_IAM &
     wait "$!"
     ret=$?
-  fi    
-    
+  fi
+
   echo "Created stack $APPS_DNS_STACK_NAME"
 
   aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${APPS_DNS_STACK_NAME}" &
