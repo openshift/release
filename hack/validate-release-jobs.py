@@ -12,7 +12,14 @@ logger = logging.getLogger('validate-release-jobs')
 logger.setLevel(logging.INFO)
 
 release_definition_path = 'core-services/release-controller/_releases'
-job_definitions_paths = ['ci-operator/jobs/openshift/release', 'ci-operator/jobs/openshift/multiarch', 'ci-operator/jobs/openshift/hypershift', 'ci-operator/jobs/openshift/microshift', 'ci-operator/jobs/openshift/cluster-control-plane-machine-set-operator']
+job_definitions_paths = [
+    'ci-operator/jobs/openshift/release',
+    'ci-operator/jobs/openshift/multiarch',
+    'ci-operator/jobs/openshift/hypershift',
+    'ci-operator/jobs/openshift/microshift',
+    'ci-operator/jobs/openshift/cluster-control-plane-machine-set-operator',
+    'ci-operator/jobs/openshift/osde2e'
+]
 
 
 def raise_on_duplicates(ordered_pairs):
