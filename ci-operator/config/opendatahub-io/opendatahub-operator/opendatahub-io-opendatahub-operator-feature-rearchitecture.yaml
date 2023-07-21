@@ -11,7 +11,7 @@ build_root:
 images:
 - build_args:
   - name: MANIFEST_RELEASE
-    value: feature-rearchitecture
+    value: master
   context_dir: .
   dockerfile_path: Dockerfiles/Dockerfile
   from: os
@@ -20,7 +20,7 @@ operator:
   bundles:
   - dockerfile_path: Dockerfiles/bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/opendatahub/opendatahub-operator:dev-0.0.1
+  - pullspec: REPLACE_IMAGE:latest
     with: pipeline:opendatahub-operator
 releases:
   initial:
@@ -54,6 +54,27 @@ tests:
       IMAGE_REPO: opendatahub-operator
       RELEASE_VERSION: feature-rearchitecture
     workflow: opendatahub-io-ci-image-mirror
+- as: opendatahub-operator-e2e
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+      OO_CHANNEL: fast
+      OO_INSTALL_NAMESPACE: openshift-operators
+      OO_PACKAGE: opendatahub-operator
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        make e2e-test -e OPERATOR_NAMESPACE=openshift-operators
+      from: src
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: feature-rearchitecture
   org: opendatahub-io
