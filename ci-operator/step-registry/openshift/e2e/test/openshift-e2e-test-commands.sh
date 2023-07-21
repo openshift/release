@@ -313,7 +313,7 @@ i=0
 node_check_interval=30
 node_check_limit=20
 # AWS Local Zone nodes usually take much more to be ready.
-test -n "${AWS_EDGE_POOL_ENABLED-}" && node_check_limit=60
+test -n "${AWS_EDGE_POOL_ENABLED-}" && node_check_limit=90
 while true
 do
     MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
