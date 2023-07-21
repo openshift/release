@@ -73,6 +73,33 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    as: custom
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.10"
+  steps:
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        OCM_VERSION=main
+        export KUBECTL OCM_VERSION
+        make e2e-test-prow
+      dependencies:
+      - env: IMPORT_CONTROLLER_IMAGE_NAME
+        name: managedcluster-import-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: pr-image-mirror
   steps:
     dependencies:
