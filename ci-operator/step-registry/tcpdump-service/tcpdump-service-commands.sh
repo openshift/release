@@ -25,13 +25,14 @@ b64_script=$(echo "$sysd_script" | base64 -w 0)
 
 # Create the MachineConfig manifest with embedded b64 encoded systemd script, and the two
 # systemd units to (a) install tcpdump, and (b) run the script.
-cat > "${SHARED_DIR}/manifest_tcpdump_service_machineconfig.yaml" << EOF
+for role in master worker; do
+cat > "${SHARED_DIR}/manifest_tcpdump_service_machineconfig_${role}.yaml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
 metadata:
   labels:
-    machineconfiguration.openshift.io/role: worker
-  name: tcpdump-service
+    machineconfiguration.openshift.io/role: $role
+  name: tcpdump-service-$role
 spec:
   config:
     ignition:
@@ -82,6 +83,7 @@ spec:
         name: tcpdump.service
 EOF
 
-echo "manifest_tcpdump_service_machineconfig.yaml"
+echo "manifest_tcpdump_service_machineconfig_${role}.yaml"
 echo "---------------------------------------------"
-cat ${SHARED_DIR}/manifest_tcpdump_service_machineconfig.yaml
+cat ${SHARED_DIR}/manifest_tcpdump_service_machineconfig_${role}.yaml
+done
