@@ -11,6 +11,27 @@ BASE_DOMAIN="$(yq-go r "${SHARED_DIR}/install-config.yaml" 'baseDomain')"
 which openshift-install
 openshift-install version
 
+function set-cluster-version-spec-update-service() {
+    local payload_version
+    payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+    echo "Release payload version: ${payload_version}"
+    local channel
+    channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"
+    echo "Original channel from CVO manifest: ${channel}"
+    local candidate_channel
+    candidate_channel="$(echo "${channel}" | sed -E 's/(stable|eus|fast)/candidate/')"
+    echo "Matching candidate channel: ${candidate_channel}"
+
+    if curl --silent "https://api.integration.openshift.com/api/upgrades_info/graph?channel=$candidate_channel" | grep --quiet '"version":"'"$payload_version"'"'; then
+        echo "Version ${payload_version} is available in ${candidate_channel}: cluster can query OpenShift Update Service (OSUS/Cincinnati)"
+        sed -i "s|^  channel: .+|  channel: $candidate_channel|" "${dir}/manifests/cvo-overrides.yaml"
+        echo '  upstream: https://api.integration.openshift.com/api/upgrades_info/graph' >> "${dir}/manifests/cvo-overrides.yaml"
+    else
+        echo "Version ${payload_version} is not available in ${candidate_channel}: cluster cannot query OpenShift Update Service (OSUS/Cincinnati), clearing the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+    fi
+}
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -42,7 +63,7 @@ function prepare_next_steps() {
       "${dir}/auth/kubeconfig" \
       "${dir}/auth/kubeadmin-password" \
       "${dir}/metadata.json"
-  
+
   # For private cluster, the bootstrap address is private, installer cann't gather log-bundle directly even if proxy is set
   # the workaround is gather log-bundle from bastion host
   # copying install folder to bastion host for gathering logs
@@ -130,7 +151,7 @@ aws-c2s|aws-sc2s) export AWS_SHARED_CREDENTIALS_FILE=${SHARED_DIR}/aws_temp_cred
 esac
 
 
-# set CA_BUNDLE for C2S and SC2S 
+# set CA_BUNDLE for C2S and SC2S
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   export AWS_CA_BUNDLE=${SHARED_DIR}/additional_trust_bundle
 fi
@@ -160,7 +181,7 @@ fi
 if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
   if [[ -f "${SHARED_DIR}/manifest_localzone_machineset.yaml" ]]; then
     # Phase 0, inject manifests
-    
+
     # replace PLACEHOLDER_INFRA_ID PLACEHOLDER_AMI_ID
     echo "Local Zone is enabled, updating Infran ID and AMI ID ... "
     localzone_machineset="${SHARED_DIR}/manifest_localzone_machineset.yaml"
@@ -177,10 +198,10 @@ if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
       yq-go d "${dir}/openshift/99_openshift-cluster-api_worker-machineset-1.yaml" spec.template.spec.taints
     fi
   fi
-  
+
 fi
 
-sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+set-cluster-version-spec-update-service
 
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
@@ -347,8 +368,8 @@ EOF
       --capabilities CAPABILITY_NAMED_IAM &
     wait "$!"
     ret=$?
-  fi    
-    
+  fi
+
   echo "Created stack $APPS_DNS_STACK_NAME"
 
   aws --region "${REGION}" cloudformation wait stack-create-complete --stack-name "${APPS_DNS_STACK_NAME}" &
