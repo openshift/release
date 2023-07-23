@@ -109,16 +109,8 @@ function classic_rosa_upgrade()
 
 #main
 set -x
-HOSTED_CP=${HOSTED_CP:-false}
-prefix="ci-rosa-s"
-if [[ "$HOSTED_CP" == "true" ]]; then
-	  prefix="ci-rosa-h"
-fi
-CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
+CLUSTER_NAME=${CLUSTER_NAME:=""}
 LEASED_RESOURCE=${LEASED_RESOURCE:=""}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
-if [[ "$HOSTED_CP" == "true" ]] && [[ ! -z "$REGION" ]]; then
-     CLOUD_PROVIDER_REGION="${REGION}"
-fi
 rosa_login $CLOUD_PROVIDER_REGION
 classic_rosa_upgrade perf-rosa01 $CLOUD_PROVIDER_REGION
