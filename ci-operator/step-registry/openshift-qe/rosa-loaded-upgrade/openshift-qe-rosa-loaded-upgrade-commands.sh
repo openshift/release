@@ -14,7 +14,6 @@ function rosa_login()
   ROSA_LOGIN_ENV=${ROSA_LOGIN_ENV:="staging"}
   CLUSTER_NAME=${CLUSTER_NAME:=""}
   SHARED_DIR=${SHARED_DIR:=""}
-  CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR:=""}
   echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
   ROSA_VERSION=$(rosa version)
@@ -112,5 +111,14 @@ set -x
 CLUSTER_NAME=${CLUSTER_NAME:=""}
 LEASED_RESOURCE=${LEASED_RESOURCE:=""}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
+CLUSTER_PROFILE_DIR=${CLUSTER_PROFILE_DIR:=""}
+AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -f "${AWSCRED}" ]]; then
+  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+  export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
+else
+  echo "Did not find compatible cloud provider cluster_profile"
+  exit 1
+fi
 rosa_login $CLOUD_PROVIDER_REGION
 classic_rosa_upgrade perf-rosa01 $CLOUD_PROVIDER_REGION
