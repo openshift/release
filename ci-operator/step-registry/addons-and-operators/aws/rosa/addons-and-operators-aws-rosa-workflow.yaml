@@ -10,10 +10,16 @@ workflow:
       REPLICAS: "2"
       MULTI_AZ: "false"
       PARALLEL: "true"
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "rosa-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA"}
+        ]
     post:
     - ref: operator-uninstall
     - ref: addon-uninstall
     - chain: rosa-aws-sts-deprovision
+    - ref : firewatch-report-issues
     pre:
     - chain: rosa-aws-sts-provision
     - ref: addon-install
