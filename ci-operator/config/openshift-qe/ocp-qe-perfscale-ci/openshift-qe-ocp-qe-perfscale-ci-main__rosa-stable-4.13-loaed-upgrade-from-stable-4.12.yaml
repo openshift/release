@@ -1,0 +1,66 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-4.12-stable-upgrade-prod
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: perfscale-rosa-multiaz-3nodes-prod-loaded-upgrade
+  cron: 0 8 * * 3
+  steps:
+    cluster_profile: aws-perfscale-qe
+    dependencies:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.12"
+      REGION: us-east-2
+      ROSA_LOGIN_ENV: production
+    test:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - chain: openshift-qe-rosa-loaded-upgrade
+    workflow: rosa-aws-sts
+- as: perfscale-rosa-multiaz-24nodes-stage-loaded-upgrade
+  cron: 0 8 * * 3
+  steps:
+    cluster_profile: aws-perfscale-lrc-qe
+    dependencies:
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      CHANNEL_GROUP: candidate
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "false"
+      OPENSHIFT_VERSION: "4.12"
+      PODS_PER_NODE: "100"
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-west-2
+      USER_COUNT: "3"
+    test:
+    - ref: ipi-install-rbac
+    - ref: openshift-cluster-bot-rbac
+    - chain: openshift-qe-node-density
+    - chain: openshift-qe-rosa-loaded-upgrade
+    workflow: rosa-aws-sts
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: rosa-stable-4.13-loaed-upgrade-from-stable-4.12

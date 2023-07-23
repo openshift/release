@@ -1,0 +1,57 @@
+ref:
+  as: openshift-qe-rosa-loaded-upgrade
+  from_image:
+    namespace: ci
+    name: rosa-aws-cli
+    tag: latest
+  timeout: 8h0m0s
+  commands: openshift-qe-rosa-loaded-upgrade-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ROSA_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for rosa login. The supported values are [production, staging].
+  - name: CLUSTER_NAME
+    default: ""
+    documentation: The name of the rosa cluster to create. Must be unique for the account, lowercase, and no more than 15 characters.
+  - name: COMPUTE_MACHINE_TYPE
+    default: ""
+    documentation: The instance size for compute nodes. If not specified, a default will be chosen appropriate for your cluster_profile.
+  - name: REGION
+    default: ""
+    documentation: Use a specific AWS region, overriding the LEASED_RESOURCE environment variable in the cluster_profile.
+  - name: CHANNEL_GROUP
+    default: "stable"
+    documentation: The channel group where to to get the openshift version. The supported groups are [stable, candidate, nightly].
+  - name: ENABLE_FORCE
+    default: "true"
+    documentation: |-
+      Default is true, which means forcing upgrade, you can set false to disable force upgrade
+  - name: SCALE
+    default: "false"
+    documentation: |-
+      Default is false, This variable will scale the cluster up one node at the end up the upgrade
+  - name: MAX_UNAVAILABLE
+    default: "1"
+    documentation: |-
+      Default is 1, This variable will set the max number of unavailable nodes during the upgrade
+  - name: EUS_UPGRADE
+    default: "fasle"
+    documentation: |-
+      Default is false, which means IF It's EUS upgrade.
+  - name: EUS_CHANNEL
+    default: "fast"
+    documentation: |-
+      Default is fast, which means which channel EUS upgrade used, support fast,eus,candidate,stable.
+  dependencies:
+  - name: "release:latest"
+    env: OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE
+  documentation: >-
+    This step runs the perfscale rosa-loaded-upgrade workload in the deployed cluster
