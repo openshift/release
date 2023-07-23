@@ -225,6 +225,15 @@ function upgrade_conformance() {
     return $exit_code
 }
 
+# upgrade_rt runs the rt test suite, the upgrade, and the rt test suite again, and exits with an error if any calls fail
+function upgrade_rt() {
+    local exit_code=0 &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
+    upgrade || exit_code=$? &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
+    return $exit_code
+}
+
 function upgrade_paused() {
     set -x
     unset TEST_SUITE
@@ -301,6 +310,10 @@ oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
+node_check_interval=30
+node_check_limit=20
+# AWS Local Zone nodes usually take much more to be ready.
+test -n "${AWS_EDGE_POOL_ENABLED-}" && node_check_limit=60
 while true
 do
     MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
@@ -315,10 +328,10 @@ EOF
         echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
         break
     fi
-    echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
-    sleep 30
+    echo "$(date) [$i/$node_check_limit] - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+    sleep $node_check_interval
     i=$((i+1))
-    if [ $i -gt 20 ]; then
+    if [ $i -gt $node_check_limit ]; then
       MACHINELIST="$(kubectl get machines -A)"
       NODELIST="$(kubectl get nodes)"
       cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
@@ -452,6 +465,9 @@ upgrade)
     ;;
 upgrade-paused)
     upgrade_paused
+    ;;
+upgrade-rt)
+    upgrade_rt
     ;;
 suite-conformance)
     suite

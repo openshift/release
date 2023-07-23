@@ -64,6 +64,7 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
   --annotations "prow.k8s.io/job=${JOB_NAME}" \
   --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
   --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m \
+  --annotations hypershift.openshift.io/cleanup-cloud-resources="false" \
   --additional-tags "prow.k8s.io/job=${JOB_NAME}" \
   --additional-tags "prow.k8s.io/build-id=${BUILD_ID}"
 
@@ -129,3 +130,4 @@ done
 
 # Data for cluster bot.
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"

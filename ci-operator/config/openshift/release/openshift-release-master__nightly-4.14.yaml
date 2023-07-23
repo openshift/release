@@ -287,7 +287,7 @@ tests:
     observers:
       enable:
       - observers-resource-watch
-    workflow: baremetalds-e2e-ovn-dualstack
+    workflow: baremetalds-e2e-ovn-dualstack-cgroupsv1
 - as: e2e-aws-ovn-proxy
   cron: 0 0 */2 * *
   steps:
@@ -410,6 +410,14 @@ tests:
   steps:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-upi-zones
+- as: e2e-vsphere-ipi-ovn-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: vsphere-8
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-vsphere-cgroupsv1
 - as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
   steps:
@@ -668,6 +676,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-azurestack-upi-csi
+- as: e2e-azure-ovn-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: azure-2
+    env:
+      BASE_DOMAIN: ci2.azure.devcluster.openshift.com
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-azure-cgroupsv1
 - as: e2e-aws-sdn-cgroupsv2
   interval: 168h
   steps:
@@ -678,6 +696,16 @@ tests:
       enable:
       - observers-resource-watch
     workflow: openshift-e2e-aws-sdn-cgroupsv2
+- as: e2e-aws-ovn-cgroupsv1
+  cron: '@daily'
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-cgroupsv1
 - as: e2e-aws-sdn-crun
   interval: 168h
   steps:
@@ -970,6 +998,35 @@ tests:
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
     workflow: openshift-e2e-gcp-graceful-shutdown
+- as: e2e-aws-ovn-shared-vpc-phz-techpreview
+  interval: 8h
+  steps:
+    cluster_profile: aws
+    env:
+      BASE_DOMAIN: origin-ci-int-aws.dev.rhcloud.com
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-shared-vpc-phz
+- as: e2e-agent-compact-ipv4
+  cluster: build05
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+  timeout: 5h0m0s
+- as: e2e-agent-sno-ipv6
+  cluster: build05
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
+  timeout: 5h0m0s
+- as: e2e-agent-ha-dualstack
+  cluster: build05
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-ha-dualstack
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

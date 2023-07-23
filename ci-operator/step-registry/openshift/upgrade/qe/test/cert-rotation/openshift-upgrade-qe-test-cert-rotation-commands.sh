@@ -1,6 +1,23 @@
 #!/bin/bash
 set -xeuo pipefail
 
+function download_oc(){
+    local tmp_bin_path='/tmp/oc-bin/'
+    # 4.6 using latest 4.10 oc client, hits the bug https://issues.redhat.com/browse/OCPBUGS-16009, it has been fixed on 4.14.
+    # In order for the test to continue, we have to use 4.14 nightly oc client temporarily, once 4.10 is available, will remove the code.
+    if [[ ${major_version} -eq 4 && ${minor_version} -eq 6 ]];then
+        echo "extract oc client from 4.14 release image for OCP 4.6 test"
+        RELEASE_IMAGE_TARGET="registry.ci.openshift.org/ocp/release:4.14.0-0.nightly-2023-07-17-215017"
+        extract_oc
+    else
+        mkdir -p "$tmp_bin_path"
+        curl -sSL --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
+        export PATH=${tmp_bin_path}:$PATH
+        which oc
+        oc version --client
+    fi
+}
+
 function extract_oc(){
     mkdir -p /tmp/client
     export OC_DIR="/tmp/client"
@@ -23,7 +40,15 @@ function extract_oc(){
 }
 
 # This step is executed after upgrade to target, oc client of target release should use as many new versions as possible, make sure new feature cert-rotation of oc amd is supported
-extract_oc
+ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
+major_version=$(echo ${ocp_version} | cut -d '.' -f1)
+minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
+if [[ -n "$minor_version" && "$minor_version" -lt 10 ]] ; then
+    echo "Y version is less than 10, using oc 4.10 directly"
+    download_oc
+else
+    extract_oc
+fi
 
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
 
@@ -148,8 +173,11 @@ oc config new-admin-kubeconfig > "${SHARED_DIR}/admin.kubeconfig"
 # Detail see https://issues.redhat.com/browse/OCPBUGS-15793
 if oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
     :
-else
-    sleep 2
+elif sleep 10;oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
+    :
+else 
+    # 4.6 - 4.9 need to wait for more time
+    [[ ${major_version} -eq 4 && ${minor_version} -lt 10 ]] && sleep 60 || sleep 10
     oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
 fi
 
