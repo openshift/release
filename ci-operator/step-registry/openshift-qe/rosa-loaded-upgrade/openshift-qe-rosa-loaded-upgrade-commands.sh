@@ -114,7 +114,7 @@ prefix="ci-rosa-s"
 if [[ "$HOSTED_CP" == "true" ]]; then
 	  prefix="ci-rosa-h"
 fi
-
+CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
 LEASED_RESOURCE=${LEASED_RESOURCE:=""}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 if [[ "$HOSTED_CP" == "true" ]] && [[ ! -z "$REGION" ]]; then
