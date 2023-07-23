@@ -11,9 +11,6 @@ BREW_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/brew-token)
 RUN_COMMAND="poetry run python app/cli.py addons --cluster ${CLUSTER_NAME} --token ${OCM_TOKEN} --api-host ${API_HOST} "
 export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export OCM_TOKEN
-# TODO set AWS_REGION?
-# export AWS_REGION=$LEASED_RESOURCE
-export AWS_REGION="test_region"
 
 ADDONS_CMD=""
 for addon_value in $(env | grep -E '^ADDON[0-9]+_CONFIG' | sort  --version-sort); do
@@ -37,4 +34,5 @@ RUN_COMMAND+=" install"
 
 echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
 
-${RUN_COMMAND}
+sleep 2h
+# ${RUN_COMMAND}
