@@ -31,7 +31,9 @@ else
     API_URL=https://api.openshift.com/
 fi
 ocm login --url=$API_URL --token=$OCM_TOKEN
-ocm delete idp rosa-htpasswd --cluster=$CLUSTER_ID
+for IDP in $(ocm list idps -c $CLUSTER_ID | cut -f1 -d' ' | tail -n +2); do
+  ocm delete idp $IDP --cluster=$CLUSTER_ID
+done
 
 # running RHODS testsuite
 ./ods_ci/build/run.sh
