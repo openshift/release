@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "Temp exit for debugging"
+exit 1
+
 MPREFIX="${SHARED_DIR}/manifest"
 TPREFIX="${SHARED_DIR}/tls"
 
