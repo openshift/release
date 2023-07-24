@@ -22,7 +22,7 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: web-terminal-aws-rosa-hypershift-412
+- as: web-terminal-aws-rosa-hypershift-412-debug
   cron: 0 10 * * 1
   steps:
     cluster_profile: aws-cspi-qe
@@ -46,10 +46,17 @@ tests:
         ]
       REGION: us-west-2
       ROSA_LOGIN_ENV: staging
+    post:
+    - chain: rosa-aws-sts-deprovision-byo-vpc
+    - ref: firewatch-report-issues
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc
+    - chain: rosa-aws-sts-provision
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
     test:
     - ref: install-operators
     - ref: cucushift-hypershift-extended-health-check
-    workflow: firewatch-rosa-aws-sts-hypershift
 zz_generated_metadata:
   branch: main
   org: rhpit
