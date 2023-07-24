@@ -1,4 +1,4 @@
-# openshift-open-telemetry-operator-main-tests<!-- omit from toc -->
+# open-telemetry-opentelemetry-operator-main-tests<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 - [General Information](#general-information)
