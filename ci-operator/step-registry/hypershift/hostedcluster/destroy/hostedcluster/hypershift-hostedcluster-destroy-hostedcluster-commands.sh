@@ -31,6 +31,14 @@ else
   echo "$HOSTED_CLUSTER_FILE does not exist. Defaulting to the default cluster name: $CLUSTER_NAME."
 fi
 
+createdAt=`oc -n clusters get hostedclusters $CLUSTER_NAME -o jsonpath='{.metadata.annotations.created-at}'`
+if [ -z $createdAt ]; then
+  echo Cluster is broken, skipping...
+  oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "broken=true"
+  exit 0
+fi
+echo Cluster successfully created at $createdAt
+
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
 bin/hypershift destroy cluster aws \
   --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
