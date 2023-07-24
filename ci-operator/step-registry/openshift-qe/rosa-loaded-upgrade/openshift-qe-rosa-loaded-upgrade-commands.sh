@@ -72,7 +72,7 @@ function classic_rosa_upgrade()
   echo  Loaded Upgrade from [ $CURRENT_VERSION ] to [ $TARGET_RELEASES ] for $CLUSTER_NAME on $REGION
   echo  "-------------------------------------------------------------------------------------------"
 
-  rosa upgrade cluster -c $CLUSTER_NAME --mode=auto --region $REGION --version $TARGET_RELEASES  -schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
+  rosa upgrade cluster -c $CLUSTER_NAME --mode=auto --region $REGION --version $TARGET_RELEASES  --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
 
   echo "Checking ROSA upgrade status ..."
   INIT=1
