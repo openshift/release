@@ -267,6 +267,9 @@ CONFIG = {
     },
     'aws-perfscale-quota-slice': {
         'us-west-2': 10,
+    },
+    'aws-chaos-quota-slice': {
+        'us-west-2': 10,
     }
 }
 
