@@ -28,6 +28,19 @@ elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
   master_type=e2-standard-8
 fi
 
+case "${DISK_SIZE_VARIANT:-}" in
+  "")
+    # FIXME; this should actually default to what's in openshift-install like aws does
+    disk_size=200
+    ;;
+  large)
+    disk_size=6144
+    ;;
+  *)
+    echo "Unknown DISK_SIZE_VARIANT" 1>&2; exit 1
+    ;;
+esac
+
 cat >> "${CONFIG}" << EOF
 baseDomain: ${GCP_BASE_DOMAIN}
 platform:
@@ -41,7 +54,7 @@ controlPlane:
       type: ${master_type}
       osDisk:
         diskType: pd-ssd
-        diskSizeGB: 200
+        diskSizeGB: ${disk_size}
   replicas: ${masters}
 compute:
 - name: worker
