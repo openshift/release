@@ -152,7 +152,7 @@ output_dir="${ARTIFACT_DIR}/tcpdump/"
 mkdir -p "$output_dir"
 
 # Skip downloading of .terminating and .lock files.
-oc adm node-logs --role=worker --path="/tcpdump" | \
+oc adm node-logs -l kubernetes.io/os=linux --path="/tcpdump" | \
 grep -v ".terminating" | \
 grep -v ".lock" | \
 tee "${output_dir}.tcpdump_listing"
