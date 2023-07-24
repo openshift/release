@@ -1,0 +1,38 @@
+base_images:
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    release:
+      channel: candidate
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: rosa-aws-sts-rosacli-e2e-p2-f3
+  cron: 38 16 3,6,9,12,15,18,21,23,27,30 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      CHANNEL_GROUP: stable
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: openshift-extended-rosacli-tests
+    workflow: rosa-aws-sts-rosacli-e2e
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: openshift-tests-private
+  variant: rosacli
