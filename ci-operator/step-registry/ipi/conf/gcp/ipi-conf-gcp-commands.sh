@@ -64,6 +64,30 @@ compute:
       type: ${COMPUTE_NODE_TYPE}
 EOF
 
+# For non-default disks, we will fully reprovision XFS for now.  See
+# https://github.com/coreos/fedora-coreos-tracker/issues/1183 which
+# will obviate this in the future (post-4.13).
+if test -n "${DISK_SIZE_VARIANT:-}"; then
+    cat > "${SHARED_DIR}/manifest-reprovision-controlplane.yml" << 'EOF'
+variant: fcos
+version: 1.4.0
+storage:
+  disks:
+  - device: /dev/disk/by-id/coreos-boot-disk
+    wipe_table: false
+    partitions:
+    - number: 4
+      label: root
+      size_mib: 0
+      resize: true
+  filesystems:
+    - device: /dev/disk/by-partlabel/root
+      wipe_filesystem: true
+      format: xfs
+      label: root
+EOF
+fi
+
 if [ ${RT_ENABLED} = "true" ]; then
 	cat > "${SHARED_DIR}/manifest_mc-kernel-rt.yml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
