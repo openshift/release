@@ -11,6 +11,10 @@ base_images:
     name: cert-manager-webhook
     namespace: ci
     tag: v1.11.1
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
   ocp_builder_rhel-9-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -43,12 +47,6 @@ operator:
     with: cert-manager-webhook
   - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.11.1
     with: cert-manager-cainjector
-promotion:
-  additional_images:
-    cert-manager-operator-bundle: cert-manager-operator-bundle
-  namespace: ci
-  tag: latest
-  tag_by_commit: true
 releases:
   initial:
     integration:
@@ -80,6 +78,25 @@ tests:
     make test --warn-undefined-variables
   container:
     from: src
+- as: alpha-e2e-operator
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-operator
   steps:
     cluster_profile: aws

@@ -56,8 +56,8 @@ function check_latest_machineconfig_applied() {
 
 function wait_machineconfig_applied() {
     local role="${1}" try=0 interval=60
-    num=$(oc get node --no-headers | awk -v var="${role}" '$3 == var' | wc -l)
-    local max_retries; max_retries=$(expr $num \* 10)
+    num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
+    local max_retries; max_retries=$((num*10))
     while (( try < max_retries )); do
         echo "Checking #${try}"
         if ! check_latest_machineconfig_applied "${role}"; then
@@ -98,7 +98,8 @@ wait_machineconfig_applied "worker"
 
 echo "Adding the CA signed mirror-registry server cert to cluster"
 client_ca_cert=/var/run/vault/mirror-registry/client_ca.crt
-oc create configmap registry-config --from-file=${mirror_registry_url/:/..}=${client_ca_cert} -n openshift-config
+mirror_registry_host=$(echo "$mirror_registry_url" | cut -d : -f 1)
+oc create configmap registry-config --from-file="${mirror_registry_host}..5000"=${client_ca_cert} --from-file="${mirror_registry_host}..6001"=${client_ca_cert} --from-file="${mirror_registry_host}..6002"=${client_ca_cert} -n openshift-config
 oc patch image.config.openshift.io/cluster --patch '{"spec":{"additionalTrustedCA":{"name":"registry-config"}}}' --type=merge
 #sleep 1min to wait for patch applied
 sleep 60
@@ -117,10 +118,10 @@ wait_machineconfig_applied "master"
 wait_machineconfig_applied "worker"
 
 echo "Disconnecting network"
-ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@"${BASTION_IP}" \
+ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${BASTION_SSH_USER}"@"${BASTION_IP}" \
     "sudo cp /etc/disconnected-dns.conf /etc/dnsmasq.d/ | sudo systemctl restart dnsmasq.service"
 #sleep waiting for servcie restart
 sleep 60
 echo "check dnsmasq.service status and disconnected-dns.conf is effective"
-ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@"${BASTION_IP}" \
+ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no "${BASTION_SSH_USER}"@"${BASTION_IP}" \
     "sudo systemctl status dnsmasq.service"

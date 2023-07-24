@@ -68,6 +68,7 @@ dashboard.new(
 .addPanel(statePanel(iaas="azure4", displayName="Azure"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="azure-2", displayName="Azure-2"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="vsphere", displayName="vSphere"), gridPos={h: 9, w: 24, x: 0, y: 0})
+.addPanel(statePanel(iaas="vsphere-8", displayName="vSphere 8"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="packet", displayName="Packet.net"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="openstack", displayName="OpenStack"), gridPos={h: 9, w: 24, x: 0, y: 0})
 .addPanel(statePanel(iaas="openstack-kuryr", displayName="OpenStack Kuryr"), gridPos={h: 9, w: 24, x: 0, y: 0})
