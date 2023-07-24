@@ -280,7 +280,7 @@ the private repo themselves. Otherwise, utilize the bot account to delete the ta
 
 ## `periodic-image-mirroring-supplemental-ci-images`
 This job mirrors images between two registries.
-Usually it mirror images from quay.io to registry.ci.openshift.org, and vice vesa.
+Usually it mirrors images from quay.io to registry.ci.openshift.org, and vice versa.
 
 ### Symptom
 ```
