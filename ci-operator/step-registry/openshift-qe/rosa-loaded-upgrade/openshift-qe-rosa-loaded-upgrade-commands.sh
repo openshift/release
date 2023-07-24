@@ -145,3 +145,4 @@ else
 fi
 rosa_login $CLOUD_PROVIDER_REGION
 classic_rosa_upgrade $CLOUD_PROVIDER_REGION
+sleep 7200
