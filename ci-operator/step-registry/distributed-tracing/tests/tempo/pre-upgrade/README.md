@@ -1,4 +1,4 @@
-# distributed-tracing-tests-tempo-ref<!-- omit from toc -->
+# distributed-tracing-tests-tempo-pre-upgrade-ref<!-- omit from toc -->
 
 ## Table of Contents<!-- omit from toc -->
 
@@ -58,10 +58,6 @@ Use to execute the `Tempo E2E tests` [tempo-e2e-tests](https://github.com/grafan
 - `MANIFEST_DIR`
   - **Definition**: One or more directories containing manifests to apply before running the tests.
   - **If left empty**: It will use "/tmp/kuttl-manifests" as the default value.
-
-- `SKIP_TESTS`
-  - **Definition**: Space seperated test cases to skip from the test run. Example "tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation".
-  - **If left empty**: All the e2e tests are run.
 
 ### Other:
 
