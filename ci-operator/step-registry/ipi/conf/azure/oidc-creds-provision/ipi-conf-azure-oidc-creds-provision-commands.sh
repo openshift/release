@@ -105,7 +105,8 @@ ccoctl azure create-all \
   --credentials-requests-dir="/tmp/credrequests" \
   --dnszone-resource-group-name="${BASE_DOMAIN_RESOURCE_GROUP_NAME}" \
   --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
-  --output-dir="/tmp"
+  --output-dir="/tmp" \
+  --enable-tech-preview
 
 # Output authentication file for ci logs
 echo "Cluster authentication:"
