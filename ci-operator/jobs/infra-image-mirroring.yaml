@@ -1381,3 +1381,40 @@ periodics:
     - configMap:
         name: image-mirror-mappings
       name: config
+- agent: kubernetes
+  cluster: app.ci
+  cron: '@yearly'
+  decorate: true
+  labels:
+    ci.openshift.io/area: image-mirroring-on-demand
+    ci.openshift.io/role: image-mirroring
+  name: periodic-image-mirroring-on-demand
+  spec:
+    containers:
+    - args:
+      - -c
+      - |
+        set -o errexit
+        failures=0
+        for mapping in $IMAGE_PATHS; do
+          image_name_tag=${mapping##*/}
+          cmd="oc image mirror --keep-manifest-list ${mapping} registry.ci.openshift.org/ci/${image_name_tag} --skip-multiple-scopes"
+          echo "Running: ${cmd}"
+          if ! ${cmd}; then
+            echo "ERROR: Failed to mirror images from $mapping"
+            failures=$((failures+1))
+          fi
+        done
+        exit $failures
+      command:
+      - /bin/bash
+      env:
+      - name: HOME
+        value: /home/mirror
+      - name: IMAGE_PATHS
+      image: registry.ci.openshift.org/ocp/4.12:cli
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 500m
