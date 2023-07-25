@@ -60,6 +60,11 @@ KUBECONFIG_REMOTE="/tmp/lb-ext.kubeconfig"
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
+# Set kubelet node IP hint. Nodes are created with two interfaces - provisioning and external,
+# and we want to make sure kubelet uses external address as main, instead of DHCP racing to use 
+# a random one as primary
+run-on "${control_nodes}" "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
+
 # Shutdown nodes
 VMS=( $( virsh list --all --name ) )
 for vm in ${VMS[@]}; do
