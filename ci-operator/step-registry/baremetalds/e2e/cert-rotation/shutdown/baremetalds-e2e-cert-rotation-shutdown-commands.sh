@@ -95,6 +95,7 @@ run-on "${control_nodes}" "timedatectl status"
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
+until oc get nodes; do sleep 10; done
 oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT}
 until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
   if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
