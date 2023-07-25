@@ -325,7 +325,7 @@ presubmits:
     decorate: true
     decoration_config:
       skip_cloning: true
-      timeout: 4h0m0s
+      timeout: 5h0m0s
     labels:
       ci-operator.openshift.io/variant: lightspeed
       ci.openshift.io/generator: prowgen
@@ -480,6 +480,57 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )load-aware-e2e,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build02
+    context: ci/prow/load-aware-e2e-long
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+      timeout: 7h0m0s
+    labels:
+      ci-operator.openshift.io/variant: load-aware
+      ci.openshift.io/generator: prowgen
+    name: pull-ci-openshift-psap-ci-artifacts-main-load-aware-e2e-long
+    rerun_command: /test load-aware-e2e-long
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=e2e-long
+        - --variant=load-aware
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )load-aware-e2e-long,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
