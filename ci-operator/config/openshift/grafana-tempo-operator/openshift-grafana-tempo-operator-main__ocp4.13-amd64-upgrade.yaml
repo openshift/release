@@ -7,6 +7,10 @@ base_images:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
+  tempo-bundle-old:
+    name: tempo-operator-bundle
+    namespace: ci
+    tag: old
 binary_build_commands: make build
 build_root:
   image_stream_tag:
@@ -34,19 +38,24 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.13"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: tempo-e2e-tests
-  cron: 0 6 * * 2
+- as: tempo-operator-upgrade
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.13"
+  cron: 0 6 * * 4
   steps:
-    cluster_profile: aws-qe
     env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
       EO_SUB_CHANNEL: stable-5.7
       EO_SUB_SOURCE: redhat-operators
     test:
@@ -57,8 +66,23 @@ tests:
     - as: install
       cli: latest
       commands: |
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-operators "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-operators deployment tempo-operator-controller
+        oc create namespace tempo-operator
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n tempo-operator "$OO_BUNDLE_OLD"
+        oc wait --for condition=Available -n tempo-operator deployment tempo-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE_OLD
+        name: tempo-bundle-old
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: distributed-tracing-tests-tempo-pre-upgrade
+    - as: upgrade
+      cli: latest
+      commands: |
+        operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted -n tempo-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n tempo-operator deployment tempo-operator-controller
       dependencies:
       - env: OO_BUNDLE
         name: tempo-bundle
@@ -68,9 +92,9 @@ tests:
           cpu: 1000m
           memory: 400Mi
     - ref: distributed-tracing-tests-tempo
-    workflow: cucushift-installer-rehearse-aws-ipi
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: grafana-tempo-operator
-  variant: ocp4.14-amd64
+  variant: ocp4.13-amd64-upgrade
