@@ -13,17 +13,17 @@ cp -R /tmp/jaeger-operator /tmp/jaeger-tests && cd /tmp/jaeger-tests
 curl -o tests/e2e/Makefile -L https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/Makefile
 curl -o hack/run-e2e-test-suite.sh -L https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/hack/run-e2e-test-suite.sh
 curl -o hack/install/install-kuttl.sh -L https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/hack/install/install-kuttl.sh
-curl -o tests/e2e/elasticsearch/render.sh https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/elasticsearch/render.sh
-curl -o tests/e2e/miscellaneous/render.sh https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/miscellaneous/render.sh
-curl -o tests/e2e/streaming/render.sh https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/streaming/render.sh
-curl -o tests/e2e/examples/render.sh https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/examples/render.sh
+#curl -o tests/e2e/elasticsearch/render.sh https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/elasticsearch/render.sh
+#curl -o tests/e2e/miscellaneous/render.sh https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/miscellaneous/render.sh
+#curl -o tests/e2e/streaming/render.sh https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/streaming/render.sh
+#curl -o tests/e2e/examples/render.sh https://raw.githubusercontent.com/IshwarKanse/test-files/main/jaeger-operator/tests/e2e/examples/render.sh
 ./hack/install/install-kuttl.sh
 
-rm -rf tests/e2e/elasticsearch/es-rollover-upstream/
-rm -rf tests/e2e/elasticsearch/es-index-cleaner-upstream/
-rm -rf tests/e2e/miscellaneous/collector-autoscale/
-rm -rf tests/e2e/streaming/streaming-with-autoprovisioning-autoscale/
-rm -rf tests/e2e/examples/examples-openshift-agent-as-daemonset/
+#rm -rf tests/e2e/elasticsearch/es-rollover-upstream/
+#rm -rf tests/e2e/elasticsearch/es-index-cleaner-upstream/
+#rm -rf tests/e2e/miscellaneous/collector-autoscale/
+#rm -rf tests/e2e/streaming/streaming-with-autoprovisioning-autoscale/
+#rm -rf tests/e2e/examples/examples-openshift-agent-as-daemonset/
 
 
 # Run the e2e tests
