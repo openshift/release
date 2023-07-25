@@ -77,7 +77,6 @@ function classic_rosa_upgrade()
   rosa list upgrade -c $CLUSTER_NAME
   echo "######################################################################"
   echo rosa upgrade cluster -c $CLUSTER_NAME --mode=auto --region $REGION --version $TARGET_RELEASES  --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
-  sleep 14400
   rosa upgrade cluster -c $CLUSTER_NAME --mode=auto --region $REGION --version $TARGET_RELEASES  --schedule-date $SCHEDULE_DATE --schedule-time $SCHEDULE_TIME -y
 
 
