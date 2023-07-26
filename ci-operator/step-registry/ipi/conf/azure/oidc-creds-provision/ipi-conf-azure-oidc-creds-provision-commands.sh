@@ -112,7 +112,7 @@ ccoctl azure create-all \
   --dnszone-resource-group-name="${BASE_DOMAIN_RESOURCE_GROUP_NAME}" \
   --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
   --output-dir="/tmp" \
-  ${ADDITONAL_CCOCTL_ARGS}
+  ${ADDITIONAL_CCOCTL_ARGS}
 
 # Output authentication file for ci logs
 echo "Cluster authentication:"
