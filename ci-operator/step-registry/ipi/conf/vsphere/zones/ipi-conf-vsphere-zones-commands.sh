@@ -24,6 +24,47 @@ mapfile -t vips < "${SHARED_DIR}/vips.txt"
 CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
+#ova_url=$(openshift-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location')
+#vm_template="${ova_url##*/}"
+
+VERSION=$(echo "${JOB_NAME}" | grep -o -E '4\.[0-9]+')
+if [ ! -z ${VERSION} ]; then
+    Z_VERSION=$(echo ${VERSION} | cut -d'.' -f2)
+    if [ ${Z_VERSION} -gt 13  ]; then
+      if [ ${ENABLE_TEMPLATE} == "yes" ]; then
+	      ova_url=$(openshift-install coreos print-stream-json | jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location')
+	      vm_template="${ova_url##*/}"
+              #TEMPLATE_SETTING="template: /${vsphere_datacenter}/vm/${vm_template}"
+	      #echo ${TEMPLATE_SETTING}
+	      if [[ "$(govc vm.info "${vm_template}" | wc -c)" -eq 0 ]]; then
+		      echo "Boot image ${vm_template} does not exist on ${vsphere_url}, uploading..."
+	              cat <<EOF > /${SHARED_DIR}/upload_template.json
+{
+   "DiskProvisioning": "thin",
+   "MarkAsTemplate": false,
+   "PowerOn": false,
+   "InjectOvfEnv": false,
+   "WaitForIP": false,
+   "Name": "${vm_template}",
+   "NetworkMapping":[{"Name":"VM Network","Network":"${LEASED_RESOURCE}"}]
+}
+EOF
+                      echo "OVA URL: ${ova_url}"
+                      curl -L -o /tmp/${vm_template} "${ova_url}"
+                      govc import.ova -options=/${SHARED_DIR}/upload_template.json /${SHARED_DIR}/${vm_template} || ret=$?
+		      TEMPLATE_SETTING="template: /${vsphere_datacenter}/vm/${vm_template}"
+                  if [[ ret -ne 0 ]]; then
+			  echo "Fail to upload ova image ${vm_template}!"
+			  exit 1
+                  fi
+	      else 
+		      TEMPLATE_SETTING="template: /${vsphere_datacenter}/vm/${vm_template}"
+	      fi
+      else
+	      TEMPLATE_SETTING=""
+      fi
+    fi
+fi
 
 TECH_PREVIEW_NO_UPGRADE=""
 if [[ "$JOB_NAME" == *"4.12-e2e-vsphere-zones"* ]]; then
@@ -73,6 +114,7 @@ platform:
         networks:
         - ${LEASED_RESOURCE}
         datastore: mdcnc-ds-1
+        ${TEMPLATE_SETTING}
     - name: us-east-2
       region: us-east
       zone: us-east-2a
@@ -81,6 +123,7 @@ platform:
         networks:
         - ${LEASED_RESOURCE}
         datastore: mdcnc-ds-2
+        ${TEMPLATE_SETTING}
     - name: us-east-3
       region: us-east
       zone: us-east-3a
@@ -89,6 +132,7 @@ platform:
         networks:
         - ${LEASED_RESOURCE}
         datastore: mdcnc-ds-3
+        ${TEMPLATE_SETTING}
     - name: us-west-1
       region: us-west
       zone: us-west-1a
@@ -98,6 +142,7 @@ platform:
         networks:
         - ${LEASED_RESOURCE}
         datastore: mdcnc-ds-4
+        ${TEMPLATE_SETTING}
 
 networking:
   networkType: OpenShiftSDN
