@@ -1,27 +1,30 @@
-postsubmits:
-  openshift/hive:
+presubmits:
+  openshift-knative/net-istio:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^ocm-2\.5$
-    cluster: build03
+    - ^release-v1\.11$
+    - ^release-v1\.11-
+    cluster: build01
+    context: ci/prow/410-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: "410"
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-hive-ocm-2.5-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-net-istio-release-v1.11-410-images
+    rerun_command: /test 410-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --target=src
+        - --variant=410
         command:
         - ci-operator
         image: ci-operator:latest
@@ -37,9 +40,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -48,32 +48,35 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )410-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^ocm-2\.5$
-    cluster: build03
+    - ^release-v1\.11$
+    - ^release-v1\.11-
+    cluster: build01
+    context: ci/prow/413-images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: "413"
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-hive-ocm-2.5-publish-coverage
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-knative-net-istio-release-v1.11-413-images
+    rerun_command: /test 413-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/hive-codecov-token
-        - --target=publish-coverage
+        - --target=[images]
+        - --target=src
+        - --variant=413
         command:
         - ci-operator
         image: ci-operator:latest
@@ -86,9 +89,6 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /secrets/hive-codecov-token
-          name: hive-codecov-token
-          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -97,12 +97,10 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: hive-codecov-token
-        secret:
-          secretName: hive-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )413-images,?($|\s.*)
