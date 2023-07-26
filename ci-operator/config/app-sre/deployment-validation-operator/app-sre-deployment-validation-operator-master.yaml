@@ -61,12 +61,11 @@ tests:
       cli: latest
       commands: |
         python hack/generate-operator-bundle-contents.py -n deployment-validation-operator -c testing -i ${DVO_OPERATOR} -t latest -o bundle/manifests/ --no-nodeAffinity
-        oc create namespace deployment-validation-operator
         operator-sdk generate bundle --package=deployment-validation-operator --input-dir=bundle/manifests --metadata
         podman build -f bundle.Dockerfile -t quay.io/jfula/dvo-bundle-test
         podman push quay.io/jfula/dvo-bundle-test
-        operator-sdk run bundle quay.io/jfula/dvo-bundle-test:latest --namespace deployment-validation-operator --skip-tls
-        oc wait --for condition=Available -n deployment-validation-operator deployment-operator
+        operator-sdk run bundle quay.io/jfula/dvo-bundle-test:latest --namespace openshift-operators --skip-tls
+        oc wait --for condition=Available -n openshift-operators deployment-operator
       dependencies:
       - env: DVO_OPERATOR
         name: dvo-operator
