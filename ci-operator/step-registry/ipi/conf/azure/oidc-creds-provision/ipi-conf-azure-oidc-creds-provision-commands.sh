@@ -96,6 +96,12 @@ cat > ${SHARED_DIR}/metadata.json << EOF
 {"infraID":"${CLUSTER_NAME}","azure":{"region":"${REGION}","resourceGroupName":"${CLUSTER_NAME}"}}
 EOF
 
+if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ]; then
+  ADDITIONAL_CCOCTL_ARGS="--enable-tech-preview"
+else
+  ADDITIONAL_CCOCTL_ARGS=""
+fi
+
 # create required credentials infrastructure and installer manifests
 ccoctl azure create-all \
   --name="${CLUSTER_NAME}" \
@@ -106,7 +112,7 @@ ccoctl azure create-all \
   --dnszone-resource-group-name="${BASE_DOMAIN_RESOURCE_GROUP_NAME}" \
   --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
   --output-dir="/tmp" \
-  --enable-tech-preview
+  ${ADDITONAL_CCOCTL_ARGS}
 
 # Output authentication file for ci logs
 echo "Cluster authentication:"
