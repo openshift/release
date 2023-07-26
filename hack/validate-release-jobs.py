@@ -104,7 +104,7 @@ def main(git_repo_path):
         core-services/release-controller/_releases, and then run a "make release-controllers" from the root of the repo.
     - If your PR has changes that have added any of the aforementioned jobs, then you must also ensure that these jobs have been defined in their respective location under:
         ci-operator/jobs
-    - If you have no idea why you've received this error, then it's most likely do to another commit that introduced the problem.  Please reach out to #forum-crt in Slack.'''
+    - If you have no idea why you've received this error, then it's most likely do to another commit that introduced the problem.  Please reach out to #forum-ocp-crt in Slack.'''
 
         logger.error(message)
 
