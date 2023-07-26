@@ -16,4 +16,4 @@ oc apply -f - <<EOF
 EOF
 
 
-sleep 7200
+sleep 10800
