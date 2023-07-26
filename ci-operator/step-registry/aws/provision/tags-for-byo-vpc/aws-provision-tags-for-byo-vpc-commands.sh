@@ -16,7 +16,6 @@ REGION="${LEASED_RESOURCE}"
 infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
 vpc_id=$(head -n 1 ${SHARED_DIR}/vpc_id)
 private_subnet_ids=$(yq-go r -j ${SHARED_DIR}/private_subnet_ids | jq -r '[ . | join(" ") ] | @csv' | sed "s/\"//g")
-public_subnet_ids=$(yq-go r -j ${SHARED_DIR}/public_subnet_ids | jq -r '[ . | join(" ") ] | @csv' | sed "s/\"//g")
 
 if [[ -z $vpc_id ]] || [[ -z $private_subnet_ids ]] || [[ -z $infra_id ]]; then
   echo "Error: Can not get VPC id or private subnets, exit"
@@ -29,8 +28,3 @@ aws --region $REGION ec2 create-tags --resources $vpc_id --tags Key=kubernetes.i
 
 echo "Adding tags for private subnets:$private_subnet_ids, tags: kubernetes.io/role/internal-elb, value is empty."
 aws --region $REGION ec2 create-tags --resources $private_subnet_ids --tags Key=kubernetes.io/role/internal-elb,Value=
-
-if [[ ${APPLY_TAGS_TO_PUBLIC_SUBNETS} == "yes" ]]; then
-  echo "Adding tags for public subnets:$public_subnet_ids, tags: kubernetes.io/role/elb, value is empty."
-  aws --region $REGION ec2 create-tags --resources $public_subnet_ids --tags Key=kubernetes.io/role/elb,Value=
-fi
