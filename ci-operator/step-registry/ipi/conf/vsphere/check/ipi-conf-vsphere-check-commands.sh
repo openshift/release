@@ -37,6 +37,8 @@ fi
 
 source /var/run/vault/vsphere-config/load-vsphere-env-config.sh
 
+sleep 3600
+
 declare vcenter_usernames
 declare vcenter_passwords
 # shellcheck source=/dev/null
