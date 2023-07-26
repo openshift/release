@@ -279,24 +279,29 @@ in
 the private repo themselves. Otherwise, utilize the bot account to delete the tag.
 
 ## `periodic-image-mirroring-supplemental-ci-images`
-This job mirrors images between two registries.
-Usually it mirrors images from quay.io to registry.ci.openshift.org, and vice versa.
+This job [mirrors external images to the CI registry](https://docs.ci.openshift.org/docs/how-tos/external-images/) `registry.ci.openshift.org`.
 
 ### Symptom
+
 ```
  error: unable to push manifest to registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2: errors:
 manifest blob unknown: blob unknown to registry
-manifest blob unknown: blob unknown to registry
-manifest blob unknown: blob unknown to registry
-manifest blob unknown: blob unknown to registry 
 ```
 
 #### Culprit
-The manifest might be corrupted.
+The image data might be corrupted somehow.
 
 #### Resolution
-Delete the `imagestream` with
+Mirror the broken image(s) manually with `--force`:
+
+```console
+$ oc --context app.ci -n ci extract secret/registry-push-credentials-ci-central --to=/tmp --keys .dockerconfigjson --confirm
+/tmp/.dockerconfigjson
+
+### find the source and destination of the mirroring
+$ rg registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2 ./core-services 
+./core-services/image-mirroring/supplemental-ci-images/mapping_supplemental_ci_images_ci
+100:quay.io/kubevirt/prom-metrics-linter:v0.0.2 registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2
+
+$ oc image mirror --keep-manifest-list --skip-multiple-scopes --force --registry-config /tmp/.dockerconfigjson quay.io/kubevirt/prom-metrics-linter:v0.0.2 registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2
 ```
-oc --context app.ci -n ci delete is prom-metrics-linter --as system:admin
-```
-Then rerun the job.
