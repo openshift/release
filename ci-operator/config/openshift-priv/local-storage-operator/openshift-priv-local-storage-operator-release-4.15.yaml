@@ -15,6 +15,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/local-storage-operator
@@ -91,6 +95,24 @@ tests:
       resources:
         requests:
           cpu: 100m
+    workflow: optional-operators-ci-aws
+- as: e2e-operator-extended
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-local-storage-operator-bundle
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FORCE_SUCCESS_EXIT: "no"
+      OO_CHANNEL: preview
+      OO_INSTALL_NAMESPACE: openshift-marketplace
+      OO_PACKAGE: local-storage-operator
+      OO_TARGET_NAMESPACES: '!install'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~StagerunOnly;STORAGE&
+      TEST_SCENARIOS: \[LSO\]
+    test:
+    - ref: openshift-extended-test
     workflow: optional-operators-ci-aws
 - as: verify-deps
   steps:
