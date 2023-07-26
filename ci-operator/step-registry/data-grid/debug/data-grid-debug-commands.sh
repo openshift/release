@@ -9,10 +9,11 @@ oc apply -f - <<EOF
     kind: ConfigMap
     metadata:
         name: cluster-monitoring-config
-        namespace: openshift-monitoring
+        namespace: ds-integration
     data:
         config.yaml: |
             enableUserWorkload: true 
 EOF
+
 
 sleep 7200
