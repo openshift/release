@@ -1,4 +1,9 @@
 base_images:
+  base:
+    cluster: https://api.ci.openshift.org
+    name: python
+    namespace: openshift
+    tag: "3.8"
   operator-sdk:
     name: "4.12"
     namespace: origin
@@ -60,8 +65,7 @@ tests:
     - as: install
       cli: latest
       commands: |
-        yum install python3.8
-        python3.8 hack/generate-operator-bundle-contents.py -n deployment-validation-operator -c testing -i ${DVO_OPERATOR} -t latest -o bundle/manifests/ --no-nodeAffinity
+        python hack/generate-operator-bundle-contents.py -n deployment-validation-operator -c testing -i ${DVO_OPERATOR} -t latest -o bundle/manifests/ --no-nodeAffinity
         operator-sdk generate bundle --package=deployment-validation-operator --input-dir=bundle/manifests --metadata
         podman build -f bundle.Dockerfile -t quay.io/jfula/dvo-bundle-test
         podman push quay.io/jfula/dvo-bundle-test
