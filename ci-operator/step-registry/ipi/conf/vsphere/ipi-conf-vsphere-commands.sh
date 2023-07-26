@@ -34,14 +34,20 @@ set +o errexit
 VERSION=$(echo "${JOB_NAME}" | grep -o -E '4\.[0-9]+')
 set -o errexit
 
+Z_VERSION=1000
 if [ ! -z ${VERSION} ]; then
-    Z_VERSION=$(echo ${VERSION} | cut -d'.' -f2)
-    if [ ${Z_VERSION} -gt 9 ]; then
-        echo "4.x installation is later than 4.9, will install with resource pool"
-        RESOURCE_POOL_DEF="resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources/ipi-ci-clusters"
-    fi
-    if [ ${Z_VERSION} -lt 11 ]; then
-      MACHINE_POOL_OVERRIDES="controlPlane:
+  Z_VERSION=$(echo ${VERSION} | cut -d'.' -f2)
+  echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
+else 
+  echo "$(date -u --rfc-3339=seconds) - unable to determine y stream, assuming this is master"
+fi
+
+if [ ${Z_VERSION} -gt 9 ]; then
+    echo "$(date -u --rfc-3339=seconds) - 4.x installation is later than 4.9, will install with resource pool"
+    RESOURCE_POOL_DEF="resourcePool: /${vsphere_datacenter}/host/${vsphere_cluster}/Resources/ipi-ci-clusters"
+fi
+if [ ${Z_VERSION} -lt 11 ]; then
+  MACHINE_POOL_OVERRIDES="controlPlane:
   name: master
   replicas: 3
   platform:
@@ -58,7 +64,6 @@ compute:
       memoryMB: 16384
       osDisk:
         diskSizeGB: 120"
-    fi
 fi
 
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
@@ -111,37 +116,39 @@ networking:
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
-PULL_THROUGH_CACHE_DISABLE="/var/run/vault/vsphere-config/pull-through-cache-disable"
 
-CACHE_FORCE_DISABLE="false"
-if [ -f "${PULL_THROUGH_CACHE_DISABLE}" ]; then
-  CACHE_FORCE_DISABLE=$(cat ${PULL_THROUGH_CACHE_DISABLE})
-fi
-
-if [ ${CACHE_FORCE_DISABLE} == "false" ]; then
-  if [ ${PULL_THROUGH_CACHE} == "enabled" ]; then
-    echo "$(date -u --rfc-3339=seconds) - pull-through cache enabled for job"
-    PULL_THROUGH_CACHE_CREDS="/var/run/vault/vsphere-config/pull-through-cache-secret"
-    PULL_THROUGH_CACHE_CONFIG="/var/run/vault/vsphere-config/pull-through-cache-config"
-    PULL_SECRET="/var/run/secrets/ci.openshift.io/cluster-profile/pull-secret"
-    TMP_INSTALL_CONFIG="/tmp/tmp-install-config.yaml"
-    if [ -f ${PULL_THROUGH_CACHE_CREDS} ]; then    
-      echo "$(date -u --rfc-3339=seconds) - pull-through cache credentials found. updating pullSecret"
-      cat ${CONFIG} | sed '/pullSecret/d' > ${TMP_INSTALL_CONFIG}2
-      cat ${TMP_INSTALL_CONFIG}2 | sed '/\"auths\"/d' > ${TMP_INSTALL_CONFIG}
-      jq -cs '.[0] * .[1]' ${PULL_SECRET} ${PULL_THROUGH_CACHE_CREDS} > /tmp/ps-combined.json
-      echo -e "\npullSecret: '""$(cat /tmp/ps-combined.json)""'" >> ${TMP_INSTALL_CONFIG}
-      cat ${TMP_INSTALL_CONFIG} > ${CONFIG}
-    else
-      echo "$(date -u --rfc-3339=seconds) - pull-through cache credentials not found. not updating pullSecret"
-    fi
-    if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
-      echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
-      cat ${PULL_THROUGH_CACHE_CONFIG} >> ${CONFIG}
-    else
-      echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration not found. not updating install-config"
-    fi
+if [ ${Z_VERSION} -gt 9 ]; then
+  PULL_THROUGH_CACHE_DISABLE="/var/run/vault/vsphere-config/pull-through-cache-disable"
+  CACHE_FORCE_DISABLE="false"
+  if [ -f "${PULL_THROUGH_CACHE_DISABLE}" ]; then
+    CACHE_FORCE_DISABLE=$(cat ${PULL_THROUGH_CACHE_DISABLE})
   fi
-else 
-  echo "$(date -u --rfc-3339=seconds) - pull-through cache force disabled"
+
+  if [ ${CACHE_FORCE_DISABLE} == "false" ]; then
+    if [ ${PULL_THROUGH_CACHE} == "enabled" ]; then
+      echo "$(date -u --rfc-3339=seconds) - pull-through cache enabled for job"
+      PULL_THROUGH_CACHE_CREDS="/var/run/vault/vsphere-config/pull-through-cache-secret"
+      PULL_THROUGH_CACHE_CONFIG="/var/run/vault/vsphere-config/pull-through-cache-config"
+      PULL_SECRET="/var/run/secrets/ci.openshift.io/cluster-profile/pull-secret"
+      TMP_INSTALL_CONFIG="/tmp/tmp-install-config.yaml"
+      if [ -f ${PULL_THROUGH_CACHE_CREDS} ]; then    
+        echo "$(date -u --rfc-3339=seconds) - pull-through cache credentials found. updating pullSecret"
+        cat ${CONFIG} | sed '/pullSecret/d' > ${TMP_INSTALL_CONFIG}2
+        cat ${TMP_INSTALL_CONFIG}2 | sed '/\"auths\"/d' > ${TMP_INSTALL_CONFIG}
+        jq -cs '.[0] * .[1]' ${PULL_SECRET} ${PULL_THROUGH_CACHE_CREDS} > /tmp/ps-combined.json
+        echo -e "\npullSecret: '""$(cat /tmp/ps-combined.json)""'" >> ${TMP_INSTALL_CONFIG}
+        cat ${TMP_INSTALL_CONFIG} > ${CONFIG}
+      else
+        echo "$(date -u --rfc-3339=seconds) - pull-through cache credentials not found. not updating pullSecret"
+      fi
+      if [ -f ${PULL_THROUGH_CACHE_CONFIG} ]; then
+        echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration found. updating install-config"
+        cat ${PULL_THROUGH_CACHE_CONFIG} >> ${CONFIG}
+      else
+        echo "$(date -u --rfc-3339=seconds) - pull-through cache configuration not found. not updating install-config"
+      fi
+    fi
+  else 
+    echo "$(date -u --rfc-3339=seconds) - pull-through cache force disabled"
+  fi
 fi
