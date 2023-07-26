@@ -2,15 +2,19 @@ base_images:
   cert-manager-cainjector:
     name: cert-manager-cainjector
     namespace: ci
-    tag: v1.12.2
+    tag: v1.11.1
   cert-manager-controller:
     name: cert-manager-controller
     namespace: ci
-    tag: v1.12.2
+    tag: v1.11.1
   cert-manager-webhook:
     name: cert-manager-webhook
     namespace: ci
-    tag: v1.12.2
+    tag: v1.11.1
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
   ocp_builder_rhel-9-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -37,18 +41,12 @@ operator:
   substitutions:
   - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller:v1.12.2
+  - pullspec: quay.io/jetstack/cert-manager-controller:v1.11.1
     with: cert-manager-controller
-  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.12.2
+  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.11.1
     with: cert-manager-webhook
-  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.12.2
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.11.1
     with: cert-manager-cainjector
-promotion:
-  additional_images:
-    cert-manager-operator-bundle: cert-manager-operator-bundle
-  namespace: ci
-  tag: latest
-  tag_by_commit: true
 releases:
   initial:
     integration:
@@ -80,6 +78,25 @@ tests:
     make test --warn-undefined-variables
   container:
     from: src
+- as: alpha-e2e-operator
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: cert-manager-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: cert-manager-operator
+      OO_SECURITY_CONTEXT: restricted
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: optional-operators-ci-operator-sdk-aws
 - as: e2e-operator
   steps:
     cluster_profile: aws
@@ -99,30 +116,6 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-aws
-- as: e2e-operator-upgrade
-  optional: true
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-cert-manager-operator-bundle
-    env:
-      OO_CHANNEL: stable-v1
-      OO_INSTALL_NAMESPACE: cert-manager-operator
-      OO_LATEST_CSV: cert-manager-operator.v1.12.2
-      OO_PACKAGE: cert-manager-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: test-upgrade
-      cli: latest
-      commands: make test-e2e
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: cert-manager-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: optional-operators-ci-aws-upgrade
 zz_generated_metadata:
   branch: master
   org: openshift

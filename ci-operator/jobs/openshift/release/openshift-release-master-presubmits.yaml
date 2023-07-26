@@ -266,6 +266,31 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build03
+    context: ci/prow/build-clusters
+    decorate: true
+    labels:
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build-clusters
+    rerun_command: /test build-clusters
+    spec:
+      containers:
+      - args:
+        - ./
+        command:
+        - hack/validate-ci-build-clusters.sh
+        image: registry.ci.openshift.org/ci/cluster-init:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+    trigger: ((?m)^/test build-clusters,?(\s+|$))
+  - agent: kubernetes
     always_run: false
     branches:
     - ^master$
@@ -738,7 +763,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20230712-b85330a1e4
+        image: gcr.io/k8s-prow/checkconfig:v20230718-0a86ec6744
         imagePullPolicy: IfNotPresent
         name: ""
         resources:

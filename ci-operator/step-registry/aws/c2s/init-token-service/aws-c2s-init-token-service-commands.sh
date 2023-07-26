@@ -164,7 +164,7 @@ if [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/ma
 fi
 
 credentials_requests_files=`mktemp`
-ls ${cr_yaml_d} > ${credentials_requests_files}
+ls -p "${cr_yaml_d}"/*.yaml | awk -F'/' '{print $NF}' > "${credentials_requests_files}"
 
 echo "CRs to be processed:"
 cat "${credentials_requests_files}"

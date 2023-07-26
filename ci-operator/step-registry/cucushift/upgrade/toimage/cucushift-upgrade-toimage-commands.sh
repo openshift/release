@@ -340,7 +340,7 @@ function check_latest_machineconfig_applied() {
 function wait_machineconfig_applied() {
     local role="${1}" try=0 interval=60
     num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
-    local max_retries; max_retries=$(expr $num \* 15)
+    local max_retries; max_retries=$(expr $num \* 20)
     while (( try < max_retries )); do
         echo "Checking #${try}"
         if ! check_latest_machineconfig_applied "${role}"; then
@@ -474,7 +474,7 @@ function check_upgrade_status() {
         fi
     done
     if (( wait_upgrade <= 0 )); then
-        echo >&2 "Upgrade timeout, exiting" && return 1
+        echo -e "Upgrade timeout, exiting\n" && return 1
     fi
 }
 

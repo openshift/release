@@ -95,8 +95,11 @@ esac
 
 if [[ "${ZONES_COUNT}" -gt '0' ]]; then
 	yq --yaml-output --in-place ".
-		| .compute[0].platform.openstack.zones = ${ZONES_JSON}
 		| .controlPlane.platform.openstack.zones = ${ZONES_JSON}
+		| .controlPlane.platform.openstack.rootVolume.type = \"tripleo\"
+		| .controlPlane.platform.openstack.rootVolume.size = 30
+		| .controlPlane.platform.openstack.rootVolume.zones = ${ZONES_JSON}
+		| .compute[0].platform.openstack.zones = ${ZONES_JSON}
 		| .compute[0].platform.openstack.rootVolume.type = \"tripleo\"
 		| .compute[0].platform.openstack.rootVolume.size = 30
 		| .compute[0].platform.openstack.rootVolume.zones = ${ZONES_JSON}

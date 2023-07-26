@@ -45,7 +45,7 @@ Use to execute the `Tempo E2E tests` [tempo-e2e-tests](https://github.com/grafan
 
 - `TIMEOUT`
   - **Definition**: The timeout in seconds for the Tempo tests.
-  - **If left empty**: It will use "150" as the default value.
+  - **If left empty**: It will use "180" as the default value.
 
 - `PARALLEL_TESTS`
   - **Definition**: The number of test cases to run in parallel.
