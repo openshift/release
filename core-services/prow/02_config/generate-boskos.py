@@ -216,7 +216,6 @@ CONFIG = {
     'powervs-2-quota-slice': {
         'syd04': 1,
         'syd05': 1,
-        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
