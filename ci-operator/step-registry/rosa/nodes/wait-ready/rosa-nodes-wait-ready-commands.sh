@@ -74,31 +74,21 @@ function listDetails() {
 function waitForReady() {
     echo "Wait for all nodes to be Ready"
 
-    # Sleep for 2 minutes to allow for the nodes to begin restarting after initial scaling
-    sleep 120
     # Query the node state until all of the nodes are ready
     FINAL_NODE_STATE="Pass"
-    max_attempts=60 # Max of 60 attempts with 30 sec wait time in between, for total of 30 min
+    max_attempts=60 # Max of 60 attempts with 30 sec wait time in between, for total of 60 min
+    retry_api_count=0
+    max_retry_api_attempts=5
     for i in $( seq $max_attempts ); do
         NODE_STATE="$(oc get nodes || echo "ERROR")"
         if [[ ${NODE_STATE} == *"NotReady"*  || ${NODE_STATE} == *"SchedulingDisabled"* ]]; then
             FINAL_NODE_STATE="Fail"
             echo "Not all nodes have finished restarting - waiting for 30 seconds, attempt ${i}"
-            sleep 30
         elif [[ ${NODE_STATE} == "ERROR" ]]; then
-            retry_api_count=0
-            max_retry_api_attempts=3
-            if [[ "$retry_api_count" -lt "$max_retry_api_attempts" ]]; then
-                NODE_STATE="$(oc get nodes || echo "ERROR")"
-                while [ "$NODE_STATE" == "ERROR" ]; do
-                  retry_api_count++
-                  break
-                done
-            else
-                echo "Failed to connect to API to retrive node status after $max_retry_api_attempts attempts. Response from server:"
-                oc get nodes
-                echo "Exiting test execution."
-                exit 1
+            retry_api_count++
+            if [[ "$retry_api_count" -gt "$max_retry_api_attempts" ]]; then
+                FINAL_NODE_STATE="Fail"
+                break
             fi
         else
             echo "All nodes are ready to run workloads."
@@ -106,6 +96,7 @@ function waitForReady() {
             break
         fi
         export FINAL_NODE_STATE
+        sleep 60
     done
 
     if [[ ${FINAL_NODE_STATE} == *"Fail"* ]]; then
