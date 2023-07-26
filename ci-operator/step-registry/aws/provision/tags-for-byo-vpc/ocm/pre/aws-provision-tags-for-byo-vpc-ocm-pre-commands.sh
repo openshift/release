@@ -11,7 +11,7 @@ else
   export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 fi
 
-REGION="${LEASED_RESOURCE}"
+REGION=${REGION:-$LEASED_RESOURCE}
 
 private_subnet_ids=$(yq-go r -j ${SHARED_DIR}/private_subnet_ids | jq -r '[ . | join(" ") ] | @csv' | sed "s/\"//g")
 public_subnet_ids=$(yq-go r -j ${SHARED_DIR}/public_subnet_ids | jq -r '[ . | join(" ") ] | @csv' | sed "s/\"//g")
@@ -22,8 +22,12 @@ if [[ -z $private_subnet_ids ]] || [[ -z $public_subnet_ids ]]; then
   exit 1
 fi
 
-echo "Adding tags for private subnets:$private_subnet_ids, tags: kubernetes.io/role/internal-elb, value is empty."
-aws --region $REGION ec2 create-tags --resources $private_subnet_ids --tags Key=kubernetes.io/role/internal-elb,Value=
+echo $REGION
 
-echo "Adding tags for public subnets:$public_subnet_ids, tags: kubernetes.io/role/elb, value is empty."
-aws --region $REGION ec2 create-tags --resources $public_subnet_ids --tags Key=kubernetes.io/role/elb,Value=
+sleep 30m
+
+# echo "Adding tags for private subnets:$private_subnet_ids, tags: kubernetes.io/role/internal-elb, value is empty."
+# aws --region $REGION ec2 create-tags --resources $private_subnet_ids --tags Key=kubernetes.io/role/internal-elb,Value=
+
+# echo "Adding tags for public subnets:$public_subnet_ids, tags: kubernetes.io/role/elb, value is empty."
+# aws --region $REGION ec2 create-tags --resources $public_subnet_ids --tags Key=kubernetes.io/role/elb,Value=
