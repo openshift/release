@@ -1,0 +1,107 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- dockerfile_literal: |-
+    # Dockerfile to bootstrap build and test in openshift-ci
+    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14 as builder
+
+    ENV GOFLAGS ""
+
+    RUN go install github.com/onsi/ginkgo/v2/ginkgo@latest && \
+        go install github.com/axw/gocov/gocov@latest
+
+    FROM src
+
+    COPY --from=builder /go/bin/ginkgo /usr/bin/ginkgo
+    COPY --from=builder /go/bin/gocov /usr/bin/gocov
+
+    RUN yum -y install httpd-tools
+
+    # Install kubectl
+    RUN KUBECTL_VERSION=1.24.3 && \
+        curl -LO https://storage.googleapis.com/kubernetes-release/release/v$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
+        chmod +x ./kubectl && mv ./kubectl /usr/local/bin && \
+        kubectl version --client=true
+  from: src
+  to: src-kubectl
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |
+    make test
+  container:
+    from: src-kubectl
+- as: test-integration
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test-integration
+      cli: latest
+      commands: |
+        echo "--- NAMESPACE---"
+        oc project
+        # echo "----ALL PROJECTS----"
+        # oc projects
+        # echo  "----SERVICE ACCOUNTS----"
+        # oc get sa
+        # oc create serviceaccount pipeline
+        # oc adm policy add-scc-to-user privileged -z default
+        # oc adm policy add-role-to-user edit -z default
+        # oc adm policy add-scc-to-user privileged -z pipeline
+        # oc adm policy add-role-to-user edit -z pipeline
+        make test-integration
+      from: src-kubectl
+      resources:
+        requests:
+          cpu: 200m
+    workflow: ipi-aws
+- as: test-e2e
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test-e2e
+      cli: latest
+      commands: "echo \"----NAMESPACE---\"\necho $NAMESPACE       \n# oc create serviceaccount
+        pipeline\n# oc adm policy add-scc-to-user privileged -z default\n# oc adm
+        policy add-role-to-user edit -z default\n# oc adm policy add-scc-to-user privileged
+        -z pipeline\n# oc adm policy add-role-to-user edit -z pipeline\n# echo \"---
+        oc whoami ---\"\n# oc whoami\n# echo \"--- oc whoami -t ---\"\n# oc whoami
+        -t\n# oc registry login\nexport TEST_IMAGE_REPO=image-registry.openshift-image-registry.svc:5000/ci-op-y20fk3hi/build-e2e
+        \nmake install-apis\nkubectl apply -R -f samples/buildstrategy/buildah\nkubectl
+        apply -R -f samples/buildstrategy/buildkit\nkubectl apply -R -f samples/buildstrategy/buildpacks-v3/buildstrategy_buildpacks-v3-heroku_cr.yaml\nkubectl
+        apply -R -f samples/buildstrategy/buildpacks-v3/buildstrategy_buildpacks-v3_cr.yaml\nkubectl
+        apply -R -f samples/buildstrategy/kaniko\nkubectl apply -R -f samples/buildstrategy/ko\nkubectl
+        apply -R -f samples/buildstrategy/source-to-image\nmake test-e2e-plain\n"
+      from: src-kubectl
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+zz_generated_metadata:
+  branch: main
+  org: shipwright-io
+  repo: build
