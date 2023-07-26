@@ -69,7 +69,7 @@ spec:
           git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
-          sed -i "s@golang:1.19@docker.io/library/golang:1.19@g" Dockerfile
+          sed -i -E "s@golang:(.*)@docker.io/library/golang:\1@g" Dockerfile
           sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
           make docker-build
           podman push ${IMG} --tls-verify=false
