@@ -68,6 +68,20 @@ echo "HAC NAMESPACE: $HAC_NAMESPACE"
 CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/application-pipeline"
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
 
+echo "Deploying proxy plugin for tekton-results"
+cat << EOF |
+apiVersion: toolchain.dev.openshift.com/v1alpha1
+kind: ProxyPlugin
+metadata:
+  name: tekton-results
+  namespace: toolchain-host-operator
+spec:
+  openShiftRouteTargetEndpoint:
+    name: tekton-results
+    namespace: tekton-results
+EOF
+oc apply -f --kubeconfig=$KUBECONFIG -
+
 # Register user `user1`
 
 cd /tmp/e2e
