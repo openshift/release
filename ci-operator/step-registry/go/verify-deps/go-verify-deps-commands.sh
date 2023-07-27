@@ -14,8 +14,14 @@ die_modlist() {
 echo "Checking that all modules can be resolved offline"
 go list -mod=readonly -m all || die_modlist
 
+COMPAT=
+# Relax compat for go 1.17
+if grep -q "^go 1.17" go.mod; then
+    COMPAT="-compat=1.17"
+fi
+
 echo "Checking that vendor/ is correct"
-go mod tidy
+go mod tidy $COMPAT
 go mod vendor
 CHANGES=$(git status --porcelain)
 if [ -n "$CHANGES" ] ; then
