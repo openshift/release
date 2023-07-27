@@ -1,0 +1,34 @@
+ref:
+  as: openshift-qe-node-density-cni
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  commands: openshift-qe-node-density-cni-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  env:
+  - name: OUTPUT_FILE
+    default: "kube-burner-ocp.out"
+    documentation: |-
+      File in which we will parse to find uuid, start and end time
+  - name: PODS_PER_NODE
+    default: "200"
+    documentation: |-
+      Define the maximum number of pods to deploy on each labeled node.  
+  - name: POD_READY_THRESHOLD
+    default: "180000ms"
+    documentation: |-
+      Define the maximum number of pods to deploy on each labeled node.
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resouce
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale node-density-cni workload in the deployed cluster
