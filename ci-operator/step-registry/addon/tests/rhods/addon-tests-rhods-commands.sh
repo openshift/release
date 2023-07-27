@@ -31,7 +31,7 @@ else
     API_URL=https://api.openshift.com/
 fi
 ocm login --url=$API_URL --token=$OCM_TOKEN
-for IDP in $(ocm list idps -c $CLUSTER_ID | cut -f1 -d' ' | tail -n +2); do
+for IDP in $(ocm get /api/clusters_mgmt/v1/clusters/$CLUSTER_ID/identity_providers | jq -r '.items[].name'); do
   ocm delete idp $IDP --cluster=$CLUSTER_ID
 done
 
