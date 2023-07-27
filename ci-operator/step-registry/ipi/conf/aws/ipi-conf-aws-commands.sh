@@ -137,8 +137,8 @@ BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 workers=${COMPUTE_NODE_REPLICAS:-3}
 if [[ "${COMPUTE_NODE_REPLICAS}" -le 0 ]]; then
     workers=0
-elif [[ "${COMPUTE_NODE_REPLICAS}" -gt 5 ]]; then
-    workers=5
+elif [[ "${COMPUTE_NODE_REPLICAS}" -gt 9 ]]; then
+    workers=9
 fi
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
