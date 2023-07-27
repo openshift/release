@@ -340,3 +340,6 @@ echo "${API_URL}" > "${SHARED_DIR}/api.url"
 
 PRODUCT_ID=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.product.id')
 echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
+
+INFRA_ID=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.infra_id')
+echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
