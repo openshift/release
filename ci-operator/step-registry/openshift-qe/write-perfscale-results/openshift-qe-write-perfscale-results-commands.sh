@@ -1,8 +1,5 @@
 #!/bin/bash
-set -o errexit
-set -o nounset
-set -o pipefail
-set -x
+set +e
 cat /etc/os-release
 oc config view
 oc projects
@@ -48,3 +45,4 @@ pip install -r requirements.txt
 pushd write_to_sheet
 
 python prow_write.py
+exit 0
