@@ -4,7 +4,7 @@ cat /etc/os-release
 oc config view
 oc projects
 python --version
-pushd /tmp
+pushd /tmp  || exit 0
 python -m virtualenv ./venv_qe
 source ./venv_qe/bin/activate
 
@@ -39,10 +39,10 @@ ls sandman
 
 source ./sandman/data/workload.sh
 
-pushd ocp-qe-perfscale-ci
+pushd ocp-qe-perfscale-ci || exit 0
 
 pip install -r requirements.txt
-pushd write_to_sheet
+pushd write_to_sheet || exit 0
 
 python prow_write.py
 exit 0
