@@ -53,7 +53,12 @@ EOF
 
 # Install HAC in ephemeral cluster
 
-curl https://raw.githubusercontent.com/rhopp/infra-deployments/debugHACe2e/hack/hac/installHac.sh -o installHac.sh
+REF=main
+if [ -n "$PULL_PULL_SHA" ]; then
+  REF=$PULL_PULL_SHA
+fi
+echo $REF
+curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/$REF/hack/hac/installHac.sh -o installHac.sh
 
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
@@ -64,6 +69,20 @@ echo "=== HAC INSTALLED ==="
 echo "HAC NAMESPACE: $HAC_NAMESPACE"
 CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$HAC_KUBECONFIG -o jsonpath="{.spec.hostname}")/application-pipeline"
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
+
+echo "Deploying proxy plugin for tekton-results"
+cat << EOF |
+apiVersion: toolchain.dev.openshift.com/v1alpha1
+kind: ProxyPlugin
+metadata:
+  name: tekton-results
+  namespace: toolchain-host-operator
+spec:
+  openShiftRouteTargetEndpoint:
+    name: tekton-results
+    namespace: tekton-results
+EOF
+oc apply -f --kubeconfig=$KUBECONFIG -
 
 # Register user `user1`
 
