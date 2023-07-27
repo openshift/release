@@ -38,16 +38,6 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   interfaces:
   - macAddress: ${mac}
     name: ${baremetal_iface}
-  networkConfig:
-    interfaces:
-    - name: ${baremetal_iface}
-      type: ethernet
-      state: up
-      ipv4:
-        enabled: ${ipv4_enabled}
-        dhcp: ${ipv4_enabled}
-      ipv6:
-        enabled: ${ipv6_enabled}
 "
 
   # split the ipi_disabled_ifaces semi-comma separated list into an array
