@@ -18,7 +18,10 @@ GSHEET_KEY_LOCATION="/ga-gsheet/gcp-sa-account"
 export GSHEET_KEY_LOCATION
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
-pushd e2e-benchmarking/workloads/kube-burner
+pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+#export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE "
+#export NAMESPACED_ITERATIONS=${NAMESPACED_ITERATIONS:-false}
+#export EXTRA_FLAGS=${EXTRA_FLAGS:-}
 export WORKLOAD=node-density-heavy
 
 export CLEANUP_WHEN_FINISH=true
