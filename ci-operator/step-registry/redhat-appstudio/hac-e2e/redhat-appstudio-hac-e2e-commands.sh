@@ -58,7 +58,7 @@ if [ -n "$PULL_PULL_SHA" ]; then
   REF=$PULL_PULL_SHA
 fi
 echo $REF
-curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/main/hack/hac/installHac.sh -o installHac.sh
+curl https://raw.githubusercontent.com/rhopp/infra-deployments/debugHACe2e/hack/hac/installHac.sh -o installHac.sh
 
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
