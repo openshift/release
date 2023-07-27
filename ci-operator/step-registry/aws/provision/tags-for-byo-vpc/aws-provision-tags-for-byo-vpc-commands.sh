@@ -30,7 +30,7 @@ echo "infra_id: $infra_id"
 vpc_id=$(head -n 1 ${SHARED_DIR}/vpc_id)
 private_subnet_ids=$(yq-go r -j ${SHARED_DIR}/private_subnet_ids | jq -r '[ . | join(" ") ] | @csv' | sed "s/\"//g")
 
-if [[ -z $vpc_id ]] || [[ -z $private_subnet_ids ]] || [[ -z $infra_id ]]; then
+if [[ -z $vpc_id ]] || [[ -z $private_subnet_ids ]] || [[ -z $infra_id ]] || [[ "${infra_id}" == "null" ]]; then
   echo "Error: Can not get VPC id or private subnets, exit"
   echo "vpc: $vpc_id, private_subnet_ids: $private_subnet_ids"
   exit 1
