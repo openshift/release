@@ -342,4 +342,8 @@ PRODUCT_ID=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.product.
 echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
 
 INFRA_ID=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.infra_id')
+if [[ "$HOSTED_CP" == "true" ]] && [[ "${INFRA_ID}" == "null" ]]; then
+  # Currently, there is no infra_id for rosa hypershift cluster, use a fake one instead of null
+  INFRA_ID=$CLUSTER_NAME
+fi
 echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"
