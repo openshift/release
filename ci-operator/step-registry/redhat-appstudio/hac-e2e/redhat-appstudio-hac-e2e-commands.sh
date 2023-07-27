@@ -53,7 +53,7 @@ EOF
 
 # Install HAC in ephemeral cluster
 REF=main
-if [ -n "$PULL_PULL_SHA" ]; then
+if [ -n "$PULL_PULL_SHA" ] && [ "$REPO_NAME" = "infra-deployments" ]; then
   REF=$PULL_PULL_SHA
 fi
 echo $REF
