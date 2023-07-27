@@ -162,7 +162,7 @@ ansible-galaxy install emilienm.routed_lb,1.0.1
 ansible-galaxy collection install ansible.posix ansible.utils
 
 echo "Running Ansible playbook"
-ansible-playbook -i "${WORK_DIR}/inventory.yaml" -e "@$WORK_DIR/vars.yaml" "${WORK_DIR}/playbook.yaml"
+ansible-playbook -i "${WORK_DIR}/inventory.yaml" -e "@$WORK_DIR/vars.yaml" "${WORK_DIR}/playbook.yaml" -vvvv
 
 echo "Collecting load balancer artifacts"
 $SSH_CMD bash - << EOF
