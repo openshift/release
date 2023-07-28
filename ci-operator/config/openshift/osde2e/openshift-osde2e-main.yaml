@@ -403,6 +403,23 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
+- as: rosa-stage-complete-e2e
+  commands: "export REPORT_DIR=\"$ARTIFACT_DIR\"\nexport CONFIGS=\"rosa,stage,complete-e2e\"\nexport
+    CHANNEL=\"stable\"\nexport SECRET_LOCATIONS=\"/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/osde2e-rosa-stage\"\nexport
+    SUITE_TIMEOUT=\"900\"\nexport POLLING_TIMEOUT=\"7200\"\nexport ROSA_ENV=\"stage\"\nexport
+    ROSA_STS=\"true\"  \nexport ROSA_AWS_REGION=\"random\"\n\n/osde2e test --secret-locations
+    ${SECRET_LOCATIONS} --configs ${CONFIGS}\n"
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 15 * * 0
+  secrets:
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
+  - mount_path: /usr/local/osde2e-rosa-stage
+    name: osde2e-rosa-stage
 zz_generated_metadata:
   branch: main
   org: openshift
