@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+sleep 7200
+
 # Move the oc client to /usr/bin
 mv oc /usr/bin
 
