@@ -1,8 +1,13 @@
+base_images:
+  operator-sdk:
+    name: "4.12"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   from_repository: true
 images:
 - dockerfile_path: build/Dockerfile
-  to: unused
+  to: dvo-operator
 resources:
   '*':
     limits:
@@ -46,3 +51,31 @@ zz_generated_metadata:
   branch: master
   org: app-sre
   repo: deployment-validation-operator
+- as: deployment-validation-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        echo ${DVO_OPERATOR}
+        sed -i "48 s|quay.io/deployment-validation-operator/dv-operator:latest|${DVO_OPERATOR}|" deploy/openshift/operator.yaml
+        sed -i '30,35d' deploy/openshift/operator.yaml
+        operator-sdk generate bundle --package=deployment-validation-operator --input-dir=deploy/openshift
+        podman build -f bundle.Dockerfile -t quay.io/jfula/dvo-bundle-test
+        podman push quay.io/jfula/dvo-bundle-test
+        operator-sdk run bundle quay.io/jfula/dvo-bundle-test:latest --namespace openshift-operators --skip-tls
+        oc wait --for condition=Available -n openshift-operators deployment-operator
+      dependencies:
+      - env: DVO_OPERATOR
+        name: dvo-operator
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
