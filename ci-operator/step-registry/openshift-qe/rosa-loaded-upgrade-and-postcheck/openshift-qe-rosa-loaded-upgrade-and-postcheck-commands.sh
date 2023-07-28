@@ -58,11 +58,18 @@ function classic_rosa_upgrade()
   echo RELEASE_IMAGE_LATEST is $RELEASE_IMAGE_LATEST
   echo RELEASE_IMAGE_INTERMEDIATE is $RELEASE_IMAGE_INTERMEDIATE
 
+  if [[ -z $RELEASE_IMAGE_INTERMEDIATE && -s "${SHARED_DIR}/perfscale-override-upgrade" ]]; then
+      RELEASE_IMAGE_INTERMEDIATE="$(< "${SHARED_DIR}/perfscale-override-upgrade")" 
+  fi
+
   IF_MINOR_Z_UPGRADE=${IF_MINOR_Z_UPGRADE:=true}
-  if [[ ${IF_MINOR_Z_UPGRADE} ]];then
+  if [[ ${IF_MINOR_Z_UPGRADE} == "true" ]];then
       TARGET_RELEASES="$(oc adm release info "${RELEASE_IMAGE_INTERMEDIATE}" --output=json | jq -r '.metadata.version')"
-  else
+  elif [[ ${IF_MINOR_Z_UPGRADE} == "false" ]];then
       TARGET_RELEASES="$(oc adm release info "${RELEASE_IMAGE_LATEST}" --output=json | jq -r '.metadata.version')"
+  else
+      echo "Invalid value of IF_MINOR_Z_UPGRADE, only support true or false"
+      exit 1
   fi
 
   echo "######################################################################"

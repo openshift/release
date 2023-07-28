@@ -40,10 +40,22 @@ tests:
       OPENSHIFT_VERSION: 4.12.24
       REGION: us-east-2
       ROSA_LOGIN_ENV: production
-    test:
+    pre:
     - ref: ipi-install-rbac
     - ref: openshift-cluster-bot-rbac
     - chain: openshift-qe-cluster-density-v2
+    test:
+    - as: set-intermediate-releases
+      commands: echo "${RELEASE_IMAGE_INTERMEDIATE}" > ${SHARED_DIR}/perfscale-override-upgrade
+        && cat ${SHARED_DIR}/perfscale-override-upgrade
+      dependencies:
+      - env: RELEASE_IMAGE_INTERMEDIATE
+        name: release:intermediate
+      from: cli
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
     - chain: openshift-qe-rosa-loaded-upgrade-and-postcheck
     workflow: rosa-aws-sts
   timeout: 8h0m0s
