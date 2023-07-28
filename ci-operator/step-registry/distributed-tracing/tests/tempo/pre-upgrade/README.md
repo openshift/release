@@ -59,6 +59,14 @@ Use to execute the `Tempo E2E tests` [tempo-e2e-tests](https://github.com/grafan
   - **Definition**: One or more directories containing manifests to apply before running the tests.
   - **If left empty**: It will use "/tmp/kuttl-manifests" as the default value.
 
+- `SKIP_TESTS`
+  - **Definition**: Space seperated test cases to skip from the test run. Example "tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation".
+  - **If left empty**: tests/e2e/smoketest-with-jaeger and tests/e2e-openshift/multitenancy will be skipped.
+
+- `DOWNSTREAM_TESTS_COMMIT`
+  - **Definition**: The Tempo operator commit which has downstream release compatible test cases.".
+  - **If left empty**: The latest commit is used.
+
 ### Other:
 
 ## Custom Image:

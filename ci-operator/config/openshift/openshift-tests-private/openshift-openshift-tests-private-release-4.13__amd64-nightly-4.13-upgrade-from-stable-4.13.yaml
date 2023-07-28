@@ -71,6 +71,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi'
     test:
@@ -442,6 +443,18 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
+- as: gcp-ipi-ovn-fips-cert-rotation-p2-f360
+  cron: 22 2 3 10  *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @gcp-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @gcp-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test-cert-rotation
+    workflow: cucushift-installer-rehearse-gcp-ipi-ovn
 - as: gcp-ipi-ovn-ipsec-p1-f28
   cron: 16 0 7 * *
   steps:
@@ -475,7 +488,7 @@ tests:
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @gcp-ipi'
     test:
     - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-cert-rotation
+    - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
 - as: gcp-ipi-workload-identity-f28
   cron: 16 0 30 * *
