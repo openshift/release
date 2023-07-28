@@ -16,7 +16,7 @@ PATH=$PATH:/tmp/go/bin
 #  Setup env variables
 
 export  OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD QONTRACT_BASE_URL \
-     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL
+     QONTRACT_PASSWORD QONTRACT_USERNAME HAC_SA_TOKEN CYPRESS_HAC_BASE_URL CYPRESS_GH_TOKEN
 
 QONTRACT_PASSWORD=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_password)
 QONTRACT_USERNAME=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qontract_username)
@@ -24,6 +24,7 @@ QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
 export CYPRESS_USERNAME=user1
 export CYPRESS_PASSWORD=user1
 export CYPRESS_PERIODIC_RUN=true
+CYPRESS_GH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
 HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
@@ -58,6 +59,7 @@ if [ -n "$PULL_PULL_SHA" ] && [ "$REPO_NAME" = "infra-deployments" ]; then
 fi
 echo $REF
 curl https://raw.githubusercontent.com/redhat-appstudio/infra-deployments/$REF/hack/hac/installHac.sh -o installHac.sh
+
 chmod +x installHac.sh
 HAC_KUBECONFIG=/tmp/hac.kubeconfig
 oc login --kubeconfig=$HAC_KUBECONFIG --token=$HAC_SA_TOKEN --server=https://api.c-rh-c-eph.8p0c.p1.openshiftapps.com:6443
@@ -69,7 +71,7 @@ CYPRESS_HAC_BASE_URL="https://$(oc get feenv env-$HAC_NAMESPACE  --kubeconfig=$H
 echo "Cypress Base url: $CYPRESS_HAC_BASE_URL"
 
 echo "Deploying proxy plugin for tekton-results"
-cat << EOF |
+oc apply --kubeconfig=$KUBECONFIG -f - <<EOF
 apiVersion: toolchain.dev.openshift.com/v1alpha1
 kind: ProxyPlugin
 metadata:
@@ -80,7 +82,6 @@ spec:
     name: tekton-results
     namespace: tekton-results
 EOF
-oc apply -f --kubeconfig=$KUBECONFIG -
 
 # Register user `user1`
 
