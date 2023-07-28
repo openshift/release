@@ -34,6 +34,9 @@ function rosa_login()
 function classic_rosa_upgrade()
 {
 
+  RELEASE_IMAGE_INTERMEDIATE=${RELEASE_IMAGE_INTERMEDIATE:=""}
+  RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST:=""}
+
   SCHEDULE_OFFSET=15  #After $SCHEDULE_OFFSET minutes to upgrade
   SCHEDULE_DATETIME=`date  -d "+${SCHEDULE_OFFSET} min" "+%Y-%m-%d %H:%M"`
   SCHEDULE_DATE=$(echo $SCHEDULE_DATETIME | awk '{print $1}')
@@ -52,6 +55,8 @@ function classic_rosa_upgrade()
     echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
     exit 1
   fi
+  echo RELEASE_IMAGE_LATEST is $RELEASE_IMAGE_LATEST
+  echo RELEASE_IMAGE_INTERMEDIATE is $RELEASE_IMAGE_INTERMEDIATE
 
   IF_MINOR_Z_UPGRADE=${IF_MINOR_Z_UPGRADE:=true}
   if [[ ${IF_MINOR_Z_UPGRADE} ]];then
