@@ -24,6 +24,7 @@ QONTRACT_BASE_URL="https://app-interface.devshift.net/graphql"
 export CYPRESS_USERNAME=user1
 export CYPRESS_PASSWORD=user1
 export CYPRESS_PERIODIC_RUN=true
+export CYPRESS_GH_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github-token)
 HAC_SA_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/c-rh-ceph_SA_bot)
 OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
