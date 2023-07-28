@@ -56,11 +56,11 @@ function classic_rosa_upgrade()
     exit 1
   fi
   echo RELEASE_IMAGE_LATEST is $RELEASE_IMAGE_LATEST
-  echo RELEASE_IMAGE_INTERMEDIATE is $RELEASE_IMAGE_INTERMEDIATE
 
   if [[ -z $RELEASE_IMAGE_INTERMEDIATE && -s "${SHARED_DIR}/perfscale-override-upgrade" ]]; then
       RELEASE_IMAGE_INTERMEDIATE="$(< "${SHARED_DIR}/perfscale-override-upgrade")" 
   fi
+  echo RELEASE_IMAGE_INTERMEDIATE is $RELEASE_IMAGE_INTERMEDIATE
 
   IF_MINOR_Z_UPGRADE=${IF_MINOR_Z_UPGRADE:=true}
   if [[ ${IF_MINOR_Z_UPGRADE} == "true" ]];then
@@ -70,6 +70,10 @@ function classic_rosa_upgrade()
   else
       echo "Invalid value of IF_MINOR_Z_UPGRADE, only support true or false"
       exit 1
+  fi
+
+  if [[ -z $CLUSTER_ID && -s "${SHARED_DIR}/cluster-id" ]];then
+       CLUSTER_ID=$(cat ${SHARED_DIR}/cluster-name)
   fi
 
   echo "######################################################################"
