@@ -37,6 +37,26 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: baremetal-ha-agent-ipv4-static-disconnected-f7
+  cluster: build05
+  cron: 30 15 * * 3
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@baremetal-upi and @amd64 and @disconnected and @network-ovnkubernetes
+        and not @fips'
+      RESERVE_BOOTSTRAP: "false"
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      architecture: amd64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "3"
+      workers: "2"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-static-disconnected
 - as: installer-rehearse-debug
   cron: '@yearly'
   steps:
