@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# Move the oc client to /usr/bin
+mv oc /usr/bin
+
 # Set variables required for execution
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
 API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:6443"
