@@ -37,8 +37,7 @@ done
 
 control_nodes=( $( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' ) )
 
-# Compute nodes seem to be protected with firewall?
-#compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
 function run-on {
   for n in ${1}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${2}; done
@@ -52,10 +51,10 @@ function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} core@"${control_nodes[0]}:${1}" "${2}"
 }
 
-ssh-keyscan -H ${control_nodes} >> ~/.ssh/known_hosts
+ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
 
 # Stop chrony service on all nodes
-run-on "${control_nodes}" "systemctl disable chronyd --now"
+run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
 
 # Backup lb-ext kubeconfig so that it could be compared to a new one
 KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
@@ -67,7 +66,7 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 # Set kubelet node IP hint. Nodes are created with two interfaces - provisioning and external,
 # and we want to make sure kubelet uses external address as main, instead of DHCP racing to use 
 # a random one as primary
-run-on "${control_nodes}" "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
+run-on "${control_nodes} ${compute_nodes}" "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
 
 # Shutdown nodes
 VMS=( $( virsh list --all --name ) )
@@ -98,7 +97,7 @@ for vm in ${VMS[@]}; do
 done
 
 # Check that time on nodes has been updated
-run-on "${control_nodes}" "timedatectl status"
+run-on "${control_nodes} ${compute_nodes}" "timedatectl status"
 
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 run-on-first-master "
