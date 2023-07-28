@@ -73,6 +73,8 @@ run-on "${control_nodes}" "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /
 VMS=( $( virsh list --all --name ) )
 for vm in ${VMS[@]}; do
   virsh shutdown ${vm}
+done
+for vm in ${VMS[@]}; do
   until virsh domstate ${vm} | grep "shut off"; do
     echo "${vm} still running"
     sleep 10
@@ -87,6 +89,8 @@ sudo timedatectl status
 # Start nodes again
 for vm in ${VMS[@]}; do
   virsh start ${vm}
+done
+for vm in ${VMS[@]}; do
   until virsh domstate ${vm} | grep "running"; do
     echo "${vm} still not yet running"
     sleep 10
