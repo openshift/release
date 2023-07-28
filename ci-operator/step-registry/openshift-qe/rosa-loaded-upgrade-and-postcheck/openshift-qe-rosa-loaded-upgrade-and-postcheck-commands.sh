@@ -73,7 +73,7 @@ function classic_rosa_upgrade()
   fi
 
   if [[ -z $CLUSTER_ID && -s "${SHARED_DIR}/cluster-id" ]];then
-       CLUSTER_ID=$(cat ${SHARED_DIR}/cluster-name)
+       CLUSTER_ID=$(cat ${SHARED_DIR}/cluster-id)
   fi
 
   echo "######################################################################"
