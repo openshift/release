@@ -20,7 +20,7 @@ NUM_CLUSTERS=0
 for cluster_value in $(env | grep -E '^CLUSTER[0-9]+_CONFIG' | sort  --version-sort); do
     cluster_value=$(echo "$cluster_value" | sed -E  's/^CLUSTER[0-9]+_CONFIG=//')
     if  [ "${cluster_value}" ]; then
-      CLUSTERS_CMD+=" --cluster ${cluster_value} "
+      CLUSTERS_CMD+=" --cluster \"${cluster_value}\" "
       NUM_CLUSTERS=$(( NUM_CLUSTERS + 1))
     fi
 done
