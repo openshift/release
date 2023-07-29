@@ -88,7 +88,31 @@ tests:
     - chain: ipi-aws-pre
     - chain: workers-scale
     workflow: openshift-qe-node-density-heavy
+- as: ocp-qe-perfscale-ingress-perf-9nodes-periodic-aws
+  cron: 0 21 * * 2
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      CONFIG: config/standard-classic-rosa.yml
+      CONTROL_PLANE_INSTANCE_TYPE: r5.xlarge
+      LOKI_USE_SERVICEMONITOR: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      OPENSHIFT_INFRA_NODE_VOLUME_SIZE: "50"
+      OPENSHIFT_INFRA_NODE_VOLUME_TYPE: gp3
+      WORKER_REPLICA_COUNT: "9"
+      ZONES_COUNT: "3"
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-ingress-perf
 - as: ocp-qe-perfscale-network-perf-9nodes-periodic-aws
+  cron: 0 1 * * 3
   steps:
     cluster_profile: aws-perfscale-qe
     env:
