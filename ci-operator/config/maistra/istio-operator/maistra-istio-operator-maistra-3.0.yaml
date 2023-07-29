@@ -53,7 +53,7 @@ tests:
   container:
     from: src
   timeout: 20m0s
-- as: istio-operator-push-image-3-0
+- as: push-images
   steps:
     cluster_profile: aws
     dependencies:
@@ -81,7 +81,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: istio-operator-push-image-3-0
+    - as: push-images
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
@@ -145,9 +145,9 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           entrypoint \
           sh -c \
-          "export KUBECONFIG=/work/ci-kubeconfig; \
-          docker login -u='maistra-dev+prow'-p=${QUAY_PASS} quay.io; \
-          make deploy; \
+          "export KUBECONFIG=/work/ci-kubeconfig && \
+          docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+          make deploy && \
           make test.integration.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
