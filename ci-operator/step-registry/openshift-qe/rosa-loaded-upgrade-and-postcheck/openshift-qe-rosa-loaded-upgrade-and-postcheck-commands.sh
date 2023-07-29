@@ -29,6 +29,7 @@ function rosa_login()
   rosa list clusters --region $REGION
   echo "######################################################################"
   echo 
+
 }
 
 function classic_rosa_upgrade()
