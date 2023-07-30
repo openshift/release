@@ -51,14 +51,15 @@ tests:
     XDG_CACHE_HOME="/tmp/cache"
   container:
     from: src
-- as: istio-operator-push-image-2-3
+- as: push-images
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:2.3
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -78,7 +79,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: istio-operator-push-image-2-3
+    - as: push-images
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)

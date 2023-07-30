@@ -40,6 +40,7 @@ chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
 source ${SHARED_DIR}/azurestack-login-script.sh
 
 az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
+echo "${RESOURCE_GROUP}" > "${SHARED_DIR}/RESOURCE_GROUP_NAME"
 
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
@@ -47,7 +48,7 @@ oc registry login
 oc adm release extract --credentials-requests --cloud=azure --to=/tmp/credentials-request "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 ls /tmp/credentials-request
-files=$(ls /tmp/credentials-request)
+files=$(ls -p /tmp/credentials-request/*.yaml | awk -F'/' '{print $NF}')
 for f in $files
 do
   SECRET_NAME=$(yq-go r "/tmp/credentials-request/${f}" "spec.secretRef.name")
@@ -88,4 +89,3 @@ stringData:
 EOF
 
 done
-echo "${RESOURCE_GROUP}" > "${SHARED_DIR}/RESOURCE_GROUP_NAME"

@@ -32,12 +32,41 @@ cd ${SHARED_DIR}/work
 
 cp /root/terraform-provider-ocm/${TF_FOLDER}/* ./
 
+# Find openshift_version by channel_group in case openshift_version = "" 
+ver=$(echo "${TF_VARS}" | grep 'openshift_version' | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
+if [[ "$ver" == "" ]]; then
+  TF_VARS=$(echo "${TF_VARS}" | sed 's/openshift_version.*//')
+
+  chn=$(echo "${TF_VARS}" | grep 'channel_group' | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
+  if [[ "$chn" == "" ]]; then
+    chn='stable'
+  fi
+
+  ver=$(curl -kLs https://mirror.openshift.com/pub/openshift-v4/x86_64/clients/ocp/$chn/release.txt | grep "Name\:" | awk '{print $NF}')
+  TF_VARS+=$(echo -e "\nopenshift_version = \"$ver\"")
+fi
+
 rm terraform.tfvars || true
 echo "${TF_VARS}"                                                    >> terraform.tfvars
 echo "cluster_name = \"$(cat ${SHARED_DIR}/cluster-name)\""          >> terraform.tfvars
 echo "account_role_prefix = \"$(cat ${SHARED_DIR}/cluster-name)\""   >> terraform.tfvars
 echo "operator_role_prefix = \"$(cat ${SHARED_DIR}/cluster-name)\""  >> terraform.tfvars
 cat terraform.tfvars
+
+
+# Check for provider source and version 'provider_source = "hashicorp/rhcs" (or "terraform.local/local/rhcs"') and 'provider_version = ">=1.0.1"'  
+src=$(echo "${TF_VARS}" | grep 'provider_source'  | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
+ver=$(echo "${TF_VARS}" | grep 'provider_version' | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
+
+if [[ "$src" != "" && "$ver" != "" ]]; then
+  provider=$(cat main.tf | awk '/required_providers/{line=1; next} line && /^\}/{exit} line' | awk '/rhcs(.+?)=(.+?)\{/{line=1; next} line && /\}/{exit} line')
+
+  provider_src=$(echo "${provider}" | grep source  | awk -F '=' '{print $2}' | sed 's/[ |"]//g')
+  sed -i "s|${provider_src}|source  = \"${src}\"|" main.tf
+  provider_ver=$(echo "${provider}" | grep version | awk -F '=' '{print $2}' | sed 's/[ |"]//g')
+  sed -i "s|${provider_ver}|version = \"${ver}\"|" main.tf
+fi
+
 
 HOME='/root' terraform init
 

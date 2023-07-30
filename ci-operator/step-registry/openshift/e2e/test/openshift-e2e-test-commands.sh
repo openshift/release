@@ -169,7 +169,7 @@ openstack*)
     fi
     ;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-ibmcloud)
+ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
@@ -222,6 +222,15 @@ function upgrade_conformance() {
     else
         echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
     fi &&
+    return $exit_code
+}
+
+# upgrade_rt runs the rt test suite, the upgrade, and the rt test suite again, and exits with an error if any calls fail
+function upgrade_rt() {
+    local exit_code=0 &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
+    upgrade || exit_code=$? &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
     return $exit_code
 }
 
@@ -456,6 +465,9 @@ upgrade)
     ;;
 upgrade-paused)
     upgrade_paused
+    ;;
+upgrade-rt)
+    upgrade_rt
     ;;
 suite-conformance)
     suite

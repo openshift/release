@@ -37,6 +37,21 @@ echo "${TF_VARS}"                                                    >> terrafor
 echo "account_role_prefix = \"$(cat ${SHARED_DIR}/cluster-name)\""   >> terraform.tfvars
 cat terraform.tfvars
 
+
+# Check for provider source and version 'provider_source = "hashicorp/rhcs" (or "terraform.local/local/rhcs"') and 'provider_version = ">=1.0.1"'  
+src=$(echo "${TF_VARS}" | grep 'provider_source'  | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
+ver=$(echo "${TF_VARS}" | grep 'provider_version' | awk -F '=' '{print $2}' | sed 's/[ |"]//g') || true
+
+if [[ "$src" != "" && "$ver" != "" ]]; then
+  provider=$(cat main.tf | awk '/required_providers/{line=1; next} line && /^\}/{exit} line' | awk '/rhcs(.+?)=(.+?)\{/{line=1; next} line && /\}/{exit} line')
+
+  provider_src=$(echo "${provider}" | grep source  | awk -F '=' '{print $2}' | sed 's/[ |"]//g')
+  sed -i "s|${provider_src}|source  = \"${src}\"|" main.tf
+  provider_ver=$(echo "${provider}" | grep version | awk -F '=' '{print $2}' | sed 's/[ |"]//g')
+  sed -i "s|${provider_ver}|version = \"${ver}\"|" main.tf
+fi
+
+
 HOME='/root' terraform init
 
 trap 'tar cvfz ${SHARED_DIR}/${TF_ARTIFACT_NAME}.tar.gz *.tf*' TERM

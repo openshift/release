@@ -3,11 +3,19 @@ set -xeuo pipefail
 
 function download_oc(){
     local tmp_bin_path='/tmp/oc-bin/'
-    mkdir -p "$tmp_bin_path"
-    curl -sSL --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
-    export PATH=${tmp_bin_path}:$PATH
-    which oc
-    oc version --client
+    # 4.6 using latest 4.10 oc client, hits the bug https://issues.redhat.com/browse/OCPBUGS-16009, it has been fixed on 4.14.
+    # In order for the test to continue, we have to use 4.14 nightly oc client temporarily, once 4.10 is available, will remove the code.
+    if [[ ${major_version} -eq 4 && ${minor_version} -eq 6 ]];then
+        echo "extract oc client from 4.10 release image for OCP 4.6 test"
+        RELEASE_IMAGE_TARGET="registry.ci.openshift.org/ocp/release:4.10.0-0.nightly-2023-07-21-181058"
+        extract_oc
+    else
+        mkdir -p "$tmp_bin_path"
+        curl -sSL --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
+        export PATH=${tmp_bin_path}:$PATH
+        which oc
+        oc version --client
+    fi
 }
 
 function extract_oc(){
@@ -32,8 +40,9 @@ function extract_oc(){
 }
 
 # This step is executed after upgrade to target, oc client of target release should use as many new versions as possible, make sure new feature cert-rotation of oc amd is supported
-major_version="$(oc version --client -o json  | jq -r '.clientVersion.gitVersion' | cut -d '.' -f1)"
-minor_version="$(oc version --client -o json  | jq -r '.clientVersion.gitVersion' | cut -d '.' -f2)"
+ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
+major_version=$(echo ${ocp_version} | cut -d '.' -f1)
+minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
 if [[ -n "$minor_version" && "$minor_version" -lt 10 ]] ; then
     echo "Y version is less than 10, using oc 4.10 directly"
     download_oc
@@ -166,18 +175,15 @@ if oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
     :
 elif sleep 10;oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
     :
-else
-    sleep 30 
+else 
+    # 4.6 - 4.9 need to wait for more time
+    [[ ${major_version} -eq 4 && ${minor_version} -lt 10 ]] && sleep 60 || sleep 10
     oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
 fi
 
 # revoke old trust for the signers we have regenerated
 oc adm ocp-certificates remove-old-trust -n openshift-kube-apiserver-operator configmaps kube-apiserver-to-kubelet-client-ca kube-control-plane-signer-ca loadbalancer-serving-ca localhost-serving-ca service-network-serving-ca  --created-before=${start_date}
 oc adm wait-for-stable-cluster
-if [[ "X${major_version}" == "Xv4" && ${minor_version} -eq 8 ]];then
-    echo "OCP 4.8, need extra wait-for-stable-cluster!"
-    oc adm wait-for-stable-cluster
-fi
 oc adm reboot-machine-config-pool mcp/worker mcp/master
 oc adm wait-for-node-reboot nodes --all
 

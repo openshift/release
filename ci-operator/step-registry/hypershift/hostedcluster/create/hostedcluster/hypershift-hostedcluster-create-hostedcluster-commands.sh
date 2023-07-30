@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euox pipefail
+set -euo pipefail
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
@@ -99,9 +99,9 @@ bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${
 }
 
 # Data for cluster bot.
-# The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 2 minutes for it to become available
+# The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 5 minutes for it to become available
 echo "Retrieving kubeadmin password"
-for _ in {1..8}; do
+for _ in {1..20}; do
   kubeadmin_pwd=`oc get secret --namespace=clusters ${CLUSTER_NAME}-kubeadmin-password --template='{{.data.password}}' | base64 -d` || true
   if [ -z $kubeadmin_pwd ]; then
     echo "kubeadmin password is not ready yet, waiting 15s"
@@ -130,3 +130,4 @@ done
 
 # Data for cluster bot.
 echo "https://$(oc -n openshift-console get routes console -o=jsonpath='{.spec.host}')" > "${SHARED_DIR}/console.url"
+KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "created-at=`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
