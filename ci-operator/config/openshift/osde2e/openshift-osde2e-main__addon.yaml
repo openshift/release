@@ -138,6 +138,27 @@ tests:
     name: integr8ly-ci-secrets
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+- as: stage-aws-integreatly-operator-rhmi
+  commands: |
+    export ADDON_IDS="rhmi"
+    export CHANNEL="stable"
+    export CLOUD_PROVIDER_REGION="us-east-2"
+    export CONFIGS="aws,stage,test-harness"
+    export NUM_WORKER_NODES="6"
+    export OCM_CCS="true"
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/integr8ly-ci-secrets"
+    export TEST_HARNESSES="quay.io/integreatly/integreatly-operator-test-harness:osde2e-rhmi"
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 22 * * 0
+  secrets:
+  - mount_path: /usr/local/integr8ly-ci-secrets
+    name: integr8ly-ci-secrets
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
 zz_generated_metadata:
   branch: main
   org: openshift
