@@ -84,7 +84,7 @@ run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
 set +o pipefail
 while true; do
-  oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve; sleep 10
+  oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || sleep 10
 done
 " &
 
