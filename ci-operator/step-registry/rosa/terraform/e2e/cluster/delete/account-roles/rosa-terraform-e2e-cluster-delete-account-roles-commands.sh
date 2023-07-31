@@ -19,6 +19,11 @@ else
   exit 1
 fi
 
+TF_VAR_aws_access_key=$(cat ${CLUSTER_PROFILE_DIR}/.awscred | awk '/\[default\]/{line=1; next} line && /^\[/{exit} line' | grep aws_access_key_id     | awk -F '=' '{print $2}'| sed 's/ //g')
+export TF_VAR_aws_access_key
+TF_VAR_aws_secret_key=$(cat ${CLUSTER_PROFILE_DIR}/.awscred | awk '/\[default\]/{line=1; next} line && /^\[/{exit} line' | grep aws_secret_access_key | awk -F '=' '{print $2}'| sed 's/ //g')
+export TF_VAR_aws_secret_key
+
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 export TF_VAR_token=${OCM_TOKEN}
 
