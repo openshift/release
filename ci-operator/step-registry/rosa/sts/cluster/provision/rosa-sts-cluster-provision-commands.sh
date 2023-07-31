@@ -22,6 +22,8 @@ ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
 HOSTED_CP=${HOSTED_CP:-false}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
+ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
+PRIVATE_SUBNET_ONLY=${PRIVATE_SUBNET_ONLY:-false}
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
@@ -139,14 +141,14 @@ if [[ "$HOSTED_CP" == "true" ]]; then
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
   fi  
-
-  PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
-  PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
-  if [[ -z "${PUBLIC_SUBNET_IDs}" ]] || [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
-    echo -e "The public_subnet_ids and the the privated_subnet_ids are mandatory."
-    exit 1
-  fi
-  SUBNET_ID_SWITCH="--subnet-ids ${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
+  ENABLE_BYOVPC="true"
+  #PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
+  #PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  #if [[ -z "${PUBLIC_SUBNET_IDs}" ]] || [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
+  #  echo -e "The public_subnet_ids and the the privated_subnet_ids are mandatory."
+  #  exit 1
+  #fi
+  #SUBNET_ID_SWITCH="--subnet-ids ${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
 fi
 
 FIPS_SWITCH=""
@@ -169,25 +171,56 @@ fi
 PRIVATE_LINK_SWITCH=""
 if [[ "$PRIVATE_LINK" == "true" ]]; then
   PRIVATE_LINK_SWITCH="--private-link"
-
-  PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
-  if [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
-    echo -e "The privated_subnet_ids are mandatory."
-    exit 1
-  fi
-  SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
+  ENABLE_BYOVPC="true"
+  PRIVATE_SUBNET_ONLY="true"
+  #PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  #if [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
+  #  echo -e "The privated_subnet_ids are mandatory."
+  #  exit 1
+  #fi
+  #SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
 fi
 
 PROXY_SWITCH=""
 if [[ "$ENABLE_PROXY" == "true" ]]; then
   # Get the proxy information from the previous steps, and replace the value here
   proxy_private_url=$(< "${SHARED_DIR}/proxy_private_url")
-  TRUST_BUNDLE_FILE="bundle_file"
-  if [[ -z "${proxy_private_url}" ]] || [[ -z "${TRUST_BUNDLE_FILE}" ]]; then
-    echo -e "The http_proxy, the http_proxy and the additional_trust_bundle_file are mandatory."
+  TRUST_BUNDLE_FILE="${SHARED_DIR}/bundle_file"
+  if [[ -z "${proxy_private_url}" ]]; then
+    echo -e "The http_proxy, and https_proxy URLs are mandatory when specifying use of proxy."
     exit 1
   fi
-  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url} --additional-trust-bundle-file ${TRUST_BUNDLE_FILE}"
+  PROXY_SWITCH="--http-proxy ${proxy_private_url} --https-proxy ${proxy_private_url}"
+  if [[ -f "${TRUST_BUNDLE_FILE}" ]]; then
+    echo -e "Using proxy with requested additional trust bundle"
+    PROXY_SWITCH="${PROXY_SWITCH} --additional-trust-bundle-file ${TRUST_BUNDLE_FILE}"
+  fi
+  ENABLE_BYOVPC="true"
+  #PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
+  #PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  #if [[ -z "${PUBLIC_SUBNET_IDs}" ]] || [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
+  #  echo -e "The public_subnet_ids and the the private_subnet_ids are mandatory when using the proxy."
+  #  exit 1
+  #fi
+  #SUBNET_ID_SWITCH="--subnet-ids ${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
+fi
+
+if [[ "$ENABLE_BYOVPC" == "true" ]]; then
+  PUBLIC_SUBNET_IDs=$(cat ${SHARED_DIR}/public_subnet_ids | tr -d "[']")
+  PRIVATE_SUBNET_IDs=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']")
+  if [[ -z "${PRIVATE_SUBNET_IDs}" ]]; then
+    echo -e "The private_subnet_ids are mandatory."
+    exit 1
+  fi
+  if [[ "${PRIVATE_SUBNET_ONLY}" == "true" ]] ; then
+    SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
+  else
+    if [[ -z "${PUBLIC_SUBNET_IDs}" ]] ; then
+      echo -e "The public_subnet_ids are mandatory."
+      exit 1
+    fi
+    SUBNET_ID_SWITCH="--subnet-ids ${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
+  fi
 fi
 
 DRY_RUN_SWITCH=""
@@ -230,6 +263,7 @@ echo "  Enable customer managed key: ${ENABLE_CUSTOMER_MANAGED_KEY}"
 echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
+echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
   echo "  Min replicas: ${MIN_REPLICAS}"
