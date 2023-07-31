@@ -231,8 +231,10 @@ if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
 else
     export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
 fi
+FEATURES="performance dpdk"
 export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
 export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
+VALIDATIONS_FEATURES="sriov dpdk performance"
 
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
 export SCTPTEST_HAS_NON_CNF_WORKERS="${SCTPTEST_HAS_NON_CNF_WORKERS:-false}"
@@ -304,11 +306,11 @@ if [[ "$CNF_BRANCH" == *"4.12"* ]]; then
 fi
 if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
     create_tests_temp_skip_list_13
-    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
+    export GINKGO_PARAMS=" --ginkgo.timeout 120m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 1"
 fi
 if [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_14
-    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
+    export GINKGO_PARAMS=" --ginkgo.timeout 120m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 1"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
@@ -399,3 +401,7 @@ set +x
 set -e
 
 exit ${status}
+
+
+#  DO NOT MERGE
+ 
