@@ -68,9 +68,10 @@ cat > "${WORK_DIR}/playbook.yaml" <<EOF
 - hosts: lb
   vars:
     config: lb
+  name: Deploy the load balancer
   tasks:
     - name: Deploy the load balancer
-      include_role:
+      ansible.builtin.include_role:
         name: emilienm.routed_lb
 EOF
 cp "${WORK_DIR}/playbook.yaml" "${ARTIFACT_DIR}/playbook.yaml"
@@ -156,7 +157,7 @@ EOF
 cp "${WORK_DIR}/vars.yaml" "${ARTIFACT_DIR}/vars.yaml"
 
 echo "Installing Ansible collections"
-ansible-galaxy install emilienm.routed_lb,1.0.0
+ansible-galaxy install emilienm.routed_lb,1.0.1
 # Ultimately, dependencies should be deployed by routed_lb, once it'll be converted to a collection.
 ansible-galaxy collection install ansible.posix ansible.utils
 
