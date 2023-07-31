@@ -155,6 +155,11 @@ cat << EOF > ~/fetch-kubeconfig.yml
       regexp: '    server: https://api.*'
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
+    
+  - name: Add docker auth to enable pulling containers from CI registry
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer
+      'oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/root/openshift_pull.json'
 
 EOF
 
@@ -294,13 +299,13 @@ log_chronyd_status() {
 
 #Set status and run playbooks
 status=0
-ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
+#ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
-if [[ "$status" == 0 ]]; then
-  #installer has issues applying machine-configs with OCP 4.10, using manual way
-  KUBECONFIG=$SHARED_DIR/kubeconfig oc apply -f $SHARED_DIR/disable_ntp.yml || true
-  wait_for_mcp "2700s" || true
-  log_chronyd_status || true
-fi
+#if [[ "$status" == 0 ]]; then
+#  #installer has issues applying machine-configs with OCP 4.10, using manual way
+#  KUBECONFIG=$SHARED_DIR/kubeconfig oc apply -f $SHARED_DIR/disable_ntp.yml || true
+#  wait_for_mcp "2700s" || true
+#  log_chronyd_status || true
+#fi
 exit ${status}
