@@ -11,7 +11,7 @@ else
   export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 fi
 
-REGION="${LEASED_RESOURCE}"
+REGION=${REGION:-$LEASED_RESOURCE}
 
 if [[ -e ${SHARED_DIR}/metadata.json ]]; then
   # for OCP

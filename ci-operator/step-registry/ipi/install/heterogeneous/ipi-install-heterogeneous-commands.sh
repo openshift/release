@@ -130,6 +130,18 @@ case $CLUSTER_TYPE in
   MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.vmSize = \"${ADDITIONAL_WORKER_VM_TYPE}\"
        | .spec.template.spec.providerSpec.value.image.resourceID = \"${resource_id}\"" <<< "$MACHINE_SET")
 ;;
+*gcp*)
+  echo "Extracting gcp boot image..."
+  workers_addi_rhcos_image_project=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
+    yq-v4 ".data.stream
+      | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.images.gcp.project")
+  workers_addi_rhcos_image_name=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
+    yq-v4 ".data.stream
+      | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.images.gcp.name")
+  MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.machineType = \"${ADDITIONAL_WORKER_VM_TYPE}\"
+                     | .spec.template.spec.providerSpec.value.disks[0].image = \"projects/$workers_addi_rhcos_image_project/global/images/$workers_addi_rhcos_image_name\"
+              " <<< "${MACHINE_SET}")
+;;
 *ibmcloud*)
   FULL_CLUSTER_NAME=$(yq-v4 '.metadata.labels."machine.openshift.io/cluster-api-cluster"' <<< $MACHINE_SET)
   REGION="${LEASED_RESOURCE}"
