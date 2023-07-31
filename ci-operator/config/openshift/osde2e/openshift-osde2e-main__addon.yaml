@@ -70,6 +70,30 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
+- as: stage-aws-nvidia-gpu
+  commands: |
+    export ADDON_IDS="nvidia-gpu-addon"
+    export CHANNEL="stable"
+    export CONFIGS="aws,stage,test-harness"
+    export CLOUD_PROVIDER_REGION="us-east-2"
+    export NUM_WORKER_NODES="2"
+    export OCM_CCS="true"
+    export OCM_COMPUTE_MACHINE_TYPE="g4dn.2xlarge"
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/osde2e-credentials,/usr/local/nvidia-ci-secrets"
+    export TEST_HARNESSES="quay.io/edge-infrastructure/ci-tools-nvidia-gpu-operator:osde2e"
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 */12 * * *
+  secrets:
+  - mount_path: /usr/local/nvidia-ci-secrets
+    name: nvidia-ci-secrets
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
+  - mount_path: /usr/local/osde2e-credentials
+    name: osde2e-credentials
 zz_generated_metadata:
   branch: main
   org: openshift
