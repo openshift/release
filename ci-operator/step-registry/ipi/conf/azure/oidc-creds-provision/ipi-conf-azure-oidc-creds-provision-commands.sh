@@ -74,22 +74,6 @@ oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credreque
 # generated credentials as work is done to support workload identity.
 # At the time of this comment, openshift-cluster-api appears to only be
 # enabled with the TechPreviewNoUpgrade FeatureSet.
-mkdir -p "/tmp/manifests"
-echo "Creating credentials for openshift-cluster-api..."
-cat > "/tmp/manifests/openshift-cluster-api-capz-manager-bootstrap-credentials-credentials.yaml" << EOF
-apiVersion: v1
-stringData:
-  azure_client_id: ${AZURE_CLIENT_ID}
-  azure_client_secret: ${AZURE_CLIENT_SECRET}
-  azure_region: ${REGION}
-  azure_resourcegroup: ${CLUSTER_NAME}
-  azure_subscription_id: ${AZURE_SUBSCRIPTION_ID}
-  azure_tenant_id: ${AZURE_TENANT_ID}
-kind: Secret
-metadata:
-  name: capz-manager-bootstrap-credentials
-  namespace: openshift-cluster-api
-EOF
 
 # create required credentials infrastructure and installer manifests
 ccoctl azure create-all \
