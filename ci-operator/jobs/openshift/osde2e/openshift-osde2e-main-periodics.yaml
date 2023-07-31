@@ -67,74 +67,6 @@ periodics:
         secretName: osde2e-rosa-staging
 - agent: kubernetes
   cluster: build03
-  cron: 0 22 * * 1,4
-  decorate: true
-  extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: osde2e
-  labels:
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: osde2e-stage-aws-addon-integreatly-operator
-  spec:
-    containers:
-    - args:
-      - test
-      - --secret-locations
-      - $(SECRET_LOCATIONS)
-      - --configs
-      - $(CONFIGS)
-      command:
-      - /osde2e
-      env:
-      - name: ADDON_IDS
-        value: managed-api-service
-      - name: ADDON_PARAMETERS
-        value: '{"managed-api-service":{"addon-managed-api-service": "1","addon-resource-required":
-          "true", "cidr-range": "10.1.0.0/26"}}'
-      - name: CHANNEL
-        value: stable
-      - name: CLOUD_PROVIDER_REGION
-        value: us-east-1
-      - name: CONFIGS
-        value: aws,stage,test-harness
-      - name: HIBERNATE_AFTER_USE
-        value: "false"
-      - name: NUM_WORKER_NODES
-        value: "6"
-      - name: OCM_CCS
-        value: "true"
-      - name: OCM_COMPUTE_MACHINE_TYPE
-        value: m5.xlarge
-      - name: POLLING_TIMEOUT
-        value: "7400"
-      - name: SECRET_LOCATIONS
-        value: /usr/local/osde2e-common,/usr/local/integr8ly-ci-secrets
-      - name: TEST_HARNESSES
-        value: quay.io/integreatly/integreatly-operator-test-harness:osde2e
-      image: quay.io/app-sre/osde2e
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /usr/local/integr8ly-ci-secrets
-        name: integr8ly-ci-secrets
-        readOnly: true
-      - mountPath: /usr/local/osde2e-common
-        name: osde2e-common
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: integr8ly-ci-secrets
-      secret:
-        secretName: integr8ly-ci-secrets
-    - name: osde2e-common
-      secret:
-        secretName: osde2e-common
-- agent: kubernetes
-  cluster: build03
   cron: 0 22 * * 0
   decorate: true
   extra_refs:
@@ -425,7 +357,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build03
-  cron: 0 */12 * * *
+  cron: 0 3 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -484,6 +416,69 @@ periodics:
     - name: ocm-aws-access
       secret:
         secretName: ocm-aws-access
+    - name: osde2e-common
+      secret:
+        secretName: osde2e-common
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: 0 22 * * 1,4
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: openshift
+    repo: osde2e
+  labels:
+    ci-operator.openshift.io/variant: addon
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-osde2e-main-addon-stage-aws-integreatly-operator
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/integr8ly-ci-secrets
+      - --secret-dir=/secrets/osde2e-common
+      - --target=stage-aws-integreatly-operator
+      - --variant=addon
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/integr8ly-ci-secrets
+        name: integr8ly-ci-secrets
+        readOnly: true
+      - mountPath: /secrets/osde2e-common
+        name: osde2e-common
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: integr8ly-ci-secrets
+      secret:
+        secretName: integr8ly-ci-secrets
     - name: osde2e-common
       secret:
         secretName: osde2e-common

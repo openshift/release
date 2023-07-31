@@ -115,6 +115,29 @@ tests:
     name: ocm-aws-access
   - mount_path: /usr/local/osde2e-common
     name: osde2e-common
+- as: stage-aws-integreatly-operator
+  commands: |
+    export ADDON_IDS="managed-api-service"
+    export ADDON_PARAMETERS='{"managed-api-service":{"addon-managed-api-service": "1","addon-resource-required": "true", "cidr-range": "10.1.0.0/26"}}'
+    export CHANNEL="stable"
+    export CLOUD_PROVIDER_REGION="us-east-1"
+    export CONFIGS="aws,stage,test-harness"
+    export NUM_WORKER_NODES="6"
+    export OCM_CCS="true"
+    export OCM_COMPUTE_MACHINE_TYPE="m5.xlarge"
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/integr8ly-ci-secrets"
+    export TEST_HARNESSES="quay.io/integreatly/integreatly-operator-test-harness:osde2e"
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 22 * * 1,4
+  secrets:
+  - mount_path: /usr/local/integr8ly-ci-secrets
+    name: integr8ly-ci-secrets
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
 zz_generated_metadata:
   branch: main
   org: openshift
