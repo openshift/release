@@ -1932,17 +1932,6 @@ tests:
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-private
-- always_run: false
-  as: disabled-azure-ipi-private-workers-marketimage-p2-f28
-  steps:
-    cluster_profile: azure-marketplace-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.13'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-private-workers-marketimage
 - as: azure-ipi-proxy-tp-p3-f28
   cron: 41 4 3 * *
   steps:
@@ -2279,19 +2268,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-upi
-- as: baremetalds-assisted-hypershift-agent-mgmt-p2-f7
-  cron: 49 3 8,16,23,30 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    dependencies:
-      INDEX_IMAGE: assisted-service-index
-    env:
-      TEST_ADDITIONAL: Hypershift
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-mgmt
-    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent
 - as: baremetalds-assisted-hypershift-agent-guest-p2-f7
   cron: 33 0 4,12,20,27 * *
   steps:
@@ -2322,6 +2298,19 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-guest
+- as: baremetalds-assisted-hypershift-agent-mgmt-p2-f7
+  cron: 49 3 8,16,23,30 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      INDEX_IMAGE: assisted-service-index
+    env:
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent
 - as: baremetalds-ipi-ovn-ipv4-fips-p1-f4
   cron: 27 17 1,5,9,13,17,22,27 * *
   steps:
@@ -2351,6 +2340,34 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-guest-p2-f7
+  cron: 5 13 4,12,20,27 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      CNV_PRERELEASE_VERSION: "4.13"
+      E2E_RUN_TAGS: '@amd64 and @baremetal-ipi and @network-ovnkubernetes and @hypershift-hosted
+        and not @fips'
+      TAG_VERSION: '@4.13'
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-guest
+- as: baremetalds-ipi-ovn-kubevirt-hypershift-guest-p2-f14-destr
+  cron: 28 19 7,22 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      CNV_PRERELEASE_VERSION: "4.13"
+      E2E_RUN_TAGS: '@amd64 and @baremetal-ipi and @network-ovnkubernetes and @hypershift-hosted
+        and not @fips and @destructive'
+      TAG_VERSION: '@4.13'
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-destructive
+    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift
 - as: baremetalds-ipi-ovn-kubevirt-hypershift-mce-guest-p2-f14
   cron: 17 20 7,22 * *
   steps:
@@ -2408,34 +2425,6 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-mce
-- as: baremetalds-ipi-ovn-kubevirt-hypershift-guest-p2-f7
-  cron: 5 13 4,12,20,27 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      CNV_PRERELEASE_VERSION: "4.13"
-      E2E_RUN_TAGS: '@amd64 and @baremetal-ipi and @network-ovnkubernetes and @hypershift-hosted
-        and not @fips'
-      TAG_VERSION: '@4.13'
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;~Serial&;~Disruptive&
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift-guest
-- as: baremetalds-ipi-ovn-kubevirt-hypershift-guest-p2-f14-destr
-  cron: 28 19 7,22 * *
-  steps:
-    cluster_profile: equinix-ocp-metal-qe
-    env:
-      CNV_PRERELEASE_VERSION: "4.13"
-      E2E_RUN_TAGS: '@amd64 and @baremetal-ipi and @network-ovnkubernetes and @hypershift-hosted
-        and not @fips and @destructive'
-      TAG_VERSION: '@4.13'
-      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~NonPreRelease&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;Serial;Disruptive
-      TEST_TIMEOUT: "30"
-    test:
-    - chain: openshift-e2e-test-hypershift-qe-destructive
-    workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4-kubevirt-hypershift
 - as: baremetalds-ipi-ovn-kubevirt-hypershift-mgmt-p2-f7
   cron: 28 0 7,15,22,29 * *
   steps:
@@ -2515,6 +2504,17 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
+- as: disabled-azure-ipi-private-workers-marketimage-p2-f28
+  cron: 0 3 29 2 *
+  steps:
+    cluster_profile: azure-marketplace-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.13'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-private-workers-marketimage
 - as: gcp-ipi-baselinecaps-none-additionalcaps-p2-f14
   cron: 19 21 1,16 * *
   steps:
