@@ -94,6 +94,27 @@ tests:
     name: osde2e-common
   - mount_path: /usr/local/osde2e-credentials
     name: osde2e-credentials
+- as: stage-aws-codeready-qe-operator
+  commands: |
+    export ADDON_IDS="codeready-workspaces-qe"
+    export CHANNEL="stable"
+    export CONFIGS="aws,stage,test-harness"
+    export OCM_CCS="true"
+    export REPORT_DIR="$ARTIFACT_DIR"
+    export SECRET_LOCATIONS="/usr/local/osde2e-common,/usr/local/crw-osd-token,/usr/local/ocm-aws-access"
+    export TEST_HARNESSES="quay.io/crw/osd-e2e:nightly"
+    /osde2e test --secret-locations ${SECRET_LOCATIONS} --configs ${CONFIGS}
+  container:
+    clone: true
+    from: osde2e
+  cron: 0 3 * * *
+  secrets:
+  - mount_path: /usr/local/crw-osd-token
+    name: crw-osd-token
+  - mount_path: /usr/local/ocm-aws-access
+    name: ocm-aws-access
+  - mount_path: /usr/local/osde2e-common
+    name: osde2e-common
 zz_generated_metadata:
   branch: main
   org: openshift
