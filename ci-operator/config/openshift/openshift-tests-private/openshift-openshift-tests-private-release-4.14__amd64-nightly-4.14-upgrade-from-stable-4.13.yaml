@@ -71,6 +71,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi'
     test:
@@ -831,6 +832,17 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-sdn
+- as: vsphere-ipi-zones-f28
+  cron: 31 7 20 * *
+  steps:
+    cluster_profile: vsphere-multizone
+    env:
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @vsphere-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @vsphere-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-vsphere-ipi-zones
 - as: vsphere-upi-disconnected-sdn-workers-rhcos-rhel8-f28
   cron: 27 0 17 * *
   steps:

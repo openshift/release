@@ -169,7 +169,7 @@ openstack*)
     fi
     ;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-ibmcloud)
+ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY

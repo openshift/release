@@ -43,6 +43,11 @@ CONFIG = {
         'us-east-1': 25,
         'ap-northeast-1': 5,
     },
+    'aws-terraform-qe-quota-slice': {
+        'ap-northeast-1': 2,
+        'us-east-1': 2,
+        'us-east-2': 2,
+    },
     'aws-sd-qe-quota-slice': {
         'us-west-2': 3,
     },
@@ -193,7 +198,6 @@ CONFIG = {
     'vsphere-ibm-7-quota-slice':{
         'default': 5
     },
-    'vsphere-discon-quota-slice':{},
     'vsphere-dis-quota-slice':{},
     'vsphere-clusterbot-quota-slice':{},
     'vsphere-connected-quota-slice':{},
@@ -222,7 +226,6 @@ CONFIG = {
     'powervs-2-quota-slice': {
         'syd04': 1,
         'syd05': 1,
-        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
@@ -316,9 +319,6 @@ for i in range(134,140):
 
 for i in range(56,60):
     CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
-
-for i in range(60,64):
-    CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
 
 for i in range(230,235):
     CONFIG['vsphere-dis-quota-slice']['devqe-segment-{}-disconnected'.format(i)] = 1

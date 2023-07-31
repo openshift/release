@@ -4,9 +4,17 @@ set -ex
 
 META_OPERATOR="openstack-operator"
 ORG="openstack-k8s-operators"
+CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
+CEPH_DATASIZE=${CEPH_DATASIZE:="2Gi"}
+CEPH_TIMEOUT=${CEPH_TIMEOUT:="90"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
+
+# Export Ceph options for tests that call 'make ceph'
+export DATA_SIZE=${CEPH_DATASIZE}
+export TIMEOUT=${CEPH_TIMEOUT}
+export HOSTNETWORK=${CEPH_HOSTNETWORK}
 
 # Check org and project from job's spec
 REF_REPO=$(echo ${JOB_SPEC} | jq -r '.refs.repo')

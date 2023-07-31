@@ -6,6 +6,9 @@ DEFAULT_REGISTRY="quay.io"
 OPENSTACK_OPERATOR="openstack-operator"
 BASE_DIR=${HOME:-"/alabama"}
 NS_SERVICES=${NS_SERVICES:-"openstack"}
+CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
+CEPH_DATASIZE=${CEPH_DATASIZE:="2Gi"}
+CEPH_TIMEOUT=${CEPH_TIMEOUT:="90"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
@@ -97,7 +100,7 @@ if [[ "$SERVICE_NAME" == "OPENSTACK" ]]; then
   export ${SERVICE_NAME}_CR=/go/src/github.com/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}/${OPENSTACK_CTLPLANE}
 fi
 
-make ceph DATA_SIZE=2Gi TIMEOUT=90
+make ceph DATA_SIZE=${CEPH_DATASIZE} TIMEOUT=${CEPH_TIMEOUT} HOSTNETWORK=${CEPH_HOSTNETWORK}
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
