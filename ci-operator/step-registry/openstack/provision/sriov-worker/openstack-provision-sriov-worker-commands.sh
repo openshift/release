@@ -4,6 +4,7 @@ set -Eeuo pipefail
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
+# foo
 function wait_for_worker_machines() {
     INTERVAL=10
     CNT=180
