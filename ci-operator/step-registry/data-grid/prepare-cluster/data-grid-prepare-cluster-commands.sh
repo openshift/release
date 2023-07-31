@@ -34,3 +34,5 @@ oc apply -f - <<EOF
         config.yaml: |
             enableUserWorkload: true 
 EOF
+
+oc -n openshift-user-workload-monitoring adm policy add-role-to-user user-workload-monitoring-config-edit system:admin --role-namespace openshift-user-workload-monitoring
