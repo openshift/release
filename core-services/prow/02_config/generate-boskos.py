@@ -43,6 +43,11 @@ CONFIG = {
         'us-east-1': 25,
         'ap-northeast-1': 5,
     },
+    'aws-terraform-qe-quota-slice': {
+        'ap-northeast-1': 2,
+        'us-east-1': 2,
+        'us-east-2': 2,
+    },
     'aws-sd-qe-quota-slice': {
         'us-west-2': 3,
     },
