@@ -80,6 +80,8 @@ if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -le 157 ]; then
   )
 fi
 
+sleep 3600
+
 # 1. Get the OpaqueNetwork (NSX-T port group) which is listed in LEASED_RESOURCE.
 # 2. Select the virtual machines attached to network
 # 3. list the path to the virtual machine via the managed object reference
