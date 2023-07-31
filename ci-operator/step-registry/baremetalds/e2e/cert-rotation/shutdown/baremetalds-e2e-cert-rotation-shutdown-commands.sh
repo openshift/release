@@ -99,18 +99,14 @@ done
 # Check that time on nodes has been updated
 run-on "${control_nodes} ${compute_nodes}" "timedatectl status"
 
-# Wait for nodes to become unready and approve CSRs until nodes are ready again
+# Approve CSRs in the background
 run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
-until oc get nodes; do sleep 10; done
-oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT}
-until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
-  if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
-    oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
-  fi
-  sleep 30
+set +o pipefail
+while true; do
+  oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve; sleep 10
 done
-"
+" &
 
 # Wait for kube-apiserver operator to generate new localhost-recovery kubeconfig
 run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do sleep 30; done"
