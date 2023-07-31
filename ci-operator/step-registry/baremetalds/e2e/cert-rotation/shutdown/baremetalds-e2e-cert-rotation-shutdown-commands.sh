@@ -92,12 +92,15 @@ done
 for vm in ${VMS[@]}; do
   until virsh domstate ${vm} | grep "running"; do
     echo "${vm} still not yet running"
-    sleep 10
+    sleep 30
   done
 done
 
-# Check that time on nodes has been updated
-run-on "${control_nodes} ${compute_nodes}" "timedatectl status"
+# Wait for nodes to come up and check time has been updated
+until run-on "${control_nodes} ${compute_nodes}" "timedatectl status"; do sleep 30; done
+
+# Wait API server to come up on first master
+until run-on-first-master "KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig oc get nodes"; do sleep 30; done
 
 # Approve CSRs in the background
 run-on-first-master "
