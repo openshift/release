@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-trap 'FRC=$?; createUpgradeJunit; debug' EXIT TERM
+trap 'FRC=$?; sleep 7200; createUpgradeJunit; debug' EXIT TERM
 
 # Print cv, failed node, co, mcp information for debug purpose
 function debug() {
