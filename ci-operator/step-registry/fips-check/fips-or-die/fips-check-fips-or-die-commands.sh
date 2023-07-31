@@ -111,6 +111,16 @@ images=("quay.io/openshift-qe-optional-operators/myapp:v1.16-1"
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
+
+run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
+if [[ $ret -eq 0 ]]; then
+    auths=`cat /tmp/.dockerconfigjson`
+    if [[ $auths =~ "5000" ]]; then
+        echo "This is a disconnected env, skip it."
+        exit 0
+    fi
+fi
+
 node_name=`oc get node -l node-role.kubernetes.io/master= -o=jsonpath="{.items[0].metadata.name}"`
 arch=`oc get node/$node_name -o=jsonpath="{.status.nodeInfo.architecture}"`
 if [[ $arch != "amd64" ]]; then
@@ -175,5 +185,5 @@ if $pass; then
     echo "All tests pass!"
 else
     echo "Test fail, please check log."
-    return 1
+    exit 1
 fi

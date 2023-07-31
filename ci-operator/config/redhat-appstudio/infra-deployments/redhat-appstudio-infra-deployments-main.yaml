@@ -29,7 +29,7 @@ tests:
     cluster_profile: aws-2
     env:
       COMPUTE_NODE_TYPE: m6i.4xlarge
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.19-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.26-multi
       HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: redhat-appstudio-install-rhtap
@@ -41,18 +41,28 @@ tests:
     cluster_profile: aws-2
     env:
       COMPUTE_NODE_TYPE: m6i.4xlarge
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.19-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.26-multi
       HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: redhat-appstudio-e2e
     workflow: redhat-appstudio-install
+- always_run: false
+  as: appstudio-load-test
+  steps:
+    cluster_profile: aws
+    env:
+      SCENARIO: ci-infra-dep
+    test:
+    - ref: redhat-appstudio-load-test-infra-deployments
+    workflow: redhat-appstudio-load-test
+  timeout: 8h0m0s
 - as: appstudio-e2e-tests-periodic
   cron: 0 */24 * * *
   steps:
     cluster_profile: aws-2
     env:
       COMPUTE_NODE_TYPE: m6i.4xlarge
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.19-multi
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.26-multi
       HYPERSHIFT_NODE_COUNT: "3"
     test:
     - ref: redhat-appstudio-e2e

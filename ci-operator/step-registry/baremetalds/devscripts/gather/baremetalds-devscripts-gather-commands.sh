@@ -55,7 +55,7 @@ echo "Get install-gather, if there is one..."
 cp /root/dev-scripts/ocp/*/log-bundle*.tar.gz /tmp/artifacts/log-bundle-\$HOSTNAME.tar.gz || true
 
 echo "Get sosreport including sar data..."
-sos report --case-id "\$HOSTNAME" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,yum --tmp-dir /tmp/artifacts
+sos report --case-id "\$HOSTNAME" --batch -o container_log,filesys,kvm,libvirt,logs,networkmanager,podman,processor,rpm,sar,virsh,dnf --tmp-dir /tmp/artifacts
 
 echo "Get libvirt logs..."
 tar -czC "/var/log/libvirt/qemu" -f "/tmp/artifacts/libvirt-logs-\$HOSTNAME.tar.gz" --transform "s?^\.?libvirt-logs-\$HOSTNAME?" .

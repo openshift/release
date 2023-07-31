@@ -593,12 +593,12 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )istio-unit-2-3,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^maistra-2\.3$
     - ^maistra-2\.3-
     cluster: build05
-    context: ci/prow/maistra-istio-push-image-2-3
+    context: ci/prow/push-images
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -607,8 +607,8 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-maistra-istio-maistra-2.3-maistra-istio-push-image-2-3
-    rerun_command: /test maistra-istio-push-image-2-3
+    name: pull-ci-maistra-istio-maistra-2.3-push-images
+    rerun_command: /test push-images
     spec:
       containers:
       - args:
@@ -617,8 +617,8 @@ presubmits:
         - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/maistra-istio-push-image-2-3-cluster-profile
-        - --target=maistra-istio-push-image-2-3
+        - --secret-dir=/usr/local/push-images-cluster-profile
+        - --target=push-images
         command:
         - ci-operator
         image: ci-operator:latest
@@ -634,7 +634,7 @@ presubmits:
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/maistra-istio-push-image-2-3-cluster-profile
+        - mountPath: /usr/local/push-images-cluster-profile
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
@@ -665,4 +665,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )maistra-istio-push-image-2-3,?($|\s.*)
+    trigger: (?m)^/test( | .* )push-images,?($|\s.*)

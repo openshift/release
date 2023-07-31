@@ -51,6 +51,15 @@ credentialsMode: Manual
 platform:
   ibmcloud:
     region: ${REGION}
+EOF
+
+if [[ "${RESOURCE_GROUP}" ]]; then
+cat >> "${CONFIG}" << EOF
+    resourceGroupName: ${RESOURCE_GROUP}
+EOF
+fi
+
+cat >> "${CONFIG}" << EOF
 controlPlane:
   name: master
   platform:
