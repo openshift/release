@@ -24,6 +24,7 @@ HOSTED_CP=${HOSTED_CP:-false}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
 PRIVATE_SUBNET_ONLY=${PRIVATE_SUBNET_ONLY:-false}
+USER_TAGS=${USER_TAGS:-"ciprow_cluster:${CLUSTER_NAME}"}
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
@@ -181,6 +182,11 @@ if [[ "$PRIVATE_LINK" == "true" ]]; then
   #SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
 fi
 
+USER_TAGS_SWITCH=""
+if [[ "$USER_TAGS" ]]; then
+  USER_TAGS_SWITCH = "--tags ${USER_TAGS}"
+fi
+
 PROXY_SWITCH=""
 if [[ "$ENABLE_PROXY" == "true" ]]; then
   # Get the proxy information from the previous steps, and replace the value here
@@ -264,6 +270,7 @@ echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
+echo "  User Tags: ${USER_TAGS}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
   echo "  Min replicas: ${MIN_REPLICAS}"
@@ -295,6 +302,7 @@ ${FIPS_SWITCH} \
 ${KMS_KEY_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
+${USER_TAGS_SWITCH} \
 ${PROXY_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
@@ -327,6 +335,7 @@ rosa create cluster -y \
                     ${KMS_KEY_SWITCH} \
                     ${PRIVATE_SWITCH} \
                     ${PRIVATE_LINK_SWITCH} \
+                    ${USER_TAGS_SWITCH} \
                     ${PROXY_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
