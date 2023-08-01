@@ -184,7 +184,7 @@ fi
 
 USER_TAGS_SWITCH=""
 if [[ "$USER_TAGS" ]]; then
-  USER_TAGS_SWITCH = "--tags ${USER_TAGS}"
+  USER_TAGS_SWITCH="--tags ${USER_TAGS}"
 fi
 
 PROXY_SWITCH=""
