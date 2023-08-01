@@ -2803,7 +2803,7 @@ periodics:
           cpu: 500m
 - agent: kubernetes
   cluster: build01
-  cron: '@hourly'
+  cron: '@daily'
   decorate: true
   name: periodic-openshift-dptp-3312-hypershift-leaks-cleaner
   spec:
@@ -2813,6 +2813,8 @@ periodics:
       env:
       - name: AWS_CONFIG_FILE
         value: /token/.awscred
+      - name: KUBECONFIG
+        value: /kubeconfig/hive/kubeconfig
       image: dptp-3312-hypershift-leaks-cleaner:latest
       imagePullPolicy: Always
       name: ""
@@ -2823,7 +2825,13 @@ periodics:
       - mountPath: /token
         name: token
         readOnly: true
+      - mountPath: /kubeconfig
+        name: hive
+        readOnly: true
     volumes:
     - name: token
       secret:
         secretName: cluster-secrets-aws-2
+    - name: hive
+      secret:
+        secretName: hypershift-workload-credentials
