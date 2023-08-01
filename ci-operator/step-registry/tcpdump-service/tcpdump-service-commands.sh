@@ -16,7 +16,7 @@ set -e
 echo "Running tcpdump:"
 
 # Grab all 443 traffic, all attempts to filter have caused us to miss what we need.
-/usr/sbin/tcpdump -nn -U -i any -s 256 -w "/var/log/tcpdump/tcpdump-\$(date +'%FT%H%M%S').pcap" 'tcp and (port 443 or 6443)'
+/usr/sbin/tcpdump -nn -U -i any -s 256 -w "/var/log/tcpdump/tcpdump-\$(date +'%FT%H%M%S').pcap" 'tcp and (port 443 or 6443 or 1337)'
 EOF
 )
 
