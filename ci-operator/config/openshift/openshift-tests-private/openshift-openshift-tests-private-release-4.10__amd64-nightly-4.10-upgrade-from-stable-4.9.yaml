@@ -56,20 +56,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-c2s-ipi-disconnected-private-fips-f28
-  cron: 13 11 18 * *
-  steps:
-    cluster_profile: aws-c2s-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @aws-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @aws-ipi'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-disconnected
-    workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-c2s-ipi-disconnected-private-fips-cert-rotation-f28
   cron: 34 23 25 * *
   steps:
@@ -84,18 +70,20 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-disconnected-cert-rotation
     workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
-- as: aws-ipi-byo-iam-role-f28
-  cron: 18 5 5 * *
+- as: aws-c2s-ipi-disconnected-private-fips-f28
+  cron: 13 11 18 * *
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-c2s-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @aws-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @aws-ipi and not @fips'
+      FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @aws-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @aws-ipi'
     test:
     - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+    - chain: openshift-upgrade-qe-test-disconnected
+    workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-ipi-byo-iam-role-cert-rotation-f28
   cron: 58 20 17 * *
   steps:
@@ -107,6 +95,18 @@ tests:
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-cert-rotation
+    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
+- as: aws-ipi-byo-iam-role-f28
+  cron: 18 5 5 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @aws-ipi and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
 - as: aws-ipi-byo-kms-etcd-encryption-f28
   cron: 23 13 6 * *
@@ -246,19 +246,6 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-fips-f28
-  cron: 26 11 20 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @azure-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @azure-ipi'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-fips-cert-rotaiton-f28
   cron: 28 1 4 * *
   steps:
@@ -271,6 +258,19 @@ tests:
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-cert-rotation
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-fips-f28
+  cron: 26 11 20 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @azure-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @azure-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-fullyprivate-proxy-f28
   cron: 19 3 19 * *
@@ -443,18 +443,6 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
-- as: vsphere-ipi-proxy-fips-f28
-  cron: 12 1 15 * *
-  steps:
-    cluster_profile: vsphere-dis
-    env:
-      FIPS_ENABLED: "true"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @vsphere-ipi and @proxy'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @vsphere-ipi and @proxy'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-fips-cert-rotation-f28
   cron: 12 17 28 * *
   steps:
@@ -466,6 +454,18 @@ tests:
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test-cert-rotation
+    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
+- as: vsphere-ipi-proxy-fips-f28
+  cron: 12 1 15 * *
+  steps:
+    cluster_profile: vsphere-dis
+    env:
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.9 and @vsphere-ipi and @proxy'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.9 and @vsphere-ipi and @proxy'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-upi-disconnected-secureboot-f28
   cron: 37 10 26 * *

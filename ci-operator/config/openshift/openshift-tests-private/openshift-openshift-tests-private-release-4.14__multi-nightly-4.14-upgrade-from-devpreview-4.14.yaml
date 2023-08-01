@@ -74,6 +74,20 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f14
+  cron: 46 23 4,19 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi
 - as: aws-ipi-ovn-ipsec-amd64-f14
   cron: 37 18 9,24 * *
   steps:
@@ -101,20 +115,6 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-f14
-  cron: 46 23 4,19 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @aws-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @aws-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-    test:
-    - ref: ipi-install-heterogeneous
-    - chain: openshift-upgrade-qe-test
-    workflow: cucushift-installer-rehearse-aws-ipi
 - as: azure-ipi-baselinecaps-v412-amd64-f14
   cron: 26 0 9,24 * *
   steps:
