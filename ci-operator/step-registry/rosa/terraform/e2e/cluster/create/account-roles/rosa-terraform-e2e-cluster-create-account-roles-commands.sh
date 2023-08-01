@@ -6,6 +6,11 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+
+TF_FOLDER="${TF_FOLDER1}"
+TF_ARTIFACT_NAME="${TF_ARTIFACT_NAME1}"
+
+
 # ACCOUNT_ROLE_PREFIX=${ACCOUNT_ROLE_PREFIX:-$NAMESPACE}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 
@@ -26,8 +31,6 @@ export TF_VAR_aws_secret_key
 
 OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
 export TF_VAR_token=${OCM_TOKEN}
-
-TF_FOLDER="ci/e2e/account_roles_files"
 
 rm -rf ${SHARED_DIR}/work
 mkdir  ${SHARED_DIR}/work
@@ -59,7 +62,6 @@ if [[ "$ver" != "" ]]; then
   sed -i "s|${provider_ver}|${ver}|" main.tf
 fi
 
-cat main.tf
 
 HOME='/root' terraform init
 

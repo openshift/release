@@ -1,0 +1,103 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- context_dir: .
+  dockerfile_path: agent.Dockerfile
+  to: kserve-agent
+- context_dir: .
+  dockerfile_path: router.Dockerfile
+  to: kserve-router
+- context_dir: .
+  dockerfile_path: Dockerfile
+  to: kserve-controller
+- context_dir: ./python
+  dockerfile_path: storage-initializer.Dockerfile
+  to: kserve-storage-initializer
+promotion:
+  namespace: opendatahub-io
+  tag: latest
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: pr-image-mirror-kserve-agent
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-agent
+    env:
+      IMAGE_REPO: kserve-agent
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-kserve-router
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-router
+    env:
+      IMAGE_REPO: kserve-router
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-kserve-controller
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-controller
+    env:
+      IMAGE_REPO: kserve-controller
+    workflow: opendatahub-io-ci-image-mirror
+- as: pr-image-mirror-kserve-storage-initializer
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-storage-initializer
+    env:
+      IMAGE_REPO: kserve-storage-initializer
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror-kserve-agent
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-agent
+    env:
+      IMAGE_REPO: kserve-agent
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror-kserve-router
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-router
+    env:
+      IMAGE_REPO: kserve-router
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror-kserve-controller
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-controller
+    env:
+      IMAGE_REPO: kserve-controller
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+- as: fast-image-mirror-kserve-storage-initializer
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-storage-initializer
+    env:
+      IMAGE_REPO: kserve-storage-initializer
+      RELEASE_VERSION: fast
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: master
+  org: opendatahub-io
+  repo: kserve
