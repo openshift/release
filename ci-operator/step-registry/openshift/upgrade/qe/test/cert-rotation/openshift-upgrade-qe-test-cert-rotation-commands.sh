@@ -83,9 +83,25 @@ openssl genrsa -out $cusIngressKey $keyLength
 openssl req -new -key $cusIngressKey  -subj "/CN=$defaultIngressDomin" -addext "subjectAltName = DNS:*.$defaultIngressDomin" -out  $cusIngressCsr
 openssl x509 -req -days 30 -CA $proxyCert -CAkey $proxyKey -CAserial caproxy.srl -CAcreateserial -extfile  tmp.conf -extensions cus -in $cusIngressCsr -out $cusIngressCert
 
-## create a config map and update the cluster-wide proxy configuration with the newly created config map
-oc create configmap custom-ca --from-file=ca-bundle.crt=$workPath/$proxyCert -n openshift-config
-oc patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"custom-ca"}}}'
+## check if the cluster-wide proxy has a trustedCA
+cmForClusterProxy=$(oc get proxy cluster -o=jsonpath='{.spec.trustedCA.name}')
+if ! [ -z "$cmForClusterProxy" ]
+then
+    oc -n openshift-config get configmap $cmForClusterProxy -o=jsonpath='{.data.ca-bundle\.crt}' > systemCA.txt
+fi
+
+## update the cluster-wide proxy's trustedCA with a newly created config map, or with the updated existing config map
+if  [ -z "$cmForClusterProxy" ]
+then
+    oc create configmap custom-ca --from-file=ca-bundle.crt=$workPath/$proxyCert -n openshift-config
+    oc patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"custom-ca"}}}'
+else
+    cat $proxyCert >> systemCA.txt
+    oc patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":""}}}'
+    oc delete configmap $cmForClusterProxy -n openshift-config
+    oc create configmap $cmForClusterProxy --from-file=ca-bundle.crt=$workPath/systemCA.txt -n openshift-config
+    oc patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"'$cmForClusterProxy'"}}}'
+fi
 
 ## create secret and update the Ingress Controller configuration with the newly created secret
 oc create secret tls custom-secret --cert=$workPath/$cusIngressCert --key=$workPath/$cusIngressKey -n openshift-ingress
