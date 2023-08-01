@@ -98,6 +98,8 @@ done
 # Check that time on nodes has been updated
 until run-on "${control_nodes} ${compute_nodes}" "timedatectl status"; do sleep 30; done
 
+sleep infinity
+
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig

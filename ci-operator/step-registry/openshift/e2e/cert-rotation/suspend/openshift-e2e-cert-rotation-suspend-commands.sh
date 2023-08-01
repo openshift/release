@@ -56,6 +56,8 @@ function copy-file-from-first-master {
 
 ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
 
+sleep infinity
+
 # Stop chrony service on all nodes
 run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
 
