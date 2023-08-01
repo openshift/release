@@ -301,6 +301,7 @@ function run {
     exit 0
 }
 
+sleep 5400
 # select the cases per FILTERS
 function handle_filters {
     filter_tmp="$1"
