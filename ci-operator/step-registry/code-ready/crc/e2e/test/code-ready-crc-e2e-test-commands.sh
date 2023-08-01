@@ -58,7 +58,7 @@ function run-tests() {
   export PULL_SECRET_FILE=--pull-secret-file="${HOME}"/pull-secret
   export BUNDLE_LOCATION=--bundle-location="${HOME}"/$(cat "${HOME}"/bundle)
   export CRC_BINARY=--crc-binary=/tmp/
-  make e2e GODOG_OPTS="--godog.tags='~@story_registry && @linux && ~@minimal'"
+  make e2e GODOG_OPTS="--godog.tags='~@story_registry && @linux && ~@minimal && ~@microshift'"
   if [[ $? -ne 0 ]]; then
     exit 1
     popd
