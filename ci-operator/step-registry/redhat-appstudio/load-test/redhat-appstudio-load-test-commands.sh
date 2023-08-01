@@ -92,6 +92,8 @@ cd "$(mktemp -d)"
 # git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
 git clone --branch RHTAP-1018/Load-test-measure-how-long-the-app-test-took "https://github.com/naftalysh/e2e-tests.git" .
 
+echo "*** Debug: JOB_TYPE=$JOB_TYPE; JOB_NAME=$JOB_NAME, PULL_NUMBER=${PULL_NUMBER}"
+
 
 set -x
 if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
