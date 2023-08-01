@@ -1,0 +1,73 @@
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
+images:
+- dockerfile_path: automation/generatetasks/build/Dockerfile
+  to: base-tests
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: automation/build-test.sh
+tests:
+- as: openshift-pipelines-e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: openshift-pipelines-e2e
+      cli: latest
+      commands: "printenv KUBECONFIG\nprintenv KUBEADMIN_PASSWORD_FILE\noc get node\noc
+        config view\noc whoami   \n./automation/e2e-deploy-openshift-resources.sh
+        latest\nmake test-e2e-openshift\n"
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+- as: openshift-pipelines-nightly-e2e
+  cluster_claim:
+    architecture: amd64
+    as: latest
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.11"
+  steps:
+    test:
+    - as: openshift-pipelines-nightly-e2e
+      cli: latest
+      commands: "printenv KUBECONFIG\nprintenv KUBEADMIN_PASSWORD_FILE\noc get node\noc
+        config view\noc whoami   \n./automation/e2e-deploy-openshift-resources.sh
+        nightly\nmake test-e2e-openshift\n"
+      from: base-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: p
+  org: openshift-pipelines
+  repo: tektoncd-catalog
