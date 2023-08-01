@@ -3,17 +3,18 @@ workflow:
   steps:
     allow_best_effort_post_steps: true
     env:
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: "m5.4xlarge"
+      API_HOST: stage
       PARALLEL: "true"
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
     post:
     - chain: ipi-aws-post
+    - ref : firewatch-report-issues
     pre:
     - chain: ipi-aws-pre
     - ref: operator-install
     - ref: addon-install
   documentation: |-
-    This workflow provision an OpenShift cluster with default configurations on AWS. 
+    This workflow provision an OpenShift IPI cluster with default configurations on AWS. 
     The cluster is set with telemetry step generates a "${SHARED_DIR}/manifest_cluster-monitoring-config.yaml" manifest, and 
     generates the AWS-specific install-config.yaml contents based on the cluster profile, located in "${SHARED_DIR}/install-config.yaml".
     It then install required addons and operators on the cluster.
