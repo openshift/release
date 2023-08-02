@@ -2,46 +2,6 @@
 
 set -ex
 
-
-# W/A for https://issues.redhat.com/browse/CNV-31504
-# remove once CRI-O permissions issue for block devices is resolved
-function create_crio_mc() {
-  local TARGET=$1
-  oc apply -f - <<EOF
-  apiVersion: machineconfiguration.openshift.io/v1
-  kind: MachineConfig
-  metadata:
-    name: 99-${TARGET}-crio-fix
-    labels:
-      machineconfiguration.openshift.io/role: ${TARGET}
-  spec:
-    config:
-      ignition:
-        version: 3.2.0
-      storage:
-        files:
-          - path: /etc/crio/crio.conf
-            mode: 420
-            contents:
-              source: "data:;base64,${CONTENTS}"
-            overwrite: true
-EOF
-}
-DEBUG_NS=debug-ns
-oc create ns ${DEBUG_NS}
-oc label ns ${DEBUG_NS} security.openshift.io/scc.podSecurityLabelSync=false --overwrite
-oc label ns ${DEBUG_NS} pod-security.kubernetes.io/enforce=privileged --overwrite
-
-NODE_NAME=$(oc get nodes -o json | jq -r .items[0].metadata.name) # all nodes have the same crio config
-oc debug node/${NODE_NAME} --to-namespace ${DEBUG_NS} -- chroot /host cat /etc/crio/crio.conf > /tmp/crio.conf.tmp
-sed '/^\[crio\.runtime\]/a device_ownership_from_security_context = true' /tmp/crio.conf.tmp > /tmp/crio.conf
-CONTENTS=$(cat /tmp/crio.conf | base64 -w 0)
-create_crio_mc worker
-create_crio_mc master
-sleep 5
-oc wait mcp master worker --for condition=updated --timeout=60m
-###  End of W/A ###
-
 CNV_PRERELEASE_VERSION=${CNV_PRERELEASE_VERSION:-}
 
 if [ -z "${CNV_PRERELEASE_VERSION}" ]
