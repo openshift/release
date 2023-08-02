@@ -9,8 +9,6 @@ images:
 - dockerfile_path: build/Dockerfile
   from: src
   to: dvo-operator
-- from: operator-sdk
-  to: src
 resources:
   '*':
     limits:
@@ -56,7 +54,7 @@ tests:
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 1h0m0s
+    timeout: 2h0m0s
     version: "4.12"
   steps:
     test:
@@ -65,14 +63,16 @@ tests:
       commands: |
         sed -i "48 s|quay.io/deployment-validation-operator/dv-operator:latest|${DVO_OPERATOR}|" deploy/openshift/operator.yaml
         sed -i '30,35d' deploy/openshift/operator.yaml
-        operator-sdk generate bundle --package=deployment-validation-operator --input-dir=/go/src/github.com/app-sre/deployment-validation-operator/deploy/openshift
+        ${OPERATOR_SDK} generate bundle --package=deployment-validation-operator --input-dir=/go/src/github.com/app-sre/deployment-validation-operator/deploy/openshift
         podman build -f bundle.Dockerfile -t quay.io/jfula/dvo-bundle-test
         podman push quay.io/jfula/dvo-bundle-test
-        operator-sdk run bundle quay.io/jfula/dvo-bundle-test:latest --namespace openshift-operators --skip-tls
+        ${OPERATOR_SDK} run bundle quay.io/jfula/dvo-bundle-test:latest --namespace openshift-operators --skip-tls
         oc wait --for condition=Available -n openshift-operators deployment-operator
       dependencies:
       - env: DVO_OPERATOR
         name: dvo-operator
+      - env: OPERATOR_SDK
+        name: operator-sdk
       from: src
       resources:
         requests:
