@@ -24,7 +24,7 @@ HOSTED_CP=${HOSTED_CP:-false}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
 PRIVATE_SUBNET_ONLY=${PRIVATE_SUBNET_ONLY:-false}
-CLUSTER_TAGS=${CLUSTER_TAGS:-"ciprow:${CLUSTER_NAME}"}
+CLUSTER_TAGS=${CLUSTER_TAGS:-"prowci:${CLUSTER_NAME}"}
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
@@ -331,7 +331,6 @@ rosa create cluster -y \
                     ${KMS_KEY_SWITCH} \
                     ${PRIVATE_SWITCH} \
                     ${PRIVATE_LINK_SWITCH} \
-                    ${USER_TAGS_SWITCH} \
                     ${PROXY_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
