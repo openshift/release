@@ -81,3 +81,5 @@ until \
     echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
     sleep 1s
 done
+
+echo "Done ${VSPHERE_CLUSTER}"
