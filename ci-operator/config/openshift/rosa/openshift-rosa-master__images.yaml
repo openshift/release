@@ -5,12 +5,12 @@ base_images:
     tag: cli
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
 images:
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/openshift/release:golang-1.18 as builder
+    FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14 as builder
     WORKDIR /go/src/github.com/openshift/rosa
     RUN go install ./cmd/rosa
     RUN rosa version
@@ -34,7 +34,7 @@ images:
       - registry.ci.openshift.org/origin/4.10:cli
     src:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: rosa-aws-cli
 promotion:
   namespace: ci
