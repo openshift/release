@@ -14,7 +14,7 @@ RUN_COMMAND="poetry run pytest tests \
             --pytest-log-file='${ARTIFACT_DIR}/pytest-tests.log' \
             -m ${TEST_MARKER} \
             --data-collector=data-collector_containerized.yaml"
-KUBECONFIG_COMMAND="--kubeconfig-file-paths="${KUBECONFIG1_PATH},${KUBECONFIG2_PATH},${KUBECONFIG3_PATH}" "
+KUBECONFIG_COMMAND="--kubeconfig-file-paths="${KUBECONFIG1_PATH},${KUBECONFIG2_PATH}" "
 
 RUN_COMMAND+=" ${KUBECONFIG_COMMAND} "
 
