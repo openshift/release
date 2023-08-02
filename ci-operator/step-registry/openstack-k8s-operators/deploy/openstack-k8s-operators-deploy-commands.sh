@@ -100,7 +100,7 @@ if [[ "$SERVICE_NAME" == "OPENSTACK" ]]; then
   export ${SERVICE_NAME}_CR=/go/src/github.com/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}/${OPENSTACK_CTLPLANE}
 fi
 
-make ceph DATA_SIZE=${CEPH_DATASIZE} TIMEOUT=${CEPH_TIMEOUT} HOSTNETWORK=${CEPH_HOSTNETWORK}
+make ceph
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
