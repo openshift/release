@@ -80,7 +80,15 @@ spec:
         - mountPath: /var/run/secrets/openshift.io/push
           name: dockercfg
           readOnly: true
+        - name: secret-volume
+          mountPath: /root/.docker
   volumes:
+    - name: secret-volume
+      secret:
+        secretName: pull-secret
+        items:
+        - key: .dockerconfigjson
+          path: config.json
     - name: dockercfg
       defaultMode: 384
       secret:
