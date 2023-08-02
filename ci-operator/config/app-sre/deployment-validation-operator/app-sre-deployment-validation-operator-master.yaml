@@ -61,8 +61,8 @@ tests:
     - as: install
       cli: latest
       commands: |
-        sed -i "48 s|quay.io/deployment-validation-operator/dv-operator:latest|${DVO_OPERATOR}|" /go/src/github.com/app-sre/deployment-validation-operator/deploy/openshift/operator.yaml
-        sed -i '30,35d' /go/src/github.com/app-sre/deployment-validation-operator/deploy/openshift/operator.yaml
+        sed -i "48 s|quay.io/deployment-validation-operator/dv-operator:latest|${DVO_OPERATOR}|" deployment-validation-operator/deploy/openshift/operator.yaml
+        sed -i '30,35d' deployment-validation-operator/deploy/openshift/operator.yaml
         operator-sdk generate bundle --package=deployment-validation-operator --input-dir=/go/src/github.com/app-sre/deployment-validation-operator/deploy/openshift
         podman build -f bundle.Dockerfile -t quay.io/jfula/dvo-bundle-test
         podman push quay.io/jfula/dvo-bundle-test
@@ -71,7 +71,7 @@ tests:
       dependencies:
       - env: DVO_OPERATOR
         name: dvo-operator
-      from: operator-sdk
+      from: src
       resources:
         requests:
           cpu: 100m
