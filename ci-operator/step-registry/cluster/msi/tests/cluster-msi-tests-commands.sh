@@ -8,6 +8,9 @@ set -o verbose
 # Extract clusters archive from SHARED_DIR
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
 
+sleep 500000
+
+
 RUN_COMMAND="poetry run pytest tests \
             -s -o log_cli=true \
             --junit-xml='${ARTIFACT_DIR}/xunit_results.xml' \
@@ -20,6 +23,5 @@ RUN_COMMAND+=" ${KUBECONFIG_COMMAND} "
 
 echo "$RUN_COMMAND"
 
-sleep 500000
 
 ${RUN_COMMAND}
