@@ -40,10 +40,10 @@ mkdir -p /tmp/artifacts
 function run-tests() {
   pushd crc
   set +e
-  /tmp/crc config set preset microshift
-  /tmp/crc config set pull-secret-file ~/pull-secret
-  /tmp/crc setup
-  /tmp/crc start
+  export PULL_SECRET_FILE=--pull-secret-file="${HOME}"/pull-secret
+  export BUNDLE_LOCATION=--bundle-location=""
+  export CRC_BINARY=--crc-binary=/tmp/
+  make e2e-story-microshift
   if [[ $? -ne 0 ]]; then
     exit 1
     popd
