@@ -19,9 +19,7 @@ export GSHEET_KEY_LOCATION
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
-#export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE "
-#export NAMESPACED_ITERATIONS=${NAMESPACED_ITERATIONS:-false}
-#export EXTRA_FLAGS=${EXTRA_FLAGS:-}
+export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE"
 export WORKLOAD=node-density-heavy
 
 export CLEANUP_WHEN_FINISH=true
