@@ -24,6 +24,7 @@ HOSTED_CP=${HOSTED_CP:-false}
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
 PRIVATE_SUBNET_ONLY=${PRIVATE_SUBNET_ONLY:-false}
+CLUSTER_TAGS=${CLUSTER_TAGS:-"prowci:${CLUSTER_NAME}"}
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
@@ -264,6 +265,7 @@ echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
+echo "  Cluster Tags: ${CLUSTER_TAGS}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
   echo "  Min replicas: ${MIN_REPLICAS}"
@@ -284,6 +286,7 @@ rosa create cluster -y \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
+--tags ${CLUSTER_TAGS} \
 ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
 ${MULTI_AZ_SWITCH} \
 ${COMPUTE_NODES_SWITCH} \
