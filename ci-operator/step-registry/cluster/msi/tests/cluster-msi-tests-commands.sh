@@ -9,7 +9,7 @@ set -o verbose
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
 
 RUN_COMMAND="poetry run pytest tests \
-            -s -o log_cli=true \
+            -s -o log_cli=true --pdb \
             --junit-xml='${ARTIFACT_DIR}/xunit_results.xml' \
             --pytest-log-file='${ARTIFACT_DIR}/pytest-tests.log' \
             -m ${TEST_MARKER} \
