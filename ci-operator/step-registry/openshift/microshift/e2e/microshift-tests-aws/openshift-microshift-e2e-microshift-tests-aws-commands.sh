@@ -20,6 +20,10 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
+cat >> ${SHARED_DIR}/custom-links.txt << EOF
+  <a target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/openshift_microshift/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/openshift-microshift-e2e-microshift-tests-aws/artifacts/log.html" title="Robot Framework's log.html">log.html</a>
+EOF
+
 # Robot Framework setup and execution.
 cat << EOF >/tmp/variables.yaml
 USHIFT_HOST: ${IP_ADDRESS}
