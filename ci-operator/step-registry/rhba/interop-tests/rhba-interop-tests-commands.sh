@@ -11,7 +11,7 @@ echo "Running tests..."
 
 echo "Adding junit prefix for xml test reports"
 cd "${ARTIFACT_DIR}"
-for file in "*.xml"
+for file in *.xml
 do
   mv "$file" "junit_${file}"
 done
