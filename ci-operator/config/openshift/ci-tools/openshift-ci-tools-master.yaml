@@ -200,6 +200,23 @@ images:
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD ci-images-mirror /usr/bin/ci-images-mirror
+    ADD usr/bin/oc /usr/bin/oc
+    ENTRYPOINT ["ci-images-mirror"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-images-mirror
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: ci-images-mirror
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
     ADD prcreator /usr/bin/prcreator
     ENTRYPOINT ["prcreator"]
   from: os
