@@ -4,6 +4,18 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.19
+images:
+- dockerfile_literal: |
+    # Dockerfile to bootstrap build and test in openshift-ci
+    FROM registry.ci.openshift.org/openshift/release:golang-1.19
+    WORKDIR /home
+    COPY . .
+    RUN yum -y install make wget gcc git httpd-tools
+
+    RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
+    RUN chmod +x ./kubectl
+    RUN mv ./kubectl /usr/local/bin
+  to: src-kubectl
 promotion:
   name: "4.14"
   namespace: ocp
@@ -30,9 +42,10 @@ tests:
   container:
     from: bin
 - as: test-integration
-  commands: make test-integration
+  commands: |
+    make test-integration
   container:
-    from: bin
+    from: src-kubectl
 - as: test-e2e
   steps:
     cluster_profile: aws
@@ -40,9 +53,8 @@ tests:
     - as: test-e2e
       cli: latest
       commands: |
-        make kubectl
         make test-e2e
-      from: src
+      from: src-kubectl
       resources:
         requests:
           cpu: 100m
