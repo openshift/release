@@ -16,6 +16,7 @@ To execute RHBA interop tests. All XML results will be saved into "$ARTIFACT_DIR
 
 This script does the following to run RHBA interop tests:
 1. Run `/opt/runTest.sh` script to execute tests.
+2. Add 'junit_' prefix to all xml tests reports
 
 ## Prerequisite(s)
 
