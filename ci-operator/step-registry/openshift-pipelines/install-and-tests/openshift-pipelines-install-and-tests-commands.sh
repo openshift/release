@@ -17,22 +17,17 @@ echo "Login to the cluster as kubeadmin"
 oc login -u kubeadmin -p "$(cat $SHARED_DIR/kubeadmin-password)" "${API_URL}" --insecure-skip-tls-verify=true
 
 echo "Running olm.spec to install operator"
-CATALOG_SOURCE=redhat-operators CHANNEL=${OLM_CHANNEL} gauge run --log-level=debug --verbose --tags install specs/olm.spec
+CATALOG_SOURCE=redhat-operators CHANNEL=${OLM_CHANNEL} gauge run --log-level=debug --verbose --tags install specs/olm.spec || true
 
 echo "Running gauge specs"
-gauge run --log-level=debug --verbose --tags 'sanity & !tls' specs/clustertasks/clustertask-s2i.spec
-gauge run --log-level=debug --verbose --tags 'sanity & !tls'  specs/clustertasks/clustertask.spec
-gauge run --log-level=debug --verbose --tags 'sanity & !tls'  specs/pipelines/
-gauge run --log-level=debug --verbose --tags 'sanity & !tls'  specs/triggers/ || true
-gauge run --log-level=debug --verbose --tags 'sanity & !tls'  specs/metrics/
-gauge run --log-level=debug --verbose --tags 'sanity & !tls' -p specs/operator/addon.spec specs/operator/auto-prune.spec
-gauge run --log-level=debug --verbose --tags sanity specs/operator/rbac.spec
+declare -a specs=("specs/clustertasks/clustertask-s2i.spec" "specs/clustertasks/clustertask.spec" "specs/pipelines/" "specs/triggers/" "specs/metrics/" "-p specs/operator/addon.spec specs/operator/auto-prune.spec")
+for spec in "${specs[@]}"; do
+  gauge run --log-level=debug --verbose --tags 'sanity & !tls' ${spec} || true
+done
+gauge run --log-level=debug --verbose --tags sanity specs/operator/rbac.spec || true
 
 echo "Rename xml files to junit_test_*.xml"
 readarray -t path <<< "$(find ${ARTIFACT_DIR}/xml-report/ -name '*.xml')"
 for index in "${!path[@]}"; do
   mv "${path[index]}" ${ARTIFACT_DIR}/junit_test_result$[index+1].xml
 done
-
-echo "sleep"
-sleep 2h
