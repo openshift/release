@@ -39,7 +39,7 @@ oc adm policy add-scc-to-user privileged system:serviceaccount:${E2E_PROVIDER_NA
 echo "Created E2E Provider ServiceAccount"
 
 echo "Creating E2E Provider DaemonSet"
-cat <<EOF >>${E2E_PROVIDER_DAEMONSET_LOCATION}
+cat <<EOF >${E2E_PROVIDER_DAEMONSET_LOCATION}
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -100,22 +100,19 @@ cat ${E2E_PROVIDER_DAEMONSET_LOCATION}
 oc create -f ${E2E_PROVIDER_DAEMONSET_LOCATION}
 echo "Created E2E Provider DaemonSet from file ${E2E_PROVIDER_DAEMONSET_LOCATION}"
 
-export E2E_PROVIDER_GET_ARGS="-n ${E2E_PROVIDER_NAMESPACE} --selector=${E2E_PROVIDER_SELECTOR}"
-echo "Waiting for E2E Provider pods to be created"
-loop_counter=0
-while true; do
-	oc get pods ${E2E_PROVIDER_GET_ARGS} && break
-	if [ ${loop_counter} -eq 60 ]; then
-		echo "Timed out while waiting for E2E Provider pods to be created"
-		exit 1
-	fi
-	loop_counter=${loop_counter}+1
-	sleep 5
-done
+echo "Getting list of worker nodes on the cluster"
+oc get nodes --selector='node-role.kubernetes.io/worker' --no-headers
+NUM_WORKER_NODES=$(oc get nodes --selector='node-role.kubernetes.io/worker' --no-headers | wc -l)
+echo "NUM_WORKER_NODES = ${NUM_WORKER_NODES}"
 
 echo "Waiting for E2E Provider pods to be Ready"
-if ! oc wait pod ${E2E_PROVIDER_GET_ARGS} --for=condition=Ready --timeout=300s; then
+E2E_PROVIDER_GET_ARGS="-n ${E2E_PROVIDER_NAMESPACE} --selector=${E2E_PROVIDER_SELECTOR}"
+OC_WAIT_ARGS="--for=jsonpath=.status.numberReady=${NUM_WORKER_NODES} --timeout=300s"
+if ! oc wait daemonset ${E2E_PROVIDER_GET_ARGS} ${OC_WAIT_ARGS}; then
+	oc describe daemonset ${E2E_PROVIDER_GET_ARGS}
+	oc get daemonset ${E2E_PROVIDER_GET_ARGS} -o yaml
 	echo "Wait failed, E2E Provider pods did not reach Ready state"
 	exit 1
 fi
+oc get pods ${E2E_PROVIDER_GET_ARGS}
 echo "E2E Provider pods are Ready"
