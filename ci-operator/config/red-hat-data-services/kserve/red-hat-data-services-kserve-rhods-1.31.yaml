@@ -38,6 +38,9 @@ images:
       as:
       - golang:1.20
   to: kserve-agent
+- context_dir: qpext/
+  dockerfile_path: qpext.Dockerfile
+  to: kserve-queue-proxy
 - context_dir: .
   dockerfile_path: router.Dockerfile
   to: kserve-router
@@ -51,6 +54,7 @@ promotion:
   excluded_images:
   - kserve-controller
   - kserve-agent
+  - kserve-queue-proxy
   - kserve-router
   - kserve-storage-initializer
   - sklearn-serving-runtime
@@ -70,6 +74,13 @@ tests:
       SOURCE_IMAGE_REF: kserve-agent
     env:
       IMAGE_REPO: kserve-agent
+    workflow: red-hat-data-services-ci-image-mirror
+- as: pr-image-mirror-kserve-queue-proxy
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-queue-proxy
+    env:
+      IMAGE_REPO: kserve-queue-proxy
     workflow: red-hat-data-services-ci-image-mirror
 - as: pr-image-mirror-kserve-router
   steps:
@@ -99,6 +110,15 @@ tests:
       SOURCE_IMAGE_REF: kserve-agent
     env:
       IMAGE_REPO: kserve-agent
+      RELEASE_VERSION: stable
+    workflow: red-hat-data-services-ci-image-mirror
+- as: stable-image-mirror-kserve-queue-proxy
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-queue-proxy
+    env:
+      IMAGE_REPO: kserve-queue-proxy
       RELEASE_VERSION: stable
     workflow: red-hat-data-services-ci-image-mirror
 - as: stable-image-mirror-kserve-router
@@ -134,6 +154,14 @@ tests:
       SOURCE_IMAGE_REF: kserve-agent
     env:
       IMAGE_REPO: kserve-agent
+      RELEASE_VERSION: rhods-1.31-nightly
+    workflow: red-hat-data-services-ci-image-mirror
+- as: nightly-image-mirror-kserve-queue-proxy
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: kserve-queue-proxy
+    env:
+      IMAGE_REPO: kserve-queue-proxy
       RELEASE_VERSION: rhods-1.31-nightly
     workflow: red-hat-data-services-ci-image-mirror
 - as: nightly-image-mirror-kserve-router
