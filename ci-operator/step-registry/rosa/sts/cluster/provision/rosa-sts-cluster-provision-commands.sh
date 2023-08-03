@@ -265,7 +265,7 @@ echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
-echo "  User Tags: ${USER_TAGS}"
+echo "  Cluster Tags: ${CLUSTER_TAGS}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
   echo "  Min replicas: ${MIN_REPLICAS}"
@@ -298,7 +298,6 @@ ${FIPS_SWITCH} \
 ${KMS_KEY_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
-${USER_TAGS_SWITCH} \
 ${PROXY_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
