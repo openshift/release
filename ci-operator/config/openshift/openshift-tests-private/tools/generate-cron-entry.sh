@@ -21,7 +21,7 @@ fi
 TEST_NAME="$1"    # aws-c2s-ipi-disconnected-private-p2-f7
 YAML_FILE="$2"    # openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml
 
-if [[ "${TEST_NAME}" =~ (baremetal-|-disabled) ]] && [[ "$@" != *\ --force* ]]; then
+if [[ "${TEST_NAME}" =~ (baremetal-|-disabled|powervs-) ]] && [[ "$@" != *\ --force* ]]; then
     echo "The test config ${TEST_NAME} should not get changes in the cron entry as
       the schedule rotation scheme is different than the other tests.
       Use --force to skip this check."
