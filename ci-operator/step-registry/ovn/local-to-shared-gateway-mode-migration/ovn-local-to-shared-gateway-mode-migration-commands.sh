@@ -10,8 +10,8 @@ oc patch Network.operator.openshift.io cluster --type='merge' --patch "{\"spec\"
 
 oc wait co network --for='condition=PROGRESSING=True' --timeout=60s
 # Wait until the ovn-kubernetes pods are restarted
-timeout 360s oc rollout status ds/ovnkube-node -n openshift-ovn-kubernetes
-timeout 360s oc rollout status ds/ovnkube-master -n openshift-ovn-kubernetes
+timeout 720s oc rollout status ds/ovnkube-node -n openshift-ovn-kubernetes
+timeout 720s oc rollout status ds/ovnkube-master -n openshift-ovn-kubernetes
 
 # ensure the gateway mode change was successful, if not no use proceeding with the test
 mode=$(oc get Network.operator.openshift.io cluster -o template --template '{{.spec.defaultNetwork.ovnKubernetesConfig.gatewayConfig.routingViaHost}}')
