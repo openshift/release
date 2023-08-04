@@ -21,4 +21,9 @@ chmod 0600 "${HOME}/.ssh/config"
 
 trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info ${ARTIFACT_DIR}' EXIT
 
-ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/microshift/test/bin/ci_phase_test.sh"
+SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
+if [[ "$JOB_NAME" =~ .*periodic.* ]]; then
+  SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-periodics"
+fi
+
+ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_test.sh"

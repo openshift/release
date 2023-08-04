@@ -31,5 +31,10 @@ scp "${SETTINGS_FILE}" "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/test/"
 
 trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info ${ARTIFACT_DIR}' EXIT
 
+SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
+if [[ "$JOB_NAME" =~ .*periodic.* ]]; then
+  SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-periodics"
+fi
+
 # Run the in-repo ci phase script to create the VMs for the test scenarios.
-ssh "${INSTANCE_PREFIX}" "/home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh"
+ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh"
