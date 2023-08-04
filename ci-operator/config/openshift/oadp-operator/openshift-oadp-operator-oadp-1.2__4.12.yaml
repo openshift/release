@@ -1,0 +1,78 @@
+base_images:
+  rhel-8-golang-1.19:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.12
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_path: Dockerfile
+  from: rhel-8-golang-1.19
+  to: oadp-operator
+- dockerfile_path: build/ci-Dockerfile
+  from: rhel-8-golang-1.19
+  to: test-oadp-operator-1.2
+operator:
+  bundles:
+  - dockerfile_path: build/Dockerfile.bundle
+  substitutions:
+  - pullspec: quay.io/konveyor/oadp-operator:latest
+    with: oadp-operator
+promotion:
+  excluded_images:
+  - oadp-operator
+  name: test-oadp-operator-1.2
+  namespace: openshift
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 1000m
+      memory: 512Mi
+tests:
+- as: operator-unit-test
+  steps:
+    test:
+    - as: unit
+      commands: HOME=$(pwd) make test
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: operator-unit-test-coverage
+  postsubmit: true
+  steps:
+    test:
+    - as: unit-coverage
+      commands: HOME=$(pwd) make test submit-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: operator-unit-test-periodic
+  cron: 0 4 * * *
+  steps:
+    test:
+    - as: unit-periodic
+      commands: HOME=$(pwd) make test submit-coverage
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+zz_generated_metadata:
+  branch: oadp-1.2
+  org: openshift
+  repo: oadp-operator
+  variant: "4.12"

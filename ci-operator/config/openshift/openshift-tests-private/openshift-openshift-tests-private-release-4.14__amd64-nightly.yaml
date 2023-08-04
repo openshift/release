@@ -84,7 +84,7 @@ tests:
   steps:
     cluster_profile: alibabacloud-qe
     env:
-      E2E_RUN_TAGS: '@amd64 and @alibaba-ipi and @network-ovnkubernetes'
+      E2E_RUN_TAGS: '@amd64 and @alicloud-ipi and @network-ovnkubernetes'
       FIPS_ENABLED: "true"
       TAG_VERSION: '@4.14'
     test:
@@ -95,11 +95,22 @@ tests:
   steps:
     cluster_profile: alibabacloud-qe
     env:
-      E2E_RUN_TAGS: '@amd64 and @alibaba-ipi and @network-ovnkubernetes and @destructive'
+      E2E_RUN_TAGS: '@amd64 and @alicloud-ipi and @network-ovnkubernetes and @destructive'
       FIPS_ENABLED: "true"
       TAG_VERSION: '@4.14'
     test:
     - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
+- as: alibaba-ipi-private-fips-f28-ui
+  cron: 14 14 18 * *
+  steps:
+    cluster_profile: alibabacloud-qe
+    env:
+      E2E_RUN_TAGS: '@amd64 and @alicloud-ipi and @network-ovnkubernetes and @console'
+      FIPS_ENABLED: "true"
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe-ui
     workflow: cucushift-installer-rehearse-alibabacloud-ipi-private
 - as: aws-c2s-ipi-disconnected-private-fips-f14
   cron: 48 12 4,19 * *
@@ -1622,6 +1633,17 @@ tests:
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-private
+- as: azure-ipi-private-workers-marketimage-f28-disabled
+  cron: 0 5 29 2 *
+  steps:
+    cluster_profile: azure-marketplace-qe
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-private-workers-marketimage
 - as: azure-ipi-proxy-tp-f28
   cron: 48 21 18 * *
   steps:
@@ -2160,19 +2182,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-upi
-- as: disabled-azure-ipi-private-workers-marketimage-f28
-  cron: 0 5 29 2 *
-  steps:
-    cluster_profile: azure-marketplace-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      E2E_RUN_TAGS: '@amd64 and @azure-ipi and @network-ovnkubernetes and not @fips'
-      TAG_VERSION: '@4.14'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-private-workers-marketimage
 - as: gcp-ipi-baselinecaps-none-additionalcaps-f28
-  cron: 55 19 24 * *
+  cron: 29 16 29 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2211,7 +2222,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi
 - as: gcp-ipi-compact-filestore-csi-f28
-  cron: 23 7 6 * *
+  cron: 36 2 8 * *
   steps:
     cluster_profile: gcp-qe
     dependency_overrides:
@@ -2248,7 +2259,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private
 - as: gcp-ipi-disconnected-private-workload-identity-f28
-  cron: 18 15 19 * *
+  cron: 2 4 25 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2284,7 +2295,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-workers-rhel8
 - as: gcp-ipi-disk-encryption-f28
-  cron: 34 22 4 * *
+  cron: 55 0 28 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2352,7 +2363,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-ipsec
 - as: gcp-ipi-ovn-mtu-migrate-f28
-  cron: 14 2 18 * *
+  cron: 22 11 25 * *
   steps:
     cluster_profile: gcp-qe
     test:
@@ -2370,7 +2381,7 @@ tests:
     - ref: openshift-extended-test
     workflow: cucushift-installer-rehearse-gcp-ipi-ovn-winc
 - as: gcp-ipi-private-disasterrecovery-f14
-  cron: 45 22 2,17 * *
+  cron: 24 13 2,17 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2395,7 +2406,7 @@ tests:
     - chain: openshift-e2e-test-qe-long-duration
     workflow: cucushift-installer-rehearse-gcp-ipi-private
 - as: gcp-ipi-proxy-etcd-encryption-f28
-  cron: 49 11 15 * *
+  cron: 49 22 24 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2417,7 +2428,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 - as: gcp-ipi-proxy-private-f28
-  cron: 39 18 19 * *
+  cron: 19 7 2 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2463,7 +2474,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy
 - as: gcp-ipi-sdn-f28
-  cron: 9 5 15 * *
+  cron: 27 0 28 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2484,7 +2495,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-sdn
 - as: gcp-ipi-sdn-migration-ovn-f28
-  cron: 13 21 23 * *
+  cron: 37 17 12 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2517,7 +2528,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-secureboot
 - as: gcp-ipi-sno-f28
-  cron: 16 20 25 * *
+  cron: 38 3 4 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2629,7 +2640,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn
 - as: gcp-ipi-xpn-private-f28
-  cron: 44 10 23 * *
+  cron: 36 15 19 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2650,7 +2661,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-ipi-xpn-private
 - as: gcp-upi-baselinecaps-v413-f28
-  cron: 12 12 7 * *
+  cron: 6 18 20 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2695,7 +2706,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-upi
 - as: gcp-upi-private-xpn-ingress-glb-f28
-  cron: 53 15 7 * *
+  cron: 41 1 23 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2716,7 +2727,7 @@ tests:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-gcp-upi-private-xpn-ingress-glb
 - as: gcp-upi-private-xpn-sdn-f28
-  cron: 12 12 20 * *
+  cron: 36 23 26 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -2775,6 +2786,7 @@ tests:
       E2E_RUN_TAGS: '@amd64 and @ibmcloud-ipi and @network-ovnkubernetes and not @fips
         and @destructive'
       TAG_VERSION: '@4.14'
+      TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-ibmcloud-ipi
