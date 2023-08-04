@@ -19,7 +19,6 @@ fi
 export REPORT_DIR="${ARTIFACT_DIR}"
 
 echo "RELEASE_IMAGE_LATEST=${RELEASE_IMAGE_LATEST}"
-exit 1
 
 /osde2e test --configs "${CONFIGS}" \
 --secret-locations "${SECRET_LOCATIONS}"
