@@ -30,3 +30,9 @@ export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
 rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
 ./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+printenv
+var_names=$(set | grep -E '^[a-zA-Z_]+=' | sed 's/=.*//' | tr '\n' ' ')
+for var_name in $var_names; do
+    eval "export $var_name=\"\$$var_name\""
+done
+printenv
