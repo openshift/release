@@ -34,6 +34,24 @@ else
   exit 1
 fi
 
+# The API_URL is not registered ASAP, we need to wait for a while. 
+API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
+start_time=$(date +"%s")
+while true; do
+  if [[ "${API_URL}" != "null" ]]; then
+    echo "API URL: ${API_URL}"
+    break
+  fi
+  echo "API URL is not registered back. Wait for 60 seconds..."
+  sleep 60
+  API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
+
+  if (( $(date +"%s") - $start_time >= $IDP_TIMEOUT )); then
+    echo "error: Timed out while waiting for the API URL to be ready"
+    exit 1
+  fi
+done
+
 # Config htpasswd idp
 # The expected time for the htpasswd idp configuaration is in 1 minute. But actually, we met the waiting time
 # is over 10 minutes, so we give a loop to wait for the configuration to be active before timeout. 
@@ -46,8 +64,6 @@ rosa create idp -c ${CLUSTER_ID} \
                 --name rosa-htpasswd \
                 --username ${IDP_USER} \
                 --password ${IDP_PASSWD}
-
-API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-verify=true" > "${SHARED_DIR}/api.login"
 
 # Grant cluster-admin access to the cluster
