@@ -9,5 +9,3 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 echo "${CLUSTER_NAME_PREFIX}-$(mktemp -u XXXXX | tr '[:upper:]' '[:lower:]')" > ${SHARED_DIR}/cluster-name
 
 cat ${SHARED_DIR}/cluster-name
-
-cp ${SHARED_DIR}/cluster-name ${ARTIFACT_DIR}/
