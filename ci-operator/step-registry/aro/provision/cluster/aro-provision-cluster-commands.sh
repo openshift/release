@@ -15,7 +15,10 @@ AZURE_AUTH_CLIENT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientId)"
 AZURE_AUTH_CLIENT_SECRET="$(<"${AZURE_AUTH_LOCATION}" jq -r .clientSecret)"
 AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 ARO_WORKER_COUNT=${ARO_WORKER_COUNT:=""}
+ARO_MASTER_VM_SIZE=${ARO_MASTER_VM_SIZE:=""}
 ARO_WORKER_VM_SIZE=${ARO_WORKER_VM_SIZE:=""}
+ARO_APISERVER_VISIBILITY=${ARO_APISERVER_VISIBILITY:="Public"}
+ARO_INGRESS_VISIBILITY=${ARO_INGRESS_VISIBILITY:="Public"}
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
@@ -38,7 +41,7 @@ az provider register -n Microsoft.Compute --wait
 az provider register -n Microsoft.Storage --wait
 az provider register -n Microsoft.Authorization --wait
 
-CREATE_CMD="az aro create --resource-group ${RESOURCEGROUP} --name ${CLUSTER} --vnet ${VNET} --master-subnet master-subnet --worker-subnet worker-subnet "
+CREATE_CMD="az aro create --resource-group ${RESOURCEGROUP} --name ${CLUSTER} --vnet ${VNET} --master-subnet master-subnet --worker-subnet worker-subnet --apiserver-visibility ${ARO_APISERVER_VISIBILITY} --ingress-visibility ${ARO_INGRESS_VISIBILITY} "
 
 
 if [ -f "$PULL_SECRET_FILE"  ]; then
@@ -50,6 +53,11 @@ if [ -f "${SHARED_DIR}/azure_des" ]; then
     des=$(cat ${SHARED_DIR}/azure_des)
     des_id=$(az disk-encryption-set show -n ${des} -g ${RESOURCEGROUP} --query "[id]" -o tsv)
     CREATE_CMD="${CREATE_CMD} --disk-encryption-set ${des_id} --master-encryption-at-host --worker-encryption-at-host "
+fi
+
+# Change master vm size from default
+if [[ -n ${ARO_MASTER_VM_SIZE} ]]; then
+    CREATE_CMD="${CREATE_CMD} --master-vm-size ${ARO_MASTER_VM_SIZE}"
 fi
 
 # Change worker vm size from default
