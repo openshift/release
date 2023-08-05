@@ -15,6 +15,9 @@ images:
     RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
     RUN chmod +x ./kubectl
     RUN mv ./kubectl /usr/local/bin
+
+    # TODO: to be replaced with oc binary download steps
+    FROM openshift/origin-cli
   to: src-kubectl
 promotion:
   name: "4.14"
@@ -43,6 +46,9 @@ tests:
     from: bin
 - as: test-integration
   commands: |
+    oc create serviceaccount pipeline
+    oc adm policy add-scc-to-user privileged -z default
+    oc adm policy add-role-to-user edit -z default
     oc adm policy add-scc-to-user privileged -z pipeline
     oc adm policy add-role-to-user edit -z pipeline
     make test-integration
@@ -55,6 +61,9 @@ tests:
     - as: test-e2e
       cli: latest
       commands: |
+        oc create serviceaccount pipeline
+        oc adm policy add-scc-to-user privileged -z default
+        oc adm policy add-role-to-user edit -z default
         oc adm policy add-scc-to-user privileged -z pipeline
         oc adm policy add-role-to-user edit -z pipeline
         make test-e2e
