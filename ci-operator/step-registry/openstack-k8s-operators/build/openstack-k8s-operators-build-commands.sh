@@ -99,13 +99,15 @@ function build_push_operator_images {
 
   unset GOFLAGS
   pushd ${OP_DIR}
-  GOWORK='' make build bundle
+  GOWORK='' make build
 
   # Build and push operator image
   oc new-build --binary --strategy=docker --name ${OPERATOR} --to=${IMAGE_TAG_BASE}:${IMAGE_TAG} --push-secret=${PUSH_REGISTRY_SECRET} --to-docker=true
   oc set build-secret --pull bc/${OPERATOR} ${DOCKER_REGISTRY_SECRET}
   oc start-build ${OPERATOR} --from-dir . -F
   check_build_result ${OPERATOR}
+
+  GOWORK='' make bundle
 
   # if it is the metaoperator and any extra dependant bundles exist build and push them here
   local STORAGE_BUNDLE_EXISTS=0
