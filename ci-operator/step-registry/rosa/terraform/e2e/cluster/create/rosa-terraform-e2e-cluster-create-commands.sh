@@ -94,7 +94,7 @@ cluster_id=$(terraform output -json cluster_id | jq -r .)
 echo ${cluster_id} > ${SHARED_DIR}/cluster-id
 
 # get KUBECONFIG kubeadmin-assword
-ocm login --token=${OCM_TOKEN} --url=$(cat terraform.tfvars | grep 'url' | awk -F '=' '{print $2}' | sed 's/[ |"]//g')
+ocm login --token="${OCM_TOKEN}" --url="$(cat terraform.tfvars | grep 'url' | awk -F '=' '{print $2}' | sed 's/[ |"]//g')"
 ocm get /api/clusters_mgmt/v1/clusters/${cluster_id}/credentials | jq -r .kubeconfig     > ${SHARED_DIR}/kubeconfig
 ocm get /api/clusters_mgmt/v1/clusters/${cluster_id}/credentials | jq -r .admin.password > ${SHARED_DIR}/kubeadmin-password
 cp ${SHARED_DIR}/kubeconfig ${ARTIFACT_DIR}/

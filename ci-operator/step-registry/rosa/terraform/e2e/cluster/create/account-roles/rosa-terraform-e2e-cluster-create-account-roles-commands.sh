@@ -6,9 +6,10 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-
-TF_FOLDER="${TF_FOLDER1}"
-TF_ARTIFACT_NAME="${TF_ARTIFACT_NAME1}"
+export TF_FOLDER1="${TF_FOLDER1-ci/e2e/account_roles_files}"
+export TF_FOLDER="${TF_FOLDER1}"
+export TF_ARTIFACT_NAME="${TF_ARTIFACT_NAME1:-account-roles}"
+export TF_ARTIFACT_NAME="${TF_ARTIFACT_NAME1}"
 
 
 # ACCOUNT_ROLE_PREFIX=${ACCOUNT_ROLE_PREFIX:-$NAMESPACE}
