@@ -125,6 +125,20 @@ function getDesiredComputeCount {
   echo "Total desired node count: $desired_compute_count"
 }
 
+# Determine if node count needs to be revised due to day 2 op workaround for medium+ sized clusters
+function fixNodeScaling {
+  machine_pool=$(rosa list machinepool -c "$CLUSTER_ID" -o json)
+  if [[ "$HOSTED_CP" == "false" ]] && [[ `echo "$machine_pool" | jq -e '.[] | has("autoscaling")'` == "true" ]]; then
+    if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
+      if [[ `echo "$machine_pool" | jq -r '.[].autoscaling.min_replicas'` -ne ${MIN_REPLICAS} ]]; then
+        rosa edit machinepool -c "$CLUSTER_ID" Default --min-replicas ${MIN_REPLICAS}
+      fi
+    else
+      rosa edit machinepool -c "$CLUSTER_ID" Default --enable-autoscaling=false --replicas ${REPLICAS}
+    fi
+  fi
+}
+
 # Get cluster 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 echo "CLUSTER_ID is $CLUSTER_ID"
@@ -158,6 +172,9 @@ fi
 # Check if this is a HCP cluster
 is_hcp_cluster="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
 log "hypershift.enabled is set to $is_hcp_cluster"
+
+# Check if we modified the node counts to reduce day 2 op time and fix as necessary
+fixNodeScaling
 
 # Get desired compute node count
 getDesiredComputeCount
