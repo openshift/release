@@ -1,0 +1,30 @@
+ref:
+  as: openshift-qe-pod-service-route
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  commands: openshift-qe-pod-service-route-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  env:
+  - name: OUTPUT_FILE
+    default: "kube-burner-ocp.out"
+    documentation: |-
+      File in which we will parse to find uuid, start and end time
+  - name: NUMBER_OF_NS_PER_NODE
+    default: "30"
+    documentation: |-
+      Number of namespaces per node created by kube-burner
+  - name: GC
+    default: "true"
+    documentation: |-
+      Default is true, which means clean up the pod/resource that kube-burner ocp created, you can set it to false to keep the resouce
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the perfscale pod-service-route workload in the deployed cluster
