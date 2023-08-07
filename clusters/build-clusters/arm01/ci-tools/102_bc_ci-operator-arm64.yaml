@@ -1,0 +1,40 @@
+kind: BuildConfig
+apiVersion: build.openshift.io/v1
+metadata:
+  namespace: ci
+  name: ci-operator-arm64
+spec:
+  successfulBuildsHistoryLimit: 1
+  failedBuildsHistoryLimit: 2
+  output:
+    to:
+      kind: ImageStreamTag
+      name: ci-operator-arm64:latest
+  source:
+    images:
+    - from:
+        kind: ImageStreamTag
+        name: ci-tools-bin-arm64:latest
+        namespace: ci
+      paths:
+      - destinationDir: .
+        sourcePath: /go/bin/ci-operator
+    git:
+      uri: https://github.com/openshift/ci-tools
+    type: Dockerfile
+  strategy:
+    dockerStrategy:
+      from:
+        kind: ImageStreamTag
+        name: centos:stream8
+        namespace: origin
+      imageOptimizationPolicy: SkipLayers
+      dockerfilePath: images/ci-operator/Dockerfile
+    type: Docker
+  triggers:
+  - imageChange:
+      from:
+        kind: ImageStreamTag
+        name: ci-tools-bin-arm64:latest
+        namespace: ci
+    type: ImageChange
