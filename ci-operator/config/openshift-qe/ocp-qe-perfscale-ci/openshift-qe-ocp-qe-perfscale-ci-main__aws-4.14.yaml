@@ -43,12 +43,12 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      WORKER_REPLICA_COUNT: "20"
+      COMPUTE_NODE_REPLICAS: "24"
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
-    - ref: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-ocp-qe-perfscale-ci-tests
 - as: ocp-qe-perfscale-aws-ci-tests-net-perf
   cron: 0 12 * * 2
@@ -56,12 +56,12 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      WORKER_REPLICA_COUNT: "6"
+      COMPUTE_NODE_REPLICAS: "6"
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
-    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-network-perf
 - always_run: false
   as: ocp-qe-perfscale-aws-router-perf-aws
@@ -69,12 +69,12 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      WORKER_REPLICA_COUNT: "20"
+      COMPUTE_NODE_REPLICAS: "24"
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
-    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-router-perf
 - as: ocp-qe-perfscale-aws-node-density-heavy-small-scale
   cron: 0 18 * * 2
@@ -82,13 +82,13 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
       PODS_PER_NODE: "200"
-      WORKER_REPLICA_COUNT: "20"
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
-    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-heavy
 - as: ocp-qe-perfscale-aws-ingress-perf-9nodes-periodic
   cron: 0 21 * * 2
@@ -96,7 +96,7 @@ tests:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "3"
+      COMPUTE_NODE_REPLICAS: "9"
       COMPUTE_NODE_TYPE: m5.2xlarge
       CONFIG: config/standard-classic-rosa.yml
       CONTROL_PLANE_INSTANCE_TYPE: r5.xlarge
@@ -104,13 +104,11 @@ tests:
       OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
       OPENSHIFT_INFRA_NODE_VOLUME_SIZE: "50"
       OPENSHIFT_INFRA_NODE_VOLUME_TYPE: gp3
-      WORKER_REPLICA_COUNT: "9"
       ZONES_COUNT: "3"
     post:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
-    - chain: workers-scale
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-ingress-perf
 zz_generated_metadata:
