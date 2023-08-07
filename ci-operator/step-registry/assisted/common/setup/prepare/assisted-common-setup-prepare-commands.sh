@@ -177,6 +177,8 @@ cat > run_test_playbook.yaml <<-"EOF"
     ASSISTED_TEST_INFRA_IMAGE: "{{ lookup('env', 'ASSISTED_TEST_INFRA_IMAGE')}}"
     CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE')}}"
     OPENSHIFT_INSTALL_RELEASE_IMAGE: "{{ lookup('env', 'OPENSHIFT_INSTALL_RELEASE_IMAGE')}}"
+    BREW_REGISTRY_REDHAT_IO_USERNAME: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/username') }}"
+    BREW_REGISTRY_REDHAT_IO_PASSWORD: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/password') }}"
   tasks:
     - name: Fail on unsupported environment
       fail:
@@ -336,6 +338,12 @@ cat > run_test_playbook.yaml <<-"EOF"
         content: |
           {{ POST_INSTALL_COMMANDS }}
           echo "Finish running post installation script"
+    - name: Log against brew.registry.redhat.io
+      containers.podman.podman_login:
+        username: "{{ BREW_REGISTRY_REDHAT_IO_USERNAME }}"
+        password: "{{ BREW_REGISTRY_REDHAT_IO_PASSWORD }}"
+        registry: brew.registry.redhat.io
+        authfile: /root/pull-secret
 EOF
 
 export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
