@@ -29,6 +29,9 @@ This script does the following to run RHBA interop tests:
 - `OLM_CHANNEL`
   - **Definition**: OLM channel selected for RHBA operator.
   - **If left empty**: This step will use default value i.e., "stable".
+- `TEST_COLLECT_BASE_DIR`
+  - **Definition**: Result directory where are placed test results and logs. This should be set to ARTIFACT_DIR to have results correctly uploaded.
+  - **If left empty**: This step will use default value i.e., "data/results".
   
 ## Custom Images
 
