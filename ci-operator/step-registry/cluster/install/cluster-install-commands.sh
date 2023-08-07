@@ -8,12 +8,17 @@ set -o verbose
 AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
+CLUSTER_DATA_DIR="/tmp/clusters-data"
 
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 export OCM_TOKEN
 
-RUN_COMMAND="poetry run python app/cli.py --action create --clusters-install-data-directory /tmp/clusters-data --ocm-token=$OCM_TOKEN "
+RUN_COMMAND="poetry run python app/cli.py \
+            --action create \
+            --clusters-install-data-directory $CLUSTER_DATA_DIR \
+            --ocm-token=$OCM_TOKEN \
+            --s3-bucket-name=${S3_BUCKET_NAME} "
 
 CLUSTERS_CMD=""
 NUM_CLUSTERS=0
@@ -35,10 +40,6 @@ if [ "${PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
     RUN_COMMAND+=" --parallel"
 fi
 
-if [[ -n "${S3_BUCKET_NAME}" ]]; then
-    RUN_COMMAND+=" --s3-bucket-name=${S3_BUCKET_NAME} "
-fi
-
 if [[ -n "${S3_BUCKET_PATH}" ]]; then
     RUN_COMMAND+=" --s3-bucket-path=${S3_BUCKET_PATH} "
 fi
@@ -52,8 +53,8 @@ echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-toke
 set +e
 ${RUN_COMMAND}
 return_code=$?
-# As SHARED_DIR can only store files, tar the output dirs and store as a file
-tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" --exclude=*terraform --exclude=*.zip -C /tmp/clusters-data .
+# Save cluster_data.yaml files to be used during cluster deletion
+find $CLUSTER_DATA_DIR  -name "cluster_data.yaml"  | tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" -T -
 
 set -e
 exit "$return_code"
