@@ -92,7 +92,7 @@ if [ X"$ret" != X"0" ]; then
     exit 1
 fi
 
-VNET_BASE_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+VNET_BASE_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 # create vnet
 if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then

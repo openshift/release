@@ -30,7 +30,7 @@ echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 
 # Create clustername.txt
-echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/clustername.txt
+echo "${NAMESPACE}-${UNIQUE_HASH}" > "${SHARED_DIR}"/clustername.txt
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
 # Create clusterdomain.txt
@@ -217,6 +217,8 @@ bootstrap_ip_address = "192.168.${third_octet}.3"
 lb_ip_address = "192.168.${third_octet}.2"
 compute_ip_addresses = [${zone_worker_ips%?}]
 control_plane_ip_addresses = [${zone_master_ips%?}]
+control_plane_count = ${MASTER_REPLICAS}
+compute_count = ${WORKER_REPLICAS}
 failure_domains = [
     {
         datacenter = "IBMCloud"

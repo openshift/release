@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "${BASE_DOMAIN:?BASE_DOMAIN env variable should be defined}" > "${SHARED_DIR}"/basedomain.txt
 
-cluster_name="${NAMESPACE}-${JOB_NAME_HASH}"
+cluster_name="${NAMESPACE}-${UNIQUE_HASH}"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 

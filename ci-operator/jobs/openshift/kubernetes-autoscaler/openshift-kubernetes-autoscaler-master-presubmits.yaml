@@ -153,7 +153,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-azure-operator
     decorate: true
     labels:
@@ -307,10 +307,12 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build04
     context: ci/prow/e2e-hypershift
     decorate: true
     labels:
+      ci-operator.openshift.io/cloud: hypershift
+      ci-operator.openshift.io/cloud-cluster-profile: hypershift
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-kubernetes-autoscaler-master-e2e-hypershift
@@ -322,8 +324,10 @@ presubmits:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-hypershift-cluster-profile
         - --target=e2e-hypershift
         command:
         - ci-operator
@@ -334,9 +338,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
+        - mountPath: /usr/local/e2e-hypershift-cluster-profile
+          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -348,9 +357,18 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-hypershift
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -363,7 +381,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build04
     context: ci/prow/git-history
     decorate: true
     labels:
@@ -412,7 +430,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build04
     context: ci/prow/goimports
     decorate: true
     labels:
@@ -461,7 +479,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build04
     context: ci/prow/golint
     decorate: true
     labels:
@@ -509,7 +527,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build04
     context: ci/prow/govet
     decorate: true
     labels:
@@ -557,7 +575,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build04
     context: ci/prow/images
     decorate: true
     labels:
@@ -606,7 +624,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build02
+    cluster: build04
     context: ci/prow/unit
     decorate: true
     labels:

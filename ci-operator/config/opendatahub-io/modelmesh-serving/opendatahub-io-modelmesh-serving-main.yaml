@@ -5,8 +5,21 @@ base_images:
     tag: "8"
 build_root:
   project_image:
-    dockerfile_path: Dockerfile.develop
+    dockerfile_literal: "FROM registry.access.redhat.com/ubi8/go-toolset:1.19\nENV
+      GOBIN=/go/bin\nENV PATH=/usr/local/go/bin:${GOBIN}:$PATH\nUSER root\n# Prow
+      expects to be able to check out a repo under /go \nWORKDIR /go\nRUN umask 0111
+      && find /go -type d -not -perm -0775 | xargs --max-procs 10 --max-args 100 --no-run-if-empty
+      chmod g+xw"
 images:
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  context_dir: .
+  dockerfile_path: Dockerfile.develop.ci
+  from: src
+  to: modelmesh-serving-develop
 - build_args:
   - name: COMMIT_SHA
     value: ci-sha
@@ -16,7 +29,7 @@ images:
   dockerfile_path: Dockerfile
   from: ubi_minimal
   inputs:
-    root:
+    modelmesh-serving-develop:
       as:
       - ${DEV_IMAGE}
   to: modelmesh-serving
@@ -38,33 +51,12 @@ resources:
       memory: 200Mi
 tests:
 - as: unit
-  commands: |
-    export HOME=/go
-    make test
+  commands: make test
   container:
-    from: src
+    from: modelmesh-serving-develop
   run_if_changed: ^(apis/.*|controllers/.*|pkg/.*|Dockerfile|main\.go|go\.mod|go\.sum)
-- as: fvt
-  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum)
-  steps:
-    cluster_profile: gcp
-    env:
-      COMPUTE_NODE_TYPE: n2-standard-8
-    test:
-    - as: fvt
-      commands: "export HOME=/go\nexport NAMESPACE=modelmesh-serving\nexport MODELMESH_SERVING_IMAGE=${PR_MODELMESH_SERVING_IMAGE}
-        \  \ncat  ./config/internal/base/deployment.yaml.tmpl     \nmake e2e-test\n"
-      dependencies:
-      - env: PR_MODELMESH_SERVING_IMAGE
-        name: modelmesh-serving
-      from: src
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 3Gi
-    workflow: ipi-gcp
 - as: fvt-odh-manifests
-  run_if_changed: ^(opendatahub/odh-manifests)
+  run_if_changed: ^(apis/.*|controllers/.*|fvt/.*|pkg/.*|scripts/.*|proto/.*|config/.*|Makefile|main\.go|Dockerfile|go\.mod|go\.sum|opendatahub/odh-manifests)
   steps:
     cluster_profile: aws
     env:
@@ -77,7 +69,7 @@ tests:
       dependencies:
       - env: PR_MODELMESH_SERVING_IMAGE
         name: modelmesh-serving
-      from: src
+      from: modelmesh-serving-develop
       resources:
         requests:
           cpu: 2000m

@@ -5,8 +5,8 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
-    context: ci/prow/ci-index-volsync-bundle
+    cluster: build03
+    context: ci/prow/ci-bundle-volsync-bundle
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -14,15 +14,15 @@ presubmits:
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-backube-volsync-main-ci-index-volsync-bundle
-    rerun_command: /test ci-index-volsync-bundle
+    name: pull-ci-backube-volsync-main-ci-bundle-volsync-bundle
+    rerun_command: /test ci-bundle-volsync-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index-volsync-bundle
+        - --target=volsync-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -49,9 +49,9 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index-volsync-bundle,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-bundle-volsync-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -68,6 +68,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-backube-volsync-main-e2e-openshift
     rerun_command: /test e2e-openshift
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -126,7 +127,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openshift,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -143,6 +144,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-backube-volsync-main-e2e-openshift-fips
     rerun_command: /test e2e-openshift-fips
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -201,7 +203,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openshift-fips,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
@@ -218,6 +220,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-backube-volsync-main-e2e-openshift-helm
     rerun_command: /test e2e-openshift-helm
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:
@@ -280,7 +283,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -327,11 +330,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build01
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -342,6 +345,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-backube-volsync-main-unit
     rerun_command: /test unit
+    skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
     spec:
       containers:
       - args:

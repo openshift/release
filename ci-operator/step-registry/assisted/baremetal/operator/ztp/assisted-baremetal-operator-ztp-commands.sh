@@ -74,6 +74,43 @@ else
   cat "${EXTRA_BAREMETALHOSTS_FILE}" | jq --arg DAY_2_HOSTS ${NUMBER_OF_DAY2_HOSTS:-0} '.[:-($DAY_2_HOSTS | tonumber)]' > /root/dev-scripts/cluster_bmh.json
 fi
 
+cat > machine_config_pool.yaml << END
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfigPool
+metadata:
+  name: infra
+spec:
+  machineConfigSelector:
+    matchExpressions:
+      - {key: machineconfiguration.openshift.io/role, operator: In, values: [worker,infra]}
+  maxUnavailable: null
+  nodeSelector:
+    matchLabels:
+      node-role.kubernetes.io/infra: ""
+  paused: false
+END
+
+cat > machine_config.yaml << END
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: infra
+  name: 50-infra
+spec:
+  config:
+    ignition:
+      version: 2.2.0
+    storage:
+      files:
+      - contents:
+          source: data:,test
+        filesystem: root
+        mode: 0644
+        path: /etc/testinfra
+END
+
+
 cat /root/dev-scripts/cluster_bmh.json
 
 EXTRA_BAREMETALHOSTS_FILE="/root/dev-scripts/cluster_bmh.json" ./deploy_spoke_cluster.sh

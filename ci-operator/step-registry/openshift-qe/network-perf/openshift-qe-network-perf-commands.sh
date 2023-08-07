@@ -23,4 +23,8 @@ oc delete ns netperf --wait=true --ignore-not-found=true
 # Only store the results from the full run versus the smoke test.
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-WORKLOAD=full-run.yaml ./run.sh
+export TOLERANCE=90
+
+rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
+
+WORKLOAD=full-run.yaml ./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"

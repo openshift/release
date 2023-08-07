@@ -29,12 +29,19 @@ fi
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 export OVIRT_CONFIG=${SHARED_DIR}/ovirt-config.yaml
 
-if [[ "${CLUSTER_TYPE}" == "ibmcloud" ]]; then
+if [[ "${CLUSTER_TYPE}" == "ibmcloud"* ]]; then
   IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
   export IC_API_KEY
 fi
 if [[ "${CLUSTER_TYPE}" == "vsphere" ]]; then
-    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    declare cloud_where_run
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/vsphere_context.sh"
+    if [ "$cloud_where_run" == "IBMC-DEVQE" ]; then
+        export SSL_CERT_FILE=/var/run/devqe-secrets/vcenter-certificate
+    else
+        export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    fi
 fi
 
 echo "Deprovisioning cluster ..."

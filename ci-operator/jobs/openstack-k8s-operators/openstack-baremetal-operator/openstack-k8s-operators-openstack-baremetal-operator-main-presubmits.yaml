@@ -1,11 +1,11 @@
 presubmits:
   openstack-k8s-operators/openstack-baremetal-operator:
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
@@ -13,6 +13,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-openstack-baremetal-operator-main-images
     rerun_command: /test images
+    skip_if_only_changed: ^renovate.json|^README.md
     spec:
       containers:
       - args:
@@ -48,19 +49,20 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build03
-    context: ci/prow/openstack-baremetal-operator-build
+    cluster: build05
+    context: ci/prow/openstack-baremetal-operator-build-deploy
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openstack-k8s-operators-openstack-baremetal-operator-main-openstack-baremetal-operator-build
+    name: pull-ci-openstack-k8s-operators-openstack-baremetal-operator-main-openstack-baremetal-operator-build-deploy
     optional: true
-    rerun_command: /test openstack-baremetal-operator-build
+    rerun_command: /test openstack-baremetal-operator-build-deploy
+    skip_if_only_changed: ^renovate.json|^README.md
     spec:
       containers:
       - args:
@@ -69,7 +71,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=openstack-baremetal-operator-build
+        - --target=openstack-baremetal-operator-build-deploy
         command:
         - ci-operator
         image: ci-operator:latest
@@ -108,21 +110,21 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openstack-baremetal-operator-build,?($|\s.*)
+    trigger: (?m)^/test( | .* )openstack-baremetal-operator-build-deploy,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/precommit-check
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-openstack-baremetal-operator-main-precommit-check
-    optional: true
     rerun_command: /test precommit-check
+    skip_if_only_changed: ^renovate.json|^README.md
     spec:
       containers:
       - args:
@@ -158,11 +160,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )precommit-check,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -170,6 +172,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-openstack-baremetal-operator-main-unit
     rerun_command: /test unit
+    skip_if_only_changed: ^renovate.json|^README.md
     spec:
       containers:
       - args:

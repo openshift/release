@@ -49,9 +49,24 @@ tests:
   container:
     from: src
 - as: unit
-  commands: make test
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make unit
   container:
     from: src
+  secret:
+    mount_path: /tmp/secret
+    name: insights-operator-codecov-token
+- as: publish-coverage
+  commands: |
+    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
+    make coverage
+  container:
+    from: src
+  postsubmit: true
+  secret:
+    mount_path: /tmp/secret
+    name: insights-operator-codecov-token
 - as: e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
@@ -72,7 +87,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui"
+      commands: pytest.sh -m "not ui and not tp_only"
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -92,7 +107,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh --junitxml=${ARTIFACT_DIR}/test-report.xml
+      commands: pytest.sh -k "not tp_only" --junitxml=${ARTIFACT_DIR}/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -119,7 +134,6 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-gcp-ovn-techpreview
-  optional: true
   steps:
     cluster_profile: gcp
     env:
@@ -130,7 +144,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui"
+      commands: pytest.sh -m "not ui and techpreview"
       credentials:
       - mount_path: /secrets
         name: insights-qa

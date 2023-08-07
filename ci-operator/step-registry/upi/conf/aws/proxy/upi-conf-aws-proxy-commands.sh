@@ -273,8 +273,8 @@ PROXY_KEY_PASSWORD="$(cat ${ROOTCA}/intpassfile)"
 CA_CHAIN="$(base64 -w0 ${INTERMEDIATE}/certs/ca-chain.cert.pem)"
 # create random uname and pw
 pushd ${SHARED_DIR}
-USER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
-base_domain=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
+USER_NAME=$(yq-go r "install-config.yaml" "metadata.name")
+base_domain=$(yq-go r "install-config.yaml" "baseDomain")
 popd
 PASSWORD="$(uuidgen | sha256sum | cut -b -32)"
 

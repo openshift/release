@@ -52,13 +52,13 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -135,23 +135,6 @@ tests:
       ASSISTED_CONFIG: |
         DISK_ENCRYPTION_ROLES=all
         DISK_ENCRYPTION_MODE=tang
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-8
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.8
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-4-8-periodic
-  cron: 15 01 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OPENSHIFT_VERSION=4.8
-      TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-9
   optional: true
@@ -253,7 +236,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.13
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-periodic
   cron: 15 02 */1 * 0-5
@@ -262,7 +245,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.13
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
@@ -295,7 +278,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.13
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-mce
@@ -318,6 +301,16 @@ tests:
         NUM_MASTERS=1
         NUM_WORKERS=0
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-metallb
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        OLM_OPERATORS=metallb
+        METALLB_API_IP=10.0.0.1
+        METALLB_INGRESS_IP=10.0.0.2
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf-periodic
   cron: 30 02 */1 * 0-5
   steps:
@@ -325,30 +318,19 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.13
       PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
-- as: e2e-metal-assisted-ocs
-  optional: true
+- as: e2e-metal-assisted-mce-periodic
+  cron: 30 04 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     env:
       ASSISTED_CONFIG: |
-        OLM_OPERATORS=ocs
-        OPENSHIFT_VERSION=4.8
+        OLM_OPERATORS=mce
       PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ocs-periodic
-  cron: 45 02 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=ocs
-        OPENSHIFT_VERSION=4.8
-      PACKET_PLAN: m3.large.x86
-      TEST_SUITE: full
+      TEST_SUITE: none
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
   optional: true
@@ -766,7 +748,34 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
       PLATFORM: nutanix
     workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-4-13
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.13
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-periodic
+  cluster: build01
+  interval: 24h
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-4-13-periodic
   cluster: build01
   interval: 48h
   steps:
@@ -777,6 +786,7 @@ tests:
         MAKEFILE_TARGET=test
         DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
         ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.13
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-metal-assisted-day2-arm-workers
@@ -810,6 +820,7 @@ tests:
 - as: e2e-oci-assisted
   optional: true
   steps:
+    cluster_profile: oci-assisted
     workflow: assisted-oci
 zz_generated_metadata:
   branch: master

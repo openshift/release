@@ -1,58 +1,33 @@
-base_images:
-  operator-index:
-    name: redhat-operator-index
-    namespace: ci
-    tag: v4.11
-  operator-registry:
-    name: "4.13"
-    namespace: ocp
-    tag: operator-registry
-  os:
-    name: ubi
-    namespace: ocp
-    tag: "8"
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-9-release-golang-1.20-openshift-4.14
 images:
-- dockerfile_path: build/Dockerfile.build
-  from: os
+- build_args:
+  - name: LDFLAGS
+    value: -X github.com/red-hat-storage/ocs-operator/v4/version.Version=4.14.0
+  dockerfile_path: Dockerfile
   to: ocs-operator
-- dockerfile_path: openshift-ci/Dockerfile.registry.build
-  from: operator-registry
-  to: ocs-registry
-- context_dir: openshift-ci/
-  dockerfile_path: index.Dockerfile
-  from: operator-index
-  to: noobaa-index
-- dockerfile_path: openshift-ci/Dockerfile.registry
-  from: operator-registry
-  to: ocs-registry-quay
+- build_args:
+  - name: LDFLAGS
+    value: -X github.com/red-hat-storage/ocs-operator/v4/version.Version=4.14.0
+  dockerfile_path: metrics/Dockerfile
+  to: ocs-metrics-exporter
 operator:
   bundles:
   - as: ocs-operator-bundle
-    base_index: noobaa-index
-    context_dir: deploy/
-    dockerfile_path: Dockerfile
+    dockerfile_path: Dockerfile.bundle
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/ocs-dev/ocs-operator:latest
-    with: ocs-operator
-promotion:
-  excluded_images:
-  - operator-registry-base
-  - noobaa-index
-  - ocs-registry
-  - ocs-registry-master
-  name: odf-latest
-  namespace: ocp
+    with: pipeline:ocs-operator
+  - pullspec: quay.io/ocs-dev/ocs-metrics-exporter:latest
+    with: pipeline:ocs-metrics-exporter
 releases:
-  initial:
-    integration:
-      name: "4.13"
-      namespace: ocp
   latest:
     integration:
-      include_built_images: true
-      name: "4.13"
+      name: "4.14"
       namespace: ocp
 resources:
   '*':
@@ -60,73 +35,28 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: verify-latest-csv
-  commands: |
-    make verify-latest-csv
-  container:
-    from: src
 - as: ocs-operator-ci
   commands: |
-    export GOFLAGS=''; make ocs-operator-ci
+    make ocs-operator-ci
   container:
     from: src
 - as: ocs-operator-bundle-e2e-aws
   steps:
     cluster_profile: aws
-    dependencies:
-      CATALOG_FULL_IMAGE_NAME: ocs-registry
-      OO_INDEX: ci-index-ocs-operator-bundle
-    env:
-      OCP_MUST_GATHER_DIR: ${ARTIFACT_DIR}/ocp-must-gather
-      OCS_MUST_GATHER_DIR: ${ARTIFACT_DIR}/ocs-must-gather
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: openshift-storage
-      OO_PACKAGE: ocs-operator
-      OO_TARGET_NAMESPACES: '!install'
-    post:
-    - as: ocs-must-gather
-      cli: latest
-      commands: hack/dump-debug-info.sh
-      env:
-      - name: OCP_MUST_GATHER_DIR
-      - name: OCS_MUST_GATHER_DIR
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    - chain: ipi-deprovision
     test:
-    - as: tests
+    - as: e2e-test
       cli: latest
       commands: |
-        export GOFLAGS=''; hack/install-noobaa-operator.sh; make functest
+        export BUNDLE_FULL_IMAGE_NAME="$OO_BUNDLE"; make install-ocs; make install-noobaa
+        export GOFLAGS=''; make functest
       dependencies:
-      - env: CATALOG_FULL_IMAGE_NAME
-        name: ocs-registry
-      - env: OO_INDEX
-        name: ci-index
+      - env: OO_BUNDLE
+        name: ocs-operator-bundle
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
-- as: red-hat-storage-ocs-ci-e2e-aws
-  optional: true
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: |
-        export REDHAT_OCS_CI_FORCE_TOOL_POD_INSTALL="true" && make cluster-deploy && make red-hat-storage-ocs-ci
-      dependencies:
-      - env: CATALOG_FULL_IMAGE_NAME
-        name: ci-index-ocs-operator-bundle
-      from: src
-      resources:
-        requests:
-          cpu: 100m
     workflow: ipi-aws
 zz_generated_metadata:
   branch: main

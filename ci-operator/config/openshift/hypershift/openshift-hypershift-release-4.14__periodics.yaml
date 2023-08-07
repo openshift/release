@@ -1,26 +1,30 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-service
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.8
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   dev-scripts:
@@ -68,21 +72,24 @@ tests:
 - as: e2e-aws-ovn
   cron: 0 */6 * * *
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-aws-ovn-conformance-serial
   cron: 0 1 * * *
   steps:
+    cluster_profile: hypershift
     env:
       TEST_SUITE: openshift/conformance/serial
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-conformance
   cron: 0 2 * * *
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: e2e-aws-ovn-proxy-conformance
   cron: 0 3 * * *
   steps:
-    cluster_profile: aws
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance-proxy
 - as: e2e-powervs
   cron: 0 4 * * *
@@ -125,16 +132,25 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      CNV_PRERELEASE_VERSION: "4.13"
+      CNV_PRERELEASE_VERSION: "4.14"
     workflow: hypershift-kubevirt-conformance
 - as: e2e-kubevirt-mce-conformance
   cron: 0 4 * * *
   steps:
     cluster_profile: aws
     env:
-      CNV_PRERELEASE_VERSION: "4.13"
+      CNV_PRERELEASE_VERSION: "4.14"
       MCE_VERSION: "2.3"
     workflow: hypershift-mce-kubevirt-conformance
+- as: e2e-kubevirt-mce-baremetalds-conformance
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_VERSION: "4.14"
+      MCE_VERSION: "2.3"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.13
+    workflow: hypershift-mce-kubevirt-baremetalds-conformance
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

@@ -5,6 +5,7 @@ set -o pipefail
 
 export STORAGECLASS_LOCATION=${SHARED_DIR}/efs-sc.yaml
 export MANIFEST_LOCATION=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 # For disconnected or otherwise unreachable environments, we want to
 # have steps use an HTTP(S) proxy to reach the API server. This proxy
@@ -17,7 +18,25 @@ then
 	source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-/usr/bin/create-efs-volume start --kubeconfig $KUBECONFIG --namespace openshift-cluster-csi-drivers
+ROOT_SECRET_EXIST="yes"
+if [[ "$(oc -n kube-system get secret/aws-creds --ignore-not-found)" == "" ]]; then
+  echo "Root secret is not exist, temply using the shared secret instead"
+  ROOT_SECRET_EXIST="no"
+fi
+
+# In all CCO mode manual and some mint mode test clusters doesn't have the root secret
+# temply create the root secret using for create efs volume
+if [[ "${ROOT_SECRET_EXIST}" == "no" ]]; then
+  AWS_AK=$(< "$AWS_SHARED_CREDENTIALS_FILE" grep aws_access_key_id | sed -e 's/aws_access_key_id = //g')
+  AWS_SK=$(< "${AWS_SHARED_CREDENTIALS_FILE}" grep aws_secret_access_key | sed -e 's/aws_secret_access_key = //g')
+  oc create secret generic aws-creds -n kube-system \
+  --from-literal aws_access_key_id="${AWS_AK}" \
+  --from-literal aws_secret_access_key="${AWS_SK}"
+  /usr/bin/create-efs-volume start --kubeconfig "$KUBECONFIG" --namespace openshift-cluster-csi-drivers
+  oc -n kube-system delete secret/aws-creds
+else
+  /usr/bin/create-efs-volume start --kubeconfig "$KUBECONFIG" --namespace openshift-cluster-csi-drivers
+fi
 
 echo "Using storageclass ${STORAGECLASS_LOCATION}"
 cat ${STORAGECLASS_LOCATION}

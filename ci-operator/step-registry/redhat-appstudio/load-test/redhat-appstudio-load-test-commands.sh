@@ -91,11 +91,19 @@ cd "$(mktemp -d)"
 
 git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
 
+set -x
+if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
+    # if this is executed as PR check of github.com/redhat-appstudio/e2e-tests.git repo, switch to PR branch.
+    git fetch origin "pull/${PULL_NUMBER}/head"
+    git checkout -b "pr-${PULL_NUMBER}" FETCH_HEAD
+fi
+set +x
+
 # Setup OpenShift cluster
-./tests/load-tests/ci-scripts/setup-cluster.sh $SCENARIO
+./tests/load-tests/ci-scripts/setup-cluster.sh "$SCENARIO"
 
 # Execute load test
-./tests/load-tests/ci-scripts/load-test.sh $SCENARIO
+./tests/load-tests/ci-scripts/load-test.sh "$SCENARIO"
 
 # Collect load test results
-./tests/load-tests/ci-scripts/collect-results.sh $SCENARIO
+./tests/load-tests/ci-scripts/collect-results.sh "$SCENARIO"

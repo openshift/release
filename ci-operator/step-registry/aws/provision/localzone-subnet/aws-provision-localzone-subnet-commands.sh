@@ -120,7 +120,7 @@ Outputs:
     Value: !Ref LocalZoneSubnet
 EOF
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 # first private subnet
 if [[ "${LOCALZONE_WORKER_ASSIGN_PUBLIC_IP}" == "yes" ]]; then
@@ -138,6 +138,8 @@ fi
 
 az_name=$(aws --region $REGION ec2 describe-subnets --subnet-ids $localzone_parent_subnet | jq -r '.Subnets[0].AvailabilityZone')
 local_az_name=$(aws --region $REGION ec2 describe-availability-zones --filters Name=opt-in-status,Values=opted-in Name=zone-type,Values=local-zone | jq -r --arg z $az_name '[.AvailabilityZones[] | select (.ParentZoneName==$z)] | .[0].ZoneName')
+echo $local_az_name > "${SHARED_DIR}"/local-zone-name.txt
+
 route_table_id=$(aws --region $REGION ec2 describe-route-tables --filter Name=association.subnet-id,Values=$localzone_parent_subnet | jq -r .RouteTables[].RouteTableId)
 
 echo "localzone_parent_subnet: $localzone_parent_subnet"
@@ -153,7 +155,7 @@ if [[ "$az_name" == "" ]] || [[ "$local_az_name" == "" ]] || [[ "$route_table_id
 fi
 
 
-STACK_NAME="${NAMESPACE}-${JOB_NAME_HASH}-localzone"
+STACK_NAME="${NAMESPACE}-${UNIQUE_HASH}-localzone"
 # save stack information to ${SHARED_DIR} for deprovision step
 echo ${STACK_NAME} >> "${SHARED_DIR}/to_be_removed_cf_stack_list"
 extra_options=" "

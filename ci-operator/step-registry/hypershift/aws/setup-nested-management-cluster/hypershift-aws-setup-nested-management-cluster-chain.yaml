@@ -23,8 +23,8 @@ chain:
       default: ""
       documentation: "The cluster's FQDN will be a subdomain of the base domain."
     - name: HYPERSHIFT_HC_RELEASE_IMAGE
-      default: "quay.io/hypershift/release:4.13.0-0.nightly-2023-01-17-084735"
-      documentation: "Release image used for the HostedCluster. TODO: Set to a stable release when resource overrides are included in a stable OCP release."
+      default: ""
+      documentation: "Release image used for the HostedCluster. Latest 4.13 release image is used by default"
     commands: |-
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
@@ -34,7 +34,9 @@ chain:
         DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
       fi
       DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
-      
+
+      DEFAULT_RELEASE_STREAM=4.13.0-0.nightly
+
       export KUBECONFIG=/etc/hypershift-kubeconfig/hypershift-ops-admin.kubeconfig
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)-mgmt"
       echo "Creating management cluster ${CLUSTER_NAME} with $((${HYPERSHIFT_NODE_COUNT} * 3)) nodes"
@@ -51,6 +53,7 @@ chain:
         --service-cidr=172.29.0.0/16 \
         --node-pool-replicas=${HYPERSHIFT_NODE_COUNT} \
         --release-image=${HYPERSHIFT_HC_RELEASE_IMAGE} \
+        --release-stream=${DEFAULT_RELEASE_STREAM} \
         --namespace=${HYPERSHIFT_NAMESPACE} \
         --annotations resource-request-override.hypershift.openshift.io/kube-apiserver.kube-apiserver=memory=3Gi,cpu=2000m
       echo "Waiting for cluster to become available"

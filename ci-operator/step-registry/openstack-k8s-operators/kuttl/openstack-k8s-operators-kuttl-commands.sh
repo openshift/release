@@ -4,6 +4,10 @@ set -ex
 
 META_OPERATOR="openstack-operator"
 ORG="openstack-k8s-operators"
+# Export Ceph options for tests that call 'make ceph'
+export CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
+export CEPH_DATASIZE=${CEPH_DATASIZE:="2Gi"}
+export CEPH_TIMEOUT=${CEPH_TIMEOUT:="90"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
@@ -32,6 +36,7 @@ fi
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${SERVICE_NAME}-operator
 export KUTTL_REPORT=kuttl-test-${SERVICE_NAME}.json
+export NETWORK_ISOLATION=false
 if [ ${SERVICE_NAME} == "openstack-ansibleee" ]; then
     # the service_name needs to be different to use in the image url than in
     # the environment variables

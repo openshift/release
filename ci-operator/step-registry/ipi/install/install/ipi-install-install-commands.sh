@@ -381,7 +381,7 @@ gcp)
       export GOOGLE_CLOUD_KEYFILE_JSON="${SHARED_DIR}/gcp_min_permissions.json"
     fi
     ;;
-ibmcloud)
+ibmcloud*)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
     ;;
@@ -389,7 +389,14 @@ alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.i
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
 vsphere)
     export VSPHERE_PERSIST_SESSION=true
-    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    declare cloud_where_run
+    # shellcheck source=/dev/null
+    source "${SHARED_DIR}/vsphere_context.sh"
+    if [ "$cloud_where_run" == "IBMC-DEVQE" ]; then
+        export SSL_CERT_FILE=/var/run/devqe-secrets/vcenter-certificate
+    else
+        export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
+    fi
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
@@ -402,6 +409,10 @@ esac
 dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
+
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
@@ -449,10 +460,6 @@ if [ ! -z "${OPENSHIFT_INSTALL_PROMTAIL_ON_BOOTSTRAP:-}" ]; then
   wait "$!"
   inject_promtail_service
 fi
-
-echo "install-config.yaml"
-echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
 
 if [ "${OPENSHIFT_INSTALL_AWS_PUBLIC_ONLY:-}" == "true" ]; then
 	echo "Cluster will be created with public subnets only"

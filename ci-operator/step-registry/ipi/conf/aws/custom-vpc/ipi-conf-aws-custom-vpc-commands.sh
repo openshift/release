@@ -18,11 +18,18 @@ fi
 echo -e "subnets: $(cat ${subnet_ids_file})"
 echo -e "AZs: $(cat ${az_file})"
 
-CONFIG_PATCH="${SHARED_DIR}/install-config-subnet-azs.yaml.patch"
-cat > "${CONFIG_PATCH}" << EOF
+CONFIG_SUBNETS="${SHARED_DIR}/install-config-subnet.yaml.patch"
+cat > "${CONFIG_SUBNETS}" << EOF
 platform:
   aws:
     subnets: $(cat "${subnet_ids_file}")
+EOF
+yq-go m -x -i "${CONFIG}" "${CONFIG_SUBNETS}"
+
+
+if [[ ${ADD_ZONES} == "yes" ]]; then
+  CONFIG_AZ="${SHARED_DIR}/install-config-azs.yaml.patch"
+  cat > "${CONFIG_AZ}" << EOF
 controlPlane:
   platform:
     aws:
@@ -32,4 +39,5 @@ compute:
     aws:
       zones: $(cat "${az_file}")
 EOF
-yq-go m -x -i "${CONFIG}" "${CONFIG_PATCH}"
+  yq-go m -x -i "${CONFIG}" "${CONFIG_AZ}"
+fi

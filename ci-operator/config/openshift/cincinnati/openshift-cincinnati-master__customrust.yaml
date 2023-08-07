@@ -3,10 +3,6 @@ base_images:
     name: stream9
     namespace: coreos
     tag: "9"
-  openshift_release_golang-1.18:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
   ubi:
     name: ubi
     namespace: ocp
@@ -29,8 +25,8 @@ images:
         dnf install -y jq python38 && \
         dnf clean all
     # build: Rust stable toolchain
-    RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.58.0 -y && \
-      rustup install 1.54.0
+    RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.70.0 -y && \
+      rustup install 1.64.0
     # install yamllint
     RUN pip3 install --user yamllint
     RUN \
@@ -48,10 +44,6 @@ images:
 - dockerfile_path: dist/Dockerfile.deploy/Dockerfile
   to: deploy
 - dockerfile_path: dist/Dockerfile.e2e/Dockerfile
-  inputs:
-    openshift_release_golang-1.18:
-      as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
   to: e2e-test
 promotion:
   name: cincinnati-build-root
@@ -154,12 +146,12 @@ tests:
   commands: dist/prow_yaml_lint.sh
   container:
     from: src-rust
-- as: rustfmt-1.58.0
-  commands: dist/prow_rustfmt.sh 1.58.0
+- as: rustfmt-1.70.0
+  commands: dist/prow_rustfmt.sh 1.70.0
   container:
     from: src-rust
-- as: rustfmt-1.54.0
-  commands: dist/prow_rustfmt.sh 1.54.0
+- as: rustfmt-1.64.0
+  commands: dist/prow_rustfmt.sh 1.64.0
   container:
     from: src-rust
 - as: e2e

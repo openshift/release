@@ -3,8 +3,8 @@ set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
-HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
+IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
+HOST_USER="$(cat "${SHARED_DIR}"/ssh_user)"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
 
 echo "Using Host $IP_ADDRESS"
@@ -67,3 +67,7 @@ scp \
   "${INSTANCE_PREFIX}:/tmp"
 
 ssh "${INSTANCE_PREFIX}" "sudo /tmp/install.sh"
+
+echo 1 > "${SHARED_DIR}/num_vms"
+echo "${HOST_USER}" > "${SHARED_DIR}/vm_user_0"
+echo 22 > "${SHARED_DIR}/vm_ssh_port_0"

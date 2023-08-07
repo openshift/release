@@ -11,6 +11,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.48.0
+  hypershift:
+    name: hypershift-cli
+    namespace: ci
+    tag: latest
   os:
     name: centos
     namespace: origin
@@ -61,6 +65,16 @@ images:
 - context_dir: images/envoyproxy/
   to: envoyproxy
 - context_dir: images/dptp-3312-hypershift-leaks-cleaner/
+  from: os
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    hypershift:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/hypershift
   to: dptp-3312-hypershift-leaks-cleaner
 - context_dir: images/cvp-trigger/
   from: os
@@ -197,6 +211,23 @@ images:
       - destination_dir: .
         source_path: /go/bin/promoted-image-governor
   to: promoted-image-governor
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
+    ADD ci-images-mirror /usr/bin/ci-images-mirror
+    ADD usr/bin/oc /usr/bin/oc
+    ENTRYPOINT ["ci-images-mirror"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/ci-images-mirror
+    cli:
+      paths:
+      - destination_dir: usr/bin
+        source_path: /usr/bin/oc
+  to: ci-images-mirror
 - dockerfile_literal: |-
     FROM quay.io/centos/centos:stream8
     RUN dnf install -y git && dnf clean all && rm -rf /var/cache/dnf
@@ -708,7 +739,8 @@ tests:
   commands: make integration
   container:
     from: test-bin
-- as: e2e
+- always_run: false
+  as: e2e
   steps:
     test:
     - as: e2e

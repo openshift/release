@@ -10,6 +10,7 @@ cluster_groups:
   - build03
   - build04
   - build05
+  - build08
   - multi01
   - vsphere
   non_app_ci:
@@ -19,6 +20,7 @@ cluster_groups:
   - build03
   - build04
   - build05
+  - build08
   - multi01
   - vsphere
   non_app_ci_arm:
@@ -31,6 +33,7 @@ cluster_groups:
   - build03
   - build04
   - build05
+  - build08
   - multi01
 secret_configs:
 - from:
@@ -883,7 +886,27 @@ secret_configs:
     namespace: ci
   - cluster_groups:
     - non_app_ci
+    name: cluster-secrets-aws-terraform-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
     name: cluster-secrets-aws-perf-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-perfscale
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-perfscale-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-perfscale-lrc-qe
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-aws-chaos
     namespace: ci
 - from:
     pull-secret:
@@ -1782,6 +1805,9 @@ secret_configs:
         email_field: email
         item: registry.redhat.io-pull-secret
         registry_url: registry.redhat.io
+      - auth_field: auth
+        item: brew.registry.redhat.io-pull-secret
+        registry_url: brew.registry.redhat.io
   to:
   - cluster_groups:
     - non_app_ci
@@ -1813,6 +1839,33 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-packet-sno
+    namespace: ci
+- from:
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-oci-assisted
     namespace: ci
 - from:
     osServicePrincipal.json:
@@ -2061,6 +2114,9 @@ secret_configs:
     build05.config:
       field: sa.pod-scaler.build05.config
       item: pod-scaler
+    build08.config:
+      field: sa.pod-scaler.build08.config
+      item: pod-scaler
     multi01.config:
       field: sa.pod-scaler.multi01.config
       item: pod-scaler
@@ -2081,6 +2137,9 @@ secret_configs:
       item: pod-scaler
     sa.pod-scaler.build05.token.txt:
       field: sa.pod-scaler.build05.token.txt
+      item: pod-scaler
+    sa.pod-scaler.build08.token.txt:
+      field: sa.pod-scaler.build08.token.txt
       item: pod-scaler
     sa.pod-scaler.multi01.token.txt:
       field: sa.pod-scaler.multi01.token.txt
@@ -2165,6 +2224,10 @@ secret_configs:
     - build_farm
     name: hypershift-workload-credentials
     namespace: test-credentials
+  - cluster_groups:
+    - build_farm
+    name: hypershift-workload-credentials
+    namespace: ci
 - from:
     ci.htpasswd:
       field: ci.htpasswd
@@ -2387,6 +2450,12 @@ secret_configs:
     sa.crier.build05.token.txt:
       field: sa.crier.build05.token.txt
       item: build_farm
+    sa.crier.build08.config:
+      field: sa.crier.build08.config
+      item: build_farm
+    sa.crier.build08.token.txt:
+      field: sa.crier.build08.token.txt
+      item: build_farm
     sa.crier.multi01.config:
       field: sa.crier.multi01.config
       item: build_farm
@@ -2487,6 +2556,12 @@ secret_configs:
     sa.deck.build05.token.txt:
       field: sa.deck.build05.token.txt
       item: build_farm
+    sa.deck.build08.config:
+      field: sa.deck.build08.config
+      item: build_farm
+    sa.deck.build08.token.txt:
+      field: sa.deck.build08.token.txt
+      item: build_farm
     sa.deck.multi01.config:
       field: sa.deck.multi01.config
       item: build_farm
@@ -2546,6 +2621,12 @@ secret_configs:
     sa.hook.build05.token.txt:
       field: sa.hook.build05.token.txt
       item: build_farm
+    sa.hook.build08.config:
+      field: sa.hook.build08.config
+      item: build_farm
+    sa.hook.build08.token.txt:
+      field: sa.hook.build08.token.txt
+      item: build_farm
     sa.hook.multi01.config:
       field: sa.hook.multi01.config
       item: build_farm
@@ -2604,6 +2685,12 @@ secret_configs:
       item: build_farm
     sa.prow-controller-manager.build05.token.txt:
       field: sa.prow-controller-manager.build05.token.txt
+      item: build_farm
+    sa.prow-controller-manager.build08.config:
+      field: sa.prow-controller-manager.build08.config
+      item: build_farm
+    sa.prow-controller-manager.build08.token.txt:
+      field: sa.prow-controller-manager.build08.token.txt
       item: build_farm
     sa.prow-controller-manager.multi01.config:
       field: sa.prow-controller-manager.multi01.config
@@ -2681,6 +2768,12 @@ secret_configs:
     sa.sinker.build05.token.txt:
       field: sa.sinker.build05.token.txt
       item: build_farm
+    sa.sinker.build08.config:
+      field: sa.sinker.build08.config
+      item: build_farm
+    sa.sinker.build08.token.txt:
+      field: sa.sinker.build08.token.txt
+      item: build_farm
     sa.sinker.multi01.config:
       field: sa.sinker.multi01.config
       item: build_farm
@@ -2734,6 +2827,12 @@ secret_configs:
     sa.dptp-controller-manager.build05.token.txt:
       field: sa.dptp-controller-manager.build05.token.txt
       item: build_farm
+    sa.dptp-controller-manager.build08.config:
+      field: sa.dptp-controller-manager.build08.config
+      item: build_farm
+    sa.dptp-controller-manager.build08.token.txt:
+      field: sa.dptp-controller-manager.build08.token.txt
+      item: build_farm
     sa.dptp-controller-manager.multi01.config:
       field: sa.dptp-controller-manager.multi01.config
       item: build_farm
@@ -2780,6 +2879,12 @@ secret_configs:
       item: build_farm
     sa.promoted-image-governor.build05.token.txt:
       field: sa.promoted-image-governor.build05.token.txt
+      item: build_farm
+    sa.promoted-image-governor.build08.config:
+      field: sa.promoted-image-governor.build08.config
+      item: build_farm
+    sa.promoted-image-governor.build08.token.txt:
+      field: sa.promoted-image-governor.build08.token.txt
       item: build_farm
     sa.promoted-image-governor.multi01.config:
       field: sa.promoted-image-governor.multi01.config
@@ -2846,6 +2951,12 @@ secret_configs:
     sa.ci-operator.build05.token.txt:
       field: sa.ci-operator.build05.token.txt
       item: build_farm
+    sa.ci-operator.build08.config:
+      field: sa.ci-operator.build08.config
+      item: build_farm
+    sa.ci-operator.build08.token.txt:
+      field: sa.ci-operator.build08.token.txt
+      item: build_farm
     sa.ci-operator.multi01.config:
       field: sa.ci-operator.multi01.config
       item: build_farm
@@ -2906,6 +3017,12 @@ secret_configs:
     sa.ci-chat-bot.build05.token.txt:
       field: sa.ci-chat-bot.build05.token.txt
       item: ci-chat-bot
+    sa.ci-chat-bot.build08.config:
+      field: sa.ci-chat-bot.build08.config
+      item: ci-chat-bot
+    sa.ci-chat-bot.build08.token.txt:
+      field: sa.ci-chat-bot.build08.token.txt
+      item: ci-chat-bot
     sa.ci-chat-bot.multi01.config:
       field: sa.ci-chat-bot.multi01.config
       item: ci-chat-bot
@@ -2964,6 +3081,12 @@ secret_configs:
       item: build_farm
     sa.github-ldap-user-group-creator.build05.token.txt:
       field: sa.github-ldap-user-group-creator.build05.token.txt
+      item: build_farm
+    sa.github-ldap-user-group-creator.build08.config:
+      field: sa.github-ldap-user-group-creator.build08.config
+      item: build_farm
+    sa.github-ldap-user-group-creator.build08.token.txt:
+      field: sa.github-ldap-user-group-creator.build08.token.txt
       item: build_farm
     sa.github-ldap-user-group-creator.hive.config:
       field: sa.github-ldap-user-group-creator.hive.config
@@ -3045,6 +3168,9 @@ secret_configs:
     name: cert-issuer
     namespace: cert-manager
   - cluster: build05
+    name: cert-issuer
+    namespace: cert-manager
+  - cluster: build08
     name: cert-issuer
     namespace: cert-manager
 - from:
@@ -3233,6 +3359,9 @@ secret_configs:
       - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
         item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: arm01
     name: registry-push-credentials-ci-central
@@ -3254,13 +3383,12 @@ secret_configs:
       - auth_field: token_image-puller_build01_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build01.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        item: quay.io-pull-secret
-        registry_url: quay.io
       - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
         item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: build01
     name: registry-push-credentials-ci-central
@@ -3282,13 +3410,12 @@ secret_configs:
       - auth_field: token_image-puller_build02_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build02.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        item: quay.io-pull-secret
-        registry_url: quay.io
       - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
         item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: build02
     name: registry-push-credentials-ci-central
@@ -3313,6 +3440,9 @@ secret_configs:
       - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
         item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: vsphere
     name: registry-push-credentials-ci-central
@@ -3419,13 +3549,13 @@ secret_configs:
       - auth_field: token_image-puller_build01_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build01.ci.openshift.org
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
       - auth_field: auth
         email_field: email
         item: quay.io-pull-secret
         registry_url: quay.io
-      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.ci.openshift.org
   to:
   - cluster: build01
     name: registry-pull-credentials
@@ -3447,13 +3577,13 @@ secret_configs:
       - auth_field: token_image-puller_build02_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build02.ci.openshift.org
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
       - auth_field: auth
         email_field: email
         item: quay.io-pull-secret
         registry_url: quay.io
-      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.ci.openshift.org
   to:
   - cluster: build02
     name: registry-pull-credentials
@@ -3971,6 +4101,12 @@ secret_configs:
     sa.cluster-display.build05.token.txt:
       field: sa.cluster-display.build05.token.txt
       item: build_farm
+    sa.cluster-display.build08.config:
+      field: sa.cluster-display.build08.config
+      item: build_farm
+    sa.cluster-display.build08.token.txt:
+      field: sa.cluster-display.build08.token.txt
+      item: build_farm
     sa.cluster-display.hive.config:
       field: sa.cluster-display.hive.config
       item: build_farm
@@ -4043,6 +4179,49 @@ secret_configs:
   - cluster_groups:
     - non_app_ci
     name: cluster-secrets-ibmcloud-qe
+    namespace: ci
+- from:
+    insights-live.yaml:
+      field: insights-live.yaml
+      item: insights-ci-account
+    ops-mirror.pem:
+      field: cert-key.pem
+      item: mirror.openshift.com
+    pull-secret:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: cloud.openshift.com-pull-secret
+        registry_url: cloud.openshift.com
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+      - auth_field: auth
+        email_field: email
+        item: registry.connect.redhat.com-pull-secret
+        registry_url: registry.connect.redhat.com
+      - auth_field: auth
+        email_field: email
+        item: registry.redhat.io-pull-secret
+        registry_url: registry.redhat.io
+    ssh-privatekey:
+      field: ssh-privatekey
+      item: jenkins-ci-iam
+    ssh-publickey:
+      field: ssh-publickey
+      item: jenkins-ci-iam
+  to:
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-ibmcloud-multi-ppc64le
+    namespace: ci
+  - cluster_groups:
+    - non_app_ci
+    name: cluster-secrets-ibmcloud-multi-s390x
     namespace: ci
 - from:
     insights-live.yaml:
@@ -4155,13 +4334,12 @@ secret_configs:
       - auth_field: token_image-puller_build03_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build03.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        item: quay.io-pull-secret
-        registry_url: quay.io
       - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
         item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: build03
     name: registry-push-credentials-ci-central
@@ -4183,13 +4361,13 @@ secret_configs:
       - auth_field: token_image-puller_build03_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build03.ci.openshift.org
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
       - auth_field: auth
         email_field: email
         item: quay.io-pull-secret
         registry_url: quay.io
-      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.ci.openshift.org
   to:
   - cluster: build03
     name: registry-pull-credentials
@@ -4222,13 +4400,12 @@ secret_configs:
       - auth_field: token_image-puller_build04_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build04.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        item: quay.io-pull-secret
-        registry_url: quay.io
       - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
         item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: build04
     name: registry-push-credentials-ci-central
@@ -4250,13 +4427,13 @@ secret_configs:
       - auth_field: token_image-puller_build04_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build04.ci.openshift.org
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
       - auth_field: auth
         email_field: email
         item: quay.io-pull-secret
         registry_url: quay.io
-      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.ci.openshift.org
   to:
   - cluster: build04
     name: registry-pull-credentials
@@ -4289,13 +4466,12 @@ secret_configs:
       - auth_field: token_image-puller_build05_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build05.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        item: quay.io-pull-secret
-        registry_url: quay.io
       - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
         item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: build05
     name: registry-push-credentials-ci-central
@@ -4317,13 +4493,13 @@ secret_configs:
       - auth_field: token_image-puller_build05_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build05.ci.openshift.org
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
       - auth_field: auth
         email_field: email
         item: quay.io-pull-secret
         registry_url: quay.io
-      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.ci.openshift.org
   to:
   - cluster: build05
     name: registry-pull-credentials
@@ -4674,13 +4850,12 @@ secret_configs:
       - auth_field: token_image-puller_multi01_reg_auth_value.txt
         item: build_farm
         registry_url: registry.multi01.ci.openshift.org
-      - auth_field: auth
-        email_field: email
-        item: quay.io-pull-secret
-        registry_url: quay.io
       - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
         item: build_farm
         registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
   to:
   - cluster: multi01
     name: registry-push-credentials-ci-central
@@ -4702,13 +4877,13 @@ secret_configs:
       - auth_field: token_image-puller_multi01_reg_auth_value.txt
         item: build_farm
         registry_url: registry.multi01.ci.openshift.org
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
       - auth_field: auth
         email_field: email
         item: quay.io-pull-secret
         registry_url: quay.io
-      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
-        item: build_farm
-        registry_url: registry.ci.openshift.org
   to:
   - cluster: multi01
     name: registry-pull-credentials
@@ -4740,6 +4915,72 @@ secret_configs:
   - cluster: app.ci
     name: quay-io-pull-credentials
     namespace: ci
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_build08_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_field: token_image-puller_build08_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_image-puller_build08_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build08.ci.openshift.org
+      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
+  to:
+  - cluster: build08
+    name: registry-push-credentials-ci-central
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build08
+    name: registry-push-credentials-ci-central
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_build08_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_field: token_image-puller_build08_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_image-puller_build08_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build08.ci.openshift.org
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+  to:
+  - cluster: build08
+    name: registry-pull-credentials
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build08
+    name: registry-pull-credentials
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    kubeconfig:
+      field: sa.ci-operator.build08.config
+      item: build_farm
+    sa.ci-operator.build08.token.txt:
+      field: sa.ci-operator.build08.token.txt
+      item: build_farm
+  to:
+  - cluster: build08
+    name: ci-operator
+    namespace: test-credentials
 user_secrets_target_clusters:
 - app.ci
 - arm01
@@ -4748,6 +4989,7 @@ user_secrets_target_clusters:
 - build03
 - build04
 - build05
+- build08
 - hive
 - multi01
 - vsphere

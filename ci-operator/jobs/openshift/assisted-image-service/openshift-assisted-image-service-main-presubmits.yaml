@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/edge-e2e-ai-operator-ztp
     decorate: true
     decoration_config:
@@ -15,7 +15,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-image-service-main-edge-e2e-ai-operator-ztp
     rerun_command: /test edge-e2e-ai-operator-ztp
@@ -83,7 +83,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/edge-e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -93,7 +93,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-image-service-main-edge-e2e-metal-assisted
     optional: true
@@ -161,7 +161,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/edge-e2e-metal-assisted-day2-arm-workers
     decorate: true
     decoration_config:
@@ -171,7 +171,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-image-service-main-edge-e2e-metal-assisted-day2-arm-workers
     optional: true
@@ -239,7 +239,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/edge-e2e-metal-assisted-deploy-nodes
     decorate: true
     decoration_config:
@@ -249,7 +249,7 @@ presubmits:
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-image-service-main-edge-e2e-metal-assisted-deploy-nodes
     rerun_command: /test edge-e2e-metal-assisted-deploy-nodes
@@ -313,11 +313,89 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )edge-e2e-metal-assisted-deploy-nodes,?($|\s.*)
   - agent: kubernetes
+    always_run: false
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/edge-e2e-oci-assisted
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cloud: oci-edge
+      ci-operator.openshift.io/cloud-cluster-profile: oci-assisted
+      ci-operator.openshift.io/variant: edge
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-assisted-image-service-main-edge-e2e-oci-assisted
+    optional: true
+    rerun_command: /test edge-e2e-oci-assisted
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-oci-assisted-cluster-profile
+        - --target=e2e-oci-assisted
+        - --variant=edge
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-oci-assisted-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-oci-assisted
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )edge-e2e-oci-assisted,?($|\s.*)
+  - agent: kubernetes
     always_run: true
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/edge-images
     decorate: true
     decoration_config:
@@ -325,7 +403,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-image-service-main-edge-images
     rerun_command: /test edge-images
@@ -369,7 +447,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/edge-lint
     decorate: true
     decoration_config:
@@ -377,7 +455,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-image-service-main-edge-lint
     rerun_command: /test edge-lint
@@ -422,7 +500,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/edge-test
     decorate: true
     decoration_config:
@@ -430,7 +508,7 @@ presubmits:
     labels:
       ci-operator.openshift.io/variant: edge
       ci.openshift.io/generator: prowgen
-      job-release: "4.13"
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-image-service-main-edge-test
     rerun_command: /test edge-test
@@ -482,7 +560,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -531,7 +609,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build03
     context: ci/prow/mce-images
     decorate: true
     decoration_config:

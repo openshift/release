@@ -7,12 +7,36 @@ build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
 images:
+- dockerfile_path: openshift/ci-operator/knative-images/event_display/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-kafka-broker-event-display
+- dockerfile_path: openshift/ci-operator/knative-images/heartbeats/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-kafka-broker-heartbeats
 - dockerfile_path: openshift/ci-operator/knative-images/kafka-controller/Dockerfile
   inputs:
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-kafka-broker-kafka-controller
+- dockerfile_path: openshift/ci-operator/knative-images/kafka-source-controller/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-kafka-broker-kafka-source-controller
+- dockerfile_path: openshift/ci-operator/knative-images/migrate/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-kafka-broker-migrate
 - dockerfile_path: openshift/ci-operator/knative-images/post-install/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -55,6 +79,12 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-kafka-broker-test-kafka-consumer
+- dockerfile_path: openshift/ci-operator/knative-test-images/logs-exporter/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-kafka-broker-test-logs-exporter
 - dockerfile_path: openshift/ci-operator/knative-test-images/performance/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -79,6 +109,12 @@ images:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: knative-eventing-kafka-broker-test-request-sender
+- dockerfile_path: openshift/ci-operator/knative-test-images/watch-cm/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-kafka-broker-test-watch-cm
 - dockerfile_path: openshift/ci-operator/knative-test-images/wathola-fetcher/Dockerfile
   inputs:
     openshift_release_golang-1.19:
@@ -153,8 +189,16 @@ tests:
       cli: latest
       commands: make test-conformance
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
@@ -169,6 +213,8 @@ tests:
         name: knative-eventing-kafka-broker-test-eventshub
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
         name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PERFORMANCE
         name: knative-eventing-kafka-broker-test-performance
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
@@ -177,6 +223,8 @@ tests:
         name: knative-eventing-kafka-broker-test-recordevents
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
         name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
         name: knative-eventing-kafka-broker-test-wathola-fetcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
@@ -231,8 +279,16 @@ tests:
       cli: latest
       commands: make test-conformance
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
@@ -247,6 +303,8 @@ tests:
         name: knative-eventing-kafka-broker-test-eventshub
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
         name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PERFORMANCE
         name: knative-eventing-kafka-broker-test-performance
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
@@ -255,6 +313,8 @@ tests:
         name: knative-eventing-kafka-broker-test-recordevents
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
         name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
         name: knative-eventing-kafka-broker-test-wathola-fetcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
@@ -308,8 +368,16 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
@@ -324,6 +392,8 @@ tests:
         name: knative-eventing-kafka-broker-test-eventshub
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
         name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PERFORMANCE
         name: knative-eventing-kafka-broker-test-performance
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
@@ -332,6 +402,8 @@ tests:
         name: knative-eventing-kafka-broker-test-recordevents
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
         name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
         name: knative-eventing-kafka-broker-test-wathola-fetcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
@@ -386,8 +458,16 @@ tests:
       cli: latest
       commands: make test-e2e
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
@@ -402,6 +482,8 @@ tests:
         name: knative-eventing-kafka-broker-test-eventshub
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
         name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PERFORMANCE
         name: knative-eventing-kafka-broker-test-performance
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
@@ -410,6 +492,8 @@ tests:
         name: knative-eventing-kafka-broker-test-recordevents
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
         name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
         name: knative-eventing-kafka-broker-test-wathola-fetcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
@@ -463,8 +547,16 @@ tests:
       cli: latest
       commands: make test-reconciler
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
@@ -479,6 +571,8 @@ tests:
         name: knative-eventing-kafka-broker-test-eventshub
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
         name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PERFORMANCE
         name: knative-eventing-kafka-broker-test-performance
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
@@ -487,6 +581,8 @@ tests:
         name: knative-eventing-kafka-broker-test-recordevents
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
         name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
         name: knative-eventing-kafka-broker-test-wathola-fetcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER
@@ -541,8 +637,16 @@ tests:
       cli: latest
       commands: make test-reconciler
       dependencies:
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_EVENT_DISPLAY
+        name: knative-eventing-kafka-broker-event-display
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_HEARTBEATS
+        name: knative-eventing-kafka-broker-heartbeats
       - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_CONTROLLER
         name: knative-eventing-kafka-broker-kafka-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_KAFKA_SOURCE_CONTROLLER
+        name: knative-eventing-kafka-broker-kafka-source-controller
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_MIGRATE
+        name: knative-eventing-kafka-broker-migrate
       - env: KNATIVE_EVENTING_KAFKA_BROKER_POST_INSTALL
         name: knative-eventing-kafka-broker-post-install
       - env: KNATIVE_EVENTING_KAFKA_BROKER_WEBHOOK_KAFKA
@@ -557,6 +661,8 @@ tests:
         name: knative-eventing-kafka-broker-test-eventshub
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_KAFKA_CONSUMER
         name: knative-eventing-kafka-broker-test-kafka-consumer
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_LOGS_EXPORTER
+        name: knative-eventing-kafka-broker-test-logs-exporter
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PERFORMANCE
         name: knative-eventing-kafka-broker-test-performance
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_PRINT
@@ -565,6 +671,8 @@ tests:
         name: knative-eventing-kafka-broker-test-recordevents
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_REQUEST_SENDER
         name: knative-eventing-kafka-broker-test-request-sender
+      - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATCH_CM
+        name: knative-eventing-kafka-broker-test-watch-cm
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FETCHER
         name: knative-eventing-kafka-broker-test-wathola-fetcher
       - env: KNATIVE_EVENTING_KAFKA_BROKER_TEST_WATHOLA_FORWARDER

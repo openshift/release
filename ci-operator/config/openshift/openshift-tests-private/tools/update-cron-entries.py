@@ -7,6 +7,13 @@ import os
 import subprocess
 from datetime import datetime
 
+#import yaml
+#To avoid yaml.load change doulbe-quotes values to sigle-quote, use ruamel.yaml module instead of yaml
+#yum install python3-ruamel-yaml.x86_64
+from ruamel.yaml import YAML
+yaml=YAML()
+yaml.default_flow_style = False
+yaml.preserve_quotes = True
 
 def shell(cmd, debug=False, env_=dict(os.environ)):
     """
@@ -78,7 +85,8 @@ if __name__ == "__main__":
         print("Updating %s" % (target_file))
 
         with open(target_file, 'r') as file:
-            all_data = yaml.safe_load(file)
+            #all_data = yaml.safe_load(file)
+            all_data = yaml.load(file)
         file.close()
 
         all_tests_list = all_data['tests']

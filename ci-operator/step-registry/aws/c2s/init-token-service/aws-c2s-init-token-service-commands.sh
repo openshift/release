@@ -150,9 +150,11 @@ function remove_tech_preview_feature_from_manifests()
 # ------------------------------
 
 cr_yaml_d=$(mktemp -d)
-echo "extracting CR from image $RELEASE_IMAGE_LATEST"
+echo "extracting CR from image ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
-oc adm release extract ${RELEASE_IMAGE_LATEST} --credentials-requests --cloud=aws --to "${cr_yaml_d}" || exit 1
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+oc adm release extract ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --credentials-requests --cloud=aws --to "${cr_yaml_d}" || exit 1
 
 echo "Extracted CR files:"
 ls $cr_yaml_d
@@ -162,7 +164,7 @@ if [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/ma
 fi
 
 credentials_requests_files=`mktemp`
-ls ${cr_yaml_d} > ${credentials_requests_files}
+ls -p "${cr_yaml_d}"/*.yaml | awk -F'/' '{print $NF}' > "${credentials_requests_files}"
 
 echo "CRs to be processed:"
 cat "${credentials_requests_files}"

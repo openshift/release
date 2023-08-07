@@ -1,6 +1,6 @@
 ref:
   as: rosa-terraform-e2e-teardown
-  from: ocm-tf-e2e
+  from: rhcs-tf-e2e
   grace_period: 10m
   commands: rosa-terraform-e2e-teardown-commands.sh
   resources:
@@ -8,10 +8,19 @@ ref:
       cpu: 100m
       memory: 300Mi
   timeout: 2h0m0s
+  credentials:
+  - namespace: test-credentials    
+    name: aws-key
+    mount_path: /var/run/aws-key
+  - namespace: test-credentials
+    name: aws-secret
+    mount_path: /var/run/aws-secret
   env:
-  - name: GATEWAY_URL
-    default: "https://api.stage.openshift.com"
   - name: TOKEN_URL
     default: "https://sso.redhat.com/auth/realms/redhat-external/protocol/openid-connect/token"
-  - name: OPENSHIFT_VERSION
-    default: ''
+  - name: TF_FOLDER
+    default: 'ci/e2e/terraform_provider_rhcs_files'
+  - name: TF_VARS
+    default: |
+      url = "https://api.stage.openshift.com"
+      channel_group = "stable"

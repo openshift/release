@@ -8,6 +8,8 @@ echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
@@ -104,6 +106,7 @@ ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.y
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
 PLAN_NAME="${CLUSTER_NAME}_ci"
+echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
@@ -268,6 +271,24 @@ cat << EOF > $SHARED_DIR/check-cluster.yml
   - name: Check if cluster is available
     shell: kcli ssh root@${CLUSTER_NAME}-installer "oc get clusterversion -o=jsonpath='{.items[0].status.conditions[?(@.type=='\''Available'\'')].status}'"
     register: ready_check
+
+  - name: Grab the kcli log from installer
+    shell: >-
+      kcli scp root@${CLUSTER_NAME}-installer:/var/log/cloud-init-output.log /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+    ignore_errors: true
+
+  - name: Grab the log from HV to artifacts
+    fetch:
+      src: /tmp/kcli_${CLUSTER_NAME}_cloud-init-output.log
+      dest: ${ARTIFACT_DIR}/cloud-init-output.log
+      flat: yes
+    ignore_errors: true
+
+  - name: Show last logs from cloud init if failed
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer 'tail -100 /var/log/cloud-init-output.log'
+    when: "'True' not in ready_check.stdout"
+    ignore_errors: true
 
   - name: Fail when cluster is not available
     shell: "echo Cluster ready: {{ ready_check.stdout }}"

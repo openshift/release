@@ -115,6 +115,11 @@ function rhel_repo(){
       replace: "{{ target_repo_version }}"
   - name: Clean up yum cache
     command: yum clean all
+  - name: Import GPG key on RHEL machines for the following upgrade task - Install downloaded packages
+    ignore_errors: true
+    rpm_key:
+      state: present
+      key: /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 EOF
 
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
@@ -150,7 +155,7 @@ function extract_oc(){
     echo -e "Extracting oc\n"
     local retry=5 tmp_oc="/tmp/client-2"
     mkdir -p ${tmp_oc}
-    while ! (oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc adm release extract -a "${CLUSTER_PROFILE_DIR}/pull-secret" --command=oc --to=${tmp_oc} ${TARGET});
     do
         echo >&2 "Failed to extract oc binary, retry..."
         (( retry -= 1 ))
@@ -161,6 +166,12 @@ function extract_oc(){
     which oc
     oc version --client
     return 0
+}
+
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function run_command_oc() {
@@ -288,7 +299,7 @@ function check_latest_machineconfig_applied() {
     eval "$cmd"
 
     echo "Checking $role machines are applied with latest $role machineconfig..."
-    latest_machineconfig=$(oc get machineconfig --sort-by='{.metadata.creationTimestamp}' | grep "rendered-${role}-" | tail -1 | awk '{print $1}')
+    latest_machineconfig=$(oc get mcp/$role -o json | jq -r '.spec.configuration.name')
     if [[ ${latest_machineconfig} == "" ]]; then
         echo >&2 "Did not found ${role} render machineconfig"
         return 1
@@ -308,19 +319,30 @@ function check_latest_machineconfig_applied() {
 }
 
 function wait_machineconfig_applied() {
-    local role="${1}" try=0 interval=60
+    local role="${1}" try=0 interval=30
     num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
-    local max_retries; max_retries=$(expr $num \* 10)
-    while (( try < max_retries )); do
+    local max_retries; max_retries=$(expr $num \* 10 \* 60 \/ $interval) # Wait 10 minutes for each node, try 60/interval times per minutes
+
+    local mcp_try=0 mcp_status=''
+    local max_try_between_updated_and_updating; max_try_between_updated_and_updating=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    while [ $mcp_try -lt $max_try_between_updated_and_updating ] && [ $try -lt $max_retries ]
+    do
+        sleep ${interval}
         echo "Checking #${try}"
-        if ! check_latest_machineconfig_applied "${role}"; then
-            sleep ${interval}
-        else
-            break
+        mcp_status=$(oc get mcp/$role -o json | jq -r '.status.conditions[] | select(.type == "Updated") | .status')
+        if [[ X"$mcp_status" != X"True" ]]; then
+            mcp_try=0
         fi
+        (( mcp_try += 1 ))
         (( try += 1 ))
     done
-    if (( try == max_retries )); then
+    echo "MCP ${role} status is ${mcp_status}"
+    if [[ X"$mcp_status" != X"True" ]]; then
+        echo "Timeout waiting for mcp updated"
+        return 1
+    fi
+    
+    if ! check_latest_machineconfig_applied "${role}"; then
         echo >&2 "Timeout waiting for all $role machineconfigs are applied"
         return 1
     else
@@ -377,7 +399,7 @@ function check_signed() {
     digest="$(echo "${TARGET}" | cut -f2 -d@)"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror2.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -494,7 +516,7 @@ unset 'TARGET_RELEASES[-1]'
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
-    TARGET_VERSION="$(oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"

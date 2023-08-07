@@ -8,6 +8,8 @@ echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
@@ -83,6 +85,7 @@ ansible-playbook -i $SHARED_DIR/bastion_inventory $SHARED_DIR/get-cluster-name.y
 # Get all required variables - cluster name, API IP, port, environment
 # shellcheck disable=SC2046,SC2034
 IFS=- read -r CLUSTER_NAME CLUSTER_API_IP CLUSTER_API_PORT CLUSTER_HV_IP CLUSTER_ENV <<< "$(cat ${SHARED_DIR}/cluster_name)"
+echo "${CLUSTER_NAME}" > ${ARTIFACT_DIR}/job-cluster
 
 cat << EOF > $SHARED_DIR/release-cluster.yml
 ---
@@ -264,6 +267,7 @@ EOF
 status=0
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/ocp-install.yml -vv || status=$?
 ansible-playbook -i $SHARED_DIR/inventory ~/fetch-kubeconfig.yml -vv || true
+sleep 300  # Wait for cluster to be ready after a reboot
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/fetch-information.yml -vv || true
 ANSIBLE_STDOUT_CALLBACK=debug ansible-playbook -i $SHARED_DIR/inventory ~/check-cluster.yml -vv
 exit ${status}
