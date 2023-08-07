@@ -8,16 +8,25 @@ images:
 - dockerfile_literal: |
     # Dockerfile to bootstrap build and test in openshift-ci
     FROM registry.ci.openshift.org/openshift/release:golang-1.19
-    WORKDIR /home
-    COPY . .
-    RUN yum -y install make wget gcc git httpd-tools
+    RUN yum -y install make git httpd-tools
 
+    # Install kubectl
     RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
     RUN chmod +x ./kubectl
     RUN mv ./kubectl /usr/local/bin
 
-    # TODO: to be replaced with oc binary download steps
-    FROM openshift/origin-cli
+    # Install oc CLI
+    ENV OC_VERSION "v3.11.0"
+    ENV OC_RELEASE "openshift-origin-client-tools-v3.11.0-0cbc58b-linux-64bit"
+
+    ADD https://github.com/openshift/origin/releases/download/$OC_VERSION/$OC_RELEASE.tar.gz /opt/oc/release.tar.gz
+    # RUN apk add --no-cache ca-certificates
+    RUN tar --strip-components=1 -xzvf  /opt/oc/release.tar.gz -C /opt/oc/ && \
+        mv /opt/oc/oc /usr/local/bin/ && \
+        rm -rf /opt/oc
+
+    WORKDIR /home
+    COPY . .
   to: src-kubectl
 promotion:
   name: "4.14"
