@@ -45,15 +45,23 @@ tests:
   container:
     from: bin
 - as: test-integration
-  commands: |
-    oc create serviceaccount pipeline
-    oc adm policy add-scc-to-user privileged -z default
-    oc adm policy add-role-to-user edit -z default
-    oc adm policy add-scc-to-user privileged -z pipeline
-    oc adm policy add-role-to-user edit -z pipeline
-    make test-integration
-  container:
-    from: src-kubectl
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test-integration
+      cli: latest
+      commands: |
+        oc create serviceaccount pipeline
+        oc adm policy add-scc-to-user privileged -z default
+        oc adm policy add-role-to-user edit -z default
+        oc adm policy add-scc-to-user privileged -z pipeline
+        oc adm policy add-role-to-user edit -z pipeline
+        make test-integration
+      from: src-kubectl
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: test-e2e
   steps:
     cluster_profile: aws
