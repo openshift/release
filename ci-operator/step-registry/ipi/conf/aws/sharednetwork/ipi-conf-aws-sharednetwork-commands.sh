@@ -48,6 +48,9 @@ subnets=[]
 # save stack information to ${SHARED_DIR} for deprovision step
 echo "${STACK_NAME_VPC}" >> "${SHARED_DIR}/sharednetworkstackname"
 
+vpc_id=$(aws --region $REGION cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="VpcId").OutputValue')
+echo "$vpc_id" > "${SHARED_DIR}/vpc_id"
+
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
 
   echo "Downloading CloudFormation template for Local Zone subnet"
@@ -58,7 +61,6 @@ if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
   localzone_name=$(< "${SHARED_DIR}"/local-zone-name.txt)
   echo "Local Zone selected: ${localzone_name}"
 
-  vpc_id=$(aws --region $REGION cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="VpcId").OutputValue')
   vpc_rtb_pub=$(aws --region $REGION cloudformation describe-stacks --stack-name "${STACK_NAME_VPC}" | jq -r '.Stacks[0].Outputs[] | select(.OutputKey=="PublicRouteTableId").OutputValue')
   echo "VPC info: ${vpc_id} [public route table=${vpc_rtb_pub}]"
 
