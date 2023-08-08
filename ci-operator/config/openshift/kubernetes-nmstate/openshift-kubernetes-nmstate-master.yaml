@@ -101,27 +101,57 @@ tests:
       HANDLER_NAMESPACE: openshift-nmstate
       OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-handler
-- as: e2e-handler-ovn-ipv4
+- as: e2e-handler-ovn-ipv6
   cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
+    dependencies:
+      K8S_NMSTATE_HANDLER_IMAGE: kubernetes-nmstate-handler
+      K8S_NMSTATE_OPERATOR_IMAGE: kubernetes-nmstate-operator
     env:
       DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
+        IP_STACK=v6
         NETWORK_TYPE="OVNKubernetes"
-        MIRROR_IMAGES=false
+        MIRROR_IMAGES=true
+        MIRROR_CUSTOM_IMAGES="K8S_NMSTATE_HANDLER_IMAGE,K8S_NMSTATE_OPERATOR_IMAGE"
+        MASTER_VCPU=12
+        MASTER_MEMORY=40000
+        NUM_WORKERS=0
+        WORKER_VCPU=12
+        WORKER_MEMORY=40000
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="nmstate1 nmstate2"
+        NMSTATE1_NETWORK_SUBNET_V4=""
+        NMSTATE1_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:ca56::/120"
+        NMSTATE2_NETWORK_SUBNET_V4=""
+        NMSTATE2_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:cc56::/120"
       HANDLER_NAMESPACE: openshift-nmstate
       OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-handler
-- as: e2e-operator-ovn-ipv4
+- as: e2e-operator-ovn-ipv6
   cluster: build05
   steps:
     cluster_profile: equinix-ocp-metal
+    dependencies:
+      K8S_NMSTATE_HANDLER_IMAGE: kubernetes-nmstate-handler
+      K8S_NMSTATE_OPERATOR_IMAGE: kubernetes-nmstate-operator
     env:
       DEVSCRIPTS_CONFIG: |
-        IP_STACK=v4
+        IP_STACK=v6
         NETWORK_TYPE="OVNKubernetes"
-        MIRROR_IMAGES=false
+        MIRROR_IMAGES=true
+        MIRROR_CUSTOM_IMAGES="K8S_NMSTATE_HANDLER_IMAGE,K8S_NMSTATE_OPERATOR_IMAGE"
+        MASTER_VCPU=12
+        MASTER_MEMORY=40000
+        NUM_WORKERS=0
+        WORKER_VCPU=12
+        WORKER_MEMORY=40000
+      EXTRA_NETWORK_CONFIG: |
+        EXTRA_NETWORK_NAMES="nmstate1 nmstate2"
+        NMSTATE1_NETWORK_SUBNET_V4=""
+        NMSTATE1_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:ca56::/120"
+        NMSTATE2_NETWORK_SUBNET_V4=""
+        NMSTATE2_NETWORK_SUBNET_V6="fd2e:6f44:5dd8:cc56::/120"
       HANDLER_NAMESPACE: openshift-nmstate
       OPERATOR_NAMESPACE: openshift-nmstate
     workflow: kubernetes-nmstate-e2e-operator

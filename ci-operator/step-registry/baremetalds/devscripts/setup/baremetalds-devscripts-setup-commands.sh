@@ -10,6 +10,13 @@ echo "************ baremetalds devscripts setup command ************"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+echo "************ CHOCOBOMB DEBUGGING ************"
+echo "${SHARED_DIR}/server-ip"
+cat "${SHARED_DIR}/server-ip"
+echo "${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+cat "${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+echo "************ CHOCOBOMB DEBUGGING ************"
+
 # Get dev-scripts logs and other configuration
 finished()
 {
@@ -199,7 +206,7 @@ echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 
-# Add APPLIANCE_IMAGE only for appliance e2e tests 
+# Add APPLIANCE_IMAGE only for appliance e2e tests
 if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "DISKIMAGE" ];
 then
   echo "export APPLIANCE_IMAGE=${APPLIANCE_IMAGE}" >> /root/dev-scripts/config_root.sh
@@ -209,6 +216,14 @@ fi
 if [ "${EXTRA_MANIFESTS}" == "true" ];
 then
   echo "export ASSETS_EXTRA_FOLDER=/root/manifests" >> /root/dev-scripts/config_root.sh
+fi
+
+# For k8s-nmstate tests we need to pass around the image built by Prow so that
+# it can be mirrored to the local registry
+if [[ "$JOB_SPEC" =~ .*"kubernetes-nmstate".* ]];
+then
+  echo "export K8S_NMSTATE_HANDLER_IMAGE=${K8S_NMSTATE_HANDLER_IMAGE}" >> /root/dev-scripts/config_root.sh
+  echo "export K8S_NMSTATE_OPERATOR_IMAGE=${K8S_NMSTATE_OPERATOR_IMAGE}" >> /root/dev-scripts/config_root.sh
 fi
 
 if [[ "${ARCHITECTURE}" == "arm64" ]]; then

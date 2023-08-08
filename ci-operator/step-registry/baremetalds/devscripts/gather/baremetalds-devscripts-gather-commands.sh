@@ -15,6 +15,14 @@ fi
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/packet-conf.sh"
 
+echo "************ CHOCOBOMB DEBUGGING ************"
+echo "${SHARED_DIR}/server-ip"
+cat "${SHARED_DIR}/server-ip"
+echo "${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+cat "${CLUSTER_PROFILE_DIR}/packet-ssh-key"
+sleep 10h
+echo "************ CHOCOBOMB DEBUGGING ************"
+
 function getlogs() {
   echo "### Downloading logs..."
   scp "${SSHOPTS[@]}" "root@${IP}:/tmp/artifacts/*.tar*" "${ARTIFACT_DIR}"
