@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "************ baremetalds cert rotation suspend test command ************"
+echo "************ openshift cert rotation suspend test command ************"
 
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
@@ -57,7 +57,7 @@ function copy-file-from-first-master {
 ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
 
 # Stop chrony service on all nodes
-run-on "${control_nodes}" "systemctl disable chronyd --now"
+run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
 
 # Backup lb-ext kubeconfig so that it could be compared to a new one
 KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
