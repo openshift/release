@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "************ baremetalds cert rotation shutdown test command ************"
+echo "************ openshift cert rotation shutdown test command ************"
 
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
@@ -28,7 +28,6 @@ OC=${OC:-oc}
 SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
-SETTLE_TIMEOUT=10m
 COMMAND_TIMEOUT=15m
 
 # HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
@@ -121,12 +120,12 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Wait for operators to stabilize
 if
-  ! oc wait co --all --for='condition=Available=True' --timeout=${SETTLE_TIMEOUT} 1>/dev/null || \
-  ! oc wait co --all --for='condition=Progressing=False' --timeout=${SETTLE_TIMEOUT} 1>/dev/null || \
-  ! oc wait co --all --for='condition=Degraded=False' --timeout=${SETTLE_TIMEOUT} 1>/dev/null; then
+  ! oc adm wait-for-stable-cluster --minimum-stable-period=5s --timeout=30m; then
+    oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
     exit 1
 else
+  oc get nodes
   oc get co
   oc get clusterversion
 fi

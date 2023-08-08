@@ -100,12 +100,12 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Wait for operators to stabilize
 if
-  ! oc wait co --all --for='condition=Available=True' --timeout=${SETTLE_TIMEOUT} 1>/dev/null || \
-  ! oc wait co --all --for='condition=Progressing=False' --timeout=${SETTLE_TIMEOUT} 1>/dev/null || \
-  ! oc wait co --all --for='condition=Degraded=False' --timeout=${SETTLE_TIMEOUT} 1>/dev/null; then
+  ! oc adm wait-for-stable-cluster --minimum-stable-period=5s --timeout=30m; then
+    oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
     exit 1
 else
+  oc get nodes
   oc get co
   oc get clusterversion
 fi
