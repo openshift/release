@@ -339,11 +339,9 @@ cat > run_test_playbook.yaml <<-"EOF"
           {{ POST_INSTALL_COMMANDS }}
           echo "Finish running post installation script"
     - name: Log against brew.registry.redhat.io
-      containers.podman.podman_login:
-        username: "{{ BREW_REGISTRY_REDHAT_IO_USERNAME }}"
-        password: "{{ BREW_REGISTRY_REDHAT_IO_PASSWORD }}"
-        registry: brew.registry.redhat.io
-        authfile: /root/pull-secret
+      ansible.builtin.command:
+        cmd: podman login --authfile=/root/pull-secret --username {{ BREW_REGISTRY_REDHAT_IO_USERNAME | quote }} --password-stdin brew.registry.redhat.io
+        stdin: "{{ BREW_REGISTRY_REDHAT_IO_PASSWORD }}"
 EOF
 
 export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
