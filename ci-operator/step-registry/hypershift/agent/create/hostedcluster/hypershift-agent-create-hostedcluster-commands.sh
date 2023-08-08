@@ -12,7 +12,7 @@ RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 
-/usr/bin/hypershift create cluster agent \
+/usr/bin/hcp create cluster agent \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
   --agent-namespace="clusters-${CLUSTER_NAME}" \
