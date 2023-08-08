@@ -1,8 +1,6 @@
 #!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
 IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
 HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
@@ -60,5 +58,7 @@ scp \
     "${INSTANCE_PREFIX}:/tmp"
 
 trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs ${ARTIFACT_DIR}' EXIT
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh"
+ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh" &
+wait
