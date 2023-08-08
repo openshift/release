@@ -7,6 +7,10 @@ base_images:
     name: centos
     namespace: openshift
     tag: stream9
+  sonar:
+    name: sonar-scanner-alpine
+    namespace: ci
+    tag: latest
   tools:
     name: "4.16"
     namespace: ocp
@@ -72,6 +76,15 @@ tests:
     env:
       PROJECT_NAME: openshift/release-controller
     workflow: openshift-ci-security
+- as: sonar
+  cluster: build05
+  commands: |
+    sonar-scanner -X -Dsonar.token=$(cat /usr/local/tokens/release-controller)
+  container:
+    from: sonar
+  secrets:
+  - mount_path: /usr/local/tokens
+    name: openshift-crt-sonar-tokens
 zz_generated_metadata:
   branch: master
   org: openshift
