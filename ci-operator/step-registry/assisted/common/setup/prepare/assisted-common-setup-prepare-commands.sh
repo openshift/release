@@ -177,8 +177,7 @@ cat > run_test_playbook.yaml <<-"EOF"
     ASSISTED_TEST_INFRA_IMAGE: "{{ lookup('env', 'ASSISTED_TEST_INFRA_IMAGE')}}"
     CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE')}}"
     OPENSHIFT_INSTALL_RELEASE_IMAGE: "{{ lookup('env', 'OPENSHIFT_INSTALL_RELEASE_IMAGE')}}"
-    BREW_REGISTRY_REDHAT_IO_USERNAME: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/username') }}"
-    BREW_REGISTRY_REDHAT_IO_PASSWORD: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/password') }}"
+    BREW_REGISTRY_REDHAT_IO_PULL_SECRET: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/pull-secret') }}"
   tasks:
     - name: Fail on unsupported environment
       fail:
@@ -196,6 +195,13 @@ cat > run_test_playbook.yaml <<-"EOF"
       ansible.builtin.copy:
         src: "{{ CLUSTER_PROFILE_DIR }}/pull-secret"
         dest: /root/pull-secret
+    - name: Update pull secrets with brew.registry.redhat.io auth
+      become: true
+      ansible.builtin.copy:
+        content: "{{ pull_secret_content | combine(BREW_REGISTRY_REDHAT_IO_PULL_SECRET, recursive=true) | to_nice_json }}"
+        dest: /root/pull-secret
+      vars:
+        pull_secret_content: lookup('file', '/root/pull-secret')
     - name: Create prod directory
       ansible.builtin.file:
         path: /root/prod
@@ -338,10 +344,6 @@ cat > run_test_playbook.yaml <<-"EOF"
         content: |
           {{ POST_INSTALL_COMMANDS }}
           echo "Finish running post installation script"
-    - name: Log against brew.registry.redhat.io
-      ansible.builtin.command:
-        cmd: podman login --authfile=/root/pull-secret --username {{ BREW_REGISTRY_REDHAT_IO_USERNAME | quote }} --password-stdin brew.registry.redhat.io
-        stdin: "{{ BREW_REGISTRY_REDHAT_IO_PASSWORD }}"
 EOF
 
 export ANSIBLE_CONFIG="${SHARED_DIR}/ansible.cfg"
