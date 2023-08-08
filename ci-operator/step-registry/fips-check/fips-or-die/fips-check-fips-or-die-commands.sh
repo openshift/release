@@ -111,14 +111,26 @@ images=("quay.io/openshift-qe-optional-operators/myapp:v1.16-1"
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
-node_name=`oc get node -l node-role.kubernetes.io/master= -o=jsonpath="{.items[0].metadata.name}"`
-arch=`oc get node/$node_name -o=jsonpath="{.status.nodeInfo.architecture}"`
-if [[ $arch != "amd64" ]]; then
-    echo "Skip this test since it doesn't support $arch."
-    exit 0
-else
-    echo "Start to run test on $arch"
+
+run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
+if [[ $ret -eq 0 ]]; then
+    auths=`cat /tmp/.dockerconfigjson`
+    if [[ $auths =~ "5000" ]]; then
+        echo "This is a disconnected env, skip it."
+        exit 0
+    fi
 fi
+
+mapfile -t node_archs< <(oc get nodes -o jsonpath --template '{range .items[*]}{.status.nodeInfo.architecture}{"\n"}{end}' | sort -R | uniq -d)
+echo "The architectures included in the current cluster nodes are ${node_archs[*]}"
+### Skip ppc64le and s390x temporarily becasue the test images are not manifest list images now.
+NON_SUPPORTED_ARCHES=(arm64 ppc64le s390x)
+for arch in "${node_archs[@]}"; do
+  if [[ "${NON_SUPPORTED_ARCHES[*]}" =~ $arch ]]; then
+      echo "Skip this test since it doesn't support $arch."
+      exit 0
+  fi
+done
 
 project="fips-or-die-$RANDOM"
 run_command "oc new-project $project"
@@ -130,6 +142,7 @@ fi
 
 # check if FIPS enabled
 fips_enabled=false
+node_name=`oc get node -l node-role.kubernetes.io/master= -o=jsonpath="{.items[0].metadata.name}"`
 str=`oc debug node/$node_name -- chroot /host fips-mode-setup --check`
 if [[ $str =~ "FIPS mode is enabled" ]]
 then
@@ -175,5 +188,5 @@ if $pass; then
     echo "All tests pass!"
 else
     echo "Test fail, please check log."
-    return 1
+    exit 1
 fi

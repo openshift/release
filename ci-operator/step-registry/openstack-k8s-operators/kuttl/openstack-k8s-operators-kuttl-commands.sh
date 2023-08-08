@@ -4,6 +4,10 @@ set -ex
 
 META_OPERATOR="openstack-operator"
 ORG="openstack-k8s-operators"
+# Export Ceph options for tests that call 'make ceph'
+export CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
+export CEPH_DATASIZE=${CEPH_DATASIZE:="2Gi"}
+export CEPH_TIMEOUT=${CEPH_TIMEOUT:="90"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE

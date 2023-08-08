@@ -318,7 +318,7 @@ function check_latest_machineconfig_applied() {
     eval "$cmd"
 
     echo "Checking $role machines are applied with latest $role machineconfig..."
-    latest_machineconfig=$(oc get machineconfig --sort-by='{.metadata.creationTimestamp}' | grep "rendered-${role}-" | tail -1 | awk '{print $1}')
+    latest_machineconfig=$(oc get mcp/$role -o json | jq -r '.spec.configuration.name')
     if [[ ${latest_machineconfig} == "" ]]; then
         echo >&2 "Did not found ${role} render machineconfig"
         return 1
@@ -338,19 +338,30 @@ function check_latest_machineconfig_applied() {
 }
 
 function wait_machineconfig_applied() {
-    local role="${1}" try=0 interval=60
-    num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
-    local max_retries; max_retries=$(expr $num \* 15)
-    while (( try < max_retries )); do
-        echo "Checking #${try}"
-        if ! check_latest_machineconfig_applied "${role}"; then
-            sleep ${interval}
-        else
-            break
+    local role="${1}" try=0 interval=30
+    num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l) 
+    local max_retries; max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
+
+    local mcp_try=0 mcp_status=''
+    local max_try_between_updated_and_updating; max_try_between_updated_and_updating=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    while [ $mcp_try -lt $max_try_between_updated_and_updating ] && [ $try -lt $max_retries ]
+    do
+        sleep ${interval}
+        echo "Checking MCP #${try}"
+        mcp_status=$(oc get mcp/$role -o json | jq -r '.status.conditions[] | select(.type == "Updated") | .status')
+        if [[ X"$mcp_status" != X"True" ]]; then
+            mcp_try=0
         fi
+        (( mcp_try += 1 ))
         (( try += 1 ))
     done
-    if (( try == max_retries )); then
+    echo "MCP ${role} status is ${mcp_status}"
+    if [[ X"$mcp_status" != X"True" ]]; then
+        echo "Timeout waiting for mcp updated"
+        return 1
+    fi
+
+    if ! check_latest_machineconfig_applied "${role}"; then
         echo >&2 "Timeout waiting for all $role machineconfigs are applied"
         return 1
     else

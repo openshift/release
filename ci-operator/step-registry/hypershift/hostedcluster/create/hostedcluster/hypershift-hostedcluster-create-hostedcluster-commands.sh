@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euox pipefail
+set -euo pipefail
 
 echo HyperShift CLI version
 /usr/bin/hypershift version
