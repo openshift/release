@@ -31,8 +31,6 @@ if ! sudo subscription-manager status >&/dev/null; then
 fi
 
 chmod 0755 ~
-mkdir ~/rpms
-tar -xf /tmp/rpms.tar -C ~/rpms
 tar -xf /tmp/microshift.tgz -C ~
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
@@ -46,15 +44,12 @@ cp /tmp/pull-secret "\${PULL_SECRET}"
 cd ~/microshift
 
 ./test/bin/ci_phase_iso_build.sh
-
-./scripts/image-builder/build.sh -pull_secret_file "\${PULL_SECRET}" -microshift_rpms ~/rpms -authorized_keys_file ~/.ssh/id_rsa.pub -open_firewall_ports 6443:tcp
 EOF
 chmod +x /tmp/iso.sh
 
 tar czf /tmp/microshift.tgz /microshift
 
 scp \
-    /rpms.tar \
     /tmp/iso.sh \
     /var/run/rhsm/subscription-manager-org \
     /var/run/rhsm/subscription-manager-act-key \
@@ -63,5 +58,7 @@ scp \
     "${CLUSTER_PROFILE_DIR}/ssh-publickey" \
     /tmp/microshift.tgz \
     "${INSTANCE_PREFIX}:/tmp"
+
+trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs ${ARTIFACT_DIR}' EXIT
 
 ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh"

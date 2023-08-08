@@ -139,6 +139,10 @@ dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
+echo "install-config.yaml"
+echo "-------------------"
+cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
 mkdir -p ~/.ssh
@@ -170,11 +174,14 @@ if [ "${ENABLE_AWS_LOCALZONE}" == "yes" ]; then
     sed -i "s/PLACEHOLDER_AMI_ID/$ami_id/g" ${localzone_machineset}
     cp "${localzone_machineset}" "${ARTIFACT_DIR}/"
   else
-    # Phase 1, use install-config
-
+    # Phase 1 & 2, use install-config
     if [[ "${LOCALZONE_WORKER_SCHEDULABLE}" == "yes" ]]; then
-      echo 'LOCALZONE_WORKER_SCHEDULABLE is set to "yes", removing spec.template.spec.taints from 99_openshift-cluster-api_worker-machineset-1.yaml'
-      yq-go d "${dir}/openshift/99_openshift-cluster-api_worker-machineset-1.yaml" spec.template.spec.taints
+      echo 'LOCALZONE_WORKER_SCHEDULABLE is set to "yes", removing spec.template.spec.taints from localzone machineset'
+      for local_zone_machineset in $(grep -lr 'cluster-api-machine-type: edge' ${dir});
+      do
+        echo "Removing spec.template.spec.taints from $(basename ${local_zone_machineset})"
+        yq-go d "${local_zone_machineset}" spec.template.spec.taints
+      done
     fi
   fi
   

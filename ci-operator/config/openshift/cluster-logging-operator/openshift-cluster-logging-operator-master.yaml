@@ -108,9 +108,15 @@ tests:
     from: src
   timeout: 15m0s
 - as: e2e-target
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -148,13 +154,13 @@ tests:
         requests:
           cpu: 100m
       timeout: 3h0m0s
-    workflow: ipi-aws
+    workflow: generic-claim
   timeout: 5h0m0s
 - as: e2e-ocp-target-minus-one
   cluster_claim:
     architecture: amd64
     cloud: aws
-    owner: cvp
+    owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
     version: "4.13"
@@ -257,7 +263,8 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
+  optional: true
   skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     test:
@@ -276,6 +283,8 @@ tests:
         name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -292,10 +301,15 @@ tests:
           cpu: 100m
     workflow: generic-claim
 - as: functional-target
-  optional: true
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: cvp
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   skip_if_only_changed: ^docs/|\.adoc$|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
-    cluster_profile: aws
     test:
     - as: test
       cli: latest
@@ -312,6 +326,8 @@ tests:
         name: pipeline:logging-view-plugin
       - env: IMAGE_LOGGING_FLUENTD
         name: pipeline:logging-fluentd
+      - env: IMAGE_LOGGING_VECTOR
+        name: pipeline:logging-vector
       - env: IMAGE_ELASTICSEARCH_PROXY
         name: pipeline:elasticsearch-proxy
       - env: IMAGE_ELASTICSEARCH6
@@ -326,7 +342,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: openshift

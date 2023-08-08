@@ -219,12 +219,7 @@ Resources:
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 6443
-        ToPort: 6453
-        CidrIp: 0.0.0.0/0
-      # Range for all dynamic port-forwarding for scenario tests, see boot phase for use
-      - IpProtocol: tcp
-        FromPort: 7000
-        ToPort: 8000
+        ToPort: 6443
         CidrIp: 0.0.0.0/0
       - IpProtocol: tcp
         FromPort: 30000
@@ -279,8 +274,6 @@ Resources:
           sudo pvcreate "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
           echo "====== Creating VG ======" | tee -a /tmp/init_output.txt
           sudo vgcreate rhel "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
-          echo "====== Creating Thin Pool ======" | tee -a /tmp/init_output.txt
-          sudo lvcreate -L 10G --thinpool thin rhel |& tee -a /tmp/init_output.txt
 
 Outputs:
   InstanceId:

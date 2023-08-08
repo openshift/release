@@ -1,8 +1,4 @@
 base_images:
-  base:
-    name: 4.13-priv
-    namespace: ocp-private
-    tag: base
   cert-manager-cainjector:
     name: cert-manager-cainjector
     namespace: ci
@@ -19,13 +15,17 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.19-openshift-4.13
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
 binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/cert-manager-operator
 images:
 - dockerfile_path: images/ci/Dockerfile
-  from: base
+  from: ubi
   inputs:
     ocp_builder_rhel-9-golang-1.19-openshift-4.13:
       as:
@@ -98,30 +98,6 @@ tests:
         requests:
           cpu: 100m
     workflow: optional-operators-ci-aws
-- as: e2e-operator-upgrade
-  optional: true
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-cert-manager-operator-bundle
-    env:
-      OO_CHANNEL: stable-v1.10
-      OO_INSTALL_NAMESPACE: cert-manager-operator
-      OO_LATEST_CSV: cert-manager-operator.v1.10.3
-      OO_PACKAGE: cert-manager-operator
-      OO_TARGET_NAMESPACES: '!install'
-    test:
-    - as: test-upgrade
-      cli: latest
-      commands: make test-e2e
-      dependencies:
-      - env: IMAGE_FROM_CI
-        name: cert-manager-operator
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: optional-operators-ci-aws-upgrade
 zz_generated_metadata:
   branch: cert-manager-v1.10.x
   org: openshift-priv

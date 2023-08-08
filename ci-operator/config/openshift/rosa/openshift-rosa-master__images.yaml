@@ -1,21 +1,22 @@
 base_images:
-  origin_4.10_cli:
-    name: "4.10"
+  origin_4.14_cli:
+    name: "4.14"
     namespace: origin
     tag: cli
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
 images:
 - dockerfile_literal: |
-    FROM registry.ci.openshift.org/openshift/release:golang-1.18 as builder
+    FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14 as builder
     WORKDIR /go/src/github.com/openshift/rosa
     RUN go install ./cmd/rosa
     RUN rosa version
+    RUN rosa verify openshift-client
 
-    FROM registry.ci.openshift.org/origin/4.10:cli
+    FROM registry.ci.openshift.org/origin/4.14:cli
     COPY --from=builder /go/bin/rosa /usr/bin/rosa
     RUN yum -y install --setopt=skip_missing_names_on_install=False \
         openssl \
@@ -28,13 +29,14 @@ images:
         ./aws/install && \
         rm -rf awscliv2.zip aws &&\
         aws --version
+    RUN rosa verify openshift-client
   inputs:
-    origin_4.10_cli:
+    origin_4.14_cli:
       as:
-      - registry.ci.openshift.org/origin/4.10:cli
+      - registry.ci.openshift.org/origin/4.14:cli
     src:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.18
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: rosa-aws-cli
 promotion:
   namespace: ci

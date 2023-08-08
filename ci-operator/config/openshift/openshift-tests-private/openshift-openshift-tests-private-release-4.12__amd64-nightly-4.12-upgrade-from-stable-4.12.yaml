@@ -67,6 +67,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       FIPS_ENABLED: "true"
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @aws-ipi'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @aws-ipi'
     test:
@@ -209,23 +210,8 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-ovn
-- as: aws-ipi-ovn-hypershift-control-plane-p1-f7
-  cron: 7 19 4,12,19,26 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @aws-ipi and @hypershift-hosted
-        and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @aws-ipi and @hypershift-hosted
-        and not @fips'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-hypershift-control-plane
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-worker-node-inplace-p1-f7
-  cron: 33 19 6,13,20,28 * *
+- as: aws-ipi-ovn-hypershift-inplace-p1-f7
+  cron: 51 8 7,14,22,30 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -238,10 +224,10 @@ tests:
         and not @fips'
     test:
     - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-hypershift-worker-node
+    - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-worker-node-replace-p1-f7
-  cron: 19 3 2,9,17,25 * *
+- as: aws-ipi-ovn-hypershift-replace-p1-f7
+  cron: 27 7 4,12,20,27 * *
   steps:
     cluster_profile: aws-qe
     env:
@@ -253,7 +239,7 @@ tests:
         and not @fips'
     test:
     - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-hypershift-worker-node
+    - chain: openshift-upgrade-qe-test-hypershift
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-ipsec-p2-f28
   cron: 36 15 13 * *
@@ -439,16 +425,17 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-upi
-- as: gcp-ipi-disconnected-private-workload-identity-p2-f28
-  cron: 17 15 10 * *
+- as: gcp-ipi-disconnected-private-workload-identity-f28
+  cron: 7 20 18 * *
   steps:
     cluster_profile: gcp-qe
     env:
+      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
       UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.12 and @gcp-ipi and not @fips'
       UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.12 and @gcp-ipi and not @fips'
     test:
     - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test
+    - chain: openshift-upgrade-qe-test-disconnected
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
 - as: gcp-ipi-ovn-ipsec-p2-f28
   cron: 9 21 7 * *
@@ -472,8 +459,8 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-proxy-private
-- as: gcp-ipi-workload-identity-p2-f28
-  cron: 45 19 8 * *
+- as: gcp-ipi-workload-identity-f28
+  cron: 55 2 28 * *
   steps:
     cluster_profile: gcp-qe
     env:
@@ -483,8 +470,8 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-gcp-ipi-cco-manual-workload-identity
-- as: gcp-ipi-workload-identity-rt-fips-p2-f14
-  cron: 21 21 3,18 * *
+- as: gcp-ipi-workload-identity-rt-fips-f14
+  cron: 4 7 13,28 * *
   steps:
     cluster_profile: gcp-qe
     env:

@@ -58,16 +58,45 @@ HOME="${HOME:-/tmp/home}"
 export HOME
 XDG_RUNTIME_DIR="${HOME}/run"
 export XDG_RUNTIME_DIR
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
 oc registry login
-oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST}"
+oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
+# Create manual credentials using client secret for openshift-cluster-api.
+# This is a temp workaround until cluster-api supports workload identity
+# authentication. This enables the openshift-e2e test to succeed when running
+# the cluster-api tests. Placing it here so ccoctl can override it with
+# generated credentials as work is done to support workload identity.
+# At the time of this comment, openshift-cluster-api appears to only be
+# enabled with the TechPreviewNoUpgrade FeatureSet.
+mkdir -p "/tmp/manifests"
+echo "Creating credentials for openshift-cluster-api..."
+cat > "/tmp/manifests/openshift-cluster-api-capz-manager-bootstrap-credentials-credentials.yaml" << EOF
+apiVersion: v1
+stringData:
+  azure_client_id: ${AZURE_CLIENT_ID}
+  azure_client_secret: ${AZURE_CLIENT_SECRET}
+  azure_region: ${REGION}
+  azure_resourcegroup: ${CLUSTER_NAME}
+  azure_subscription_id: ${AZURE_SUBSCRIPTION_ID}
+  azure_tenant_id: ${AZURE_TENANT_ID}
+kind: Secret
+metadata:
+  name: capz-manager-bootstrap-credentials
+  namespace: openshift-cluster-api
+EOF
 
 # create required credentials infrastructure and installer manifests
 ccoctl azure create-all \
   --name="${CLUSTER_NAME}" \
   --region="${REGION}" \
   --subscription-id="${AZURE_SUBSCRIPTION_ID}" \
+  --tenant-id="${AZURE_TENANT_ID}" \
   --credentials-requests-dir="/tmp/credrequests" \
   --dnszone-resource-group-name="${BASE_DOMAIN_RESOURCE_GROUP_NAME}" \
   --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
