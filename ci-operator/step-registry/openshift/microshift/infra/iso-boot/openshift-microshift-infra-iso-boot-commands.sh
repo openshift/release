@@ -1,8 +1,6 @@
 #!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
@@ -88,6 +86,7 @@ EOF
 scp "${SETTINGS_FILE}" "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/test/"
 
 trap 'finalize' EXIT
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
 if [[ "$JOB_NAME" =~ .*periodic.* ]]; then
@@ -95,4 +94,5 @@ if [[ "$JOB_NAME" =~ .*periodic.* ]]; then
 fi
 
 # Run the in-repo ci phase script to create the VMs for the test scenarios.
-ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh"
+ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh" &
+wait
