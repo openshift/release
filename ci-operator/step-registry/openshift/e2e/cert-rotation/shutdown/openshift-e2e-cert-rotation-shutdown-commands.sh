@@ -31,6 +31,13 @@ SSH=${SSH:-ssh ${SSH_OPTS}}
 SETTLE_TIMEOUT=10m
 COMMAND_TIMEOUT=15m
 
+# HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
+if [ -d "$KUBECONFIG" ]; then
+  for kubeconfig in $(find ${KUBECONFIG} -type f); do
+    export KUBECONFIG=${kubeconfig}
+  done
+fi
+
 control_nodes=( $( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' ) )
 
 # Compute nodes seem to be protected with firewall?
