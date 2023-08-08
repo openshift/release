@@ -86,7 +86,9 @@ EOF
 scp "${SETTINGS_FILE}" "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/test/"
 
 trap 'finalize' EXIT
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+# Call wait regardless of the outcome of the kill command, in case some of the children are finished
+# by the time we try to kill them. There is only 1 child now, but this is generic enough to allow N.
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
 
 SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
 if [[ "$JOB_NAME" =~ .*periodic.* ]]; then
