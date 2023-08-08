@@ -201,7 +201,7 @@ cat > run_test_playbook.yaml <<-"EOF"
         content: "{{ pull_secret_content | combine(BREW_REGISTRY_REDHAT_IO_PULL_SECRET, recursive=true) | to_nice_json }}"
         dest: /root/pull-secret
       vars:
-        pull_secret_content: lookup('file', '/root/pull-secret')
+        pull_secret_content: "{{ lookup('file', '/root/pull-secret') }}"
     - name: Create prod directory
       ansible.builtin.file:
         path: /root/prod
