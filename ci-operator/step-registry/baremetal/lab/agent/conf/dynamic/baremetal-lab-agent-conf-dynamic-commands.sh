@@ -66,7 +66,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
         dhcp: false
     "
   done
-  # Patch the agent-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza
+  # Patch the agent-config.yaml by adding the given host to the hosts list in the platform.baremetal stanza --test
   yq --inplace eval-all 'select(fileIndex == 0).hosts += select(fileIndex == 1) | select(fileIndex == 0)' \
     "$SHARED_DIR/agent-config.yaml" - <<< "$ADAPTED_YAML"
 done
