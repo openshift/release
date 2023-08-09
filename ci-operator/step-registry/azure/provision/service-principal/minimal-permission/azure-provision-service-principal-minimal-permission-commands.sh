@@ -24,7 +24,8 @@ function create_custom_role() {
 
     role=$(az role definition list --custom-role-only true --output json --query "[?roleName=='${custom_role_name}'].roleName" -otsv)
     if [[ "${role}" != "${custom_role_name}" ]]; then
-        echo "Unable to create custom role"
+        echo "Unable to create custom role ${custom_role_name}! get created role: ${role}"
+        az role definition list --custom-role-only true --output json --query '[].{roleName:roleName, roleType:roleType}'
         return 1
     else
         echo "Custom role ${custom_role_name} created"
@@ -201,6 +202,7 @@ jq --null-input \
 
 echo "Creating custom role..."
 create_custom_role "${ROLE_DEFINITION}" "${CUSTOM_ROLE_NAME}"
+echo "${CUSTOM_ROLE_NAME}" > "${SHARED_DIR}/azure_custom_role_name"
 
 echo "Creating sp with custom role..."
 create_sp_with_custom_role "${SP_NAME}" "${CUSTOM_ROLE_NAME}" "${AZURE_AUTH_SUBSCRIPTOIN_ID}" "${SP_OUTPUT}"
@@ -220,7 +222,6 @@ cat <<EOF > "${SHARED_DIR}/azure_minimal_permission"
 EOF
 
 # for destroy
-echo "${CUSTOM_ROLE_NAME}" > "${SHARED_DIR}/azure_custom_role_name"
 echo "${sp_id}" > "${SHARED_DIR}/azure_sp_id"
 
 rm -rf ${SP_OUTPUT}
