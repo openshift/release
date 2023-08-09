@@ -39,7 +39,7 @@ function cvoCapabilityCheck() {
     fi
     if [[ "${capability_set}" != "" ]]; then
         if [[ "${cvo_caps}" == "null" ]]; then
-            echo "ERROR: ${expected_status} capability set are ${enabled_capability_set}, but it's empty in cvo ${cvo_field}"
+            echo "ERROR: ${expected_status} capability set are ${capability_set}, but it's empty in cvo ${cvo_field}"
             result=1
         else
             cvo_caps_str=$(echo $cvo_caps | tr -d '["]' | tr "," " " | xargs -n1 | sort -u | xargs)
@@ -132,7 +132,7 @@ case ${BASELINE_CAPABILITY_SET} in
 esac
 
 if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
-    enabled_capability_set=$(echo ${enabled_capability_set} ${ADDITIONAL_ENABLED_CAPABILITIES} | xargs -n1 | sort -u | xargs)
+    enabled_capability_set="${enabled_capability_set} ${ADDITIONAL_ENABLED_CAPABILITIES}"
 fi
 
 disabled_capability_set="${vCurrent}"
@@ -172,6 +172,7 @@ done
 # cvo status capability check
 echo "------check cvo status capabilities check-----"
 echo "===check .status.capabilities.enabledCapabilities"
+enabled_capability_set=$(echo ${enabled_capability_set} | xargs -n1 | sort -u | xargs)
 cvoCapabilityCheck "${enabled_capability_set}" "enabled" ".status.capabilities.enabledCapabilities" || check_result=1
 
 echo "===check .status.capabilities.knownCapabilities"
