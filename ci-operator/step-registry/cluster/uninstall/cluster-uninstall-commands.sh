@@ -35,7 +35,7 @@ RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
 #  CLUSTER_DATA_CMD+="${data_file},"
 #done
 
-RUN_COMMAND+=$(echo "${CLUSTER_DATA_CMD}" | sed 's/,$//g')
+# RUN_COMMAND+=$(echo "${CLUSTER_DATA_CMD}" | sed 's/,$//g')
 
 if [[ -n "${OCM_ENVIRONMENT}" ]]; then
     RUN_COMMAND+=" --ocm-env=${OCM_ENVIRONMENT} "
