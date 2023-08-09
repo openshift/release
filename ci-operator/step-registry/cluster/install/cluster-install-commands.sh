@@ -53,8 +53,9 @@ echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-toke
 set +e
 ${RUN_COMMAND}
 return_code=$?
-# Save cluster_data.yaml files to be used during cluster deletion
-find $CLUSTER_DATA_DIR  -name "cluster_data.yaml"  | tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" -T -
+# Save cluster_data.yaml and kubeconfig files to be used during cluster deletion
+# find $CLUSTER_DATA_DIR  -name "cluster_data.yaml"  | tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" -T -
+tar -zcvf xx.tar.gz --exclude=*.json --exclude=*terraform* --exclude=*.zip --exclude=*.tf* --exclude=tls --exclude=*.log  -C /tmp/clusters-data .
 
 set -e
 exit "$return_code"
