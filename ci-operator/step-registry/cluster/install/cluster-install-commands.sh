@@ -14,11 +14,11 @@ export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 export OCM_TOKEN
 
-RUN_COMMAND="poetry run python app/cli.py \
+RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
             --action create \
             --clusters-install-data-directory $CLUSTER_DATA_DIR \
             --ocm-token=$OCM_TOKEN \
-            --s3-bucket-name=${S3_BUCKET_NAME} "
+            --s3-bucket-name=$S3_BUCKET_NAME "
 
 CLUSTERS_CMD=""
 NUM_CLUSTERS=0

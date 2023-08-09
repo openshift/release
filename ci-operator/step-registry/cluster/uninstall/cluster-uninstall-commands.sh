@@ -9,6 +9,7 @@ AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred"
 AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 CLUSTER_DATA_DIR="/tmp/clusters-data"
+DATA_FILENAME="cluster_data.yaml"
 
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
@@ -17,31 +18,27 @@ export OCM_TOKEN
 # Extract clusters archive from SHARED_DIR
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=$CLUSTER_DATA_DIR
 
-RUN_COMMAND="poetry run python app/cli.py \
-            --action destroy \
-            --clusters-install-data-directory /tmp/clusters-data \
+RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
+            --destroy-all-clusters \
+            --clusters-install-data-directory $CLUSTER_DATA_DIR \
             --ocm-token=$OCM_TOKEN \
-            --s3-bucket-name=${S3_BUCKET_NAME}"
+            --s3-bucket-name=$S3_BUCKET_NAME "
 
-#CLUSTERS_CMD=""
-#NUM_CLUSTERS=0
-#for cluster_value in $(env | grep -E '^CLUSTER[0-9]+_CONFIG' | sort  --version-sort); do
-#    cluster_value=$(echo "$cluster_value" | sed -E  's/^CLUSTER[0-9]+_CONFIG=//')
-#    if  [ "${cluster_value}" ]; then
-#      CLUSTERS_CMD+=" --cluster ${cluster_value} "
-#      NUM_CLUSTERS=$(( NUM_CLUSTERS + 1))
-#    fi
-#done
+#CLUSTER_DATA_FILES=$(find $CLUSTER_DATA_DIR -name $DATA_FILENAME)
+#if [ -z "${CLUSTER_DATA_FILES}" ] ; then
+#  echo "No ${DATA_FILENAME} files found under ${CLUSTER_DATA_DIR}"
+#  exit 1
+#fi
 #
-#RUN_COMMAND+="${CLUSTERS_CMD} "
+#CLUSTER_DATA_CMD="--destroy-clusters-from-config-files "
+#for data_file in $CLUSTER_DATA_FILES; do
+#  CLUSTER_DATA_CMD+="${data_file},"
+#done
+
+RUN_COMMAND+=$(echo "${CLUSTER_DATA_CMD}" | sed 's/,$//g')
 
 if [[ -n "${OCM_ENVIRONMENT}" ]]; then
     RUN_COMMAND+=" --ocm-env=${OCM_ENVIRONMENT} "
-fi
-
-# if [ "${PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
-if [ "${PARALLEL}" = "true" ]; then
-    RUN_COMMAND+=" --parallel"
 fi
 
 if [[ -n "${S3_BUCKET_PATH}" ]]; then
