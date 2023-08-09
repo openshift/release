@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "************ baremetalds cert rotation suspend test command ************"
+echo "************ openshift cert rotation suspend test command ************"
 
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
@@ -31,6 +31,13 @@ SSH=${SSH:-ssh ${SSH_OPTS}}
 SETTLE_TIMEOUT=5m
 COMMAND_TIMEOUT=15m
 
+# HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
+if [ -d "$KUBECONFIG" ]; then
+  for kubeconfig in $(find ${KUBECONFIG} -type f); do
+    export KUBECONFIG=${kubeconfig}
+  done
+fi
+
 control_nodes=( $( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' ) )
 
 compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
@@ -50,7 +57,7 @@ function copy-file-from-first-master {
 ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
 
 # Stop chrony service on all nodes
-run-on "${control_nodes}" "systemctl disable chronyd --now"
+run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
 
 # Backup lb-ext kubeconfig so that it could be compared to a new one
 KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
@@ -93,12 +100,12 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Wait for operators to stabilize
 if
-  ! oc wait co --all --for='condition=Available=True' --timeout=${SETTLE_TIMEOUT} 1>/dev/null || \
-  ! oc wait co --all --for='condition=Progressing=False' --timeout=${SETTLE_TIMEOUT} 1>/dev/null || \
-  ! oc wait co --all --for='condition=Degraded=False' --timeout=${SETTLE_TIMEOUT} 1>/dev/null; then
+  ! oc adm wait-for-stable-cluster --minimum-stable-period=5s --timeout=30m; then
+    oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
     exit 1
 else
+  oc get nodes
   oc get co
   oc get clusterversion
 fi
