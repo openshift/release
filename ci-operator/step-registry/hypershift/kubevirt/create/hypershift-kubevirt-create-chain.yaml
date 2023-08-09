@@ -7,15 +7,18 @@ chain:
     - name: HYPERSHIFT_NODE_COUNT
       default: "3"
       documentation: "The number nodes to automatically create and join to the cluster."
+    - name: HYPERSHIFT_CLI
+      default: "hypershfit"
+      documentation: "The chosen CLI, hcp or hypershift"
     commands: |-
       set -exuo pipefail
 
       HCP_CLI="/usr/bin/hcp"
-      if [[ ! -f $HCP_CLI ]]; then
+      if [[ ! -f $HCP_CLI && "${HYPERSHIFT_CLI}" == "hcp" ]]; then
           # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
           HCP_CLI="/usr/bin/hypershift"
       fi
-      echo "Using $HCP_CLI for cli"
+      echo "Using $HYPERSHIFT_CLI for cli"
 
       # Enable wildcard routes on the management cluster
       oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
