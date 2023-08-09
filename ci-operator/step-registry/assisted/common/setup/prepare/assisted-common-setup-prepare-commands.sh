@@ -177,6 +177,8 @@ cat > run_test_playbook.yaml <<-"EOF"
     ASSISTED_TEST_INFRA_IMAGE: "{{ lookup('env', 'ASSISTED_TEST_INFRA_IMAGE')}}"
     CLUSTER_TYPE: "{{ lookup('env', 'CLUSTER_TYPE')}}"
     OPENSHIFT_INSTALL_RELEASE_IMAGE: "{{ lookup('env', 'OPENSHIFT_INSTALL_RELEASE_IMAGE')}}"
+    CLUSTER_PROFILE_PULL_SECRET: "{{ lookup('file', '{{ CLUSTER_PROFILE_DIR }}/pull-secret') }}"
+    BREW_REGISTRY_REDHAT_IO_PULL_SECRET: "{{ lookup('file', '/var/run/vault/brew-registry-redhat-io-pull-secret/pull-secret') }}"
   tasks:
     - name: Fail on unsupported environment
       fail:
@@ -189,11 +191,16 @@ cat > run_test_playbook.yaml <<-"EOF"
       ansible.builtin.file:
         path: /usr/config
         state: absent
-    - name: Copy pull-secret to remote
+    - name: Update pull secrets with brew.registry.redhat.io auth
+      ansible.builtin.set_fact:
+        pull_secret: "{{ CLUSTER_PROFILE_PULL_SECRET | combine(BREW_REGISTRY_REDHAT_IO_PULL_SECRET, recursive=true) }}"
+      no_log: true
+    - name: Setup pull-secret on remote
       become: true
       ansible.builtin.copy:
-        src: "{{ CLUSTER_PROFILE_DIR }}/pull-secret"
+        content: "{{ pull_secret | to_nice_json }}"
         dest: /root/pull-secret
+      no_log: true
     - name: Create prod directory
       ansible.builtin.file:
         path: /root/prod
