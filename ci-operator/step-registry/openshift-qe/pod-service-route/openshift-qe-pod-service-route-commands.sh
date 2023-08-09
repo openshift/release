@@ -26,3 +26,7 @@ export WORKLOAD=pods-service-route
 
 rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
 ./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+
+echo "-----------------------------"
+cat "${SHARED_DIR}/${OUTPUT_FILE}"
+echo "-----------------------------"
