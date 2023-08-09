@@ -1,8 +1,6 @@
 #!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
@@ -88,11 +86,17 @@ EOF
 scp "${SETTINGS_FILE}" "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/test/"
 
 trap 'finalize' EXIT
+# Call wait regardless of the outcome of the kill command, in case some of the children are finished
+# by the time we try to kill them. There is only 1 child now, but this is generic enough to allow N.
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
 
 SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios"
 if [[ "$JOB_NAME" =~ .*periodic.* ]]; then
   SCENARIO_SOURCES="/home/${HOST_USER}/microshift/test/scenarios-periodics"
 fi
 
-# Run the in-repo ci phase script to create the VMs for the test scenarios.
-ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh"
+# Run in background to allow trapping signals before the command ends. If running in foreground
+# then TERM is queued until the ssh completes. This might be too long to fit in the grace period
+# and get abruptly killed, which prevents gathering logs.
+ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh" &
+wait
