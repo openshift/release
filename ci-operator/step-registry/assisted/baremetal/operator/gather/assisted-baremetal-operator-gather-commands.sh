@@ -62,7 +62,7 @@ timeout -s 9 30m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOFTOP"
           yes | toolbox "sos report --batch --tmp-dir ${REPORT_PATH} -k crio.all=on -k crio.logs=on -k openshift.host=on -k openshift.podlogs=on \
               -o  openshift,openshift_ovn,crio,containers_common,host,containerd,logs"
 
-            sudo chmod -R +r "${REPORT_PATH}"
+           sudo chmod -R +r "${REPORT_PATH}"
 EOF
         scp -o StrictHostKeyChecking=off -r "core@${_IP}:${REPORT_PATH}/*"  "${REPORT_PATH}"
       done
