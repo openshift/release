@@ -23,4 +23,4 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
 echo "Cluster became available, creating kubeconfig"
-bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+bin/hcp create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
