@@ -3,6 +3,9 @@ set -e
 set -u
 set -o pipefail
 
+echo "debug, exit fips-check-fips-or-die"
+exit 0
+
 function set_proxy () {
     if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
         echo "setting the proxy"

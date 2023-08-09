@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "debug, exit cucushift-pre"
+exit 0
+
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi

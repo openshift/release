@@ -8,7 +8,7 @@ set -o nounset
 # Trap to kill children processes
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM ERR
 # Save exit code for must-gather to generate junit
-trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt";sleep 1800' TERM ERR
 
 [ -z "${AUX_HOST}" ] && { echo "\$AUX_HOST is not filled. Failing."; exit 1; }
 [ -z "${architecture}" ] && { echo "\$architecture is not filled. Failing."; exit 1; }
@@ -367,3 +367,5 @@ if ! wait "$!"; then
   # TODO: gather logs??
   exit 1
 fi
+echo "debug"
+oc adm release info -a "$PULL_SECRET_PATH"
