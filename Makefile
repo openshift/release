@@ -412,3 +412,35 @@ secret-config-updater:
 	--from-file=sa.config-updater.vsphere.config=$(TMPDIR)/sa.config-updater.vsphere.config \
 	--dry-run=client -o json | oc --context app.ci apply --dry-run=${DRY_RUN} --as system:admin -f -
 .PHONY: secret-config-updater
+
+# Check that given variables are set and all have non-empty values,
+# die with an error otherwise.
+#
+# Params:
+#   1. Variable name(s) to test.
+#   2. (optional) Error message to print.
+# From: https://stackoverflow.com/questions/10858261/how-to-abort-makefile-if-variable-not-set
+check_defined = \
+	$(strip $(foreach 1,$1, \
+		$(call __check_defined,$1,$(strip $(value 2)))))
+__check_defined = \
+	$(if $(value $1),, \
+		$(error Undefined environment variable $1$(if $2, ($2))))
+
+generate-hypershift-deplyment:
+	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
+	@:$(call check_defined, TMPDIR)
+
+	mkdir -p ${TMPDIR}/hypershift-cli
+	oc image extract registry.ci.openshift.org/ci/hypershift-cli:latest --path /usr/bin/hypershift:${TMPDIR}/hypershift-cli --confirm
+	chmod +x ${TMPDIR}/hypershift-cli/hypershift
+
+	${TMPDIR}/hypershift-cli/hypershift \
+		install \
+		--oidc-storage-provider-s3-bucket-name=hypershift-oidc-provider \
+		--oidc-storage-provider-s3-credentials=${MGMT_AWS_CONFIG_PATH} \
+		--oidc-storage-provider-s3-region=us-east-1 \
+		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:latest \
+		--enable-uwm-telemetry-remote-write=false \
+		render > $(CURDIR)/clusters/hive/hypershift/hypershift-install.yaml
+.PHONY: generate-hypershift-deplyment
