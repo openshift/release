@@ -23,4 +23,5 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 export ES_INDEX="ingress-performance"
 
 # Start the Workload
-./run.sh
+rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
+./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
