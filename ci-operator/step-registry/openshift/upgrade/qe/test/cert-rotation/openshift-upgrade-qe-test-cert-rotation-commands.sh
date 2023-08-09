@@ -3,19 +3,12 @@ set -xeuo pipefail
 
 function download_oc(){
     local tmp_bin_path='/tmp/oc-bin/'
-    # 4.6 using latest 4.10 oc client, hits the bug https://issues.redhat.com/browse/OCPBUGS-16009, it has been fixed on 4.14.
-    # In order for the test to continue, we have to use 4.14 nightly oc client temporarily, once 4.10 is available, will remove the code.
-    if [[ ${major_version} -eq 4 && ${minor_version} -eq 6 ]];then
-        echo "extract oc client from 4.10 release image for OCP 4.6 test"
-        RELEASE_IMAGE_TARGET="registry.ci.openshift.org/ocp/release:4.10.0-0.nightly-2023-07-21-181058"
-        extract_oc
-    else
-        mkdir -p "$tmp_bin_path"
-        curl -sSL --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
-        export PATH=${tmp_bin_path}:$PATH
-        which oc
-        oc version --client
-    fi
+
+    mkdir -p "$tmp_bin_path"
+    curl -sSL --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
+    export PATH=${tmp_bin_path}:$PATH
+    which oc
+    oc version --client
 }
 
 function extract_oc(){
