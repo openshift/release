@@ -5,7 +5,7 @@ set -o errexit
 set -o pipefail
 set -x
 
-echo "************ baremetalds cert rotation shutdown test command ************"
+echo "************ openshift cert rotation shutdown test command ************"
 
 # Fetch packet basic configuration
 # shellcheck source=/dev/null
@@ -28,13 +28,19 @@ OC=${OC:-oc}
 SSH_OPTS=${SSH_OPTS:- -o 'ConnectionAttempts=100' -o 'ConnectTimeout=5' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=90' -o LogLevel=ERROR}
 SCP=${SCP:-scp ${SSH_OPTS}}
 SSH=${SSH:-ssh ${SSH_OPTS}}
-SETTLE_TIMEOUT=10m
 COMMAND_TIMEOUT=15m
+
+# HA cluster's KUBECONFIG points to a directory - it needs to use first found cluster
+if [ -d "$KUBECONFIG" ]; then
+  for kubeconfig in $(find ${KUBECONFIG} -type f); do
+    export KUBECONFIG=${kubeconfig}
+  done
+fi
 
 control_nodes=( $( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' ) )
 
 # Compute nodes seem to be protected with firewall?
-#compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
 function run-on {
   for n in ${1}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${2}; done
@@ -51,7 +57,7 @@ function copy-file-from-first-master {
 ssh-keyscan -H ${control_nodes} >> ~/.ssh/known_hosts
 
 # Stop chrony service on all nodes
-run-on "${control_nodes}" "systemctl disable chronyd --now"
+run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
 
 # Backup lb-ext kubeconfig so that it could be compared to a new one
 KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
@@ -63,7 +69,7 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 # Set kubelet node IP hint. Nodes are created with two interfaces - provisioning and external,
 # and we want to make sure kubelet uses external address as main, instead of DHCP racing to use 
 # a random one as primary
-run-on "${control_nodes}" "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
+run-on "${control_nodes} ${compute_nodes}" "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
 
 # Shutdown nodes
 VMS=( $( virsh list --all --name ) )
@@ -90,7 +96,7 @@ for vm in ${VMS[@]}; do
 done
 
 # Check that time on nodes has been updated
-run-on "${control_nodes}" "timedatectl status"
+until run-on "${control_nodes} ${compute_nodes}" "timedatectl status"; do sleep 30; done
 
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 run-on-first-master "
@@ -114,12 +120,12 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Wait for operators to stabilize
 if
-  ! oc wait co --all --for='condition=Available=True' --timeout=${SETTLE_TIMEOUT} 1>/dev/null || \
-  ! oc wait co --all --for='condition=Progressing=False' --timeout=${SETTLE_TIMEOUT} 1>/dev/null || \
-  ! oc wait co --all --for='condition=Degraded=False' --timeout=${SETTLE_TIMEOUT} 1>/dev/null; then
+  ! oc adm wait-for-stable-cluster --minimum-stable-period=5s --timeout=30m; then
+    oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
     exit 1
 else
+  oc get nodes
   oc get co
   oc get clusterversion
 fi
