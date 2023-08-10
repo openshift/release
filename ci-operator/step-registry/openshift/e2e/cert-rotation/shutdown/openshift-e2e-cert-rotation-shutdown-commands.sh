@@ -120,7 +120,7 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Wait for operators to stabilize
 if
-  ! oc adm wait-for-stable-cluster --minimum-stable-period=5s --timeout=30m; then
+  ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
     oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
     exit 1
