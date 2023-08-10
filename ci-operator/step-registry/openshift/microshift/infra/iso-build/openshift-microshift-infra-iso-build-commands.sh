@@ -1,8 +1,6 @@
 #!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
 IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
 HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
@@ -60,5 +58,14 @@ scp \
     "${INSTANCE_PREFIX}:/tmp"
 
 trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs ${ARTIFACT_DIR}' EXIT
+# Call wait regardless of the outcome of the kill command, in case some of the children are finished
+# by the time we try to kill them. There is only 1 child now, but this is generic enough to allow N.
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
 
-ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh"
+# Run in background to allow trapping signals before the command ends. If running in foreground
+# then TERM is queued until the ssh completes. This might be too long to fit in the grace period
+# and get abruptly killed, which prevents gathering logs.
+ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh" &
+# Run wait -n since we only have one background command. Should this change, please update the exit
+# status handling.
+wait -n
