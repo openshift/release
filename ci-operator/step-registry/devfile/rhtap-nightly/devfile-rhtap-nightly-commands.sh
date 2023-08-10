@@ -5,8 +5,9 @@ set -o errexit
 set -o pipefail
 
 cd "$(mktemp -d)"
-git clone https://github.com/devfile/registry.git -b main && cd registry
+
+git clone https://github.com/devfile/registry.git -b main
 
 go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
 
-/bin/bash tests/check_rhtap_nightly.sh
+/bin/bash registry/tests/check_rhtap_nightly.sh
