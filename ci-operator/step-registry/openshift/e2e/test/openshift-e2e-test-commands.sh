@@ -55,15 +55,6 @@ trap cleanup EXIT
 
 mkdir -p "${HOME}"
 
-# Override the upstream docker.io registry due to issues with rate limiting
-# https://bugzilla.redhat.com/show_bug.cgi?id=1895107
-# sjenning: TODO: use of personal repo is temporary; should find long term location for these mirrored images
-export KUBE_TEST_REPO_LIST=${HOME}/repo_list.yaml
-cat <<EOF > ${KUBE_TEST_REPO_LIST}
-dockerLibraryRegistry: quay.io/sjenning
-dockerGluster: quay.io/sjenning
-EOF
-
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
 if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
@@ -169,7 +160,7 @@ openstack*)
     fi
     ;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-ibmcloud)
+ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
@@ -222,6 +213,15 @@ function upgrade_conformance() {
     else
         echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
     fi &&
+    return $exit_code
+}
+
+# upgrade_rt runs the rt test suite, the upgrade, and the rt test suite again, and exits with an error if any calls fail
+function upgrade_rt() {
+    local exit_code=0 &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
+    upgrade || exit_code=$? &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
     return $exit_code
 }
 
@@ -301,6 +301,10 @@ oc wait --for=condition=Progressing=False --timeout=2m clusterversion/version
 
 # wait up to 10m for the number of nodes to match the number of machines
 i=0
+node_check_interval=30
+node_check_limit=20
+# AWS Local Zone nodes usually take much more to be ready.
+test -n "${AWS_EDGE_POOL_ENABLED-}" && node_check_limit=60
 while true
 do
     MACHINECOUNT="$(kubectl get machines -A --no-headers | wc -l)"
@@ -315,10 +319,10 @@ EOF
         echo "$(date) - node count ($NODECOUNT) now matches or exceeds machine count ($MACHINECOUNT)"
         break
     fi
-    echo "$(date) - $MACHINECOUNT Machines - $NODECOUNT Nodes"
-    sleep 30
+    echo "$(date) [$i/$node_check_limit] - $MACHINECOUNT Machines - $NODECOUNT Nodes"
+    sleep $node_check_interval
     i=$((i+1))
-    if [ $i -gt 20 ]; then
+    if [ $i -gt $node_check_limit ]; then
       MACHINELIST="$(kubectl get machines -A)"
       NODELIST="$(kubectl get nodes)"
       cat >"${ARTIFACT_DIR}/junit_nodes.xml" <<EOF
@@ -452,6 +456,9 @@ upgrade)
     ;;
 upgrade-paused)
     upgrade_paused
+    ;;
+upgrade-rt)
+    upgrade_rt
     ;;
 suite-conformance)
     suite

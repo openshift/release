@@ -258,6 +258,15 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-sharednetwork
   timeout: 6h0m0s
+- as: e2e-aws-ovn-shared-vpc-localzones
+  optional: true
+  run_if_changed: aws
+  steps:
+    cluster_profile: aws-local-zones
+    env:
+      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+    workflow: openshift-e2e-aws-local-zones-byo-vpc
+  timeout: 6h0m0s
 - as: e2e-aws-ovn-localzones
   optional: true
   run_if_changed: aws
@@ -265,7 +274,6 @@ tests:
     cluster_profile: aws-local-zones
     env:
       BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-local-zones
   timeout: 6h0m0s
 - as: e2e-aws-ovn-imdsv2
@@ -488,6 +496,14 @@ tests:
     workflow: openshift-e2e-openstack-proxy
   timeout: 6h0m0s
 - always_run: false
+  as: e2e-openstack-nfv-intel
+  optional: true
+  run_if_changed: openstack
+  steps:
+    cluster_profile: openstack-nfv
+    workflow: openshift-e2e-openstack-nfv
+  timeout: 6h0m0s
+- always_run: false
   as: e2e-openstack-externallb
   optional: true
   steps:
@@ -644,6 +660,30 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
+- as: e2e-agent-compact-ipv4-none-platform
+  cluster: build05
+  optional: true
+  run_if_changed: /agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        AGENT_PLATFORM_TYPE=none
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
+- as: e2e-agent-compact-ipv4-appliance
+  cluster: build05
+  optional: true
+  run_if_changed: /agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
+        AGENT_USE_APPLIANCE_MODEL=true
+    workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
@@ -671,7 +711,7 @@ tests:
 - as: e2e-agent-ha-dualstack
   cluster: build05
   optional: true
-  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  run_if_changed: /agent/
   steps:
     cluster_profile: equinix-ocp-metal
     env:

@@ -378,6 +378,11 @@ Outputs:
       ]
 EOF
 
+MAX_ZONES_COUNT=$(aws --region "${REGION}" ec2 describe-availability-zones --filter Name=state,Values=available Name=zone-type,Values=availability-zone | jq '.AvailabilityZones | length')
+if (( ZONES_COUNT > MAX_ZONES_COUNT )); then
+  ZONES_COUNT=$MAX_ZONES_COUNT
+fi
+
 # The above cloudformation template's max zones account is 3
 if [[ "${ZONES_COUNT}" -gt 3 ]]
 then

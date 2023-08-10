@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-alibaba
     decorate: true
     decoration_config:
@@ -844,7 +844,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure
     decorate: true
     decoration_config:
@@ -927,7 +927,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure-resourcegroup
     decorate: true
     decoration_config:
@@ -1010,7 +1010,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure-shared-vpc
     decorate: true
     decoration_config:
@@ -1093,7 +1093,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure-upi
     decorate: true
     decoration_config:
@@ -1177,7 +1177,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azurestack
     decorate: true
     decoration_config:
@@ -1260,7 +1260,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azurestack-upi
     decorate: true
     decoration_config:
@@ -1866,7 +1866,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-ibmcloud
     decorate: true
     decoration_config:
@@ -2037,7 +2037,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-metal-assisted
     decorate: true
     decoration_config:
@@ -2629,7 +2629,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-metal-single-node-live-iso
     decorate: true
     decoration_config:
@@ -2797,7 +2797,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-openstack-kuryr
     decorate: true
     decoration_config:
@@ -2876,6 +2876,91 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-openstack-kuryr,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^release-4\.10$
+    - ^release-4\.10-
+    cluster: build05
+    context: ci/prow/e2e-openstack-nfv-intel
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+      timeout: 6h0m0s
+    hidden: true
+    labels:
+      ci-operator.openshift.io/cloud: openstack-nfv
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-nfv
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-installer-release-4.10-e2e-openstack-nfv-intel
+    optional: true
+    path_alias: github.com/openshift/installer
+    rerun_command: /test e2e-openstack-nfv-intel
+    run_if_changed: openstack
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-openstack-nfv-intel-cluster-profile
+        - --target=e2e-openstack-nfv-intel
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-nfv-intel-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-openstack-nfv
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-nfv-intel,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -2964,7 +3049,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-openstack-proxy
     decorate: true
     decoration_config:
@@ -3048,7 +3133,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-ovirt
     decorate: true
     decoration_config:
@@ -3303,7 +3388,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -3361,7 +3446,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/golint
     decorate: true
     decoration_config:
@@ -3419,7 +3504,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/govet
     decorate: true
     decoration_config:
@@ -3477,7 +3562,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -3617,7 +3702,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -3675,7 +3760,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/verify-codegen
     decorate: true
     decoration_config:
@@ -3732,7 +3817,7 @@ presubmits:
     branches:
     - ^release-4\.10$
     - ^release-4\.10-
-    cluster: build03
+    cluster: build05
     context: ci/prow/verify-vendor
     decorate: true
     decoration_config:

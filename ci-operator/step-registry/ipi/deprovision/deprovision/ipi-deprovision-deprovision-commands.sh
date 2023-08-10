@@ -29,7 +29,7 @@ fi
 export OS_CLIENT_CONFIG_FILE=${SHARED_DIR}/clouds.yaml
 export OVIRT_CONFIG=${SHARED_DIR}/ovirt-config.yaml
 
-if [[ "${CLUSTER_TYPE}" == "ibmcloud" ]]; then
+if [[ "${CLUSTER_TYPE}" == "ibmcloud"* ]]; then
   IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
   export IC_API_KEY
 fi
