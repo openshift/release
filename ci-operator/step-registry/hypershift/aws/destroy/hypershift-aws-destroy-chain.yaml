@@ -16,6 +16,13 @@ chain:
     commands: |-
       set -exuo pipefail
       
+      HCP_CLI="/usr/bin/hcp"
+      if [[ ! -f $HCP_CLI ]]; then
+          # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
+          HCP_CLI="/usr/bin/hypershift"
+      fi
+      echo "Using $HCP_CLI for cli"
+      
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
       
@@ -27,7 +34,7 @@ chain:
       
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-      bin/hypershift destroy cluster aws \
+      $HCP_CLI destroy cluster aws \
         --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
         --name ${CLUSTER_NAME} \
         --region ${HYPERSHIFT_AWS_REGION} \

@@ -45,6 +45,14 @@ chain:
       documentation: "Sets hostname to opinionated values in the specificed domain for services with publishing type LoadBalancer or Route"
     commands: |-
       set -exuo pipefail
+      
+      HCP_CLI="/usr/bin/hcp"
+      if [[ ! -f $HCP_CLI ]]; then
+          # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
+          HCP_CLI="/usr/bin/hypershift"
+      fi
+      echo "Using $HCP_CLI for cli"
+      
       AWS_GUEST_INFRA_CREDENTIALS_FILE="/etc/hypershift-ci-jobs-awscreds/credentials"
       DEFAULT_BASE_DOMAIN=ci.hypershift.devcluster.openshift.com
       
@@ -66,7 +74,7 @@ chain:
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-      /usr/bin/hypershift create cluster aws \
+      $HCP_CLI create cluster aws \
         ${EXTRA_ARGS} ${ICSP_COMMAND} \
         --name ${CLUSTER_NAME} \
         --external-dns-domain=${HYPERSHIFT_EXTERNAL_DNS_DOMAIN} \
@@ -87,7 +95,7 @@ chain:
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
       echo "Cluster became available, creating kubeconfig"
-      bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+      $HCP_CLI create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
       echo "Waiting for clusteroperators to be ready"
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       until \
