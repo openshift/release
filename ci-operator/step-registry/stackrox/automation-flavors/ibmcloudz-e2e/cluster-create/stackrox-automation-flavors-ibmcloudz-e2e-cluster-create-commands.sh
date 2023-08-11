@@ -24,6 +24,6 @@ KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 
 ### OCP Cluster Creation. ocpmanager script is to create/delete ocp cluster on IBM cloud [https://github.ibm.com/Ganesh-Bhure2/stackrox-ci]
 ### Thisscript runs on an intermediate node [IP 163.74.90.40] on IBM cloud
-SSH_CMD="/home/ubuntu/stackrox-ci/ocpmanager create"
+SSH_CMD="/root/ocpmanager create"
 ssh $SSH_ARGS root@163.74.90.40 "$SSH_CMD" > $KUBECONFIG_FILE
 KUBECONFIG="$KUBECONFIG_FILE" ./kubectl get nodes
