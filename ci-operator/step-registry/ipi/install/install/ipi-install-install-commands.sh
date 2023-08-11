@@ -43,6 +43,9 @@ function set-cluster-version-spec-update-service() {
 
     # The candidate channel is most likely to contain the versions we are interested in, so transfer the current channel
     # into a candidate one.
+    cat ${dir}/manifests/cvo-overrides.yaml
+    set +x
+
     local channel
     channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"
     echo "Original channel from CVO manifest: ${channel}"
@@ -67,6 +70,7 @@ function set-cluster-version-spec-update-service() {
         echo "Clearing the channel"
         sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
     fi
+    set -x
 }
 
 function populate_artifact_dir() {
