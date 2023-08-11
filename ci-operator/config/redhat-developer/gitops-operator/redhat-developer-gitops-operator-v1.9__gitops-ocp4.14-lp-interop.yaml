@@ -33,6 +33,18 @@ tests:
     cluster_profile: aws-cspi-qe
     env:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI"},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI"},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPTOCPCI"},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI"},
+          {"step": "gitops-operator", "failure_type": "pod_failure", "classification": "Test Execution", "jira_project": "LPTOCPCI"},
+          {"step": "gitops-operator", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "GITOPS"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
       OPERATORS: |
         [
             {"name": "openshift-gitops-operator", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators", "target_namespaces": "", "operator_group": "global-operators"}
@@ -41,7 +53,7 @@ tests:
     test:
     - ref: install-operators
     - ref: gitops-operator
-    workflow: ipi-aws
+    workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: v1.9
   org: redhat-developer
