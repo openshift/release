@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export TEST_NAMESPACE="stack"
+
 cd "$(mktemp -d)"
 
 go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
@@ -16,4 +18,8 @@ cd tests/rhtap && \
     go mod vendor && \
     cd ../..
 
-/bin/bash tests/check_rhtap_nightly.sh
+
+oc create namespace "${TEST_NAMESPACE}"
+ginkgo run  \
+  --timeout 2h \
+  tests/rhtap -- -samplesFile "$(pwd)/extraDevfileEntries.yaml" -namespace="stack"
