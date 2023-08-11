@@ -6,6 +6,11 @@ finalize() {
 
   STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
+  JOB_URL_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+  if [ "${JOB_TYPE}" == "periodic" ]; then
+    JOB_URL_PATH="logs"
+  fi
+  URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/${JOB_URL_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info"
   cat >>${REPORT} <<EOF
 <html>
 <head>
@@ -38,7 +43,7 @@ EOF
     testname=$(basename "${test}")
     cat >>${REPORT} <<EOF
     <p>${testname}:&nbsp;
-    <a target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info/${testname}/boot.log">boot.log</a>
+    <a target="_blank" href="${URL}/${testname}/boot.log">boot.log</a>
 EOF
     for vm in ${test}/vms/*; do
       if [ "${vm: -4}" == ".xml" ]; then
@@ -46,7 +51,7 @@ EOF
       fi
       vmname=$(basename ${vm})
       cat >>${REPORT} <<EOF
-      &nbsp;/&nbsp;<a target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info/${testname}/vms/${vmname}/sos">${vmname} sos reports</a>
+      &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/vms/${vmname}/sos">${vmname} sos reports</a>
 EOF
     done
     cat >>${REPORT} <<EOF
