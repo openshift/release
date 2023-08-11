@@ -249,12 +249,7 @@ Resources:
       BlockDeviceMappings:
       - DeviceName: /dev/sda1
         Ebs:
-          VolumeSize: "120"
-          VolumeType: gp3
-          Iops: 16000
-      - DeviceName: /dev/sdc
-        Ebs:
-          VolumeSize: "120"
+          VolumeSize: "300"
           VolumeType: gp3
           Iops: 16000
       PrivateDnsNameOptions:
