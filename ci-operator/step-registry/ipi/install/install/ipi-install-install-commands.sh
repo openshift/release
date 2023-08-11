@@ -9,6 +9,11 @@ function set-cluster-version-spec-update-service() {
     payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
     echo "Release payload version: ${payload_version}"
 
+    if [[ ! -f ${dir}/manifests/cvo-overrides.yaml ]]; then
+        echo "No CVO overrides file found, will not configure OpenShift Update Service"
+        return
+    fi
+
     # Using OSUS in upgrade jobs would be tricky (we would need to know the channel with both versions)
     # and the use case has little benefits (not many jobs that update between two released versions)
     # so we do not need to support it. We still need to channel clear to avoid tripping the
@@ -41,10 +46,16 @@ function set-cluster-version-spec-update-service() {
         payload_arch_param=""
     fi
 
+
+    local channel
+    if ! channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"; then
+        echo "No known OCP channel found in CVO manifest, clearing the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        return
+    fi
+
     # The candidate channel is most likely to contain the versions we are interested in, so transfer the current channel
     # into a candidate one.
-    local channel
-    channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"
     echo "Original channel from CVO manifest: ${channel}"
     local candidate_channel
     candidate_channel="$(echo "${channel}" | sed -E 's/(stable|eus|fast)/candidate/')"
