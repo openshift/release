@@ -37,9 +37,8 @@ if [ -d "$KUBECONFIG" ]; then
   done
 fi
 
-control_nodes=( $( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' ) )
+control_nodes=$( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
-# Compute nodes seem to be protected with firewall?
 compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
 function run-on {
@@ -54,7 +53,7 @@ function copy-file-from-first-master {
   timeout ${COMMAND_TIMEOUT} ${SCP} core@"${control_nodes[0]}:${1}" "${2}"
 }
 
-ssh-keyscan -H ${control_nodes} >> ~/.ssh/known_hosts
+ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
 
 # Stop chrony service on all nodes
 run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
