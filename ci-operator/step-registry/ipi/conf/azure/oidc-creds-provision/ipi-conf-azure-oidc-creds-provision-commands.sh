@@ -91,6 +91,11 @@ metadata:
   namespace: openshift-cluster-api
 EOF
 
+# create metadata so cluster resource group is deleted in ipi-deprovision-deprovision
+cat > ${SHARED_DIR}/metadata.json << EOF
+{"infraID":"${CLUSTER_NAME}","azure":{"region":"${REGION}","resourceGroupName":"${CLUSTER_NAME}"}}
+EOF
+
 # create required credentials infrastructure and installer manifests
 ccoctl azure create-all \
   --name="${CLUSTER_NAME}" \
