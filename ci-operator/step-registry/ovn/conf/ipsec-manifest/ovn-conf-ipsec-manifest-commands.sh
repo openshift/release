@@ -23,3 +23,23 @@ spec:
     ovnKubernetesConfig:
       ipsecConfig: {}
 EOF
+
+# additional os extension for 4.14+
+if (( ocp_minor_version >= 14 && ocp_major_version == 4 )); then
+    for role in master worker; do
+        cat >> "${SHARED_DIR}/manifest_${role}-ipsec-extension.yml" << EOF
+        apiVersion: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        metadata:
+          labels:
+            machineconfiguration.openshift.io/role: $role
+          name: 80-$role-extensions
+        spec:
+          config:
+            ignition:
+              version: 3.2.0
+          extensions:
+            - ipsec
+        EOF
+    done
+fi
