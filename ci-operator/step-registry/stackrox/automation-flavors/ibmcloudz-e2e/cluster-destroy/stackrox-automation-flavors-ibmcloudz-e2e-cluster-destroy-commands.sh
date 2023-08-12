@@ -18,5 +18,5 @@ chmod 400 $SSH_KEY_PATH
 # ssh $SSH_ARGS root@163.66.94.115 "$SSH_CMD" > $KUBECONFIG_FILE
 
 # delete OCP cluster. ocpmanager script runs on an intermediate node [IP 163.74.90.40] on IBM cloud
-SSH_CMD="/home/ubuntu/stackrox-ci/ocpmanager delete"
+SSH_CMD="/root/ocpmanager delete"
 ssh $SSH_ARGS root@163.74.90.40 "$SSH_CMD"
