@@ -33,6 +33,9 @@ set +e
 echo "### Copying test-list file"
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
 
+echo "let's goooooooooooooooooooooo.........."
+sleep 45m
+
 echo "### Running tests"
 timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
     # prepending each printed line with a timestamp
