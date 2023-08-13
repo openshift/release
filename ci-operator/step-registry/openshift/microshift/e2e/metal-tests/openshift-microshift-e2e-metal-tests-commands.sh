@@ -8,6 +8,11 @@ finalize() {
 
   STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
+  JOB_URL_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+  if [ "${JOB_TYPE}" == "periodic" ]; then
+    JOB_URL_PATH="logs"
+  fi
+  URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/${JOB_URL_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info"
   cat >>${REPORT} <<EOF
 <html>
 <head>
@@ -39,12 +44,12 @@ EOF
     testname=$(basename "${test}")
     cat >>${REPORT} <<EOF
     <p>${testname}:&nbsp;
-    <a target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info/${testname}">directory</a>
-    &nbsp;/&nbsp;<a target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info/${testname}/run.log">run.log</a>
+    <a target="_blank" href="${URL}/${testname}">directory</a>
+    &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/run.log">run.log</a>
 EOF
     if [ -f ${test}/log.html ]; then
       cat >>${REPORT} <<EOF
-    &nbsp;/&nbsp;<a target="_blank" href="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info/${testname}/log.html">RF log</a>
+    &nbsp;/&nbsp;<a target="_blank" href="${URL}/${testname}/log.html">RF log</a>
 EOF
     fi
     cat >>${REPORT} <<EOF
