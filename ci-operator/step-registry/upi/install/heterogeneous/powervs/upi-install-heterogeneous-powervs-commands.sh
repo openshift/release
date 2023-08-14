@@ -91,9 +91,9 @@ case "$CLUSTER_TYPE" in
         fi
       fi
 
-      # build terraform from source v1.5.4
-      cd ${IBMCLOUD_HOME_FOLDER} && curl -L https://github.com/hashicorp/terraform/archive/refs/tags/v1.5.4.tar.gz -o ${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz \
-        && tar -xzf ${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz && cd ${IBMCLOUD_HOME_FOLDER}/terraform-1.5.4 \
+      # build terraform from source v1.5.5
+      cd ${IBMCLOUD_HOME_FOLDER} && curl -L https://github.com/hashicorp/terraform/archive/refs/tags/v1.5.5.tar.gz -o ${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz \
+        && tar -xzf ${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz && cd ${IBMCLOUD_HOME_FOLDER}/terraform-1.5.5 \
         && go build -ldflags "-w -s -X 'github.com/hashicorp/terraform/version.dev=no'" -o bin/ . && cp bin/terraform /tmp/terraform
       export PATH=$PATH:/tmp
       t_ver1=$(/tmp/terraform -version)
@@ -107,8 +107,8 @@ case "$CLUSTER_TYPE" in
       ic login --apikey @${CLUSTER_PROFILE_DIR}/ibmcloud-api-key -r ${REGION} -g ${RESOURCE_GROUP}
       ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage power-iaas is
 
-      # create workspace for power from cli
-      echo "Display all the variable values"
+      # create workspace for powervs from cli
+      echo "Display all the variable values:"
       POWERVS_REGION=$(
           case "$REGION" in
               ("jp-osa") echo "osa21" ;;
@@ -132,11 +132,16 @@ case "$CLUSTER_TYPE" in
       echo ${OCP_VERSION} > ${SHARED_DIR}/OCP_VERSION
 
       # After the workspace is created, invoke the automation code
-      cd ${IBMCLOUD_HOME_FOLDER} && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-${OCP_VERSION}.tar.gz -o ${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz \
-        && tar -xzf ${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz && mv ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION} ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs
+      cd ${IBMCLOUD_HOME_FOLDER} \
+        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-${OCP_VERSION}.tar.gz -o ${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz \
+        && tar -xzf ${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz \
+        && mv ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION} ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs
 
       echo "Creating the Centos Stream Image"
-      bash ocp4-upi-compute-powervs/scripts/import-centos.sh /tmp/ibmcloud "${SERVICE_INSTANCE_ID}"
+      ic pi sl --json | jq -r '.[] | select(.Name == "'${WORKSPACE_NAME}'").CRN'  
+      ic pi st "$(ic pi sl --json | jq -r '.[] | select(.Name == "'${WORKSPACE_NAME}'").CRN')"
+      ic pi image-create CentOS-Stream-8
+      echo "Import image status is: $?"
 
       # Set the values to be used for generating var.tfvars
       IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
@@ -149,7 +154,8 @@ case "$CLUSTER_TYPE" in
 
       # Invoke create_var_file.sh to generate var.tfvars file
       echo "Creating the var file"
-      cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs && bash scripts/create-var-file.sh /tmp/ibmcloud "${EXPECTED_NODES}"
+      cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
+        && bash scripts/create-var-file.sh /tmp/ibmcloud "${EXPECTED_NODES}"
 
       # TODO:MAC check if the var.tfvars file is populated
       VARFILE_OUTPUT=$(cat ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/var.tfvars)
@@ -158,7 +164,8 @@ case "$CLUSTER_TYPE" in
       # copy the var.tfvars file and the POWERVS_SERVICE_INSTANCE_ID to ${SHARED_DIR} so that it can be used to destroy the
       # created resources. The FAILED_DEPLOY flag is only exported on a fail
       cp ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/var.tfvars ${SHARED_DIR}/var.tfvars
-      cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/ && /tmp/terraform init -upgrade \
+      cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/ \
+        && /tmp/terraform init -upgrade \
         && /tmp/terraform plan -var-file=data/var.tfvars -no-color \
         && /tmp/terraform apply -var-file=data/var.tfvars -auto-approve -no-color \
         || export FAILED_DEPLOY="true"

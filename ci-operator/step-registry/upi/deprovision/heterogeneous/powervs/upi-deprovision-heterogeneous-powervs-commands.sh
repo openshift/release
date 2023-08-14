@@ -33,9 +33,9 @@ then
     fi
   fi
 
-  # build terraform from source v1.5.4
-  cd ${IBMCLOUD_HOME_FOLDER} && curl -L https://github.com/hashicorp/terraform/archive/refs/tags/v1.5.4.tar.gz -o ${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz \
-    && tar -xzf ${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz && cd ${IBMCLOUD_HOME_FOLDER}/terraform-1.5.4 \
+  # build terraform from source v1.5.5
+  cd ${IBMCLOUD_HOME_FOLDER} && curl -L https://github.com/hashicorp/terraform/archive/refs/tags/v1.5.5.tar.gz -o ${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz \
+    && tar -xzf ${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz && cd ${IBMCLOUD_HOME_FOLDER}/terraform-1.5.5 \
     && go build -ldflags "-w -s -X 'github.com/hashicorp/terraform/version.dev=no'" -o bin/ . && cp bin/terraform /tmp/terraform
   export PATH=$PATH:/tmp
   t_ver1=$(/tmp/terraform -version)
@@ -45,13 +45,14 @@ then
   OCP_VERSION=$(cat ${SHARED_DIR}/OCP_VERSION)
   # Fetch the ocp4-upi-compute-powervs repo to perform deprovisioning
   cd ${IBMCLOUD_HOME_FOLDER} && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-${OCP_VERSION}.tar.gz -o ${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz \
-      && tar -xzvf ${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz && mv ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION} ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs
+      && tar -xzf ${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz && mv ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION} ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs
   # copy the var.tfvars file from ${SHARED_DIR}
   cp ${SHARED_DIR}/var.tfvars ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/var.tfvars
   cp ${SHARED_DIR}/terraform.tfstate ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/terraform.tfstate
 
   # Invoke the destroy command and optimistically run twice due to synchronization issues
   cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
+    && /tmp/terraform init -upgrade \
     && /tmp/terraform destroy -var-file=var.tfvars -auto-approve -no-color || true \
     && /tmp/terraform destroy -var-file=var.tfvars -auto-approve -no-color
 else
