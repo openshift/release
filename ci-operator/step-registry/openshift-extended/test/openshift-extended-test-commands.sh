@@ -233,8 +233,8 @@ function run {
     fi
 
     if [ "W${test_additional}W" != "WW" ]; then
-        echo "test additional: ${test_additional:1:-1}"
-        test_scenarios="${test_scenarios}|${test_additional:1:-1}"
+        echo "test additional: ${test_additional:1}"
+        test_scenarios="${test_scenarios}|${test_additional:1}"
     fi
 
     echo "final scenarios: ${test_scenarios}"
