@@ -4,6 +4,34 @@ set -xeuo pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+mkdir "${HOME}"/manifests
+cat <<'EOF' > "${HOME}"/manifests/infra.yaml
+apiVersion: "config.openshift.io/v1"
+kind: Infrastructure
+metadata:
+  name: cluster
+spec:
+  platformSpec:
+    type: None
+status:
+  apiServerURL: https://10.43.0.1:6443
+  controlPlaneTopology: SingleReplica
+  infrastructureTopology: SingleReplica
+  platform: None
+  platformStatus:
+    type: None
+EOF
+cat <<'EOF' > "${HOME}"/manifests/network.yaml
+apiVersion: config.openshift.io/v1
+kind: Network
+metadata:
+  name: cluster
+spec:
+  networkType: OVNKubernetes
+status:
+  networkType: OVNKubernetes
+EOF
+
 cat <<'EOF' > "${HOME}"/suite.txt
 "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing mutating webhooks should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 "[sig-api-machinery] AdmissionWebhook [Privileged:ClusterAdmin] listing validating webhooks should work [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
@@ -531,4 +559,4 @@ cat <<'EOF' > "${HOME}"/suite.txt
 EOF
 chmod +r "${HOME}/suite.txt"
 
-KUBECONFIG="${SHARED_DIR}/kubeconfig" openshift-tests run -v 2 --provider=none -f "${HOME}/suite.txt" -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
+STATIC_CONFIG_MANIFEST_DIR="${HOME}/manifests" KUBECONFIG="${SHARED_DIR}/kubeconfig" openshift-tests run -v 2 --provider=none -f "${HOME}/suite.txt" -o "${ARTIFACT_DIR}/e2e.log" --junit-dir "${ARTIFACT_DIR}/junit"
