@@ -32,10 +32,11 @@ echo "E2E_RUN_TAGS is '${E2E_RUN_TAGS}'"
 echo "E2E_SKIP_TAGS is '${E2E_SKIP_TAGS}'"
 
 cd verification-tests
-export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/ui1"
+export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/ui"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
 set -x
-cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @console" -p junit || true
+cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @console and not @destructive" -p junit || true
+cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @console and @destructive" -p junit || true
 set +x
 
 # summarize test results
@@ -49,5 +50,5 @@ done
 if [ $((failures)) == 0 ]; then
     echo "All tests have passed"
 else
-    echo "${failures} failures in cucushift-e2e-ui" | tee -a "${SHARED_DIR}/cucushift-e2e-ui-failures"
+    echo "${failures} failures in cucushift-e2e-ui" | tee -a "${SHARED_DIR}/cucushift-e2e-failures"
 fi
