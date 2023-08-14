@@ -2,6 +2,11 @@
 
 set -Eeuo pipefail
 
+echo "skip this step for debug"
+echo "now sleeping 5000 seconds"
+sleep 5000
+exit 1
+
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
 function wait_for_worker_machines() {
