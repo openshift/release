@@ -88,7 +88,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
     retries: 15
     delay: 2
   - name: Discover cluster to run job
-    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster $ADDITIONAL_ARG
+    command: python3 ~/telco5g-lab-deployment/scripts/upstream_cluster_all.py --get-cluster --force --cluster-name cnfdc7
     register: cluster
     environment:
       JOB_NAME: ${JOB_NAME:-'unknown'}
