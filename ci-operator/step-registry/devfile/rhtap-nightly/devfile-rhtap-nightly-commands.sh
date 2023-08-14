@@ -18,8 +18,7 @@ cd tests/rhtap && \
     go mod vendor && \
     cd ../..
 
-
 oc create namespace "${TEST_NAMESPACE}"
-ginkgo run  \
+ginkgo run -p \
   --timeout 2h \
   tests/rhtap -- -samplesFile "$(pwd)/extraDevfileEntries.yaml" -namespace="stack"
