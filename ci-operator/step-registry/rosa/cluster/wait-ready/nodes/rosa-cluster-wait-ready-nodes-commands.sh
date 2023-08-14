@@ -166,12 +166,12 @@ else
   exit 1
 fi
 
-# Get desired compute node count
-getDesiredComputeCount
-
 # Check if this is a HCP cluster
 is_hcp_cluster="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
 log "hypershift.enabled is set to $is_hcp_cluster"
+
+# Get desired compute node count
+getDesiredComputeCount
 
 ret=0
 echo "Wait for all nodes to be ready and schedulable."
