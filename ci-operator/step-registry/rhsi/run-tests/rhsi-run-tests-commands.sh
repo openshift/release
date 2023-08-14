@@ -3,25 +3,26 @@
 set -u
 set -e
 set -o pipefail
+set -x
 
 export PUBKUBECONFIG=$KUBECONFIG
 
 export PRIVKUBECONFIG=$KUBECONFIG
 
-export QUIET=TRUE
-
 cd /app
 
 status=0
 
-./run-tests.sh || status="$?" || :
+./run-test.sh || status="$?" || :
 
-mkdir -p $ARTIFACT_DIR/results
+mkdir -p $ARTIFACT_DIR/result
 
 # Copy results to ARTIFACT_DIR
-cp /results $ARTIFACT_DIR/results
+cp -r /result/* $ARTIFACT_DIR/result 2>/dev/null || :
+cp -r /tmp/test.out $ARTIFACT_DIR/result 2>/dev/null || :
 
 # Prepend junit_ to result xml files
+rename '/junit' '/junit_rhsi' ${ARTIFACT_DIR}/result/*.xml 2>/dev/null || :
 
 exit $status
 
