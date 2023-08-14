@@ -42,7 +42,7 @@ echo Cluster successfully created at $createdAt
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
 
 for _ in {1..10}; do
-  bin/hypershift destroy cluster aws \
+  bin/hcp destroy cluster aws \
     --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
     --name ${CLUSTER_NAME} \
     --infra-id ${INFRA_ID} \

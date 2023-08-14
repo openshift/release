@@ -12,7 +12,7 @@ RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 
-/usr/bin/hypershift create cluster agent \
+/usr/bin/hcp create cluster agent \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
   --agent-namespace="clusters-${CLUSTER_NAME}" \
@@ -23,4 +23,4 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
 echo "Cluster became available, creating kubeconfig"
-bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+bin/hcp create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
