@@ -92,8 +92,14 @@ oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedclus
   oc get hostedcluster --namespace=clusters -o yaml ${CLUSTER_NAME}
   exit 1
 }
+HCP_CLI="/usr/bin/hcp"
+if [[ ! -f $HCP_CLI ]]; then
+  # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
+  HCP_CLI="/usr/bin/hypershift"
+fi
+echo "Using $HCP_CLI for cli"
 echo "Cluster became available, creating kubeconfig"
-bin/hcp create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig || {
+$HCP_CLI create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig || {
   echo "Failed to create kubeconfig"
   exit 1
 }

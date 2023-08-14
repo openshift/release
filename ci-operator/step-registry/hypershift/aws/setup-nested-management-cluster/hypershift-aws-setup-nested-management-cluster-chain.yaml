@@ -66,8 +66,14 @@ chain:
       echo "Getting ${CLUSTER_NAME}-kubeadmin-password from namespace ${HYPERSHIFT_NAMESPACE}"
       oc get secret -n${HYPERSHIFT_NAMESPACE} ${CLUSTER_NAME}-kubeadmin-password --template={{.data.password}} | base64 -d > ${SHARED_DIR}/kubeadmin-password
 
-      bin/hcp create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/management_cluster_kubeconfig
-      bin/hcp create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/kubeconfig
+      HCP_CLI="/usr/bin/hcp"
+      if [[ ! -f $HCP_CLI ]]; then
+        # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
+        HCP_CLI="/usr/bin/hypershift"
+      fi
+      echo "Using $HCP_CLI for cli"
+      $HCP_CLI create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/management_cluster_kubeconfig
+      $HCP_CLI create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/kubeconfig
       echo "Waiting for clusteroperators to be ready"
       export KUBECONFIG=${SHARED_DIR}/management_cluster_kubeconfig
       until \

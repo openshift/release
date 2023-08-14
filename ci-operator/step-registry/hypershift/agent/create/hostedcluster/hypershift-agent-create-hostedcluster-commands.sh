@@ -2,6 +2,13 @@
 
 set -exuo pipefail
 
+HCP_CLI="/usr/bin/hcp"
+if [[ ! -f $HCP_CLI ]]; then
+    # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
+    HCP_CLI="/usr/bin/hypershift"
+fi
+echo "Using $HCP_CLI for cli"
+
 oc annotate sc assisted-service storageclass.kubernetes.io/is-default-class=true
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
@@ -12,7 +19,7 @@ RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 
-/usr/bin/hcp create cluster agent \
+$HCP_CLI create cluster agent \
   --name=${CLUSTER_NAME} \
   --pull-secret=/tmp/.dockerconfigjson \
   --agent-namespace="clusters-${CLUSTER_NAME}" \
@@ -23,4 +30,4 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 echo "Waiting for cluster to become available"
 oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
 echo "Cluster became available, creating kubeconfig"
-bin/hcp create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+$HCP_CLI create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig

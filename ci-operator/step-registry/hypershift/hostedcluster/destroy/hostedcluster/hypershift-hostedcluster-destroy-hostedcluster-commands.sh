@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euox pipefail
 
+HCP_CLI="/usr/bin/hcp"
+if [[ ! -f $HCP_CLI ]]; then
+  # we have to fall back to hypershift in cases where the new hcp cli isn't available yet
+  HCP_CLI="/usr/bin/hypershift"
+fi
+echo "Using $HCP_CLI for cli"
+
 echo "Set KUBECONFIG to Hive cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
@@ -42,7 +49,7 @@ echo Cluster successfully created at $createdAt
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
 
 for _ in {1..10}; do
-  bin/hcp destroy cluster aws \
+  $HCP_CLI destroy cluster aws \
     --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
     --name ${CLUSTER_NAME} \
     --infra-id ${INFRA_ID} \
