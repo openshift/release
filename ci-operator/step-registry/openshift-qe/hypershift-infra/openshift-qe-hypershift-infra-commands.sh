@@ -11,7 +11,7 @@ log(){
 }
 
 function getDesiredInfraCount() {
-  desired_infra_count=${INFRA_REPLICAS}
+  desired_infra_count=${MP_REPLICAS}
   echo "Desired Infra node count: $desired_infra_count"
 }
 
