@@ -28,6 +28,11 @@ build_root:
     name: apollo-ci
     namespace: stackrox
     tag: stackrox-test-0.3.59
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.12"
 resources:
   '*':
     requests:
@@ -47,14 +52,6 @@ tests:
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
-- as: gke-ebpf-qa-e2e-tests
-  optional: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      TEST_SUITE: gke-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
 - as: gke-ui-e2e-tests
   optional: true
   steps:
@@ -75,6 +72,11 @@ tests:
   steps:
     env:
       COLLECTION_METHOD: core_bpf
+    test:
+    - ref: stackrox-e2e
+- as: gke-operator-e2e-tests
+  optional: true
+  steps:
     test:
     - ref: stackrox-e2e
 - as: gke-upgrade-tests
@@ -108,13 +110,12 @@ tests:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-eks-e2e
   timeout: 5h0m0s
-- as: eks-ebpf-qa-e2e-tests
+- as: osd-aws-qa-e2e-tests
   optional: true
   steps:
     env:
-      COLLECTION_METHOD: ebpf
-      TEST_SUITE: eks-qa-e2e-tests
-    workflow: stackrox-automation-flavors-eks-e2e
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-osd-aws-e2e
   timeout: 5h0m0s
 - as: osd-gcp-qa-e2e-tests
   optional: true
@@ -130,6 +131,20 @@ tests:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-aro-e2e
   timeout: 5h0m0s
+- as: rosa-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-rosa-e2e
+  timeout: 5h0m0s
+- as: aks-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-aks-e2e
+  timeout: 5h0m0s
 - as: merge-shell-unit-tests
   postsubmit: true
   steps:
@@ -140,15 +155,6 @@ tests:
   steps:
     env:
       COLLECTION_METHOD: core_bpf
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: merge-gke-ebpf-qa-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      TEST_SUITE: gke-qa-e2e-tests
     test:
     - ref: stackrox-e2e
   timeout: 5h0m0s
@@ -179,54 +185,11 @@ tests:
   steps:
     test:
     - ref: stackrox-e2e
-  timeout: 5h0m0s
 - as: merge-gke-version-compatibility-tests
   postsubmit: true
   steps:
     test:
     - ref: stackrox-e2e
-- as: merge-gke-race-condition-qa-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-    test:
-    - ref: stackrox-e2e
-  timeout: 5h0m0s
-- as: merge-gke-scale-tests
-  postsubmit: true
-  steps:
-    test:
-    - ref: stackrox-e2e
-- as: merge-eks-qa-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-    workflow: stackrox-automation-flavors-eks-e2e
-  timeout: 5h0m0s
-- as: merge-eks-ebpf-qa-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: ebpf
-      TEST_SUITE: eks-qa-e2e-tests
-    workflow: stackrox-automation-flavors-eks-e2e
-  timeout: 5h0m0s
-- as: merge-osd-gcp-qa-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-    workflow: stackrox-automation-flavors-osd-gcp-e2e
-  timeout: 5h0m0s
-- as: merge-aro-qa-e2e-tests
-  postsubmit: true
-  steps:
-    env:
-      COLLECTION_METHOD: core_bpf
-    workflow: stackrox-automation-flavors-aro-e2e
-  timeout: 5h0m0s
 - as: powervs-qa-e2e-tests
   optional: true
   steps:
@@ -234,7 +197,28 @@ tests:
       COLLECTION_METHOD: core_bpf
     workflow: stackrox-automation-flavors-powervs-e2e
   timeout: 5h0m0s
+- as: nightly-powervs-qa-e2e-tests
+  cron: 0 7 * * *
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-powervs-e2e
+  timeout: 5h0m0s
+- as: ibmcloudz-qa-e2e-tests
+  optional: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-ibmcloudz-e2e
+  timeout: 5h0m0s
+- as: nightly-ibmcloudz-qa-e2e-tests
+  cron: 0 7 * * *
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+    workflow: stackrox-automation-flavors-ibmcloudz-e2e
+  timeout: 5h0m0s
 zz_generated_metadata:
-  branch: release-x.y
+  branch: jv-rox-18829-switch-gke-ebpf-race-condition-qa-e2e-tests-to-core_bpf
   org: stackrox
   repo: stackrox
