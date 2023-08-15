@@ -56,6 +56,11 @@ function copy-file-from-first-master {
 
 ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
 
+# Prepull tools image on the nodes. "baremetalds-sno-gather" step uses it to run sos report
+# However, if time is too far in the future the pull will fail with "Trying to pull registry.redhat.io/rhel8/support-tools:latest...
+# Error: initializing source ...: tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time ... is after <now + 6m>"
+run-on "${control_nodes} ${compute_nodes}" "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
+
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
 
