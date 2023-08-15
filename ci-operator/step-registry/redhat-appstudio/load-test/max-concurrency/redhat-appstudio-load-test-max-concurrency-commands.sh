@@ -99,11 +99,11 @@ if [ "$JOB_TYPE" == "presubmit" ] && [[ "$JOB_NAME" != rehearse-* ]]; then
 fi
 set +x
 
+# Collect load test results at the end
+trap './tests/load-tests/ci-scripts/max-concurrency/collect-results.sh "$SCENARIO"; trap EXIT' SIGINT EXIT
+
 # Setup OpenShift cluster
 ./tests/load-tests/ci-scripts/setup-cluster.sh "$SCENARIO"
 
 # Execute load test
 ./tests/load-tests/ci-scripts/max-concurrency/load-test.sh "$SCENARIO"
-
-# Collect load test results
-./tests/load-tests/ci-scripts/max-concurrency/collect-results.sh "$SCENARIO"
