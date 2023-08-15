@@ -231,4 +231,27 @@ do
 done
 
 echo "Check the route reachability via the custom ingresscontroller LB"
+# check if custom ingresscontroller LB can retrieve an ip address at first
+#hostname_lb=$(echo ${custom_public_ip} | grep -E "[a-z]|[A-Z]")
+hostname_lb="aa bb cc"
+function wait_retrieve_ip() {
+    local try=0 retries=120
+    while [ X"$(dig ${custom_public_ip} +short | head -n 1)" == X ] && [ $try -lt $retries ]; do
+        echo "try to get the ip addresses of host ${custom_public_ip}..."
+        sleep 10
+        try=$(expr $try + 1)
+    done
+    if [ X"$try" == X"$retries" ]; then
+        echo "can't get the ip address of host ${custom_public_ip}, maybe something wrong with the new nodes"
+        return 1
+    fi
+    return 0
+}
+
+if ! [ -z $hostname_lb ]
+then
+    wait_retrieve_ip || exit 2
+fi
+echo "wait for 3 hours for debug: curl -kI --resolve ${canary_host}:443:${custom_public_ip} https://${canary_host}"
+sleep 3h
 curl -kI --resolve ${canary_host}:443:${custom_public_ip} https://${canary_host}
