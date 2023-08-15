@@ -45,7 +45,7 @@ if [[ -n "${S3_BUCKET_PATH}" ]]; then
 fi
 
 if [[ -n "${PULL_SECRET_NAME}" ]]; then
-    RUN_COMMAND+=" --registry-config-file=/var/run/secrets/ci.openshift.io/cluster-profile/${PULL_SECRET_NAME} "
+    RUN_COMMAND+=" --registry-config-file=/var/run/secrets/ci.openshift.io/cluster-profile/${PULL_SECRET_NAME} --docker-config-json-dir-path ${CLUSTER_PROFILE_DIR}"
 fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
