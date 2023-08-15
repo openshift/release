@@ -3,7 +3,9 @@
 set -o errexit
 set -o pipefail
 
-# install kubectl
+cd /tmp
+pwd
+
 curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 chmod +x kubectl
 
@@ -17,13 +19,8 @@ chmod 400 $SSH_KEY_PATH
 # https://docs.ci.openshift.org/docs/architecture/step-registry/#sharing-data-between-steps
 KUBECONFIG_FILE="${SHARED_DIR}/kubeconfig"
 
-### Kubernetes Cluster Creation. k8smanager script is to create/delete k8s cluster on IBM cloud [https://github.ibm.com/Ganesh-Bhure2/stackrox-ci]. 
-### This script runs on an intermediate node [IP 163.66.94.115] on IBM cloud
-# SSH_CMD="/home/ubuntu/stackrox-ci/k8smanager create"
-# ssh $SSH_ARGS root@163.66.94.115 "$SSH_CMD"
-
-### OCP Cluster Creation. ocpmanager script is to create/delete ocp cluster on IBM cloud [https://github.ibm.com/Ganesh-Bhure2/stackrox-ci]
-### Thisscript runs on an intermediate node [IP 163.74.90.40] on IBM cloud
+# The ocpmanager script creates/deletes OCP clusters on IBM Z via IBM Cloud [https://github.ibm.com/Ganesh-Bhure2/stackrox-ci]
+# The script runs on an intermediate node [IP 163.74.90.40] on IBM Cloud
 SSH_CMD="/root/ocpmanager create"
-ssh $SSH_ARGS root@163.74.90.40 "$SSH_CMD" > $KUBECONFIG_FILE
+ssh $SSH_ARGS root@163.74.90.40 "export BUILD_ID=$BUILD_ID && $SSH_CMD" > $KUBECONFIG_FILE
 KUBECONFIG="$KUBECONFIG_FILE" ./kubectl get nodes

@@ -93,7 +93,7 @@ oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedclus
   exit 1
 }
 echo "Cluster became available, creating kubeconfig"
-bin/hcp create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig || {
+bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig || {
   echo "Failed to create kubeconfig"
   exit 1
 }
