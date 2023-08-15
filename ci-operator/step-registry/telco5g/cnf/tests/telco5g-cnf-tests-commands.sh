@@ -16,11 +16,6 @@ cat <<EOF >"${SKIP_TESTS_FILE}"
 # TESTNAME
 sriov "FPGA Programmable Acceleration Card N3000 for Networking"
 
-# SKIPTEST
-# bz### takes too much time
-# TESTNAME
-dpdk "Client should be able to forward packets"
-
 EOF
 }
 
@@ -29,11 +24,6 @@ function create_tests_temp_skip_list_11 {
 # List of temporarly skipped tests for 4.11
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-13684
-# TESTNAME
-sriov "2 Pods 2 VRFs OCP Primary network overlap {\\\"IPStack\\\":\\\"ipv4\\\"}"
 
 EOF
 }
@@ -44,11 +34,6 @@ function create_tests_temp_skip_list_12 {
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
 
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-10424
-# TESTNAME
-performance "Should have the correct RPS configuration"
-
 EOF
 }
 
@@ -56,16 +41,6 @@ function create_tests_temp_skip_list_13 {
 # List of temporarly skipped tests for 4.13
 cat <<EOF >>"${SKIP_TESTS_FILE}"
 # <feature> <test name>
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-10424
-# TESTNAME
-performance "Check RPS Mask is applied to atleast one single rx queue on all veth interface"
-
-# SKIPTEST
-# bz### https://issues.redhat.com/browse/OCPBUGS-14713
-# TESTNAME
-performance "Should not overwrite the banned CPU set on tuned restart"
 
 # SKIPTEST
 # bz### https://issues.redhat.com/browse/OCPBUGS-10927
