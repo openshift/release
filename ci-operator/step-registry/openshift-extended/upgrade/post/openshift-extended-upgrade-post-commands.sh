@@ -224,8 +224,13 @@ function run {
     fi
 
     if [ "W${test_additional}W" != "WW" ]; then
-        echo "test additional: ${test_additional:1:-1}"
-        test_scenarios="${test_scenarios}|${test_additional:1:-1}"
+        if [ "W${test_additional: -1}W" != "W|W" ]; then
+            echo "test additional: ${test_additional:1}"
+            test_scenarios="${test_scenarios}|${test_additional:1}"
+        else
+            echo "test additional: ${test_additional:1:-1}"
+            test_scenarios="${test_scenarios}|${test_additional:1:-1}"
+        fi
     fi
 
     echo "final scenarios: ${test_scenarios}"
