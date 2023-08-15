@@ -36,17 +36,17 @@ fi
 
 # The API_URL is not registered ASAP, we need to wait for a while.
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
-if [[ "${API_URL}" == "null" ]]; then
-  port="6443"
-  if [[ "$HOSTED_CP" == "true" ]]; then
-    port="443"
-  fi
-  echo "warning: API URL was null, attempting to build API URL"
-  base_domain=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.dns.base_domain')
-  CLUSTER_NAME=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.name')
-  echo "info: Using baseDomain : ${base_domain} and clusterName : ${CLUSTER_NAME}"
-  API_URL="https://api.${CLUSTER_NAME}.${base_domain}:${port}"
-fi
+# if [[ "${API_URL}" == "null" ]]; then
+#   port="6443"
+#   if [[ "$HOSTED_CP" == "true" ]]; then
+#     port="443"
+#   fi
+#   echo "warning: API URL was null, attempting to build API URL"
+#   base_domain=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.dns.base_domain')
+#   CLUSTER_NAME=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.name')
+#   echo "info: Using baseDomain : ${base_domain} and clusterName : ${CLUSTER_NAME}"
+#   API_URL="https://api.${CLUSTER_NAME}.${base_domain}:${port}"
+# fi
 
 # Config htpasswd idp
 # The expected time for the htpasswd idp configuaration is in 1 minute. But actually, we met the waiting time
