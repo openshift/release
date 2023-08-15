@@ -137,4 +137,7 @@ if [[ "$is_hcp_cluster" == "true" ]]; then
     checkInfra "prometheus-k8s" "openshift-monitoring"
     checkInfra "router" "openshift-ingress"
   fi
+else
+  echo "$CLUSTER_ID is not an Hostedcluster, skipping this task"
+  exit 0
 fi
