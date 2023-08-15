@@ -37,27 +37,26 @@ if [ -d "$KUBECONFIG" ]; then
   done
 fi
 
-control_nodes=( $( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' ) )
+mapfile -d ' ' -t control_nodes < <( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
-# Compute nodes seem to be protected with firewall?
-compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+mapfile -d ' ' -t compute_nodes < <( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
-function run-on {
-  for n in ${1}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${2}; done
+function run-on-all-nodes {
+  for n in ${control_nodes[@]} ${compute_nodes[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${1}; done
 }
 
 function run-on-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SSH} core@"${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
 function copy-file-from-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SCP} core@"${control_nodes[0]}:${1}" "${2}"
+  timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
 
-ssh-keyscan -H ${control_nodes} >> ~/.ssh/known_hosts
+ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
 
 # Stop chrony service on all nodes
-run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
+run-on-all-nodes "systemctl disable chronyd --now"
 
 # Backup lb-ext kubeconfig so that it could be compared to a new one
 KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
@@ -69,10 +68,10 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 # Set kubelet node IP hint. Nodes are created with two interfaces - provisioning and external,
 # and we want to make sure kubelet uses external address as main, instead of DHCP racing to use 
 # a random one as primary
-run-on "${control_nodes} ${compute_nodes}" "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
+run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/default/nodeip-configuration"
 
 # Shutdown nodes
-VMS=( $( virsh list --all --name ) )
+mapfile -d ' ' -t VMS < <( virsh list --all --name )
 for vm in ${VMS[@]}; do
   virsh shutdown ${vm}
   until virsh domstate ${vm} | grep "shut off"; do
@@ -96,13 +95,13 @@ for vm in ${VMS[@]}; do
 done
 
 # Check that time on nodes has been updated
-until run-on "${control_nodes} ${compute_nodes}" "timedatectl status"; do sleep 30; done
+until run-on-all-nodes "timedatectl status"; do sleep 30; done
 
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
 until oc get nodes; do sleep 30; done
-oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT}
+oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT} || true
 until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
   if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
     oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
@@ -120,7 +119,7 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Wait for operators to stabilize
 if
-  ! oc adm wait-for-stable-cluster --minimum-stable-period=5s --timeout=30m; then
+  ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
     oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
     exit 1
