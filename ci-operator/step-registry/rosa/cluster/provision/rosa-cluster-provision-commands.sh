@@ -31,8 +31,8 @@ elif [[ "$HOSTED_CP" == "true" ]]; then
 fi
 subfix=$(openssl rand -hex 2)
 CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
-CLUSTER_TAGS=${CLUSTER_TAGS:-"prowci:${CLUSTER_NAME}"}
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
+
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
@@ -107,6 +107,11 @@ fi
 echo "Choosing openshift version ${OPENSHIFT_VERSION}"
 
 # Switches
+TAGS="prowci:${CLUSTER_NAME}"
+if [[ ! -z "$CLUSTER_TAGS" ]]; then
+  TAGS="${TAGS},${CLUSTER_TAGS}"
+fi
+
 EC2_METADATA_HTTP_TOKENS_SWITCH=""
 if [[ -n "${EC2_METADATA_HTTP_TOKENS}" && "$HOSTED_CP" != "true" ]]; then
   EC2_METADATA_HTTP_TOKENS_SWITCH="--ec2-metadata-http-tokens ${EC2_METADATA_HTTP_TOKENS}"
@@ -264,7 +269,7 @@ echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
-echo "  Cluster Tags: ${CLUSTER_TAGS}"
+echo "  Cluster Tags: ${TAGS}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
   echo "  Min replicas: ${MIN_REPLICAS}"
@@ -282,7 +287,7 @@ ${STS_SWITCH} \
 --version ${OPENSHIFT_VERSION} \
 --channel-group ${CHANNEL_GROUP} \
 --compute-machine-type ${COMPUTE_MACHINE_TYPE} \
---tags ${CLUSTER_TAGS} \
+--tags ${TAGS} \
 ${ACCOUNT_ROLES_SWITCH} \
 ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
 ${MULTI_AZ_SWITCH} \
@@ -314,7 +319,7 @@ rosa create cluster -y \
                     --version "${OPENSHIFT_VERSION}" \
                     --channel-group ${CHANNEL_GROUP} \
                     --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
-                    --tags ${CLUSTER_TAGS} \
+                    --tags ${TAGS} \
                     ${ACCOUNT_ROLES_SWITCH} \
                     ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
                     ${MULTI_AZ_SWITCH} \
@@ -367,6 +372,20 @@ rosa describe cluster -c ${CLUSTER_ID} -o json
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
+
+if [[ "${API_URL}" == "null" ]]; then
+  port="6443"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    port="443"
+  fi
+  echo "warning: API URL was null, attempting to build API URL"
+  base_domain=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.dns.base_domain')
+  CLUSTER_NAME=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.name')
+  echo "info: Using baseDomain : ${base_domain} and clusterName : ${CLUSTER_NAME}"
+  API_URL="https://api.${CLUSTER_NAME}.${base_domain}:${port}"
+  CONSOLE_URL="https://console-openshift-console.apps.${CLUSTER_NAME}.${base_domain}"
+fi
+
 echo "API URL: ${API_URL}"
 echo "Console URL: ${CONSOLE_URL}"
 echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"

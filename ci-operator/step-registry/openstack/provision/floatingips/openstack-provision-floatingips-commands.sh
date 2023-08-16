@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "${CONFIG_TYPE}" == *"proxy"* ]]; then
+if [[ "${CONFIG_TYPE}" == *"proxy"* || "$CONFIG_TYPE" == *"dualstack"* ]]; then
     echo "Skipping step due to CONFIG_TYPE being '${CONFIG_TYPE}'."
     exit 0
 fi

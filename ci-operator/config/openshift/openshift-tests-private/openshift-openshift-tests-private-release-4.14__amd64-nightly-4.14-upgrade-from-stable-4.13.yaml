@@ -64,20 +64,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: aws-c2s-ipi-disconnected-private-fips-cert-rotation-f14
-  cron: 24 21 14,29 * *
-  steps:
-    cluster_profile: aws-c2s-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-      TEST_FILTERS: ~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-disconnected-cert-rotation
-    workflow: cucushift-installer-rehearse-aws-c2s-ipi-disconnected-private
 - as: aws-c2s-ipi-disconnected-private-fips-f14
   cron: 22 8 4,19 * *
   steps:
@@ -97,7 +83,6 @@ tests:
   steps:
     cluster_profile: aws-qe
     env:
-      ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
       BASE_DOMAIN: qe.devcluster.openshift.com
       BASELINE_CAPABILITY_SET: None
       PERSISTENT_MONITORING: "false"
@@ -109,18 +94,6 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-byo-iam-role-cert-rotation-f14
-  cron: 33 12 13,28 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and not @fips'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-cert-rotation
-    workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
 - as: aws-ipi-byo-iam-role-fips-f28
   cron: 44 3 19 * *
   steps:
@@ -298,27 +271,16 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-network-mtu-localzone-sdn
-- as: aws-ipi-ovn-fips-cert-rotation-f14
-  cron: 13 19 12,27 * *
-  steps:
-    cluster_profile: aws-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-cert-rotation
-    workflow: cucushift-installer-rehearse-aws-ipi-ovn
 - as: aws-ipi-ovn-ipsec-f28
   cron: 59 19 6 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and not @fips
+        and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and not @fips
+        and @network-ovnkubernetes'
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
@@ -335,6 +297,31 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-ipi-shared-vpc-phz-f14
+  cron: 41 17 5,20 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and not @fips'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz
+- as: aws-ipi-shared-vpc-phz-sts-fips-f14
+  cron: 9 15 8,23 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      FIPS_ENABLED: "true"
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi'
+    test:
+    - ref: cucushift-installer-check
+    - chain: openshift-upgrade-qe-test
+    workflow: cucushift-installer-rehearse-aws-ipi-shared-vpc-phz-sts
 - as: aws-ipi-usertags-fips-f28
   cron: 55 7 9 * *
   steps:
@@ -400,19 +387,6 @@ tests:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
-- as: azure-ipi-fips-cert-rotation-f14
-  cron: 35 20 11,26 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      FIPS_ENABLED: "true"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-cert-rotation
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-fullyprivate-proxy-f28
   cron: 41 17 4 * *
   steps:
@@ -444,8 +418,10 @@ tests:
     cluster_profile: azure-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @azure-ipi and not @fips
+        and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @azure-ipi and not @fips
+        and @network-ovnkubernetes'
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
@@ -548,8 +524,8 @@ tests:
         FIPS_MODE=true
         IP_STACK=v4
         NETWORK_TYPE=OVNKubernetes
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @baremetal-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @baremetal-ipi'
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @baremetal-ipi and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @baremetal-ipi and @network-ovnkubernetes'
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
@@ -583,8 +559,10 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @gcp-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @gcp-ipi and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @gcp-ipi and not @fips
+        and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @gcp-ipi and not @fips
+        and @network-ovnkubernetes'
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
@@ -768,8 +746,10 @@ tests:
   steps:
     cluster_profile: vsphere
     env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @vsphere-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @vsphere-ipi and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @vsphere-ipi and not @fips
+        and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @vsphere-ipi and not @fips
+        and @network-ovnkubernetes'
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
@@ -779,24 +759,14 @@ tests:
   steps:
     cluster_profile: vsphere
     env:
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @vsphere-ipi and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @vsphere-ipi and not @fips'
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @vsphere-ipi and not @fips
+        and @network-ovnkubernetes'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @vsphere-ipi and not @fips
+        and @network-ovnkubernetes'
     test:
     - ref: cucushift-installer-check
     - chain: openshift-upgrade-qe-test
     workflow: cucushift-installer-rehearse-vsphere-ipi-ovn-ipsec
-- as: vsphere-ipi-proxy-fips-cert-rotation-f14
-  cron: 22 3 6,21 * *
-  steps:
-    cluster_profile: vsphere-dis
-    env:
-      FIPS_ENABLED: "true"
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @vsphere-ipi'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @vsphere-ipi'
-    test:
-    - ref: cucushift-installer-check
-    - chain: openshift-upgrade-qe-test-cert-rotation
-    workflow: cucushift-installer-rehearse-vsphere-ipi-proxy
 - as: vsphere-ipi-proxy-fips-f28
   cron: 53 5 29 * *
   steps:

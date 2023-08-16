@@ -3,18 +3,19 @@ workflow:
   steps:
     env:
       STS: "false"
-      COMPUTE_MACHINE_TYPE: "m5.2xlarge"
+      COMPUTE_MACHINE_TYPE: "c5.2xlarge"
       MULTI_AZ: "false"
       ENABLE_AUTOSCALING: "true"
-      MIN_REPLICAS: "3"
-      MAX_REPLICAS: "6"
-      ETCD_ENCRYPTION: "true"
-      DISABLE_WORKLOAD_MONITORING: "false"
+      MIN_REPLICAS: "2"
+      MAX_REPLICAS: "4"
+      ETCD_ENCRYPTION: "false"
+      DISABLE_WORKLOAD_MONITORING: "true"
     pre:
     - chain: rosa-cluster-provision
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
     post:
     - chain: rosa-cluster-deprovision
   documentation: |-
-    This workflow installs a rosa cluster. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    This workflow installs a rosa non-sts cluster. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
     After finish testing, the cluster will be deprovsioned.

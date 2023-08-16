@@ -1,19 +1,19 @@
 base_images:
-  rhel-8-golang-1.19:
+  rhel-8-golang-1.20:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+    tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
 images:
 - dockerfile_path: Dockerfile
-  from: rhel-8-golang-1.19
+  from: rhel-8-golang-1.20
   to: oadp-operator
 - dockerfile_path: build/ci-Dockerfile
-  from: rhel-8-golang-1.19
+  from: rhel-8-golang-1.20
   to: test-oadp-operator-1.2
 operator:
   bundles:
@@ -71,6 +71,78 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
+- as: operator-e2e-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable-1.2
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: CLUSTER_PROFILE=aws make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator-1.2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
+- as: operator-e2e-azure
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable-1.2
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: CLUSTER_PROFILE=azure make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator-1.2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-azure
+- as: operator-e2e-gcp
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable-1.2
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: CLUSTER_PROFILE=gcp make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator-1.2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: oadp-1.2
   org: openshift
