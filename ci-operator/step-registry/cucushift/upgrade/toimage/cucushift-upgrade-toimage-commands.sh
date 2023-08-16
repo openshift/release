@@ -341,7 +341,7 @@ function check_latest_machineconfig_applied() {
 function wait_machineconfig_applied() {
     local role="${1}" try=0 interval=30
     num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l) 
-    local max_retries; max_retries=$(expr $num \* 20 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
+    local max_retries; max_retries=$(expr $num \* 25 \* 60 \/ $interval) # Wait 20 minutes for each node, try 60/interval times per minutes
 
     local mcp_try=0 mcp_status=''
     local max_try_between_updated_and_updating; max_try_between_updated_and_updating=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
