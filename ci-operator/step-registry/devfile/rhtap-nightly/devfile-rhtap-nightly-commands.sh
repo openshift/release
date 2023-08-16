@@ -9,7 +9,7 @@ export TEST_NAMESPACE="stack"
 cd "$(mktemp -d)"
 
 go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo
-git clone https://github.com/devfile/registry.git -b main
+git clone https://github.com/flacatus/registry.git -b ns_gen
 cd registry
 
 # Install golang modules
@@ -21,4 +21,4 @@ cd tests/rhtap && \
 oc create namespace "${TEST_NAMESPACE}"
 ginkgo run -p \
   --timeout 2h \
-  tests/rhtap -- -samplesFile "$(pwd)/extraDevfileEntries.yaml" -namespace="stack"
+  tests/rhtap -- -samplesFile "$(pwd)/extraDevfileEntries.yaml"
