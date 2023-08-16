@@ -616,14 +616,45 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-long-duration
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-f28-long-duration-part3-3
-  cron: 16 15 12 * *
+- as: aws-ipi-f28-long-duration-rosa
+  cron: 23 11 9 * *
   steps:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and not @fips
         and @long-duration'
+      FILTERS_ADDITIONAL: HiveSDRosa&
+      TAG_VERSION: '@4.14'
+      TEST_SCENARIOS: Cluster_Operator
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-qe-long-duration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f28-long-duration-spec
+  cron: 15 1 16 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and not @fips
+        and @long-duration'
+      FILTERS_ADDITIONAL: ~HiveSDRosa&;HiveSpec&
+      TAG_VERSION: '@4.14'
+      TEST_SCENARIOS: Cluster_Operator
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-qe-long-duration
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-f28-long-duration-remaining
+  cron: 24 8 19 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and not @fips
+        and @long-duration'
+      FILTERS_ADDITIONAL: ~HiveSDRosa&;~HiveSpec&
       TAG_VERSION: '@4.14'
       TEST_SCENARIOS: Cluster_Operator
       TEST_TIMEOUT: "90"
