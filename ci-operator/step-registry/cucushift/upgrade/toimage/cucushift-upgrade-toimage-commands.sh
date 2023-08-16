@@ -359,6 +359,7 @@ function wait_machineconfig_applied() {
     echo "MCP ${role} status is ${mcp_status}"
     if [[ X"$mcp_status" != X"True" ]]; then
         echo "Timeout waiting for mcp updated"
+        oc describe mcp ${role}
         return 1
     fi
 
