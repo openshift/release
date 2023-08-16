@@ -153,6 +153,13 @@ EOF
     fi
 
 fi
+
+# We don't want to apply the PerformanceProfile to the masters so we make sure they don't have the worker role
+# by disabling mastersSchedulable.
+echo "Disable mastersSchedulable since we now have a dedicated worker node"
+oc patch Scheduler cluster --type=merge --patch '{ "spec": { "mastersSchedulable": false } }'
+sleep 10
+
 PAO_PROFILE=$(oc create -f /tmp/performance_profile.yaml -o jsonpath='{.metadata.name}')
 echo "Created \"$PAO_PROFILE\" PerformanceProfile"
 
