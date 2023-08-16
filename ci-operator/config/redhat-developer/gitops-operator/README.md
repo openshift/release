@@ -5,10 +5,9 @@
 - [Purpose](#purpose)
 - [Process](#process)
   - [Cluster Provisioning and Deprovisioning: `firewatch-ipi-aws`](#cluster-provisioning-and-deprovisioning-firewatch-ipi-aws)
-  - [Test Setup, Execution, and Reporting Results - `Openshift GitOps-interop-aws`](#test-setup-execution-and-reporting-results---Openshift GitOps-interop-aws)
+  - [Test Setup, Execution, and Reporting Results - Openshift GitOps-interop-aws](#test-setup-execution-and-reporting-results---openshift-gitops-interop-aws)
 - [Prerequisite(s)](#prerequisites)
   - [Environment Variables](#environment-variables)
-  - [Custom Images](#custom-images)
 
 ## General Information
 

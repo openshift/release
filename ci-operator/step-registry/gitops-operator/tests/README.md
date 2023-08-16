@@ -14,7 +14,7 @@ Use to execute the gitops-operator [sequential tests](https://github.com/redhat-
 
 ## Process
 
-1. Runs the Operator tests from [sequential tests] (https://github.com/redhat-developer/gitops-operator/tree/master/test/openshift/e2e/sequential) directory
+1. Runs the Operator tests from [sequential tests](https://github.com/redhat-developer/gitops-operator/tree/master/test/openshift/e2e/sequential) directory
 2. Copies the XML file to `$ARTIFACT_DIR/junit_gitops-sequential.xml`
 
 ## Prerequisite(s)
@@ -23,7 +23,7 @@ Use to execute the gitops-operator [sequential tests](https://github.com/redhat-
 
 - A provisioned test cluster to target.
   - Should have a `openshift-operators` namespace/project with:
-    - [The `gitops-operator-operator` installed](../../../install-operators/README.md).
+    - The [`gitops-operator-operator`](../../install-operators/README.md) is installed.
 
 ### Environment Variables
 
