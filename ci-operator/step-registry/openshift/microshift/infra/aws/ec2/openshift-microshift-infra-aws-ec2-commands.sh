@@ -57,7 +57,7 @@ Mappings:
      PrimaryVolumeSize: "300"
      SecondaryVolumeSize: "0"
    VirtualMachine:
-     PrimaryVolumeSize: "20"
+     PrimaryVolumeSize: "200"
      SecondaryVolumeSize: "10"
 Parameters:
   EC2Type:
