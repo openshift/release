@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build05
   cron: 2 7 * * *
   decorate: true
   decoration_config:
@@ -12,10 +12,20 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure4
-    ci-operator.openshift.io/variant: "4.11"
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-kata-containers-kata-containers-main-4.11-e2e-tests
+  name: periodic-ci-kata-containers-kata-containers-main-e2e-tests
+  reporter_config:
+    slack:
+      channel: '#kata-ocp-ci-reports'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
+        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :volcano: {{end}}'
   spec:
     containers:
     - args:
@@ -26,7 +36,6 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-tests-cluster-profile
       - --target=e2e-tests
-      - --variant=4.11
       command:
       - ci-operator
       image: ci-operator:latest
@@ -74,7 +83,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build05
   cron: 2 7 * * *
   decorate: true
   decoration_config:
@@ -86,20 +95,10 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: azure4
     ci-operator.openshift.io/cloud-cluster-profile: azure4
+    ci-operator.openshift.io/variant: next
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-kata-containers-kata-containers-main-e2e-tests
-  reporter_config:
-    slack:
-      channel: '#kata-ocp-ci-reports'
-      job_states_to_report:
-      - success
-      - failure
-      - error
-      report_template: '{{if eq .Status.State "success"}} :rainbow: Job *{{.Spec.Job}}*
-        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :rainbow: {{else}}
-        :volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
-        logs> :volcano: {{end}}'
+  name: periodic-ci-kata-containers-kata-containers-main-next-e2e-tests
   spec:
     containers:
     - args:
@@ -110,6 +109,7 @@ periodics:
       - --secret-dir=/secrets/ci-pull-credentials
       - --secret-dir=/usr/local/e2e-tests-cluster-profile
       - --target=e2e-tests
+      - --variant=next
       command:
       - ci-operator
       image: ci-operator:latest

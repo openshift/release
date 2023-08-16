@@ -15,6 +15,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: openstack-tests
+  stolostron:
+    name: builder
+    namespace: stolostron
+    tag: go1.20-linux
 releases:
   initial:
     candidate:
@@ -152,6 +156,64 @@ tests:
     env:
       OPENSTACK_AUTHENTICATION_METHOD: password
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-ovn-etcd-scaling
+  interval: 168h
+  steps:
+    cluster_profile: openstack-vexxhost
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-openstack-etcd-scaling
+- as: e2e-openstack-dualstack-techpreview
+  minimum_interval: 96h
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-dualstack
+- as: e2e-openstack-ccpmso
+  minimum_interval: 240h
+  steps:
+    cluster_profile: openstack-vexxhost
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.14 --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        make e2e-presubmit e2e-periodic
+      from: stolostron
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 7h0m0s
+- as: e2e-openstack-ccpmso-zone
+  minimum_interval: 240h
+  steps:
+    cluster_profile: openstack-kuryr
+    env:
+      TEST_SUITE: experimental/reliability/minimal
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.14 --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
+        make e2e-presubmit e2e-periodic
+      from: stolostron
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openshift-e2e-test
+    - ref: openstack-test-openstack
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 7h0m0s
 zz_generated_metadata:
   branch: main
   org: shiftstack

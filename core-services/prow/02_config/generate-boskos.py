@@ -43,6 +43,11 @@ CONFIG = {
         'us-east-1': 25,
         'ap-northeast-1': 5,
     },
+    'aws-terraform-qe-quota-slice': {
+        'ap-northeast-1': 2,
+        'us-east-1': 2,
+        'us-east-2': 2,
+    },
     'aws-sd-qe-quota-slice': {
         'us-west-2': 3,
     },
@@ -198,6 +203,7 @@ CONFIG = {
     'vsphere-connected-quota-slice':{},
     'vsphere-multizone-quota-slice':{},
     'vsphere-platform-none-quota-slice':{},
+    'vsphere-8-vpn-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -266,6 +272,9 @@ CONFIG = {
     },
     'aws-perfscale-quota-slice': {
         'us-west-2': 10,
+    },
+    'aws-chaos-quota-slice': {
+        'us-west-2': 10,
     }
 }
 
@@ -331,6 +340,9 @@ for i in range(200,204):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 for i in range(205,214):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
+for i in [956]:
+    CONFIG['vsphere-8-vpn-quota-slice']['ci-vlan-{}'.format(i)] = 1
+
 
 config = {
     'resources': [],

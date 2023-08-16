@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-ccm-ovn-install
     decorate: true
     labels:
@@ -79,7 +79,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -152,7 +152,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-ccm
     decorate: true
     labels:
@@ -225,7 +225,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -825,7 +825,7 @@ presubmits:
     branches:
     - ^release-4\.13$
     - ^release-4\.13-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-openstack-ovn
     decorate: true
     labels:
@@ -1129,6 +1129,7 @@ presubmits:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
         - --target=unit
         command:
         - ci-operator
@@ -1139,6 +1140,9 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -1150,6 +1154,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
