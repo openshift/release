@@ -1,4 +1,8 @@
 base_images:
+  camel-quarkus-tests:
+    name: camel-quarkus-qe-test-container
+    namespace: ci
+    tag: latest
   cli:
     name: "4.14"
     namespace: ocp
@@ -8,9 +12,6 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.19
-images:
-- context_dir: openshift-ci/
-  to: quarkus-runner
 releases:
   latest:
     candidate:
@@ -40,13 +41,8 @@ tests:
         ]
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
       FIREWATCH_JIRA_SERVER: https://issues.redhat.com
-      OPERATORS: |
-        [
-            {"name": "red-hat-camel-k", "source": "redhat-operators", "channel": "latest", "install_namespace": "openshift-operators"}
-        ]
     test:
-    - ref: install-operators
-    - ref: quarkus-execute-tests
+    - ref: camel-quarkus-execute-tests
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
   branch: main
