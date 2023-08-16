@@ -42,6 +42,13 @@ cp /tmp/pull-secret "\${PULL_SECRET}"
 cd ~/microshift
 
 ./test/bin/ci_phase_iso_build.sh
+
+curl --output my.patch https://github.com/pmtk/microshift/commit/ca4702e5dff4180c3dc61ba2dc1f730151ecf9a6.diff
+git apply my.patch
+echo "========================"
+cat ~/microshift/test/bin/scenario.sh
+echo "========================"
+
 EOF
 chmod +x /tmp/iso.sh
 

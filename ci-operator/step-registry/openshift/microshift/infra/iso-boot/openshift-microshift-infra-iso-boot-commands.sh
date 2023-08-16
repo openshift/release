@@ -103,7 +103,7 @@ fi
 # Run in background to allow trapping signals before the command ends. If running in foreground
 # then TERM is queued until the ssh completes. This might be too long to fit in the grace period
 # and get abruptly killed, which prevents gathering logs.
-ssh "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh" &
+ssh -tt "${INSTANCE_PREFIX}" "SCENARIO_SOURCES=${SCENARIO_SOURCES} /home/${HOST_USER}/microshift/test/bin/ci_phase_iso_boot.sh" &
 # Run wait -n since we only have one background command. Should this change, please update the exit
 # status handling.
 wait -n
