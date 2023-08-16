@@ -268,14 +268,12 @@ Resources:
         Ebs:
           VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
           VolumeType: gp3
-          Iops: 16000
       - !If
         - AddSecondaryVolume
         - DeviceName: /dev/sdc
           Ebs:
             VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
             VolumeType: gp3
-            Iops: 16000
         - !Ref AWS::NoValue
       PrivateDnsNameOptions:
         EnableResourceNameDnsARecord: true
