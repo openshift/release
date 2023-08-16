@@ -69,7 +69,7 @@ wait_for_microshift_ready(){
 latest_release_ver="$(decrement_minor "$(microshift_version)")"
 release_repo="rhocp-${latest_release_ver}-for-rhel-9-x86_64-rpms"
 
-cat <<EOF > install_latest_release.sh
+cat <<EOF > "${HOME}"/install_latest_release.sh
 #!/bin/bash
 set -xeou pipefail
 
@@ -92,7 +92,7 @@ while ! test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig"; do
     sleep 10;
 done
 EOF
-scp ./install_latest_release.sh "${IP_ADDRESS}":~/
+scp "${HOME}"/install_latest_release.sh "${IP_ADDRESS}":~/
 
 ssh "${IP_ADDRESS}" "sudo ~/install_latest_release.sh"
 export KUBECONFIG
@@ -102,14 +102,14 @@ wait_for_microshift_ready
 ssh "${IP_ADDRESS}" "sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh"
 
 # At this point, the 4.y-1 release should be up and running. Now upgrade to the latest
-cat <<EOF >install_branch_rpms.sh
+cat <<EOF > "${HOME}"/install_branch_rpms.sh
 #!/bin/bash
 systemctl stop microshift
 dnf localinstall -y \$(find /tmp/rpms/ -iname "*\$(uname -p)*" -or -iname '*noarch*')
 systemctl restart microshift
 systemctl status microshift
 EOF
-scp install_branch_rpms.sh "${IP_ADDRESS}":~/
+scp "${HOME}"/install_branch_rpms.sh "${IP_ADDRESS}":~/
 ssh "${IP_ADDRESS}" "sudo ~/install_branch_rpms.sh"
 sleep
 wait_for_microshift_ready
