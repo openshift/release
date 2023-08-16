@@ -66,4 +66,6 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || tr
 # then TERM is queued until the ssh completes. This might be too long to fit in the grace period
 # and get abruptly killed, which prevents gathering logs.
 ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh" &
-wait
+# Run wait -n since we only have one background command. Should this change, please update the exit
+# status handling.
+wait -n

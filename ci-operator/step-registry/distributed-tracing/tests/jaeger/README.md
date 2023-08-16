@@ -39,9 +39,9 @@ Use to execute the `Jaeger E2E tests` [jaeger-e2e-tests](https://github.com/jaeg
 
 ### Environment Variables
 
-- `TIMEOUT`
+- `E2E_TESTS_TIMEOUT`
   - **Definition**: The timeout in seconds for the Jaeger tests.
-  - **If left empty**: It will use "150" as the default value.
+  - **If left empty**: It will use "420" as the default value.
 
 - `ASSERT_IMG`
   - **Definition**: The assert-e2e image used for testing.

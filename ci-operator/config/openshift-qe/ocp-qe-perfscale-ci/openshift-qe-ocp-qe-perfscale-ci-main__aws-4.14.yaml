@@ -50,19 +50,6 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-ocp-qe-perfscale-ci-tests
-- as: ocp-qe-perfscale-aws-ci-tests-net-perf
-  cron: 0 12 * * 2
-  steps:
-    cluster_profile: aws-perfscale-qe
-    env:
-      BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "6"
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-network-perf
 - always_run: false
   as: ocp-qe-perfscale-aws-router-perf-aws
   steps:
@@ -90,14 +77,14 @@ tests:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-node-density-heavy
-- as: ocp-qe-perfscale-aws-ingress-perf-9nodes-periodic
+- as: ocp-qe-perfscale-aws-data-path-9nodes-periodic
   cron: 0 21 * * 2
   steps:
     cluster_profile: aws-perfscale-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_REPLICAS: "9"
-      COMPUTE_NODE_TYPE: m5.2xlarge
+      COMPUTE_NODE_TYPE: m5.xlarge
       CONFIG: config/standard-classic-rosa.yml
       CONTROL_PLANE_INSTANCE_TYPE: r5.xlarge
       LOKI_USE_SERVICEMONITOR: "false"
@@ -110,7 +97,9 @@ tests:
     pre:
     - chain: ipi-aws-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-ingress-perf
+    test:
+    - chain: openshift-qe-data-path-tests
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
