@@ -57,12 +57,17 @@ tests:
   container:
     from: src
 - as: unit
-  commands: |
-    make verify-generate
-    make verify-manifests
-    make unit
-  container:
-    from: src
+  steps:
+    test:
+    - as: unit
+      commands: |
+        make verify-generate
+        make verify-manifests
+        make unit
+      from: src
+      resources:
+        requests:
+          cpu: 200m
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:

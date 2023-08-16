@@ -55,15 +55,6 @@ trap cleanup EXIT
 
 mkdir -p "${HOME}"
 
-# Override the upstream docker.io registry due to issues with rate limiting
-# https://bugzilla.redhat.com/show_bug.cgi?id=1895107
-# sjenning: TODO: use of personal repo is temporary; should find long term location for these mirrored images
-export KUBE_TEST_REPO_LIST=${HOME}/repo_list.yaml
-cat <<EOF > ${KUBE_TEST_REPO_LIST}
-dockerLibraryRegistry: quay.io/sjenning
-dockerGluster: quay.io/sjenning
-EOF
-
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
 if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
@@ -216,11 +207,15 @@ function upgrade_conformance() {
     local exit_code=0 &&
     upgrade || exit_code=$? &&
     PROGRESSING="$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)" &&
-    if test False = "${PROGRESSING}"
+    HISTORY_LENGTH="$(oc get -o jsonpath='{range .status.history[*]}{.version}{"\n"}{end}' clusterversion version | wc -l)" &&
+    if test 2 -gt "${HISTORY_LENGTH}"
     then
-        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
-    else
+        echo "Skipping conformance suite because ClusterVersion only has ${HISTORY_LENGTH} entries, so an update was not run"
+    elif test False != "${PROGRESSING}"
+    then
         echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
+    else
+        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
     fi &&
     return $exit_code
 }
