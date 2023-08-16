@@ -63,6 +63,19 @@ xt_u32 "Validate the module is enabled and works Should create an iptables rule 
 EOF
 }
 
+function create_tests_temp_skip_list_15 {
+# List of temporarly skipped tests for 4.15
+cat <<EOF >>"${SKIP_TESTS_FILE}"
+# <feature> <test name>
+
+# SKIPTEST
+# bz### https://issues.redhat.com/browse/OCPBUGS-10927
+# TESTNAME
+xt_u32 "Validate the module is enabled and works Should create an iptables rule inside a pod that has the module enabled"
+
+EOF
+}
+
 function is_bm_node {
     node=$1
 
@@ -240,6 +253,9 @@ export CNF_ORIGIN_TESTS
 if [[ "$T5CI_VERSION" == "4.14" ]]; then
     export CNF_BRANCH="master"
     export CNF_TESTS_IMAGE="cnf-tests:4.14"
+elif [[ "$T5CI_VERSION" == "4.15" ]]; then
+    export CNF_BRANCH="master"
+    export CNF_TESTS_IMAGE="cnf-tests:4.15"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
@@ -283,6 +299,10 @@ if [[ "$CNF_BRANCH" == *"4.13"* ]]; then
 fi
 if [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_14
+    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
+fi
+if [[ "$CNF_BRANCH" == *"4.15"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+    create_tests_temp_skip_list_15
     export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
