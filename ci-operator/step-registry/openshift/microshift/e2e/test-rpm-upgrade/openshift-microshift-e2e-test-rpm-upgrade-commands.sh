@@ -95,7 +95,8 @@ EOF
 scp ./install_latest_release.sh "${IP_ADDRESS}":~/
 
 ssh "${IP_ADDRESS}" "sudo ~/install_latest_release.sh"
-export KUBECONFIG="$(mktemp -d)/kubeconfig"
+export KUBECONFIG
+KUBECONFIG="$(mktemp -d)/kubeconfig"
 ssh "${IP_ADDRESS}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >"${KUBECONFIG}"
 wait_for_microshift_ready
 ssh "${IP_ADDRESS}" "sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh"
