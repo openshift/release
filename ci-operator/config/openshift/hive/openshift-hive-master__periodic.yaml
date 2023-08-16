@@ -63,10 +63,9 @@ tests:
         # Configure a cluster name that our monitor/reaper can use to
         # - discover clusters created by this test (prefix `hiveci-`)
         # - know when they were created (embedded date stamp)
-        # Add the PR number for extra uniqueness.
-        # We'll exceed the 21c cluster name cutoff at PR 1Mi or some
-        # time in July of 4147, whichever comes first.
-        export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
+        # Suffix with -0 to ensure it can't conflict with non-periodics,
+        # which suffix with the PR number.
+        export CLUSTER_NAME=$(printf "hiveci-%x-0" $(date +%s))
         CLOUD=aws make test-e2e
       credentials:
       - mount_path: /tmp/secret/hive-aws-creds
@@ -114,12 +113,11 @@ tests:
         # Configure a cluster name that our monitor/reaper can use to
         # - discover clusters created by this test (prefix `hiveci-`)
         # - know when they were created (embedded date stamp)
-        # Add the PR number for extra uniqueness.
-        # We'll exceed the 21c cluster name cutoff at PR 1Mi or some
-        # time in July of 4147, whichever comes first.
-        export CLUSTER_NAME=$(printf "hiveci-%x-%x" $(date +%s) $PULL_NUMBER)
+        # Suffix with -0 to ensure it can't conflict with non-periodics,
+        # which suffix with the PR number.
+        export CLUSTER_NAME=$(printf "hiveci-%x-0" $(date +%s))
         # Disable managed DNS (on by default, and left on for the e2e test)
-        USE_MANAGED_DNS=false
+        export USE_MANAGED_DNS=false
         CLOUD=aws make test-e2e-pool
       credentials:
       - mount_path: /tmp/secret/hive-aws-creds
