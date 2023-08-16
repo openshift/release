@@ -10,7 +10,6 @@ kubectl kuttl test test/openshift/e2e/sequential --config test/openshift/e2e/seq
 
 
 # Move results to Artifacts directory
-find . -type f -name "*.xml"
 cp ./kuttl-test.xml ${ARTIFACT_DIR}/junit_gitops-sequential.xml
 
 exit $exit_code
