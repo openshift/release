@@ -29,3 +29,4 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 
 rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
 ./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+#Test
