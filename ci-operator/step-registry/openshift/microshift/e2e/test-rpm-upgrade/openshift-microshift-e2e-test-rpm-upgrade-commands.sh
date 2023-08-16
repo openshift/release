@@ -22,7 +22,7 @@ chmod 0600 "${HOME}/.ssh/config"
 
 microshift_version(){
     local v
-    v="$(sed -En 's|OCP_VERSION := (4\.[0-9]+).*|\1|p' ./Makefile.version.x86_64.var)"
+    v="$(sed -En 's|OCP_VERSION := (4\.[0-9]+).*|\1|p' /microshift/Makefile.version."$(uname -i)".var)"
     [ -n "${v}" ] || exit 1
     echo "${v}"
 }
