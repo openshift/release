@@ -15,6 +15,7 @@ trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' TERM ERR
 [ -z "${workers}" ] && { echo "\$workers is not filled. Failing."; exit 1; }
 [ -z "${masters}" ] && { echo "\$masters is not filled. Failing."; exit 1; }
 
+
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
@@ -242,6 +243,17 @@ compute:
 fi
 
 if [ "${masters}" -gt 1 ]; then
+  if [ "${AGENT_PLATFORM_TYPE}" = "none" ]; then
+  yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
+compute:
+- architecture: ${architecture}
+  hyperthreading: Enabled
+  name: worker
+  replicas: ${workers}
+platform:
+  none: {}
+"
+  else
   yq --inplace eval-all 'select(fileIndex == 0) * select(fileIndex == 1)' "$SHARED_DIR/install-config.yaml" - <<< "
 compute:
 - architecture: ${architecture}
@@ -255,6 +267,7 @@ platform:
     ingressVIPs:
     - ${INGRESS_VIP}
 "
+  fi
 fi
 
 cp "${SHARED_DIR}/install-config.yaml" "${INSTALL_DIR}/"
