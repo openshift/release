@@ -3,7 +3,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+exit 0
 cat >> "${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml" << EOF
 kind: MachineConfig
 apiVersion: machineconfiguration.openshift.io/v1
