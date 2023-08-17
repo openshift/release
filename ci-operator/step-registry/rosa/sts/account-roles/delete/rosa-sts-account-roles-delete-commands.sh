@@ -40,6 +40,6 @@ Account_Installer_Role_ARN=$(rosa list account-roles -o json | jq -r '.[].RoleAR
 if [[ -z "${Account_Installer_Role_ARN}" ]]; then 
   echo "No account roles with the prefix '${ACCOUNT_ROLES_PREFIX}' exist"
 else
-  echo "Delete the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
+  echo "Start Deleting the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}..."
   rosa delete account-roles --prefix "${ACCOUNT_ROLES_PREFIX}" -y --mode auto
 fi

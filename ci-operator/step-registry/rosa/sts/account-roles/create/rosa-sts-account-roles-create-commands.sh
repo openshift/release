@@ -7,6 +7,7 @@ set -o pipefail
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 ACCOUNT_ROLES_PREFIX=${ACCOUNT_ROLES_PREFIX:-$NAMESPACE}
+HOSTED_CP=${HOSTED_CP:-false}
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP}
@@ -42,13 +43,19 @@ if [[ "$CHANNEL_GROUP" != "stable" ]] && [[ ! -z "$OPENSHIFT_VERSION" ]]; then
   VERSION_SWITCH="--version ${OPENSHIFT_VERSION} --channel-group ${CHANNEL_GROUP}"
 fi
 
+CLUSTER_SWITCH="--classic"
+if [[ "$HOSTED_CP" == "true" ]]; then
+   CLUSTER_SWITCH="--hosted-cp"
+fi
+
 # Whatever the account roles with the prefix exist or not, do creation.
-echo "Create the account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
-rosa create account-roles --prefix ${ACCOUNT_ROLES_PREFIX} -y --mode auto ${VERSION_SWITCH}
+echo "Create the ${CLUSTER_SWITCH} account roles with the prefix '${ACCOUNT_ROLES_PREFIX}'"
+rosa create account-roles -y --mode auto \
+                          --prefix ${ACCOUNT_ROLES_PREFIX} \
+                          ${CLUSTER_SWITCH} \
+                          ${VERSION_SWITCH}
 
-# Store the account-role-prefix for the post steps and the account roles deletion
+# Store the account-role-prefix for the next pre steps and the account roles deletion
+echo "Store the account-role-prefix and the account-roles-arn ..."
 echo -n "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-prefix"
-
-# List the created account roles
-echo -e "\nList the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
-rosa list account-roles | grep "${ACCOUNT_ROLES_PREFIX}"
+rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${ARTIFACT_DIR}/account-roles-arn"
