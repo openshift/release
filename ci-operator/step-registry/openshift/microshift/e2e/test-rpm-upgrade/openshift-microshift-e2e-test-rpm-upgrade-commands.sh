@@ -75,7 +75,7 @@ set -xeou pipefail
 
 # The latest version of microshift was installed during the infra setup. Tear it down before testing
 microshift-cleanup-data --all <<<1
-rpm -qa|grep microshift|xargs dnf uninstall -y
+rpm -qa|grep microshift|xargs dnf remove -y
 rm -rf /etc/microshift /var/lib/microshift
 
 subscription-manager repos --enable "${release_repo}"
@@ -92,6 +92,7 @@ while ! test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig"; do
     sleep 10;
 done
 EOF
+chmod +x "${HOME}"/install_latest_release.sh
 scp "${HOME}"/install_latest_release.sh "${IP_ADDRESS}":~/
 
 ssh "${IP_ADDRESS}" "sudo ~/install_latest_release.sh"
@@ -109,6 +110,7 @@ dnf localinstall -y \$(find /tmp/rpms/ -iname "*\$(uname -p)*" -or -iname '*noar
 systemctl restart microshift
 systemctl status microshift
 EOF
+chmod +x "${HOME}"/install_branch_rpms.sh
 scp "${HOME}"/install_branch_rpms.sh "${IP_ADDRESS}":~/
 ssh "${IP_ADDRESS}" "sudo ~/install_branch_rpms.sh"
 sleep
