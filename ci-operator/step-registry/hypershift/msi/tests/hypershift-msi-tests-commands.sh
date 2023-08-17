@@ -21,7 +21,7 @@ poetry run pytest tests \
   --pytest-log-file="${ARTIFACT_DIR}/pytest-tests.log" \
   --ocp-target-version "${HYPERSHIFT_VERSION}" \
   -m hypershift_install  \
-  --tc=api_server:"${API_HOST}" \
+  --tc=ocm_api_server:"${API_HOST}" \
   --tc=openshift_channel_group:"${CHANNEL_GROUP}" \
   --tc=home_dir:/tmp \
   --tc=aws_region:"${AWS_REGION}" \
