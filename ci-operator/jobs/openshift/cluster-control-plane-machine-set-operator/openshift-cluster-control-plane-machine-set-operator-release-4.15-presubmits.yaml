@@ -1,11 +1,58 @@
 presubmits:
   openshift/cluster-control-plane-machine-set-operator:
   - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-4\.15$
+    - ^release-4\.15-
+    cluster: build03
+    context: ci/prow/crds-sync
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-cluster-control-plane-machine-set-operator-release-4.15-crds-sync
+    rerun_command: /test crds-sync
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=crds-sync
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )crds-sync,?($|\s.*)
+  - agent: kubernetes
     always_run: false
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-operator
     decorate: true
     labels:
@@ -78,7 +125,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-ovn
     decorate: true
     labels:
@@ -151,7 +198,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-etcd-scaling
     decorate: true
     labels:
@@ -224,7 +271,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-serial
     decorate: true
     labels:
@@ -297,7 +344,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-upgrade
     decorate: true
     labels:
@@ -370,7 +417,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-aws-periodic-pre
     decorate: true
     labels:
@@ -444,7 +491,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-operator
     decorate: true
     labels:
@@ -518,7 +565,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-azure-ovn-etcd-scaling
     decorate: true
     labels:
@@ -823,7 +870,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-openstack-operator
     decorate: true
     labels:
@@ -897,7 +944,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/e2e-openstack-operator-zone
     decorate: true
     labels:
@@ -1045,7 +1092,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/fmt
     decorate: true
     labels:
@@ -1092,7 +1139,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/generate
     decorate: true
     labels:
@@ -1139,7 +1186,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/images
     decorate: true
     labels:
@@ -1187,7 +1234,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/lint
     decorate: true
     labels:
@@ -1234,7 +1281,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/periodics-images
     decorate: true
     labels:
@@ -1284,7 +1331,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/unit
     decorate: true
     labels:
@@ -1331,7 +1378,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/vendor
     decorate: true
     labels:
@@ -1378,7 +1425,7 @@ presubmits:
     branches:
     - ^release-4\.15$
     - ^release-4\.15-
-    cluster: build05
+    cluster: build03
     context: ci/prow/vet
     decorate: true
     labels:

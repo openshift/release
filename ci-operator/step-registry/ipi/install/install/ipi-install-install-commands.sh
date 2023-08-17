@@ -9,6 +9,11 @@ function set-cluster-version-spec-update-service() {
     payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
     echo "Release payload version: ${payload_version}"
 
+    if [[ ! -f ${dir}/manifests/cvo-overrides.yaml ]]; then
+        echo "No CVO overrides file found, will not configure OpenShift Update Service"
+        return
+    fi
+
     # Using OSUS in upgrade jobs would be tricky (we would need to know the channel with both versions)
     # and the use case has little benefits (not many jobs that update between two released versions)
     # so we do not need to support it. We still need to channel clear to avoid tripping the
@@ -41,10 +46,16 @@ function set-cluster-version-spec-update-service() {
         payload_arch_param=""
     fi
 
+
+    local channel
+    if ! channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"; then
+        echo "No known OCP channel found in CVO manifest, clearing the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        return
+    fi
+
     # The candidate channel is most likely to contain the versions we are interested in, so transfer the current channel
     # into a candidate one.
-    local channel
-    channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"
     echo "Original channel from CVO manifest: ${channel}"
     local candidate_channel
     candidate_channel="$(echo "${channel}" | sed -E 's/(stable|eus|fast)/candidate/')"
@@ -392,6 +403,30 @@ EOF
   echo "Enabled AWS Spot instances for worker nodes"
 }
 
+# enable_efa_pg_instance_config is an AWS specific option that enables one worker machineset in a placement group and with EFA Network Interface Type, other worker machinesets will be ENA Network Interface Type by default.....
+function enable_efa_pg_instance_config() {
+  local dir=${1}
+  #sed -i 's/          instanceType: .*/          networkInterfaceType: EFA\n          placementGroupName: pgcluster\n          instanceType: c5n.9xlarge/' "$dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml"
+  pip3 install pyyaml --user
+  pushd "${dir}/openshift"
+  python -c '
+import os
+import yaml
+
+for manifest_name in os.listdir("./"):
+    if "worker-machineset" in manifest_name:
+      data = yaml.safe_load(open(manifest_name))
+      data["spec"]["template"]["spec"]["providerSpec"]["value"]["networkInterfaceType"] = "EFA"
+      data["spec"]["template"]["spec"]["providerSpec"]["value"]["instanceType"] = "c5n.9xlarge"
+      data["spec"]["template"]["spec"]["providerSpec"]["value"]["placementGroupName"] = "pgcluster"
+      open(manifest_name, "w").write(yaml.dump(data, default_flow_style=False))
+      print("Patched efa pg into ",  manifest_name)
+      break
+' || return 1
+  popd
+  
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM INT
 
@@ -495,6 +530,9 @@ azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
 aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config ${dir}
+    fi
+    if [[ "${ENABLE_AWS_EFA_PG_INSTANCE:-}"  == 'true' ]]; then
+      enable_efa_pg_instance_config ${dir}
     fi
     ;;
 esac

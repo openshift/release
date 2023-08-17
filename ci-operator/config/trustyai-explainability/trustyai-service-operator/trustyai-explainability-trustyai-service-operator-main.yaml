@@ -1,0 +1,55 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- context_dir: tests/
+  dockerfile_path: Dockerfile
+  from: os
+  to: trustyai-service-operator-ci-tests
+promotion:
+  additional_images:
+    latest: trustyai-service-operator-ci-tests
+  name: trustyai-service-operator-ci-tests
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.13"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.13"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+tests:
+- as: trustyai-service-operator-e2e
+  run_if_changed: ^(tests/*|config/*|controllers/*|hack/*|Dockerfile|main.go|go.mod|go.sum|api/*|.github/*)
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e
+      commands: $HOME/peak/installandtest.sh
+      from: trustyai-service-operator-ci-tests
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: main
+  org: trustyai-explainability
+  repo: trustyai-service-operator
