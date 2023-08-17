@@ -8,6 +8,9 @@ MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"5m"}
 NS_OPERATORS=${NS_OPERATORS:-"openstack-operators"}
 NS_SERVICES=${NS_SERVICES:-"openstack"}
 
+# debug
+sleep 7200
+
 # Creates directory if does not exists
 #  Parameters:
 #  $1: directory to be created
