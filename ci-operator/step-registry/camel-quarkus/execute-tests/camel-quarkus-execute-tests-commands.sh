@@ -1,13 +1,13 @@
 #!/bin/bash
 
+#TODO check execution
+sleep 4h
+
 set -o nounset
 set -o errexit
 set -o pipefail
 
 shopt -s nullglob
-
-#TODO check execution
-sleep 4h
 
 # Set the ocp env variables and execute oc login
 CONSOLE_URL=$(cat $SHARED_DIR/console.url)
