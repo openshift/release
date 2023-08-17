@@ -1,0 +1,39 @@
+ref:
+  as: rosa-conf-machine-pool-edit
+  from_image:
+    namespace: ci
+    name: rosa-aws-cli
+    tag: latest
+  grace_period: 10m
+  commands: rosa-conf-machine-pool-edit-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: ROSA_LOGIN_ENV
+    default: "staging"
+    documentation: The environment for rosa login. The supported values are [production, staging, integration].
+  - name: HOSTED_CP
+    default: "false"
+    documentation: Enable the use of hosted control planes (HyperShift).
+  - name: REGION
+    default: ""
+    documentation: Use a specific AWS region, overriding the LEASED_RESOURCE environment variable in the cluster_profile.
+  - name: MP_NAME
+    default: ""
+    documentation: Name of the machinepool you want to edit in some way
+  - name: MP_MACHINE_TYPE
+    default: ""
+    documentation: Instance type that should be used. (default "m5.xlarge")  
+  - name: MP_ZONE
+    default: ""
+    documentation: Select availability zone to create a single AZ machine pool for a multi-AZ cluster.
+  - name: MP_LABELS
+    default: ""
+    documentation: Labels for machine pool. Format should be a comma-separated list of 'key=value'.
+  - name: MP_TAINTS
+    default: ""
+    documentation: Taints for machine pool. Format should be a comma-separated list of 'key=value:<ScheduleType>'. The supported schedule types are ['NoExecute', 'NoSchedule', 'PreferNoSchedule'].
+  documentation: |-
+    Using rosa cli to edit an exisiting machine pool on a rosa cluster. Any variables that are not blank are going to be set on the given MP_NAME
