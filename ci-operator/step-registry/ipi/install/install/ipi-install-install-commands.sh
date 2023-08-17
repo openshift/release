@@ -374,11 +374,6 @@ EOF
 function inject_boot_diagnostics() {
   local dir=${1}
 
-  if [ ! -f /tmp/yq ]; then
-    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
-    -o /tmp/yq && chmod +x /tmp/yq
-  fi
-
   PATCH="${SHARED_DIR}/machinesets-boot-diagnostics.yaml.patch"
   cat > "${PATCH}" << EOF
 spec:
@@ -399,11 +394,6 @@ EOF
 # inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
 function inject_spot_instance_config() {
   local dir=${1}
-
-  if [ ! -f /tmp/yq ]; then
-    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
-    -o /tmp/yq && chmod +x /tmp/yq
-  fi
 
   PATCH="${SHARED_DIR}/machinesets-spot-instances.yaml.patch"
   cat > "${PATCH}" << EOF
@@ -528,9 +518,16 @@ dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
+curl -L https://github.com/mikefarah/yq/releases/download/3.3.1/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+
 echo "install-config.yaml"
 echo "-------------------"
-cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
+cp ${SHARED_DIR}/install-config.yaml /tmp/install-config.yaml
+/tmp/yq d --inplace /tmp/install-config.yaml '**.pullSecret'
+/tmp/yq d --inplace /tmp/install-config.yaml '**.sshKey'
+/tmp/yq d --inplace /tmp/install-config.yaml '**.username'
+/tmp/yq d --inplace /tmp/install-config.yaml '**.password'
+/tmp/yq r /tmp/install-config.yaml
 
 # move private key to ~/.ssh/ so that installer can use it to gather logs on
 # bootstrap failure
