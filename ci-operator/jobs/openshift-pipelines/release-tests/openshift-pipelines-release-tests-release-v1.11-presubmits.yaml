@@ -1,32 +1,30 @@
 presubmits:
-  openshift-priv/build-machinery-go:
+  openshift-pipelines/release-tests:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.15$
-    - ^release-4\.15-
-    cluster: build02
-    context: ci/prow/verify
+    - ^release-v1\.11$
+    - ^release-v1\.11-
+    cluster: build01
+    context: ci/prow/openshift-pipelines-ocp4.14-lp-interop-images
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
+      skip_cloning: true
     labels:
+      ci-operator.openshift.io/variant: openshift-pipelines-ocp4.14-lp-interop
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-priv-build-machinery-go-release-4.15-verify
-    path_alias: github.com/openshift/build-machinery-go
-    rerun_command: /test verify
+    name: pull-ci-openshift-pipelines-release-tests-release-v1.11-openshift-pipelines-ocp4.14-lp-interop-images
+    rerun_command: /test openshift-pipelines-ocp4.14-lp-interop-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --target=verify
+        - --target=[images]
+        - --variant=openshift-pipelines-ocp4.14-lp-interop
         command:
         - ci-operator
         image: ci-operator:latest
@@ -38,9 +36,6 @@ presubmits:
         volumeMounts:
         - mountPath: /secrets/gcs
           name: gcs-credentials
-          readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -56,4 +51,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )verify,?($|\s.*)
+    trigger: (?m)^/test( | .* )openshift-pipelines-ocp4.14-lp-interop-images,?($|\s.*)

@@ -1,0 +1,50 @@
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  annotations:
+    openshift.io/description: This SA is used to start ci builds
+  name: ci-images-builder
+  namespace: ci
+---
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-images-builder
+  namespace: ci
+rules:
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - buildconfigs
+  - builds
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - buildconfigs/instantiate
+  verbs:
+  - create
+- apiGroups:
+  - build.openshift.io
+  resources:
+  - builds/log
+  verbs:
+  - get
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ci-images-builder
+  namespace: ci
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: ci-images-builder
+subjects:
+- kind: ServiceAccount
+  name: ci-images-builder
+  namespace: ci
