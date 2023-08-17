@@ -122,16 +122,16 @@ if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
 fi
 
-# If the node count is >24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
+# If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
 # This requires a second step in the waiting for nodes phase where we put the config back to the desired setup.
 COMPUTE_NODES_SWITCH=""
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
-  if [[ ${MIN_REPLICAS} -gt 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
+  if [[ ${MIN_REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
     COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas 3 --max-replicas ${MAX_REPLICAS}"
   else
     COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
   fi
-elif [[ ${REPLICAS} -gt 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
+elif [[ ${REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
   COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas 3 --max-replicas ${REPLICAS}"
 else
   COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
