@@ -1,25 +1,25 @@
-presubmits:
+postsubmits:
   stolostron/grafana:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^global-hub-1\.0$
-    - ^global-hub-1\.0-
-    cluster: build05
-    context: ci/prow/images
+    - ^globalhub-1\.0$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
+      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-grafana-global-hub-1.0-images
-    rerun_command: /test images
+    max_concurrency: 1
+    name: branch-ci-stolostron-grafana-globalhub-1.0-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         command:
@@ -37,6 +37,9 @@ presubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -45,25 +48,79 @@ presubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^global-hub-1\.0$
-    - ^global-hub-1\.0-
-    cluster: build05
-    context: ci/prow/ocm-ci-rbac
+    - ^globalhub-1\.0$
+    cluster: arm01
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/cluster: arm01
+      ci-operator.openshift.io/is-promotion: "true"
+      ci.openshift.io/generator: prowgen
+    max_concurrency: 1
+    name: branch-ci-stolostron-grafana-globalhub-1.0-images-arm64
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
+        - --promote
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        command:
+        - ci-operator
+        image: registry.arm-build01.arm-build.devcluster.openshift.com/ci-arm64/ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/push-secret
+          name: push-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: push-secret
+        secret:
+          secretName: registry-push-credentials-ci-central
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^globalhub-1\.0$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-grafana-global-hub-1.0-ocm-ci-rbac
-    rerun_command: /test ocm-ci-rbac
+    max_concurrency: 1
+    name: branch-ci-stolostron-grafana-globalhub-1.0-publish
     spec:
       containers:
       - args:
@@ -71,7 +128,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --target=ocm-ci-rbac
+        - --target=publish
         command:
         - ci-operator
         image: ci-operator:latest
@@ -104,78 +161,18 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ocm-ci-rbac,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^global-hub-1\.0$
-    - ^global-hub-1\.0-
-    cluster: build05
-    context: ci/prow/pr-image-mirror
+    - ^globalhub-1\.0$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-grafana-global-hub-1.0-pr-image-mirror
-    rerun_command: /test pr-image-mirror
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=pr-image-mirror
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )pr-image-mirror,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^global-hub-1\.0$
-    - ^global-hub-1\.0-
-    cluster: build05
-    context: ci/prow/sonar-pre-submit
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-stolostron-grafana-global-hub-1.0-sonar-pre-submit
-    rerun_command: /test sonar-pre-submit
+    max_concurrency: 1
+    name: branch-ci-stolostron-grafana-globalhub-1.0-sonar-post-submit
     spec:
       containers:
       - args:
@@ -183,7 +180,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/acm-sonarcloud-token
-        - --target=sonar-pre-submit
+        - --target=sonar-post-submit
         command:
         - ci-operator
         image: ci-operator:latest
@@ -216,4 +213,3 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )sonar-pre-submit,?($|\s.*)
