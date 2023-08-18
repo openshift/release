@@ -216,6 +216,7 @@ case "$CLUSTER_TYPE" in
 
       # copy the var.tfvars file and the POWERVS_SERVICE_CRN to ${SHARED_DIR} so that it can be used to destroy the
       # created resources. The FAILED_DEPLOY flag is only exported on a fail
+      FAILED_DEPLOY=""
       cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
       cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
         && /tmp/terraform init -upgrade -no-color \
