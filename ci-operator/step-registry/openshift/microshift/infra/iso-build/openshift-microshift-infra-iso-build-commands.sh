@@ -42,6 +42,7 @@ cp /tmp/pull-secret "\${PULL_SECRET}"
 cd ~/microshift
 
 ./test/bin/ci_phase_iso_build.sh
+sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
 EOF
 chmod +x /tmp/iso.sh
 
