@@ -49,17 +49,20 @@ function mirror_release_image_for_disconnected_upgrade() {
     # release image should be mirrored for upgrades.
     if [[ "${DS_IP_STACK}" == "v6" ]]; then
       # shellcheck disable=SC2087
-      ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+      ssh "${SSHOPTS[@]}" "root@${IP}" bash -x - << EOF
 MIRRORED_RELEASE_IMAGE=${DS_REGISTRY}/localimages/local-upgrade-image
 DIGEST=\$(oc adm release info --registry-config ${DS_WORKING_DIR}/pull_secret.json ${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} --output=jsonpath="{.digest}")
 RELEASE_TAG=\$(sed -e "s/^sha256://" <<< \${DIGEST})
 MIRROR_RESULT_LOG=/tmp/image_mirror-\${RELEASE_TAG}.log
 
-echo "Mirroring release images for disconnected environment"
-oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
+MIRRORCOMMAND="oc adm release mirror --registry-config ${DS_WORKING_DIR}/pull_secret.json \
   --from=${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE} \
   --to=\${MIRRORED_RELEASE_IMAGE} \
-  --to-release-image=\${MIRRORED_RELEASE_IMAGE}:\${RELEASE_TAG}  2>&1 | tee \${MIRROR_RESULT_LOG}
+  --to-release-image=\${MIRRORED_RELEASE_IMAGE}:\${RELEASE_TAG}"
+
+# We run this first in dry-mode to get the ImageContentSourcePolicy and apply it early
+# So we don't have to wait as long for the machine-config to be applied after we do the mirroring
+\$MIRRORCOMMAND --dry-run 2>&1 | tee \${MIRROR_RESULT_LOG}
 
 echo "Create ImageContentSourcePolicy to use mirrored registry in upgrade"
 UPGRADE_ICS=\$(cat \${MIRROR_RESULT_LOG} | sed -n '/repositoryDigestMirrors/,//p')
@@ -72,6 +75,13 @@ metadata:
 spec:
 \${UPGRADE_ICS}
 EOF1
+
+echo "Mirroring release images for disconnected environment"
+\$MIRRORCOMMAND
+
+echo "Waiting for the new ImageContentSourcePolicy to be updated on machines"
+oc wait clusteroperators/machine-config --for=condition=Upgradeable=true --timeout=15m
+
 EOF
 
       TEST_UPGRADE_ARGS="--from-repository ${DS_REGISTRY}/localimages/local-test-image"

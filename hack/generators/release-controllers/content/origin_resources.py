@@ -197,10 +197,10 @@ def _add_origin_resources(gendoc):
                                     }
                                 ],
                                 "resources": {
-                                  "requests": {
-                                    "memory": "1Gi",
-                                    "cpu": "0.5",
-                                  }
+                                    "requests": {
+                                        "memory": "1Gi",
+                                        "cpu": "0.5",
+                                    }
                                 }
                             },
                             {
@@ -212,7 +212,7 @@ def _add_origin_resources(gendoc):
                                     "--job-config=/var/repo/release/ci-operator/jobs",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=4.6:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tests",
                                     "--release-architecture=amd64",
                                     "-v=4",
                                     "--process-legacy-results"
@@ -275,7 +275,7 @@ def _add_origin_resources(gendoc):
                                     "--release-namespace=origin",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=4.6:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tests",
                                     "--release-architecture=amd64",
                                     "--enable-jira",
                                     "--jira-endpoint=https://issues.redhat.com",
