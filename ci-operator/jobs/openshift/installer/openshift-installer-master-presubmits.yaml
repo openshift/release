@@ -613,6 +613,7 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+<<<<<<< HEAD
       - name: boskos
         secret:
           items:
@@ -625,6 +626,8 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-azure4
+=======
+>>>>>>> d367fd36a06 (Add master node outage chaos scenario)
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4783,7 +4786,11 @@ presubmits:
           secretName: ci-pull-credentials
       - name: cluster-profile
         secret:
+<<<<<<< HEAD
           secretName: cluster-secrets-openstack-vh-mecha-az0
+=======
+          secretName: cluster-secrets-openstack-kuryr
+>>>>>>> d367fd36a06 (Add master node outage chaos scenario)
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -4945,7 +4952,93 @@ presubmits:
         secret:
           secretName: cluster-secrets-openstack-vh-mecha-central
       - name: manifest-tool-local-pusher
+<<<<<<< HEAD
         secret:
+=======
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )e2e-openstack-externallb,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build04
+    context: ci/prow/e2e-openstack-kuryr
+    decorate: true
+    decoration_config:
+      timeout: 6h0m0s
+    labels:
+      ci-operator.openshift.io/cloud: openstack-kuryr
+      ci-operator.openshift.io/cloud-cluster-profile: openstack-kuryr
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-installer-master-e2e-openstack-kuryr
+    optional: true
+    rerun_command: /test e2e-openstack-kuryr
+    run_if_changed: (openstack|gophercloud)
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --lease-server-credentials-file=/etc/boskos/credentials
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --secret-dir=/usr/local/e2e-openstack-kuryr-cluster-profile
+        - --target=e2e-openstack-kuryr
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/boskos
+          name: boskos
+          readOnly: true
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /usr/local/e2e-openstack-kuryr-cluster-profile
+          name: cluster-profile
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: boskos
+        secret:
+          items:
+          - key: credentials
+            path: credentials
+          secretName: boskos-credentials
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: cluster-profile
+        secret:
+          secretName: cluster-secrets-openstack-kuryr
+      - name: manifest-tool-local-pusher
+        secret:
+>>>>>>> d367fd36a06 (Add master node outage chaos scenario)
           secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:

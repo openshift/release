@@ -107,6 +107,8 @@ presubmits:
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
+<<<<<<< HEAD
+=======
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -118,6 +120,81 @@ presubmits:
       volumes:
       - name: manifest-tool-local-pusher
         secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build04
+    context: ci/prow/integration
+    decorate: true
+    decoration_config:
+      oauth_token_secret:
+        key: oauth
+        name: github-credentials-openshift-ci-robot-private-git-cloner
+    hidden: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-priv-oc-mirror-main-integration
+    optional: true
+    path_alias: github.com/openshift/oc-mirror
+    rerun_command: /test integration
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=integration
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
+>>>>>>> d367fd36a06 (Add master node outage chaos scenario)
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+<<<<<<< HEAD
+=======
+          secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+>>>>>>> d367fd36a06 (Add master node outage chaos scenario)
           secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
