@@ -51,7 +51,7 @@ if [[ ! -z "$MP_LABELS" ]]; then
 #  "test": "worker2"
 #}
   ## edit labels to be 
-  EDIT_LABELS=' --labels "${MP_LABELS}"'
+  EDIT_LABELS=" --labels ${MP_LABELS}"
 fi
 
 EDIT_TAINTS=""
