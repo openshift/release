@@ -66,9 +66,9 @@ if [[ "$branch" == "main" || "$branch" == "master" ]]; then
 fi
 
 # Validate release branch. We can only run on release-x.y branches.
-if [[ ! ("$branch" =~ ^release-[0-9]+\.[0-9]+$ || "$branch" =~ ^backplane-[0-9]+\.[0-9]+$) ]]; then
-    log "ERROR Branch $branch is not a release or backplane branch."
-    log "      Base branch of PR must match release-x.y or backplane-x.y"
+if [[ ! ("$branch" =~ ^release-[0-9]+\.[0-9]+$ || "$branch" =~ ^backplane-[0-9]+\.[0-9]+$ || "$branch" =~ ^globalhub-[0-9]+\.[0-9]+$) ]]; then
+    log "ERROR Branch $branch is not a release, backplane or globalhub branch."
+    log "      Base branch of PR must match release-x.y, backplane-x.y or globalhub-x.y"
     exit 1
 fi
 
