@@ -66,20 +66,11 @@ if [[ "$branch" == "main" || "$branch" == "master" ]]; then
 fi
 
 # Validate release branch. We can only run on release-x.y branches.
-if [[ ! ("$branch" =~ ^release-[0-9]+\.[0-9]+$ || "$branch" =~ ^backplane-[0-9]+\.[0-9]+$) ]]; then
-    log "ERROR Branch $branch is not a release or backplane branch."
-    log "      Base branch of PR must match release-x.y or backplane-x.y"
+if [[ ! ("$branch" =~ ^release-[0-9]+\.[0-9]+$ || "$branch" =~ ^backplane-[0-9]+\.[0-9]+$ || "$branch" =~ ^globalhub-[0-9]+\.[0-9]+$) ]]; then
+    log "ERROR Branch $branch is not a release, backplane or globalhub branch."
+    log "      Base branch of PR must match release-x.y, backplane-x.y or globalhub-x.y"
     exit 1
 fi
-
-# Get current Z-stream version
-cd "$release_dir" || exit 1
-git checkout "$branch" || {
-    log "ERROR Could not checkout branch $branch in release repo"
-    exit 1
-}
-release=$(cat "$release_dir/Z_RELEASE_VERSION")
-log "INFO Z-stream version is $release"
 
 # Get IMAGE_REPO if not provided
 if [[ -z "$IMAGE_REPO" ]]; then
@@ -91,6 +82,15 @@ log "INFO Image repo is $IMAGE_REPO"
 
 # Get IMAGE_TAG if not provided
 if [[ -z "$IMAGE_TAG" ]]; then
+    # Get current Z-stream version
+    cd "$release_dir" || exit 1
+    git checkout "$branch" || {
+        log "ERROR Could not checkout branch $branch in release repo"
+        exit 1
+    }
+    release=$(cat "$release_dir/Z_RELEASE_VERSION")
+    log "INFO Z-stream version is $release"
+
     case "$JOB_TYPE" in
         presubmit)
             log "INFO Building default image tag for a $JOB_TYPE job"
