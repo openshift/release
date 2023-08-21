@@ -76,7 +76,6 @@ set -xeou pipefail
 # The latest version of microshift was installed during the infra setup. Tear it down before testing
 microshift-cleanup-data --all <<<1
 rpm -qa|grep microshift|xargs dnf remove -y
-rm -rf /etc/microshift /var/lib/microshift
 
 subscription-manager repos --enable "${release_repo}"
 dnf install microshift -y
@@ -99,12 +98,13 @@ ssh "${IP_ADDRESS}" "sudo ~/install_latest_release.sh"
 export KUBECONFIG
 KUBECONFIG="$(mktemp -d)/kubeconfig"
 ssh "${IP_ADDRESS}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >"${KUBECONFIG}"
-wait_for_microshift_ready
+wait_for_microshift_ready || exit 1
 ssh "${IP_ADDRESS}" "sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh"
 
 # At this point, the 4.y-1 release should be up and running. Now upgrade to the latest
 cat <<EOF > "${HOME}"/install_branch_rpms.sh
 #!/bin/bash
+set -xe
 systemctl stop microshift
 dnf localinstall -y \$(find /tmp/rpms/ -iname "*\$(uname -p)*" -or -iname '*noarch*')
 systemctl restart microshift
@@ -114,5 +114,5 @@ chmod +x "${HOME}"/install_branch_rpms.sh
 scp "${HOME}"/install_branch_rpms.sh "${IP_ADDRESS}":~/
 ssh "${IP_ADDRESS}" "sudo ~/install_branch_rpms.sh"
 sleep
-wait_for_microshift_ready
+wait_for_microshift_ready || exit 1
 ssh "${IP_ADDRESS}" "sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh"
