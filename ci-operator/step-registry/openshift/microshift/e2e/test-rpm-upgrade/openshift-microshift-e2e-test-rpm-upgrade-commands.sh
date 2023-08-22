@@ -36,39 +36,12 @@ decrement_minor(){
     echo "$major.$(( --minor ))"
 }
 
-wait_for_microshift_ready(){
-    # Disable exit-on-error and enable command logging with a timestamp
-    set +e
-    set -x
-    PS4='+ $(date "+%T.%N")\011'
-    retries=3
-    while [ ${retries} -gt 0 ] ; do
-      ((retries-=1))
-
-      oc wait \
-        pod \
-        --for=condition=ready \
-        -l='app.kubernetes.io/name=topolvm-csi-driver' \
-        -n openshift-storage \
-        --timeout=5m
-      [ $? -eq 0 ] && return 0
-
-      # Image pull operation sometimes get stuck for topolvm images
-      # Delete topolvm pods to retry image pull operation
-      oc delete \
-        pod \
-        -l='app.kubernetes.io/name=topolvm-csi-driver' \
-        -n openshift-storage \
-        --timeout=30s
-    done
-
-    # All retries waiting for the cluster failed
-    return 1
-}
-
 latest_release_ver="$(decrement_minor "$(microshift_version)")"
 release_repo="rhocp-${latest_release_ver}-for-rhel-9-x86_64-rpms"
 
+# install_latest_release.sh
+# The test instance has been created and the PR's source has been deployed. We need to start from the y-1 release though.
+# Wipe the current microshift installation and install the latest y-1 release rpm.
 cat <<EOF > "${HOME}"/install_latest_release.sh
 #!/bin/bash
 set -xeou pipefail
@@ -76,43 +49,34 @@ set -xeou pipefail
 # The latest version of microshift was installed during the infra setup. Tear it down before testing
 microshift-cleanup-data --all <<<1
 rpm -qa|grep microshift|xargs dnf remove -y
+rm -rf /var/lib/microshift
 
+# Once the env has been cleaned up, install the latest y-1 rpm release, relative to the PR's y-stream.
 subscription-manager repos --enable "${release_repo}"
-dnf install microshift -y
-
+dnf install microshift microshift-greenboot -y
 systemctl enable --now microshift
 
-# test if microshift is running
-sudo systemctl status microshift
-
-# test if microshift created the kubeconfig under /var/lib/microshift/resources/kubeadmin/kubeconfig
-while ! test -f "/var/lib/microshift/resources/kubeadmin/kubeconfig"; do
-    echo "Waiting for kubeconfig..."
-    sleep 10;
-done
+# wait for microshift to become ready
+sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh
 EOF
 chmod +x "${HOME}"/install_latest_release.sh
 scp "${HOME}"/install_latest_release.sh "${IP_ADDRESS}":~/
-
 ssh "${IP_ADDRESS}" "sudo ~/install_latest_release.sh"
-export KUBECONFIG
-KUBECONFIG="$(mktemp -d)/kubeconfig"
-ssh "${IP_ADDRESS}" "sudo cat /var/lib/microshift/resources/kubeadmin/${IP_ADDRESS}/kubeconfig" >"${KUBECONFIG}"
-wait_for_microshift_ready || exit 1
-ssh "${IP_ADDRESS}" "sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh"
 
-# At this point, the 4.y-1 release should be up and running. Now upgrade to the latest
+# At this point, the 4.y-1 release should be up and running. Now upgrade to microshift built from PR's source.
 cat <<EOF > "${HOME}"/install_branch_rpms.sh
 #!/bin/bash
 set -xe
+
 systemctl stop microshift
-dnf localinstall -y \$(find /tmp/rpms/ -iname "*\$(uname -p)*" -or -iname '*noarch*')
+
+dnf localinstall -y /tmp/rpms/*/microshift*.rpm
+
 systemctl restart microshift
-systemctl status microshift
+
+# wait for microshift to become ready
+sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh
 EOF
 chmod +x "${HOME}"/install_branch_rpms.sh
 scp "${HOME}"/install_branch_rpms.sh "${IP_ADDRESS}":~/
 ssh "${IP_ADDRESS}" "sudo ~/install_branch_rpms.sh"
-sleep
-wait_for_microshift_ready || exit 1
-ssh "${IP_ADDRESS}" "sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh"
