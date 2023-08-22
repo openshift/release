@@ -91,9 +91,14 @@ function waitForReady() {
                 break
             fi
         else
-            echo "All nodes are ready to run workloads."
-            FINAL_NODE_STATE="Pass"
-            break
+            node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+            if (( "$node_count" >= "$1" )); then
+                echo "All nodes are ready to run workloads."
+                FINAL_NODE_STATE="Pass"
+                break
+            else
+                echo "Only $node_count/$1 worker nodes are ready."
+            fi
         fi
         export FINAL_NODE_STATE
         sleep 60
@@ -117,7 +122,7 @@ function getDesiredComputeCount {
     desired_compute_count=$(rosa describe cluster -c "$CLUSTER_ID"  -o json  |jq -r '.nodes.compute')
   fi
   export desired_compute_count
-  echo "Desired worker node count: $desired_compute_count"
+  echo "Total desired node count: $desired_compute_count"
 }
 
 # Get cluster 
@@ -150,12 +155,12 @@ else
   exit 1
 fi
 
-# Get desired compute node count
-getDesiredComputeCount
-
 # Check if this is a HCP cluster
 is_hcp_cluster="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
 log "hypershift.enabled is set to $is_hcp_cluster"
+
+# Get desired compute node count
+getDesiredComputeCount
 
 ret=0
 echo "Wait for all nodes to be ready and schedulable."
