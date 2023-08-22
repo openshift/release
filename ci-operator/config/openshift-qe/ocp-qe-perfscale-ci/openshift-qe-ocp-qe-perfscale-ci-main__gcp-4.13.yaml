@@ -1,8 +1,14 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
     namespace: ci
     tag: latest
+  use_build_cache: true
 images:
 - dockerfile_path: prow/Dockerfile
   to: ocp-qe-perfscale-ci-gcp-413
@@ -11,9 +17,8 @@ promotion:
   tag: latest
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.13"
 resources:
   '*':
@@ -44,6 +49,7 @@ tests:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
+    - chain: create-infra-move-ingress-monitoring-registry
     - chain: workers-scale
     workflow: openshift-qe-data-path-tests
   timeout: 5h0m0s
@@ -57,6 +63,7 @@ tests:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
+    - chain: create-infra-move-ingress-monitoring-registry
     - chain: workers-scale
     workflow: openshift-qe-router-perf
 - as: ocp-qe-perfscale-node-density-cni-gcp
@@ -69,6 +76,7 @@ tests:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
+    - chain: create-infra-move-ingress-monitoring-registry
     - chain: workers-scale
     workflow: openshift-qe-node-density-cni
 - as: ocp-qe-perfscale-node-density-heavy-gcp
@@ -81,6 +89,7 @@ tests:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
+    - chain: create-infra-move-ingress-monitoring-registry
     - chain: workers-scale
     workflow: openshift-qe-node-density-heavy
 zz_generated_metadata:

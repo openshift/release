@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
@@ -53,7 +53,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     labels:
@@ -173,7 +173,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -220,7 +220,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/verify
     decorate: true
     labels:
@@ -267,7 +267,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/verify-commits
     decorate: true
     labels:
@@ -314,7 +314,54 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
+    context: ci/prow/verify-commits-shared
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-operator-framework-rukpak-main-verify-commits-shared
+    rerun_command: /test verify-commits-shared
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=verify-commits-shared
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )verify-commits-shared,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build05
     context: ci/prow/verify-deps
     decorate: true
     labels:
@@ -361,7 +408,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build03
+    cluster: build05
     context: ci/prow/verify-manifests
     decorate: true
     labels:
