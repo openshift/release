@@ -9,6 +9,8 @@ shopt -s nullglob
 # Collect test reports into $ARTIFACT_DIR
 PROJECTS=$PROJECTS
 
+sleep 4h
+
 echo "Copying results and xmls to ${ARTIFACT_DIR}"
 for PROJECT in ${PROJECTS//","/" "}; do
   for FILE in ./$PROJECT/target/failsafe-reports/TEST-*.xml; do
