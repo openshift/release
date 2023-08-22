@@ -27,4 +27,4 @@ function archive-results() {
 echo "Executing tests..."
 trap archive-results SIGINT SIGTERM ERR EXIT
 cd $TEST_DIR
-mvn clean verify -B -Dxtf.openshift.namespace=$DG_TEST_NAMESPACE -Dxtf.openshift.url=$API_URL
+mvn clean verify -B -Dxtf.openshift.namespace=$DG_TEST_NAMESPACE -Dxtf.openshift.url=$API_URL -P$DG_TEST_PROFILE
