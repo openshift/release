@@ -14,6 +14,7 @@ DATA_FILENAME="cluster_data.yaml"
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
 export OCM_TOKEN
+export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
 
 # Extract clusters archive from SHARED_DIR
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=$CLUSTER_DATA_DIR
@@ -45,7 +46,7 @@ if [[ -n "${S3_BUCKET_PATH}" ]]; then
 fi
 
 if [[ -n "${PULL_SECRET_NAME}" ]]; then
-    RUN_COMMAND+=" --registry-config-file=/var/run/secrets/ci.openshift.io/cluster-profile/${PULL_SECRET_NAME} --docker-config-json-dir-path ${CLUSTER_PROFILE_DIR}"
+    RUN_COMMAND+=" --registry-config-file=/var/run/secrets/ci.openshift.io/cluster-profile/${PULL_SECRET_NAME} --docker-config-file ${DOCKER_CONFIG_JSON_PATH}"
 fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
