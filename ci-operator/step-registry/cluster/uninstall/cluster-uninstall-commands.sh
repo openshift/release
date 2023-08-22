@@ -10,6 +10,7 @@ AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 CLUSTER_DATA_DIR="/tmp/clusters-data"
 DATA_FILENAME="cluster_data.yaml"
+DOCKER_CONFIG_JSON_PATH="${CLUSTER_PROFILE_DIR}/config.json"
 
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
