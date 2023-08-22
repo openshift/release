@@ -1,0 +1,54 @@
+base_images:
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: os
+  to: fence-agents-remediation
+operator:
+  bundles:
+  - dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/medik8s/fence-agents-remediation-operator:.*
+    with: pipeline:fence-agents-remediation
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 500m
+      memory: 1000Mi
+tests:
+- as: openshift-e2e
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: aws
+    env:
+      OO_CHANNEL: stable
+      OO_INSTALL_NAMESPACE: far-install
+      OO_PACKAGE: fence-agents-remediation
+      OO_TARGET_NAMESPACES: '!all'
+    test:
+    - as: e2e
+      cli: latest
+      commands: export OPERATOR_NS="far-install" && make ocp-aws-credentials test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+zz_generated_metadata:
+  branch: release-0.2
+  org: medik8s
+  repo: fence-agents-remediation
+  variant: "4.14"
