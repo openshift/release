@@ -1,13 +1,13 @@
 #!/bin/bash
 set -o nounset
-set -o errexit
 set -o pipefail
+set -x
 
 function set_storage_class() {
 
     storage_class_found=false
     default_storage_class=""
-    # need to verify passed storage class exists 
+    # need to verify passed storage class exists
     for s_class in $(oc get storageclass -A --no-headers | awk '{print $1}'); do
         if [ "$s_class"X != ${OPENSHIFT_PROMETHEUS_STORAGE_CLASS}X ]; then
             s_class_annotations=$(oc get storageclass $s_class -o jsonpath='{.metadata.annotations}')
@@ -54,7 +54,7 @@ function wait_for_prometheus_status() {
 
 function check_monitoring_statefulset_status()
 {
-  attempts=20
+  attempts=30
   infra_nodes=$(oc get nodes -l 'node-role.kubernetes.io/infra=' --no-headers | awk '{print $1}' |  tr '\n' '|')
   infra_nodes=${infra_nodes:0:-1}
   echo -e "\nQuery infra_nodes in check_monitoring_statefulset_status:\n[ $infra_nodes ]"
