@@ -5,6 +5,8 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
+sleep 50000000
+
 OC_HOST=$(oc whoami --show-server)
 OCP_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
 
