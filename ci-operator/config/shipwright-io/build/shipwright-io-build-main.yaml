@@ -5,21 +5,17 @@ build_root:
     namespace: openshift
     tag: golang-1.19
 images:
-- dockerfile_literal: |
+- dockerfile_literal: |-
     # Dockerfile to bootstrap build and test in openshift-ci
-    FROM quay.io/openshift/origin-cli:4.14 AS base
-
-    FROM registry.ci.openshift.org/openshift/release:golang-1.19
-    COPY --from=base /usr/bin/oc /usr/local/bin/oc
+    FROM src
     RUN yum -y install make git httpd-tools
 
     # Install kubectl
-    RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl
-    RUN chmod +x ./kubectl
-    RUN mv ./kubectl /usr/local/bin
-
-    WORKDIR /home
-    COPY . .
+    RUN KUBECTL_VERSION=1.24.3 && \
+        curl -LO https://storage.googleapis.com/kubernetes-release/release/v$KUBECTL_VERSION/bin/linux/amd64/kubectl && \
+        chmod +x ./kubectl && mv ./kubectl /usr/local/bin && \
+        kubectl version --client=true
+  from: src
   to: src-kubectl
 promotion:
   name: "4.14"
@@ -47,8 +43,14 @@ tests:
   container:
     from: bin
 - as: test-integration
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   steps:
-    cluster_profile: aws
     test:
     - as: test-integration
       cli: latest
@@ -69,10 +71,16 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: test-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   steps:
-    cluster_profile: aws
     test:
     - as: test-e2e
       cli: latest
@@ -95,7 +103,7 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: ipi-aws
+    workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: shipwright-io
