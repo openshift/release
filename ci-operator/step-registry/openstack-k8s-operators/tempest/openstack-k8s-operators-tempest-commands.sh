@@ -60,6 +60,12 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
 fi
 SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g')
 
+# custom per project ENV variables
+# shellcheck source=/dev/null
+if [ -f /go/src/github.com/${ORG}/${BASE_OP}/.prow_ci.env ]; then
+  source /go/src/github.com/${ORG}/${BASE_OP}/.prow_ci.env
+fi
+
 # NOTE: if manila is deployed, build a default share required by tempest
 if [[ "${SERVICE_NAME}" == "MANILA" ]]; then
     oc exec -it pod/openstackclient -- openstack share type create default false

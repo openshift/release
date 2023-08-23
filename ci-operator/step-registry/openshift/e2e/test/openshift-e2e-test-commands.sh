@@ -207,11 +207,15 @@ function upgrade_conformance() {
     local exit_code=0 &&
     upgrade || exit_code=$? &&
     PROGRESSING="$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)" &&
-    if test False = "${PROGRESSING}"
+    HISTORY_LENGTH="$(oc get -o jsonpath='{range .status.history[*]}{.version}{"\n"}{end}' clusterversion version | wc -l)" &&
+    if test 2 -gt "${HISTORY_LENGTH}"
     then
-        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
-    else
+        echo "Skipping conformance suite because ClusterVersion only has ${HISTORY_LENGTH} entries, so an update was not run"
+    elif test False != "${PROGRESSING}"
+    then
         echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
+    else
+        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
     fi &&
     return $exit_code
 }

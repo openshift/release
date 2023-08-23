@@ -414,18 +414,28 @@ function admin_ack() {
     fi
 
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
+    echo -e "All admin acks:\n${out}"
     if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
         echo "Admin ack not required" && return
     fi
 
     echo "Require admin ack"
     local wait_time_loop_var=0 ack_data
-    ack_data="$(echo ${out} | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
-    oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
+    ack_data="$(echo ${out} | jq -r "keys[]")"
+    for ack in ${ack_data};
+    do
+        # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
+        if [[ "${ack}" == *4\.$TARGET_MINOR_VERSION ]] 
+        then
+            echo "Admin ack patch data is: ${ack}"
+            oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
+            break
+        fi
+    done
 
     echo "Admin-acks patch gets started"
 
-    echo -e "sleep 5 min wait admin-acks patch to be valid...\n"
+    echo -e "sleep 5 mins wait admin-acks patch to be valid...\n"
     while (( wait_time_loop_var < 5 )); do
         sleep 1m
         echo -e "wait_time_passed=${wait_time_loop_var} min.\n"

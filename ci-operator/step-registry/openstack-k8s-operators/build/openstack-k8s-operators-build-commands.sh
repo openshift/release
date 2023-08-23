@@ -99,6 +99,12 @@ function build_push_operator_images {
 
   unset GOFLAGS
   pushd ${OP_DIR}
+
+  # custom per project ENV variables
+  if [ -f .prow_ci.env ]; then
+    source .prow_ci.env
+  fi
+
   GOWORK='' make build
 
   # Build and push operator image

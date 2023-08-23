@@ -34,27 +34,23 @@ else
   exit 1
 fi
 
-# The API_URL is not registered ASAP, we need to wait for a while. 
+# The API_URL is not registered ASAP, we need to wait for a while.
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
-start_time=$(date +"%s")
-while true; do
-  if [[ "${API_URL}" != "null" ]]; then
-    echo "API URL: ${API_URL}"
-    break
+if [[ "${API_URL}" == "null" ]]; then
+  port="6443"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    port="443"
   fi
-  echo "API URL is not registered back. Wait for 60 seconds..."
-  sleep 60
-  API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
-
-  if (( $(date +"%s") - $start_time >= $IDP_TIMEOUT )); then
-    echo "error: Timed out while waiting for the API URL to be ready"
-    exit 1
-  fi
-done
+  echo "warning: API URL was null, attempting to build API URL"
+  base_domain=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.dns.base_domain')
+  CLUSTER_NAME=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.name')
+  echo "info: Using baseDomain : ${base_domain} and clusterName : ${CLUSTER_NAME}"
+  API_URL="https://api.${CLUSTER_NAME}.${base_domain}:${port}"
+fi
 
 # Config htpasswd idp
 # The expected time for the htpasswd idp configuaration is in 1 minute. But actually, we met the waiting time
-# is over 10 minutes, so we give a loop to wait for the configuration to be active before timeout. 
+# is over 10 minutes, so we give a loop to wait for the configuration to be active before timeout.
 echo "Config htpasswd idp ..."
 IDP_USER="rosa-admin"
 IDP_PASSWD="HTPasswd_$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 6)"

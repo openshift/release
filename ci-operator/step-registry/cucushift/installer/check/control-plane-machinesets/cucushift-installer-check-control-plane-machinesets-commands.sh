@@ -4,6 +4,15 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+KUBECONFIG="" oc registry login
+
 # get OCP version, e.g. "4.12"
 function getVersion() {
   local release_image=""
@@ -15,7 +24,6 @@ function getVersion() {
   
   local version=""
   if [ ${release_image} != "" ]; then
-    oc registry login
     version=$(oc adm release info ${release_image} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)    
   fi
   echo "${version}"

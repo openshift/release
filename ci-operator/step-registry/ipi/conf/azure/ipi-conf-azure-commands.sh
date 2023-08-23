@@ -8,6 +8,7 @@ export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
+oc registry login
 
 function getVersion() {
   local release_image=""
@@ -19,7 +20,6 @@ function getVersion() {
   
   local version=""
   if [ ${release_image} != "" ]; then
-    oc registry login
     version=$(oc adm release info ${release_image} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)    
   fi
   echo "${version}"

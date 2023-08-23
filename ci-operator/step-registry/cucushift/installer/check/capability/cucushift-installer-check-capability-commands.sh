@@ -19,7 +19,6 @@ function getVersion() {
 
   local version=""
   if [ ${release_image} != "" ]; then
-    oc registry login
     version=$(oc adm release info ${release_image} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
   fi
   echo "${version}"
@@ -39,7 +38,7 @@ function cvoCapabilityCheck() {
     fi
     if [[ "${capability_set}" != "" ]]; then
         if [[ "${cvo_caps}" == "null" ]]; then
-            echo "ERROR: ${expected_status} capability set are ${enabled_capability_set}, but it's empty in cvo ${cvo_field}"
+            echo "ERROR: ${expected_status} capability set are ${capability_set}, but it's empty in cvo ${cvo_field}"
             result=1
         else
             cvo_caps_str=$(echo $cvo_caps | tr -d '["]' | tr "," " " | xargs -n1 | sort -u | xargs)
@@ -68,6 +67,14 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+KUBECONFIG="" oc registry login
 ocp_version=$(getVersion)
 ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
@@ -132,7 +139,7 @@ case ${BASELINE_CAPABILITY_SET} in
 esac
 
 if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
-    enabled_capability_set=$(echo ${enabled_capability_set} ${ADDITIONAL_ENABLED_CAPABILITIES} | xargs -n1 | sort -u | xargs)
+    enabled_capability_set="${enabled_capability_set} ${ADDITIONAL_ENABLED_CAPABILITIES}"
 fi
 
 disabled_capability_set="${vCurrent}"
@@ -172,6 +179,7 @@ done
 # cvo status capability check
 echo "------check cvo status capabilities check-----"
 echo "===check .status.capabilities.enabledCapabilities"
+enabled_capability_set=$(echo ${enabled_capability_set} | xargs -n1 | sort -u | xargs)
 cvoCapabilityCheck "${enabled_capability_set}" "enabled" ".status.capabilities.enabledCapabilities" || check_result=1
 
 echo "===check .status.capabilities.knownCapabilities"

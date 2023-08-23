@@ -122,9 +122,17 @@ if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
 fi
 
+# If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
+# This requires a second step in the waiting for nodes phase where we put the config back to the desired setup.
 COMPUTE_NODES_SWITCH=""
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
-  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+  if [[ ${MIN_REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
+    COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas 3 --max-replicas ${MAX_REPLICAS}"
+  else
+    COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+  fi
+elif [[ ${REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
+  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas 3 --max-replicas ${REPLICAS}"
 else
   COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
 fi
@@ -372,6 +380,20 @@ rosa describe cluster -c ${CLUSTER_ID} -o json
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
+
+if [[ "${API_URL}" == "null" ]]; then
+  port="6443"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    port="443"
+  fi
+  echo "warning: API URL was null, attempting to build API URL"
+  base_domain=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.dns.base_domain')
+  CLUSTER_NAME=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.name')
+  echo "info: Using baseDomain : ${base_domain} and clusterName : ${CLUSTER_NAME}"
+  API_URL="https://api.${CLUSTER_NAME}.${base_domain}:${port}"
+  CONSOLE_URL="https://console-openshift-console.apps.${CLUSTER_NAME}.${base_domain}"
+fi
+
 echo "API URL: ${API_URL}"
 echo "Console URL: ${CONSOLE_URL}"
 echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"

@@ -4,6 +4,82 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+function set-cluster-version-spec-update-service() {
+    local payload_version
+    payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+    echo "Release payload version: ${payload_version}"
+
+    if [[ ! -f ${dir}/manifests/cvo-overrides.yaml ]]; then
+        echo "No CVO overrides file found, will not configure OpenShift Update Service"
+        return
+    fi
+
+    # Using OSUS in upgrade jobs would be tricky (we would need to know the channel with both versions)
+    # and the use case has little benefits (not many jobs that update between two released versions)
+    # so we do not need to support it. We still need to channel clear to avoid tripping the
+    # CannotRetrieveUpdates alert on one of the versions.
+    # Not all steps that use this script expose OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE so we need to default it
+    # If we are in a step that exposes it and it differs from OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE, we are likely
+    # running an upgrade job.
+    if [[ -n "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]] &&
+       [[ "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" != "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE:-}" ]]; then
+        echo "This is likely an upgrade job (OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE differs from nonempty OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE)"
+        echo "Cluster cannot query OpenShift Update Service (OSUS/Cincinnati), cleaning the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        return
+    fi
+
+    # Determine architecture that Cincinnati would use: check metadata for release.openshift.io/architecture key
+    # and fall back to manifest-declared architecture
+    local payload_arch
+    payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
+    if [[ -z "${payload_arch}" ]]; then
+        echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.config.architecture}")"
+    fi
+    local payload_arch_param
+    if [[ -n "${payload_arch}" ]]; then
+        echo "Release payload architecture: ${payload_arch}"
+        payload_arch_param="&arch=${payload_arch}"
+    else
+        echo "Unable to determine payload architecture"
+        payload_arch_param=""
+    fi
+
+
+    local channel
+    if ! channel="$(grep -E --only-matching '(stable|eus|fast|candidate)-4.[0-9]+' "${dir}/manifests/cvo-overrides.yaml")"; then
+        echo "No known OCP channel found in CVO manifest, clearing the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+        return
+    fi
+
+    # The candidate channel is most likely to contain the versions we are interested in, so transfer the current channel
+    # into a candidate one.
+    echo "Original channel from CVO manifest: ${channel}"
+    local candidate_channel
+    candidate_channel="$(echo "${channel}" | sed -E 's/(stable|eus|fast)/candidate/')"
+    echo "Matching candidate channel: ${candidate_channel}"
+
+    # If the version is known to OSUS, it is safe for the CI cluster to query it, so we will query the integration OSUS
+    # instance maintained by OTA team. Otherwise, the cluster would trip the CannotRetrieveUpdates alert, so we need
+    # to clear the channel to make the cluster *not* query any OSUS instance.
+    local query
+    query="https://api.integration.openshift.com/api/upgrades_info/graph?channel=${candidate_channel}${payload_arch_param}"
+    echo "Querying $query for version ${payload_version}"
+    if curl --silent "$query" | grep --quiet '"version":"'"$payload_version"'"'; then
+        echo "Version ${payload_version} is available in ${candidate_channel}, cluster can query OpenShift Update Service (OSUS/Cincinnati)"
+        echo "Setting channel to $candidate_channel and upstream to https://api.integration.openshift.com/api/upgrades_info/graph "
+        sed -i "s|^  channel: .*|  channel: $candidate_channel|" "${dir}/manifests/cvo-overrides.yaml"
+        echo '  upstream: https://api.integration.openshift.com/api/upgrades_info/graph' >> "${dir}/manifests/cvo-overrides.yaml"
+    else
+        echo "Version ${payload_version} is not available in ${candidate_channel}"
+        echo "Cluster cannot query OpenShift Update Service (OSUS/Cincinnati)"
+        echo "Clearing the channel"
+        sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+    fi
+}
+
 function populate_artifact_dir() {
   set +e
   echo "Copying log bundle..."
@@ -327,6 +403,30 @@ EOF
   echo "Enabled AWS Spot instances for worker nodes"
 }
 
+# enable_efa_pg_instance_config is an AWS specific option that enables one worker machineset in a placement group and with EFA Network Interface Type, other worker machinesets will be ENA Network Interface Type by default.....
+function enable_efa_pg_instance_config() {
+  local dir=${1}
+  #sed -i 's/          instanceType: .*/          networkInterfaceType: EFA\n          placementGroupName: pgcluster\n          instanceType: c5n.9xlarge/' "$dir/openshift/99_openshift-cluster-api_worker-machineset-0.yaml"
+  pip3 install pyyaml --user
+  pushd "${dir}/openshift"
+  python -c '
+import os
+import yaml
+
+for manifest_name in os.listdir("./"):
+    if "worker-machineset" in manifest_name:
+      data = yaml.safe_load(open(manifest_name))
+      data["spec"]["template"]["spec"]["providerSpec"]["value"]["networkInterfaceType"] = "EFA"
+      data["spec"]["template"]["spec"]["providerSpec"]["value"]["instanceType"] = "c5n.9xlarge"
+      data["spec"]["template"]["spec"]["providerSpec"]["value"]["placementGroupName"] = "pgcluster"
+      open(manifest_name, "w").write(yaml.dump(data, default_flow_style=False))
+      print("Patched efa pg into ",  manifest_name)
+      break
+' || return 1
+  popd
+  
+}
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 trap 'prepare_next_steps' EXIT TERM INT
 
@@ -431,10 +531,13 @@ aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
       inject_spot_instance_config ${dir}
     fi
+    if [[ "${ENABLE_AWS_EFA_PG_INSTANCE:-}"  == 'true' ]]; then
+      enable_efa_pg_instance_config ${dir}
+    fi
     ;;
 esac
 
-sed -i '/^  channel:/d' "${dir}/manifests/cvo-overrides.yaml"
+set-cluster-version-spec-update-service
 
 echo "Will include manifests:"
 find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \)
