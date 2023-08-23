@@ -231,11 +231,8 @@ make input
 oc kustomize ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/ | oc apply -f -
 sleep 60
 
-# Waiting for all services to be ready
-OPENSTACK_CONTROL_PLANE=$(oc get OpenStackControlPlane -o name)
-TEST_CONDITIONS_CMD=("echo testing condition={}; oc wait ${OPENSTACK_CONTROL_PLANE} --for=condition={} --timeout=-1s")
-oc get OpenStackControlPlane -o json | jq -r '.items[0].status.conditions[].type' | \
-timeout ${TIMEOUT_SERVICES_READY} xargs -d '\n' -I {} sh -c "${TEST_CONDITIONS_CMD[@]}"
+# Waiting for Openstack CR to be ready
+oc kustomize ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/ | oc wait --for condition=Ready --timeout="${TIMEOUT_SERVICES_READY}s" -f -
 
 # Basic validations after deploying
 oc project "${NS_SERVICES}"
