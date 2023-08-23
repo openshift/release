@@ -9,11 +9,19 @@ shopt -s nullglob
 # Collect test reports into $ARTIFACT_DIR
 PROJECTS=$PROJECTS
 
+env
+
+
+
+
+
+
+
 echo "'mvn' version:"
 mvn --version
 echo "Logging to oc:"
 sh ./oc_login.sh
-source "$SDKMAN_DIR/bin/sdkman-init.sh"
+source $SDKMAN_DIR/bin/sdkman-init.sh
 echo "Executing tests:"
 sh ./run.sh
 
@@ -26,3 +34,5 @@ for PROJECT in ${PROJECTS//","/" "}; do
     cp $FILE $TARGET
   done
 done
+
+
