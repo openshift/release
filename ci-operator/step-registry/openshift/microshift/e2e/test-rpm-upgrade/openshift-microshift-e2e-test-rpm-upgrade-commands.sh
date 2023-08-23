@@ -39,10 +39,10 @@ decrement_minor(){
 latest_release_ver="$(decrement_minor "$(microshift_version)")"
 release_repo="rhocp-${latest_release_ver}-for-rhel-9-x86_64-rpms"
 
-# install_latest_release.sh
+# install_and_upgrade.sh
 # The test instance has been created and the PR's source has been deployed. We need to start from the y-1 release though.
 # Wipe the current microshift installation and install the latest y-1 release rpm.
-cat <<EOF > "${HOME}"/install_latest_release.sh
+cat <<EOF > "${HOME}"/install_and_upgrade.sh
 #!/bin/bash
 set -xeou pipefail
 
@@ -58,15 +58,6 @@ systemctl enable --now microshift
 
 # wait for microshift to become ready
 sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh
-EOF
-chmod +x "${HOME}"/install_latest_release.sh
-scp "${HOME}"/install_latest_release.sh "${IP_ADDRESS}":~/
-ssh "${IP_ADDRESS}" "sudo ~/install_latest_release.sh"
-
-# At this point, the 4.y-1 release should be up and running. Now upgrade to microshift built from PR's source.
-cat <<EOF > "${HOME}"/install_branch_rpms.sh
-#!/bin/bash
-set -xe
 
 systemctl stop microshift
 
@@ -77,6 +68,6 @@ systemctl restart microshift
 # wait for microshift to become ready
 sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh
 EOF
-chmod +x "${HOME}"/install_branch_rpms.sh
-scp "${HOME}"/install_branch_rpms.sh "${IP_ADDRESS}":~/
-ssh "${IP_ADDRESS}" "sudo ~/install_branch_rpms.sh"
+chmod +x "${HOME}"/install_and_upgrade.sh
+scp "${HOME}"/install_and_upgrade.sh "${IP_ADDRESS}":~/
+ssh "${IP_ADDRESS}" "sudo ~/install_and_upgrade.sh"
