@@ -38,26 +38,31 @@ if [ -d "$KUBECONFIG" ]; then
   done
 fi
 
-control_nodes=( $( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' ) )
+mapfile -d ' ' -t control_nodes < <( ${OC} get nodes --selector='node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
-compute_nodes=$( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
+mapfile -d ' ' -t compute_nodes < <( ${OC} get nodes --selector='!node-role.kubernetes.io/master' --template='{{ range $index, $_ := .items }}{{ range .status.addresses }}{{ if (eq .type "InternalIP") }}{{ if $index }} {{end }}{{ .address }}{{ end }}{{ end }}{{ end }}' )
 
-function run-on {
-  for n in ${1}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${2}; done
+function run-on-all-nodes {
+  for n in ${control_nodes[@]} ${compute_nodes[@]}; do timeout ${COMMAND_TIMEOUT} ${SSH} core@"${n}" sudo 'bash -eEuxo pipefail' <<< ${1}; done
 }
 
 function run-on-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SSH} core@"${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
+  timeout ${COMMAND_TIMEOUT} ${SSH} "core@${control_nodes[0]}" sudo 'bash -eEuxo pipefail' <<< ${1}
 }
 
 function copy-file-from-first-master {
-  timeout ${COMMAND_TIMEOUT} ${SCP} core@"${control_nodes[0]}:${1}" "${2}"
+  timeout ${COMMAND_TIMEOUT} ${SCP} "core@${control_nodes[0]}:${1}" "${2}"
 }
 
-ssh-keyscan -H ${control_nodes} ${compute_nodes} >> ~/.ssh/known_hosts
+ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
+
+# Prepull tools image on the nodes. "baremetalds-sno-gather" step uses it to run sos report
+# However, if time is too far in the future the pull will fail with "Trying to pull registry.redhat.io/rhel8/support-tools:latest...
+# Error: initializing source ...: tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time ... is after <now + 6m>"
+run-on-all-nodes "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
 
 # Stop chrony service on all nodes
-run-on "${control_nodes} ${compute_nodes}" "systemctl disable chronyd --now"
+run-on-all-nodes "systemctl disable chronyd --now"
 
 # Backup lb-ext kubeconfig so that it could be compared to a new one
 KUBECONFIG_NODE_DIR="/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs"
@@ -73,16 +78,16 @@ sudo timedatectl status
 
 # Skew clock on every node
 # TODO: Suspend, resume and make it resync time from host instead?
-run-on "${control_nodes} ${compute_nodes}" "timedatectl set-time ${SKEW} && timedatectl status"
+run-on-all-nodes "timedatectl set-time ${SKEW} && timedatectl status"
 
 # Restart kubelet
-run-on "${control_nodes} ${compute_nodes}" "systemctl restart kubelet"
+run-on-all-nodes "systemctl restart kubelet"
 
 # Wait for nodes to become unready and approve CSRs until nodes are ready again
 run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
 until oc get nodes; do sleep 30; done
-oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT}
+oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT} || true
 until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
   if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
     oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
@@ -100,7 +105,7 @@ copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
 # Wait for operators to stabilize
 if
-  ! oc adm wait-for-stable-cluster --minimum-stable-period=5s --timeout=30m; then
+  ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
     oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
     exit 1
