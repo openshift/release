@@ -6,6 +6,7 @@ set -xeuo pipefail
 finalize() {
   scp -r "${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/scenario-info" "${ARTIFACT_DIR}"
 
+  set +x
   STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
   JOB_URL_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
@@ -60,6 +61,7 @@ EOF
 </body>
 </html>
 EOF
+  set -x
 }
 
 IP_ADDRESS="$(cat "${SHARED_DIR}"/public_address)"
