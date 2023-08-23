@@ -24,14 +24,24 @@ if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
   REGION=$(jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
 fi
 
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 # 1. get vpc id and public subnet
-VpcId=$(cat "${SHARED_DIR}/vpc_id")
+if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]]; then
+  if [[ -e ${SHARED_DIR}/metadata.json ]]; then
+    # for OCP
+    echo "Reading infra id from file metadata.json"
+    infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
+    echo "Looking up IDs for VPC ${infra_id} and subnet ${infra_id}-public-${REGION}a"
+    VpcId=$(aws --region ${REGION} ec2 describe-vpcs --filters Name=tag:"Name",Values=${infra_id}-vpc --query 'Vpcs[0].VpcId' --output text)
+    PublicSubnet=$(aws --region ${REGION} ec2 describe-subnets --filters "Name=tag:kubernetes.io/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=*public*" --query 'Subnets[0].SubnetId' --output text)
+  fi
+else
+  VpcId=$(cat "${SHARED_DIR}/vpc_id")
+  PublicSubnet="$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')"
+fi
 echo "VpcId: $VpcId"
-
-PublicSubnet="$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')"
 echo "PublicSubnet: $PublicSubnet"
 
-CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 stack_name="${CLUSTER_NAME}-bas"
 s3_bucket_name="${CLUSTER_NAME}-s3"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
