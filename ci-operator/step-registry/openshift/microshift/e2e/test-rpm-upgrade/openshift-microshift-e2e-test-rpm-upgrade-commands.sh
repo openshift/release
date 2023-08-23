@@ -70,7 +70,7 @@ set -xe
 
 systemctl stop microshift
 
-dnf localinstall -y /tmp/rpms/*/microshift*.rpm
+dnf localinstall -y \$(find /tmp/rpms/ -iname "*\$(uname -p)*" -or -iname '*noarch*')
 
 systemctl restart microshift
 
