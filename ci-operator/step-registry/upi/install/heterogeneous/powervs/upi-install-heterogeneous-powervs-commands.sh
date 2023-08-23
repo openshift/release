@@ -51,7 +51,7 @@ case "$CLUSTER_TYPE" in
   if [ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "ppc64le" ]
   then
       echo "Adding additional ppc64le nodes"
-      REGION="${LEASED_RESOURCE}"
+      REGION="${REGION:-$LEASED_RESOURCE}"
       IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
       SERVICE_NAME=power-iaas
       SERVICE_PLAN_NAME=power-virtual-server-group
@@ -227,13 +227,35 @@ case "$CLUSTER_TYPE" in
       echo "Shared Directory: copy the terraform.tfstate"
       cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
 
-      # If the deploy fails, destroy right away and hard exit
+      # If the deploy fails, hard exit
       if [ -n "${FAILED_DEPLOY}" ]
       then
-        cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
-          && /tmp/terraform apply -var-file=data/var.tfvars -auto-approve -no-color
-        echo "Failed to deploy... hard exit"
+        echo "Failed to deploy... hard exit... deprovision in later steps"
         exit 1
+      else
+        echo "Worker Status is: "
+        oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'
+        echo "Cluster Operator is: "
+        oc get co
+        IDX=0
+        while [ "$IDX" -lt "61" ]
+        do
+            FAL_COUNT=$(oc get co -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Available")].status}{"\n"}{end}' | grep False | wc -l)
+            if [ "${FAL_COUNT}" -eq "0" ]
+            then
+              break
+            fi
+            if [ "${IDX}" -eq "60" ]
+            then
+              echo "Exceeded the wait time of >60 minutes"
+              exit 3
+            fi
+            oc get co -o yaml
+            echo "waiting for the cluster operators to return to operation"
+            sleep 60
+            IDX=$(($IDX + 1))
+        done
+        
       fi
   fi
 ;;

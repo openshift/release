@@ -13,6 +13,8 @@ fi
 workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
     workers=0
+elif [ -n "${WORKERS}" ]; then
+    workers="${WORKERS}"
 fi
 
 master_type=null
@@ -36,7 +38,7 @@ case "${SIZE_VARIANT}" in
 esac
 
 # Select zone(s) based on REGION and ZONE_COUNT
-REGION="${LEASED_RESOURCE}"
+REGION=${REGION:-$LEASED_RESOURCE}
 echo "ibmcloud region: ${REGION}"
 ZONES_COUNT=${ZONES_COUNT:-1}
 R_ZONES=("${REGION}-1" "${REGION}-2" "${REGION}-3")
