@@ -9,7 +9,10 @@ shopt -s nullglob
 # Collect test reports into $ARTIFACT_DIR
 PROJECTS=$PROJECTS
 
-sleep 4h
+mvn --version
+sh ./oc_login.sh
+source "$SDKMAN_DIR/bin/sdkman-init.sh"
+sh ./run.sh
 
 echo "Copying results and xmls to ${ARTIFACT_DIR}"
 for PROJECT in ${PROJECTS//","/" "}; do
