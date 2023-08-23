@@ -66,7 +66,16 @@ dnf localinstall -y \$(find /tmp/rpms/ -iname "*\$(uname -p)*" -or -iname '*noar
 systemctl restart microshift
 
 # wait for microshift to become ready
-sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh
+max_retry=3
+last_status=0
+for (( i=0; i < max_retry; ++i )); do
+    if (( i < max_retry - 1 )) && ! /etc/greenboot/check/required.d/40_microshift_running_check.sh; then
+        echo "greenboot encountered an error, retrying"
+        continue
+    fi
+    echo "microshift failed to reach a ready state"
+    exit 1
+done
 EOF
 chmod +x "${HOME}"/install_and_upgrade.sh
 scp "${HOME}"/install_and_upgrade.sh "${IP_ADDRESS}":~/
