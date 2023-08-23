@@ -8,7 +8,10 @@ base_images:
     namespace: openshift
     tag: stream9
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
   from: os
@@ -36,15 +39,23 @@ tests:
   steps:
     cluster_profile: aws-qe
     env:
-      OCM_LOGIN_ENV: production
+      DISABLE_WORKLOAD_MONITORING: "false"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.12"
-      REGION: us-east-2
-      ROSA_LOGIN_ENV: production
+      READY_WAIT_TIMEOUT: 30m
+      REGION: us-west-2
+      REPLICAS: "3"
+      ZONES_COUNT: "3"
     observers:
       enable:
       - redhat-chaos-cerberus
     test:
+    - ref: openshift-qe-cluster-density-v2
+    - ref: redhat-chaos-pod-scenarios-ovn-pods
     - ref: redhat-chaos-pod-scenarios-random-system-pods
+    - ref: redhat-chaos-pvc-scenarios-new-pod
     workflow: rosa-aws-sts-hypershift
 zz_generated_metadata:
   branch: main

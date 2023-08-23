@@ -27,6 +27,8 @@ export TELEMETRY_PASSWORD=$telemetry_password
 
 oc get nodes --kubeconfig $KRKN_KUBE_CONFIG
 
+oc get pods -A --show-labels
+
 echo $ENABLE_ALERTS
 ./prow/pod-scenarios/prow_run.sh
 rc=$?
