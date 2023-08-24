@@ -6,9 +6,9 @@ finalize() {
 
   STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
   REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
-  JOB_URL_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
-  if [ "${JOB_TYPE}" == "periodic" ]; then
-    JOB_URL_PATH="logs"
+  JOB_URL_PATH="logs"
+  if [ "${JOB_TYPE}" == "presubmit" ]; then
+    JOB_URL_PATH="pr-logs/pull/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
   fi
   URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/${JOB_URL_PATH}/${JOB_NAME}/${BUILD_ID}/artifacts/${JOB_NAME_SAFE}/${STEP_NAME}/${ARTIFACT_DIR#/logs/}/scenario-info"
   cat >>${REPORT} <<EOF

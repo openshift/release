@@ -202,6 +202,12 @@ echo "export NUM_WORKERS=3" >> /root/dev-scripts/config_root.sh
 echo "export WORKER_MEMORY=16384" >> /root/dev-scripts/config_root.sh
 echo "export ENABLE_LOCAL_REGISTRY=true" >> /root/dev-scripts/config_root.sh
 
+# Add APPLIANCE_IMAGE only for appliance e2e tests 
+if [ "${AGENT_E2E_TEST_BOOT_MODE}" == "DISKIMAGE" ];
+then
+  echo "export APPLIANCE_IMAGE=${APPLIANCE_IMAGE}" >> /root/dev-scripts/config_root.sh
+fi
+
 # If any extra manifests, then set ASSETS_EXTRA_FOLDER
 if [ "${EXTRA_MANIFESTS}" == "true" ];
 then

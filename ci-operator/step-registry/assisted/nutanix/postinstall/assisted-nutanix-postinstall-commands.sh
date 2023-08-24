@@ -124,7 +124,11 @@ EOF
 
     if [[ $(oc get catalogsource nutanix-csi-operator-beta -n openshift-marketplace -o 'jsonpath={..status.connectionState.lastObservedState}') == "READY" ]]; then
       echo "CatalogSource is now READY."
-      break
+      if oc get packagemanifests nutanixcsioperator &> /dev/null; then
+        echo "Package Manifests nutanixcsioperator is now READY."
+        break
+      fi
+      echo "Waiting for nutanixcsioperator package manifests to become READY ..."
     fi
 
     if [[ ${elapsed_time} -ge ${resource_timeout_seconds} ]]; then
@@ -136,6 +140,7 @@ EOF
     sleep 5s
   done
 fi
+
 
 starting_csv=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.channels[*].currentCSV\})
 source=$(oc get packagemanifests nutanixcsioperator -o jsonpath=\{.status.catalogSource\})
