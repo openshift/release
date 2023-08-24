@@ -106,6 +106,3 @@ fi
 
 # Execute load test
 ./tests/load-tests/ci-scripts/load-test.sh "$SCENARIO"
-
-# Collect load test results
-./tests/load-tests/ci-scripts/collect-results.sh "$SCENARIO"

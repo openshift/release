@@ -90,6 +90,7 @@ acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
 http_access allow authenticated
 http_port 3128
+dns_v4_first on
 EOF
 
 ## PROXY Service
