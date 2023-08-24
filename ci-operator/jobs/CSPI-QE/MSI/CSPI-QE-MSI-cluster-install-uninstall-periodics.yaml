@@ -76,6 +76,86 @@ periodics:
   cluster: build03
   cron: '@yearly'
   decorate: true
+  extra_refs:
+  - base_ref: cluster-install-uninstall
+    org: CSPI-QE
+    repo: MSI
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-managed-cspi-qe
+    job-release: "4.13"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-CSPI-QE-MSI-cluster-install-uninstall-cluster-install-uninstall-aws-ipi-4.13-ci-trigger
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/cluster-install-uninstall-aws-ipi-4.13-ci-cluster-profile
+      - --target=cluster-install-uninstall-aws-ipi-4.13-ci
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER1_CONFIG
+      - name: OCM_ENVIRONMENT
+        value: stage
+      - name: PARALLEL
+        value: "true"
+      - name: PULL_SECRET_NAME
+        value: pull-secret
+      - name: S3_BUCKET_NAME
+      - name: S3_BUCKET_PATH
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/cluster-install-uninstall-aws-ipi-4.13-ci-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-managed-cspi-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build03
+  cron: '@yearly'
+  decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
@@ -261,80 +341,6 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/multi-cluster-install-uninstall-aws-4.13-ci-4.14-nightly-cluster-profile
-        name: cluster-profile
-      - mountPath: /secrets/gcs
-        name: gcs-credentials
-        readOnly: true
-      - mountPath: /etc/pull-secret
-        name: pull-secret
-        readOnly: true
-      - mountPath: /etc/report
-        name: result-aggregator
-        readOnly: true
-    serviceAccountName: ci-operator
-    volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
-    - name: ci-pull-credentials
-      secret:
-        secretName: ci-pull-credentials
-    - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws-managed-cspi-qe
-    - name: pull-secret
-      secret:
-        secretName: registry-pull-credentials
-    - name: result-aggregator
-      secret:
-        secretName: result-aggregator
-- agent: kubernetes
-  cluster: build03
-  cron: '@yearly'
-  decorate: true
-  extra_refs:
-  - base_ref: cluster-install-uninstall
-    org: CSPI-QE
-    repo: MSI
-  labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws-managed-cspi-qe
-    ci-operator.openshift.io/variant: v4.13-stage
-    job-release: "4.13"
-    pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-CSPI-QE-MSI-cluster-install-uninstall-v4.13-stage-multi-cluster-install-uninstall-aws-env
-  spec:
-    containers:
-    - args:
-      - --gcs-upload-secret=/secrets/gcs/service-account.json
-      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
-      - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/multi-cluster-install-uninstall-aws-cluster-profile
-      - --target=multi-cluster-install-uninstall-aws
-      - --variant=v4.13-stage
-      command:
-      - ci-operator
-      env:
-      - name: CLUSTER1_CONFIG
-      image: ci-operator:latest
-      imagePullPolicy: Always
-      name: ""
-      resources:
-        requests:
-          cpu: 10m
-      volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
-      - mountPath: /secrets/ci-pull-credentials
-        name: ci-pull-credentials
-        readOnly: true
-      - mountPath: /usr/local/multi-cluster-install-uninstall-aws-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
