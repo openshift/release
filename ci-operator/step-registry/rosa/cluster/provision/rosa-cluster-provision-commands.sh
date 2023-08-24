@@ -380,8 +380,15 @@ rosa describe cluster -c ${CLUSTER_ID} -o json
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
-
 if [[ "${API_URL}" == "null" ]]; then
+  # If api.url is null, call ocm-qe to analyze the root cause.
+  if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
+    slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")
+    slack_message='{"text": "Warning: the api.url for the cluster '"${CLUSTER_ID}"' is null. Sleep 20 hours for debugging. <@UD955LPJL> <@UEEQ10T4L>"}'
+    curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
+    sleep 72000
+  fi
+
   port="6443"
   if [[ "$HOSTED_CP" == "true" ]]; then
     port="443"
