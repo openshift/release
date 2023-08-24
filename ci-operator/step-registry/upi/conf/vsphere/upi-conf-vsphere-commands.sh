@@ -209,6 +209,34 @@ if test -f "${SHARED_DIR}/manifest_cluster-network-03-config.yml"
     cp "${SHARED_DIR}/manifest_cluster-network-03-config.yml" manifests/cluster-network-03-config.yml
 fi
 
+### Check External ccm setting
+if [ X"${CCM_TYPE}" != X"" ]; then
+  echo "set ccm type features ... "
+  cat manifests/cluster-infrastructure-02-config.yml
+  python -c '
+import os
+import yaml
+path = "manifests/cluster-infrastructure-02-config.yml"
+data = yaml.safe_load(open(path))
+platform_type = data["spec"]["platformSpec"]["type"]
+lowplatform_type = platform_type.lower()
+print("platform type: "+platform_type+" ... "+lowplatform_type+" ...")
+del(data["spec"]["platformSpec"][lowplatform_type])
+del(data["spec"]["cloudConfig"]["key"])
+del(data["status"]["cpuPartitioning"])
+data["spec"]["platformSpec"]["type"] = "External"
+data["spec"]["cloudConfig"]["name"] = ""
+data["status"]["platform"] = "External"
+data["status"]["platformStatus"]["type"] = "External"
+data["status"]["platformStatus"]["external"] = {}
+data["status"]["platformStatus"]["external"]["cloudControllerManager"] = {}
+data["status"]["platformStatus"]["external"]["cloudControllerManager"]["state"] = "'${CCM_TYPE}'"
+open(path, "w").write(yaml.dump(data, default_flow_style=False))
+print("patched external ccm settings")
+' || exit 2
+  cat manifests/cluster-infrastructure-02-config.yml
+fi
+
 ### Create Ignition configs
 echo "Creating Ignition configs..."
 openshift-install --dir="${dir}" create ignition-configs &

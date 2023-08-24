@@ -137,6 +137,48 @@ oc wait --for=condition=Updated mcp/worker --timeout=30m
 
 }
 
+function deploy_ccm() {
+  set -x
+  echo "INFO" "Deploy External CCM....."
+  oc label --overwrite ns kube-system pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged security.openshift.io/scc.podSecurityLabelSync=false
+  apiServerInternalURI="$(oc get infrastructure cluster -o jsonpath='{.status.apiServerInternalURI}{"\n"}')" || return 3
+  apiServerInternalHost=${apiServerInternalURI#*//} 
+  apiServerInternalHost=${apiServerInternalHost%:*} 
+  sed -e "s/<kubernetes_service_host>/${apiServerInternalHost}/g" "${SHARED_DIR}/vsphere-cloud-controller-manager.yaml" | oc create -f -
+  # Wait up to 40 minutes for cluster install ongoing
+  loops=0
+  max_loops=8
+  sleep_seconds=300
+  while true
+  do
+    flag=0
+    for i in `oc get co --no-headers | awk '$1!="authentication"&&$1!="console"&&$1!="ingress"&&$1!="monitoring"&&$1!="network"&&$1!="olm"&&$1!="storage" {print $3,$4,$5}' OFS=""`
+    do
+      flag=1
+      if [ X"$i" != X"TrueFalseFalse" ]; then
+        flag=2
+        echo $i
+        break
+      fi
+    done
+    if [ "$flag" -eq 1 ]; then
+      echo "the expected co are READY"
+      break
+    fi
+    if [ "$loops" -ge "$max_loops" ]; then
+      echo "Timeout, many co is not READY"
+      oc get co
+      return 3
+    fi
+    echo "many co is not READY yet, wait $sleep_seconds seconds"
+    ((loops++))
+    sleep $sleep_seconds
+  done
+  for i in `oc get csr --no-headers | grep -i pending |  awk '{ print $1 }'`; do oc adm certificate approve $i; done
+  sleep 60
+  for i in `oc get csr --no-headers | grep -i pending |  awk '{ print $1 }'`; do oc adm certificate approve $i; done
+}
+
 # inject porxy information into haproxy.service if deploying with proxy configuration
 if proxy_info="$(cat install-config.yaml | grep -oP 'httpProxy\s*:\s*\K.*')" ; then
   echo "$(date -u --rfc-3339=seconds) - inject proxy env into haproxy service..."
@@ -194,15 +236,22 @@ ret="$?"
 set -e
 
 if [ $ret -ne 0 ]; then
-  set +e
-  # Attempt to gather bootstrap logs.
-  echo "$(date -u --rfc-3339=seconds) - Bootstrap failed, attempting to gather bootstrap logs..."
-  gather_console_and_bootstrap
-  sed 's/password: .*/password: REDACTED/' "${installer_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
-  echo "$(date -u --rfc-3339=seconds) - Copy log-bundle to artifacts directory..."
-  cp --verbose "${installer_dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}"
-  set -e
-  exit "$ret"
+  if [ X"${CCM_TYPE}" == X"External" ]; then
+    echo "Installation failed but 'ccm_type' is External, adding pending steps...."
+    deploy_ccm || exit 1
+    echo "INFO" "Launching 'wait-for install-complete' installation step....."
+    openshift-install --dir="${installer_dir}" wait-for bootstrap-complete || exit 1
+  else
+    set +e
+    # Attempt to gather bootstrap logs.
+    echo "$(date -u --rfc-3339=seconds) - Bootstrap failed, attempting to gather bootstrap logs..."
+    gather_console_and_bootstrap
+    sed 's/password: .*/password: REDACTED/' "${installer_dir}/.openshift_install.log" >>"${ARTIFACT_DIR}/.openshift_install.log"
+    echo "$(date -u --rfc-3339=seconds) - Copy log-bundle to artifacts directory..."
+    cp --verbose "${installer_dir}"/log-bundle-*.tar.gz "${ARTIFACT_DIR}"
+    set -e
+    exit "$ret"
+  fi
 fi
 
 ## Approving the CSR requests for nodes
