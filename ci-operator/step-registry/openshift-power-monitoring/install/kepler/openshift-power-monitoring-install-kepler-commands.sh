@@ -2,6 +2,12 @@
 
 set -eu -o pipefail
 
+must_gather() {
+    oc get pods -n openshift-operators
+    oc describe deployment kepler-operator-controller-manager -n openshift-operators
+    oc logs -n openshift-operators deployments/kepler-operator-controller-manager
+}
+
 validate_cluster() {
     local label="operators.coreos.com/kepler-operator.openshift-operators"
     local ret=0
@@ -38,9 +44,11 @@ EOF
 }
 main() {
     validate_cluster || {
+        must_gather
         return 1
     }
     deploy_kepler || {
+        must_gather
         return 1
     }
 }
