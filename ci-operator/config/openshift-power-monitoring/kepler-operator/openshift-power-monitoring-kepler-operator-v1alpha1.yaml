@@ -26,9 +26,9 @@ operator:
   bundles:
   - as: kepler-bundle
     context_dir: .
-    dockerfile_path: bundle/bundle.Dockerfile
+    dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/sustainable_computing_io/kepler-operator:0.5.0
+  - pullspec: quay.io/sustainable_computing_io/kepler-operator:.*
     with: pipeline:kepler-operator
 releases:
   latest:
@@ -60,7 +60,7 @@ tests:
       cli: latest
       commands: |
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-operators deployment kepler-operator-controller-manager
+        oc wait --for condition=Available -n openshift-operators --timeout=300s deployment kepler-operator-controller-manager
         oc logs -n openshift-operators deployment/kepler-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
@@ -70,6 +70,8 @@ tests:
         requests:
           cpu: 100m
           memory: 400Mi
+    - ref: openshift-power-monitoring-install-kepler
+    - ref: openshift-power-monitoring-tests-kepler
     workflow: generic-claim
 zz_generated_metadata:
   branch: v1alpha1
