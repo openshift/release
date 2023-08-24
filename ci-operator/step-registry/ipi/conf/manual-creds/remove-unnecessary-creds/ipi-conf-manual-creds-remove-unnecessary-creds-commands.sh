@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  echo "This step is not required when EXTRACT_MANIFEST_INCLUDED is set to true"
+  exit 0
+fi
+
 if [[ "${BASELINE_CAPABILITY_SET}" == "" ]]; then
   echo "This step is not required when BASELINE_CAPABILITY_SET is not set"
   exit 0

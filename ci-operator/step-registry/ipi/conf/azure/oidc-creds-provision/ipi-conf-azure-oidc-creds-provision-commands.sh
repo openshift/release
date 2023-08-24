@@ -65,7 +65,17 @@ echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 oc registry login
-oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+ADDITIONAL_OC_EXTRACT_ARGS=""
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+fi
+echo "OC Version:"
+which oc
+oc version --client
+oc adm release extract --help
+oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credrequests" ${ADDITIONAL_OC_EXTRACT_ARGS} "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+echo "CR manifest files:"
+ls "/tmp/credrequests"
 
 # Create manual credentials using client secret for openshift-cluster-api.
 # This is a temp workaround until cluster-api supports workload identity
@@ -96,10 +106,11 @@ cat > ${SHARED_DIR}/metadata.json << EOF
 {"infraID":"${CLUSTER_NAME}","azure":{"region":"${REGION}","resourceGroupName":"${CLUSTER_NAME}"}}
 EOF
 
-if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ]; then
-  ADDITIONAL_CCOCTL_ARGS="--enable-tech-preview"
-else
-  ADDITIONAL_CCOCTL_ARGS=""
+ADDITIONAL_CCOCTL_ARGS=""
+# Most of steps support FEATURE_SET var now, actually it can replace ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS
+# But for compatiblity, not break the exisitng jobs, keep ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS here.
+if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ] || [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
+  ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
 fi
 
 # create required credentials infrastructure and installer manifests
