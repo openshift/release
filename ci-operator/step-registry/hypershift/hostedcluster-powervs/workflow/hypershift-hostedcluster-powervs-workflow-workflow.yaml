@@ -1,0 +1,22 @@
+workflow:
+  as: hypershift-hostedcluster-powervs-workflow
+  documentation: |-
+    The HyperShift powervs workflow executes tests against a new ephemeral
+    HyperShift cluster. Administrative access to the control plane is provided
+    via the `KUBECONFIG` environment variable.
+
+    Note that tests will execute once the control plane is ready, regardless of
+    whether nodes have been requested, have joined, or are available.
+
+    This workflow uses a shared HyperShift management cluster run by the Test Platform team.
+
+    OpenShift versions supported by this workflow are 4.n, 4.n-1, and 4.n-2, where n is the
+    version of Openshift in the hypershift-cli:latest image.
+
+  steps:
+    pre:
+    - ref: openshift-cluster-bot-rbac
+    - chain: hypershift-hostedcluster-powervs-create
+    post:
+    - chain: hypershift-hostedcluster-powervs-dump
+    - chain: hypershift-hostedcluster-powervs-destroy
