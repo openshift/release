@@ -8,6 +8,12 @@ shopt -s nullglob
 
 echo "Logging to oc:"
 sh ./oc_login.sh
+
+# source sdkman
+set +o nounset #disable strict mode
+source "/root/.sdkman/bin/sdkman-init.sh"
+set -o nounset #enable back strict mode
+
 echo "Executing tests:"
 sh ./run.sh
 
