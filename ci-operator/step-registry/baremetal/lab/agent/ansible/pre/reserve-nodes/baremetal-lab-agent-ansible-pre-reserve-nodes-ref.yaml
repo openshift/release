@@ -1,0 +1,49 @@
+ref:
+  as: baremetal-lab-agent-ansible-pre-reserve-nodes
+  from_image:
+    namespace: ci
+    name: "baremetal-qe-base"
+    tag: latest
+  commands: baremetal-lab-agent-ansible-pre-reserve-nodes-commands.sh
+  resources:
+    requests:
+      cpu: 500m
+      memory: 16Mi
+  env:
+    - name: IP_STACK
+      default: ""
+      documentation: "IP stack of the cluster: v4, v6, v4v6"
+    - name: DEPLOYMENT_TYPE
+      default: ""
+      documentation: "Deoployment type of the cluster: sno, compact and ha"
+    - name: FIPS
+      default: ""
+      documentation: "Enable FIPS"
+    - name: PROXY
+      default: ""
+      documentation: "Enable cluster-wide proxy in install-config"
+    - name: DISCONNECTED
+      default: ""
+      documentation: "Perform a disconnected install"
+    - name: AUX_HOST
+      default: ""
+      documentation: "Host for serving agent images and dns"
+    - name: ARCHITECTURE
+      default: ""
+      documentation: |
+        The architecture of the cluster nodes at installation time. Use LLVM architecture names (arm64, amd64, etc...).
+    - name: CLUSTER_NAME
+      default: ""
+      documentation: The cluster name
+    - name: BASE_DOMAIN
+      default: ""
+      documentation: The cluster base domain  
+    - name: NETWORK_TYPE
+      default: "static"
+      documentation: The network type, static or dhcp 
+  dependencies:
+    - name: "release:latest"
+      env: RELEASE_IMAGE
+  documentation: |-
+    This step will use the QE baremetal host service to reserve the required amount of nodes to perform an agent based bare
+    metal installation
