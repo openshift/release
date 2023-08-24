@@ -241,3 +241,15 @@
   params:
     cluster:
     - app.ci
+- fields:
+  - cmd: oc --kubeconfig /tmp/build-farm-credentials/sa.config-updater.$(cluster).config
+      get secrets --sort-by=.metadata.creationTimestamp --namespace ci -o json | jq
+      '.items[] | select(.type=="kubernetes.io/dockercfg") | select(.metadata.annotations["kubernetes.io/service-account.name"]=="multi-arch-builder-controller")'|
+      jq --slurp '.[-1] | .data[".dockercfg"]' --raw-output | base64 --decode | jq
+      '.["image-registry.openshift-image-registry.svc:5000"].auth' --raw-output |
+      tr -d '\n'
+    name: token_multi-arch-builder-controller_$(cluster)_reg_auth_value.txt
+  item_name: build_farm
+  params:
+    cluster:
+    - multi01
