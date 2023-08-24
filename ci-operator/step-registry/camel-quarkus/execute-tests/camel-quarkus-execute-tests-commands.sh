@@ -9,14 +9,12 @@ shopt -s nullglob
 # Collect test reports into $ARTIFACT_DIR
 PROJECTS=$PROJECTS
 
-env
+# source sdkman
+set +o nounset #disable strict mode
+source "/root/.sdkman/bin/sdkman-init.sh"
+set -o nounset #enable back strict mode
 
-
-
-
-
-
-
+sleep 1h
 echo "'mvn' version:"
 mvn --version
 echo "Logging to oc:"
