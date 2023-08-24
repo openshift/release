@@ -6,9 +6,8 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
-
 # Configure aws
+CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
 if [[ -f "${AWSCRED}" ]]; then
   export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
@@ -32,26 +31,12 @@ else
   exit 1
 fi
 
-CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id" || true)
-if [[ -z "$CLUSTER_ID" ]]; then
-  CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-name")
+# If the byo operator roles exist, do deletion.
+OPERATOR_ROLES_PREFIX_FILE="${SHARED_DIR}/operator-roles-prefix"
+if [[ -e "${OPERATOR_ROLES_PREFIX_FILE}" ]]; then
+  OPERATOR_ROLES_PREFIX=$(cat "${OPERATOR_ROLES_PREFIX_FILE}")
+
+  echo "Start deleting the byo operator roles with the prefix ${OPERATOR_ROLES_PREFIX}..."
+  rosa delete operator-roles -y --mode auto --prefix ${OPERATOR_ROLES_PREFIX}
 fi
-
-echo "Deleting cluster-id: ${CLUSTER_ID}"
-rosa delete cluster -c "${CLUSTER_ID}" -y
-while rosa describe cluster -c "${CLUSTER_ID}" ; do
-  sleep 60
-done
-
-if [[ "$STS" == "true" ]]; then
-  echo "Deleting operator roles"
-  rosa delete operator-roles -c "${CLUSTER_ID}" -y -m auto
-  
-  echo "Deleting oidc-provider"
-  rosa delete oidc-provider -c "${CLUSTER_ID}" -y -m auto
-fi
-echo "Do a smart 120 sleeping to make sure the processes are complted."
-sleep 120
-
-echo "Cluster is no longer accessible; delete successful."
-exit 0
+echo "Finish byo operator roles deletion."
