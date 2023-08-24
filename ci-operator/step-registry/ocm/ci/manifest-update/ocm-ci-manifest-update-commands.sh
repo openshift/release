@@ -79,15 +79,18 @@ if [[ -n "$RELEASE_REF" ]]; then
     branch="${RELEASE_REF}"
 fi
 
-# Get current Z-stream version and set to OSCI_COMPONENT_VERSION if this is not set
-cd "$release_dir" || exit 1
-git checkout "$branch" || {
-    echo "ERROR Could not checkout branch $branch in OCM release repo"
-    exit 1
-}
-release=$(cat "$release_dir/Z_RELEASE_VERSION")
-export OSCI_COMPONENT_VERSION=${OSCI_COMPONENT_VERSION:-$release}
-echo "INFO Z-stream version is $release"
+if [[ -z "$OSCI_COMPONENT_VERSION" ]]; then
+    # Get current Z-stream version and set to OSCI_COMPONENT_VERSION if this is not set
+    cd "$release_dir" || exit 1
+    git checkout "$branch" || {
+        echo "ERROR Could not checkout branch $branch in OCM release repo"
+        exit 1
+    }
+    release=$(cat "$release_dir/Z_RELEASE_VERSION")
+    echo "INFO Z-stream version is $release"
+    export OSCI_COMPONENT_VERSION=$release
+fi
+
 echo "INFO OSCI_COMPONENT_VERSION is ${OSCI_COMPONENT_VERSION}"
 
 # Set OSCI_COMPONENT_NAME to REPO_NAME if it is not provided

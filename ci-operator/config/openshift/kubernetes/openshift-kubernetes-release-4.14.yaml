@@ -11,6 +11,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.14"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -220,9 +224,10 @@ tests:
   container:
     from: src
 - as: verify-commits
-  commands: ARTIFACTS="${ARTIFACT_DIR}" openshift-hack/verify-commits.sh
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
   container:
-    from: src
+    from: commitchecker
 - as: k8s-e2e-gcp-ovn
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
