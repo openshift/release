@@ -14,12 +14,10 @@ export HOSTED_CLUSTER_NAME
 export HOSTED_CONTROL_PLANE_NAMESPACE="${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"
 export MACHINE_CIDR=192.168.122.0/24
 
-
 # InfraEnv configs
 SSH_PUB_KEY_FILE="${AGENT_POWER_CREDENTIALS}/ssh-publickey"
 SSH_PUB_KEY=$(cat ${SSH_PUB_KEY_FILE})
 export SSH_PUB_KEY
-
 
 # Creating cluster imageset
 if ! oc get clusterimageset img"$OCP_HCP_RELEASE"-appsub &> /dev/null; then
@@ -37,7 +35,6 @@ else
 fi
 
 # Creating Provisioning
-
 if ! oc get provisioning provisioning-configuration &> /dev/null; then
   # If it doesn't exist, create it
   cat <<EOF | oc create -f -
@@ -53,7 +50,6 @@ else
   echo "Resource provisioning-configuration already exists. Skipping creation."
 fi
 
-
 # Installing hypershift cli
 echo "$(date) Installing hypershift cli"
 mkdir /tmp/hypershift_cli
@@ -62,7 +58,6 @@ curl -k --output /tmp/hypershift.tar.gz ${downURL}
 tar -xvf /tmp/hypershift.tar.gz -C /tmp/hypershift_cli
 chmod +x /tmp/hypershift_cli/hypershift
 export PATH=$PATH:/tmp/hypershift_cli
-
 
 # Installing required tools
 mkdir /tmp/bin
@@ -298,7 +293,7 @@ done
 for ((i=1; i<=30; i++)); do
   not_ready_count=$(oc get no --kubeconfig=${HOME}/guest_kubeconfig --no-headers | awk '{print $2}' | grep -v 'Ready' | wc -l)
   if [ "$not_ready_count" -eq 0 ]; then
-    echo "All Compute nodes are ready"
+    echo "All Compute nodes are Ready"
     break
   else
     echo "Waiting for Compute nodes to be Ready"
