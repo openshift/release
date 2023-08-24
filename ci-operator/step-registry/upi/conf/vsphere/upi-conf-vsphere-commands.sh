@@ -17,7 +17,52 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
 fi
 
 openshift_install_path="/var/lib/openshift-install"
-third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+
+if [[ ${LEASED_RESOURCE} == *"vlan"* ]]; then
+  vlanid=$(grep -oP '[ci|qe\-discon]-vlan-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+
+  dns_server=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].dnsServer' /var/run/vault/vsphere-config/subnets.json)
+  lb_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[2]' /var/run/vault/vsphere-config/subnets.json)
+  bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[3]' /var/run/vault/vsphere-config/subnets.json)
+  machine_cidr=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].machineNetworkCidr' /var/run/vault/vsphere-config/subnets.json)
+
+  tempaddrs=()
+  for n in {4..6}
+  do
+    tempaddrs+=( "$(jq -r --argjson N $n --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)" )
+  done
+
+  printf -v control_plane_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
+
+  tempaddrs=()
+  for n in {7..9}
+  do
+    tempaddrs+=( "$(jq -r --argjson N $n --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)" )
+  done
+
+  printf -v compute_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  compute_ip_addresses="[${compute_ip_addresses%,}]"
+
+else
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+  machine_cidr="192.168.${third_octet}.0/25"
+  bootstrap_ip_address="192.168.${third_octet}.3"
+  lb_ip_address="192.168.${third_octet}.3"
+
+  read -r compute_ip_addresses << EOM
+["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
+EOM
+
+  read -r control_plane_ip_addresses << EOM
+["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
+EOM
+
+fi
 
 export HOME=/tmp
 #export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
@@ -131,13 +176,15 @@ if grep 'httpProxy' "${install_config}" ; then
   cat >> "${install_config}" << EOF
 networking:
   machineNetwork:
-  - cidr: "192.168.${third_octet}.0/25"
+  - cidr: "$machine_cidr"
 EOF
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
-machine_cidr = "192.168.${third_octet}.0/25"
+
+machine_cidr = "${machine_cidr}"
+
 vm_template = "${vm_template}"
 vsphere_cluster = "${vsphere_cluster}"
 vsphere_datacenter = "${vsphere_datacenter}"
@@ -152,10 +199,11 @@ compute_memory = "16384"
 compute_num_cpus = "4"
 vm_network = "${LEASED_RESOURCE}"
 vm_dns_addresses = ["${dns_server}"]
-bootstrap_ip_address = "192.168.${third_octet}.3"
-lb_ip_address = "192.168.${third_octet}.2"
-compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
-control_plane_ip_addresses = ["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
+bootstrap_ip_address = "${bootstrap_ip_address}"
+lb_ip_address = "${lb_ip_address}"
+
+compute_ip_addresses = ${compute_ip_addresses}
+control_plane_ip_addresses = ${control_plane_ip_addresses}
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."

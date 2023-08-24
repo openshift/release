@@ -32,8 +32,13 @@ then
     fi
 fi
 
-third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
-load_balancer_ip="192.168.${third_octet}.2"
+if [[ ${LEASED_RESOURCE} == *"vlan"* ]]; then
+  vlanid=$(grep -oP '[ci|qe\-discon]-vlan-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+  load_balancer_ip=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[2]' /var/run/vault/vsphere-config/subnets.json)
+else
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+  load_balancer_ip="192.168.${third_octet}.2"
+fi
 
 # Create Network Load Balancer in the subnet that is routable into VMC network
 vpc_id=$(aws ec2 describe-vpcs --filters Name=tag:"aws:cloudformation:stack-name",Values=vsphere-vpc --query 'Vpcs[0].VpcId' --output text)

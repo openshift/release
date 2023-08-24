@@ -19,7 +19,62 @@ echo "$(date -u --rfc-3339=seconds) - setting up static IP assignments"
 
 STATIC_IPS="${SHARED_DIR}"/static-ip-hosts.txt
 
-third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+if [[ ${LEASED_RESOURCE} == *"vlan"* ]]; then
+  vlanid=$(grep -oP '[ci|qe\-discon]-vlan-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+
+  dns_server=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].dnsServer' /var/run/vault/vsphere-config/subnets.json)
+  cidr=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].cidr' /var/run/vault/vsphere-config/subnets.json)
+  gateway=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].gateway' /var/run/vault/vsphere-config/subnets.json)
+
+
+cat >> "${STATIC_IPS}" << EOF
+    hosts:
+EOF
+
+  for n in {4..4}
+  do
+cat >> "${STATIC_IPS}" << EOF
+    - role: bootstrap
+      networkDevice:
+        ipAddrs:
+        - $(jq -r --argjson N $n --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)/$cidr
+        gateway: ${gateway}
+        nameservers:
+        - ${dns_server}
+EOF
+  done
+
+  for n in {5..7}
+  do
+cat >> "${STATIC_IPS}" << EOF
+    - role: control-plane
+      networkDevice:
+        ipAddrs:
+        - $(jq -r --argjson N $n --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)/$cidr
+        gateway: ${gateway}
+        nameservers:
+        - ${dns_server}
+EOF
+  done
+
+
+  for n in {8..10}
+  do
+cat >> "${STATIC_IPS}" << EOF
+    - role: compute
+      networkDevice:
+        ipAddrs:
+        - $(jq -r --argjson N $n --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)/$cidr
+        gateway: ${gateway}
+        nameservers:
+        - ${dns_server}
+EOF
+  done
+
+else
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
 cat >> "${STATIC_IPS}" << EOF
     hosts:
@@ -73,6 +128,8 @@ cat >> "${STATIC_IPS}" << EOF
         nameservers:
         - ${dns_server}
 EOF
+
+fi
 
 echo "$(date -u --rfc-3339=seconds) - set up static IP assignments"
 cat "${STATIC_IPS}"

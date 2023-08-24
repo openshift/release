@@ -17,7 +17,65 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
 fi
 
 openshift_install_path="/var/lib/openshift-install"
-third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+declare zone_worker_ips zone_master_ips
+
+end_master_num=$((start_master_num + MASTER_REPLICAS))
+
+start_worker_num=$((end_master_num + 1))
+end_worker_num=$((start_worker_num + WORKER_REPLICAS))
+
+if [[ ${LEASED_RESOURCE} == *"vlan"* ]]; then
+  vlanid=$(grep -oP '[ci|qe\-discon]-vlan-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+
+  dns_server=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].dnsServer' /var/run/vault/vsphere-config/subnets.json)
+  lb_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[2]' /var/run/vault/vsphere-config/subnets.json)
+  bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[3]' /var/run/vault/vsphere-config/subnets.json)
+  machine_cidr=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].machineNetworkCidr' /var/run/vault/vsphere-config/subnets.json)
+
+  tempaddrs=()
+  for n in $(seq "$start_master_num" "$end_master_num")
+  do
+    tempaddrs+=( "$(jq -r --argjson N $n --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)" )
+  done
+
+  printf -v control_plane_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
+
+  tempaddrs=()
+
+  for n in $(seq "$start_worker_num" "$end_worker_num")
+  do
+    tempaddrs+=( "$(jq -r --argjson N $n --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)" )
+  done
+
+  printf -v compute_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  compute_ip_addresses="[${compute_ip_addresses%,}]"
+
+else
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+  machine_cidr="192.168.${third_octet}.0/25"
+  bootstrap_ip_address="192.168.${third_octet}.3"
+  lb_ip_address="192.168.${third_octet}.3"
+
+  for num in $(seq "$start_master_num" "$end_master_num"); do
+    master_ip="192.168.${third_octet}.$num"
+    zone_master_ips+="\"$master_ip\"",
+  done
+
+  if [ "${WORKER_REPLICAS}" -ne 0 ]; then
+    for num in $(seq "$start_worker_num" "$end_worker_num"); do
+        worker_ips="192.168.${third_octet}.$num"
+        zone_worker_ips+="\"$worker_ips\"",
+    done
+  fi
+
+  control_plane_ip_addresses="[${zone_master_ips}%?]"
+  compute_ip_addresses="[${zone_worker_ips}%?]"
+
+fi
 
 export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
@@ -173,7 +231,7 @@ platform:
 networking:
   networkType: OpenShiftSDN
   machineNetwork:
-  - cidr: "192.168.${third_octet}.0/24"
+  - cidr: "${machine_cidr}"
 EOF
 
 #set machine cidr if proxy is enabled
@@ -181,24 +239,10 @@ if grep 'httpProxy' "${install_config}" ; then
   cat >> "${install_config}" << EOF
 networking:
   machineNetwork:
-  - cidr: "192.168.${third_octet}.0/25"
+  - cidr: "${machine_cidr}"
 EOF
 fi
 
-declare zone_worker_ips zone_master_ips
-master_num=$((3 +  $MASTER_REPLICAS))
-for num in $(seq 4 $master_num); do
-    master_ip="192.168.${third_octet}.$num"
-    zone_master_ips+="\"$master_ip\"",
-done
-
-if [ ${WORKER_REPLICAS} -ne 0 ]; then
-    worker_num=$(($master_num + $WORKER_REPLICAS ))
-    for num in $(seq $(($master_num + 1)) $worker_num); do
-        worker_ips="192.168.${third_octet}.$num"
-        zone_worker_ips+="\"$worker_ips\"",
-    done
-fi
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
@@ -213,10 +257,11 @@ ssh_public_key_path = "${ssh_pub_key_path}"
 compute_memory = "16384"
 compute_num_cpus = "4"
 vm_dns_addresses = ["${dns_server}"]
-bootstrap_ip_address = "192.168.${third_octet}.3"
-lb_ip_address = "192.168.${third_octet}.2"
-compute_ip_addresses = [${zone_worker_ips%?}]
-control_plane_ip_addresses = [${zone_master_ips%?}]
+bootstrap_ip_address = "${bootstrap_ip_address}"
+lb_ip_address = "${lb_ip_address}"
+
+compute_ip_addresses = ${compute_ip_addresses}
+control_plane_ip_addresses = ${control_plane_ip_addresses}
 control_plane_count = ${MASTER_REPLICAS}
 compute_count = ${WORKER_REPLICAS}
 failure_domains = [

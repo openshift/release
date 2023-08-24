@@ -23,6 +23,22 @@ third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED
 
 export HOME=/tmp
 
+if [[ ${LEASED_RESOURCE} == *"vlan"* ]]; then
+  vlanid=$(grep -oP '[ci|qe\-discon]-vlan-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+  dns_server=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].dnsServer' /var/run/vault/vsphere-config/subnets.json)
+  gateway=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].gateway' /var/run/vault/vsphere-config/subnets.json)
+  cidr=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].cidr' /var/run/vault/vsphere-config/subnets.json)
+
+  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+  rendezvous_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[4]' /var/run/vault/vsphere-config/subnets.json)
+
+else
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+  gateway="192.168.${third_octet}.1"
+  rendezvous_ip_address="192.168.${third_octet}.4"
+
+fi
+
 pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
 build01_secrets="/var/run/vault/secrets/.dockerconfigjson"
 extract_build01_auth=$(jq -c '.auths."registry.apps.build01-us-west-2.vmc.ci.openshift.org"' ${build01_secrets})
@@ -127,6 +143,14 @@ for ((i = 0; i < total_host; i++)); do
 done >"${SHARED_DIR}"/hostnames.txt
 
 for ((i = 0; i < total_host; i++)); do
+  ipaddress=""
+  if [[ ${LEASED_RESOURCE} == *"vlan"* ]]; then
+   ipaddress=$(jq -r --argjson N $((i + 4)) --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)
+  else
+    ipaddress=192.168.${third_octet}.$((i + 4))
+    cidr=25
+  fi
+
   echo " - hostname: ${hostnames[$i]}
    role: $(echo "${hostnames[$i]}"|rev|cut -d'-' -f2|rev|cut -f1)
    interfaces:
@@ -141,8 +165,8 @@ for ((i = 0; i < total_host; i++)); do
         ipv4:
           enabled: true
           address:
-            - ip: 192.168.${third_octet}.$((i + 4))
-              prefix-length: 25
+            - ip: ${ipaddress}
+              prefix-length: ${cidr}
           dhcp: false
     dns-resolver:
      config:
@@ -151,7 +175,7 @@ for ((i = 0; i < total_host; i++)); do
     routes:
      config:
        - destination: 0.0.0.0/0
-         next-hop-address: 192.168.${third_octet}.1
+         next-hop-address: ${gateway}
          next-hop-interface: ens32
          table-id: 254"
 done >>"${SHARED_DIR}/agent-config.yaml.patch"
@@ -161,7 +185,7 @@ agent_config_patch="${SHARED_DIR}/agent-config.yaml.patch"
 cat >"${SHARED_DIR}/agent-config.yaml" <<EOF
 apiVersion: v1alpha1
 kind: AgentConfig
-rendezvousIP: 192.168.${third_octet}.4
+rendezvousIP: ${rendezvous_ip_address}
 hosts: []
 EOF
 

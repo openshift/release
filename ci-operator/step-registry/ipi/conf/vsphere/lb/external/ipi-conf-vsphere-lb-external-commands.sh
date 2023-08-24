@@ -14,11 +14,34 @@ cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
 echo "$(date -u --rfc-3339=seconds) - Setting up external load balancer"
 
-third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+if [[ ${LEASED_RESOURCE} == *"vlan"* ]]; then
+  vlanid=$(grep -oP '[ci|qe\-discon]-vlan-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
-echo "192.168.${third_octet}.2" >> "${SHARED_DIR}"/vips.txt
-echo "192.168.${third_octet}.2" >> "${SHARED_DIR}"/vips.txt
-echo "192.168.${third_octet}.0/25" >> "${SHARED_DIR}"/machinecidr.txt
+  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+
+  dns_server=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].dnsServer' /var/run/vault/vsphere-config/subnets.json)
+  gateway=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].gateway' /var/run/vault/vsphere-config/subnets.json)
+  mask=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].mask' /var/run/vault/vsphere-config/subnets.json)
+
+  external_lb_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[2]' /var/run/vault/vsphere-config/subnets.json)
+
+  jq -r --argjson N 2 --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json >> "${SHARED_DIR}"/vips.txt
+  jq -r --argjson N 3 --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json >> "${SHARED_DIR}"/vips.txt
+  jq -r --arg VLANID "$vlanid" '.[$VLANID].machineNetworkCidr' /var/run/vault/vsphere-config/subnets.json >>  "${SHARED_DIR}"/machinecidr.txt
+
+else
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+  gateway="192.168.${third_octet}.1"
+  external_lb_ip_address="192.168.${third_octet}.2"
+
+  mask="255.255.255.192"
+
+  echo "192.168.${third_octet}.2" >> "${SHARED_DIR}"/vips.txt
+  echo "192.168.${third_octet}.2" >> "${SHARED_DIR}"/vips.txt
+  echo "192.168.${third_octet}.0/25" >> "${SHARED_DIR}"/machinecidr.txt
+fi
+
 
 echo "Reserved the following IP addresses..."
 cat "${SHARED_DIR}"/vips.txt
@@ -106,12 +129,17 @@ cat >> $HAPROXY_PATH <<-EOF
 backend ${EP_NAMES[$i]}
   mode tcp
   balance roundrobin
-  option tcp-check  
+  option tcp-check
   default-server verify none inter 10s downinter 5s rise 2 fall 3 slowstart 60s maxconn 250 maxqueue 256 weight 100
 EOF
 
   for ip in {10..127}; do
-    echo "   "server ${EP_NAMES[$i]}-${ip} 192.168.${third_octet}.${ip}:${EP_PORTS[$i]} check check-ssl >> $HAPROXY_PATH
+    if [[ ${LEASED_RESOURCE} == *"vlan"* ]]; then
+      ipaddress=$(jq -r --argjson N "$ip" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)
+      echo "   "server ${EP_NAMES[$i]}-${ip} ${ipaddress}:${EP_PORTS[$i]} check check-ssl >> $HAPROXY_PATH
+    else
+      echo "   "server ${EP_NAMES[$i]}-${ip} 192.168.${third_octet}.${ip}:${EP_PORTS[$i]} check check-ssl >> $HAPROXY_PATH
+    fi
   done
 done
 
@@ -122,12 +150,12 @@ metadata:
   labels:
     machineconfiguration.openshift.io/role: worker
   name: config-openshift
-storage: 
+storage:
   files:
-    - path: "/etc/haproxy/haproxy.conf"            
+    - path: "/etc/haproxy/haproxy.conf"
       contents:
-        local: ./haproxy.cfg        
-      mode: 0644              
+        local: ./haproxy.cfg
+      mode: 0644
 systemd:
   units:
     - name: haproxy.service
@@ -157,7 +185,7 @@ systemd:
 passwd:
   users:
     - name: core
-      ssh_authorized_keys: 
+      ssh_authorized_keys:
         - ${ssh_pub_key}
 EOF
 
@@ -167,7 +195,10 @@ LB_VMNAME="${cluster_name}-lb"
 export GOVC_NETWORK="${LEASED_RESOURCE}"
 govc vm.clone -on=false -vm="${vm_template}" ${LB_VMNAME}
 IGN=$(cat $BUTANE_CFG | /tmp/butane -r -d /tmp | gzip | base64 -w0)
-IPCFG="ip=192.168.${third_octet}.2::192.168.${third_octet}.1:255.255.255.0:lb::none nameserver=8.8.8.8"
+
+
+# TODO: Do we want to set a diff dns server there?
+IPCFG="ip=${external_lb_ip_address}::${gateway}:${mask}:lb::none nameserver=8.8.8.8"
 govc vm.network.change -vm ${LB_VMNAME} -net "${LEASED_RESOURCE}" ethernet-0
 govc vm.change -vm ${LB_VMNAME} -e "guestinfo.afterburn.initrd.network-kargs=${IPCFG}"
 govc vm.change -vm ${LB_VMNAME} -e guestinfo.ignition.config.data=$IGN

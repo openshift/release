@@ -63,6 +63,23 @@ EOF
 
 third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
 
+if [[ ${LEASED_RESOURCE} == *"vlan"* ]]; then
+  vlanid=$(grep -oP '[ci|qe\-discon]-vlan-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+cat >> "${SHARED_DIR}/platform-conf.sh" << EOF
+export API_VIP=$(jq -r --argjson N 2 --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)
+export INGRESS_VIP=$(jq -r --argjson N 3 --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' /var/run/vault/vsphere-config/subnets.json)
+EOF
+
+else
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+cat >> "${SHARED_DIR}/platform-conf.sh" << EOF
+export API_VIP="192.168.${third_octet}.2"
+export INGRESS_VIP="192.168.${third_octet}.3"
+EOF
+fi
+
 echo "$(date -u --rfc-3339=seconds) - Creating platform-conf.sh file..."
 cat >> "${SHARED_DIR}/platform-conf.sh" << EOF
 export PLATFORM=vsphere
@@ -76,8 +93,6 @@ export VSPHERE_VCENTER="${vsphere_url}"
 export VSPHERE_DATACENTER="${vsphere_datacenter}"
 export VSPHERE_DATASTORE="${vsphere_datastore}"
 export VSPHERE_PASSWORD='${vsphere_password}'
-export API_VIP="192.168.${third_octet}.2"
-export INGRESS_VIP="192.168.${third_octet}.3"
 export BASE_DOMAIN="vmc-ci.devcluster.openshift.com"
 export CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 EOF
