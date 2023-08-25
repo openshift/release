@@ -9,7 +9,7 @@ export OCP_RELEASE_VERSION=$(curl -s "$OCP_RELEASE_FILE_URL" | awk '/machine-os 
 
 # Hosted Control Plane parameters
 CLUSTERS_NAMESPACE="clusters"
-HOSTED_CLUSTER_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
+HOSTED_CLUSTER_NAME="agent-cluster"
 export HOSTED_CLUSTER_NAME
 export HOSTED_CONTROL_PLANE_NAMESPACE="${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"
 export MACHINE_CIDR=192.168.122.0/24
@@ -275,11 +275,11 @@ oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.
 
 # Download hosted cluster kubeconfig
 echo "$(date) Setup guest_kubeconfig"
-hypershift create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${HOME}/guest_kubeconfig
+hypershift create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/guest_kubeconfig
 
 # Waiting for compute nodes to attach
 for ((i=1; i<=20; i++)); do
-  node_count=$(oc get no --kubeconfig=${HOME}/guest_kubeconfig --no-headers | wc -l)
+  node_count=$(oc get no --kubeconfig=${SHARED_DIR}/guest_kubeconfig --no-headers | wc -l)
 if [ "$node_count" -eq $HYPERSHIFT_NODE_COUNT ]; then
   echo "Compute nodes attached"
   break
@@ -291,7 +291,7 @@ done
 
 # Waiting for compute nodes to be ready
 for ((i=1; i<=30; i++)); do
-  not_ready_count=$(oc get no --kubeconfig=${HOME}/guest_kubeconfig --no-headers | awk '{print $2}' | grep -v 'Ready' | wc -l)
+  not_ready_count=$(oc get no --kubeconfig=${SHARED_DIR}/guest_kubeconfig --no-headers | awk '{print $2}' | grep -v 'Ready' | wc -l)
   if [ "$not_ready_count" -eq 0 ]; then
     echo "All Compute nodes are Ready"
     break
