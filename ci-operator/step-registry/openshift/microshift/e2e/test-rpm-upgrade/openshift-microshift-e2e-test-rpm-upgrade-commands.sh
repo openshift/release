@@ -61,7 +61,11 @@ sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh
 EOF
 chmod +x "${HOME}"/install_latest_release.sh
 scp "${HOME}"/install_latest_release.sh "${IP_ADDRESS}":~/
-ssh "${IP_ADDRESS}" "sudo ~/install_latest_release.sh"
+if ! ssh "${IP_ADDRESS}" "sudo ~/install_latest_release.sh"; then
+  ssh "${IP_ADDRESS}" "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network,microshift -o logs && sudo chmod +r /tmp/sosreport*"
+  scp "${IP_ADDRESS}":/tmp/sosreport* "${ARTIFACT_DIR}/"
+  exit 1
+fi
 
 # At this point, the 4.y-1 release should be up and running. Now upgrade to microshift built from PR's source.
 cat <<EOF > "${HOME}"/install_branch_rpms.sh
@@ -79,4 +83,8 @@ sudo /etc/greenboot/check/required.d/40_microshift_running_check.sh
 EOF
 chmod +x "${HOME}"/install_branch_rpms.sh
 scp "${HOME}"/install_branch_rpms.sh "${IP_ADDRESS}":~/
-ssh "${IP_ADDRESS}" "sudo ~/install_branch_rpms.sh"
+if ! ssh "${IP_ADDRESS}" "sudo ~/install_branch_rpms.sh"; then
+  ssh "${IP_ADDRESS}" "sudo sos report --batch --all-logs --tmp-dir /tmp -p container,network,microshift -o logs && sudo chmod +r /tmp/sosreport*"
+  scp "${IP_ADDRESS}":/tmp/sosreport* "${ARTIFACT_DIR}/"
+  exit 1
+fi
