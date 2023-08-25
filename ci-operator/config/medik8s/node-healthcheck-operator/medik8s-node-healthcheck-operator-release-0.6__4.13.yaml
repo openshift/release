@@ -3,37 +3,22 @@ base_images:
     name: ubi
     namespace: ocp
     tag: "8"
-  opm-builder:
-    name: opm-builder
-    namespace: ci
-    tag: latest
+  operator-sdk:
+    name: "4.13"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make manager
 build_root:
-  image_stream_tag:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   to: node-healthcheck-operator
-- dockerfile_literal: |
-    FROM opm-builder
-    RUN opm index add \
-      --bundles quay.io/medik8s/self-node-remediation-operator-bundle:latest \
-      --out-dockerfile index.Dockerfile \
-      --generate
-    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
-    EXPOSE 50051
-    ENTRYPOINT ["/bin/opm"]
-    CMD ["registry", "serve", "--database", "/database/index.db"]
-  from: opm-builder
-  to: snr-index
 operator:
   bundles:
   - as: my-bundle
-    base_index: snr-index
     dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/medik8s/node-healthcheck-operator:.*
     with: pipeline:node-healthcheck-operator
@@ -43,7 +28,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.11"
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -61,24 +46,38 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index-my-bundle
     env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: nhc-install
-      OO_PACKAGE: node-healthcheck-operator
-      OO_TARGET_NAMESPACES: '!all'
+      INSTALL_NAMESPACE: nhc-install
     test:
-    - as: e2e
-      commands: export OPERATOR_NS="nhc-install" && make test-e2e
+    - as: e2e-install
+      cli: latest
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/self-node-remediation-operator-bundle:latest
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: my-bundle
+      env:
+      - name: INSTALL_NAMESPACE
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      commands: export OPERATOR_NS="$INSTALL_NAMESPACE" && make test-e2e
+      env:
+      - name: INSTALL_NAMESPACE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: ipi-aws
 zz_generated_metadata:
-  branch: release-0.4
+  branch: release-0.6
   org: medik8s
   repo: node-healthcheck-operator
-  variant: "4.11"
+  variant: "4.13"
