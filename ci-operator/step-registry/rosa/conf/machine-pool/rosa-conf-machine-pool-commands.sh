@@ -53,7 +53,7 @@ fi
 
 TAINTS="prowci=true:NoSchedule"
 if [[ ! -z "$MP_TAINTS" ]]; then
-  TAINTS="${TAINTS},${MP_TAINTS}"
+  TAINTS="${MP_TAINTS}"
 fi
 
 MP_NODES_SWITCH=""

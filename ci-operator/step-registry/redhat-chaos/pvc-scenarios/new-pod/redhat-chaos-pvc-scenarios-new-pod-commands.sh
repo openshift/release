@@ -29,6 +29,8 @@ export DURATION=$DURATION
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE
 export ENABLE_ALERTS=False
+telemetry_password=$(cat "/secret/telemetry/telemetry_password")
+export TELEMETRY_PASSWORD=$telemetry_password
 
 ./prow/pvc-scenario/prow_run.sh
 rc=$?

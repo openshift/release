@@ -22,6 +22,8 @@ export KUBECONFIG=/tmp/config
 
 export KRKN_KUBE_CONFIG=$KUBECONFIG
 export NAMESPACE=$TARGET_NAMESPACE 
+telemetry_password=$(cat "/secret/telemetry/telemetry_password")
+export TELEMETRY_PASSWORD=$telemetry_password
 
 oc get nodes --kubeconfig $KRKN_KUBE_CONFIG
 

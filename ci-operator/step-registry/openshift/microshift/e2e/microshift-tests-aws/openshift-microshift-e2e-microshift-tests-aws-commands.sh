@@ -20,6 +20,7 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
+set +x
 STEP_NAME="${HOSTNAME##${JOB_NAME_SAFE}-}"
 REPORT="${ARTIFACT_DIR}/custom-link-tools.html"
 cat >>${REPORT} <<EOF
@@ -60,6 +61,7 @@ cat >>${REPORT} <<EOF
 </body>
 </html>
 EOF
+set -x
 
 # Robot Framework setup and execution.
 cat << EOF >/tmp/variables.yaml

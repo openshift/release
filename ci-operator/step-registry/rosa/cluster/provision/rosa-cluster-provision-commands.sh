@@ -122,9 +122,17 @@ if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
 fi
 
+# If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
+# This requires a second step in the waiting for nodes phase where we put the config back to the desired setup.
 COMPUTE_NODES_SWITCH=""
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
-  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+  if [[ ${MIN_REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
+    COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas 3 --max-replicas ${MAX_REPLICAS}"
+  else
+    COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
+  fi
+elif [[ ${REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
+  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas 3 --max-replicas ${REPLICAS}"
 else
   COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
 fi
@@ -372,8 +380,15 @@ rosa describe cluster -c ${CLUSTER_ID} -o json
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
-
 if [[ "${API_URL}" == "null" ]]; then
+  # If api.url is null, call ocm-qe to analyze the root cause.
+  if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
+    slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")
+    slack_message='{"text": "Warning: the api.url for the cluster '"${CLUSTER_ID}"' is null. Sleep 20 hours for debugging. <@UD955LPJL> <@UEEQ10T4L>"}'
+    curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
+    sleep 72000
+  fi
+
   port="6443"
   if [[ "$HOSTED_CP" == "true" ]]; then
     port="443"
