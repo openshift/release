@@ -20,19 +20,15 @@ SSH_PUB_KEY=$(cat ${SSH_PUB_KEY_FILE})
 export SSH_PUB_KEY
 
 # Creating cluster imageset
-if ! oc get clusterimageset img"$OCP_HCP_RELEASE"-appsub &> /dev/null; then
-  # If it doesn't exist, create it
-  cat <<EOF | oc create -f -
+cat <<EOF | oc create -f -
 apiVersion: hive.openshift.io/v1
 kind: ClusterImageSet
 metadata:
-  name: img$OCP_HCP_RELEASE-appsub
+  name: img-OCP-RELEASE-MULTI-appsub
 spec:
-  releaseImage: quay.io/openshift-release-dev/ocp-release:$OCP_HCP_RELEASE
+  releaseImage: ${OCP_IMAGE_MULTI}
 EOF
-else
-  echo "Resource img"$OCP_HCP_RELEASE"-appsub already exists. Skipping creation."
-fi
+
 
 # Creating Provisioning
 if ! oc get provisioning provisioning-configuration &> /dev/null; then
