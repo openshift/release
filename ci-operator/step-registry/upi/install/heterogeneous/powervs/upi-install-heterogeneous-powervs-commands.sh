@@ -51,7 +51,7 @@ case "$CLUSTER_TYPE" in
   if [ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "ppc64le" ]
   then
       echo "Adding additional ppc64le nodes"
-      REGION="${REGION:-$LEASED_RESOURCE}"
+      REGION="${LEASED_RESOURCE}"
       IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
       SERVICE_NAME=power-iaas
       SERVICE_PLAN_NAME=power-virtual-server-group
