@@ -1,0 +1,147 @@
+base_images:
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.59
+releases:
+  latest:
+    release:
+      channel: stable
+      version: "4.10"
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: qa-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: ebpf-qa-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: ebpf
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: operator-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: ocp-operator-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: sensor-integration-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-sensor-integration-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: ui-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: compliance-e2e-tests
+  optional: true
+  run_if_changed: ^(compliance|central\/compliance.*)
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-compliance-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: merge-qa-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: merge-ebpf-qa-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: ebpf
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: merge-operator-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: ocp-operator-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: merge-ui-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: merge-compliance-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-compliance-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: release-4.2
+  org: stackrox
+  repo: stackrox
+  variant: ocp-4-10
