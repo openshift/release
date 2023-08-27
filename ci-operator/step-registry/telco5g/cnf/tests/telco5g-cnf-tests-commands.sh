@@ -206,7 +206,7 @@ function get_time_left {
     echo $time_left
 }
 
-
+# test
 
 [[ -f $SHARED_DIR/main.env ]] && source $SHARED_DIR/main.env || echo "No main.env file found"
 
