@@ -6,7 +6,8 @@ set -o pipefail
 set -o verbose
 
 OC_HOST=$(oc whoami --show-server)
-OCP_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
+sleep 5000000
+OCP_PASSWORD=$(cat "${KUBEADMIN_PASSWORD_FILE}")
 
 export OPENSHIFT_HOST=${OC_HOST}
 export OPENSHIFT_PASSWORD=${OCP_PASSWORD}
