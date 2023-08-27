@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: "8"
   operator-sdk:
-    name: "4.14"
+    name: "4.13"
     namespace: origin
     tag: operator-sdk
 binary_build_commands: make manager
@@ -28,7 +28,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.11"
 resources:
   '*':
     limits:
@@ -53,11 +53,6 @@ tests:
       cli: latest
       commands: |
         oc create namespace "$INSTALL_NAMESPACE"
-
-        # workaround for OLM pod not running with restricted PSA
-        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
-        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
-
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" quay.io/medik8s/self-node-remediation-operator-bundle:latest
         operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
         oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment node-healthcheck-controller-manager
@@ -82,7 +77,7 @@ tests:
           memory: 200Mi
     workflow: ipi-aws
 zz_generated_metadata:
-  branch: release-0.5
+  branch: release-0.6
   org: medik8s
   repo: node-healthcheck-operator
-  variant: "4.14"
+  variant: "4.11"

@@ -19,23 +19,6 @@ build_root:
 canonical_go_repository: github.com/openshift/microshift
 images:
 - dockerfile_literal: |
-    FROM src
-    RUN pip3 install --upgrade pip && \
-      pip3 install setuptools-rust cryptography pyyaml pygithub gitpython
-    ENV YQ_URL=https://github.com/mikefarah/yq/releases/download/v4.26.1/yq_linux_amd64
-    ENV YQ_HASH=9e35b817e7cdc358c1fcd8498f3872db169c3303b61645cc1faf972990f37582
-    RUN echo -n "${YQ_HASH} -" > /tmp/sum.txt ; \
-          if ! (curl -Ls "${YQ_URL}" | tee /tmp/yq | sha256sum -c /tmp/sum.txt &>/dev/null); then \
-            echo "ERROR: Expected file at ${YQ_URL} to have checksum ${YQ_HASH} but instead got $(sha256sum </tmp/yq | cut -d' ' -f1)" ; \
-            exit 1 ; \
-          fi ; \
-          chmod +x /tmp/yq && mv /tmp/yq /usr/bin/yq
-  inputs:
-    src:
-      as:
-      - src
-  to: rebase-payload
-- dockerfile_literal: |
     FROM src as rpms
     RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
     RUN make rpm
@@ -70,7 +53,6 @@ images:
 promotion:
   excluded_images:
   - microshift-test-payload
-  - rebase-payload
   name: 4.12-priv
   namespace: ocp-private
 releases:

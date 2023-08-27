@@ -13,7 +13,6 @@ source ./venv_qe/bin/activate
 
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
-export ES_SERVER="https://search-perfscale-dev-chmf5l4sh66lvxbnadi4bznl3a.us-west-2.es.amazonaws.com"
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 set_pods_per_node(){
