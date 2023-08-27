@@ -216,6 +216,7 @@ resources:
       memory: 200Mi
 tests:
 - as: mirror-nightly-image
+  cluster: build01
   cron: '@daily'
   steps:
     dependencies:
@@ -225,6 +226,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
+  cluster: build01
   postsubmit: true
   steps:
     dependencies:
@@ -234,6 +236,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: push-pr-image
+  cluster: build01
   optional: true
   steps:
     dependencies:
@@ -243,11 +246,13 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: operator-publish
+  cluster: build01
   postsubmit: true
   steps:
     test:
     - ref: assisted-baremetal-operator-publish
 - as: assisted-operator-catalog-publish
+  cluster: build01
   postsubmit: true
   steps:
     env:
@@ -257,6 +262,7 @@ tests:
     test:
     - ref: assisted-baremetal-operator-catalog-publish
 - as: lint
+  cluster: build01
   commands: |
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -266,11 +272,13 @@ tests:
     from: assisted-service-lint
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: verify-generated-code
+  cluster: build01
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
 - as: unit-test
+  cluster: build01
   commands: |
     export REPORTS=/tmp/reports
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -283,6 +291,7 @@ tests:
     name: assisted-service-codecov-token
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test-postsubmit
+  cluster: build01
   commands: |
     export REPORTS=/tmp/reports
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -295,6 +304,7 @@ tests:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
 - as: subsystem-aws
+  cluster: build01
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -330,6 +340,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: subsystem-aws-periodic
+  cluster: build01
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -365,6 +376,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: subsystem-kubeapi-aws
+  cluster: build01
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -401,6 +413,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: subsystem-kubeapi-aws-periodic
+  cluster: build01
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -437,6 +450,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ai-operator-ztp
+  cluster: build01
   run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -447,6 +461,7 @@ tests:
       ALLOW_CONVERGED_FLOW: "False"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-periodic
+  cluster: build01
   cron: 25 04 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
@@ -457,6 +472,7 @@ tests:
       ALLOW_CONVERGED_FLOW: "False"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -469,6 +485,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters-periodic
+  cluster: build01
   cron: 45 04 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
@@ -482,6 +499,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected
+  cluster: build01
   run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -494,6 +512,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected-periodic
+  cluster: build01
   cron: 50 04 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
@@ -506,6 +525,7 @@ tests:
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -520,6 +540,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-periodic
+  cluster: build01
   cron: 05 05 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
@@ -534,6 +555,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -549,6 +571,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
+  cluster: build01
   cron: 25 05 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
@@ -564,6 +587,7 @@ tests:
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-sno-ocp-410
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -575,6 +599,7 @@ tests:
       IP_STACK: v4v6
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-ipv4v6-3masters-ocp-410
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -589,6 +614,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-multiarch-3masters-ocp-411
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -602,6 +628,7 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-multiarch-sno-ocp-411
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -615,6 +642,7 @@ tests:
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-metal-assisted-kube-api-late-binding-single-node
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -625,6 +653,7 @@ tests:
         make deploy_assisted_operator test_kube_api_parallel
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
