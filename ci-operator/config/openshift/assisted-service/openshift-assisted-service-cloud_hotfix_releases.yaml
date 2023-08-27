@@ -80,6 +80,7 @@ resources:
       memory: 200Mi
 tests:
 - as: mirror-vcsref-image
+  cluster: build01
   postsubmit: true
   steps:
     dependencies:
@@ -89,11 +90,13 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
+  cluster: build01
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
     && make lint
   container:
     from: assisted-service-lint
 - as: unit-test
+  cluster: build01
   commands: |
     export REPORTS=/tmp/reports
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -106,11 +109,13 @@ tests:
     name: assisted-service-codecov-token
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: verify-generated-code
+  cluster: build01
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
 - as: subsystem-aws
+  cluster: build01
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -143,6 +148,7 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-metal-assisted-single-node
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     env:
@@ -151,6 +157,7 @@ tests:
         NUM_MASTERS=1
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-onprem
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     env:
@@ -159,6 +166,7 @@ tests:
         DEPLOY_TARGET=onprem
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     env:
@@ -167,6 +175,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv4v6
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     env:
@@ -176,6 +185,7 @@ tests:
         IPv4=yes
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-9
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     env:
@@ -184,6 +194,7 @@ tests:
         OPENSHIFT_VERSION=4.9
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-10
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     env:
@@ -192,6 +203,7 @@ tests:
         OPENSHIFT_VERSION=4.10
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-11
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     env:
@@ -200,6 +212,7 @@ tests:
         OPENSHIFT_VERSION=4.11
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-12
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     env:
@@ -208,6 +221,7 @@ tests:
         OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-4-13
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -217,6 +231,7 @@ tests:
         OPENSHIFT_VERSION=4.13
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite
+  cluster: build01
   steps:
     cluster_profile: packet-assisted
     env:
@@ -227,6 +242,7 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
+  cluster: build01
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/cnv/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -237,6 +253,7 @@ tests:
         OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
+  cluster: build01
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/lvm/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted
@@ -249,6 +266,7 @@ tests:
         MASTER_CPU=9
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
+  cluster: build01
   run_if_changed: ^(internal/operators/.*\.go|internal/operators/odf/.*|internal/operators/api/.*|internal/operators/handler/.*)$
   steps:
     cluster_profile: packet-assisted

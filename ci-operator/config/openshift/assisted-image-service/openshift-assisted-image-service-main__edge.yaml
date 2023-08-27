@@ -85,6 +85,7 @@ test_binary_build_commands: |
   go mod vendor
 tests:
 - as: mirror-nightly-image
+  cluster: build01
   cron: '@daily'
   steps:
     dependencies:
@@ -92,6 +93,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
+  cluster: build01
   postsubmit: true
   steps:
     dependencies:
@@ -99,6 +101,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
+  cluster: build01
   commands: |
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -109,6 +112,7 @@ tests:
     from: golangci-lint
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: test
+  cluster: build01
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make test
@@ -119,6 +123,7 @@ tests:
     name: assisted-image-service-codecov-token
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: test-postsubmit
+  cluster: build01
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make test
@@ -129,11 +134,13 @@ tests:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
 - as: e2e-metal-assisted
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-deploy-nodes
+  cluster: build01
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
@@ -142,6 +149,7 @@ tests:
         MAKEFILE_TARGET="deploy_nodes"
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2-arm-workers
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -156,6 +164,7 @@ tests:
         INSTALLER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-rhel8:latest
     workflow: assisted-equinix
 - as: e2e-ai-operator-ztp
+  cluster: build01
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
@@ -165,6 +174,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-oci-assisted
+  cluster: build01
   optional: true
   steps:
     cluster_profile: oci-assisted
