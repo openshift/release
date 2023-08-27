@@ -7,6 +7,26 @@ chain:
     - name: HYPERSHIFT_NODE_COUNT
       default: "3"
       documentation: "The number nodes to automatically create and join to the cluster."
+    - name: HYPERSHIFT_NODE_MEMORY
+      default: "16"
+      documentation: "The amount of RAM that will be allocated for the kubevirt hosted cluster's nodes in Gi"
+    - name: HYPERSHIFT_NODE_CPU_CORES
+      default: "4"
+      documentation: "The number of CPU cores that will be assigned for the kubevirt hosted cluster's nodes."
+    - name: RUN_HOSTEDCLUSTER_CREATION
+      default: "true"
+      documentation: |-
+        Indicates whether this step should be skipped. Useful when it is a part of a workflow used in various
+        branches, and some branches don't need to execute that step.
+    - name: KUBEVIRT_CSI_INFRA
+      default: ""
+      documentation: |-
+        The default storage class on the infra cluster to be used by the guest cluster with the
+        kubevirt csi-driver.
+    - name: ETCD_STORAGE_CLASS
+      default: ""
+      documentation: |-
+        The storage class that will be used for etcd on the hosted control plane.
     commands: |-
       set -exuo pipefail
 
@@ -17,22 +37,42 @@ chain:
       fi
       echo "Using $HCP_CLI for cli"
 
+      RUN_HOSTEDCLUSTER_CREATION="${RUN_EXTERNAL_INFRA_TEST:-$RUN_HOSTEDCLUSTER_CREATION}"
+
+      if [ "${RUN_HOSTEDCLUSTER_CREATION}" != "true" ]
+      then
+        echo "Creation of a kubevirt hosted cluster has been skipped."
+        exit 0
+      fi
+
+      EXTRA_ARGS=""
+
+      if [ -n "${KUBEVIRT_CSI_INFRA}" ]
+      then
+        EXTRA_ARGS="${EXTRA_ARGS} --infra-storage-class-mapping=${KUBEVIRT_CSI_INFRA}/${KUBEVIRT_CSI_INFRA}"
+      fi
+      
+      if [ -n "${ETCD_STORAGE_CLASS}" ]
+      then
+        EXTRA_ARGS="${EXTRA_ARGS} --etcd-storage-class=${ETCD_STORAGE_CLASS}"
+      fi
+
       # Enable wildcard routes on the management cluster
       oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
         '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
 
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-
       CLUSTER_NAMESPACE=clusters-${CLUSTER_NAME}
 
-      echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+      echo "$(date) Creating HyperShift guest cluster ${CLUSTER_NAME}"
       $HCP_CLI create cluster kubevirt \
         --name ${CLUSTER_NAME} \
         --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
-        --memory 16Gi \
-        --cores 4 \
+        --memory ${HYPERSHIFT_NODE_MEMORY}Gi \
+        --cores ${HYPERSHIFT_NODE_CPU_CORES} \
         --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson \
-        --release-image ${RELEASE_IMAGE_LATEST}
+        --release-image ${RELEASE_IMAGE_LATEST} \
+        ${EXTRA_ARGS}
 
       echo "Waiting for cluster to become available"
       oc wait --timeout=30m --for=condition=Available --namespace=clusters hostedcluster/${CLUSTER_NAME}
@@ -61,6 +101,14 @@ chain:
           oc get clusteroperators 2>/dev/null || true
           sleep 1s
       done
+
+      if [ -n "${KUBEVIRT_CSI_INFRA}" ]
+      then
+        for item in $(oc get sc --no-headers | awk '{print $1}'); do
+        oc annotate --overwrite sc $item storageclass.kubernetes.io/is-default-class='false'
+        done
+        oc annotate --overwrite sc ${KUBEVIRT_CSI_INFRA} storageclass.kubernetes.io/is-default-class='true'
+      fi
     from: hypershift-operator
     grace_period: 5m0s
     resources:
