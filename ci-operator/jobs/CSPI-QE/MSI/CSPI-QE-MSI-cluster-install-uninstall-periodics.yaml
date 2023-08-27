@@ -376,6 +376,40 @@ periodics:
   spec:
     containers:
     - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/multi-cluster-install-uninstall-cluster-profile
+      - --target=multi-cluster-install-uninstall
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ci1
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/multi-cluster-install-uninstall-aws-4-13-ci-4-14-nightly-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    - args:
       - -c
       - |
         set -o nounset
@@ -444,7 +478,7 @@ periodics:
       - name: S3_BUCKET_PATH
       image: registry.ci.openshift.org/ci/openshift-cli-installer:latest
       imagePullPolicy: Always
-      name: ""
+      name: ci2
       resources:
         requests:
           cpu: 10m
