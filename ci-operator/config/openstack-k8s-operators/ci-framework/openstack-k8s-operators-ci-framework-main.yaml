@@ -39,6 +39,25 @@ tests:
   commands: make tox
   container:
     from: ci-framework-image
+- as: check-manual-changes-zuul-jobs
+  commands: |
+    export HOME=/tmp
+    export ANSIBLE_LOCAL_TMP=/tmp
+    export ANSIBLE_REMOTE_TMP=/tmp
+    make role_molecule
+    files=("zuul.d/molecule.yaml" "zuul.d/projects.yaml")
+    files_with_diff=()
+    for file in "${files[@]}"; do
+        if ! git diff --exit-code --quiet -- "$file" > /dev/null 2>&1; then
+            files_with_diff+=("$file")
+            echo "Changes detected in $file"
+        fi
+    done
+    if [ ${#files_with_diff[@]} -gt 0 ]; then
+        exit 1
+    fi
+  container:
+    from: ci-framework-image
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators
