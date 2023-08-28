@@ -72,7 +72,8 @@ then
     && /tmp/terraform init -upgrade -no-color \
     && /tmp/terraform destroy -var-file=var.tfvars -auto-approve -no-color \
     || sleep 30 \
-    || /tmp/terraform destroy -var-file=var.tfvars -auto-approve -no-color
+    || /tmp/terraform destroy -var-file=var.tfvars -auto-approve -no-color \
+    || true
 else
   echo "Error: File ${SHARED_DIR}/var.tfvars does not exists."
 fi
