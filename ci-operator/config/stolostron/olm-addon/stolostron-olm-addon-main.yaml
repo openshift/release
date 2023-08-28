@@ -77,6 +77,32 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ocm-e2e-kind
+- as: periodic-e2e
+  cron: 42 2 * * 0
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-cicd-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: e2e
+      commands: |
+        ./cicd/prow-e2e-kind.sh
+      dependencies:
+      - env: OLM_IMAGE
+        name: operator-lifecycle-manager
+      - env: CMS_IMAGE
+        name: operator-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
 zz_generated_metadata:
   branch: main
   org: stolostron
