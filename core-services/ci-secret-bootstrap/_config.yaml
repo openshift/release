@@ -2008,10 +2008,6 @@ secret_configs:
     - non_app_ci
     name: cluster-secrets-azurestack-qe
     namespace: ci
-  - cluster_groups:
-    - non_app_ci
-    name: cluster-secrets-azure-marketplace-qe
-    namespace: ci
 - from:
     osServicePrincipal.json:
       field: osServicePrincipal.json
@@ -4996,16 +4992,27 @@ secret_configs:
     name: ci-operator
     namespace: test-credentials
 - from:
-    sa.ci-image-mirror.app.ci.config:
-      field: sa.ci-image-mirror.app.ci.config
+    sa.ci-images-mirror.app.ci.config:
+      field: sa.ci-images-mirror.app.ci.config
       item: build_farm
-    sa.ci-image-mirror.app.ci.token.txt:
-      field: sa.ci-image-mirror.app.ci.token.txt
+    sa.ci-images-mirror.app.ci.token.txt:
+      field: sa.ci-images-mirror.app.ci.token.txt
       item: build_farm
   to:
   - cluster: app.ci
-    name: ci-image-mirror
+    name: ci-images-mirror
     namespace: ci
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_multi-arch-builder-controller_multi01_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.multi-build01.arm-build.devcluster.openshift.com
+  to:
+  - cluster: multi01
+    name: multi-arch-builder-controller-multi01-registry-credentials
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
 user_secrets_target_clusters:
 - app.ci
 - arm01
