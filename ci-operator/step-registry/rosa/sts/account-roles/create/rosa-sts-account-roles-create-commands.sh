@@ -58,4 +58,4 @@ rosa create account-roles -y --mode auto \
 # Store the account-role-prefix for the next pre steps and the account roles deletion
 echo "Store the account-role-prefix and the account-roles-arn ..."
 echo -n "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-prefix"
-rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${ARTIFACT_DIR}/account-roles-arn"
+rosa list account-roles -o json | jq -r '.[].RoleARN' | grep "${ACCOUNT_ROLES_PREFIX}" > "${SHARED_DIR}/account-roles-arn"
