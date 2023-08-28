@@ -370,48 +370,37 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${vendor}"
 done
 
-# wait-for boostrap timeouts after 60 minutes, retry until success, 
-# If the command never succeeds, let prow CI handle the step timeout (2 hours) avoiding infinite loop
+# wait-for commands may timeout, retry to avoid CI failures 
+# ref. https://issues.redhat.com/browse/OCPBUGS-4962
+function agent_wait_for(){
+  local wait_for_command="${1}"
 
-function wait_for_bootrap_complete(){
   proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
   http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
-            oinst agent wait-for bootstrap-complete 2>&1 &
-}
+            oinst agent wait-for "${wait_for_command}" 2>&1 &
 
-function wait_for_install_complete(){
-  proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
-  http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
-            oinst agent wait-for install-complete &
+  if ! wait "$!"; then
+    echo "wait-for ${wait_for_command} time out, relaunching"
+    http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
+            oinst agent wait-for "${wait_for_command}" 2>&1 &
+    if ! wait "$!"; then
+      echo "ERROR: ${wait_for_command} failed on retry. Aborting execution."
+      # TODO: gather logs??
+      exit 1
+    fi
+  fi
 }
 
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
-#sleep 900
+sleep 900
 echo "Launching 'wait-for bootstrap-complete' installation step....."
 # The installer uses the rendezvous IP for checking the bootstrap phase.
 # The rendezvous IP is in the internal net in our lab.
 # Let's use a proxy here as the internal net is not routable from the container running the installer.
-wait_for_bootrap_complete
-if ! wait "$!"; then
-  echo "wait-for bootstrap-complete time out, relaunching"
-  wait_for_bootrap_complete
-  if ! wait "$!"; then
-    echo "ERROR: Installation failed. Aborting execution."
-    # TODO: gather logs??
-    exit 1
-  fi
-fi
+agent_wait_for "bootstrap-complete"
+
 
 update_image_registry &
 echo -e "\nLaunching 'wait-for install-complete' installation step....."
-wait_for_install_complete
-if ! wait "$!"; then
-  echo "wait-for install-complete time out, relaunching"
-  wait_for_install_complete
-  if ! wait "$!"; then
-    echo "ERROR: Installation failed. Aborting execution."
-    # TODO: gather logs??
-    exit 1
-  fi
-fi
+agent_wait_for "install-complete"
