@@ -78,6 +78,7 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
 - as: publish-multi-arch-images
+  cluster: build01
   postsubmit: true
   steps:
     cluster_profile: packet-assisted
@@ -86,6 +87,7 @@ tests:
         Dockerfile.assisted_installer_agent , quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
     workflow: assisted-tools-multi-arch
 - as: mirror-nightly-image
+  cluster: build01
   cron: '@daily'
   steps:
     dependencies:
@@ -93,6 +95,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
+  cluster: build01
   postsubmit: true
   steps:
     dependencies:
@@ -100,6 +103,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
+  cluster: build01
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
@@ -108,6 +112,7 @@ tests:
     from: test-bin
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
+  cluster: build01
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
@@ -118,6 +123,7 @@ tests:
     name: assisted-installer-agent-codecov-token
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test-postsubmit
+  cluster: build01
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
@@ -128,21 +134,25 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
 - as: subsystem-test
+  cluster: build01
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
 - as: subsystem-test-periodic
+  cluster: build01
   cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
 - as: e2e-metal-assisted
+  cluster: build01
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-ipv6
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -152,6 +162,7 @@ tests:
         IPv4=no
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -160,6 +171,7 @@ tests:
         NUM_MASTERS=1
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -169,6 +181,7 @@ tests:
         OPENSHIFT_VERSION=4.12
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -180,6 +193,7 @@ tests:
         MASTER_CPU=9
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-odf
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -190,6 +204,7 @@ tests:
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -198,6 +213,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-upgrade-agent
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -207,6 +223,7 @@ tests:
         TEST_FUNC=test_upgrade_agent
     workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp
+  cluster: build01
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
@@ -216,6 +233,7 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-oci-assisted
+  cluster: build01
   optional: true
   steps:
     cluster_profile: oci-assisted
