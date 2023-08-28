@@ -235,23 +235,26 @@ if [[ "$STS" == "true" ]]; then
 
   # Account roles
   ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
-  echo -e "Validate the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
-  Account_Installer_Role_Name="${ACCOUNT_ROLES_PREFIX}-Installer-Role"
-  Account_ControlPlane_Role_Name="${ACCOUNT_ROLES_PREFIX}-ControlPlane-Role"
-  Account_Support_Role_Name="${ACCOUNT_ROLES_PREFIX}-Support-Role"
-  Account_Worker_Role_Name="${ACCOUNT_ROLES_PREFIX}-Worker-Role"
+  echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
-  roleARNList=$(rosa list account-roles -o json | jq -r '.[].RoleARN')
-
-  Account_Installer_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Installer_Role_Name}" || true; })
-  Account_ControlPlane_Role_ARN=$(echo "$roleARNList" | { grep "${Account_ControlPlane_Role_Name}" || true; })
-  Account_Support_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Support_Role_Name}" || true; })
-  Account_Worker_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Worker_Role_Name}" || true; })
-  if [[ -z "${Account_ControlPlane_Role_ARN}" ]] || [[ -z "${Account_Installer_Role_ARN}" ]] || [[ -z "${Account_Support_Role_ARN}" ]] || [[ -z "${Account_Worker_Role_ARN}" ]]; then
+  roleARNFile="${SHARED_DIR}/account-roles-arn"
+  account_intaller_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
+  account_support_role_arn=$(cat "$roleARNFile" | { grep "Support-Role" || true; })
+  account_worker_role_arn=$(cat "$roleARNFile" | { grep "Worker-Role" || true; })
+  if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
+  fi  
+  ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
+
+  if [[ "$HOSTED_CP" == "false" ]]; then
+    account_control_plane_role_arn=$(cat "$roleARNFile" | { grep "ControlPlane-Role" || true; })
+    if [[ -z "${account_control_plane_role_arn}" ]]; then
+      echo -e "The control plane account role with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
+      exit 1
+    fi      
+    ACCOUNT_ROLES_SWITCH="${ACCOUNT_ROLES_SWITCH} --controlplane-iam-role ${account_control_plane_role_arn}"
   fi
-  ACCOUNT_ROLES_SWITCH="--role-arn ${Account_Installer_Role_ARN} --controlplane-iam-role ${Account_ControlPlane_Role_ARN} --support-role-arn ${Account_Support_Role_ARN} --worker-iam-role ${Account_Worker_Role_ARN}"
 fi
 
 DRY_RUN_SWITCH=""

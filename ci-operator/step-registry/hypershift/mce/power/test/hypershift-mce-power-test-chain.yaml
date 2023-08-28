@@ -1,0 +1,23 @@
+chain:
+  as: hypershift-mce-power-test
+  steps:
+    - as: test-hostedcluster
+      cli: latest
+      commands: |-
+        set -x
+        
+        echo "Waiting for clusteroperators to be ready"
+        export KUBECONFIG=${SHARED_DIR}/guest_kubeconfig
+        until \
+          oc wait clusterversion/version --for='condition=Available=True' > /dev/null; do
+          echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
+          oc get clusterversion 2>/dev/null || true
+          sleep 1s
+        done
+      from: tests
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 30m0s
