@@ -5,13 +5,7 @@ set -o errexit
 set -o pipefail
 set -o verbose
 
-if [[ -n $CLUSTER_KUBECONFIG_PATH ]]; then
-  # Extract clusters archive from SHARED_DIR
-  tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
-  export KUBECONFIG=${CLUSTER_KUBECONFIG_PATH}
-else
-  export KUBECONFIG=${SHARED_DIR}/kubeconfig
-fi
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
 RUN_COMMAND="poetry run python app/cli.py operators --kubeconfig ${KUBECONFIG} "
 
