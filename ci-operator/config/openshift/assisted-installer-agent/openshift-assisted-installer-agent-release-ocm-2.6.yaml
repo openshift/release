@@ -73,6 +73,7 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
 - as: mirror-nightly-image
+  cluster: build01
   cron: '@daily'
   steps:
     dependencies:
@@ -82,6 +83,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
+  cluster: build01
   postsubmit: true
   steps:
     dependencies:
@@ -91,6 +93,7 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
+  cluster: build01
   commands: |
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
@@ -99,6 +102,7 @@ tests:
     from: test-bin
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
+  cluster: build01
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
@@ -109,6 +113,7 @@ tests:
     name: assisted-installer-agent-codecov-token
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test-postsubmit
+  cluster: build01
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
@@ -119,16 +124,19 @@ tests:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
 - as: subsystem-test
+  cluster: build01
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
 - as: subsystem-test-periodic
+  cluster: build01
   cron: 00 00 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
 - as: e2e-metal-assisted
+  cluster: build01
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
@@ -137,6 +145,7 @@ tests:
         SERVICE_BASE_REF=release-ocm-2.6
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-single-node
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -146,6 +155,7 @@ tests:
         NUM_MASTERS=1
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-day2
+  cluster: build01
   optional: true
   steps:
     cluster_profile: packet-assisted
@@ -155,6 +165,7 @@ tests:
         TEST_FUNC=test_deploy_day2_nodes_cloud
     workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp
+  cluster: build01
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
     cluster_profile: packet-assisted
