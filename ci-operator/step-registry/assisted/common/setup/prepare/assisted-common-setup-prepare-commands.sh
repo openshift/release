@@ -106,6 +106,7 @@ export TEST_FUNC=test_install
 export ASSISTED_SERVICE_HOST={{ IP }}
 export PUBLIC_CONTAINER_REGISTRIES="{{ CI_REGISTRIES | join(',') }}"
 export OPENSHIFT_INSTALL_RELEASE_IMAGE={{ OPENSHIFT_INSTALL_RELEASE_IMAGE }}
+export TF_APPLY_ATTEMPTS=3
 
 {% if ENVIRONMENT == "production" %}
 # Testing against the production AI parameters

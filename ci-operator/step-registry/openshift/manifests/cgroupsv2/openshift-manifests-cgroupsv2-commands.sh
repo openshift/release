@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+# In 4.11 we introduced `cgroupMode` in Node API. However we still need to
+# support the 4.10 CI jobs that exist with cgroupsv2.
+
 cat >> "${SHARED_DIR}/manifest_mc-master-cgroupsv2.yml" << EOF
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
