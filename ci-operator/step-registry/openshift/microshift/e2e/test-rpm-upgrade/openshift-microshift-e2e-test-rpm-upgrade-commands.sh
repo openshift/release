@@ -63,6 +63,20 @@ chmod +x "${HOME}"/install_latest_release.sh
 scp "${HOME}"/install_latest_release.sh "${IP_ADDRESS}":~/
 ssh "${IP_ADDRESS}" "sudo ~/install_latest_release.sh"
 
+ssh "${IP_ADDRESS}" "sudo systemctl reboot"
+offset=300
+to=$(($(date "+%s") + offset ))
+echo "waiting up to $offset seconds to regain ssh connection"
+until ssh "$IP_ADDRESS" "echo 'Hello, CI'"; do
+    if (( $(date '+%s') <= to )); then
+        echo "retrying ssh"
+        sleep 1
+    else
+        echo "failed to regain ssh connection after $offset seconds"
+        exit 1
+    fi
+done
+
 # At this point, the 4.y-1 release should be up and running. Now upgrade to microshift built from PR's source.
 cat <<EOF > "${HOME}"/install_branch_rpms.sh
 #!/bin/bash
