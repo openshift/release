@@ -1,0 +1,27 @@
+chain:
+  as: hypershift-mce-ibmz-destroy
+  steps:
+    - as: destroy-ibmz-hostedcluster
+      cli: latest
+      env:
+      - name: HYPERSHIFT_NODE_COUNT
+        documentation: "The number of ibmz nodes to join the agent cluster"
+      commands: |-
+        set -x
+        
+        # Destroying and removing the storage for VMs 
+        for ((i = 0; i < ${HYPERSHIFT_NODE_COUNT} ; i++)); do
+            echo "Deleting the VM agent-$i and it's storage"
+            virsh shutdown agent-$i; virsh undefine agent-$i --remove-all-storage
+        done  
+
+        # Delete the initrd and kernel images (need to change the commands based on tobias comments)
+        echo "Deleting the initrd and kernel images used for agents bootup..."
+        rm /var/lib/libvirt/images/initrd.img /var/lib/libvirt/images/kernel.img 
+      from: dev-scripts
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 30m0s

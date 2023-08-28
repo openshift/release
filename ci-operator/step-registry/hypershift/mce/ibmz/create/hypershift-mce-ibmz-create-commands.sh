@@ -229,13 +229,13 @@ mkdir -p /var/lib/libvirt/images/pxeboot
 
 
 # Create qemu 
-for ((i = 0; i < $HYPERSHIFT_BASEDOMAIN ; i++)); do
+for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
 qemu-img create -f qcow2 /var/lib/libvirt/openshift-images/agent$i.qcow2 100G
 done
 
 # Boot agents 
-for ((i = 0; i < $HYPERSHIFT_BASEDOMAIN ; i++)); do
-  virt-install   --name "agent-1"   --autostart   --ram=16384   --cpu host   --vcpus=4   --location "/var/lib/libvirt/images/pxeboot/,kernel=kernel.img,initrd=initrd.img"   --disk /var/lib/libvirt/openshift-images/agent$i.qcow2   --network network=default,mac=${mac_addresses[i]}   --graphics none   --noautoconsole   --wait=-1   --extra-args "rd.neednet=1 nameserver=172.23.0.1   coreos.live.rootfs_url=http://172.23.232.140:8080/rootfs.img random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal console=tty1 console=ttyS1,115200n8 coreos.inst.persistent-kargs=console=tty1 console=ttyS1,115200n8"
+for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
+  virt-install   --name "agent-$i"   --autostart   --ram=16384   --cpu host   --vcpus=4   --location "/var/lib/libvirt/images/pxeboot/,kernel=kernel.img,initrd=initrd.img"   --disk /var/lib/libvirt/openshift-images/agent$i.qcow2   --network network=default,mac=${mac_addresses[i]}   --graphics none   --noautoconsole   --wait=-1   --extra-args "rd.neednet=1 nameserver=172.23.0.1   coreos.live.rootfs_url=http://172.23.232.140:8080/rootfs.img random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal console=tty1 console=ttyS1,115200n8 coreos.inst.persistent-kargs=console=tty1 console=ttyS1,115200n8"
 done
 
 # Logout from machine
