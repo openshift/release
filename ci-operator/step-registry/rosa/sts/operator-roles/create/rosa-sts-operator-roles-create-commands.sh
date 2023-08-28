@@ -36,7 +36,7 @@ else
 fi
 
 # Switches
-account_installer_role_arn=$(cat "${ARTIFACT_DIR}/account-roles-arn" | { grep "Installer-Role" || true; })
+account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arn" | { grep "Installer-Role" || true; })
 oidc_config_id=$(cat "${ARTIFACT_DIR}/oidc-config" | jq -r '.id')
 
 HOSTED_CP_SWITCH=""
@@ -60,5 +60,5 @@ rosa create operator-roles -y --mode auto \
                            ${HOSTED_CP_SWITCH} \
                            ${SHARED_VPC_SWITCH}
 # Store the operator-roles-prefix for the post steps and the operator roles deletion
-echo -n "${OPERATOR_ROLES_PREFIX}" > "${SHARED_DIR}/operator-roles-prefix"
+echo -n "${OPERATOR_ROLES_PREFIX}" > "${ARTIFACT_DIR}/operator-roles-prefix"
 rosa list operator-roles --prefix ${OPERATOR_ROLES_PREFIX}
