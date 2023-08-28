@@ -25,7 +25,7 @@ go mod tidy $COMPAT
 go mod vendor
 CHANGES=$(git status --porcelain)
 if [ -n "$CHANGES" ] ; then
-    echo "ERROR: detected vendor inconsistency after 'go mod tidy; go mod vendor':"
+    echo "ERROR: detected vendor inconsistency after 'go mod tidy $COMPAT; go mod vendor':"
     echo "$CHANGES"
     exit 1
 fi

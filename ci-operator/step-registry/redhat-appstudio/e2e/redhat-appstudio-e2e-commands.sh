@@ -9,7 +9,7 @@ mkdir -p /tmp/bin
 
 export DEFAULT_QUAY_ORG DEFAULT_QUAY_ORG_TOKEN GITHUB_USER GITHUB_TOKEN QUAY_TOKEN QUAY_OAUTH_USER QUAY_OAUTH_TOKEN QUAY_OAUTH_TOKEN_RELEASE_SOURCE QUAY_OAUTH_TOKEN_RELEASE_DESTINATION OPENSHIFT_API OPENSHIFT_USERNAME OPENSHIFT_PASSWORD \
     GITHUB_ACCOUNTS_ARRAY PREVIOUS_RATE_REMAINING GITHUB_USERNAME_ARRAY GH_RATE_REMAINING PYXIS_STAGE_KEY PYXIS_STAGE_CERT BYOC_KUBECONFIG GITHUB_TOKENS_LIST OAUTH_REDIRECT_PROXY_URL CYPRESS_GH_USER CYPRESS_GH_PASSWORD CYPRESS_GH_2FA_CODE SPI_GITHUB_CLIENT_ID SPI_GITHUB_CLIENT_SECRET \
-    QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN
+    QE_SPRAYPROXY_HOST QE_SPRAYPROXY_TOKEN E2E_PAC_GITHUB_APP_ID E2E_PAC_GITHUB_APP_PRIVATE_KEY PAC_GITHUB_APP_WEBHOOK_SECRET
 
 DEFAULT_QUAY_ORG=redhat-appstudio-qe
 DEFAULT_QUAY_ORG_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/default-quay-org-token)
@@ -34,6 +34,9 @@ SPI_GITHUB_CLIENT_ID=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/spi-github-
 SPI_GITHUB_CLIENT_SECRET=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/spi-github-client-secret)
 QE_SPRAYPROXY_HOST=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qe-sprayproxy-host)
 QE_SPRAYPROXY_TOKEN=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/qe-sprayproxy-token)
+E2E_PAC_GITHUB_APP_ID=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pac-github-app-id)
+E2E_PAC_GITHUB_APP_PRIVATE_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pac-github-app-private-key)
+PAC_GITHUB_APP_WEBHOOK_SECRET=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pac-github-app-webhook-secret)
 
 # user stored: username:token,username:token
 IFS=',' read -r -a GITHUB_ACCOUNTS_ARRAY <<< "$(cat /usr/local/ci-secrets/redhat-appstudio-qe/github_accounts)"

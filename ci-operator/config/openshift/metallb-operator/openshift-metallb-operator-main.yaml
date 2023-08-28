@@ -19,10 +19,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
-  redhat-operator-index:
-    name: redhat-operator-index
-    namespace: ci
-    tag: v4.11
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   image_stream_tag:
     name: release
@@ -38,17 +38,15 @@ images:
   to: metallb-operator
 operator:
   bundles:
-  - dockerfile_path: bundleci.Dockerfile
-  - as: upgrade-bundle
-    base_index: redhat-operator-index
+  - as: operatorbundle
     dockerfile_path: bundleci.Dockerfile
-    update_graph: semver
+    skip_building_index: true
   substitutions:
-  - pullspec: quay.io/openshift/origin-metallb:4.12
+  - pullspec: quay.io/openshift/origin-metallb:4.14
     with: pipeline:metallb
-  - pullspec: quay.io/openshift/origin-metallb-operator:4.12
+  - pullspec: quay.io/openshift/origin-metallb-operator:4.14
     with: pipeline:metallb-operator
-  - pullspec: quay.io/openshift/origin-metallb-frr:4.12
+  - pullspec: quay.io/openshift/origin-metallb-frr:4.14
     with: pipeline:metallb-frr
 promotion:
   name: "4.14"
@@ -72,15 +70,32 @@ resources:
       memory: 200Mi
 tests:
 - as: operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
   steps:
-    cluster_profile: aws
-    env:
-      OO_CHANNEL: alpha
-      OO_INSTALL_NAMESPACE: openshift-metallb-operator
-      OO_PACKAGE: metallb-operator
-      OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-metallb-operator
+        operator-sdk run bundle -n openshift-metallb-operator "$OO_BUNDLE" # install my-operator
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-controller-manager
+        oc wait --for condition=Available -n openshift-metallb-operator deployment metallb-operator-webhook-server
+      dependencies:
+      - env: OO_BUNDLE
+        name: operatorbundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: run-test
+      cli: latest
       commands: |
         PATH=$PATH:$(pwd)/_cache hack/validate_ocp_bundle.sh
         export OO_INSTALL_NAMESPACE=openshift-metallb-operator
@@ -93,7 +108,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: generic-claim
 - as: metallb-e2e-metal-ipi
   cluster: build05
   steps:
