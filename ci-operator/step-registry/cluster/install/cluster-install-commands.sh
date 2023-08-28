@@ -55,9 +55,21 @@ echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-toke
 set +e
 ${RUN_COMMAND}
 return_code=$?
+
+sleep 5000000
+
+if [ $NUM_CLUSTERS -eq 1 ]; then
+  CLUSTER_NAME=$(awk -F'.*name=|;' '{print $2}' <<< "CLUSTERS_CMD")
+  CLUSTER_PLATFORM=$(awk -F'.*platform=|;' '{print $2}' <<< "CLUSTERS_CMD")
+  CLUSTER_AUTH_DIR="$CLUSTER_DATA_DIR/$CLUSTER_PLATFORM/$CLUSTER_NAME/auth"
+  cp "$CLUSTER_AUTH_DIR/kubeconfig" "${SHARED_DIR}/kubeconfig"
+  cp "$CLUSTER_AUTH_DIR/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
+  echo "$CLUSTER_NAME" > "${SHARED_DIR}/cluster-name"
+fi
+
 # Save cluster_data.yaml and kubeconfig files to be used during cluster deletion
 # find $CLUSTER_DATA_DIR  -name "cluster_data.yaml"  | tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" -T -
-tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" --exclude=*.json --exclude=*terraform* --exclude=*.zip --exclude=*.tf* --exclude=tls --exclude=*.log  -C /tmp/clusters-data .
+tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" --exclude=*.json --exclude=*terraform* --exclude=*.zip --exclude=*.tf* --exclude=tls --exclude=*.log  -C $CLUSTER_DATA_DIR .
 
 set -e
 exit "$return_code"
