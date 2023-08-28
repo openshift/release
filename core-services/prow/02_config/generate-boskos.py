@@ -122,9 +122,6 @@ CONFIG = {
         'eastus2': 4,
         'northeurope': 4
     },
-    'azure-marketplace-qe-quota-slice': {
-        'westus': 6
-    },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5,
         'usgovtexas': 5
