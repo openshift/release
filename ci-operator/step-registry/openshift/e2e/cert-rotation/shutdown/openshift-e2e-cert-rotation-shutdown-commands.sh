@@ -106,7 +106,6 @@ until run-on-all-nodes "timedatectl status"; do sleep 30; done
 run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
 until oc get nodes; do sleep 30; done
-oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT} || true
 until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
   if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
     oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
