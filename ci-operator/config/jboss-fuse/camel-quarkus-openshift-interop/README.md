@@ -12,7 +12,8 @@ During the run CI takes the Dockerfile from `camel-quarkus-openshift-interop/ope
 ###### -TODO Slack channel
 Results are posted into [quarkus-qe](https://redhat-internal.slack.com/archives/C05CMLUAWTT) channel in Slack and new issue in [CEQ Jira](https://issues.redhat.com/projects/CEQ/summary) is created automatically for every failure. 
 
-Job history can be accessed from the [Prow Dashboard](https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/periodic-ci-quarkus-qe-quarkus-test-suite-main-quarkus-ocp4.14-lp-interop-quarkus-interop-aws) or via [dashboard](https://testgrid.k8s.io/redhat-openshift-lp-interop-release-4.14-informing#periodic-ci-quarkus-qe-quarkus-test-suite-main-quarkus-ocp4.14-lp-interop-quarkus-interop-aws&width=90).
+Job history can be accessed from the [Prow Dashboard](https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/periodic-ci-jboss-fuse-camel-quarkus-openshift-interop-main-camel-quarkus-ocp4.14-lp-interop-camel-quarkus-interop-aws) 
+or via [dashboard](https://testgrid.k8s.io/redhat-openshift-lp-interop-release-4.14-informing#periodic-ci-jboss-fuse-camel-quarkus-openshift-interop-main-camel-quarkus-ocp4.14-lp-interop-camel-quarkus-interop-aws)
 
 ## Process
 
