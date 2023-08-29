@@ -95,12 +95,18 @@ caps_operator[Insights]="insights"
 caps_operator[Storage]="storage"
 caps_operator[NodeTuning]="node-tuning"
 caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autoscaler"
+caps_operator[ImageRegistry]="image-registry"
+
+# Mapping between optional capability and resources
+declare -A caps_resource
+caps_resource[Build]="build.build.openshift.io"
+caps_resource[DeploymentConfig]="dc"
 
 v411="baremetal marketplace openshift-samples"
 # shellcheck disable=SC2034
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
-v414=" ${v413} MachineAPI"
+v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 latest_defined="v414"
 always_default="${!latest_defined}"
 
@@ -159,9 +165,14 @@ check_result=0
 echo "------check enabled capabilities-----"
 echo "enabled capability set: ${enabled_capability_set}"
 for cap in $enabled_capability_set; do
+    if [[ "${cap}" == "Build" ]] || [[ "${cap}" == "DeploymentConfig" ]]; then
+        resource="${caps_resource[$cap]}"
+        [[ "$(oc get ${resource} -A)" -ne 0 ]] && echo "ERROR: capability ${cap}: resources ${resource} -- not found!" && check_result=1
+        continue
+    fi
     for op in ${caps_operator[$cap]}; do
         if [[ ! `grep -e "^${op} " ${co_content}` ]]; then
-            echo "ERROR: capability ${cap}: operator ${op} -- not deployed!"
+            echo "ERROR: capability ${cap}: operator ${op} -- not found!"
             check_result=1
         fi
     done
@@ -171,9 +182,14 @@ done
 echo "------check disabled capabilities-----"
 echo "disabled capability set: ${disabled_capability_set}"
 for cap in $disabled_capability_set; do
+    if [[ "${cap}" == "Build" ]] || [[ "${cap}" == "DeploymentConfig" ]]; then
+        resource="${caps_resource[$cap]}"
+        [[ "$(oc get ${resource} -A)" -eq 0 ]] && echo "ERROR: capability ${cap}: resources ${resource} -- found!" && check_result=1
+        continue
+    fi
     for op in ${caps_operator[$cap]}; do
         if [[ `grep -e "^${op} " ${co_content}` ]]; then
-            echo "ERROR: capability ${cap}: operator ${op} -- deployed"
+            echo "ERROR: capability ${cap}: operator ${op} -- found"
             check_result=1
         fi
     done
