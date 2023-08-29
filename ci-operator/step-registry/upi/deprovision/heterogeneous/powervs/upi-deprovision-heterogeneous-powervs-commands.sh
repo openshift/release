@@ -37,6 +37,20 @@ then
     fi
   fi
 
+  # The must-gather chain can not be called twice, as the ibmcloud embeds must-gather in deprovision
+  # we must call must-gather specific to ppc64le at this location.
+  MUST_GATHER_TIMEOUT=${MUST_GATHER_TIMEOUT:-"15m"}
+  MUST_GATHER_IMAGE=${MUST_GATHER_IMAGE:-""}
+  oc get nodes -l kubernetes.io/arch=ppc64le -o yaml > "${ARTIFACT_DIR}"/nodes_with_ppc64le.txt || true
+  mkdir -p ${ARTIFACT_DIR}/must-gather-ppc64le
+  oc adm must-gather \
+      --node-selector=kubernetes.io/arch=ppc64le \
+      --insecure-skip-tls-verify $MUST_GATHER_IMAGE \
+      --timeout=$MUST_GATHER_TIMEOUT \
+      --dest-dir ${ARTIFACT_DIR}/must-gather-ppc64le > ${ARTIFACT_DIR}/must-gather-ppc64le/must-gather-ppc64le.log
+  tar -czC "${ARTIFACT_DIR}/must-gather-ppc64le" -f "${ARTIFACT_DIR}/must-gather-ppc64le.tar.gz" .
+  rm -rf "${ARTIFACT_DIR}"/must-gather-ppc64le
+
   # build terraform
   cd "${IBMCLOUD_HOME_FOLDER}" \
     && curl -L "https://github.com/hashicorp/terraform/archive/refs/tags/v${TERRAFORM_VERSION}.tar.gz" \
