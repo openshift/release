@@ -10,7 +10,7 @@
 During the run CI takes the Dockerfile from `camel-quarkus-openshift-interop/openshift-ci` folder, builds an image from it and runs tests from [Camel Quarkus TS](https://gitlab.cee.redhat.com/jboss-fuse-qe/camel-q/camel-q-test-suite) modules defined by `$PROJECTS` variable.
 
 ###### -TODO Slack channel
-Results are posted into [quarkus-qe](https://redhat-internal.slack.com/archives/C05CMLUAWTT) channel in Slack and new issue in [CEQ Jira](https://issues.redhat.com/projects/CEQ/summary) is created automatically for every failure. 
+Results are posted into `camel-quarkus-qe` channel in `redhat-internal` Slack and new issue in [CEQ Jira](https://issues.redhat.com/projects/CEQ/summary) is created automatically for every failure. 
 
 Job history can be accessed from the [Prow Dashboard](https://prow.ci.openshift.org/job-history/gs/origin-ci-test/logs/periodic-ci-jboss-fuse-camel-quarkus-openshift-interop-main-camel-quarkus-ocp4.14-lp-interop-camel-quarkus-interop-aws) 
 or via [dashboard](https://testgrid.k8s.io/redhat-openshift-lp-interop-release-4.14-informing#periodic-ci-jboss-fuse-camel-quarkus-openshift-interop-main-camel-quarkus-ocp4.14-lp-interop-camel-quarkus-interop-aws)
@@ -30,7 +30,7 @@ Please see the [`firewatch-ipi-aws`](https://steps.ci.openshift.org/workflow/fir
 
 ### Test Setup, Execution, and Reporting Results - `camel-quarkus-interop-aws`
 
-Please see the [`kkk`](../../../step-registry/install-operators/README.md) documentation for information about scenarios testsing ref.
+Please see the [`step-registry/camel-quarkus/execute-tests/README.md`](../../../step-registry/camel-quarkus/execute-tests/README.md) documentation for the `camel-quarkus-execute-tests` information about scenarios testsing ref.
 
 ## Prerequisite(s)
 
