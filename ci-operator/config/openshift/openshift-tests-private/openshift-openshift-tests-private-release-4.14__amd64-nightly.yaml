@@ -903,7 +903,7 @@ tests:
       TEST_ADDITIONAL: Hypershift|Network_Observability
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_IMPORTANCE: Critical
-      TEST_TIMEOUT: "30"
+      TEST_TIMEOUT: "35"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
@@ -2160,6 +2160,7 @@ tests:
       AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
       E2E_RUN_TAGS: '@baremetal-upi and @amd64 and @disconnected and @network-ovnkubernetes
         and not @fips'
+      FIPS_ENABLED: "true"
       RESERVE_BOOTSTRAP: "false"
       TAG_VERSION: '@4.14'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
@@ -2237,6 +2238,7 @@ tests:
       AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
       E2E_RUN_TAGS: '@amd64 and @baremetal-upi and @network-ovnkubernetes and not
         @fips'
+      FIPS_ENABLED: "true"
       RESERVE_BOOTSTRAP: "false"
       TAG_VERSION: '@4.14'
       architecture: amd64
@@ -2486,6 +2488,18 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-long-duration
     workflow: cucushift-installer-rehearse-gcp-ipi-private
+- as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
+  cron: 0 8 15 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_FILTERS: ~HyperShiftMGMT
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: The Security Profiles Operator
+      TEST_TIMEOUT: "20"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 - as: gcp-ipi-proxy-etcd-encryption-f28
   cron: 49 22 24 * *
   steps:
@@ -3069,6 +3083,7 @@ tests:
     cluster_profile: vsphere
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @network-ovnkubernetes and not @fips'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.14'
     test:
     - chain: openshift-e2e-test-qe
