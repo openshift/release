@@ -229,7 +229,7 @@ case "$CLUSTER_TYPE" in
         echo "Cluster Operator is: "
         oc get co
         IDX=0
-        while [ "$IDX" -lt "61" ]
+        while [ "$IDX" -lt "121" ]
         do
             FAL_COUNT=$(oc get co -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Available")].status}{"\n"}{end}' | grep False | wc -l)
             if [ "${FAL_COUNT}" -eq "0" ]
@@ -238,7 +238,7 @@ case "$CLUSTER_TYPE" in
             fi
             if [ "${IDX}" -eq "60" ]
             then
-              echo "Exceeded the wait time of >60 minutes"
+              echo "Exceeded the wait time of >120 minutes"
               exit 3
             fi
             oc get co -o yaml
