@@ -9,13 +9,13 @@ export OCP_RELEASE_VERSION=$(curl -s "$OCP_RELEASE_FILE_URL" | awk '/machine-os 
 
 # Hosted Control Plane parameters
 CLUSTERS_NAMESPACE="clusters"
-HOSTED_CLUSTER_NAME="agent-cluster"
+HOSTED_CLUSTER_NAME="agent-ibmz"
 export HOSTED_CLUSTER_NAME
 export HOSTED_CONTROL_PLANE_NAMESPACE="${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"
 export MACHINE_CIDR=192.168.122.0/24
 
 # InfraEnv configs
-SSH_PUB_KEY_FILE="${AGENT_POWER_CREDENTIALS}/ssh-publickey"
+SSH_PUB_KEY_FILE="${AGENT_IBMZ_CREDENTIALS}/ssh-publickey"
 SSH_PUB_KEY=$(cat ${SSH_PUB_KEY_FILE})
 export SSH_PUB_KEY
 
@@ -134,7 +134,7 @@ echo "$(date) AgentServiceConfig ready"
 set +x
 # Setting up pull secret with brew token
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-brewToken="${AGENT_POWER_CREDENTIALS}/brew-token"
+brewToken="${AGENT_IBMZ_CREDENTIALS}/brew-token"
 cat /tmp/.dockerconfigjson | jq --arg brew_token "$(cat ${brewToken})" '.auths += {"brew.registry.redhat.io": {"auth": $brew_token}}' > /tmp/pull-secret
 PULL_SECRET_FILE=/tmp/pull-secret
 set -x
@@ -202,13 +202,11 @@ metadata:
   name: ${HOSTED_CLUSTER_NAME}
   namespace: ${HOSTED_CONTROL_PLANE_NAMESPACE}
 spec:
-  cpuArchitecture: $ARCH
+  cpuArchitecture: ${ARCH}
   pullSecretRef:
     name: pull-secret
   sshAuthorizedKey: ${SSH_PUB_KEY}
 EOF
-
-HOSTED_CLUSTER_API_SERVER=$(oc get service kube-apiserver -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o json | jq -r '.status.loadBalancer.ingress[].hostname')
 
 # Waiting for discovery iso file to ready
 oc wait --timeout=10m --for=condition=ImageCreated --namespace=${HOSTED_CONTROL_PLANE_NAMESPACE} infraenv/${HOSTED_CLUSTER_NAME}
@@ -220,35 +218,29 @@ INITRD_URL=$(oc get infraenv/${HOSTED_CLUSTER_NAME} -n ${HOSTED_CONTROL_PLANE_NA
 KERNEL_URL=$(oc get infraenv/${HOSTED_CLUSTER_NAME} -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o json | jq -r '.status.bootArtifacts.kernel')
 ROOTFS_URL=$(oc get infraenv/${HOSTED_CLUSTER_NAME} -n ${HOSTED_CONTROL_PLANE_NAMESPACE} -o json | jq -r '.status.bootArtifacts.rootfs')
 
-# scp these 3 imagages to machine
-# Login to machine where the VMs should boot
-
-mkdir -p /var/lib/libvirt/images/pxeboot 
-
-# Setup httpd on any VM other than machine where VMs are getting booted  and down load rootfs on /var/www/html
-
+# TO DO : virsh-vol upload these 3 images to LPAR 
 
 # Create qemu 
+# TO DO : include -c URI for connecting to LPAR
 for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
 qemu-img create -f qcow2 /var/lib/libvirt/openshift-images/agent$i.qcow2 100G
 done
 
-# Boot agents 
+# Boot agents
+# TO DO : include -c URI for connecting to LPAR, hardcode macaddress
+mac_addresses=()
 for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
   virt-install   --name "agent-$i"   --autostart   --ram=16384   --cpu host   --vcpus=4   --location "/var/lib/libvirt/images/pxeboot/,kernel=kernel.img,initrd=initrd.img"   --disk /var/lib/libvirt/openshift-images/agent$i.qcow2   --network network=default,mac=${mac_addresses[i]}   --graphics none   --noautoconsole   --wait=-1   --extra-args "rd.neednet=1 nameserver=172.23.0.1   coreos.live.rootfs_url=http://172.23.232.140:8080/rootfs.img random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal console=tty1 console=ttyS1,115200n8 coreos.inst.persistent-kargs=console=tty1 console=ttyS1,115200n8"
 done
 
-# Logout from machine
-
-
-# Wait for agents to join 
-for ((i=1; i<=50; i++)); do
+# Wait for agents to join (max: 20 min)
+for ((i=50; i>=1; i--)); do
   agents_count=$(oc get agents -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --no-headers | wc -l)
   if [ "$agents_count" -eq ${HYPERSHIFT_NODE_COUNT} ]; then
     echo "Agents attached"
     break
   else
-    echo "Waiting for agents to join the cluster"
+    echo "Waiting for agents to join the cluster..., $i retries left"
   fi
   sleep 25
 done
@@ -268,31 +260,30 @@ oc -n ${CLUSTERS_NAMESPACE} scale nodepool ${HOSTED_CLUSTER_NAME} --replicas ${H
 echo "$(date) Approved the agents, waiting for the installation to get completed on them"
 oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m
 
-
 # Download hosted cluster kubeconfig
 echo "$(date) Setup guest_kubeconfig"
 hypershift create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/guest_kubeconfig
 
-# Waiting for compute nodes to attach
-for ((i=1; i<=20; i++)); do
+# Waiting for compute nodes to attach (max: 30 min)
+for ((i=60; i>=1; i--)); do
   node_count=$(oc get no --kubeconfig=${SHARED_DIR}/guest_kubeconfig --no-headers | wc -l)
-if [ "$node_count" -eq $HYPERSHIFT_NODE_COUNT ]; then
-  echo "Compute nodes attached"
-  break
-else
-  echo "Waiting for Compute nodes to join"
-fi
-sleep 20
+  if [ "$node_count" -eq $HYPERSHIFT_NODE_COUNT ]; then
+    echo "Compute nodes attached"
+    break
+  else
+    echo "Waiting for Compute nodes to join..., $i retries left"
+  fi
+  sleep 30
 done
 
-# Waiting for compute nodes to be ready
-for ((i=1; i<=30; i++)); do
+# Waiting for compute nodes to be ready (max: 12 min)
+for ((i=30; i>=1; i--)); do
   not_ready_count=$(oc get no --kubeconfig=${SHARED_DIR}/guest_kubeconfig --no-headers | awk '{print $2}' | grep -v 'Ready' | wc -l)
   if [ "$not_ready_count" -eq 0 ]; then
     echo "All Compute nodes are Ready"
     break
   else
-    echo "Waiting for Compute nodes to be Ready"
+    echo "Waiting for Compute nodes to be Ready..., $i retries left"
   fi
   sleep 25
 done
