@@ -1,0 +1,109 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  stolostron_builder_go1.19-linux:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+binary_build_commands: make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: stolostron
+    tag: go1.19-linux
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    stolostron_builder_go1.19-linux:
+      as:
+      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
+  to: olm-addon-controller
+- dockerfile_path: cleaner-Dockerfile
+  inputs:
+    base:
+      as:
+      - registry.ci.openshift.org/ocp/ubi-minimal:8
+  to: olm-addon-cleaner
+promotion:
+  name: "2.9"
+  namespace: stolostron
+releases:
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+test_binary_build_commands: make build BUILDFLAGS:='-race'
+tests:
+- as: unit
+  commands: |
+    export SELF="make -f Makefile"
+    export HOME="/tmp"
+    make -f Makefile unit
+  container:
+    from: src
+- as: e2e
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-cicd-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: e2e
+      commands: |
+        ./cicd/prow-e2e-kind.sh
+      dependencies:
+      - env: OLM_IMAGE
+        name: operator-lifecycle-manager
+      - env: CMS_IMAGE
+        name: operator-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
+- as: periodic-e2e
+  cron: 42 2 * * 0
+  steps:
+    env:
+      AWS_CREDENTIALS_SECRET: ocm-cicd-aws-kind
+      AWS_INSTANCE_TYPE: t3.xlarge
+    post:
+    - ref: ocm-e2e-kind-destroy
+    pre:
+    - ref: ocm-ci-rbac
+    - ref: ocm-e2e-kind-create
+    test:
+    - as: e2e
+      commands: |
+        ./cicd/prow-e2e-kind.sh
+      dependencies:
+      - env: OLM_IMAGE
+        name: operator-lifecycle-manager
+      - env: CMS_IMAGE
+        name: operator-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ocm-e2e-kind
+zz_generated_metadata:
+  branch: main
+  org: stolostron
+  repo: olm-addon
