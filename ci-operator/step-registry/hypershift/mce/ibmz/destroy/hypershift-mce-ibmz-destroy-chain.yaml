@@ -8,13 +8,33 @@ chain:
         documentation: "The number of ibmz nodes to join the agent cluster"
       commands: |-
         set -x
-
-        # TO DO: Scale down nodepool, wait for nodepool to 0, delete agents, destroy HC
         
+        CLUSTERS_NAMESPACE="clusters"
+        HOSTED_CLUSTER_NAME="agent-ibmz"
+        export HOSTED_CLUSTER_NAME
+        export HOSTED_CONTROL_PLANE_NAMESPACE="${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"
+        
+        # Scale in nodepool to 0 
+        oc -n ${CLUSTERS_NAMESPACE} scale nodepool ${HOSTED_CLUSTER_NAME} --replicas 0
+        
+        # Wait for compute nodes to detach
+        oc wait --for=jsonpath='{.status.replicas}'=0 np/${HOSTED_CLUSTER_NAME} -n ${CLUSTERS_NAMESPACE} --timeout=10m
+
+        # Delete agents
+        agents=$(oc get agents -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --no-headers | awk '{print $1}')
+        agents=$(echo "$agents" | tr '\n' ' ')
+        IFS=' ' read -ra agents_list <<< "$agents"
+        for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
+            oc delete agent ${agents_list[i]} -n ${HOSTED_CONTROL_PLANE_NAMESPACE}
+        done
+
+        # Delete Hosted Cluster
+        hypershift destroy cluster agent --name ${HOSTED_CLUSTER_NAME} --namespace ${CLUSTERS_NAMESPACE}
+      
         # Destroying and removing the storage for VMs 
         for ((i = 0; i < ${HYPERSHIFT_NODE_COUNT} ; i++)); do
             echo "Deleting the VM agent-$i and it's storage"
-            virsh shutdown agent-$i; virsh undefine agent-$i --remove-all-storage
+            virsh destroy agent-$i; virsh undefine agent-$i --remove-all-storage
         done  
 
         # Delete the initrd and kernel images (need to change the commands based on tobias comments)
