@@ -39,7 +39,7 @@ echo -e "[INFO] Start cleanup with user: ${GITHUB_USER}"
 
 cd "$(mktemp -d)"
 
-git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
+git clone --branch fix-quay-cleanup "https://${GITHUB_TOKEN}@github.com/psturc/e2e-tests.git" .
 
 make clean-gitops-repositories || CLEAN_REPOS_STATUS=$?
 make clean-github-webhooks || CLEAN_WEBHOOK_STATUS=$?
