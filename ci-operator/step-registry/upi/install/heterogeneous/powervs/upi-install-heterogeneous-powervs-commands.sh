@@ -118,19 +118,16 @@ case "$CLUSTER_TYPE" in
       ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -r "${REGION}" -g "${RESOURCE_GROUP}"
       ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage power-iaas is
 
+      # Before the workspace is created, download the automation code
+      cd "${IBMCLOUD_HOME_FOLDER}" \
+        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}".tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
+        && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
+        && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs
+
       # create workspace for powervs from cli
       echo "Display all the variable values:"
-      POWERVS_REGION=$(
-          case "$REGION" in
-              ("jp-osa") echo "osa21" ;;
-              ("eu-gb") echo "lon04" ;;
-              ("ca-tor") echo "mon01" ;;
-              ("br-sao") echo "sao01" ;;
-              ("au-syd") echo "syd04" ;;
-              ("jp-tok") echo "tok04" ;;
-              (*) echo "$REGION" ;;
-          esac)
-      echo "Region is ${REGION}"
+      POWERVS_REGION=$(bash "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+      echo "VPC Region is ${REGION}"
       echo "PowerVS region is ${POWERVS_REGION}"
       echo "Resource Group is ${RESOURCE_GROUP}"
       ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" 2>&1 \
@@ -179,12 +176,6 @@ case "$CLUSTER_TYPE" in
       echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
       echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
 
-      # After the workspace is created, invoke the automation code
-      cd "${IBMCLOUD_HOME_FOLDER}" \
-        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}".tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
-        && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
-        && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs
-
       # The CentOS-Stream-8 image is stock-image on PowerVS.
       # This image is available across all PowerVS workspaces.
       # The VMs created using this image are used in support of ignition on PowerVS.
@@ -205,7 +196,7 @@ case "$CLUSTER_TYPE" in
       export INSTALL_CONFIG_FILE=${SHARED_DIR}/install-config.yaml
       export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-      # Invoke create_var_file.sh to generate var.tfvars file
+      # Invoke create-var-file.sh to generate var.tfvars file
       echo "Creating the var file"
       cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
         && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}"
