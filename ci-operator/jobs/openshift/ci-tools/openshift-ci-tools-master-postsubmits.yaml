@@ -4,32 +4,6 @@ postsubmits:
     always_run: true
     branches:
     - ^master$
-    cluster: arm01
-    decorate: true
-    labels:
-      ci-operator.openshift.io/cluster: arm01
-    max_concurrency: 1
-    name: branch-ci-openshift-ci-tools-master-images-arm64
-    spec:
-      containers:
-      - args:
-        - --namespace=ci
-        - start-build
-        - --follow
-        - buildconfig/ci-tools-bin-arm64
-        command:
-        - oc
-        image: image-registry.openshift-image-registry.svc:5000/ocp-arm64/4.13:cli
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-      serviceAccountName: ci-images-builder
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
     cluster: build03
     decorate: true
     labels:
@@ -121,3 +95,29 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    cluster: arm01
+    decorate: true
+    labels:
+      ci-operator.openshift.io/cluster: arm01
+    max_concurrency: 1
+    name: branch-ci-openshift-ci-tools-master-images-arm64
+    spec:
+      containers:
+      - args:
+        - --namespace=ci
+        - start-build
+        - --follow
+        - buildconfig/ci-tools-bin-arm64
+        command:
+        - oc
+        image: image-registry.openshift-image-registry.svc:5000/ocp-arm64/4.13:cli
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+      serviceAccountName: ci-images-builder
