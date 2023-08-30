@@ -6,7 +6,7 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-MCE_VERSION=$(oc get $(oc get multiclusterengines -oname) -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
+MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_NAME=hcp
 if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
   echo "MCE version is less than 2.4"
