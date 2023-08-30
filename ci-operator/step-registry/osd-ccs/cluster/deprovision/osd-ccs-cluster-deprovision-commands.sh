@@ -15,6 +15,8 @@ ocm login --url "${OCM_LOGIN_ENV}" --token "${OCM_TOKEN}"
 # Deprovision cluster
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 echo "Deleting cluster: ${CLUSTER_ID}"
+# Sleep 6 hours for debugging
+sleep 21600
 
 ocm delete "/api/clusters_mgmt/v1/clusters/${CLUSTER_ID}"
 echo "Waiting for cluster deletion..."
