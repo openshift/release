@@ -70,7 +70,7 @@ then
       && tar -xzf "${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz" \
       && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs"
   # copy the var.tfvars file from ${SHARED_DIR}
-  cp "${SHARED_DIR}/var.tfvars" ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/var.tfvars
+  cp "${SHARED_DIR}/var.tfvars" ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/var.tfvars
   cp "${SHARED_DIR}/terraform.tfstate" ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/terraform.tfstate
 
   # Copy over the key files and kubeconfig
@@ -84,9 +84,9 @@ then
   # Invoke the destroy command
   cd "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs" \
     && /tmp/terraform init -upgrade -no-color \
-    && /tmp/terraform destroy -var-file=var.tfvars -auto-approve -no-color \
+    && /tmp/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
     || sleep 30 \
-    || /tmp/terraform destroy -var-file=var.tfvars -auto-approve -no-color \
+    || /tmp/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
     || true
 else
   echo "Error: File ${SHARED_DIR}/var.tfvars does not exists."
@@ -102,7 +102,8 @@ then
   then
     # service-instance-delete uses a CRN
     RESOURCE_GROUP=$(cat "${SHARED_DIR}/RESOURCE_GROUP")
-    ic resource service-instance-delete "${POWERVS_SERVICE_INSTANCE_ID}" -g "${RESOURCE_GROUP}" --force --recursive
+    ic resource service-instance-delete "${POWERVS_SERVICE_INSTANCE_ID}" -g "${RESOURCE_GROUP}" --force --recursive \
+      || true
   else
     echo "WARNING: No RESOURCE_GROUP or POWERVS_SERVICE_INSTANCE_ID found, not deleting the workspace"
   fi
@@ -118,16 +119,26 @@ do
   ic pi st "${T_CRN}"
 
   echo "-- Cloud Connection --"
-  ic pi cons --json | jq -r '.cloudConnections[] | .name,.cloudConnectionID'
+  ic pi cons --json | jq -r '.cloudConnections[] | .name,.cloudConnectionID' || true
 
   echo "-- Network --"
   ic pi nets
 
+  # Rare case when no volumes or instances are ever created in the workspace.
   echo "-- Volumes --"
-  ic pi vols
+  ic pi vols || true
 
   echo "-- Instances --"
-  ic pi ins
+  ic pi ins || true
+
+  COUNT_INS=$(ibmcloud pi ins --json | jq -r '.pvmInstances[]' | wc -l)
+  COUNT_NETS=$(ibmcloud pi nets --json | jq -r '.networks[]' | wc -l)
+  TOTAL=$((COUNT_INS + COUNT_NETS))
+
+  echo "TOTAL RESOURCES: ${TOTAL}"
+  RESOURCE_GROUP=$(cat "${SHARED_DIR}/RESOURCE_GROUP")
+  ic resource service-instance-delete "${T_CRN}" -g "${RESOURCE_GROUP}" --force --recursive \
+    || true
 
   echo "-- Gateway --"
   echo "TIP: only delete your gateway"

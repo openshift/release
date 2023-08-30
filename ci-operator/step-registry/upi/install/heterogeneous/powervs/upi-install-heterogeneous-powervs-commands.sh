@@ -221,7 +221,16 @@ case "$CLUSTER_TYPE" in
       # If the deploy fails, hard exit
       if [ -n "${FAILED_DEPLOY}" ]
       then
-        echo "Failed to deploy... hard exit... deprovision in later steps"
+        echo "Failed to deploy... hard exit... deprovisioning now to more cleanly exit"
+        cd "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs" \
+          && /tmp/terraform init -upgrade -no-color \
+          && /tmp/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
+          || sleep 120 \
+          || /tmp/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
+          || true
+        echo "cleaning up workspace"
+        ic resource service-instance-delete "${POWERVS_SERVICE_INSTANCE_ID}" -g "${RESOURCE_GROUP}" --force --recursive \
+          || true
         exit 1
       else
         echo "Worker Status is: "
