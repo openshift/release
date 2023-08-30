@@ -243,7 +243,7 @@ bump-pr:
 .PHONY: bump-pr
 
 job:
-	hack/job.sh "$(JOB)"
+	CONTAINER_ENGINE="$(CONTAINER_ENGINE)" VOLUME_MOUNT_FLAGS="$(VOLUME_MOUNT_FLAGS)" hack/job.sh "$(JOB)"
 .PHONY: job
 
 kerberos_id ?= dptp
