@@ -740,6 +740,29 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
+- as: aws-ipi-localzone-byo-subnet-day2-f14
+  cron: 47 6 12,27 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-localzone-byo-subnet-day2
+- as: aws-ipi-localzone-byo-subnet-day2-f28-destructive
+  cron: 23 10 2 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and not @fips
+        and @destructive'
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-localzone-byo-subnet-day2
 - as: aws-ipi-localzone-byo-subnet-sdn-f14
   cron: 18 0 2,17 * *
   steps:
@@ -903,7 +926,7 @@ tests:
       TEST_ADDITIONAL: Hypershift|Network_Observability
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
       TEST_IMPORTANCE: Critical
-      TEST_TIMEOUT: "30"
+      TEST_TIMEOUT: "35"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
@@ -2160,6 +2183,7 @@ tests:
       AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
       E2E_RUN_TAGS: '@baremetal-upi and @amd64 and @disconnected and @network-ovnkubernetes
         and not @fips'
+      FIPS_ENABLED: "true"
       RESERVE_BOOTSTRAP: "false"
       TAG_VERSION: '@4.14'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
@@ -2237,6 +2261,7 @@ tests:
       AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
       E2E_RUN_TAGS: '@amd64 and @baremetal-upi and @network-ovnkubernetes and not
         @fips'
+      FIPS_ENABLED: "true"
       RESERVE_BOOTSTRAP: "false"
       TAG_VERSION: '@4.14'
       architecture: amd64
@@ -2486,6 +2511,18 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-long-duration
     workflow: cucushift-installer-rehearse-gcp-ipi-private
+- as: gcp-ipi-proxy-etcd-encryption-f28-security-profiles-operator
+  cron: 0 8 15 * *
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      TEST_FILTERS: ~HyperShiftMGMT
+      TEST_PARALLEL: "3"
+      TEST_SCENARIOS: The Security Profiles Operator
+      TEST_TIMEOUT: "20"
+    test:
+    - ref: openshift-extended-test
+    workflow: cucushift-installer-rehearse-gcp-ipi-proxy-etcd-encryption
 - as: gcp-ipi-proxy-etcd-encryption-f28
   cron: 49 22 24 * *
   steps:
@@ -3069,6 +3106,7 @@ tests:
     cluster_profile: vsphere
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @network-ovnkubernetes and not @fips'
+      FIPS_ENABLED: "true"
       TAG_VERSION: '@4.14'
     test:
     - chain: openshift-e2e-test-qe
@@ -3123,6 +3161,37 @@ tests:
   cron: 56 16 7,22 * *
   steps:
     cluster_profile: vsphere
+    env:
+      E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @network-ovnkubernetes and @singlenode
+        and not @fips'
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-agent-vsphere-install-sno
+- as: vsphere-8-agent-compact-f14
+  cron: 9 5 14,29 * *
+  steps:
+    cluster_profile: vsphere-8
+    env:
+      E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-agent-vsphere-install-compact
+- as: vsphere-8-agent-ha-f14
+  cron: 34 6 15,30 * *
+  steps:
+    cluster_profile: vsphere-8
+    env:
+      E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @network-ovnkubernetes and not @fips'
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-agent-vsphere-install-ha
+- as: vsphere-8-agent-sno-f14
+  cron: 56 7 7,22 * *
+  steps:
+    cluster_profile: vsphere-8
     env:
       E2E_RUN_TAGS: '@amd64 and @vsphere-upi and @network-ovnkubernetes and @singlenode
         and not @fips'
