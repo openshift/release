@@ -3,6 +3,26 @@ apiVersion: v1
 metadata:
   name: ci-search
 
+---
+# Import the ImageStream from CI
+kind: ImageStream
+apiVersion: image.openshift.io/v1
+metadata:
+  name: ci-search
+  namespace: ci-search
+spec:
+  lookupPolicy:
+    local: true
+  tags:
+  - from:
+      kind: DockerImage
+      name: registry.ci.openshift.org/ci/ci-search:latest
+    importPolicy:
+      scheduled: true
+    name: latest
+    referencePolicy:
+      type: Local
+
 # deploy the controller
 ---
 kind: Service
