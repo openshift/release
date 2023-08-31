@@ -217,7 +217,7 @@ function test_monitoring_disabled ()
 function test_labels() 
 {
   TEST_PASSED=true
-  sc_cluster_id=$(cat "${ARTIFACT_DIR}"/osd-fm-sc-id)
+  sc_cluster_id=$(cat "${SHARED_DIR}"/osd-fm-sc-id)
   mc_cluster_id=$(cat "${ARTIFACT_DIR}"/osd-fm-mc-id)
 
   #Set up region
