@@ -16,30 +16,41 @@ resources:
       memory: 200Mi
 tests:
 - as: rosa-sts-cluster-diff
-  commands: |
-    export GOFLAGS=""
-    export OCM_CONFIG=/tmp/.ocm.json
-    export OCM_TOKEN=$(cat /usr/local/osde2e-credentials/ocm-refresh-token)
-    export AWS_ACCESS_KEY_ID=$(cat /usr/local/osde2e-rosa-stage/aws-access-key)
-    export AWS_SECRET_ACCESS_KEY=$(cat /usr/local/osde2e-rosa-stage/aws-secret-access-key)
-    export AWS_REGION=$(cat /usr/local/osde2e-rosa-stage/aws-region)
-
-    go mod tidy
-    go install github.com/onsi/ginkgo/v2/ginkgo
-
-    sleep 15m
-
-    ginkgo run -vv ./test/cluster_diff/
-  container:
-    from: src
   cron: 0 0 1 1 *
-  secrets:
-  - mount_path: /usr/local/osde2e-common
-    name: osde2e-common
-  - mount_path: /usr/local/osde2e-credentials
-    name: osde2e-credentials
-  - mount_path: /usr/local/osde2e-rosa-stage
-    name: osde2e-rosa-stage
+  steps:
+    test:
+    - as: gingko
+      commands: |
+        export GOFLAGS=""
+        export OCM_CONFIG=/tmp/.ocm.json
+        export OCM_TOKEN=$(cat /usr/local/osde2e-credentials/ocm-refresh-token)
+        export AWS_ACCESS_KEY_ID=$(cat /usr/local/osde2e-rosa-stage/aws-access-key)
+        export AWS_SECRET_ACCESS_KEY=$(cat /usr/local/osde2e-rosa-stage/aws-secret-access-key)
+        export AWS_REGION=$(cat /usr/local/osde2e-rosa-stage/aws-region)
+
+        go mod tidy
+        go install github.com/onsi/ginkgo/v2/ginkgo
+
+        sleep 15m
+
+        ginkgo run -vv ./test/cluster_diff/
+      credentials:
+      - mount_path: /usr/local/osde2e-common
+        name: osde2e-common
+        namespace: test-credentials
+      - mount_path: /usr/local/osde2e-credentials
+        name: osde2e-credentials
+        namespace: test-credentials
+      - mount_path: /usr/local/osde2e-rosa-stage
+        name: osde2e-rosa-stage
+        namespace: test-credentials
+      dependencies:
+      - env: RELEASE_IMAGE_LATEST
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
 - as: rosa-classic-sts
   cron: 0 0 1 1 *
   steps:

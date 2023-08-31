@@ -1591,9 +1591,7 @@ periodics:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
       - --report-credentials-file=/etc/report/credentials
-      - --secret-dir=/secrets/osde2e-common
-      - --secret-dir=/secrets/osde2e-credentials
-      - --secret-dir=/secrets/osde2e-rosa-stage
+      - --secret-dir=/secrets/ci-pull-credentials
       - --target=rosa-sts-cluster-diff
       - --variant=nightly-4.14
       command:
@@ -1605,17 +1603,11 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
       - mountPath: /secrets/gcs
         name: gcs-credentials
-        readOnly: true
-      - mountPath: /secrets/osde2e-common
-        name: osde2e-common
-        readOnly: true
-      - mountPath: /secrets/osde2e-credentials
-        name: osde2e-credentials
-        readOnly: true
-      - mountPath: /secrets/osde2e-rosa-stage
-        name: osde2e-rosa-stage
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -1625,15 +1617,9 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: osde2e-common
+    - name: ci-pull-credentials
       secret:
-        secretName: osde2e-common
-    - name: osde2e-credentials
-      secret:
-        secretName: osde2e-credentials
-    - name: osde2e-rosa-stage
-      secret:
-        secretName: osde2e-rosa-stage
+        secretName: ci-pull-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
