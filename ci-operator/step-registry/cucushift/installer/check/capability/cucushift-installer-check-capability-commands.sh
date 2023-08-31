@@ -63,10 +63,6 @@ else
     exit 1
 fi
 
-if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
-    source "${SHARED_DIR}/proxy-conf.sh"
-fi
-
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
@@ -74,11 +70,18 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
 # so that the credentials of the build farm registry can be saved in docker client config file.
-KUBECONFIG="" oc registry login
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc --loglevel=8 registry login
 ocp_version=$(getVersion)
 ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 echo "OCP Version: $ocp_version"
+
+
+# Setting proxy only if you need to communicate with installed cluster
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 # Mapping between optional capability and operators
 # Need to be updated when new operator marks as optional
