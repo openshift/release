@@ -16,7 +16,7 @@ source ${SHARED_DIR}/govc.sh
 echo "Data center is ${GOVC_DATACENTER}"
 if govc object.collect /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template; then
     printf 'Assisted service ci template already exist - skipping \n'
-    exit 0
+    govc object.destroy /${GOVC_DATACENTER}/vm/assisted-test-infra-ci/assisted-test-infra-machine-template
 fi
 
 printf 'Assisted service ci template does not exist - creating using packer\n'

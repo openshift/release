@@ -51,6 +51,9 @@ mkdir -p build/packer
 cp -r packer_files/nutanix_centos_template/* build/packer/
 cd build/packer/
 
+echo "***"
+export DUMMY=123
+
 # Create packer variables file
 cat >> nutanix-params.hcl << EOF
 nutanix_username = "${NUTANIX_USERNAME}"
