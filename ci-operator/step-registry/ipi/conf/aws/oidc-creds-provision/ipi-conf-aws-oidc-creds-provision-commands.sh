@@ -22,6 +22,30 @@ echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FA
 oc registry login
 oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
+if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
+  echo "Shared VPC is enabled"
+  echo "Checking if ingress CR file exits"
+  ingress_cr_file=$(grep -lr "namespace: openshift-ingress-operator" /tmp/credrequests/) || exit 1
+  echo "Ingress CR file: ${ingress_cr_file}"
+  echo "Ingress CR content (initial):"
+  cat ${ingress_cr_file}
+
+  # x.y.z
+  ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} -ojsonpath="{.metadata.version}" | cut -d. -f 1,2)
+  ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
+  ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
+  echo "OCP version: ${ocp_version}"
+  
+  if (( ocp_minor_version <= 13 && ocp_major_version == 4 )); then
+    if ! grep "sts:AssumeRole" ${ingress_cr_file}; then
+      echo "WARN: Adding sts:AssumeRole to ingress role"
+      sed -i '/      - tag:GetResources/a\ \ \ \ \ \ - sts:AssumeRole' ${ingress_cr_file}
+    fi
+  fi
+  echo "Ingress CR content:"
+  cat ${ingress_cr_file}
+fi
+
 # Create extra efs csi driver iam resources, it's optional only for efs csi driver related tests on sts clusters
 if [[ "${CREATE_EFS_CSI_DRIVER_IAM}" == "yes" ]]; then
   cat <<EOF >/tmp/credrequests/aws-efs-csi-driver-operator-credentialsrequest.yaml
