@@ -4,6 +4,9 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+
+sleep 7200
+
 if [[ "${BASELINE_CAPABILITY_SET}" == "" ]]; then
   echo "This step is not required when BASELINE_CAPABILITY_SET is not set"
   exit 0
