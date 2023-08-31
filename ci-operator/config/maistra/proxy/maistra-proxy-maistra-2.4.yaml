@@ -47,6 +47,36 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 20m0s
+    - as: check-system
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          sh -c \
+          "echo 'ulimit -u: '; \
+           ulimit -u; \
+           echo 'sysctl: '; \
+           sysctl -a; \
+           echo 'threads-max: '; \
+           cat /proc/sys/kernel/threads-max; \
+           echo 'pid_max: '; \
+           cat /proc/sys/kernel/pid_max; \
+           echo 'max_map_count: '; \
+           cat /proc/sys/vm/max_map_count; \
+           echo 'logind.conf: '; \
+           grep -i "^UserTasksMax" /etc/systemd/logind.conf; \
+           echo 'file-max: '; \
+           cat /proc/sys/fs/file-max; \
+           echo 'limits.conf: '; \
+           cat /etc/security/limits.conf;"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 20m0s
     - as: maistra-proxy-unit-2-4
       cli: latest
       commands: |
