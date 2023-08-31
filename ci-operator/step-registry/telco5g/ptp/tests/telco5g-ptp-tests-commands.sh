@@ -69,7 +69,7 @@ spec:
 
           set -x
 
-          git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
+          git clone --single-branch --branch OPERATOR_VERSION https://github.com/nishant-parekh/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
           sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
@@ -193,7 +193,7 @@ fi
 
 export CNF_E2E_TESTS
 export CNF_ORIGIN_TESTS
-export TEST_BRANCH="master"
+export TEST_BRANCH="fix_tests"
 export PTP_UNDER_TEST_BRANCH="master"
 export KUBECONFIG=$SHARED_DIR/kubeconfig
 
@@ -210,7 +210,7 @@ build_images
 
 # deploy ptp-operator
 
-git clone https://github.com/openshift/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
+git clone https://github.com/nishant-parekh/ptp-operator.git -b "${PTP_UNDER_TEST_BRANCH}" ptp-operator-under-test
 
 cd ptp-operator-under-test
 
@@ -232,7 +232,7 @@ retry_with_timeout 400 5 kubectl rollout status daemonset linuxptp-daemon -nopen
 # Run ptp conformance test
 cd -
 echo "running conformance tests from branch ${TEST_BRANCH}"
-git clone https://github.com/openshift/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
+git clone https://github.com/nishant-parekh/ptp-operator.git -b "${TEST_BRANCH}" ptp-operator-conformance-test
 
 cd ptp-operator-conformance-test
 
