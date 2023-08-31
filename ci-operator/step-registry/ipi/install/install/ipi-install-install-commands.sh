@@ -6,7 +6,21 @@ set -o pipefail
 
 function set-cluster-version-spec-update-service() {
     local payload_version
-    payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+    local jsonpath_flag
+
+    if oc adm release info --help | grep "\-\-output=" -A 1 | grep -q jsonpath; then
+        jsonpath_flag=true
+    else
+        echo "this oc does not support jsonpath output"
+        oc adm release info --help | grep "\-o, \-\-output=" -A 1
+        jsonpath_flag=false
+    fi
+
+    if [[ "${jsonpath_flag}" == "true" ]]; then
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+    else
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep -oP '(?<=^  Version:  ).*$')"
+    fi
     echo "Release payload version: ${payload_version}"
 
     if [[ ! -f ${dir}/manifests/cvo-overrides.yaml ]]; then
@@ -32,10 +46,14 @@ function set-cluster-version-spec-update-service() {
     # Determine architecture that Cincinnati would use: check metadata for release.openshift.io/architecture key
     # and fall back to manifest-declared architecture
     local payload_arch
-    payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
-    if [[ -z "${payload_arch}" ]]; then
-        echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
-        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.config.architecture}")"
+    if [[ "${jsonpath_flag}" == "true" ]]; then
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
+        if [[ -z "${payload_arch}" ]]; then
+            echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
+            payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.config.architecture}")"
+        fi
+    else
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep "^OS/Arch: " | cut -d/ -f3)"
     fi
     local payload_arch_param
     if [[ -n "${payload_arch}" ]]; then
