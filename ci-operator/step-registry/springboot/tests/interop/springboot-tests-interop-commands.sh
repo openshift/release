@@ -22,6 +22,3 @@ function archive-results() {
 echo "Executing tests..."
 trap archive-results SIGINT SIGTERM ERR EXIT
 /bin/bash /spring-boot-openshift-interop-tests/interop.sh ${API_URL} springboot kubeadmin ${KUBEADMIN_PASSWORD}
-
-# Archive Results
-sleep 7200
