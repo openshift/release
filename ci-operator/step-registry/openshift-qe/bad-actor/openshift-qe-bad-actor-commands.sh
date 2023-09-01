@@ -198,3 +198,4 @@ else
   echo "Actual celetion time for $num_projects projects (expected time $delete_cycle_thresshold seconds (or less): $total_delete_cycle_time s."
   exit 1
 fi 
+parallel_project_actions mynamespace 1 2 3
