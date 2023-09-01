@@ -32,16 +32,30 @@ echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FA
 
 # Extract credential requests
 oc registry login
-oc adm release extract --credentials-requests --cloud=nutanix --to "${CR_DIR}" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+ADDITIONAL_OC_EXTRACT_ARGS=""
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+fi
+echo "OC Version:"
+which oc
+oc version --client
+oc adm release extract --help
+oc adm release extract --credentials-requests --cloud=nutanix --to "${CR_DIR}" ${ADDITIONAL_OC_EXTRACT_ARGS} "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 echo "Extracted credentials requests:"
 ls -l "${CR_DIR}"
+
+ADDITIONAL_CCOCTL_ARGS=""
+if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
+  ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
+fi
 
 # Create the credentials request manifest
 ccoctl nutanix create-shared-secrets \
       --credentials-requests-dir="${CR_DIR}" \
       --output-dir="/tmp" \
-      --credentials-source-filepath="${SHARED_DIR}/credentials"
+      --credentials-source-filepath="${SHARED_DIR}/credentials" \
+      ${ADDITIONAL_CCOCTL_ARGS}
 
 echo "Created credentials request manifest:"
 ls -l "/tmp/manifests"
