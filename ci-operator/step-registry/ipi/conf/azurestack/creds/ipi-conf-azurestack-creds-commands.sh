@@ -45,8 +45,17 @@ echo "${RESOURCE_GROUP}" > "${SHARED_DIR}/RESOURCE_GROUP_NAME"
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 oc registry login
-oc adm release extract --credentials-requests --cloud=azure --to=/tmp/credentials-request "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+ADDITIONAL_OC_EXTRACT_ARGS=""
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+fi
+echo "OC Version:"
+which oc
+oc version --client
+oc adm release extract --help
+oc adm release extract --credentials-requests --cloud=azure --to=/tmp/credentials-request ${ADDITIONAL_OC_EXTRACT_ARGS} "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
+echo "CR manifest files:"
 ls /tmp/credentials-request
 files=$(ls -p /tmp/credentials-request/*.yaml | awk -F'/' '{print $NF}')
 for f in $files

@@ -20,7 +20,17 @@ echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 oc registry login
-oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+ADDITIONAL_OC_EXTRACT_ARGS=""
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+fi
+echo "OC Version:"
+which oc
+oc version --client
+oc adm release extract --help
+oc adm release extract --credentials-requests --cloud=aws --to="/tmp/credrequests" ${ADDITIONAL_OC_EXTRACT_ARGS} "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+echo "CR manifest files:"
+ls "/tmp/credrequests"
 
 if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "Shared VPC is enabled"
