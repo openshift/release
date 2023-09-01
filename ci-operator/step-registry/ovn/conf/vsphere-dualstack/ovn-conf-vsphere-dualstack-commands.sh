@@ -5,8 +5,8 @@ set -o pipefail
 
 echo "saving ipv4 vip configuration"
 
-API_VIP=$(/tmp/yq e '.platform.vsphere.apiVIP' ${SHARED_DIR}/install-config.yaml)
-INGRESS_VIP=$(/tmp/yq e '.platform.vsphere.ingressVIP' ${SHARED_DIR}/install-config.yaml)
+API_VIP=$(/tmp/yq e '.platform.vsphere.apiVIP' "${SHARED_DIR}/install-config.yaml")
+INGRESS_VIP=$(/tmp/yq e '.platform.vsphere.ingressVIP' "${SHARED_DIR}/install-config.yaml")
 export API_VIP
 export INGRESS_VIP
 
@@ -35,3 +35,12 @@ networking:
   - 172.30.0.0/16
   - fd65:172:16::/112
 EOF
+
+if [[ "${IP_FAMILIES}" == "DualStackIPv6Primary" ]]; then
+  echo Swapping IP addresses
+  /tmp/yq e --inplace '.platform.vsphere.apiVIPs = (.platform.vsphere.apiVIPs | reverse)' ${SHARED_DIR}/install-config.yaml
+  /tmp/yq e --inplace '.platform.vsphere.ingressVIPs = (.platform.vsphere.ingressVIPs | reverse)' ${SHARED_DIR}/install-config.yaml
+  /tmp/yq e --inplace '.networking.machineNetwork = (.networking.machineNetwork | reverse)' "${SHARED_DIR}/install-config.yaml"
+  /tmp/yq e --inplace '.networking.clusterNetwork = (.networking.clusterNetwork | reverse)' "${SHARED_DIR}/install-config.yaml"
+  /tmp/yq e --inplace '.networking.serviceNetwork = (.networking.serviceNetwork | reverse)' "${SHARED_DIR}/install-config.yaml"
+fi
