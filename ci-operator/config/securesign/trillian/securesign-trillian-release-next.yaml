@@ -9,8 +9,14 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.14
 images:
-- from: trilliandb
-  to: trillian
+- dockerfile_literal: |
+    FROM trilliandb
+    WORKDIR /go/src/github.com/securesign/trillian
+    COPY . .
+    ENV MYSQL_USER=test
+    ENV MYSQL_PASSWORD=zaphod
+    ENV MYSQL_DATABASE=test
+  to: src-with-sql
 releases:
   initial:
     integration:
@@ -30,24 +36,11 @@ resources:
       memory: 200Mi
 tests:
 - as: integration
-  steps:
-    test:
-    - as: integration
-      commands: |
-        go mod vendor
-        ./integration/integration_test.sh
-      env:
-      - default: test
-        name: MYSQL_USER
-      - default: zaphod
-        name: MYSQL_PASSWORD
-      - default: test
-        name: MYSQL_DATABASE
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+  commands: |
+    go mod vendor
+    ./integration/integration_test.sh
+  container:
+    from: src-with-sql
 zz_generated_metadata:
   branch: release-next
   org: securesign
