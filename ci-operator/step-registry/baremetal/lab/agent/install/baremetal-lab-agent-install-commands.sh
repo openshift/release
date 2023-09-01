@@ -139,7 +139,7 @@ EOF
 
 function oinst() {
   /tmp/openshift-install --dir="${INSTALL_DIR}" --log-level=debug "${@}" 2>&1 | grep\
-   --line-buffered -v 'password\|X-Auth-Token\|UserData:'
+   --line-buffered -v 'password\|X-Auth-Token\|UserData:' | gawk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }'
 }
 
 function get_ready_nodes_count() {
@@ -365,6 +365,8 @@ echo -e "\nPreparing files for next steps in SHARED_DIR..."
 cp "${INSTALL_DIR}/auth/kubeconfig" "${SHARED_DIR}/"
 cp "${INSTALL_DIR}/auth/kubeadmin-password" "${SHARED_DIR}/"
 
+scp "${SSHOPTS[@]}" "/var/run/idrac-vnc-password/idrac-vnc-password" "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/idrac-vnc-password"
+
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -373,10 +375,28 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${vendor}"
 done
 
-date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
-#echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
+#date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
+#echo -e "\nForcing 15 min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
 #sleep 900
-cp /var/run/idrac-vnc-password/idrac-vnc-password "${SHARED_DIR}/"
+
+function agent_gather_logs(){
+  SSH_PORT=2222
+# shellcheck disable=SC2154
+for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  echo "Creating SSH tunnel to host ${ip} on port ${SSH_PORT} via bastion"
+  ssh "${SSHOPTS[@]}" -N -L $SSH_PORT:"${ip}":22 "root@${AUX_HOST}" &
+  sleep 10
+  echo "Generating agent gather logs on remote host ${ip}"
+  ssh "${SSHOPTS[@]}" -t -p "${SSH_PORT}" "core@127.0.0.1" << 'EOF'
+    agent-gather -O >/tmp/agent-gather.tar.xz
+EOF
+  echo "Copying agent logs from remote host ${ip} to artifact dir"
+  scp "${SSHOPTS[@]}" -r -P "${SSH_PORT}" "core@127.0.0.1:/tmp/agent-gather.tar.xz" "${ARTIFACT_DIR}/agent-gather-${name}.tar.xz"
+  ((SSH_PORT=SSH_PORT+1))
+done
+}
 
 echo "Launching 'wait-for bootstrap-complete' installation step....."
 # The installer uses the rendezvous IP for checking the bootstrap phase.
@@ -384,10 +404,11 @@ echo "Launching 'wait-for bootstrap-complete' installation step....."
 # Let's use a proxy here as the internal net is not routable from the container running the installer.
 proxy="$(<"${CLUSTER_PROFILE_DIR}/proxy")"
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
-  oinst agent wait-for bootstrap-complete 2>&1 &
+  oinst agent wait-for bootstrap-complete 2>&1 & 
 if ! wait $!; then
-  # TODO: gather logs??
-  echo "ERROR: Bootstrap failed. Aborting execution."
+  echo "ERROR: Bootstrap failed. Aborting execution and gathering agent logs"
+  #agent_gather_logs
+  oinst gather bootstrap
   exit 1
 fi
 
@@ -396,7 +417,7 @@ echo -e "\nLaunching 'wait-for install-complete' installation step....."
 http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="${proxy}" \
   oinst agent wait-for install-complete &
 if ! wait "$!"; then
-  echo "ERROR: Installation failed. Aborting execution."
-  # TODO: gather logs??
+  echo "ERROR: Installation failed. Aborting execution and gathering agent logs"
+  #agent_gather_logs
   exit 1
 fi

@@ -57,6 +57,8 @@ mkdir -p "${OINK_DIR}"
 scp "${SSHOPTS[@]}" "root@openshift-qe-bastion.arm.eng.rdu2.redhat.com:/opt/html/vnc-recorder" "${OINK_DIR}/"
 scp "${SSHOPTS[@]}" "root@openshift-qe-bastion.arm.eng.rdu2.redhat.com:/opt/html/ffmpeg" "${OINK_DIR}/"
 
+
+
 #vnc_password=$(< "/var/run/idrac-vnc-password/idrac-vnc-password")
 
 # $KUBECONFIG could not be available when the observer first starts
@@ -67,10 +69,14 @@ do
 done
 echo "Installation started, recording VNC output"
 
-vnc_password=$(< "${SHARED_DIR}/idrac-vnc-password")
+scp "${SSHOPTS[@]}" "root@openshift-qe-bastion.arm.eng.rdu2.redhat.com:/opt/html/${CLUSTER_NAME}/idrac-vnc-password" "${OINK_DIR}/"
+
+vnc_password=$(< "${OINK_DIR}/idrac-vnc-password")
 
 
 scp "${SSHOPTS[@]}" "root@openshift-qe-bastion.arm.eng.rdu2.redhat.com:/var/builds/${CLUSTER_NAME}/*.yaml" "${OINK_DIR}/"
+
+VNC_PORT=5901
 
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${OINK_DIR}/hosts.yaml"); do
@@ -81,10 +87,9 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${OINK_DIR}/hosts.yaml"); do
      -H 'Accept: application/json' \
      -d '{"Attributes":{"VNCServer.1.Enable": "Enabled", "VNCServer.1.Timeout": 10800, "VNCServer.1.Password": "'"${vnc_password}"'"}}'
   echo "VNC recording on ${bmc_address}"
-  VNC_PORT=5901
   ssh "${SSHOPTS[@]}" -N -L $VNC_PORT:"${bmc_address}":5901 root@openshift-qe-bastion.arm.eng.rdu2.redhat.com &
   sleep 60
-  "${OINK_DIR}/vnc-recorder" --host 127.0.0.1 --port $VNC_PORT --password "${vnc_password}" --outfile "${ARTIFACT_DIR}/${bmc_address}_boot.mp4" --ffmpeg "${OINK_DIR}/ffmpeg" &
+  "${OINK_DIR}/vnc-recorder" --host 127.0.0.1 --port $VNC_PORT --password "${vnc_password}" --outfile "${ARTIFACT_DIR}/${bmc_address}_boot.mp4" --ffmpeg "${OINK_DIR}/ffmpeg" 1> /dev/null &
   ((VNC_PORT=VNC_PORT+1))
 done
 

@@ -62,7 +62,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${OINK_DIR}/hosts.yaml"); do
   touch "${ARTIFACT_DIR}/${name}_ipmi_sol_output_stdout.txt"
   echo "SoL recording on ${bmc_address}"
   sleep 3600 \
-    | ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" sol activate \
+    | ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" sol activate usesolkeepalive \
     2>> "${ARTIFACT_DIR}/${name}_ipmi_sol_output_stderr.txt" >> "${ARTIFACT_DIR}/${name}_ipmi_sol_output_stdout.txt" &
 done
 

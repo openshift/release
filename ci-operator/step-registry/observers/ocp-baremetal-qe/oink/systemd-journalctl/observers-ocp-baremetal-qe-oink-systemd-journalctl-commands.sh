@@ -58,21 +58,23 @@ sleep 300
 
 scp "${SSHOPTS[@]}" "root@openshift-qe-bastion.arm.eng.rdu2.redhat.com:/var/builds/${CLUSTER_NAME}/*.yaml" "${OINK_DIR}/"
 
+SSH_PORT=2222
+
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${OINK_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  touch "${ARTIFACT_DIR}/${bmc_address}_${name}_journalctl.txt"
+  #touch "${ARTIFACT_DIR}/${bmc_address}_${name}_journalctl.txt"
   echo "journalctl recording on ${bmc_address} ${name} ${ip}"
-  SSH_PORT=2222
-  sleep 300
+  #sleep 300
   ssh "${SSHOPTS[@]}" -N -L $SSH_PORT:"${ip}":22 root@openshift-qe-bastion.arm.eng.rdu2.redhat.com &
   sleep 10
   nohup ssh "${SSHOPTS[@]}" -t -p "${SSH_PORT}" "core@127.0.0.1" << EOF > "${ARTIFACT_DIR}/${ip}_${name}_journalctl.txt"
     journalctl -f &
 EOF
+  until ! !; do sleep 30 ; done
   ((SSH_PORT=SSH_PORT+1))
 done
 
-# Keep the observer pod alive while VNC recording
+# Keep the observer pod alive while recording
 sleep 3600
