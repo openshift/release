@@ -30,12 +30,6 @@ chain:
 
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 
-        echo "$(date) dump HyperShift cluster ${CLUSTER_NAME}"
-        /tmp/${HYPERSHIFT_NAME} dump cluster --artifact-dir=$ARTIFACT_DIR \
-          --dump-guest-cluster=true \
-          --namespace local-cluster \
-          --name="${CLUSTER_NAME}"
-      
         echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
         /tmp/${HYPERSHIFT_NAME} destroy cluster aws \
           --aws-creds=${CLUSTER_PROFILE_DIR}/.awscred  \
@@ -46,6 +40,8 @@ chain:
           --cluster-grace-period 40m
         echo "$(date) Finished deleting cluster"
         
+        // MCE 2.4+ will auto-destroy the managed cluster when destroy command is called for hcp
+        // We can keep this for older MCE versions
         oc delete managedcluster ${CLUSTER_NAME} --ignore-not-found
         echo "$(date) Finished destroying hypershift managed cluster"
       from_image:
