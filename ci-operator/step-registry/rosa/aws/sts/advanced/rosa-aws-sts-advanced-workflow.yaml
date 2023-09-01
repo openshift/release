@@ -1,0 +1,35 @@
+workflow:
+  as: rosa-aws-sts-advanced
+  steps:
+    env:
+      STS: "true"
+      COMPUTE_MACHINE_TYPE: "m5.2xlarge"
+      ENABLE_AUTOSCALING: "true"
+      MIN_REPLICAS: "3"
+      MAX_REPLICAS: "6"
+      MULTI_AZ: "true"
+      FIPS: "true"
+      ENABLE_BYOVPC: "true"
+      ENABLE_PROXY: "true"
+      ETCD_ENCRYPTION: "true"
+      BYO_OIDC: "true"
+      OIDC_CONFIG_MANAGED: "false"
+      DISABLE_WORKLOAD_MONITORING: "true"
+      DISABLE_SCP_CHECKS: "true"
+      EC2_METADATA_HTTP_TOKENS: "required"
+      DEFAULT_MACHINE_POOL_LABELS: "prowci=true"
+    pre:
+    - ref: aws-provision-vpc-shared
+    - ref: aws-provision-tags-for-byo-vpc-ocm-pre
+    - chain: aws-provision-bastionhost
+    - chain: rosa-aws-sts-provision-byo-oidc
+    - ref: aws-provision-tags-for-byo-vpc
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    post:
+    - chain: rosa-aws-sts-deprovision-byo-oidc
+    - ref: aws-deprovision-s3buckets
+    - ref: aws-deprovision-stacks
+  documentation: |-
+    This workflow installs an advanced rosa sts cluster. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    After finish testing, the cluster will be deprovsioned.
