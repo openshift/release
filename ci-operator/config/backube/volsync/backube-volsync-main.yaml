@@ -3,6 +3,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
   operator-sdk:
     name: "4.13"
     namespace: origin
@@ -17,7 +21,7 @@ build_root:
     dockerfile_literal: |
       FROM registry.access.redhat.com/ubi9
       USER root
-      ENV GOVERSION=1.19.5
+      ENV GOVERSION=1.20.7
       RUN yum install -y diffutils gcc git jq make openssl python python-pip && \
           yum clean all && rm -rf /var/cache/dnf/*
       # Install Go. This version will only be used for unit tests. The
@@ -49,6 +53,10 @@ images:
   to: src-oc
 - context_dir: .
   from: ubi_minimal
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+      as:
+      - golang:1.20
   to: volsync
 operator:
   bundles:
