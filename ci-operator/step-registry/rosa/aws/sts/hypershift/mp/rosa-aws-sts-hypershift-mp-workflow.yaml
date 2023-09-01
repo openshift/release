@@ -9,13 +9,14 @@ workflow:
       DISABLE_WORKLOAD_MONITORING: "false"
       MP_MACHINE_TYPE: "r5.xlarge"
       MP_REPLICAS: "2"
+      MP_LABELS: "k8s.ovn.org/egress-assignable=''"
     pre:
-    - chain: rosa-aws-sts-provision-byo-vpc
+    - chain: rosa-aws-sts-hypershift-provision
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
     - ref: rosa-conf-machine-pool
     - ref: rosa-cluster-wait-ready-nodes
     post:
-    - chain: rosa-aws-sts-deprovision-byo-vpc
+    - chain: rosa-aws-sts-hypershift-deprovision
   documentation: |-
     This workflow installs a multiAZ rosa hypershift cluster with the machine pools on each zone. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
     After finish testing, the cluster will be deprovsioned.
