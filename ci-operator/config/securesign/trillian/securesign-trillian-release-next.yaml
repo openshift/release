@@ -15,12 +15,8 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM src
-    FROM golang AS golayer
     FROM trilliandb
-    COPY --from=golayer /usr/local/go /usr/local/go
     COPY --from=src /go/src/github.com/securesign/trillian /go/src/github.com/securesign/trillian
-    WORKDIR /go/src/github.com/securesign/trillian
-    ENV PATH ="/usr/local/go/bin:$PATH"
     ENV MYSQL_USER=test
     ENV MYSQL_PASSWORD=zaphod
     ENV MYSQL_DATABASE=test
@@ -29,8 +25,9 @@ images:
       as:
       - src
     openshift_release_golang-1.19:
-      as:
-      - golang
+      paths:
+      - destination_dir: .
+        source_path: /usr/local/go
     trilliandb:
       as:
       - trilliandb
