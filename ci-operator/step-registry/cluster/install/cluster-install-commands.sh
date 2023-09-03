@@ -7,12 +7,14 @@ set -o verbose
 
 AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+AWS_ACCOUNT_ID=$(grep "aws_account_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 DOCKER_CONFIG_JSON_PATH="${CLUSTER_PROFILE_DIR}/config.json"
 CLUSTER_DATA_DIR="/tmp/clusters-data"
 
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
+export AWS_ACCOUNT_ID
 export OCM_TOKEN
 export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
 
@@ -60,8 +62,8 @@ if [ $NUM_CLUSTERS -eq 1 ]; then
   cp "$CLUSTER_AUTH_DIR/kubeconfig" "${SHARED_DIR}/kubeconfig"
   cp "$CLUSTER_AUTH_DIR/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
   echo "$CLUSTER_NAME" > "${SHARED_DIR}/cluster-name"
-  grep 'api-url'| cut -d' ' -f 2 "$CLUSTER_DATA_DIR/cluster_data.yaml" > "${SHARED_DIR}/api-url"
-  grep 'console-url' "$CLUSTER_DATA_DIR/cluster_data.yaml"| cut -d' ' -f 2 > "${SHARED_DIR}/console-url"
+  grep 'api-url'| cut -d' ' -f 2 "$CLUSTER_DATA_DIR/cluster_data.yaml" > "${SHARED_DIR}/api.url"
+  grep 'console-url' "$CLUSTER_DATA_DIR/cluster_data.yaml"| cut -d' ' -f 2 > "${SHARED_DIR}/console.url"
   grep 'cluster-id' "$CLUSTER_DATA_DIR/cluster_data.yaml"| cut -d' ' -f 2 > "${SHARED_DIR}/cluster-id"
 fi
 
