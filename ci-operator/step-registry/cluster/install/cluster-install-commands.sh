@@ -60,9 +60,9 @@ if [ $NUM_CLUSTERS -eq 1 ]; then
   cp "$CLUSTER_AUTH_DIR/kubeconfig" "${SHARED_DIR}/kubeconfig"
   cp "$CLUSTER_AUTH_DIR/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
   echo "$CLUSTER_NAME" > "${SHARED_DIR}/cluster-name"
-  echo $(cat "$CLUSTER_DATA_DIR/cluster_data.yaml" | grep 'api-url'| cut -d' ' -f 2) > "${SHARED_DIR}/api-url"
-  echo $(cat "$CLUSTER_DATA_DIR/cluster_data.yaml" | grep 'console-url'| cut -d' ' -f 2) > "${SHARED_DIR}/console-url"
-  echo $(cat "$CLUSTER_DATA_DIR/cluster_data.yaml" | grep 'cluster-id'| cut -d' ' -f 2) > "${SHARED_DIR}/cluster-id"
+  grep 'api-url'| cut -d' ' -f 2 "$CLUSTER_DATA_DIR/cluster_data.yaml" > "${SHARED_DIR}/api-url"
+  grep 'console-url' "$CLUSTER_DATA_DIR/cluster_data.yaml"| cut -d' ' -f 2 > "${SHARED_DIR}/console-url"
+  grep 'cluster-id' "$CLUSTER_DATA_DIR/cluster_data.yaml"| cut -d' ' -f 2 > "${SHARED_DIR}/cluster-id"
 fi
 
 # Save cluster_data.yaml and kubeconfig files to be used during cluster deletion
