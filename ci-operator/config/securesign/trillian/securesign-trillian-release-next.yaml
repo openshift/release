@@ -10,12 +10,15 @@ build_root:
     tag: rhel-9-golang-1.20-openshift-4.14
 images:
 - dockerfile_literal: |
-    FROM trilliandb
+    FROM src AS baselayer
+    FROM trillian
+    COPY --from=baselayer /usr/local/go /usr/local/go
+    COPY --from=baselayer . .
+    ENV PATH ="/usr/local/go/bin:${PATH}"
     ENV MYSQL_USER=test
     ENV MYSQL_PASSWORD=zaphod
     ENV MYSQL_DATABASE=test
-  from: trilliandb
-  to: bin
+  to: src-db
 releases:
   initial:
     integration:
@@ -39,7 +42,7 @@ tests:
     go mod vendor
     ./integration/integration_test.sh
   container:
-    from: bin
+    from: dbtest
 zz_generated_metadata:
   branch: release-next
   org: securesign
