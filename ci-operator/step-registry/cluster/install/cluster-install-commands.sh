@@ -52,8 +52,6 @@ set +e
 ${RUN_COMMAND}
 return_code=$?
 
-sleep 5000000
-
 if [ $NUM_CLUSTERS -eq 1 ]; then
   CLUSTER_NAME=$(awk -F'.*name=|;' '{print $2}' <<< "CLUSTERS_CMD")
   CLUSTER_PLATFORM=$(awk -F'.*platform=|;' '{print $2}' <<< "CLUSTERS_CMD")
