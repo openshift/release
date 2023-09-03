@@ -18,8 +18,8 @@ images:
     FROM golang AS golayer
     FROM trilliandb
     COPY . . 
-    USER root
-    RUN mkdir /usr/local/go/
+    #USER root
+    #RUN mkdir /usr/local/go/
     COPY --from=golayer /usr/local/go/ /usr/local/go/
     COPY --from=src /go/src/github.com/securesign/trillian .
     ENV PATH=$PATH:/usr/local/go/bin
@@ -58,7 +58,9 @@ resources:
 tests:
 - as: integration
   commands: |
-    mysqld start
+    echo $MYSQL_USER
+    export mysql_flags="-pzaphod -utest -h 127.0.0.1 -P 3306"
+    ./usr/share/container-scripts/mysql/init/60-load-db.sh
     ./integration/integration_test.sh
   container:
     from: src-db
