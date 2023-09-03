@@ -21,6 +21,7 @@ export CLUSTER_NAME
 export OCM_TOKEN
 export ROBOT_EXTRA_ARGS
 export RUN_SCRIPT_ARGS
+export CLUSTER_ID
 
 mkdir "$ARTIFACT_DIR/results"
 
