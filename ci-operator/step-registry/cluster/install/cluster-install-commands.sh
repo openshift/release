@@ -34,10 +34,6 @@ done
 
 RUN_COMMAND+="${CLUSTERS_CMD} "
 
-if [[ -n "${OCM_ENVIRONMENT}" ]]; then
-    RUN_COMMAND+=" --ocm-env=${OCM_ENVIRONMENT} "
-fi
-
 if [ "${PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
     RUN_COMMAND+=" --parallel"
 fi
@@ -61,10 +57,14 @@ sleep 5000000
 if [ $NUM_CLUSTERS -eq 1 ]; then
   CLUSTER_NAME=$(awk -F'.*name=|;' '{print $2}' <<< "CLUSTERS_CMD")
   CLUSTER_PLATFORM=$(awk -F'.*platform=|;' '{print $2}' <<< "CLUSTERS_CMD")
-  CLUSTER_AUTH_DIR="$CLUSTER_DATA_DIR/$CLUSTER_PLATFORM/$CLUSTER_NAME/auth"
+  CLUSTER_DATA_DIR="$CLUSTER_DATA_DIR/$CLUSTER_PLATFORM/$CLUSTER_NAME"
+  CLUSTER_AUTH_DIR="$CLUSTER_DATA_DIR/auth"
   cp "$CLUSTER_AUTH_DIR/kubeconfig" "${SHARED_DIR}/kubeconfig"
   cp "$CLUSTER_AUTH_DIR/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
   echo "$CLUSTER_NAME" > "${SHARED_DIR}/cluster-name"
+  echo $(cat "$CLUSTER_DATA_DIR/cluster_data.yaml" | grep 'api-url'| cut -d' ' -f 2) > "${SHARED_DIR}/api-url"
+  echo $(cat "$CLUSTER_DATA_DIR/cluster_data.yaml" | grep 'console-url'| cut -d' ' -f 2) > "${SHARED_DIR}/console-url"
+  echo $(cat "$CLUSTER_DATA_DIR/cluster_data.yaml" | grep 'cluster-id'| cut -d' ' -f 2) > "${SHARED_DIR}/cluster-id"
 fi
 
 # Save cluster_data.yaml and kubeconfig files to be used during cluster deletion

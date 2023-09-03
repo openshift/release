@@ -38,10 +38,6 @@ done
 
 RUN_COMMAND+=$(echo "${CLUSTER_DATA_CMD}" | sed 's/,$//g')
 
-if [[ -n "${OCM_ENVIRONMENT}" ]]; then
-    RUN_COMMAND+=" --ocm-env=${OCM_ENVIRONMENT} "
-fi
-
 if [[ -n "${S3_BUCKET_PATH}" ]]; then
     RUN_COMMAND+=" --s3-bucket-path=${S3_BUCKET_PATH} "
 fi
