@@ -101,6 +101,7 @@ function getCIR(){
 CIRTYPE=host
 [ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster
 [ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host-arm
+[ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_lab_small
 
 
 if [[ ! "$RELEASE_IMAGE_LATEST" =~ build05 ]] ; then

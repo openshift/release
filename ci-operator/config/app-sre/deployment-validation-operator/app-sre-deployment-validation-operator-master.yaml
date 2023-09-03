@@ -1,8 +1,30 @@
+base_images:
+  cli:
+    name: "4.12"
+    namespace: ocp
+    tag: cli
+  dvo-tests:
+    name: deployment-validation-operator-tests
+    namespace: ci
+    tag: latest
+  operator-sdk:
+    name: "4.12"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   from_repository: true
 images:
 - dockerfile_path: build/Dockerfile
-  to: unused
+  from: src
+  to: dvo-operator
+operator:
+  bundles:
+  - as: dvo-operator-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/deployment-validation-operator/dv-operator:latest
+    with: pipeline:dvo-operator
 resources:
   '*':
     limits:
@@ -42,6 +64,36 @@ tests:
   commands: make validate
   container:
     from: src
+- as: deployment-validation-operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+      dependencies:
+      - env: OO_BUNDLE
+        name: dvo-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        pytest.sh -m "not ui"
+      from: dvo-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: app-sre

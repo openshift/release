@@ -17,10 +17,11 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
+control_plane_node_count=0
+compute_node_count=0
+
 function all_nodes()
 {
-    local control_plane_node_count
-    local compute_node_count
     control_plane_node_count=$(oc get node --no-headers | grep master | wc -l)
     compute_node_count=$(oc get node --no-headers | grep worker | wc -l)
 

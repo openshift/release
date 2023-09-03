@@ -16,6 +16,17 @@
             },
           },
           {
+            alert: 'ImagePullBackOff',
+            expr: 'sum(sum_over_time(kube_pod_container_status_waiting_reason{reason="ImagePullBackOff"}[5m])) > 30',
+            'for': '10m',
+            labels: {
+              severity: 'critical',
+            },
+            annotations: {
+              message: 'Many pods have been failing on pulling images. Please check the relevant events on the cluster.'
+            },
+          },
+          {
             alert: 'prow-job-backlog-growing',
             expr: 'sum(rate(prowjob_state_transitions{state="triggered"}[5m])) - sum(rate(prowjob_state_transitions{state!="triggered"}[5m])) > 0',
             'for': '60m',

@@ -36,8 +36,8 @@ else
 fi
 
 # Switches
-account_installer_role_arn=$(cat "${ARTIFACT_DIR}/account-roles-arn" | { grep "Installer-Role" || true; })
-oidc_config_id=$(cat "${ARTIFACT_DIR}/oidc-config" | jq -r '.id')
+account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arn" | { grep "Installer-Role" || true; })
+oidc_config_id=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
 
 HOSTED_CP_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
@@ -46,7 +46,7 @@ fi
 
 SHARED_VPC_SWITCH=""
 if [[ "$ENABLE_SHARED_VPC" == "true" ]]; then
-  shared_vpc_role_arn=$(cat "${ARTIFACT_DIR}/shared-vpc-role-arn")
+  shared_vpc_role_arn=$(cat "${SHARED_DIR}/shared-vpc-role-arn")
   SHARED_VPC_SWITCH="--shared-vpc-role-arn ${shared_vpc_role_arn}"
 fi
 

@@ -13,7 +13,7 @@ POWERVS_VSI_NAME="${HOSTED_CLUSTER_NAME}-worker"
 POWERVS_VSI_MEMORY=16
 POWERVS_VSI_PROCESSORS=0.5
 POWERVS_VSI_PROC_TYPE="shared"
-POWERVS_VSI_SYS_TYPE="s922"
+POWERVS_VSI_SYS_TYPE="e980"
 
 # MCE agentserviceconfig configs
 export DB_VOLUME_SIZE="10Gi"
@@ -378,5 +378,5 @@ echo "$(date) Approved the agents, waiting for the installation to get completed
 oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m
 
 # Download guest cluster kubeconfig
-echo "$(date) Setup guest_kubeconfig"
-hypershift create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/guest_kubeconfig
+echo "$(date) Setup nested_kubeconfig"
+hypershift create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
