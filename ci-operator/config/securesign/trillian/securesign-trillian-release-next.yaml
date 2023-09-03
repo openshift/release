@@ -15,7 +15,11 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM src
+    RUN pwd
+    FROM golang AS golayer
     FROM trilliandb
+    RUN mkdir /usr/local/go
+    COPY --from=golayer /usr/local/go /usr/local/go
     COPY --from=src /go/src/github.com/securesign/trillian /go/src/github.com/securesign/trillian
     WORKDIR /go/src/github.com/securesign/trillian
     ENV PATH=$PATH:/usr/local/go/bin
@@ -28,9 +32,8 @@ images:
       as:
       - src
     openshift_release_golang-1.19:
-      paths:
-      - destination_dir: .
-        source_path: /usr/local/go
+      as:
+      - golang
     trilliandb:
       as:
       - trilliandb
@@ -58,6 +61,7 @@ tests:
     pwd
     ls
     cd /usr/local/go
+    echo $PATH
     ls
     go mod vendor
     ./integration/integration_test.sh
