@@ -1,12 +1,12 @@
 base_images:
-  trilliandb:
-    name: trillian-db
-    namespace: securesign
-    tag: redhat-v1.5.2
   openshift_release_golang-1.19:
     name: release
     namespace: openshift
     tag: golang-1.19
+  trilliandb:
+    name: trillian-db
+    namespace: securesign
+    tag: redhat-v1.5.2
 build_root:
   image_stream_tag:
     name: builder
@@ -15,7 +15,6 @@ build_root:
 images:
 - dockerfile_literal: |
     FROM src AS base
-    COPY . .
     FROM golang As builder
     FROM trilliandb
     COPY --from=builder /usr/local/go /usr/local/go
@@ -28,12 +27,12 @@ images:
     ENV MYSQL_DATABASE=test
   from: src
   inputs:
+    openshift_release_golang-1.19:
+      as:
+      - golang
     trilliandb:
       as:
       - trilliandb
-    openshift_release_golang-1.20:
-      as:
-      - golang
   to: src-db
 releases:
   initial:
