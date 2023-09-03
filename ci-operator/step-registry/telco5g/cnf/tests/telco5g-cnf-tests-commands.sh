@@ -255,7 +255,7 @@ if [[ "$T5CI_VERSION" == "4.14" ]]; then
     export CNF_TESTS_IMAGE="cnf-tests:4.14"
 elif [[ "$T5CI_VERSION" == "4.15" ]]; then
     export CNF_BRANCH="master"
-    export CNF_TESTS_IMAGE="cnf-tests:4.15"
+    export CNF_TESTS_IMAGE="cnf-tests:4.14"
 else
     export CNF_BRANCH="release-${T5CI_VERSION}"
     export CNF_TESTS_IMAGE="cnf-tests:${T5CI_VERSION}"
