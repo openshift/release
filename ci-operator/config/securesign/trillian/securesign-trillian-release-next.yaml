@@ -14,17 +14,21 @@ build_root:
     tag: rhel-9-golang-1.20-openshift-4.14
 images:
 - dockerfile_literal: |
+    FROM src
     FROM golang AS golayer
     FROM trilliandb
     COPY --from=golayer /usr/local/go /usr/local/go
     COPY --from=golayer  . .
-    COPY /go/src/github.com/securesign/trillian /go/src/github.com/securesign/trillian
+    COPY --from=src /go/src/github.com/securesign/trillian /go/src/github.com/securesign/trillian
     WORKDIR /go/src/github.com/securesign/trillian
     ENV PATH ="/usr/local/go/bin:${PATH}"
     ENV MYSQL_USER=test
     ENV MYSQL_PASSWORD=zaphod
     ENV MYSQL_DATABASE=test
   inputs:
+    src:
+      as:
+      - src
     openshift_release_golang-1.19:
       as:
       - golang
