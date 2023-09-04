@@ -13,6 +13,7 @@ TEST_NS="openshift-e2e-fips-check"
 oc create ns "$TEST_NS"
 oc label namespace "$TEST_NS" --overwrite \
   pod-security.kubernetes.io/enforce=privileged \
+  pod-security.kubernetes.io/warn=privileged \
   pod-security.kubernetes.io/audit=privileged
 
 
