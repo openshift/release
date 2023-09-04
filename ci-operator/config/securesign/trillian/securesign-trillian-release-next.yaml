@@ -30,12 +30,12 @@ images:
     CMD ["run-mysqld"]
   from: trilliandb
   inputs:
-    src:
-      as:
-      - src
     openshift_release_golang-1.19:
       as:
       - golang
+    src:
+      as:
+      - src
   to: src-db
 releases:
   initial:
@@ -56,11 +56,26 @@ resources:
       memory: 200Mi
 tests:
 - as: integration
-  commands: |
-    cd /go/src/github.com/securesign/trillian/
-    ./integration/integration_test.sh
-  container:
-    from: src-db
+  steps:
+    pre:
+    - as: setup
+      commands: |
+        sleep 1m
+      from: src-db
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    test:
+    - as: int-test
+      commands: |
+        cd /go/src/github.com/securesign/trillian/
+        ./integration/integration_test.sh
+      from: src-db
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: release-next
   org: securesign
