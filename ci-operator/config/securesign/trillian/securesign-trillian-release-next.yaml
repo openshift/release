@@ -16,15 +16,14 @@ images:
 - dockerfile_literal: |
     FROM src AS repo
     FROM golang AS golayer
+    FROM trilliandb
+    COPY --from=golayer /usr/local/go/ /usr/local/go/
+    COPY --from=repo /go/src/github.com/securesign/trillian /go/src/github.com/securesign/trillian
     ENV PATH=$PATH:/usr/local/go/bin
     ENV MYSQL_USER=test
     ENV MYSQL_PASSWORD=zaphod
     ENV MYSQL_DATABASE=test
     ENV mysql_flags="-pzaphod -utest"
-    FROM trilliandb
-    COPY --from=golayer /usr/local/go/ /usr/local/go/
-    COPY --from=repo /go/src/github.com/securesign/trillian /go/src/github.com/securesign/trillian
-    RUN /usr/share/container-scripts/mysql/init/60-load-db.sh
   from: trilliandb
   inputs:
     src:
@@ -54,6 +53,7 @@ resources:
 tests:
 - as: integration
   commands: |
+    cd /go/src/github.com/securesign/trillian
     ./integration/run_integration.sh
   container:
     from: src-db
