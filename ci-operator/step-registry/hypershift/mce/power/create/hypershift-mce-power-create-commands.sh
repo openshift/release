@@ -38,12 +38,20 @@ export PATH=$PATH:/tmp/bin
 
 # Installing hypershift cli
 echo "$(date) Installing hypershift cli"
-mkdir /tmp/hypershift_cli
-downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
-curl -k --output /tmp/hypershift.tar.gz ${downURL}
-tar -xvf /tmp/hypershift.tar.gz -C /tmp/hypershift_cli
-chmod +x /tmp/hypershift_cli/hypershift
-export PATH=$PATH:/tmp/hypershift_cli
+MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
+HYPERSHIFT_NAME=hcp
+if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+  echo "MCE version is less than 2.4"
+  HYPERSHIFT_NAME=hypershift
+fi
+
+# x86 only now
+mkdir /tmp/${HYPERSHIFT_NAME}_cli
+downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz -C /tmp/${HYPERSHIFT_NAME}_cli
+chmod +x /tmp/${HYPERSHIFT_NAME}_cli/${HYPERSHIFT_NAME}
+export PATH=$PATH:/tmp/${HYPERSHIFT_NAME}_cli
 
 # IBM cloud login
 echo | ibmcloud login --apikey @"${AGENT_POWER_CREDENTIALS}/ibmcloud-apikey"
@@ -180,7 +188,7 @@ echo "$(date) Creating agent hosted cluster manifests"
 oc create ns ${HOSTED_CONTROL_PLANE_NAMESPACE}
 mkdir /tmp/hc-manifests
 
-hypershift create cluster agent \
+${HYPERSHIFT_NAME} create cluster agent \
     --name=${HOSTED_CLUSTER_NAME} \
     --pull-secret=${PULL_SECRET} \
     --agent-namespace=${HOSTED_CONTROL_PLANE_NAMESPACE} \
@@ -379,4 +387,4 @@ oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.
 
 # Download guest cluster kubeconfig
 echo "$(date) Setup nested_kubeconfig"
-hypershift create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+${HYPERSHIFT_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
