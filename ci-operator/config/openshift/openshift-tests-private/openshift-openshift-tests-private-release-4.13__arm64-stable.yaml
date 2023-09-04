@@ -76,8 +76,36 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-ipi-ovn-ipsec-to-multiarch-p2-f14
-  cron: 51 9 12,27 * *
+- as: aws-ipi-disconnected-private-sno-f14
+  cron: 29 11 7,22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
+- as: aws-ipi-disconnected-sts-ep-f14
+  cron: 35 17 15,30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
+- as: aws-ipi-ovn-ipsec-to-multiarch-f14
+  cron: 35 14 5,20 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -96,8 +124,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-arch-migration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-to-multiarch-p2-f14
-  cron: 19 15 14,29 * *
+- as: aws-ipi-proxy-sts-f14
+  cron: 38 10 15,30 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-ipi-to-multiarch-f14
+  cron: 15 18 10,25 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -116,8 +158,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-arch-migration
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: azure-ipi-baselinecaps-v412-to-multiarch-p2-f14
-  cron: 29 1 14,29 * *
+- as: aws-ipi-usertags-f14
+  cron: 22 2 1,16 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-aws-ipi-usertags
+- as: azure-ipi-baselinecaps-v412-to-multiarch-f14
+  cron: 47 10 8,23 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -136,7 +192,33 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-arch-migration
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: baremetal-upi-to-multiarch-p2-f7
+- as: azure-ipi-disconnected-fullyprivate-f14
+  cron: 33 5 8,23 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
+- as: azure-ipi-fullyprivate-proxy-f14
+  cron: 26 1 10,25 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+    test:
+    - chain: cucushift-installer-check-cluster-health
+    workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: baremetal-upi-to-multiarch-f7
   cluster: build05
   cron: 30 21 2,14 * *
   steps:
