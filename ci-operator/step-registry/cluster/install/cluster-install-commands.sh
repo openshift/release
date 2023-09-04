@@ -55,8 +55,8 @@ ${RUN_COMMAND}
 return_code=$?
 
 if [ $NUM_CLUSTERS -eq 1 ]; then
-  CLUSTER_NAME=$(awk -F'.*name=|;' '{print $2}' <<< "CLUSTERS_CMD")
-  CLUSTER_PLATFORM=$(awk -F'.*platform=|;' '{print $2}' <<< "CLUSTERS_CMD")
+  CLUSTER_NAME=$(awk -F'.*name=|;' '{print $2}' <<< "$CLUSTERS_CMD")
+  CLUSTER_PLATFORM=$(awk -F'.*platform=|;' '{print $2}' <<< "$CLUSTERS_CMD")
   CLUSTER_DATA_DIR="$CLUSTER_DATA_DIR/$CLUSTER_PLATFORM/$CLUSTER_NAME"
   CLUSTER_AUTH_DIR="$CLUSTER_DATA_DIR/auth"
   cp "$CLUSTER_AUTH_DIR/kubeconfig" "${SHARED_DIR}/kubeconfig"
