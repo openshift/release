@@ -16,6 +16,7 @@ images:
 - dockerfile_literal: |
     FROM src AS repo
     FROM golang AS golayer
+    USER root
     FROM trilliandb
     COPY --from=golayer /usr/local/go/ /usr/local/go/
     COPY --from=repo /go/src/github.com/securesign/trillian /go/src/github.com/securesign/trillian
@@ -24,6 +25,7 @@ images:
     ENV MYSQL_PASSWORD=zaphod
     ENV MYSQL_DATABASE=test
     ENV mysql_flags="-pzaphod -utest"
+    USER 27
     ENTRYPOINT ["container-entrypoint"]
     CMD ["run-mysqld"]
   from: trilliandb
@@ -55,7 +57,6 @@ resources:
 tests:
 - as: integration
   commands: |
-    container-entrypoint run-mysqld
     cd /go/src/github.com/securesign/trillian/
     ./integration/integration_test.sh
   container:
