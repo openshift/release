@@ -215,11 +215,11 @@ export RUN_TESTS="${RUN_TESTS:-true}"
 export RUN_VALIDATIONS="${RUN_VALIDATIONS:-true}"
 
 if [[ "$T5CI_JOB_TYPE" == "sno-cnftests" ]]; then
-    export FEATURES="${FEATURES:-performance sriov sctp}"
+    export FEATURES="${FEATURES:-dpdk ovs_qos}"
 else
-    export FEATURES="${FEATURES:-sriov performance sctp xt_u32 ovn metallb multinetworkpolicy vrf bondcni tuningcni}"
+    export FEATURES="${FEATURES:-dpdk ovs_qos}"
 fi
-export VALIDATIONS_FEATURES="${VALIDATIONS_FEATURES:-$FEATURES}"
+export VALIDATIONS_FEATURES="sriov dpdk ovs_qos"
 export TEST_RUN_FEATURES="${TEST_RUN_FEATURES:-$FEATURES}"
 
 export SKIP_TESTS_FILE="${SKIP_TESTS_FILE:-${SHARED_DIR}/telco5g-cnf-tests-skip-list.txt}"
