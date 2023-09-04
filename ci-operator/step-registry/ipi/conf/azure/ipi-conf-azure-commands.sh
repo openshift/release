@@ -4,26 +4,13 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 oc registry login
-
-function getVersion() {
-  local release_image=""
-  if [ -n "${RELEASE_IMAGE_INITIAL-}" ]; then
-    release_image=${RELEASE_IMAGE_INITIAL}
-  elif [ -n "${RELEASE_IMAGE_LATEST-}" ]; then
-    release_image=${RELEASE_IMAGE_LATEST}     
-  fi
-  
-  local version=""
-  if [ ${release_image} != "" ]; then
-    version=$(oc adm release info ${release_image} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)    
-  fi
-  echo "${version}"
-}
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
@@ -97,7 +84,7 @@ do
   yq-go write -i "${CONFIG}" "platform.azure.userTags.${TAG}" "${VALUE}"
 done
 
-version=$(getVersion)
+version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 echo "get ocp version: ${version}"
 REQUIRED_OCP_VERSION="4.12"
 isOldVersion=true
