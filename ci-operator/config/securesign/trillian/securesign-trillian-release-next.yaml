@@ -1,0 +1,61 @@
+base_images:
+  openshift_release_golang-1.19:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+  trilliandb:
+    name: trillian-db
+    namespace: securesign
+    tag: redhat-v1.5.2
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
+images:
+- dockerfile_literal: |
+    FROM src AS repo
+    FROM golang AS golayer
+    FROM trilliandb AS sql
+    COPY --from=golayer /usr/local/go/ /usr/local/go/
+    COPY --from=repo /go/src/github.com/securesign/trillian /go/src/github.com/securesign/trillian
+    ENV PATH=$PATH:/usr/local/go/bin
+    ENV MYSQL_USER=test
+    ENV MYSQL_PASSWORD=zaphod
+    ENV MYSQL_DATABASE=test
+  from: trilliandb
+  inputs:
+    src:
+      as:
+      - src
+    openshift_release_golang-1.19:
+      as:
+      - golang
+  to: src-db
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.14"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: integration
+  commands: |
+    mysql -utest -pzaphod -h 127.0.0.1 -P 3306
+  container:
+    from: src-db
+zz_generated_metadata:
+  branch: release-next
+  org: securesign
+  repo: trillian
