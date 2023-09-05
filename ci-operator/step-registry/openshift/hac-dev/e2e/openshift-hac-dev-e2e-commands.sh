@@ -28,26 +28,6 @@ export OC_LOGIN_TOKEN OC_LOGIN_SERVER
 OC_LOGIN_TOKEN=$(cat /usr/local/ci-secrets/ephemeralbot/oc-login-token)
 OC_LOGIN_SERVER=$(cat /usr/local/ci-secrets/ephemeralbot/oc-login-server)
 
-echo "Preparing bonfire config"
-CONFIG_DIR=$(mktemp -d)
-cat > "$CONFIG_DIR/config.yaml" << EOF
-# Bonfire deployment configuration
-# Defines where to fetch the file that defines application configs
-appsFile:
-  host: gitlab
-  repo: insights-platform/cicd-common
-  path: bonfire_configs/ephemeral_apps.yaml
-# (optional) define any apps locally. An app defined here with <name> will override config for app
-# <name> in above fetched config.
-apps:
-- name: insights-ephemeral
-  components:
-    - name: frontend-configs
-      host: github
-      repo: redhat-hac-qe/frontend-configs
-      path: deploy/deploy.yaml
-EOF
-
 echo "Installing bonfire."
 export LANG LC_ALL
 LANG=en_US.utf-8
@@ -57,7 +37,7 @@ python3 -m venv .bonfire_venv
 source .bonfire_venv/bin/activate
 
 python3 -m pip install --upgrade pip 'setuptools<58' wheel
-python3 -m pip install --upgrade 'crc-bonfire==4.16.0'
+python3 -m pip install --upgrade 'crc-bonfire>=4.18.0'
 
 export KUBECONFIG_DIR KUBECONFIG
 KUBECONFIG_DIR="$WORKSPACE/.kube"
@@ -78,10 +58,12 @@ HOSTNAME=$(oc get feenv ${ENV_NAME} -o json | jq ".spec.hostname" | tr -d '"')
 oc patch feenv ${ENV_NAME} --type merge  -p '{"spec":{"sso": "'$HAC_KC_SSO_URL'" }}'
 oc process -f https://raw.githubusercontent.com/openshift/hac-dev/main/tmp/hac-proxy.yaml -n ${NAMESPACE} -p NAMESPACE=${NAMESPACE} -p ENV_NAME=${ENV_NAME} -p HOSTNAME=${HOSTNAME} | oc create -f -
 
+# Omit some default bonfire frontend dependencies
+export BONFIRE_FRONTEND_DEPENDENCIES=chrome-service,insights-chrome
+
 # Deploy hac-dev
 echo "Deploy hac-dev"
-bonfire deploy -c "$CONFIG_DIR/config.yaml" \
-        hac \
+bonfire deploy hac \
         --frontends true \
         --source=appsre \
         --clowd-env ${ENV_NAME} \

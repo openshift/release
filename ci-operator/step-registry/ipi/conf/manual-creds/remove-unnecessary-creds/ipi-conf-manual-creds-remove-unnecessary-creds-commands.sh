@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  echo "This step is not required when EXTRACT_MANIFEST_INCLUDED is set to true"
+  exit 0
+fi
+
 if [[ "${BASELINE_CAPABILITY_SET}" == "" ]]; then
   echo "This step is not required when BASELINE_CAPABILITY_SET is not set"
   exit 0
@@ -52,7 +57,7 @@ v411="baremetal marketplace openshift-samples"
 # shellcheck disable=SC2034
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
-v414=" ${v413} MachineAPI"
+v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
 latest_defined="v414"
 always_default="${!latest_defined}"
 
@@ -112,10 +117,15 @@ if (( ocp_minor_version >=12 && ocp_major_version == 4 )); then
   fi
 fi
 
-# Remove openshift-machine-api secret, >= 4.14
+# Remove openshift-machine-api/openshift-image-registry secret, >= 4.14
 if (( ocp_minor_version >=14 && ocp_major_version == 4 )); then
   if [[ ! "${enabled_operators}" =~ "MachineAPI" ]]; then 
       namespace="openshift-machine-api"
+      remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
+  fi
+
+  if [[ ! "${enabled_operators}" =~ "ImageRegistry" ]]; then
+      namespace="openshift-image-registry"
       remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
   fi
 fi

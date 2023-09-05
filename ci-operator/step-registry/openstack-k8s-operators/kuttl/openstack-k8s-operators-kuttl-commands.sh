@@ -33,6 +33,12 @@ if [[ "$REF_ORG" != "$ORG" ]]; then
     BASE_OP=${EXTRA_REF_REPO}
 fi
 
+# custom per project ENV variables
+# shellcheck source=/dev/null
+if [ -f /go/src/github.com/${ORG}/${BASE_OP}/.prow_ci.env ]; then
+  source /go/src/github.com/${ORG}/${BASE_OP}/.prow_ci.env
+fi
+
 SERVICE_NAME=$(echo "${BASE_OP}" | sed 's/\(.*\)-operator/\1/')
 export IMAGE_TAG_BASE=${REGISTRY}/${ORGANIZATION}/${SERVICE_NAME}-operator
 export KUTTL_REPORT=kuttl-test-${SERVICE_NAME}.json

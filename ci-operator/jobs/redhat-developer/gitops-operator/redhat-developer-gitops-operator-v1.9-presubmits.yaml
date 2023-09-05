@@ -6,6 +6,58 @@ presubmits:
     - ^v1\.9$
     - ^v1\.9-
     cluster: build05
+    context: ci/prow/gitops-ocp4.14-lp-interop-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: gitops-ocp4.14-lp-interop
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-redhat-developer-gitops-operator-v1.9-gitops-ocp4.14-lp-interop-images
+    rerun_command: /test gitops-ocp4.14-lp-interop-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=gitops-ocp4.14-lp-interop
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )gitops-ocp4.14-lp-interop-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^v1\.9$
+    - ^v1\.9-
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -97,7 +149,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.12-ci-index-gitops-operator-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.9$
     - ^v1\.9-
@@ -112,6 +164,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-v1.9-v4.12-e2e
     rerun_command: /test v4.12-e2e
+    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -220,7 +273,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.12-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.9$
     - ^v1\.9-
@@ -233,6 +286,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-v1.9-v4.12-kuttl-parallel
     rerun_command: /test v4.12-kuttl-parallel
+    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -283,7 +337,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.12-kuttl-parallel,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.9$
     - ^v1\.9-
@@ -296,6 +350,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-v1.9-v4.12-kuttl-sequential
     rerun_command: /test v4.12-kuttl-sequential
+    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -395,7 +450,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.13-ci-index-gitops-operator-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.9$
     - ^v1\.9-
@@ -410,6 +465,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-v1.9-v4.13-e2e
     rerun_command: /test v4.13-e2e
+    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -518,7 +574,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.13-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.9$
     - ^v1\.9-
@@ -531,6 +587,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-v1.9-v4.13-kuttl-parallel
     rerun_command: /test v4.13-kuttl-parallel
+    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -581,7 +638,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.13-kuttl-parallel,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.9$
     - ^v1\.9-
@@ -594,6 +651,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-v1.9-v4.13-kuttl-sequential
     rerun_command: /test v4.13-kuttl-sequential
+    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -693,7 +751,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.14-ci-index-gitops-operator-bundle,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.9$
     - ^v1\.9-
@@ -708,6 +766,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-v1.9-v4.14-e2e
     rerun_command: /test v4.14-e2e
+    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -816,7 +875,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.14-images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.9$
     - ^v1\.9-
@@ -831,6 +890,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-v1.9-v4.14-kuttl-parallel
     rerun_command: /test v4.14-kuttl-parallel
+    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
       - args:
@@ -890,7 +950,7 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )v4.14-kuttl-parallel,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^v1\.9$
     - ^v1\.9-
@@ -905,6 +965,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-redhat-developer-gitops-operator-v1.9-v4.14-kuttl-sequential
     rerun_command: /test v4.14-kuttl-sequential
+    skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
     spec:
       containers:
       - args:

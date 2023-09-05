@@ -19,6 +19,10 @@ declare vsphere_cluster
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+export HOME="${HOME:-/tmp/home}"
+export XDG_RUNTIME_DIR="${HOME}/run"
+export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
+mkdir -p "${XDG_RUNTIME_DIR}"
 
 declare -a vips
 mapfile -t vips < "${SHARED_DIR}/vips.txt"
@@ -31,10 +35,21 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 MACHINE_POOL_OVERRIDES=""
 RESOURCE_POOL_DEF=""
 set +o errexit
-VERSION=$(echo "${JOB_NAME}" | grep -o -E '4\.[0-9]+')
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc registry login
+
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
+VERSION=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+
 set -o errexit
 
 Z_VERSION=1000
+
 if [ ! -z ${VERSION} ]; then
   Z_VERSION=$(echo ${VERSION} | cut -d'.' -f2)
   echo "$(date -u --rfc-3339=seconds) - determined version is 4.${Z_VERSION}"
@@ -104,6 +119,11 @@ cat >> "${CONFIG}" << EOF
     apiVIP: "${vips[0]}"
     ingressVIP: "${vips[1]}"
 EOF
+fi
+
+if [ -f "${SHARED_DIR}"/enable_template_content.txt ]; then
+  echo "$(date -u --rfc-3339=seconds) - tamplate defined, appending to platform spec"
+  cat "${SHARED_DIR}"/enable_template_content.txt >> ${CONFIG}
 fi
 
 if [ -f ${STATIC_IPS} ]; then

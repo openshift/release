@@ -38,6 +38,12 @@ SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g'
 # Copy base operator code to home directory
 cp -r /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/ ${BASE_DIR}
 
+# custom per project ENV variables
+# shellcheck source=/dev/null
+if [ -f /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/.prow_ci.env ]; then
+  source /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/.prow_ci.env
+fi
+
 if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
   # when testing install_yamls patch, we can skip build process and
   #  validate using latest openstack-operator tag
@@ -225,11 +231,8 @@ make input
 oc kustomize ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/ | oc apply -f -
 sleep 60
 
-# Waiting for all services to be ready
-OPENSTACK_CONTROL_PLANE=$(oc get OpenStackControlPlane -o name)
-TEST_CONDITIONS_CMD=("echo testing condition={}; oc wait ${OPENSTACK_CONTROL_PLANE} --for=condition={} --timeout=-1s")
-oc get OpenStackControlPlane -o json | jq -r '.items[0].status.conditions[].type' | \
-timeout ${TIMEOUT_SERVICES_READY} xargs -d '\n' -I {} sh -c "${TEST_CONDITIONS_CMD[@]}"
+# Waiting for Openstack CR to be ready
+oc kustomize ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/ | oc wait --for condition=Ready --timeout="${TIMEOUT_SERVICES_READY}s" -f -
 
 # Basic validations after deploying
 oc project "${NS_SERVICES}"

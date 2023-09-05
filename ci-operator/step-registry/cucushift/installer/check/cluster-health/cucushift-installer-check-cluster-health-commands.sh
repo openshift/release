@@ -110,7 +110,7 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
     if oc get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Available") | .status' | grep -iv "True"; then
-        echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
+        echo >&2 "Some operators are not Available, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
 
@@ -121,7 +121,7 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
     if oc get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Progressing") | .status' | grep -iv "False"; then
-        echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
+        echo >&2 "Some operators are Progressing, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
 

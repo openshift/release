@@ -110,6 +110,7 @@ images:
     FROM src
     COPY oc /usr/bin/oc
     RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y nmstate
     # Cache dir must be accessible when running the integration tests
     RUN mkdir /.cache -m 0777
   from: src
@@ -500,7 +501,7 @@ tests:
   run_if_changed: openstack
   steps:
     cluster_profile: openstack-nfv
-    workflow: openshift-e2e-openstack-nfv
+    workflow: openshift-e2e-openstack-nfv-cgroupsv1
   timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-externallb
@@ -508,6 +509,45 @@ tests:
   steps:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-external-lb
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-ccpmso
+  optional: true
+  steps:
+    cluster_profile: openstack-vexxhost
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-ccpmso-zone
+  optional: true
+  steps:
+    cluster_profile: openstack-kuryr
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: openstack-manifests
   run_if_changed: openstack
@@ -726,6 +766,12 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-publicsubnets
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-dualstack-techpreview
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-dualstack
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

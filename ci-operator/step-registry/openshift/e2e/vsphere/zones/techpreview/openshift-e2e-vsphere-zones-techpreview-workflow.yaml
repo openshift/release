@@ -1,0 +1,28 @@
+workflow:
+  as: openshift-e2e-vsphere-zones-techpreview
+  steps:
+    pre:
+    - chain: ipi-vsphere-pre-zones
+    test:
+    - ref: openshift-e2e-test
+    post:
+    - chain: gather-network
+    - chain: gather-core-dump
+    - chain: ipi-vsphere-post
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      TEST_SKIPS: >-
+        \[sig-storage\] In-tree Volumes \[Driver\: vsphere\]\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should provide basic identity\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should adopt matching orphans and release non-matching pods\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should perform rolling updates and roll backs of template modifications with PVCs\|
+        StatefulSet Basic StatefulSet functionality \[StatefulSetBasic\] should not deadlock when a pod's predecessor fails\|
+        deletion of a PVC that is not in active use by a pod\|
+        PVC Protection Verify that scheduling of a pod that uses PVC that is being deleted fails and the pod becomes Unschedulable\|
+        PVC Protection Verify that PVC in active use by a pod is not removed immediately\|
+        Image info should display information about images\|
+        Networking should provide Internet connection for containers\|
+        Prometheus when installed on the cluster shouldn't report any alerts in firing state apart from Watchdog and AlertmanagerReceiversNotConfigured\|
+        Alerts shouldn't report any alerts in firing or pending state apart from Watchdog and AlertmanagerReceiversNotConfigured and have no gaps in Watchdog firing
+  documentation: |-
+     The origin E2E vsphere executes the common end-to-end test suite with an IPI installed multi-zoned vSphere cluster.

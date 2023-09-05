@@ -61,6 +61,10 @@ tests:
   commands: make verify-generate
   container:
     from: src
+- as: crds-sync
+  commands: make verify-crds-sync
+  container:
+    from: src
 - as: vendor
   commands: make verify-vendor
   container:
@@ -148,6 +152,22 @@ tests:
     test:
     - as: test
       commands: |
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-openstack-ipi
+- as: e2e-openstack-operator-zone
+  optional: true
+  run_if_changed: pkg/machineproviders/providers/openshift/machine/v1beta1/.*|.*openstack.*
+  steps:
+    cluster_profile: openstack-kuryr
+    test:
+    - as: test
+      commands: |
+        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         make e2e-presubmit
       from: src

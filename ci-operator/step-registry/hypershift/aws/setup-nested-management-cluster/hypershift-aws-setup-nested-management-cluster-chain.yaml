@@ -64,6 +64,11 @@ chain:
       # The kubeadmin-password secret is reconciled only after the kas is available so giving a few seconds to avoid racing and move forward otherwise. 
       sleep 15
       echo "Getting ${CLUSTER_NAME}-kubeadmin-password from namespace ${HYPERSHIFT_NAMESPACE}"
+      until \
+        oc get secret -n${HYPERSHIFT_NAMESPACE} ${CLUSTER_NAME}-kubeadmin-password 2> /dev/null; do
+          echo "$(date --rfc-3339=seconds) kubeadmin password not yet available"
+          sleep 5
+      done
       oc get secret -n${HYPERSHIFT_NAMESPACE} ${CLUSTER_NAME}-kubeadmin-password --template={{.data.password}} | base64 -d > ${SHARED_DIR}/kubeadmin-password
 
       bin/hypershift create kubeconfig --namespace=${HYPERSHIFT_NAMESPACE} --name=${CLUSTER_NAME} >${SHARED_DIR}/management_cluster_kubeconfig

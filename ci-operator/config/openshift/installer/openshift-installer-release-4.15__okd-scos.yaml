@@ -1,0 +1,140 @@
+base_images:
+  base:
+    name: "4.15"
+    namespace: origin
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+build_root:
+  from_repository: true
+images:
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: installer
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer-artifacts/Dockerfile.rhel
+  from: installer
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: installer-artifacts
+- build_args:
+  - name: TAGS
+    value: baremetal libvirt scos
+  dockerfile_path: images/baremetal/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: baremetal-installer
+promotion:
+  name: scos-4.15
+  namespace: origin
+releases:
+  initial:
+    integration:
+      name: scos-4.15
+      namespace: origin
+  latest:
+    integration:
+      include_built_images: true
+      name: scos-4.15
+      namespace: origin
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  baremetal-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  govet:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  installer-artifacts:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  libvirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  openstack-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  ovirt-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  unit:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+  upi-installer:
+    requests:
+      cpu: "3"
+      memory: 5Gi
+tests:
+- as: unit
+  commands: go test ./pkg/...
+  container:
+    from: src
+  optional: true
+  skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
+- as: verify-codegen
+  commands: IS_CONTAINER=TRUE ./hack/verify-codegen.sh
+  container:
+    from: src
+  optional: true
+- as: e2e-aws-ovn
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-gcp
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-aws-upgrade
+  optional: true
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg(/.+)?|cmd/openshift-install|terraform/providers)/(agent|alibabacloud|aws|azure|azurestack|baremetal|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-gcp-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- as: e2e-vsphere
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere
+zz_generated_metadata:
+  branch: release-4.15
+  org: openshift
+  repo: installer
+  variant: okd-scos
