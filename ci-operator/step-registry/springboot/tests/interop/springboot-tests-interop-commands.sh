@@ -10,6 +10,11 @@ API_URL="https://api.${CONSOLE_URL#"https://console-openshift-console.apps."}:64
 KUBEADMIN_PASSWORD=$(cat $SHARED_DIR/kubeadmin-password)
 RESULTS_FILE="/spring-boot-openshift-interop-tests/junit-report.xml"
 
+sleep 7200
+# Login as Kubadmin
+echo "Login as Kubeadmin to the test cluster at ${API_URL}..."
+./oc login -u kubeadmin -p "${KUBEADMIN_PASSWORD}" "${API_URL}" --insecure-skip-tls-verify=true
+
 # Archive results function
 function archive-results() {
     if [[ -f "${RESULTS_FILE}" ]] && [[ ! -f "${ARTIFACT_DIR}/junit_springboot_interop_results.xml" ]]; then
