@@ -57,19 +57,12 @@ resources:
       memory: 200Mi
 tests:
 - as: integration
-  steps:
-    test:
-    - as: testdb
-      commands: |
-        MYSQL_PASSWORD=zaphod
-        MYSQL_USER=test
-        MYSQL_DATABASE=test
-        mysql -utest -pzaphod -h 127.0.0.1 -P3306 -e 'exit'
-      from: trilliandb
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
+  commands: |
+    mysqladmin -uroot ping
+    cd /go/src/github.com/securesign/trillian/
+    ./integration/integration_test.sh
+  container:
+    from: src-db
 zz_generated_metadata:
   branch: release-next
   org: securesign
