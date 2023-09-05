@@ -1,29 +1,22 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
-  cron: 0 1 * * *
+  cluster: build05
+  cron: 0 10 * * 1
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: microshift
+  - base_ref: release-v1.4.x
+    org: redhat-developer
+    repo: service-binding-operator
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: "4.12"
     ci.openshift.io/generator: prowgen
+    job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-microshift-main-ocp-conformance-nightly
-  reporter_config:
-    slack:
-      channel: '#microshift-alerts'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  name: periodic-ci-redhat-developer-service-binding-operator-release-v1.4.x-4.12-acceptance-lp-rosa-hypershift-412
   spec:
     containers:
     - args:
@@ -32,8 +25,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ocp-conformance-nightly-cluster-profile
-      - --target=ocp-conformance-nightly
+      - --secret-dir=/usr/local/acceptance-lp-rosa-hypershift-412-cluster-profile
+      - --target=acceptance-lp-rosa-hypershift-412
+      - --variant=4.12
       command:
       - ci-operator
       image: ci-operator:latest
@@ -49,7 +43,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ocp-conformance-nightly-cluster-profile
+      - mountPath: /usr/local/acceptance-lp-rosa-hypershift-412-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -73,7 +67,7 @@ periodics:
         secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
-        secretName: cluster-secrets-aws
+        secretName: cluster-secrets-aws-cspi-qe
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -81,30 +75,23 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build02
-  cron: 0 1 * * *
+  cluster: build05
+  cron: 0 6 23 11 *
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: microshift
+  - base_ref: release-v1.4.x
+    org: redhat-developer
+    repo: service-binding-operator
   labels:
     ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: "4.13"
     ci.openshift.io/generator: prowgen
+    job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-microshift-main-ocp-metal-nightly
-  reporter_config:
-    slack:
-      channel: '#microshift-alerts'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  name: periodic-ci-redhat-developer-service-binding-operator-release-v1.4.x-4.13-acceptance-lp-interop
   spec:
     containers:
     - args:
@@ -113,8 +100,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/ocp-metal-nightly-cluster-profile
-      - --target=ocp-metal-nightly
+      - --secret-dir=/usr/local/acceptance-lp-interop-cluster-profile
+      - --target=acceptance-lp-interop
+      - --variant=4.13
       command:
       - ci-operator
       image: ci-operator:latest
@@ -130,7 +118,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/ocp-metal-nightly-cluster-profile
+      - mountPath: /usr/local/acceptance-lp-interop-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -154,7 +142,7 @@ periodics:
         secretName: ci-pull-credentials
     - name: cluster-profile
       secret:
-        secretName: cluster-secrets-aws
+        secretName: cluster-secrets-aws-cspi-qe
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -162,35 +150,34 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build03
-  cron: 0 5 * * 1-5
+  cluster: build05
+  cron: 0 10 * * 1
   decorate: true
   decoration_config:
     skip_cloning: true
   extra_refs:
-  - base_ref: main
-    org: openshift
-    repo: microshift
+  - base_ref: release-v1.4.x
+    org: redhat-developer
+    repo: service-binding-operator
   labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: "4.13"
     ci.openshift.io/generator: prowgen
+    job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-microshift-main-rebase-on-nightlies
-  reporter_config:
-    slack:
-      channel: '#microshift-alerts'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: '<@here> :red_jenkins_circle: Job *{{.Spec.Job}}* ended with
-        *{{.Status.State}}*. <{{.Status.URL}}|View logs>'
+  name: periodic-ci-redhat-developer-service-binding-operator-release-v1.4.x-4.13-acceptance-lp-rosa-hypershift
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --target=rebase-on-nightlies
+      - --secret-dir=/usr/local/acceptance-lp-rosa-hypershift-cluster-profile
+      - --target=acceptance-lp-rosa-hypershift
+      - --variant=4.13
       command:
       - ci-operator
       image: ci-operator:latest
@@ -200,9 +187,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
+      - mountPath: /usr/local/acceptance-lp-rosa-hypershift-cluster-profile
+        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
@@ -214,9 +206,93 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-cspi-qe
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 0 6 23 11 *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: release-v1.4.x
+    org: redhat-developer
+    repo: service-binding-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
+    ci-operator.openshift.io/variant: "4.14"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-redhat-developer-service-binding-operator-release-v1.4.x-4.14-acceptance-lp-interop
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/acceptance-lp-interop-cluster-profile
+      - --target=acceptance-lp-interop
+      - --variant=4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/acceptance-lp-interop-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-cspi-qe
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
