@@ -3,15 +3,14 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.5$
-    cluster: build05
+    - ^release-ocm-2\.9$
+    cluster: build01
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
     max_concurrency: 1
-    name: branch-ci-openshift-assisted-service-release-ocm-2.5-assisted-operator-catalog-publish
+    name: branch-ci-openshift-assisted-service-release-ocm-2.9-assisted-operator-catalog-publish
     spec:
       containers:
       - args:
@@ -55,16 +54,15 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.5$
-    cluster: build05
+    - ^release-ocm-2\.9$
+    cluster: build01
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
     max_concurrency: 1
-    name: branch-ci-openshift-assisted-service-release-ocm-2.5-images
+    name: branch-ci-openshift-assisted-service-release-ocm-2.9-images
     spec:
       containers:
       - args:
@@ -109,8 +107,8 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.5$
-    cluster: build05
+    - ^release-ocm-2\.9$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -119,7 +117,7 @@ postsubmits:
       ci-operator.openshift.io/variant: mce
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-assisted-service-release-ocm-2.5-mce-images
+    name: branch-ci-openshift-assisted-service-release-ocm-2.9-mce-images
     spec:
       containers:
       - args:
@@ -165,8 +163,8 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.5$
-    cluster: build05
+    - ^release-ocm-2\.9$
+    cluster: build01
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -174,14 +172,15 @@ postsubmits:
       ci-operator.openshift.io/variant: mce
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-assisted-service-release-ocm-2.5-mce-mce-publish
+    name: branch-ci-openshift-assisted-service-release-ocm-2.9-mce-publish
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=mce-publish
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=publish
         - --variant=mce
         command:
         - ci-operator
@@ -192,6 +191,9 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
@@ -203,6 +205,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -212,15 +217,14 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.5$
-    cluster: build05
+    - ^release-ocm-2\.9$
+    cluster: build01
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
     max_concurrency: 1
-    name: branch-ci-openshift-assisted-service-release-ocm-2.5-mirror-vcsref-image
+    name: branch-ci-openshift-assisted-service-release-ocm-2.9-mirror-vcsref-image
     spec:
       containers:
       - args:
@@ -264,15 +268,14 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.5$
-    cluster: build05
+    - ^release-ocm-2\.9$
+    cluster: build01
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
     max_concurrency: 1
-    name: branch-ci-openshift-assisted-service-release-ocm-2.5-operator-publish
+    name: branch-ci-openshift-assisted-service-release-ocm-2.9-operator-publish
     spec:
       containers:
       - args:
@@ -316,15 +319,65 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-ocm-2\.5$
-    cluster: build05
+    - ^release-ocm-2\.9$
+    cluster: build01
     decorate: true
-    decoration_config:
-      skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
+      job-release: "4.14"
     max_concurrency: 1
-    name: branch-ci-openshift-assisted-service-release-ocm-2.5-unit-test-postsubmit
+    name: branch-ci-openshift-assisted-service-release-ocm-2.9-publish-python-client
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=publish-python-client
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: ci-pull-credentials
+        secret:
+          secretName: ci-pull-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^release-ocm-2\.9$
+    cluster: build01
+    decorate: true
+    labels:
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+    max_concurrency: 1
+    name: branch-ci-openshift-assisted-service-release-ocm-2.9-unit-test-postsubmit
     spec:
       containers:
       - args:
@@ -359,58 +412,6 @@ postsubmits:
       - name: assisted-service-codecov-token
         secret:
           secretName: assisted-service-codecov-token
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^release-ocm-2\.5$
-    cluster: build05
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-assisted-service-release-ocm-2.5-verify-generated-code-postsubmit
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=verify-generated-code-postsubmit
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
