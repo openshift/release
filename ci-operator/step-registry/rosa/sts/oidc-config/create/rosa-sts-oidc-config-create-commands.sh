@@ -51,5 +51,5 @@ fi
 echo "Create the managed=${OIDC_CONFIG_MANAGED} oidc config ..."
 rosa create oidc-config -y --mode auto --output json\
                         ${MANAGED_SWITCH} \
-                        > "${ARTIFACT_DIR}/oidc-config"
-cat "${ARTIFACT_DIR}/oidc-config"
+                        > "${SHARED_DIR}/oidc-config"
+cat "${SHARED_DIR}/oidc-config"

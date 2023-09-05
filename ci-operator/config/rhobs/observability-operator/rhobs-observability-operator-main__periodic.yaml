@@ -1,8 +1,23 @@
 base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
   osde2e:
     name: osde2e
     namespace: ci
     tag: latest
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -36,6 +51,29 @@ tests:
     name: osde2e-credentials
   - mount_path: /usr/local/osde2e-rosa-stage
     name: osde2e-rosa-stage
+- as: ocp414-compat
+  cron: 0 8 * * 4
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+    test:
+    - as: obo-e2e
+      cli: latest
+      commands: |
+        if ! which kubectl; then
+            mkdir -p /tmp/obo
+            export PATH=$PATH:/tmp/obo
+            ln -s "$(which oc)" /tmp/obo/kubectl
+        fi
+        export GOFLAGS=""
+        ./test/run-e2e-ocp.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: rhobs
