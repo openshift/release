@@ -301,9 +301,9 @@ if [[ "$CNF_BRANCH" == *"4.14"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
     create_tests_temp_skip_list_14
     export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
 fi
-if [[ "$CNF_BRANCH" == *"4.15"* ]] || [[ "$CNF_BRANCH" == *"master"* ]]; then
+if [[ "$T5CI_VERSION" == "4.15" ]]; then
     create_tests_temp_skip_list_15
-    export GINKGO_PARAMS=" --ginkgo.timeout 230m -ginkgo.slowSpecThreshold=0.001 -ginkgo.v -ginkgo.show-node-events --ginkgo.json-report ${ARTIFACT_DIR}/test_ginkgo.json --ginkgo.flake-attempts 4"
+    export GINKGO_PARAMS=" --timeout 230m -slow-spec-threshold=0.001s -v --show-node-events --json-report test_ginkgo.json --flake-attempts 4"
 fi
 cp "$SKIP_TESTS_FILE" "${ARTIFACT_DIR}/"
 
@@ -343,6 +343,10 @@ export CNF_NODES="${test_nodes}"
 pushd $CNF_REPO_DIR
 status=0
 val_status=0
+
+if [[ "$T5CI_VERSION" == "4.15" ]]; then
+    git submodule update --init --force --recursive
+fi
 
 if [[ -n "$skip_tests" ]]; then
     export SKIP_TESTS="${skip_tests}"
