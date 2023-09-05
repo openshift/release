@@ -16,7 +16,7 @@ echo "Copying kubeconfig into /.kube/config"
 cp $SHARED_DIR/kubeconfig /.kube/config
 
 # Add /spring-boot-openshift-interop-tests/oc to $PATH to use the oc client that is copied in 
-# export PATH="/spring-boot-openshift-interop-tests/oc:$PATH"
+export PATH="/spring-boot-openshift-interop-tests/oc:$PATH"
 
 # Login as Kubadmin
 echo "Login as Kubeadmin to the test cluster at ${API_URL}..."
