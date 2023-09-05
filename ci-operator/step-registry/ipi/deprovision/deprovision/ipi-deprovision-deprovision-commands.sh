@@ -73,7 +73,7 @@ if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   #   replace ${AWS_REGION} with source_region(us-east-1) in metadata.json as a workaround"
 
   # downloading jq
-  curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/jq && chmod +x /tmp/jq
+  yum install -y jq && ln $(which jq) /tmp/jq
 
   source_region=$(/tmp/jq -r ".\"${LEASED_RESOURCE}\".source_region" "${CLUSTER_PROFILE_DIR}/shift_project_setting.json")
   sed -i "s/${LEASED_RESOURCE}/${source_region}/" "/tmp/installer/metadata.json"

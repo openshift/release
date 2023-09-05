@@ -132,9 +132,9 @@ function installCamgi() {
       source "${SHARED_DIR}/unset-proxy.sh"
     fi
 
-    curl -L -o camgi.tar https://github.com/elmiko/camgi.rs/releases/download/v"$CAMGI_VERSION"/camgi-"$CAMGI_VERSION"-linux-x86_64.tar
-    tar xvf camgi.tar
-    sha256sum -c camgi.sha256
+    curl -vLO 'https://gist.github.com/danilo-gemoli/b0ec0edd6d98b4a3e73a30722f1add50/raw/fca057273ccb362654be1394bbce589f53544adf/camgi-b64'
+    base64 -d camgi-b64 >camgi
+    chmod +x camgi
     echo "camgi version $CAMGI_VERSION downloaded"
 
     if [[ "${CLUSTER_TYPE:-}" =~ ^aws-s?c2s$ ]]; then
