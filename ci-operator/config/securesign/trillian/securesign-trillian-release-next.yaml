@@ -26,8 +26,7 @@ images:
     ENV MYSQL_DATABASE=test
     ENV mysql_flags="-pzaphod -utest"
     USER 27
-    ENTRYPOINT ["container-entrypoint"]
-    CMD ["run-mysqld"]
+    RUN systemctl enable mariadb
   from: trilliandb
   inputs:
     openshift_release_golang-1.19:
@@ -61,7 +60,6 @@ tests:
     - as: setup
       commands: |
         sleep 1m
-      from: src-db
       resources:
         requests:
           cpu: 100m
@@ -71,11 +69,13 @@ tests:
       commands: |
         cd /go/src/github.com/securesign/trillian/
         ./integration/integration_test.sh
-      from: src-db
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
+  container:
+    from: src-db
+
 zz_generated_metadata:
   branch: release-next
   org: securesign
