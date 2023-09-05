@@ -7,6 +7,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   hypershift-operator-initial:
     name: "4.14"
     namespace: ocp
@@ -115,6 +119,14 @@ tests:
       ETCD_STORAGE_CLASS: gp3-csi
       KUBEVIRT_CSI_INFRA: gp3-csi
     workflow: hypershift-kubevirt-e2e
+- as: hypershift-kubevirt-baremetalds-e2e
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      CNV_PRERELEASE_VERSION: "4.14"
+      ODF_OPERATOR_SUB_CHANNEL: stable-4.13
+    workflow: hypershift-kubevirt-baremetalds-e2e
 - as: e2e-aws-4-12
   optional: true
   steps:

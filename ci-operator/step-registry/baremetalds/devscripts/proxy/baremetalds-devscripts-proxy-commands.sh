@@ -12,7 +12,7 @@ source "${SHARED_DIR}/packet-conf.sh"
 
 # Setup a squid proxy for accessing the cluster
 # shellcheck disable=SC2087 # We need $CLUSTERTYPE in the here doc to expand locally
-ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
+ssh "${SSHOPTS[@]}" "root@${IP}" bash -e - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
 sudo dnf install -y podman firewalld
 
 # The default "10:30:100" results in connections being rejected
