@@ -11,9 +11,16 @@ KUBEADMIN_PASSWORD=$(cat $SHARED_DIR/kubeadmin-password)
 RESULTS_FILE="/spring-boot-openshift-interop-tests/junit-report.xml"
 
 sleep 7200
+# Copy $SHARED_DIR/kubeconfig into /.kube/config
+echo "Copying kubeconfig into /.kube/config"
+cp $SHARED_DIR/kubeconfig /.kube/config
+
+# Add /spring-boot-openshift-interop-tests/oc to $PATH to use the oc client that is copied in 
+# export PATH="/spring-boot-openshift-interop-tests/oc:$PATH"
+
 # Login as Kubadmin
 echo "Login as Kubeadmin to the test cluster at ${API_URL}..."
-./oc login -u kubeadmin -p "${KUBEADMIN_PASSWORD}" "${API_URL}" --insecure-skip-tls-verify=true
+oc login -u kubeadmin -p "${KUBEADMIN_PASSWORD}" "${API_URL}" --insecure-skip-tls-verify=true
 
 # Archive results function
 function archive-results() {
