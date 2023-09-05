@@ -64,8 +64,8 @@ EOF
 if [ -z "${OUTBOUND_TYPE}" ]; then
   echo "Outbound Type is not defined"
 else
-  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ]; then
-    echo "Writing 'outboundType: UserDefinedRouting' to install-config"
+  if [ X"${OUTBOUND_TYPE}" == X"UserDefinedRouting" ] || [ X"${OUTBOUND_TYPE}" == X"NatGateway" ]; then
+    echo "Writing 'outboundType: ${OUTBOUND_TYPE}' to install-config"
     PATCH="${SHARED_DIR}/install-config-outboundType.yaml.patch"
     cat > "${PATCH}" << EOF
 platform:
