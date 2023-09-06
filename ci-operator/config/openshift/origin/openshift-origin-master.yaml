@@ -11,6 +11,10 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
+  hypershift-operator:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -390,6 +394,12 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
+- as: e2e-aws-ovn-kubevirt
+  optional: true
+  run_if_changed: ^test/extended/kubevirt/.*
+  steps:
+    cluster_profile: aws
+    workflow: hypershift-kubevirt-conformance
 zz_generated_metadata:
   branch: master
   org: openshift
