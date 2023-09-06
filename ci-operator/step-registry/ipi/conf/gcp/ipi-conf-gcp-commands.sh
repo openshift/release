@@ -20,7 +20,7 @@ fi
 # Do not change the default family type without consulting with cloud financial operations as their may
 # be active savings plans targeting this machine class.
 master_type=""
-master_type_suffix="-standard-4"
+master_type_suffix="-standard-16"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   master_type_suffix="-standard-32"
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
