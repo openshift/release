@@ -439,20 +439,20 @@ __check_defined = \
 
 # yq: https://github.com/mikefarah/yq
 yq ?= yq
-
+TAG ?= latest
 generate-hypershift-deployment:
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
 
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/hypershift-cli:latest
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/hypershift-cli:${TAG}
 	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} \
 		--rm \
 		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
-		registry.ci.openshift.org/ci/hypershift-cli:latest \
+		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		install \
 		--oidc-storage-provider-s3-bucket-name=hypershift-oidc-provider \
 		--oidc-storage-provider-s3-credentials=/mgmt-aws \
 		--oidc-storage-provider-s3-region=us-east-1 \
-		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:latest \
+		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		--enable-uwm-telemetry-remote-write=false \
 		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hive/hypershift/hypershift-install.yaml
 .PHONY: generate-hypershift-deployment

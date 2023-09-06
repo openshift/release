@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
@@ -12,22 +14,6 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
 # so that the credentials of the build farm registry can be saved in docker client config file.
 KUBECONFIG="" oc registry login
-
-# get OCP version, e.g. "4.12"
-function getVersion() {
-  local release_image=""
-  if [ -n "${RELEASE_IMAGE_INITIAL-}" ]; then
-    release_image=${RELEASE_IMAGE_INITIAL}
-  elif [ -n "${RELEASE_IMAGE_LATEST-}" ]; then
-    release_image=${RELEASE_IMAGE_LATEST}     
-  fi
-  
-  local version=""
-  if [ ${release_image} != "" ]; then
-    version=$(oc adm release info ${release_image} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)    
-  fi
-  echo "${version}"
-}
 
 # check if controlplanemachinesets is supported by the IaaS and the OCP version
 # return 0 if controlplanemachinesets is supported, otherwise 1
@@ -56,8 +42,8 @@ function hasCPMS() {
         ;;
     esac    
 
-    version=$(getVersion)
-    #echo "OCP version: ${version}"
+    version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+    echo "OCP version: ${version}"
     if [ -n "${version}" ] && [ "$(printf '%s\n' "${REQUIRED_OCP_VERSION}" "${version}" | sort --version-sort | head -n1)" = "${REQUIRED_OCP_VERSION}" ]; then
         ret=0
     fi

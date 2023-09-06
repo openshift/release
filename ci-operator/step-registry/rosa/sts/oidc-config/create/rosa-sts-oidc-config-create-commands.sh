@@ -42,8 +42,8 @@ if [[ "$OIDC_CONFIG_MANAGED" == "false" ]]; then
   # if [[ "$HOSTED_CP" == "true" ]]; then
   #   account_installer_role_name="${ACCOUNT_ROLES_PREFIX}-HCP-ROSA-Installer-Role"
   # fi
-  # account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arn" | { grep "${account_installer_role_name}" || true; })
-  account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arn" | { grep "Installer-Role" || true; })  
+  # account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arns" | { grep "${account_installer_role_name}" || true; })
+  account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arns" | { grep "Installer-Role" || true; })  
   MANAGED_SWITCH="${MANAGED_SWITCH} --prefix ${OIDC_CONFIG_PREFIX} --installer-role-arn ${account_installer_role_arn}"
 fi
 

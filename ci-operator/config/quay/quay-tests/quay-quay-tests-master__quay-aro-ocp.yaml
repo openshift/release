@@ -1,10 +1,10 @@
 base_images:
   cli:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: cli
   upi-installer:
-    name: "4.13"
+    name: "4.14"
     namespace: ocp
     tag: upi-installer
 build_root:
@@ -18,7 +18,7 @@ releases:
       architecture: amd64
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -27,21 +27,40 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: quay-e2e-tests-quay38-aro-ocp413
+- as: quay-e2e-tests-quay39-aro-ocp414
   cron: 0 12 * * 3
   steps:
     cluster_profile: azure-qe
     env:
       ARO_WORKER_COUNT: "6"
       ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CSO_CHANNEL: stable-3.9
+      QBO_CHANNEL: stable-3.9
+      QUAY_OPERATOR_CHANNEL: stable-3.9
     test:
     - ref: quay-tests-deploy-quay-azure
     - ref: quay-tests-test-quay-e2e
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: cucushift-installer-rehearse-azure-aro
-- as: quay-e2e-tests-quay37-aro-ocp413
+- as: quay-e2e-tests-quay38-aro-ocp414
   cron: 0 12 * * 4
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ARO_WORKER_COUNT: "6"
+      ARO_WORKER_VM_SIZE: Standard_D8s_v3
+      CSO_CHANNEL: stable-3.8
+      QBO_CHANNEL: stable-3.8
+      QUAY_OPERATOR_CHANNEL: stable-3.8
+    test:
+    - ref: quay-tests-deploy-quay-azure
+    - ref: quay-tests-test-quay-e2e
+    - ref: quay-tests-qbo-qe-test
+    - ref: quay-tests-cso-qe-test
+    workflow: cucushift-installer-rehearse-azure-aro
+- as: quay-e2e-tests-quay37-aro-ocp414
+  cron: 0 12 * * 5
   steps:
     cluster_profile: azure-qe
     env:
@@ -56,24 +75,8 @@ tests:
     - ref: quay-tests-qbo-qe-test
     - ref: quay-tests-cso-qe-test
     workflow: cucushift-installer-rehearse-azure-aro
-- as: quay-e2e-tests-quay36-aro-ocp413
-  cron: 0 12 * * 5
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ARO_WORKER_COUNT: "6"
-      ARO_WORKER_VM_SIZE: Standard_D8s_v3
-      CSO_CHANNEL: stable-3.6
-      QBO_CHANNEL: stable-3.6
-      QUAY_OPERATOR_CHANNEL: stable-3.6
-    test:
-    - ref: quay-tests-deploy-quay-azure
-    - ref: quay-tests-test-quay-e2e
-    - ref: quay-tests-qbo-qe-test
-    - ref: quay-tests-cso-qe-test
-    workflow: cucushift-installer-rehearse-azure-aro
 zz_generated_metadata:
   branch: master
   org: quay
   repo: quay-tests
-  variant: quay38-aro-ocp413
+  variant: quay-aro-ocp
