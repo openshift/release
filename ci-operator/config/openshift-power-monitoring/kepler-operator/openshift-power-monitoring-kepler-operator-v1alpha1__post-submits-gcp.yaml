@@ -32,9 +32,8 @@ operator:
     with: pipeline:kepler-operator
 releases:
   latest:
-    candidate:
-      product: ocp
-      stream: nightly
+    release:
+      channel: stable
       version: "4.13"
 resources:
   '*':
@@ -43,24 +42,18 @@ resources:
       memory: 200Mi
 tests:
 - as: kepler-operator-e2e
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.13"
   postsubmit: true
   steps:
+    cluster_profile: gcp
     test:
     - as: install
       cli: latest
       commands: |
         operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
         oc wait --for condition=Available -n openshift-operators \
-        --timeout=300s deployment kepler-operator-controller-manager
+          --timeout=300s deployment kepler-operator-controller-manager
         oc logs -n openshift-operators \
-        deployment/kepler-operator-controller-manager
+          deployment/kepler-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: kepler-bundle
@@ -71,9 +64,9 @@ tests:
           memory: 400Mi
     - ref: openshift-power-monitoring-install-kepler
     - ref: openshift-power-monitoring-tests-kepler
-    workflow: generic-claim
+    workflow: openshift-e2e-gcp
 zz_generated_metadata:
   branch: v1alpha1
   org: openshift-power-monitoring
   repo: kepler-operator
-  variant: post-submits
+  variant: post-submits-gcp
