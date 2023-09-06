@@ -161,7 +161,7 @@ function reset_host() {
     ampere)
       ipmitool -I lanplus -H "$bmc_address" \
         -U "$bmc_user" -P "$bmc_pass" \
-        chassis bootdev "$efi_ipmi_boot_selection" options=PEF,watchdog,reset,power,efiboot
+        chassis bootdev "$efi_ipmi_boot_selection" options=efiboot
         #chassis bootparam set bootflag "$ipmi_boot_selection" options=PEF,watchdog,reset,power
         
     ;;
