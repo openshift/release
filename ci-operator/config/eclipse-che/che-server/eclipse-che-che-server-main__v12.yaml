@@ -65,7 +65,6 @@ tests:
     - as: che-server-test
       cli: latest
       commands: |
-        export GITHUB_USER_ID=$(cat /usr/local/ci-secrets/github/gh-user-id)
         export GITHUB_PAT=$(cat /usr/local/ci-secrets/github/gh-pat)
         /bin/bash .ci/openshift-ci/test-github-with-pat-setup-flow.sh
       credentials:
@@ -85,13 +84,44 @@ tests:
     - as: che-server-test
       cli: latest
       commands: |
-        export GITLAB_USER_ID=$(cat /usr/local/ci-secrets/gitlab/gl-user-id)
         export GITLAB_PAT=$(cat /usr/local/ci-secrets/gitlab/gl-pat)
         /bin/bash .ci/openshift-ci/test-gitlab-with-pat-setup-flow.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/gitlab
         name: gitlab
         namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: azure-with-pat-setup-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export AZURE_PAT=$(cat /usr/local/ci-secrets/azure/azure-pat)
+        /bin/bash .ci/openshift-ci/test-azure-with-pat-setup-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/azure
+        name: dev-azure
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: azure-no-pat-oauth-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-azure-no-pat-oauth-flow.sh
       from: src
       resources:
         requests:

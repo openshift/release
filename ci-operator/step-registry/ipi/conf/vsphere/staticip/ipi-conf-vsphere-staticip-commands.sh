@@ -26,50 +26,50 @@ cat >> "${STATIC_IPS}" << EOF
     - role: bootstrap
       networkDevice:
         ipAddrs:
-        - 192.168.${third_octet}.4/24
-        gateway4: 192.168.${third_octet}.1
-        nameservers:
-        - ${dns_server}
-    - role: control-plane
-      networkDevice:
-        ipAddrs:
         - 192.168.${third_octet}.5/24
-        gateway4: 192.168.${third_octet}.1
+        gateway: 192.168.${third_octet}.1
         nameservers:
         - ${dns_server}
     - role: control-plane
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.6/24
-        gateway4: 192.168.${third_octet}.1
+        gateway: 192.168.${third_octet}.1
         nameservers:
         - ${dns_server}
     - role: control-plane
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.7/24
-        gateway4: 192.168.${third_octet}.1
+        gateway: 192.168.${third_octet}.1
         nameservers:
         - ${dns_server}
-    - role: compute
+    - role: control-plane
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.8/24
-        gateway4: 192.168.${third_octet}.1
+        gateway: 192.168.${third_octet}.1
         nameservers:
         - ${dns_server}
     - role: compute
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.9/24
-        gateway4: 192.168.${third_octet}.1
+        gateway: 192.168.${third_octet}.1
         nameservers:
         - ${dns_server}
     - role: compute
       networkDevice:
         ipAddrs:
         - 192.168.${third_octet}.10/24
-        gateway4: 192.168.${third_octet}.1
+        gateway: 192.168.${third_octet}.1
+        nameservers:
+        - ${dns_server}
+    - role: compute
+      networkDevice:
+        ipAddrs:
+        - 192.168.${third_octet}.11/24
+        gateway: 192.168.${third_octet}.1
         nameservers:
         - ${dns_server}
 EOF

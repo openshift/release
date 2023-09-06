@@ -23,7 +23,7 @@ EOF
 }
 
 function exit_with_failure(){
-  MESSAGE="baremetalds: ${1:-"Failed to create ci resource: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"}"
+  MESSAGE="baremetalds: ${1:-"Failed to create ci resource: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"}"
   echo $MESSAGE
   cat >"${ARTIFACT_DIR}/junit_metal_setup.xml" <<EOF
   <testsuite name="metal infra" tests="1" failures="1">
@@ -227,7 +227,7 @@ cat > packet-setup.yaml <<-EOF
         dest="${SHARED_DIR}/hosts.json"
 EOF
 
-ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
+ansible-playbook packet-setup.yaml -e "packet_hostname=ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"  |& gawk '{ print strftime("%Y-%m-%d %H:%M:%S"), $0; fflush(); }'
 
 DEVICEID=$(jq -r .devices[0].id < ${SHARED_DIR}/hosts.json)
 
@@ -244,8 +244,8 @@ for _ in $(seq 30) ; do
     if [ "$STATE" == "active" ] && [ -n "$IP" ] ; then
         echo "$IP" >  "${SHARED_DIR}/server-ip"
         # This also has 100 seconds worth of ssh retries
-        bash ${SHARED_DIR}/packet-conf.sh && exit_with_success || exit_with_failure "Failed to initialize equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+        bash ${SHARED_DIR}/packet-conf.sh && exit_with_success || exit_with_failure "Failed to initialize equinix device: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"
     fi
 done
 
-exit_with_failure "Failed to create equinix device: ipi-${NAMESPACE}-${JOB_NAME_HASH}-${BUILD_ID}"
+exit_with_failure "Failed to create equinix device: ipi-${NAMESPACE}-${UNIQUE_HASH}-${BUILD_ID}"

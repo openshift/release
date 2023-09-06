@@ -1,0 +1,24 @@
+workflow:
+  as: openshift-e2e-openstack-hwoffload-cgroupsv1
+  steps:
+    pre:
+      - chain: ipi-openstack-pre-cgroupsv1
+      - ref: openstack-provision-performanceprofile
+      - ref: openstack-provision-sriov-worker
+      - ref: operator-pipelines-preflight-common-health
+      - ref: openstack-provision-sriov-operator
+      - ref: openstack-provision-sriov-networknodepolicy
+    test:
+      - ref: openstack-test-sriov
+    post:
+      - chain: ipi-openstack-post
+    env:
+      ADDITIONAL_WORKERS_NETWORKS: ""
+      BASE_DOMAIN: shiftstack.devcluster.openshift.com
+      CONFIG_TYPE: "minimal"
+      OPENSTACK_SRIOV_NETWORK: "mellanox-hwoffload"
+      OPERATOR_HEALTH_TIMEOUT: 30
+      WORKER_REPLICAS: 0
+  documentation: |-
+    The openshift-e2e-openstack-hwoffload workflow executes an installation of
+    OpenShift on OpenStack with cgroupsv1 in OVS HW offload environment and run SR-IOV tests.

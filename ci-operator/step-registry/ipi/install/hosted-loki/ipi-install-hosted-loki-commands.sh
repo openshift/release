@@ -16,7 +16,9 @@ then
   exit 0
 fi
 
-if [[ "$JOB_NAME" =~ .*proxy.* ]]
+# Some kinds of jobs need to skip installing loki by default; but to make
+# sure we rightfully skip them, we have two different conditions.
+if [[ "$JOB_NAME" =~ .*proxy.* ]] || test -f "${SHARED_DIR}/proxy-conf.sh"
 then
   echo "Clusters using a proxy are not yet supported for loki"
   exit 0
@@ -125,9 +127,9 @@ data:
       # This will allow us to search events globally with a namespace label that matches the actual event.
       - match:
           selector: '{app="event-exporter", namespace="openshift-e2e-loki"}'
-          stages:          
+          stages:
             # Two json stages to access the nested metadata.namespace field:
-            - json: 
+            - json:
                 expressions:
                   metadata:
             - json:
@@ -138,12 +140,16 @@ data:
                 namespace:
             - static_labels:
                 type: kube-event
-      # For anything that is outside an openshift- namespace, we will pack it into the entry to 
+      # For anything that is outside an openshift- namespace, we will pack it into the entry to
       # dramatically improve cardinality. These would typically be temporary namespaces with random
       # names created by e2e tests. We still keep their logs, you just don't get a fast label filter
       # to find them globally by namespace.
+      #
+      # We had to resort to a fixed list here because there are a lot of openshift-RAND namespaces created.
+      # (must-gather, debug, amq, test, etc) If you want your namespaces to get it's own indexed namespace
+      # label, add it here, in alphabetical order, and to the near identical line below with =~ instead of !~.
       - match:
-          selector: '{namespace!~"openshift-.*"}'
+          selector: '{namespace!~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-package-operator|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
           stages:
           - pack:
               labels:
@@ -154,7 +160,7 @@ data:
               - pod
       # If this entry is in an openshift- namespace, we don't pack the namespace (it remains a real label):
       - match:
-          selector: '{namespace=~"openshift-.*"}'
+          selector: '{namespace=~"openshift-addon-operator|openshift-apiserver|openshift-apiserver-operator|openshift-authentication|openshift-authentication-operator|openshift-cloud-controller-manager|openshift-cloud-controller-manager-operator|openshift-cloud-credential-operator|openshift-cloud-ingress-operator|openshift-cloud-network-config-controller|openshift-cluster-csi-drivers|openshift-cluster-machine-approver|openshift-cluster-node-tuning-operator|openshift-cluster-samples-operator|openshift-cluster-storage-operator|openshift-cluster-version|openshift-config|openshift-config-managed|openshift-config-operator|openshift-console|openshift-console-operator|openshift-console-user-settings|openshift-controller-manager|openshift-controller-manager-operator|openshift-custom-domains-operator|openshift-dns|openshift-dns-operator|openshift-etcd|openshift-etcd-operator|openshift-host-network|openshift-image-registry|openshift-infra|openshift-ingress|openshift-ingress-canary|openshift-ingress-operator|openshift-insights|openshift-kni-infra|openshift-kube-apiserver|openshift-kube-apiserver-operator|openshift-kube-controller-manager|openshift-kube-controller-manager-operator|openshift-kube-scheduler|openshift-kube-scheduler-operator|openshift-kube-storage-version-migrator|openshift-kube-storage-version-migrator-operator|openshift-logging|openshift-machine-api|openshift-machine-config-operator|openshift-managed-node-metadata-operator|openshift-managed-upgrade-operator|openshift-marketplace|openshift-monitoring|openshift-multus|openshift-network-diagnostics|openshift-network-operator|openshift-node|openshift-nutanix-infra|openshift-oauth-apiserver|openshift-observability-operator|openshift-ocm-agent-operator|openshift-openstack-infra|openshift-operator-lifecycle-manager|openshift-operators|openshift-operators-redhat|openshift-osd-metrics|openshift-ovirt-infra|openshift-package-operator|openshift-priv|openshift-rbac-permissions|openshift-route-controller-manager|openshift-route-monitor-operator|openshift-sdn|openshift-security|openshift-service-ca|openshift-service-ca-operator|openshift-service-catalog-removed|openshift-user-workload-monitoring|openshift-validation-webhook|openshift-vsphere-infra"}'
           stages:
           - pack:
               labels:
@@ -209,13 +215,29 @@ data:
       - labeldrop:
         - filename
         - stream
-      - pack:
-          labels:
-          - boot_id
-          - systemd_unit
-          - host
+      - match:
+          # To get labels for a new systemd_unit exclude it by adding it in the selector here and include
+          # it by adding it in the selector below.  For any systemd_units, besides these, we will pack
+          # (i.e., no label) to avoid high cardinality.
+          selector: '{systemd_unit!~"auditd.service|crio.service|kubelet.service|NetworkManager.service|ovs-vswitchd.service|ovs-configuration.service|ovsdb-server.service"}'
+          stages:
+          - pack:
+              labels:
+              - boot_id
+              - systemd_unit
+              - host
+      - match:
+          # These systemd_units will get a systemd_unit label; if you add one, be sure to monitor number of
+          # Active Streams in Loki Dashboard to avoid over burdening our instance of Promtail/Loki.
+          selector: '{systemd_unit=~"auditd.service|crio.service|kubelet.service|NetworkManager.service|ovs-vswitchd.service|ovs-configuration.service|ovsdb-server.service"}'
+          stages:
+          - pack:
+              labels:
+              - boot_id
+              - host
       - labelallow:
           - invoker
+          - systemd_unit
       - static_labels:
           type: journal
       relabel_configs:

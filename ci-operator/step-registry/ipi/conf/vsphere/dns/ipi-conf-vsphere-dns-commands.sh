@@ -6,7 +6,7 @@ set -o pipefail
 
 echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 
@@ -50,9 +50,9 @@ echo "${hosted_zone_id}" > "${SHARED_DIR}/hosted-zone.txt"
 if [ "${JOB_NAME_SAFE}" = "launch" ]; then
   # setup DNS records for clusterbot to point to the IBM VIP
   api_dns_target='"TTL": 60,
-    "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.48.190.22"}]'
+    "ResourceRecords": [{"Value": "'${vips[0]}'"}, {"Value": "169.48.190.20"}]'
   apps_dns_target='"TTL": 60,
-    "ResourceRecords": [{"Value": "169.48.190.22"}]'
+    "ResourceRecords": [{"Value": "169.48.190.20"}]'
 else
   # Configure DNS direct to respective VIP
   api_dns_target='"TTL": 60,

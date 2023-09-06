@@ -25,23 +25,11 @@ pushd "${dir}"
 cp -t "${dir}" \
     "${SHARED_DIR}/install-config.yaml"
 
-if ! pip -V; then
-    echo "pip is not installed: installing"
-    if python -c "import sys; assert(sys.version_info >= (3,0))"; then
-      python -m ensurepip --user || easy_install --user 'pip'
-    else
-      echo "python < 3, installing pip<21"
-      python -m ensurepip --user || easy_install --user 'pip<21'
-    fi
-fi
-
-echo "Installing python modules: yaml"
-python3 -c "import yaml" || pip3 install --user pyyaml
 sed -i "s|ppe.azurestack.devcluster.openshift.com|ppe.upi.azurestack.devcluster.openshift.com|g" install-config.yaml
 
-CLUSTER_NAME=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["metadata"]["name"])')
-SSH_KEY=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["sshKey"])')
-BASE_DOMAIN=$(python3 -c 'import yaml;data = yaml.full_load(open("install-config.yaml"));print(data["baseDomain"])')
+CLUSTER_NAME=$(yq-go r "install-config.yaml" "metadata.name")
+SSH_KEY=$(yq-go r "install-config.yaml" "sshKey")
+BASE_DOMAIN=$(yq-go r "install-config.yaml" "baseDomain")
 TENANT_ID=$(jq -r .tenantId ${SHARED_DIR}/osServicePrincipal.json)
 AAD_CLIENT_SECRET=$(jq -r .clientSecret ${SHARED_DIR}/osServicePrincipal.json)
 APP_ID=$(jq -r .clientId ${SHARED_DIR}/osServicePrincipal.json)
@@ -69,12 +57,14 @@ fi
 export AZURE_AUTH_LOCATION="${SHARED_DIR}/osServicePrincipal.json"
 
 # remove workers from the install config so the mco won't try to create them
-python3 -c '
-import yaml;
-path = "install-config.yaml";
-data = yaml.full_load(open(path));
-data["compute"][0]["replicas"] = 0;
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+PATCH="/tmp/install-config-compute-replicas.yaml.patch"
+cat > "${PATCH}" << EOF
+compute:
+- name: worker
+  replicas: 0
+EOF
+# apply patch to install-config
+yq-go m -x -i "install-config.yaml" "${PATCH}"
 
 openshift-install create manifests
 
@@ -97,22 +87,18 @@ data:
 EOF
 
 # typical upi instruction
-python3 -c '
-import yaml;
-path = "manifests/cluster-scheduler-02-config.yml";
-data = yaml.full_load(open(path));
-data["spec"]["mastersSchedulable"] = False;
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+PATCH="/tmp/cluster-scheduler-02-config.yml.patch"
+cat > "${PATCH}" << EOF
+spec:
+  mastersSchedulable: false
+EOF
+# apply patch
+yq-go m -x -i "manifests/cluster-scheduler-02-config.yml" "${PATCH}"
 
 # typical upi instruction
-python3 -c '
-import yaml;
-path = "manifests/cluster-dns-02-config.yml";
-data = yaml.full_load(open(path));
-del data["spec"]["publicZone"];
-open(path, "w").write(yaml.dump(data, default_flow_style=False))'
+yq-go d -i "manifests/cluster-dns-02-config.yml" 'spec.publicZone'
 
-INFRA_ID=$(python3 -c 'import yaml;data = yaml.full_load(open("manifests/cluster-infrastructure-02-config.yml"));print(data["status"]["infrastructureName"])')
+INFRA_ID=$(yq-go r "manifests/cluster-infrastructure-02-config.yml" 'status.infrastructureName')
 
 openshift-install create ignition-configs &
 

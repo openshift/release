@@ -1,8 +1,6 @@
 #!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
 IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
 HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
@@ -24,37 +22,51 @@ cat <<EOF > /tmp/iso.sh
 #!/bin/bash
 set -xeuo pipefail
 
+if ! sudo subscription-manager status >&/dev/null; then
+    sudo subscription-manager register \
+        --org="\$(cat /tmp/subscription-manager-org)" \
+        --activationkey="\$(cat /tmp/subscription-manager-act-key)"
+fi
+
 chmod 0755 ~
-mkdir ~/rpms
-tar -xf /tmp/rpms.tar -C ~/rpms
 tar -xf /tmp/microshift.tgz -C ~
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
 chmod 0400 ~/.ssh/id_rsa*
 
-sudo subscription-manager register \
-  --org="$(cat /var/run/rhsm/subscription-manager-org)" \
-  --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
+# Set up the pull secret in the expected location
+export PULL_SECRET="\${HOME}/.pull-secret.json"
+cp /tmp/pull-secret "\${PULL_SECRET}"
 
 cd ~/microshift
-# Get firewalld and repos in place. Use scripts to get the right repos
-# for each branch.
-./scripts/devenv-builder/configure-vm.sh --no-build-deps --force-firewall /tmp/pull-secret
-./scripts/image-builder/configure.sh
-./scripts/image-builder/build.sh -pull_secret_file /tmp/pull-secret -microshift_rpms ~/rpms -authorized_keys_file /tmp/ssh-publickey -open_firewall_ports 6443:tcp
+
+./test/bin/ci_phase_iso_build.sh
+sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
 EOF
 chmod +x /tmp/iso.sh
 
 tar czf /tmp/microshift.tgz /microshift
 
 scp \
-  /rpms.tar \
-  /tmp/iso.sh \
-  "${CLUSTER_PROFILE_DIR}/pull-secret" \
-  ${CLUSTER_PROFILE_DIR}/ssh-privatekey \
-  ${CLUSTER_PROFILE_DIR}/ssh-publickey \
-  /tmp/microshift.tgz \
-  "${INSTANCE_PREFIX}:/tmp"
+    /tmp/iso.sh \
+    /var/run/rhsm/subscription-manager-org \
+    /var/run/rhsm/subscription-manager-act-key \
+    "${CLUSTER_PROFILE_DIR}/pull-secret" \
+    "${CLUSTER_PROFILE_DIR}/ssh-privatekey" \
+    "${CLUSTER_PROFILE_DIR}/ssh-publickey" \
+    /tmp/microshift.tgz \
+    "${INSTANCE_PREFIX}:/tmp"
 
-ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh"
+trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs ${ARTIFACT_DIR}' EXIT
+# Call wait regardless of the outcome of the kill command, in case some of the children are finished
+# by the time we try to kill them. There is only 1 child now, but this is generic enough to allow N.
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
+
+# Run in background to allow trapping signals before the command ends. If running in foreground
+# then TERM is queued until the ssh completes. This might be too long to fit in the grace period
+# and get abruptly killed, which prevents gathering logs.
+ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh" &
+# Run wait -n since we only have one background command. Should this change, please update the exit
+# status handling.
+wait -n

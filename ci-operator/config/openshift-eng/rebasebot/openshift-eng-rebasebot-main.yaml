@@ -131,7 +131,9 @@ tests:
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
-                  --git-email cloud-team-rebase-bot@redhat.com
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
         name: rebase-bot-creds
@@ -241,7 +243,9 @@ tests:
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
-                  --git-email cloud-team-rebase-bot@redhat.com
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
         name: rebase-bot-creds
@@ -267,7 +271,9 @@ tests:
                   --github-app-key /secrets/rebasebot/cloud-team-openshift-bot-key \
                   --github-cloner-key /secrets/rebasebot/cloud-team-bot-key \
                   --git-username cloud-team-rebase-bot \
-                  --git-email cloud-team-rebase-bot@redhat.com
+                  --git-email cloud-team-rebase-bot@redhat.com \
+                  --bot-emails cloud-team-rebase-bot@redhat.com openshift-bot@redhat.com openshift-ci-robot@redhat.com \
+                  --tag-policy=strict
       credentials:
       - mount_path: /secrets/rebasebot
         name: rebase-bot-creds
@@ -448,6 +454,36 @@ tests:
       credentials:
       - mount_path: /secrets/rebasebot
         name: rebase-bot-creds
+        namespace: test-credentials
+      from: rebasebot
+      resources:
+        limits:
+          memory: 4Gi
+        requests:
+          cpu: 100m
+          memory: 200Mi
+- as: kubernetes-nmstate
+  cron: 30 5 * * Mon,Wed,Fri
+  steps:
+    test:
+    - as: kubernetes-nmstate
+      commands: |
+        rebasebot --source https://github.com/nmstate/kubernetes-nmstate:main \
+                  --dest openshift/kubernetes-nmstate:master \
+                  --rebase openshift-networking/kubernetes-nmstate:rebase-bot-master \
+                  --github-app-id 352928 \
+                  --github-app-key /secrets/metal-net-merge-bot/private-key \
+                  --github-cloner-id 352930 \
+                  --github-cloner-key /secrets/metal-net-cloner-bot/private-key \
+                  --git-username metal-net-bot \
+                  --git-email metal-networking@redhat.com \
+                  --tag-policy=none
+      credentials:
+      - mount_path: /secrets/metal-net-merge-bot
+        name: metal-net-merge-bot-private-key
+        namespace: test-credentials
+      - mount_path: /secrets/metal-net-cloner-bot
+        name: metal-net-cloner-bot-private-key
         namespace: test-credentials
       from: rebasebot
       resources:

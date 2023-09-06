@@ -150,19 +150,31 @@ function remove_tech_preview_feature_from_manifests()
 # ------------------------------
 
 cr_yaml_d=$(mktemp -d)
-echo "extracting CR from image $RELEASE_IMAGE_LATEST"
+echo "extracting CR from image ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
-oc adm release extract ${RELEASE_IMAGE_LATEST} --credentials-requests --cloud=aws --to "${cr_yaml_d}" || exit 1
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+
+echo "OC Version:"
+export PATH=${CLI_DIR}:$PATH
+which oc
+oc version --client
+oc adm release extract --help
+ADDITIONAL_OC_EXTRACT_ARGS=""
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+fi
+oc adm release extract ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --credentials-requests --cloud=aws --to "${cr_yaml_d}" ${ADDITIONAL_OC_EXTRACT_ARGS} || exit 1
 
 echo "Extracted CR files:"
 ls $cr_yaml_d
 
-if [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/manifest_feature_gate.yaml ]]; then
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" != "true" ]] && [[ "${FEATURE_SET}" != "TechPreviewNoUpgrade" ]] &&  [[ ! -f ${SHARED_DIR}/manifest_feature_gate.yaml ]]; then
   remove_tech_preview_feature_from_manifests "${cr_yaml_d}" "TechPreviewNoUpgrade" || exit 1
 fi
 
 credentials_requests_files=`mktemp`
-ls ${cr_yaml_d} > ${credentials_requests_files}
+ls -p "${cr_yaml_d}"/*.yaml | awk -F'/' '{print $NF}' > "${credentials_requests_files}"
 
 echo "CRs to be processed:"
 cat "${credentials_requests_files}"

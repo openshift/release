@@ -14,7 +14,7 @@ then
 fi
 
 REGION="$(cat "${SHARED_DIR}/proxyregion")"
-PROXY_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+PROXY_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 STACK_NAME="${PROXY_NAME}-proxy"
 
 # cleaning up after ourselves

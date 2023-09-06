@@ -79,5 +79,5 @@ export VSPHERE_PASSWORD='${vsphere_password}'
 export API_VIP="192.168.${third_octet}.2"
 export INGRESS_VIP="192.168.${third_octet}.3"
 export BASE_DOMAIN="vmc-ci.devcluster.openshift.com"
-export CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+export CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 EOF

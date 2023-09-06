@@ -71,9 +71,9 @@ fi
 # create disk encryption set
 echo "Creating keyvault and disk encryption set in ${RESOURCE_GROUP}"
 # We must randomize the name of the keyvault as they do not get fully deleted for 90 days.
-keyvault="${NAMESPACE}-${JOB_NAME_HASH}-kv"
-keyvault_key="${NAMESPACE}-${JOB_NAME_HASH}-kvkey"
-des="${NAMESPACE}-${JOB_NAME_HASH}-des"
+keyvault="${NAMESPACE}-${UNIQUE_HASH}-kv"
+keyvault_key="${NAMESPACE}-${UNIQUE_HASH}-kvkey"
+des="${NAMESPACE}-${UNIQUE_HASH}-des"
 create_disk_encryption_set ${RESOURCE_GROUP} ${keyvault} ${keyvault_key} ${des}
 
 echo "Granting service principal reader permissions to the DiskEncryptionSet: ${des}"

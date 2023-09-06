@@ -30,7 +30,7 @@ echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 
 # Create clustername.txt
-echo "${NAMESPACE}-${JOB_NAME_HASH}" > "${SHARED_DIR}"/clustername.txt
+echo "${NAMESPACE}-${UNIQUE_HASH}" > "${SHARED_DIR}"/clustername.txt
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
 # Create clusterdomain.txt

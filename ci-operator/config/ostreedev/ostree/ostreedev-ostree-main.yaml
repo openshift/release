@@ -1,19 +1,41 @@
-binary_build_commands: env SKIP_INSTALLDEPS=1 ./ci/build.sh
+base_images:
+  coreos_coreos-assembler_latest:
+    name: coreos-assembler
+    namespace: coreos
+    tag: latest
 build_root:
   image_stream_tag:
     name: fcos-buildroot
     namespace: coreos
     tag: testing-devel
+images:
+- dockerfile_path: ci/prow/Dockerfile
+  inputs:
+    coreos_coreos-assembler_latest:
+      as:
+      - registry.ci.openshift.org/coreos/coreos-assembler:latest
+    root:
+      as:
+      - registry.ci.openshift.org/coreos/fcos-buildroot:testing-devel
+  to: base-fcos-e2e
 resources:
   '*':
     requests:
       cpu: 1000m
+      memory: 1Gi
+  fcos-e2e:
+    limits:
+      devices.kubevirt.io/kvm: "1"
+    requests:
+      cpu: 1000m
+      devices.kubevirt.io/kvm: "1"
       memory: 2Gi
 tests:
-- as: sanity
-  commands: ostree --version
+- as: fcos-e2e
+  commands: fcos-e2e
   container:
-    from: bin
+    from: base-fcos-e2e
+  skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore)$
 zz_generated_metadata:
   branch: main
   org: ostreedev

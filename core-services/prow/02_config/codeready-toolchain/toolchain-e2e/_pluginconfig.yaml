@@ -1,6 +1,5 @@
 approve:
 - commandHelpLink: https://go.k8s.io/bot-commands
-  ignore_review_state: false
   repos:
   - codeready-toolchain/toolchain-e2e
   require_self_approval: false
@@ -10,10 +9,33 @@ external_plugins:
     events:
     - issue_comment
     name: refresh
+  - endpoint: http://cherrypick
+    events:
+    - issue_comment
+    - pull_request
+    name: cherrypick
   - endpoint: http://needs-rebase
     events:
+    - issue_comment
     - pull_request
     name: needs-rebase
+  - endpoint: http://backport-verifier
+    events:
+    - issue_comment
+    - pull_request
+    name: backport-verifier
+  - endpoint: http://payload-testing-prow-plugin
+    events:
+    - issue_comment
+    name: payload-testing-prow-plugin
+  - endpoint: http://jira-lifecycle-plugin
+    events:
+    - issue_comment
+    - pull_request
+    name: jira-lifecycle-plugin
+lgtm:
+- repos:
+  - codeready-toolchain/toolchain-e2e
 plugins:
   codeready-toolchain/toolchain-e2e:
     plugins:
@@ -23,17 +45,27 @@ plugins:
     - dog
     - heart
     - golint
+    - goose
     - help
     - hold
+    - jira
     - label
     - lgtm
     - lifecycle
     - override
+    - pony
+    - retitle
     - shrug
     - sigmention
     - skip
     - trigger
     - verify-owners
+    - owners-label
     - wip
     - yuks
     - approve
+triggers:
+- repos:
+  - codeready-toolchain/toolchain-e2e
+  trusted_apps:
+  - dependabot

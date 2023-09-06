@@ -662,7 +662,7 @@ OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE=${OPENSHIFT_WORKLOAD_NODE_VOLUME_SIZE:-none}
 #Usage of create_machineset
 #create_machineset REF_MACHINESET_NAME NODE_REPLICAS(1) MACHINESET_TYPE(infra/workload) NODE_INSTANCE_TYPE(r5.4xlarge) VOLUME_TYPE(gp3) VOLUME_SIZE(50) VOLUME_IOPS(3000)
 #Scale machineset to 3 replicas when only one machineset was found
-IF_CREATE_WORKLOAD_NODE=${IF_CREATE_WORKLOAD_NODE:=true}
+IF_CREATE_WORKLOAD_NODE=${IF_CREATE_WORKLOAD_NODE:=false}
 if [[ $machineset_count -eq 1 && -n $machineset_list ]];then
 
        machineset=$machineset_list

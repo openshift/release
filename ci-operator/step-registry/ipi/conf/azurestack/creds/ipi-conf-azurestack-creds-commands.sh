@@ -16,7 +16,7 @@ export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
 mkdir -p "${XDG_RUNTIME_DIR}"
 
-CLUSTER_NAME=${NAMESPACE}-${JOB_NAME_HASH}
+CLUSTER_NAME=${NAMESPACE}-${UNIQUE_HASH}
 RESOURCE_GROUP=${CLUSTER_NAME}
 AZURE_AUTH_LOCATION="${SHARED_DIR}/osServicePrincipal.json"
 APP_ID=$(jq -r .clientId "${AZURE_AUTH_LOCATION}")
@@ -40,12 +40,24 @@ chmod +x "${SHARED_DIR}/azurestack-login-script.sh"
 source ${SHARED_DIR}/azurestack-login-script.sh
 
 az group create --name "$RESOURCE_GROUP" --location "$AZURE_REGION"
+echo "${RESOURCE_GROUP}" > "${SHARED_DIR}/RESOURCE_GROUP_NAME"
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 oc registry login
-oc adm release extract --credentials-requests --cloud=azure --to=/tmp/credentials-request "$RELEASE_IMAGE_LATEST"
+ADDITIONAL_OC_EXTRACT_ARGS=""
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+fi
+echo "OC Version:"
+which oc
+oc version --client
+oc adm release extract --help
+oc adm release extract --credentials-requests --cloud=azure --to=/tmp/credentials-request ${ADDITIONAL_OC_EXTRACT_ARGS} "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
+echo "CR manifest files:"
 ls /tmp/credentials-request
-files=$(ls /tmp/credentials-request)
+files=$(ls -p /tmp/credentials-request/*.yaml | awk -F'/' '{print $NF}')
 for f in $files
 do
   SECRET_NAME=$(yq-go r "/tmp/credentials-request/${f}" "spec.secretRef.name")
@@ -86,4 +98,3 @@ stringData:
 EOF
 
 done
-echo "${RESOURCE_GROUP}" > "${SHARED_DIR}/RESOURCE_GROUP_NAME"

@@ -4,6 +4,10 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if [[ -z "${EO_SUB_INSTALL_NAMESPACE}" ]]; then
   echo "ERROR: INSTALL_NAMESPACE is not defined"
   exit 1
@@ -15,7 +19,7 @@ if [[ -z "${EO_SUB_PACKAGE}" ]]; then
 fi
 
 if [[ -z "${EO_SUB_CHANNEL}" ]]; then
-  echo "ERROR: CHANNEL is not defined"
+  echo "ERROR: EO_SUB_CHANNEL is not defined"
   exit 1
 fi
 
@@ -86,6 +90,12 @@ done
 
 if [[ $(oc get csv -n "${EO_SUB_INSTALL_NAMESPACE}" "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
   echo "Error: Failed to deploy ${EO_SUB_PACKAGE}"
+  echo "oc get catsrc -n openshift-marketplace"
+  oc get catsrc -n openshift-marketplace
+  echo "oc get pod -n openshift-marketplace"
+  oc get pod -n openshift-marketplace
+  echo "oc describe sub -n ${EO_SUB_INSTALL_NAMESPACE} ${EO_SUB_PACKAGE}"
+  oc describe sub -n ${EO_SUB_INSTALL_NAMESPACE} ${EO_SUB_PACKAGE}
   echo "csv ${CSV} YAML"
   oc get csv "${CSV}" -n "${EO_SUB_INSTALL_NAMESPACE}" -o yaml
   echo

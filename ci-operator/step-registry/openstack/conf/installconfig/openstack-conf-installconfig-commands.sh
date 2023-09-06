@@ -87,6 +87,27 @@ case "$CONFIG_TYPE" in
     			" "$INSTALL_CONFIG"
 		fi
 		;;
+	dualstack*)
+		source "${SHARED_DIR}/VIPS"
+		API_VIPS=$(echo -n "${API_VIPS[@]}" | jq -cRs '(. / " ")')
+		INGRESS_VIPS=$(echo -n "${INGRESS_VIPS[@]}" | jq -cRs '(. / " ")')
+		yq --yaml-output --in-place ".
+			| .networking.machineNetwork[0].cidr = \"${MACHINES_SUBNET_v4_RANGE:?}\"
+			| .networking.machineNetwork[1].cidr = \"${MACHINES_SUBNET_v6_RANGE:?}\"
+			| .networking.clusterNetwork[0].cidr = \"10.128.0.0/14\"
+			| .networking.clusterNetwork[0].hostPrefix = 23
+			| .networking.clusterNetwork[1].cidr = \"fd01::/48\"
+			| .networking.clusterNetwork[1].hostPrefix = 64
+			| .networking.serviceNetwork = [\"172.30.0.0/16\", \"fd02::/112\"]
+			| .platform.openstack.apiVIPs = $API_VIPS
+			| .platform.openstack.ingressVIPs = $INGRESS_VIPS
+			| .platform.openstack.controlPlanePort.fixedIPs[0].subnet.name = \"${CONTROL_PLANE_SUBNET_V4}\"
+			| .platform.openstack.controlPlanePort.fixedIPs[1].subnet.name = \"${CONTROL_PLANE_SUBNET_V6}\"
+			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
+			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
+			| .platform.openstack.controlPlanePort.network.name = \"${CONTROL_PLANE_NETWORK}\"
+		" "$INSTALL_CONFIG"
+		;;
 	*)
 		echo "No valid install config type specified. Please check CONFIG_TYPE"
 		exit 1
@@ -95,8 +116,11 @@ esac
 
 if [[ "${ZONES_COUNT}" -gt '0' ]]; then
 	yq --yaml-output --in-place ".
-		| .compute[0].platform.openstack.zones = ${ZONES_JSON}
 		| .controlPlane.platform.openstack.zones = ${ZONES_JSON}
+		| .controlPlane.platform.openstack.rootVolume.type = \"tripleo\"
+		| .controlPlane.platform.openstack.rootVolume.size = 30
+		| .controlPlane.platform.openstack.rootVolume.zones = ${ZONES_JSON}
+		| .compute[0].platform.openstack.zones = ${ZONES_JSON}
 		| .compute[0].platform.openstack.rootVolume.type = \"tripleo\"
 		| .compute[0].platform.openstack.rootVolume.size = 30
 		| .compute[0].platform.openstack.rootVolume.zones = ${ZONES_JSON}

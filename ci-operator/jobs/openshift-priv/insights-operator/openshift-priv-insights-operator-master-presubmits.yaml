@@ -92,7 +92,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/e2e-agnostic-upgrade
     decorate: true
     decoration_config:
@@ -189,7 +189,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-priv-insights-operator-master-e2e-gcp-ovn-techpreview
-    optional: true
     path_alias: github.com/openshift/insights-operator
     rerun_command: /test e2e-gcp-ovn-techpreview
     spec:
@@ -346,7 +345,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -490,7 +489,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -547,7 +546,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -568,6 +567,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/insights-operator-codecov-token
         - --target=unit
         command:
         - ci-operator
@@ -584,6 +584,9 @@ presubmits:
         - mountPath: /usr/local/github-credentials
           name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
+        - mountPath: /secrets/insights-operator-codecov-token
+          name: insights-operator-codecov-token
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -592,6 +595,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: insights-operator-codecov-token
+        secret:
+          secretName: insights-operator-codecov-token
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

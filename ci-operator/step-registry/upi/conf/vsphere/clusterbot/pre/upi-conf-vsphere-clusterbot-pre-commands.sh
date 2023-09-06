@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 base_domain="${cluster_name}.vmc-ci.devcluster.openshift.com"
 
 export AWS_DEFAULT_REGION=us-west-2  # TODO: Derive this?

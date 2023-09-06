@@ -8,7 +8,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 workdir=`mktemp -d`
 
-CLUSTER_NAME="${NAMESPACE}-${JOB_NAME_HASH}"
+CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_ignition_file="${workdir}/${CLUSTER_NAME}-bastion.ign"
 
 function patch_ignition_file()
@@ -90,6 +90,7 @@ acl authenticated proxy_auth REQUIRED
 acl CONNECT method CONNECT
 http_access allow authenticated
 http_port 3128
+dns_v4_first on
 EOF
 
 ## PROXY Service

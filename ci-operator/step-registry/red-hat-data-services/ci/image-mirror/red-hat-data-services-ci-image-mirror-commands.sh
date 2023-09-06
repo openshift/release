@@ -77,21 +77,6 @@ if [[ "$IMAGE_TAG" == "YearIndex" ]]; then
     esac
 fi
 
-# Get IMAGE_TAG if it's equal to weekly 
-if [[ "$IMAGE_TAG" == "weekly" ]]; then
-    case "$JOB_TYPE" in
-        periodic)
-            log "INFO Building weekly image tag for a $JOB_TYPE job"
-            if [[ -n "${RELEASE_VERSION-}" ]]; then
-                IMAGE_TAG="${RELEASE_VERSION}-${IMAGE_TAG}"
-            fi
-            ;;
-        *)
-            IMAGE_TAG=${IMAGE_TAG}
-            ;;
-    esac
-fi
-
 log "INFO Image tag is $IMAGE_TAG"
 
 # Setup registry credentials

@@ -10,9 +10,9 @@ echo "default:x:$(id -u):$(id -g):Default Application User:/output:/sbin/nologin
 cp /var/run/proxy-pkey/proxy-pkey ~/pkey; chmod 600 ~/pkey
 proxyip="centos@$(cat /var/run/proxy-ip/proxy-ip)"
 
-RESULTS_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID/$POLARION_STEP_RESULTS"
+RESULTS_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID/artifacts/$JOB_NAME_SAFE/$POLARION_STEP_RESULTS"
 if [[ "$(echo $JOB_NAME | awk -F '-' '{print $1}')" == "rehearse" && "$JOB_TYPE" == "presubmit" ]]; then
-  RESULTS_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/openshift_release/$(echo $JOB_NAME | awk -F '-' '{print $2}')/$JOB_NAME/$BUILD_ID/$POLARION_STEP_RESULTS"
+  RESULTS_URL="https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/pr-logs/pull/openshift_release/$(echo $JOB_NAME | awk -F '-' '{print $2}')/$JOB_NAME/$BUILD_ID/artifacts/$JOB_NAME_SAFE/$POLARION_STEP_RESULTS"
 fi
 
 echo "POLARION_PROPERTIES=\"$POLARION_PROPERTIES\""

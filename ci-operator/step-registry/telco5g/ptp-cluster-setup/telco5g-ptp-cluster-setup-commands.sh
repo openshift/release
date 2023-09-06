@@ -9,6 +9,8 @@ echo "************ telco cluster setup command ************"
 #Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 #Set ssh path and permissions for connection to hypervisor
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
@@ -153,6 +155,11 @@ cat << EOF > ~/fetch-kubeconfig.yml
       regexp: '    server: https://api.*'
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
+    
+  - name: Add docker auth to enable pulling containers from CI registry
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer
+      'oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/root/openshift_pull.json'
 
 EOF
 

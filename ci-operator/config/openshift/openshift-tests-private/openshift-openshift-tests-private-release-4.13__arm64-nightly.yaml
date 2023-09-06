@@ -89,51 +89,53 @@ resources:
       cpu: "1"
       memory: 4Gi
 tests:
-- as: aws-ipi-baselinecaps-none-p2-f14
+- as: aws-ipi-baselinecaps-none-f14
   cron: 39 1 10,25 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
         and not @console and not @storage'
       OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-baselinecaps-none
-- as: aws-ipi-baselinecaps-none-p3-f28-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-baselinecaps-none-f28-destructive
   cron: 41 19 16 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: None
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and not @console and not @storage and @destructive'
+        and not @console and not @storage'
       OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-baselinecaps-none
-- as: aws-ipi-baselinecaps-v413-p2-f14
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-baselinecaps-v413-f14
   cron: 14 19 3,18 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: v4.13
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
@@ -141,28 +143,26 @@ tests:
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-baselinecaps-v413
-- as: aws-ipi-baselinecaps-v413-p3-f28-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-baselinecaps-v413-f28-destructive
   cron: 13 13 15 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: v4.13
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-baselinecaps-v413
-- as: aws-ipi-byo-iam-role-p2-f14
+    - chain: openshift-e2e-test-qe-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi
+- as: aws-ipi-byo-iam-role-f14
   cron: 19 5 14,29 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -177,9 +177,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
-- as: aws-ipi-byo-iam-role-p3-f28-destructive
+- as: aws-ipi-byo-iam-role-f28-destructive
   cron: 14 9 24 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -188,17 +187,15 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-byo-iam-role
-- as: aws-ipi-byo-kms-etcd-encryption-p2-f14
+- as: aws-ipi-byo-kms-etcd-encryption-f14
   cron: 35 6 12,27 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -213,9 +210,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
-- as: aws-ipi-byo-kms-etcd-encryption-p3-f28-destructive
+- as: aws-ipi-byo-kms-etcd-encryption-f28-destructive
   cron: 11 4 15 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -224,16 +220,14 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-byo-kms-etcd-encryption
-- as: aws-ipi-byo-route53-p2-f14
+- as: aws-ipi-byo-route53-f14
   cron: 7 15 8,23 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -248,9 +242,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
-- as: aws-ipi-byo-route53-p3-f28-destructive
+- as: aws-ipi-byo-route53-f28-destructive
   cron: 32 11 10 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -259,17 +252,15 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-byo-route53
-- as: aws-ipi-compact-p2-f14
+- as: aws-ipi-compact-f14
   cron: 27 0 3,18 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -285,9 +276,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-compact-p3-f28-destructive
+- as: aws-ipi-compact-f28-destructive
   cron: 52 7 18 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -296,17 +286,15 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       SIZE_VARIANT: compact
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-disconnected-private-p1-f14
+- as: aws-ipi-disconnected-private-f14
   cron: 46 15 15,30 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -323,9 +311,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disconnected-private-p1-f28-destructive
+- as: aws-ipi-disconnected-private-f28-destructive
   cron: 27 20 16 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -335,62 +322,60 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @disconnected and @network-ovnkubernetes
-        and not @fips and @destructive'
+        and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disconnected-private-sno-baselinecaps-none-p2-f14
+- as: aws-ipi-disconnected-private-sno-baselinecaps-none-f14
   cron: 38 0 4,19 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      BASELINE_CAPABILITY_SET: None
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @disconnected and @network-ovnkubernetes
         and @singlenode and not @fips and not @console and not @storage'
       OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno-baselinecaps-none
-- as: aws-ipi-disconnected-private-sno-baseline-p3-f28-destructive
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
+- as: aws-ipi-disconnected-private-sno-baseline-f28-destructive
   cron: 52 21 23 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      BASELINE_CAPABILITY_SET: None
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @disconnected and @network-ovnkubernetes
-        and @singlenode and not @fips and not @console and not @storage and @destructive'
+        and @singlenode and not @fips and not @console and not @storage'
       OCP_ARCH: arm64
+      PERSISTENT_MONITORING: "false"
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno-baselinecaps-none
-- as: aws-ipi-disconnected-private-sno-p2-f14
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
+- as: aws-ipi-disconnected-private-sno-f14
   cron: 51 22 14,29 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @disconnected and @network-ovnkubernetes
         and @singlenode and not @fips'
       OCP_ARCH: arm64
@@ -399,28 +384,25 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
-- as: aws-ipi-disconnected-private-sno-p3-f28-destructive
+- as: aws-ipi-disconnected-private-sno-f28-destructive
   cron: 41 20 8 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: m6g.xlarge
-      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.2xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @disconnected and @network-ovnkubernetes
-        and @singlenode and not @fips and @destructive'
+        and @singlenode and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
-- as: aws-ipi-disconnected-private-tp-p3-f28
+- as: aws-ipi-disconnected-private-tp-f28
   cron: 32 16 3 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -438,9 +420,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disconnected-private-tp-p3-f28-destructive
+- as: aws-ipi-disconnected-private-tp-f28-destructive
   cron: 37 17 5 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -450,7 +431,7 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @disconnected and @network-ovnkubernetes
-        and not @fips and @destructive'
+        and not @fips'
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
@@ -458,9 +439,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disconnected-sts-efs-p2-f14
+- as: aws-ipi-disconnected-sts-efs-f14
   cron: 33 17 13,28 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -479,9 +459,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
-- as: aws-ipi-disconnected-sts-efs-p3-f28-destructive
+- as: aws-ipi-disconnected-sts-efs-f28-destructive
   cron: 25 23 16 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -490,16 +469,18 @@ tests:
       OO_INDEX: quay.io/openshift-qe-optional-operators/aosqe-index:v4.13
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @disconnected and @network-ovnkubernetes
-        and not @fips and @destructive'
+        and not @fips'
+      OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-efs
-- as: aws-ipi-disconnected-sts-ep-p2-f14
+- as: aws-ipi-disconnected-sts-ep-f14
   cron: 13 23 12,27 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -516,23 +497,26 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-disconnected-sts-ep-p3-f28-destructive
+- as: aws-ipi-disconnected-sts-ep-f28-destructive
   cron: 18 0 4 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @disconnected and @network-ovnkubernetes
-        and not @fips and @destructive'
+        and not @fips'
+      OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-cco-manual-security-token-service-private-s3-with-ep-sts-ec2-elb
-- as: aws-ipi-imdsv2-p2-f14
+- as: aws-ipi-imdsv2-f14
   cron: 27 8 15,30 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -547,9 +531,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-imdsv2
-- as: aws-ipi-imdsv2-p3-f28-destructive
+- as: aws-ipi-imdsv2-f28-destructive
   cron: 19 14 8 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -558,16 +541,14 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-imdsv2
-- as: aws-ipi-ingress-lbtype-classic-p2-f14
+- as: aws-ipi-ingress-lbtype-classic-f14
   cron: 15 4 1,16 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -582,9 +563,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-classic
-- as: aws-ipi-ingress-lbtype-classic-p3-f28-destructive
+- as: aws-ipi-ingress-lbtype-classic-f28-destructive
   cron: 46 0 24 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -593,16 +573,14 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-classic
-- as: aws-ipi-ingress-lbtype-nlb-p1-f14
+- as: aws-ipi-ingress-lbtype-nlb-f14
   cron: 11 23 15,30 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -617,9 +595,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
-- as: aws-ipi-ingress-lbtype-nlb-p1-f28-destructive
+- as: aws-ipi-ingress-lbtype-nlb-f28-destructive
   cron: 53 17 18 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -628,16 +605,14 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ingress-lbtype-nlb
-- as: aws-ipi-ovn-efs-p2-f14
+- as: aws-ipi-ovn-efs-f14
   cron: 2 17 6,21 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -654,9 +629,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
-- as: aws-ipi-ovn-efs-p3-f28-destructive
+- as: aws-ipi-ovn-efs-f28-destructive
   cron: 33 18 8 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -667,17 +641,15 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and @destructive
-        and not @fips'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-efs
-- as: aws-ipi-ovn-hypershift-guest-p1-f7
+- as: aws-ipi-ovn-hypershift-guest-f7
   cron: 2 19 5,13,21,28 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -697,17 +669,19 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-guest-p1-f14-destructive
+- as: aws-ipi-ovn-hypershift-guest-f14-destructive
   cron: 21 13 5,20 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+      RELEASE_IMAGE_LATEST: release:multi-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and @hypershift-hosted and
-        not @fips and @destructive'
+        not @fips'
       HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.0-ec.4-multi
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
@@ -716,9 +690,8 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
-- as: aws-ipi-ovn-hypershift-mgmt-p1-f7
+- as: aws-ipi-ovn-hypershift-mgmt-f7
   cron: 12 15 8,15,22,30 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -732,13 +705,12 @@ tests:
       OCP_ARCH: arm64
       TEST_ADDITIONAL: Hypershift|Network_Observability
       TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
-      TEST_TIMEOUT: "30"
+      TEST_TIMEOUT: "35"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
-- as: aws-ipi-ovn-ipsec-p1-f14
+- as: aws-ipi-ovn-ipsec-f14
   cron: 1 0 3,18 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -753,9 +725,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-ovn-ipsec-p1-f28-destructive
+- as: aws-ipi-ovn-ipsec-f28-destructive
   cron: 57 15 18 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -764,16 +735,14 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
-- as: aws-ipi-p3-f28-long-duration-part1-3
+- as: aws-ipi-f28-long-duration-part1-3
   cron: 2 16 8 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -789,9 +758,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-long-duration
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-p3-f28-long-duration-part2-3
+- as: aws-ipi-f28-long-duration-part2-3
   cron: 15 15 3 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -808,9 +776,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-long-duration
     workflow: cucushift-installer-rehearse-aws-ipi
-- as: aws-ipi-private-disasterrecovery-p2-f14
+- as: aws-ipi-private-disasterrecovery-f14
   cron: 27 0 9,24 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -827,36 +794,44 @@ tests:
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-private
-- as: aws-ipi-private-p2-f28-long-duration-apiserver
+- as: aws-ipi-private-f28-long-duration-apiserver
   cron: 36 3 18 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      OCP_ARCH: arm64
       TEST_SCENARIOS: API_Server
       TEST_TIMEOUT: "600"
     test:
     - ref: cucushift-helper-service-build-info
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-private
-- as: aws-ipi-private-p3-f28-long-duration-cloud
+- as: aws-ipi-private-f28-long-duration-cloud
   cron: 47 20 25 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      E2E_RUN_TAGS: '@aws-ipi and @network-ovnkubernetes and not @fips and @long-duration'
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
+        and @long-duration'
+      OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_SCENARIOS: Cluster_Infrastructure
       TEST_TIMEOUT: "90"
     test:
     - chain: openshift-e2e-test-qe-long-duration
     workflow: cucushift-installer-rehearse-aws-ipi-private
-- as: aws-ipi-proxy-sts-p1-f14
+- as: aws-ipi-proxy-sts-f14
   cron: 27 7 13,28 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -872,9 +847,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
-- as: aws-ipi-proxy-sts-p1-f28-destructive
+- as: aws-ipi-proxy-sts-f28-destructive
   cron: 3 21 12 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -884,15 +858,14 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @proxy and @network-ovnkubernetes and
-        not @fips and @destructive'
+        not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
-- as: aws-ipi-proxy-tp-p3-f28
+- as: aws-ipi-proxy-tp-f28
   cron: 22 15 14 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -909,9 +882,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-po
-- as: aws-ipi-proxy-tp-p3-f28-destructive
+- as: aws-ipi-proxy-tp-f28-destructive
   cron: 25 23 12 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -921,16 +893,15 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       E2E_RUN_TAGS: '@arm64 and @aws-ipi and @proxy and @network-ovnkubernetes and
-        not @fips and @destructive'
+        not @fips'
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-po
-- as: aws-ipi-registry-s3-cloudfront-p3-f28
+- as: aws-ipi-registry-s3-cloudfront-f28
   cron: 28 22 26 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -945,9 +916,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-registry-s3-cloudfront
-- as: aws-ipi-sdn-migration-ovn-p2-f14
+- as: aws-ipi-sdn-migration-ovn-f14
   cron: 26 19 8,23 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -964,9 +934,8 @@ tests:
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-aws-ipi-sdn
-- as: aws-ipi-sdn-mtu-migrate-p3-f28
+- as: aws-ipi-sdn-mtu-migrate-f28
   cron: 13 16 7 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -979,9 +948,8 @@ tests:
     test:
     - ref: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-sdn-mtu-migrate
-- as: aws-ipi-sdn-p1-f14
+- as: aws-ipi-sdn-f14
   cron: 54 0 4,19 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -996,9 +964,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-sdn
-- as: aws-ipi-sdn-p3-f28-destructive
+- as: aws-ipi-sdn-f28-destructive
   cron: 21 17 7 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -1007,17 +974,15 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-openshiftsdn and not @fips and
-        @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-openshiftsdn and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-sdn
-- as: aws-ipi-usertags-p2-f28
+- as: aws-ipi-usertags-f28
   cron: 39 23 10 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -1032,9 +997,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-ipi-usertags
-- as: aws-ipi-usertags-p2-f28-destructive
+- as: aws-ipi-usertags-f28-destructive
   cron: 16 8 12 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -1043,16 +1007,14 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       COMPUTE_NODE_TYPE: m6g.xlarge
       CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
-      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-usertags
-- as: aws-upi-p3-f28
+- as: aws-upi-f28
   cron: 49 9 6 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -1068,9 +1030,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-aws-upi
-- as: aws-upi-p3-f28-destructive
+- as: aws-upi-f28-destructive
   cron: 42 19 19 * *
-  remote_api: true
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -1078,8 +1039,7 @@ tests:
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
       BOOTSTRAP_INSTANCE_TYPE: m6g.large
-      E2E_RUN_TAGS: '@arm64 and @aws-upi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @aws-upi and @network-ovnkubernetes and not @fips'
       MASTER_INSTANCE_TYPE: m6g.xlarge
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
@@ -1088,43 +1048,41 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-upi
-- as: azure-ipi-baselinecaps-v412-p2-f28
+- as: azure-ipi-baselinecaps-v412-f28
   cron: 35 5 13 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: v4.12
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-baselinecaps-v412
-- as: azure-ipi-baselinecaps-v412-p3-f28-destructive
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-baselinecaps-v412-f28-destructive
   cron: 6 16 18 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      BASELINE_CAPABILITY_SET: v4.12
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-baselinecaps-v412
-- as: azure-ipi-compact-p2-f14
+    workflow: cucushift-installer-rehearse-azure-ipi
+- as: azure-ipi-compact-f14
   cron: 8 0 4,19 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1139,9 +1097,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-compact-p3-f28-destructive
+- as: azure-ipi-compact-f28-destructive
   cron: 5 18 19 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1149,17 +1106,15 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       SIZE_VARIANT: compact
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-disconnected-fullyprivate-p2-f14
+- as: azure-ipi-disconnected-fullyprivate-f14
   cron: 13 2 14,29 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1175,9 +1130,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-disconnected-fullyprivate-p3-f28-destructive
+- as: azure-ipi-disconnected-fullyprivate-f28-destructive
   cron: 8 0 4 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1186,16 +1140,15 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@arm64 and @azure-ipi and @disconnected and @network-ovnkubernetes
-        and not @fips and @destructive'
+        and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-disconnected-fullyprivate-tp-p3-f28
+- as: azure-ipi-disconnected-fullyprivate-tp-f28
   cron: 13 6 10 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1212,9 +1165,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-disconnected-fullyprivate-tp-p3-f28-destructive
+- as: azure-ipi-disconnected-fullyprivate-tp-f28-destructive
   cron: 36 3 12 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1223,7 +1175,7 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@arm64 and @azure-ipi and @disconnected and @network-ovnkubernetes
-        and not @fips and @destructive'
+        and not @fips'
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
@@ -1231,9 +1183,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-disconnected-p1-f14
+- as: azure-ipi-disconnected-f14
   cron: 13 14 13,28 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1249,9 +1200,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected
-- as: azure-ipi-disconnected-p1-f28-destructive
+- as: azure-ipi-disconnected-f28-destructive
   cron: 19 19 3 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1260,16 +1210,15 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@arm64 and @azure-ipi and @disconnected and @network-ovnkubernetes
-        and not @fips and @destructive'
+        and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;Serial;Disruptive;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected
-- as: azure-ipi-disconnected-p3-f28-long-duration-cloud
+- as: azure-ipi-disconnected-f28-long-duration-cloud
   cron: 18 11 24 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1278,7 +1227,7 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@arm64 and @azure-ipi and @disconnected and @network-ovnkubernetes
-        and not @fips and @destructive and @long-duration'
+        and not @fips and @long-duration'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_SCENARIOS: Cluster_Infrastructure
@@ -1286,9 +1235,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-long-duration
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected
-- as: azure-ipi-disk-encryption-set-p2-f14
+- as: azure-ipi-disk-encryption-set-f14
   cron: 27 19 8,23 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1303,9 +1251,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
-- as: azure-ipi-disk-encryption-set-p3-f28-destructive
+- as: azure-ipi-disk-encryption-set-f28-destructive
   cron: 23 9 16 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1313,17 +1260,15 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       ENABLE_DES_DEFAULT_MACHINE: "true"
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disk-encryption-set
-- as: azure-ipi-fullyprivate-proxy-p1-f14
+- as: azure-ipi-fullyprivate-proxy-f14
   cron: 18 19 14,29 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1337,9 +1282,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
-- as: azure-ipi-fullyprivate-proxy-p1-f28-destructive
+- as: azure-ipi-fullyprivate-proxy-f28-destructive
   cron: 49 12 23 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1347,16 +1291,14 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
-- as: azure-ipi-ingress-custom-controller-p3-f28
+- as: azure-ipi-ingress-custom-controller-f28
   cron: 12 18 18 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1370,9 +1312,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
-- as: azure-ipi-ingress-custom-controller-p3-f28-destructive
+- as: azure-ipi-ingress-custom-controller-f28-destructive
   cron: 25 11 9 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1380,16 +1321,14 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
-- as: azure-ipi-ovn-etcd-encryption-p2-f14
+- as: azure-ipi-ovn-etcd-encryption-f14
   cron: 49 11 3,18 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1403,9 +1342,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-etcd-encryption
-- as: azure-ipi-ovn-etcd-encryption-p3-f28-destructive
+- as: azure-ipi-ovn-etcd-encryption-f28-destructive
   cron: 59 17 23 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1413,16 +1351,14 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-ovn-etcd-encryption
-- as: azure-ipi-ovn-ipsec-p1-f14
-  cron: 3 2 15,30 * *
-  remote_api: true
+- as: azure-ipi-ovn-ipsec-azurefile-csi-f14
+  cron: 23 5 12,27 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1435,10 +1371,9 @@ tests:
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
-- as: azure-ipi-ovn-ipsec-p1-f28-destructive
-  cron: 22 12 13 * *
-  remote_api: true
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
+- as: azure-ipi-ovn-ipsec-azurefile-csi-f28-destructive
+  cron: 38 1 29 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1446,16 +1381,14 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec
-- as: azure-ipi-private-disasterrecovery-p2-f14
+    workflow: cucushift-installer-rehearse-azure-ipi-ovn-ipsec-azurefile-csi
+- as: azure-ipi-private-disasterrecovery-f14
   cron: 26 20 7,22 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1471,9 +1404,8 @@ tests:
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-private
-- as: azure-ipi-proxy-tp-p3-f28
+- as: azure-ipi-proxy-tp-f28
   cron: 6 13 15 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1489,9 +1421,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-proxy
-- as: azure-ipi-proxy-tp-p3-f28-destructive
+- as: azure-ipi-proxy-tp-f28-destructive
   cron: 6 19 3 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1500,49 +1431,15 @@ tests:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@arm64 and @azure-ipi and @proxy and @network-ovnkubernetes and
-        not @fips and @destructive'
+        not @fips'
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-proxy
-- as: azure-ipi-resourcegroup-p3-f28
-  cron: 25 4 14 * *
-  remote_api: true
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
-      OCP_ARCH: arm64
-      TAG_VERSION: '@4.13'
-    test:
-    - chain: openshift-e2e-test-qe
-    workflow: cucushift-installer-rehearse-azure-ipi-resourcegroup
-- as: azure-ipi-resourcegroup-p3-f28-destructive
-  cron: 28 15 16 * *
-  remote_api: true
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
-      OCP_ARCH: arm64
-      TAG_VERSION: '@4.13'
-    test:
-    - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi-resourcegroup
-- as: azure-ipi-sdn-migration-ovn-p2-f14
+- as: azure-ipi-sdn-migration-ovn-f14
   cron: 19 14 2,17 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1558,9 +1455,8 @@ tests:
     test:
     - chain: cucushift-sdn-migration-ovn
     workflow: cucushift-installer-rehearse-azure-ipi-sdn
-- as: azure-ipi-sdn-p1-f14
+- as: azure-ipi-sdn-f14
   cron: 29 12 5,20 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1574,9 +1470,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-sdn
-- as: azure-ipi-sdn-p3-f28-destructive
+- as: azure-ipi-sdn-f28-destructive
   cron: 4 19 14 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1584,17 +1479,15 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-openshiftsdn and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-openshiftsdn and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
       TEST_ADDITIONAL: Network_Observability
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-sdn
-- as: azure-ipi-ultrassd-disks-p3-f28
+- as: azure-ipi-ultrassd-disks-f28
   cron: 3 12 30 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1608,9 +1501,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-ultrassd-disk
-- as: azure-ipi-usertags-tp-p2-f28
+- as: azure-ipi-usertags-tp-f28
   cron: 26 21 12 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1625,9 +1517,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi-usertags
-- as: azure-ipi-usertags-tp-p3-f28-destructive
+- as: azure-ipi-usertags-tp-f28-destructive
   cron: 25 0 4 * *
-  remote_api: true
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -1635,17 +1526,15 @@ tests:
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-ipi and @network-ovnkubernetes and not @fips'
       FEATURE_SET: TechPreviewNoUpgrade
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-usertags
-- as: azure-upi-p3-f28
+- as: azure-upi-f28
   cron: 47 3 24 * *
-  remote_api: true
   steps:
     cluster_profile: azure-arm64-qe
     dependencies:
@@ -1661,9 +1550,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-upi
-- as: azure-upi-p3-f28-destructive
+- as: azure-upi-f28-destructive
   cron: 4 10 12 * *
-  remote_api: true
   steps:
     cluster_profile: azure-arm64-qe
     dependencies:
@@ -1673,16 +1561,14 @@ tests:
       BOOTSTRAP_NODE_TYPE: Standard_D4ps_v5
       COMPUTE_NODE_TYPE: Standard_D4ps_v5
       CONTROL_PLANE_NODE_TYPE: Standard_D8ps_v5
-      E2E_RUN_TAGS: '@arm64 and @azure-upi and @network-ovnkubernetes and not @fips
-        and @destructive'
+      E2E_RUN_TAGS: '@arm64 and @azure-upi and @network-ovnkubernetes and not @fips'
       OCP_ARCH: arm64
       TAG_VERSION: '@4.13'
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-upi
-- as: baremetalds-ipi-ovn-ipv4-p1-f4
+- as: baremetalds-ipi-ovn-ipv4-f4
   cron: 36 22 1,5,10,15,19,23,27 * *
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -1698,9 +1584,8 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4
-- as: baremetalds-ipi-ovn-ipv4-p3-f28-destructive
+- as: baremetalds-ipi-ovn-ipv4-f28-destructive
   cron: 13 8 24 * *
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -1708,7 +1593,7 @@ tests:
     env:
       ARCHITECTURE: arm64
       E2E_RUN_TAGS: '@arm64 and @baremetal-ipi and @arm64 and @network-ovnkubernetes
-        and not @fips and @destructive'
+        and not @fips'
       NVME_DEVICE: /dev/nvme1n1
       PACKET_FACILITY: da11
       PACKET_PLAN: c3.large.arm64
@@ -1717,10 +1602,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-baremetalds-ipi-ovn-ipv4
-- as: baremetal-compact-agent-ipv4-dynamic-connected-p1-f7
+- as: baremetal-compact-agent-ipv4-dynamic-connected-f7
   cluster: build05
   cron: 30 21 * * 2
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -1739,10 +1623,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-dynamic
-- as: baremetal-compact-agent-ipv4-static-connected-p1-f7
+- as: baremetal-compact-agent-ipv4-static-connected-f7
   cluster: build05
   cron: 30 21 * * 1
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -1761,10 +1644,9 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static
-- as: baremetal-compact-agent-ipv4-static-disconnected-proxy-p1-f7
+- as: baremetal-compact-agent-ipv4-static-disconnected-proxy-f7
   cluster: build05
   cron: 30 21 * * 3
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:
@@ -1783,10 +1665,30 @@ tests:
     test:
     - chain: openshift-e2e-test-qe
     workflow: baremetal-lab-agent-install-network-static-disconnected-proxy
-- as: baremetal-upi-ovn-ipv4-p1-f14
+- as: baremetal-sno-agent-ipv4-static-connected-f7
+  cluster: build05
+  cron: 30 9 * * 2
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      AUX_HOST: openshift-qe-bastion.arm.eng.rdu2.redhat.com
+      E2E_RUN_TAGS: '@baremetal-upi and @arm64 and @network-ovnkubernetes and @singlenode
+        and not @fips'
+      RESERVE_BOOTSTRAP: "false"
+      TAG_VERSION: '@4.13'
+      architecture: arm64
+      ipv4_enabled: "true"
+      ipv6_enabled: "false"
+      masters: "1"
+      workers: "0"
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: baremetal-lab-agent-install-network-static
+- as: baremetal-upi-ovn-ipv4-f14
   cluster: build05
   cron: 30 21 1,14 * *
-  remote_api: true
   steps:
     cluster_profile: equinix-ocp-metal-qe
     dependencies:

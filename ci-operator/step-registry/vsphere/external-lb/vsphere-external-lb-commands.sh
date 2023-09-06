@@ -101,7 +101,7 @@ scp -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o St
 # Reload haproxy.cfg by restart haproxy.service in bastion host
 ssh -o UserKnownHostsFile=/dev/null -o IdentityFile="${SSH_PRIV_KEY_PATH}" -o StrictHostKeyChecking=no ${BASTION_SSH_USER}@${BASTION_IP} "sudo mkdir -p /etc/haproxy; sudo cp ${bastion_haproxy_cfg} /etc/haproxy/haproxy.cfg; sudo systemctl restart haproxy.service"
 
-cluster_name=${NAMESPACE}-${JOB_NAME_HASH}
+cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 cluster_domain="${cluster_name}.${base_domain}"
 hosted_zone_id=$(<"${SHARED_DIR}"/hosted-zone.txt)

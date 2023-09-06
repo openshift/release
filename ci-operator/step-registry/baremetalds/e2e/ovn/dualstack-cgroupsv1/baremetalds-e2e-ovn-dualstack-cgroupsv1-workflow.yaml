@@ -1,0 +1,17 @@
+workflow:
+  as: baremetalds-e2e-ovn-dualstack-cgroupsv1
+  steps:
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4v6
+    pre:
+      - chain: baremetalds-ofcir-pre
+      - ref: openshift-manifests-cgroupsv1
+    test:
+      - chain: baremetalds-ipi-test
+    post:
+      - chain: baremetalds-ofcir-post
+  documentation: |-
+    This workflow executes the common end-to-end test suite on a cgroups v1 cluster provisioned by running dev-scripts
+    on a packet server with both IPv4 and IPv6 enabled. The pre chain is not using any specific ovn workflow
+    because by default devscripts uses OVNKubernetes for NetworkType if the IP_STACK has any v6.

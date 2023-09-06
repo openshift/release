@@ -1,28 +1,28 @@
 base_images:
   cli:
-    name: "4.11"
+    name: "4.13"
     namespace: ocp
     tag: cli
-  openshift-release-golang-1.15:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
   ubi:
     name: ubi
     namespace: ocp
     tag: "8"
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.15
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
 images:
 - dockerfile_path: Dockerfile
   from: ubi
   inputs:
-    openshift-release-golang-1.15:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - golang:1.15
+      - golang:1.20
   to: quay-bridge-operator
 - dockerfile_literal: |
     FROM src
@@ -48,7 +48,7 @@ promotion:
 releases:
   latest:
     integration:
-      name: "4.11"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -72,7 +72,7 @@ tests:
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
-    - ref: quay-install-ocs-operator
+    - ref: quay-install-odf-operator
     - ref: quay-install-quay-operator
     - ref: quay-install-quay
     - ref: quay-create-admin
@@ -88,7 +88,7 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-aws
-- as: nightly-quay-3-7-unstable-e2e
+- as: nightly-quay-3-10-unstable-e2e
   cron: 42 10 */1 * 1-5
   steps:
     cluster_profile: aws
@@ -100,13 +100,13 @@ tests:
       OO_INSTALL_NAMESPACE: '!create'
       OO_PACKAGE: quay-bridge-operator
       OO_TARGET_NAMESPACES: '!all'
-      QUAY_OPERATOR_INDEX_IMAGE: quay.io/projectquay/quay-operator-index:3.7-unstable
+      QUAY_OPERATOR_INDEX_IMAGE: quay.io/projectquay/quay-operator-index:3.10-unstable
     post:
     - ref: quay-gather
     - chain: ipi-aws-post
     pre:
     - chain: ipi-aws-pre
-    - ref: quay-install-ocs-operator
+    - ref: quay-install-odf-operator
     - ref: quay-install-quay-operator
     - ref: quay-install-quay
     - ref: quay-create-admin

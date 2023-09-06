@@ -8,6 +8,8 @@ echo "************ telco cluster setup command ************"
 # Fix user IDs in a container
 ~/fix_uid.sh
 
+date +%s > $SHARED_DIR/start_time
+
 SSH_PKEY_PATH=/var/run/ci-key/cikey
 SSH_PKEY=~/key
 cp $SSH_PKEY_PATH $SSH_PKEY
@@ -50,10 +52,10 @@ ${BASTION_IP} ansible_ssh_user=centos ansible_ssh_common_args="$COMMON_SSH_ARGS"
 EOF
 
 ADDITIONAL_ARG=""
-# default to the first cluster in the array, unless 4.14
+# default to the first cluster in the array, unless 4.14 or 4.15
 if [[ "$T5_JOB_DESC" == "periodic-cnftests" ]]; then
     ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[0]} --force"
-    if [[ "$T5CI_VERSION" == "4.14" ]]; then
+    if [[ "$T5CI_VERSION" == "4.14" ]] || [[ "$T5CI_VERSION" == "4.15" ]]; then
         ADDITIONAL_ARG="--cluster-name ${PREPARED_CLUSTER[1]} --force"
     fi
 else
@@ -240,6 +242,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
 
+  - name: Add docker auth to enable pulling containers from CI registry
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer
+      'oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/root/openshift_pull.json'
 EOF
 
 cat << EOF > ~/fetch-information.yml
@@ -304,31 +310,6 @@ cat << EOF > $SHARED_DIR/destroy-cluster.yml
     shell: kcli delete plan -y ${PLAN_NAME}
     args:
       chdir: ~/kcli-openshift4-baremetal
-
-EOF
-
-cat << EOF > $SHARED_DIR/send-mail.yml
----
-- name: Send mail report
-  hosts: bastion
-  gather_facts: false
-  tasks:
-
-    - name: Get content of the file
-      slurp:
-        src: ${ARTIFACT_DIR}/mail_report.html
-      register: report
-      delegate_to: localhost
-
-    - name: Sending an e-mail
-      mail:
-        host: smtp.corp.redhat.com
-        port: 25
-        from: telco5g-ci@redhat.com (Upstream CI reporter)
-        to: CNF devel <cnf-devel@redhat.com>
-        subject: [US/CI] RESULTPH job ${JOB_NAME:-'unknown'}
-        subtype: html
-        body: "{{ report['content'] | b64decode }}"
 
 EOF
 

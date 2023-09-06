@@ -82,12 +82,14 @@ echo "current worker count $current_worker_count"
 echo "worker scale count $WORKER_REPLICA_COUNT"
 
 worker_count_num=$(($WORKER_REPLICA_COUNT))
-if [[ $current_worker_count -ne $worker_count_num ]]; then
-    if [[ $current_worker_count -gt $worker_count_num ]]; then
-        scaleDownMachines $current_worker_count $worker_count_num
-        waitForReady $worker_count_num
-    else
-        scaleMachineSets $worker_count_num
-        waitForReady $worker_count_num
+if [[ $worker_count_num -gt 0 ]]; then 
+    if [[ $current_worker_count -ne $worker_count_num ]]; then
+        if [[ $current_worker_count -gt $worker_count_num ]]; then
+            scaleDownMachines $current_worker_count $worker_count_num
+            waitForReady $worker_count_num
+        else
+            scaleMachineSets $worker_count_num
+            waitForReady $worker_count_num
+        fi
     fi
 fi

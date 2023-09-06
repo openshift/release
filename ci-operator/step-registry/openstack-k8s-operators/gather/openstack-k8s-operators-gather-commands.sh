@@ -78,11 +78,23 @@ pushd "${BASE_DIR}" || exit
 mkdir logs
 pushd logs || exit
 
+# check if we have any kuttl namespace
+KUTTL_NS=$(oc get project -o name | grep kuttl | cut -d '/' -f 2)
+
 # api-resources - OpenStack
 CMD=$(gen_resource_yaml_debug_cmd "${NS_SERVICES}" "api-resources")
 oc -n "${NS_SERVICES}" api-resources | grep 'openstack' | awk '{print $1}' | xargs -n1 -I {} sh -c "${CMD[@]}"
 # RabbitMQCluster
 oc -n "${NS_SERVICES}" get -o yaml RabbitMQCluster > RabbitMQCluster.yaml
+
+if [ -n "${KUTTL_NS}" ]; then
+    # api-resources - kuttl tests namespace
+    CMD=$(gen_resource_yaml_debug_cmd "${KUTTL_NS}" "api-resources-kuttl")
+    oc -n "${KUTTL_NS}" api-resources | grep 'openstack' | awk '{print $1}' | xargs -n1 -I {} sh -c "${CMD[@]}"
+    # RabbitMQCluster
+    oc -n "${KUTTL_NS}" get -o yaml RabbitMQCluster > RabbitMQCluster-kuttl.yaml
+fi
+
 
 ### Pods
 # Pods - controller manager
@@ -100,12 +112,29 @@ CMD=$(gen_pods_debug_cmd "${NS_SERVICES}" "errors")
 oc get pods -n "${NS_SERVICES}" --no-headers | egrep -iv controller-manager | egrep -iv 'Running|Completed' | awk '{print $1}' | \
 xargs -n1 -I {} sh -c "${CMD[@]}"
 
+if [ -n "${KUTTL_NS}" ]; then
+    # Pods - all others
+    CMD=$(gen_pods_debug_cmd "${KUTTL_NS}" "pods_kuttl")
+    oc get pods -n "${KUTTL_NS}" --no-headers | egrep -iv controller-manager | awk '{print $1}' | xargs -n1 -I {} sh -c "${CMD[@]}"
+
+    # Pods in error
+    CMD=$(gen_pods_debug_cmd "${KUTTL_NS}" "errors_kuttl")
+    # Capture logs from service containers if container is not in Running or Completed state
+    oc get pods -n "${KUTTL_NS}" --no-headers | egrep -iv controller-manager | egrep -iv 'Running|Completed' | awk '{print $1}' | \
+    xargs -n1 -I {} sh -c "${CMD[@]}"
+fi
+
 ### Get all from namespaces
 echo "### ${NS_OPERATORS} namespace" > get_all.log
 get_all_from_ns ${NS_OPERATORS} "pod" >> get_all.log
 if [[ "$NS_SERVICES" != "$NS_OPERATORS" ]]; then
   echo "### ${NS_SERVICES} namespace" >> get_all.log
   get_all_from_ns ${NS_SERVICES} "pod" >> get_all.log
+fi
+
+if [ -n "${KUTTL_NS}" ]; then
+  echo "### ${KUTTL_NS} namespace" >> get_all.log
+  get_all_from_ns ${KUTTL_NS} "pod" >> get_all.log
 fi
 
 # For network isolation
@@ -119,6 +148,8 @@ oc get l2advertisement -n metallb-system -o yaml > l2advertisement.yaml
 mkdir -p ${ARTIFACT_DIR}/must-gather/
 oc --insecure-skip-tls-verify adm must-gather --timeout=$MUST_GATHER_TIMEOUT \
 --dest-dir ${ARTIFACT_DIR}/must-gather > ${ARTIFACT_DIR}/must-gather/must-gather.log
+oc --insecure-skip-tls-verify adm must-gather --image=quay.io/openstack-k8s-operators/openstack-must-gather:latest --timeout=$MUST_GATHER_TIMEOUT \
+--dest-dir ${ARTIFACT_DIR}/must-gather > ${ARTIFACT_DIR}/must-gather/openstack-must-gather.log
 
 # logs dir
 popd || exit

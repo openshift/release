@@ -88,6 +88,29 @@ EOF
     echo "The bootstrap node didn't power off and it will not be released to retry in the deprovisioning steps..."
     return 0
   fi
+
+  if [ -z "${pdu_uri}" ]; then
+    echo "pdu_uri is empty... skipping pdu reset"
+  else
+    pdu_host=${pdu_uri%%/*}
+    pdu_socket=${pdu_uri##*/}
+    pdu_creds=${pdu_host%%@*}
+    pdu_host=${pdu_host##*@}
+    pdu_user=${pdu_creds%%:*}
+    pdu_pass=${pdu_creds##*:}
+    # pub-priv key auth is not supported by the PDUs
+    echo "${pdu_pass}" > /tmp/ssh-pass
+
+    timeout -s 9 10m sshpass -f /tmp/ssh-pass ssh "${SSHOPTS[@]}" "${pdu_user}@${pdu_host}" <<EOF || true
+olReboot $pdu_socket
+quit
+EOF
+    if ! wait_for_power_down "${bmc_address}" "${bmc_user}" "${bmc_pass}"; then
+      echo "The bootstrap node PDU reset was not successful... it will not be released to retry in the deprovisioning steps..."
+      return 0
+    fi
+  fi
+
   echo "Releasing the bootstrap node..."
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
         "${CLUSTER_NAME}" << 'EOF'
@@ -214,7 +237,7 @@ if [ "${DISCONNECTED}" == "true" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 
-# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${JOB_NAME_HASH} variable, and
+# Patching the cluster_name again as the one set in the ipi-conf ref is using the ${UNIQUE_HASH} variable, and
 # we might exceed the maximum length for some entity names we define
 # (e.g., hostname, NFV-related interface names, etc...)
 CLUSTER_NAME=$(<"${SHARED_DIR}/cluster_name")

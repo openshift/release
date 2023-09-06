@@ -104,6 +104,14 @@ for server in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_server_list.json"
 	openstack server show "$server" -f json
 done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_server_show.json"
 
+openstack volume list -f json \
+	| jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
+	> "${ARTIFACT_DIR_JSON}/openstack_volume_list.json"
+
+for volume in $(jq -r '.[].ID' "${ARTIFACT_DIR_JSON}/openstack_volume_list.json"); do
+	openstack volume show "$volume" -f json
+done | jq --slurp '.' > "${ARTIFACT_DIR_JSON}/openstack_volume_show.json"
+
 openstack port list -f json \
         | jq --arg CLUSTER_NAME "$CLUSTER_NAME" 'map(select(.Name | test($CLUSTER_NAME)))' \
         > "${ARTIFACT_DIR_JSON}/openstack_port_list.json"
@@ -136,6 +144,12 @@ for server in $(openstack server list --name "$CLUSTER_NAME" -c Name -f value | 
 	openstack server show "$server"               >> "${ARTIFACT_DIR}/openstack_nodes.log"
 
 	openstack console log show "$server"          &> "${ARTIFACT_DIR}/nodes/console_${server}.log"
+done
+
+openstack volume list | grep "$CLUSTER_NAME" > "${ARTIFACT_DIR}/openstack_volumes.log" || true
+for volume in $(openstack volume list -c Name -f value | { grep "$CLUSTER_NAME" || true; } | sort); do
+	echo -e "\n$ openstack volume show $volume" >> "${ARTIFACT_DIR}/openstack_volumes.log"
+	openstack volume show "$volume"             >> "${ARTIFACT_DIR}/openstack_volumes.log"
 done
 
 openstack port list | grep "$CLUSTER_NAME" > "${ARTIFACT_DIR}/openstack_ports.log" || true

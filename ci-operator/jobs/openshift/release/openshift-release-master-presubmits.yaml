@@ -31,6 +31,7 @@ presubmits:
         - --ignore=redhat-openshift-ecosystem/certified-operators-prod
         - --ignore=redhat-openshift-ecosystem/preflight
         - --ignore=redhat-openshift-ecosystem/cvp
+        - --ignore=insights-qe/iqe-cost-management-plugin
         command:
         - ./hack/check-gh-automation.sh
         env:
@@ -233,7 +234,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20230524-a7ef97e
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20230824-0ad4732
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -275,6 +276,7 @@ presubmits:
     labels:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-release-master-build-clusters
+    optional: true
     rerun_command: /test build-clusters
     spec:
       containers:
@@ -559,6 +561,55 @@ presubmits:
     branches:
     - ^master$
     - ^master-
+    cluster: app.ci
+    context: ci/build-farm/build08-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: build08
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-build08-dry
+    rerun_command: /test build08-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/build08
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.build08.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )build08-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
     cluster: build03
     context: ci/prow/ci-operator-config
     decorate: true
@@ -713,7 +764,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20230613-9df263832f
+        image: gcr.io/k8s-prow/checkconfig:v20230829-df0ee1785b
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -777,31 +828,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )core-valid,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/correctly-sharded-config
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-correctly-sharded-config
-    rerun_command: /test correctly-sharded-config
-    spec:
-      containers:
-      - args:
-        - ./
-        command:
-        - hack/validate-config-sharding.sh
-        image: config-shard-validator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: (?m)^/test( | .* )correctly-sharded-config,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -1389,6 +1415,55 @@ presubmits:
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )vsphere-dry,?($|\s.*)
+  - agent: kubernetes
+    always_run: false
+    branches:
+    - ^master$
+    - ^master-
+    cluster: app.ci
+    context: ci/build-farm/vsphere02-dry
+    decorate: true
+    labels:
+      ci.openshift.io/build-farm: vsphere02
+      ci.openshift.io/generator: cluster-init
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-release-master-vsphere02-dry
+    rerun_command: /test vsphere02-dry
+    run_if_changed: ^clusters/.*
+    spec:
+      containers:
+      - args:
+        - --config-dir=clusters/build-clusters/vsphere02
+        - --as=
+        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+        command:
+        - applyconfig
+        env:
+        - name: HOME
+          value: /tmp
+        image: registry.ci.openshift.org/ci/applyconfig:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /etc/build-farm-credentials
+          name: build-farm-credentials
+          readOnly: true
+        - mountPath: /tmp
+          name: tmp
+      serviceAccountName: config-updater
+      volumes:
+      - name: build-farm-credentials
+        secret:
+          items:
+          - key: sa.config-updater.vsphere02.config
+            path: kubeconfig
+          secretName: config-updater
+      - emptyDir: {}
+        name: tmp
+    trigger: (?m)^/test( | .* )vsphere02-dry,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:

@@ -86,9 +86,13 @@ CLUSTER_NAME="$(jq -r .clusterName metadata.json)"
 INFRA_ID="$(jq -r .infraID metadata.json)"
 PROJECT_NAME="$(jq -r .gcp.projectID metadata.json)"
 REGION="$(jq -r .gcp.region metadata.json)"
-ZONE_0="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[0] | cut -d "/" -f9)"
-ZONE_1="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[1] | cut -d "/" -f9)"
-ZONE_2="$(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[2] | cut -d "/" -f9)"
+## Available zones and instance zones might be different in region for arm64 machines
+mapfile -t AVAILABILITY_ZONES < <(gcloud compute regions describe "${REGION}" --format=json | jq -r '.zones[]' | cut -d "/" -f9)
+mapfile -t MASTER_INSTANCE_ZONES < <(gcloud compute machine-types list --filter="zone:(${REGION}) AND name=(${CONTROL_PLANE_NODE_TYPE})" --format=json | jq -r '.[].zone')
+mapfile -t MASTER_ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${MASTER_INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
+for index in {0..2}; do
+  eval ZONE_${index}=${MASTER_ZONES[index]}
+done
 
 MASTER_IGNITION="$(cat master.ign)"
 WORKER_IGNITION="$(cat worker.ign)"
@@ -328,7 +332,7 @@ imagename="${INFRA_ID}-rhcos-image"
 # https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
 # This code needs to handle pre-4.8 installers though too.
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >coreos.json; then
-  jq '.architectures.'"$(uname -m)"'.images.gcp' < coreos.json > gcp.json
+  jq '.architectures.'"$(echo "$OCP_ARCH" | sed 's/amd64/x86_64/;s/arm64/aarch64/')"'.images.gcp' < coreos.json > gcp.json
   source_image="$(jq -r .name < gcp.json)"
   source_project="$(jq -r .project < gcp.json)"
   rm -f coreos.json gcp.json
@@ -363,7 +367,7 @@ resources:
     cluster_network: '${CLUSTER_NETWORK}'
     control_subnet: '${CONTROL_SUBNET}'
     image: '${CLUSTER_IMAGE}'
-    machine_type: 'n2-standard-4'
+    machine_type: '${BOOTSTRAP_NODE_TYPE}'
     root_volume_size: '128'
     bootstrap_ign: '${BOOTSTRAP_IGN}'
 EOF
@@ -401,7 +405,7 @@ resources:
     - '${ZONE_2}'
     control_subnet: '${CONTROL_SUBNET}'
     image: '${CLUSTER_IMAGE}'
-    machine_type: 'n2-standard-4'
+    machine_type: '${CONTROL_PLANE_NODE_TYPE}'
     root_volume_size: '128'
     service_account_email: '${MASTER_SERVICE_ACCOUNT}'
     ignition: '${MASTER_IGNITION}'
@@ -467,7 +471,9 @@ gcloud compute target-pools add-instances "${INFRA_ID}-api-target-pool" "--insta
 
 ## Launch additional compute nodes
 echo "$(date -u --rfc-3339=seconds) - Launching additional compute nodes..."
-mapfile -t ZONES < <(gcloud compute regions describe "${REGION}" --format=json | jq -r .zones[] | cut -d '/' -f9)
+## Available zones and instance zones might be different in region for arm64 machines
+mapfile -t WORKER_INSTANCE_ZONES < <(gcloud compute machine-types list --filter="zone:(${REGION}) AND name=(${COMPUTE_NODE_TYPE})" --format=json | jq -r '.[].zone')
+mapfile -t WORKER_ZONES < <(echo "${AVAILABILITY_ZONES[@]}" "${WORKER_INSTANCE_ZONES[@]}" | sed 's/ /\n/g' | sort -R | uniq -d)
 cat <<EOF > 06_worker.yaml
 imports:
 - path: 06_worker.py
@@ -480,10 +486,10 @@ for compute in {0..2}; do
   type: 06_worker.py
   properties:
     infra_id: '${INFRA_ID}'
-    zone: '${ZONES[(( $compute % ${#ZONES[@]} ))]}'
+    zone: '${WORKER_ZONES[(( $compute % ${#WORKER_ZONES[@]} ))]}'
     compute_subnet: '${COMPUTE_SUBNET}'
     image: '${CLUSTER_IMAGE}'
-    machine_type: 'n2-standard-4'
+    machine_type: '${COMPUTE_NODE_TYPE}'
     root_volume_size: '128'
     service_account_email: '${WORKER_SERVICE_ACCOUNT}'
     ignition: '${WORKER_IGNITION}'

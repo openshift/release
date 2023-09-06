@@ -43,7 +43,7 @@ function check_signed() {
     digest="$(echo "${TARGET}" | cut -f2 -d@)"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror2.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -116,6 +116,12 @@ function check_upgrade_status() {
     if (( wait_upgrade <= 0 )); then
         echo >&2 "Upgrade timeout, exiting" && return 1
     fi
+}
+
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function run_command_oc_retries() {

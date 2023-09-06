@@ -4,6 +4,11 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  echo "This step is not required when EXTRACT_MANIFEST_INCLUDED is set to true"
+  exit 0
+fi
+
 if [[ "${BASELINE_CAPABILITY_SET}" == "" ]]; then
   echo "This step is not required when BASELINE_CAPABILITY_SET is not set"
   exit 0
@@ -52,7 +57,8 @@ v411="baremetal marketplace openshift-samples"
 # shellcheck disable=SC2034
 v412=" ${v411} Console Insights Storage CSISnapshot"
 v413=" ${v412} NodeTuning"
-latest_defined="v413"
+v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
+latest_defined="v414"
 always_default="${!latest_defined}"
 
 # Determine vCurrent
@@ -84,6 +90,9 @@ case ${BASELINE_CAPABILITY_SET} in
 "v4.13")
   enabled_operators="${v413}"
   ;;
+"v4.14")
+  enabled_operators="${v414}"
+  ;;
 "vCurrent")
   enabled_operators="${vCurrent}"
   ;;
@@ -96,14 +105,27 @@ esac
 # Base Capability + Additional Capability
 
 echo "Baseline Capability Set: $enabled_operators"
-echo "Additional Capability Set: $ADDITIONAL_ENABLED_CAPABILITY_SET"
-enabled_operators=$(echo "$enabled_operators $ADDITIONAL_ENABLED_CAPABILITY_SET" | xargs -n1 | sort -u | xargs)
+echo "Additional Capability Set: $ADDITIONAL_ENABLED_CAPABILITIES"
+enabled_operators=$(echo "$enabled_operators $ADDITIONAL_ENABLED_CAPABILITIES" | xargs -n1 | sort -u | xargs)
 echo "Enabled Capability Set: $enabled_operators"
 
 # Remove openshift-cluster-csi-drivers, >= 4.12
 if (( ocp_minor_version >=12 && ocp_major_version == 4 )); then
   if [[ ! "${enabled_operators}" =~ "Storage" ]]; then
       namespace="openshift-cluster-csi-drivers"
+      remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
+  fi
+fi
+
+# Remove openshift-machine-api/openshift-image-registry secret, >= 4.14
+if (( ocp_minor_version >=14 && ocp_major_version == 4 )); then
+  if [[ ! "${enabled_operators}" =~ "MachineAPI" ]]; then 
+      namespace="openshift-machine-api"
+      remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
+  fi
+
+  if [[ ! "${enabled_operators}" =~ "ImageRegistry" ]]; then
+      namespace="openshift-image-registry"
       remove_secrets "${SHARED_DIR}" "${namespace}" || exit 1
   fi
 fi

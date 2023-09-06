@@ -12,6 +12,10 @@ chain:
           documentation: "if true, add image content sources config(path=${SHARED_DIR}/mgmt_iscp.yaml)"
       commands: |-
         set -exuo pipefail
+        
+        if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+          source "${SHARED_DIR}/proxy-conf.sh"
+        fi
 
         arch=$(arch)
         if [ "$arch" == "x86_64" ]; then
@@ -47,7 +51,7 @@ chain:
           --memory 16Gi \
           --cores 4 \
           --namespace local-cluster \
-          --pull-secret=/etc/ci-pull-credentials/.dockerconfigjson
+          --pull-secret ${PULL_SECRET_PATH}
 
         oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
         oc apply -f - <<EOF
@@ -73,6 +77,10 @@ chain:
         oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
         echo "Cluster became available, creating kubeconfig"
         /tmp/hypershift create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+
+        if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "BareMetal" ]; then
+          exit 0
+        fi 
 
         echo "Waiting for nested cluster's node count to reach the desired replicas count in the NodePool"
         until \

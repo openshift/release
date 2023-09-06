@@ -115,6 +115,11 @@ function rhel_repo(){
       replace: "{{ target_repo_version }}"
   - name: Clean up yum cache
     command: yum clean all
+  - name: Import GPG key on RHEL machines for the following upgrade task - Install downloaded packages
+    ignore_errors: true
+    rpm_key:
+      state: present
+      key: /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 EOF
 
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml
@@ -161,6 +166,12 @@ function extract_oc(){
     which oc
     oc version --client
     return 0
+}
+
+function run_command() {
+    local CMD="$1"
+    echo "Running command: ${CMD}"
+    eval "${CMD}"
 }
 
 function run_command_oc() {
@@ -288,7 +299,7 @@ function check_latest_machineconfig_applied() {
     eval "$cmd"
 
     echo "Checking $role machines are applied with latest $role machineconfig..."
-    latest_machineconfig=$(oc get machineconfig --sort-by='{.metadata.creationTimestamp}' | grep "rendered-${role}-" | tail -1 | awk '{print $1}')
+    latest_machineconfig=$(oc get mcp/$role -o json | jq -r '.spec.configuration.name')
     if [[ ${latest_machineconfig} == "" ]]; then
         echo >&2 "Did not found ${role} render machineconfig"
         return 1
@@ -308,19 +319,30 @@ function check_latest_machineconfig_applied() {
 }
 
 function wait_machineconfig_applied() {
-    local role="${1}" try=0 interval=60
+    local role="${1}" try=0 interval=30
     num=$(oc get node --no-headers -l node-role.kubernetes.io/"$role"= | wc -l)
-    local max_retries; max_retries=$(expr $num \* 10)
-    while (( try < max_retries )); do
+    local max_retries; max_retries=$(expr $num \* 10 \* 60 \/ $interval) # Wait 10 minutes for each node, try 60/interval times per minutes
+
+    local mcp_try=0 mcp_status=''
+    local max_try_between_updated_and_updating; max_try_between_updated_and_updating=$(expr 5 \* 60 \/ $interval) # We consider mcp to be updated if its status is updated for 5 minutes
+    while [ $mcp_try -lt $max_try_between_updated_and_updating ] && [ $try -lt $max_retries ]
+    do
+        sleep ${interval}
         echo "Checking #${try}"
-        if ! check_latest_machineconfig_applied "${role}"; then
-            sleep ${interval}
-        else
-            break
+        mcp_status=$(oc get mcp/$role -o json | jq -r '.status.conditions[] | select(.type == "Updated") | .status')
+        if [[ X"$mcp_status" != X"True" ]]; then
+            mcp_try=0
         fi
+        (( mcp_try += 1 ))
         (( try += 1 ))
     done
-    if (( try == max_retries )); then
+    echo "MCP ${role} status is ${mcp_status}"
+    if [[ X"$mcp_status" != X"True" ]]; then
+        echo "Timeout waiting for mcp updated"
+        return 1
+    fi
+    
+    if ! check_latest_machineconfig_applied "${role}"; then
         echo >&2 "Timeout waiting for all $role machineconfigs are applied"
         return 1
     else
@@ -377,7 +399,7 @@ function check_signed() {
     digest="$(echo "${TARGET}" | cut -f2 -d@)"
     algorithm="$(echo "${digest}" | cut -f1 -d:)"
     hash_value="$(echo "${digest}" | cut -f2 -d:)"
-    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror2.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
+    response=$(curl --silent --output /dev/null --write-out %"{http_code}" "https://mirror.openshift.com/pub/openshift-v4/signatures/openshift/release/${algorithm}=${hash_value}/signature-1")
     if (( response == 200 )); then
         echo "${TARGET} is signed" && return 0
     else
@@ -392,18 +414,28 @@ function admin_ack() {
     fi
 
     local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
+    echo -e "All admin acks:\n${out}"
     if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
         echo "Admin ack not required" && return
     fi
 
     echo "Require admin ack"
     local wait_time_loop_var=0 ack_data
-    ack_data="$(echo ${out} | awk '{print $2}' | cut -f2 -d\")" && echo "Admin ack patch data is: ${ack_data}"
-    oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack_data}"'": "true"}}' --type=merge
+    ack_data="$(echo ${out} | jq -r "keys[]")"
+    for ack in ${ack_data};
+    do
+        # e.g.: ack-4.12-kube-1.26-api-removals-in-4.13
+        if [[ "${ack}" == *4\.$TARGET_MINOR_VERSION ]] 
+        then
+            echo "Admin ack patch data is: ${ack}"
+            oc -n openshift-config patch configmap admin-acks --patch '{"data":{"'"${ack}"'": "true"}}' --type=merge
+            break
+        fi
+    done
 
     echo "Admin-acks patch gets started"
 
-    echo -e "sleep 5 min wait admin-acks patch to be valid...\n"
+    echo -e "sleep 5 mins wait admin-acks patch to be valid...\n"
     while (( wait_time_loop_var < 5 )); do
         sleep 1m
         echo -e "wait_time_passed=${wait_time_loop_var} min.\n"
