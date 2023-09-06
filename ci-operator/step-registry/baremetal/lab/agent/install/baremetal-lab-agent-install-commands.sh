@@ -154,13 +154,15 @@ function reset_host() {
   local bmc_pass="${3}"
   local vendor="${4:-ampere}"
   ipmi_boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo force_pxe || echo force_cdrom)
+  efi_ipmi_boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo pxe || echo cdrom)
   sushy_boot_selection=$([ "${BOOT_MODE}" == "pxe" ] && echo PXE || echo VCD-DVD)
   echo "Resetting the host ${bmc_address}..."
   case "${vendor}" in
     ampere)
       ipmitool -I lanplus -H "$bmc_address" \
         -U "$bmc_user" -P "$bmc_pass" \
-        chassis bootparam set bootflag "$ipmi_boot_selection" options=PEF,watchdog,reset,power
+        #chassis bootparam set bootflag "$ipmi_boot_selection" options=PEF,watchdog,reset,power
+        chassis bootdev "$efi_ipmi_boot_selection" options=PEF,watchdog,reset,power,efiboot
     ;;
     dell)
       # this is how sushy does it
