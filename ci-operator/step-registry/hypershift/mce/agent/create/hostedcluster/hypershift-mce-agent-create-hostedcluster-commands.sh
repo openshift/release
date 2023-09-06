@@ -26,6 +26,7 @@ CLUSTER_NAMESPACE=local-cluster-${CLUSTER_NAME}
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
 oc create ns "${CLUSTER_NAMESPACE}"
 BASEDOMAIN=$(oc get dns/cluster -ojsonpath="{.spec.baseDomain}")
+RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 echo "extract secret/pull-secret"
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 
@@ -35,7 +36,8 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   --agent-namespace="${CLUSTER_NAMESPACE}" \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
-  --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN}
+  --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
+  --release-image ${RELEASE_IMAGE}
 
 if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
   echo "MCE version is less than 2.4"
