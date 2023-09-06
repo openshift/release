@@ -38,5 +38,7 @@ if [[ -e "${OIDC_CONFIG_FILE}" ]]; then
 
   echo "Start deleting the oidc config ${oidc_config_id}..."
   rosa delete oidc-config -y --mode auto --oidc-config-id ${oidc_config_id}
+else
+  echo "No oidc config created in the pre step"
 fi
 echo "Finish oidc config deletion."

@@ -12,22 +12,27 @@ workflow:
       ENABLE_BYOVPC: "true"
       ENABLE_PROXY: "true"
       ETCD_ENCRYPTION: "true"
+      STORAGE_ENCRYPTION: "true"
       BYO_OIDC: "true"
       OIDC_CONFIG_MANAGED: "false"
       DISABLE_WORKLOAD_MONITORING: "true"
-      DISABLE_SCP_CHECKS: "true"
+      DISABLE_SCP_CHECKS: "false"
       EC2_METADATA_HTTP_TOKENS: "required"
       DEFAULT_MACHINE_POOL_LABELS: "prowci=true"
     pre:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
     - chain: aws-provision-bastionhost
-    - chain: rosa-aws-sts-provision-byo-oidc
+    - chain: rosa-sts-oidc-config-create
+    - ref: rosa-sts-kms-key-create
+    - chain: rosa-cluster-provision
     - ref: aws-provision-tags-for-byo-vpc
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
     - ref: rosa-cluster-wait-ready-nodes
     post:
-    - chain: rosa-aws-sts-deprovision-byo-oidc
+    - chain: rosa-cluster-deprovision
+    - ref: rosa-sts-kms-key-delete
+    - chain: rosa-sts-oidc-config-delete
     - ref: aws-deprovision-s3buckets
     - ref: aws-deprovision-stacks
   documentation: |-
