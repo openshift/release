@@ -3,6 +3,7 @@
 set -o errexit
 set -o nounset
 set -o pipefail
+set -x
 
 function cleanup() {
   printf "%s: Stop recording \n" "$(date --utc --iso=s)"
@@ -48,7 +49,10 @@ do
   sleep 30
 done
 
-echo "Installation started, recording journalctl output"
+echo "Installation started, waiting 5mins before recording journalctl output"
+
+# Wait for sshd 
+sleep 300
 
 # Observer pods dont support vars from external file, thus hardcoded user and host
 # Additionaly, for reasons unkown to the writer, $SHARED_DIR in an observer pod works differently. The workaround is to manually copy files to a writable directory
@@ -58,6 +62,8 @@ scp "${SSHOPTS[@]}" "root@openshift-qe-bastion.arm.eng.rdu2.redhat.com:/var/buil
 SSH_PORT=2222
 BASTION_HOST="root@openshift-qe-bastion.arm.eng.rdu2.redhat.com"
 
+
+
 # shellcheck disable=SC2154
 for bmhost in $(yq e -o=j -I=0 '.[]' "${OINK_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
@@ -66,13 +72,8 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${OINK_DIR}/hosts.yaml"); do
   ssh "${SSHOPTS[@]}" -N -L $SSH_PORT:"${ip}":22 $BASTION_HOST &
   sleep 10
   nohup ssh "${SSHOPTS[@]}" -t -p "${SSH_PORT}" "core@127.0.0.1" << EOF > "${ARTIFACT_DIR}/${ip}_${name}_journalctl.txt"
-    journalctl -f &
+      journalctl -f &
 EOF
-  until ! !; 
-  do 
-    echo "Waiting for server at ${ip} to be ready"
-    sleep 30 ; 
-  done
   ((SSH_PORT=SSH_PORT+1))
 done
 

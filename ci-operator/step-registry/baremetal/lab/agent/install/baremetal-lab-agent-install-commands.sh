@@ -373,6 +373,26 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${vendor}"
 done
 
+function agent_gather_logs(){
+  # Use different port than observer pods
+  SSH_PORT=3222
+# shellcheck disable=SC2154
+for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
+  # shellcheck disable=SC1090
+  . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
+  echo "Creating SSH tunnel to host ${ip} on port ${SSH_PORT} via bastion"
+  ssh "${SSHOPTS[@]}" -N -L $SSH_PORT:"${ip}":22 "root@${AUX_HOST}" &
+  sleep 10
+  echo "Generating agent gather logs on remote host ${ip}"
+  ssh "${SSHOPTS[@]}" -t -p "${SSH_PORT}" "core@127.0.0.1" << 'EOF'
+    set -e; agent-gather -O >/tmp/agent-gather.tar.xz
+EOF
+  echo "Copying agent logs from remote host ${ip} to artifact dir"
+  scp "${SSHOPTS[@]}" -r -P "${SSH_PORT}" "core@127.0.0.1:/tmp/agent-gather.tar.xz" "${ARTIFACT_DIR}/agent-gather-${name}.tar.xz"
+  ((SSH_PORT=SSH_PORT+1))
+done
+}
+
 date "+%F %X" > "${SHARED_DIR}/CLUSTER_INSTALL_START_TIME"
 echo -e "\nForcing 15min delay to allow instances to properly boot up (long PXE boot times & console-hook) - NOTE: unnecessary overtime will be reduced from total bootstrap time."
 sleep 900
@@ -386,6 +406,7 @@ http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="
 if ! wait $!; then
   # TODO: gather logs??
   echo "ERROR: Bootstrap failed. Aborting execution."
+  trap 'agent_gather_logs' 1
   exit 1
 fi
 
@@ -396,5 +417,6 @@ http_proxy="${proxy}" https_proxy="${proxy}" HTTP_PROXY="${proxy}" HTTPS_PROXY="
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
   # TODO: gather logs??
+  trap 'agent_gather_logs' 1
   exit 1
 fi

@@ -67,7 +67,9 @@ function detect_kernel_panic(){
           echo "Detected kernel panic in ${bmc_address%%.*}, rebooting" | gawk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }'
           ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" power cycle
           # Use break or safely reset the content of ipmi log file to avoid infinite loop
-          break
+          #break
+          echo -n "" > "${log_file}"
+          echo "Host was rebooted after a kernel panic" > "${log_file}"
       fi
       sleep 30
     done
