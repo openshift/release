@@ -3,17 +3,20 @@ workflow:
   steps:
     allow_best_effort_post_steps: true
     env:
-      COMPUTE_NODE_REPLICAS: "2"
-      COMPUTE_NODE_TYPE: "m5.4xlarge"
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
+      API_HOST: stage
       PARALLEL: "true"
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
     post:
-    - chain: ipi-aws-post
+    - ref: cluster-uninstall
+    -  ref : firewatch-report-issues
     pre:
-    - chain: ipi-aws-pre
+    - ref: cluster-install
     - ref: operator-install
   documentation: |-
-    This workflow provision an OpenShift cluster with default configurations on AWS. 
-    The cluster is set with telemetry step generates a "${SHARED_DIR}/manifest_cluster-monitoring-config.yaml" manifest, and 
-    generates the AWS-specific install-config.yaml contents based on the cluster profile, located in "${SHARED_DIR}/install-config.yaml".
-    It then install required operator on the cluster.
-    After finish testing, console logs from AWS instances will be gathered and the cluster will be deprovisioned.
+    This workflow provisions/de-provisions an OpenShift IPI cluster based on the provided
+    cluster config as an environment variable (see cluster-install step for more information)
+    as well as installing operators on the target cluster based on the provided addons config
+    as environment variables (see operator-install step for more information).
+    Cluster data will be available under $SHARED_DIR after setup.
