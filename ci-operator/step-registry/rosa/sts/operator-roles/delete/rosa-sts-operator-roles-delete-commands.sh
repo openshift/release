@@ -32,11 +32,13 @@ else
 fi
 
 # If the byo operator roles exist, do deletion.
-OPERATOR_ROLES_PREFIX_FILE="${ARTIFACT_DIR}/operator-roles-prefix"
+OPERATOR_ROLES_PREFIX_FILE="${SHARED_DIR}/operator-roles-prefix"
 if [[ -e "${OPERATOR_ROLES_PREFIX_FILE}" ]]; then
   OPERATOR_ROLES_PREFIX=$(cat "${OPERATOR_ROLES_PREFIX_FILE}")
 
   echo "Start deleting the byo operator roles with the prefix ${OPERATOR_ROLES_PREFIX}..."
   rosa delete operator-roles -y --mode auto --prefix ${OPERATOR_ROLES_PREFIX}
+else
+  echo "No byo operator roles created in the pre step"
 fi
 echo "Finish byo operator roles deletion."
