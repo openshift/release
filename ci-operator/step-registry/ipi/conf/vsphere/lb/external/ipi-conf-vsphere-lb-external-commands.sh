@@ -1,5 +1,4 @@
 #!/bin/bash
-
 set -o nounset
 set -o errexit
 set -o pipefail
@@ -9,6 +8,8 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
   exit 1
 fi
+
+LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
 
 cluster_name=${NAMESPACE}-${UNIQUE_HASH}
 
@@ -40,7 +41,9 @@ echo "$(date -u --rfc-3339=seconds) - vm_template: ${vm_template}"
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
 # shellcheck source=/dev/null
+declare vsphere_datacenter
 source "${SHARED_DIR}/govc.sh"
+source "${SHARED_DIR}/vsphere_context.sh"
 
 cat > /tmp/rhcos.json << EOF
 {
@@ -165,10 +168,18 @@ curl -sSL "https://mirror2.openshift.com/pub/openshift-v4/clients/butane/latest/
 
 LB_VMNAME="${cluster_name}-lb"
 export GOVC_NETWORK="${LEASED_RESOURCE}"
-govc vm.clone -on=false -vm="${vm_template}" ${LB_VMNAME}
+# LEASE_NUMBER between 151 and 157 will use profile:vsphere-multizone
+if [ ${LEASE_NUMBER} -ge 151 ] && [ ${LEASE_NUMBER} -le 157 ]; then
+	govc vm.clone -on=false -dc=/${vsphere_datacenter} -ds /${vsphere_datacenter}/datastore/mdcnc-ds-shared -pool=/IBMCloud/host/vcs-mdcnc-workload-1/Resources -vm="${vm_template}" ${LB_VMNAME}
+	govc vm.network.change -dc=/${vsphere_datacenter} -vm ${LB_VMNAME} -net /${vsphere_datacenter}/host/vcs-mdcnc-workload-1/"${LEASED_RESOURCE}" ethernet-0
+else
+	govc vm.clone -on=false -vm="${vm_template}" ${LB_VMNAME}
+	govc vm.network.change -vm ${LB_VMNAME} -net "${LEASED_RESOURCE}" ethernet-0
+fi
 IGN=$(cat $BUTANE_CFG | /tmp/butane -r -d /tmp | gzip | base64 -w0)
 IPCFG="ip=192.168.${third_octet}.2::192.168.${third_octet}.1:255.255.255.0:lb::none nameserver=8.8.8.8"
-govc vm.network.change -vm ${LB_VMNAME} -net "${LEASED_RESOURCE}" ethernet-0
+#govc vm.network.change -vm ${LB_VMNAME} -net "${LEASED_RESOURCE}" ethernet-0
+
 govc vm.change -vm ${LB_VMNAME} -e "guestinfo.afterburn.initrd.network-kargs=${IPCFG}"
 govc vm.change -vm ${LB_VMNAME} -e guestinfo.ignition.config.data=$IGN
 govc vm.change -vm ${LB_VMNAME} -e guestinfo.ignition.config.data.encoding=gzip+base64
