@@ -11,7 +11,7 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.9"
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -27,7 +27,7 @@ tests:
     owner: openshift-ci
     product: ocp
     timeout: 1h30m0s
-    version: "4.9"
+    version: "4.13"
   steps:
     test:
     - as: scale-gpu-nodes
@@ -42,7 +42,7 @@ tests:
           cpu: 2000m
           memory: 2Gi
     - as: gpu-operator-e2e
-      commands: make e2e_gpu_test CHANNEL=v1.10
+      commands: make e2e_gpu_test CHANNEL=v23.6
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
         name: nvidia-ci-secrets
@@ -52,7 +52,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-- as: nvidia-gpu-operator-e2e-1-10-x
+- as: nvidia-gpu-operator-e2e-master
   cron: 0 */23 * * 6
   steps:
     cluster_profile: aws
@@ -69,7 +69,35 @@ tests:
           cpu: 2000m
           memory: 2Gi
     - as: weekly-gpu-operator-e2e
-      commands: make e2e_gpu_test CHANNEL=v1.10
+      commands: make master_e2e_gpu_test
+      credentials:
+      - mount_path: /var/run/nvidia-ci-secrets
+        name: nvidia-ci-secrets
+        namespace: test-credentials
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
+- as: nvidia-gpu-operator-e2e-23-6-x
+  cron: 0 */23 * * 6
+  steps:
+    cluster_profile: aws
+    test:
+    - as: weekly-scale-gpu-nodes
+      commands: make scale_aws_gpu_nodes
+      credentials:
+      - mount_path: /var/run/nvidia-ci-secrets
+        name: nvidia-ci-secrets
+        namespace: test-credentials
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: weekly-gpu-operator-e2e
+      commands: make e2e_gpu_test CHANNEL=v23.6
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
         name: nvidia-ci-secrets
@@ -84,4 +112,4 @@ zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
   repo: ci-tools-nvidia-gpu-operator
-  variant: "4.9"
+  variant: "4.14"
