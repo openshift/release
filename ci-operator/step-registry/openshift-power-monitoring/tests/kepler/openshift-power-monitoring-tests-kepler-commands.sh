@@ -6,9 +6,9 @@ must_gather() {
     oc get pods -n openshift-operators
     oc describe deployment kepler-operator-controller-manager -n openshift-operators
     oc logs -n openshift-operators deployments/kepler-operator-controller-manager
-    oc get pods -n openshift-kepler-operator
-    oc describe daemonsets/kepler-exporter-ds -n openshift-kepler-operator
-    oc logs -n daemonsets/kepler-exporter-ds -n openshift-kepler-operator
+    # oc get pods -n openshift-kepler-operator
+    # oc describe daemonsets/kepler-exporter-ds -n openshift-kepler-operator
+    # oc logs -n daemonsets/kepler-exporter-ds -n openshift-kepler-operator
 }
 validate_kepler() {
     local ret=0
@@ -25,18 +25,23 @@ validate_kepler() {
 }
 main() {
     # below validation steps will be replaced by go tests in future
-    validate_kepler || {
+    # validate_kepler || {
+    #     must_gather
+    #     return 1
+    # }
+    # sleep 60
+    # oc expose service/kepler-exporter-svc -n openshift-kepler-operator --name kepler-metrics-route
+    # url=http://$(oc get route kepler-metrics-route -n openshift-kepler-operator -o jsonpath='{.spec.host}')/metrics
+    # [[ $(curl "$url" | grep -c kepler_) -gt 0 ]] || {
+    #     echo "Kepler validation failed"
+    #     must_gather
+    #     return 1
+    # }
+    # echo "Kepler validation successful"
+    ls -ltr /tmp/
+    ./tests/run-e2e.sh --no-deploy --no-builds --ns openshift-operators || {
         must_gather
         return 1
     }
-    sleep 60
-    oc expose service/kepler-exporter-svc -n openshift-kepler-operator --name kepler-metrics-route
-    url=http://$(oc get route kepler-metrics-route -n openshift-kepler-operator -o jsonpath='{.spec.host}')/metrics
-    [[ $(curl "$url" | grep -c kepler_) -gt 0 ]] || {
-        echo "Kepler validation failed"
-        must_gather
-        return 1
-    }
-    echo "Kepler validation successful"
 }
 main "$@"
