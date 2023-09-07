@@ -438,8 +438,9 @@ __check_defined = \
 		$(error Undefined environment variable $1$(if $2, ($2))))
 
 # yq: https://github.com/mikefarah/yq
-yq ?= yq
-TAG ?= latest
+
+generate-hypershift-deployment: yq ?= yq
+generate-hypershift-deployment: TAG ?= latest
 generate-hypershift-deployment:
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
 
@@ -456,3 +457,9 @@ generate-hypershift-deployment:
 		--enable-uwm-telemetry-remote-write=false \
 		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hive/hypershift/hypershift-install.yaml
 .PHONY: generate-hypershift-deployment
+
+build-hypershift-deployment: TAG ?= $(shell date +%Y%m%d)
+build-hypershift-deployment:
+	echo Building HyperShift operator with tag $(TAG)
+	oc --context app.ci -n ci --as system:admin start-build -w hypershift-cli
+	oc --context app.ci -n ci --as system:admin tag hypershift-cli:latest hypershift-cli:$(TAG)
