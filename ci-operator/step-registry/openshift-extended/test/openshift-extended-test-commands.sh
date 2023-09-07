@@ -196,6 +196,7 @@ oc wait nodes --all --for=condition=Ready=true --timeout=15m
 oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 oc get clusterversion version -o yaml || true
 
+
 # execute the cases
 function run {
     test_scenarios=""
@@ -305,7 +306,7 @@ function run {
     echo "normal exit"
     exit 0
 }
-
+sleep 7200
 # select the cases per FILTERS
 function handle_filters {
     filter_tmp="$1"
