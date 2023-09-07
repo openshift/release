@@ -24,7 +24,7 @@ cd verification-tests
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/long-duration"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
 set -x
-cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS}" -p junit || true
+cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @long-duration" -p junit || true
 set +x
 
 # summarize test results
