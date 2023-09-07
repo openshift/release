@@ -32,7 +32,8 @@ if [ -z "${RHCOS_VM_TEMPLATE}" ]; then
   vm_template="${ova_url##*/}"
 
 # select a hardware version for testing
-  vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
+vsphere_version=8
+#  vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
   hw_versions=(15 17 18 19)
   if [[ ${vsphere_version} -eq 8 ]]; then
       hw_versions=(20)
