@@ -395,6 +395,31 @@ EOF
   done
 }
 
+function vsphere_internal_network() {
+  local dir=${1}
+
+
+  PATCH="${SHARED_DIR}/nodeNetworking-internal.yaml.patch"
+  cat > "${PATCH}" << EOF
+spec:
+  platformSpec:
+    vsphere:
+      nodeNetworking:
+        internal:
+          networkSubnetCidr:
+            - "$MACHINE_NETWORK"
+        external:
+          networkSubnetCidr:
+            - "$MACHINE_NETWORK"
+EOF
+
+  yq-go m -x -i  $dir/manifests/cluster-infrastructure-02-config.yml "${PATCH}"
+
+  cat $dir/manifests/cluster-infrastructure-02-config.yml
+}
+
+
+
 # inject_spot_instance_config is an AWS specific option that enables the use of AWS spot instances for worker nodes
 function inject_spot_instance_config() {
   local dir=${1}
@@ -528,6 +553,9 @@ dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
+MACHINE_NETWORK=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'networking.machineNetwork[0].cidr')
+echo ".machineNetwork[0].cidr = ${MACHINE_NETWORK}"
+
 echo "install-config.yaml"
 echo "-------------------"
 cat ${SHARED_DIR}/install-config.yaml | grep -v "password\|username\|pullSecret" | tee ${ARTIFACT_DIR}/install-config.yaml
@@ -544,6 +572,7 @@ wait "$!"
 
 # Platform specific manifests adjustments
 case "${CLUSTER_TYPE}" in
+vsphere) vsphere_internal_network ${dir} ;;
 azure4|azure-arm64) inject_boot_diagnostics ${dir} ;;
 aws|aws-arm64|aws-usgov)
     if [[ "${SPOT_INSTANCES:-}"  == 'true' ]]; then
