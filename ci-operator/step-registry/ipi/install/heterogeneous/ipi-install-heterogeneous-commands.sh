@@ -232,6 +232,17 @@ case $CLUSTER_TYPE in
     done
   fi
 
+  # explicitly disabling UDP aggregation since it is not supported on s390x. see https://issues.redhat.com/browse/OCPBUGS-18394
+  oc create -oyaml -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+data:
+  disable-udp-aggregation: "true"
+metadata:
+  name: udp-aggregation-config
+  namespace: openshift-network-operator
+EOF
+
   MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.profile = \"${ADDITIONAL_WORKER_VM_TYPE}\"
        | .spec.template.spec.providerSpec.value.image = \"${RHCOS_IMAGE_NAME}\"" <<< "$MACHINE_SET")
 ;;
