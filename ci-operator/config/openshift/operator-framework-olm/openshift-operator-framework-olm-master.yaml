@@ -7,6 +7,11 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: cd ./scripts/bumper && go install -mod=mod ./...
 build_root:
   from_repository: true
 images:
@@ -27,11 +32,30 @@ images:
 - dockerfile_path: base.Dockerfile
   from: src
   to: ci-image
+- dockerfile_literal: |-
+    FROM quay.io/centos/centos:stream8
+    ADD bumper /usr/bin/bumper
+    ENTRYPOINT ["bumper"]
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/bumper
+  to: olm-bumper
 promotion:
   excluded_images:
   - ci-image
+  - olm-bumper
   name: "4.14"
   namespace: ocp
+  to:
+  - additional_images:
+      olm-bumper: olm-bumper
+    excluded_images:
+    - '*'
+    namespace: operator-lifecycle-manager
+    tag: latest
 releases:
   initial:
     integration:
