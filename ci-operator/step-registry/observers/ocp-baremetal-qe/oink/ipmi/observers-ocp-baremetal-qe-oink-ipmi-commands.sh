@@ -54,23 +54,27 @@ echo "Installation started, recording Serial-over-Lan output"
 scp "${SSHOPTS[@]}" "root@openshift-qe-bastion.arm.eng.rdu2.redhat.com:/var/builds/${CLUSTER_NAME}/*.yaml" "${OINK_DIR}/"
 
 KERNEL_PANIC_IDENTIFIER="Kernel panic"
+BOOT_FAILURE_IDENTIFIER="failure reading sector" # probably caused by network errors in loading the ISO from remote share
 
-function detect_kernel_panic(){
+
+# Search for kernel panics and boot errors
+function detect_errors_on_boot(){
     local log_file="${1}"
     local bmc_address="${2}"   
     local bmc_user="${3}" 
     local bmc_pass="${4}" 
     while true ; do 
       echo "Searching for kernel panic in ${bmc_address%%.*} IPMI log..." | gawk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }'
-      result=$(grep "${KERNEL_PANIC_IDENTIFIER}" "${log_file}" || true;)
+      result=$(grep -E "${KERNEL_PANIC_IDENTIFIER}|${BOOT_FAILURE_IDENTIFIER}" "${log_file}" || true;)
       if [ "$result" ] ; then
-          echo "Detected kernel panic in ${bmc_address%%.*}, rebooting" | gawk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }'
+          echo "Detected boot error in ${bmc_address%%.*}, rebooting" | gawk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }'
+          echo "Boot error: $result"
           ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" chassis bootdev cdrom options=efiboot
           ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" power cycle
           # Use break or safely reset the content of ipmi log file to avoid infinite loop
           #break
           echo -n "" > "${log_file}"
-          echo "Host was rebooted after a kernel panic" > "${log_file}"
+          echo "Host was rebooted after a boot error" > "${log_file}"
       fi
       sleep 30
     done
@@ -88,7 +92,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${OINK_DIR}/hosts.yaml"); do
   sleep 3600 \
     | ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" sol activate usesolkeepalive | gawk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }' \
     2>> "${IPMI_STDERR_FILE}" >> "${IPMI_STDOUT_FILE}" &
-  detect_kernel_panic "${IPMI_STDOUT_FILE}" "${bmc_address}" "${bmc_user}" "${bmc_pass}" >> "${IPMI_KERNEL_FILE}" &
+  detect_errors_on_boot "${IPMI_STDOUT_FILE}" "${bmc_address}" "${bmc_user}" "${bmc_pass}" >> "${IPMI_KERNEL_FILE}" &
 done
 
 # Keep the observer pod alive while SoL recording

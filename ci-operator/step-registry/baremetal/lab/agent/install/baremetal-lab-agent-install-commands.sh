@@ -387,11 +387,11 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
   ssh "${SSHOPTS[@]}" -N -L $SSH_PORT:"${ip}":22 "root@${AUX_HOST}" &
   sleep 10
   echo "Generating agent gather logs on remote host ${ip}"
-  ssh "${SSHOPTS[@]}" -t -p "${SSH_PORT}" "core@127.0.0.1" << 'EOF'
+  timeout -s 9 5m ssh "${SSHOPTS[@]}" -t -p "${SSH_PORT}" "core@127.0.0.1" << 'EOF'
     set -e; agent-gather -O >/tmp/agent-gather.tar.xz
 EOF
   echo "Copying agent logs from remote host ${ip} to artifact dir"
-  scp "${SSHOPTS[@]}" -r -P "${SSH_PORT}" "core@127.0.0.1:/tmp/agent-gather.tar.xz" "${ARTIFACT_DIR}/agent-gather-${name}.tar.xz"
+  timeout -s 9 5m scp "${SSHOPTS[@]}" -r -P "${SSH_PORT}" "core@127.0.0.1:/tmp/agent-gather.tar.xz" "${ARTIFACT_DIR}/agent-gather-${name}.tar.xz"
   ((SSH_PORT=SSH_PORT+1))
 done
 }
