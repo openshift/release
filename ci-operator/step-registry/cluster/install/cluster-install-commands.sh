@@ -53,7 +53,7 @@ echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-toke
 set +e
 ${RUN_COMMAND}
 return_code=$?
-sleep 5000000
+sleep 500000000000
 
 if [ $NUM_CLUSTERS -eq 1 ]; then
   CLUSTER_NAME=$(awk -F'.*name=|;' '{print $2}' <<< "$CLUSTERS_CMD")
