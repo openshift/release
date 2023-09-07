@@ -15,7 +15,8 @@ ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
 #git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
-git clone https://github.com/lenahorsley/e2e-benchmarking/tree/prow-concurrent-builds --depth=1
+git clone https://github.com/lenahorsley/e2e-benchmarking/ --depth=1
+git checkout prow-concurrent-builds
 pushd e2e-benchmarking/workloads/kube-burner
 export EXTRA_FLAGS="--pod-ready-threshold=$POD_READY_THRESHOLD"
 export WORKLOAD=concurrent-builds
