@@ -21,8 +21,14 @@ resources:
       memory: 2Gi
 tests:
 - as: nvidia-gpu-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.13"
   steps:
-    cluster_profile: aws
     test:
     - as: scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
@@ -36,7 +42,7 @@ tests:
           cpu: 2000m
           memory: 2Gi
     - as: gpu-operator-e2e
-      commands: make e2e_gpu_test
+      commands: make e2e_gpu_test CHANNEL=v23.6
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
         name: nvidia-ci-secrets
@@ -46,13 +52,12 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    workflow: ipi-aws
 - as: nvidia-gpu-operator-e2e-master
-  cron: 0 */23 * * 6
+  cron: 0 */23 * * *
   steps:
     cluster_profile: aws
     test:
-    - as: weekly-scale-gpu-nodes
+    - as: nightly-scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
@@ -63,7 +68,7 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    - as: weekly-gpu-operator-e2e
+    - as: nightly-gpu-operator-e2e
       commands: make master_e2e_gpu_test
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
@@ -75,12 +80,12 @@ tests:
           cpu: 2000m
           memory: 2Gi
     workflow: ipi-aws
-- as: nvidia-gpu-operator-e2e-22-9-x
-  cron: 0 */23 * * 6
+- as: nvidia-gpu-operator-e2e-23-3-x
+  cron: 0 */23 * * *
   steps:
     cluster_profile: aws
     test:
-    - as: weekly-scale-gpu-nodes
+    - as: nightly-scale-gpu-nodes
       commands: make scale_aws_gpu_nodes
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
@@ -91,8 +96,36 @@ tests:
         requests:
           cpu: 2000m
           memory: 2Gi
-    - as: weekly-gpu-operator-e2e
-      commands: make e2e_gpu_test CHANNEL=v22.9
+    - as: nightly-gpu-operator-e2e
+      commands: make e2e_gpu_test CHANNEL=v23.3
+      credentials:
+      - mount_path: /var/run/nvidia-ci-secrets
+        name: nvidia-ci-secrets
+        namespace: test-credentials
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    workflow: ipi-aws
+- as: nvidia-gpu-operator-e2e-23-6-x
+  cron: 0 */23 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: nightly-scale-gpu-nodes
+      commands: make scale_aws_gpu_nodes
+      credentials:
+      - mount_path: /var/run/nvidia-ci-secrets
+        name: nvidia-ci-secrets
+        namespace: test-credentials
+      from: ci-tools-nvidia-gpu-operator
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 2Gi
+    - as: nightly-gpu-operator-e2e
+      commands: make e2e_gpu_test CHANNEL=v23.6
       credentials:
       - mount_path: /var/run/nvidia-ci-secrets
         name: nvidia-ci-secrets
