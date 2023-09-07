@@ -53,7 +53,6 @@ echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-toke
 set +e
 ${RUN_COMMAND}
 return_code=$?
-sleep 500000000000
 
 if [ $NUM_CLUSTERS -eq 1 ]; then
   CLUSTER_NAME=$(awk -F'.*name=|;' '{print $2}' <<< "$CLUSTERS_CMD")
@@ -63,7 +62,7 @@ if [ $NUM_CLUSTERS -eq 1 ]; then
   cp "$CLUSTER_AUTH_DIR/kubeconfig" "${SHARED_DIR}/kubeconfig"
   cp "$CLUSTER_AUTH_DIR/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
   echo "$CLUSTER_NAME" > "${SHARED_DIR}/cluster-name"
-  grep 'api-url'| cut -d' ' -f 2 "$CLUSTER_DATA_DIR/cluster_data.yaml" > "${SHARED_DIR}/api.url"
+  grep 'api-url' "$CLUSTER_DATA_DIR/cluster_data.yaml" | cut -d' ' -f 2 > "${SHARED_DIR}/api.url"
   grep 'console-url' "$CLUSTER_DATA_DIR/cluster_data.yaml"| cut -d' ' -f 2 > "${SHARED_DIR}/console.url"
   grep 'cluster-id' "$CLUSTER_DATA_DIR/cluster_data.yaml"| cut -d' ' -f 2 > "${SHARED_DIR}/cluster-id"
 fi
