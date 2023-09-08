@@ -13,8 +13,13 @@ chain:
         MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
         HYPERSHIFT_NAME=hcp
         if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
-          echo "MCE version is less than 2.4, use hypershift command"
+          echo "MCE version is less than 2.4, use hypershift command as default"
           HYPERSHIFT_NAME=hypershift
+        else
+          echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli for dump command"
+          oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
+          HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
+          oc image extract "${HO_IMAGE}" --path /usr/bin/hypershift:/tmp --registry-config=/tmp/.dockerconfigjson
         fi
 
         arch=$(arch)
@@ -26,7 +31,12 @@ chain:
         fi
 
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-        
+
+        /tmp/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
+          --dump-guest-cluster=true \
+          --namespace local-cluster \
+          --name="${CLUSTER_NAME}"
+      
         echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
         /tmp/${HYPERSHIFT_NAME} destroy cluster kubevirt \
           --name ${CLUSTER_NAME} \
