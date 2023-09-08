@@ -9,8 +9,11 @@ if [[ $OCP_ARCH == "arm64" ]]; then
   OPERATOR_IMAGE="quay.io/hypershift/hypershift-operator:latest-arm64"
 fi
 
-if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
-  EXTRA_ARGS="${EXTRA_ARGS} --enable-defaulting-webhook=true"
+MAJOR=$(oc get clusterversion version -o jsonpath={..desired.version} | awk -F'.' '{print $1}')
+MINOR=$(oc get clusterversion version -o jsonpath={..desired.version} | awk -F'.' '{print $2}')
+
+if [[ $MAJOR -eq 4 && $MINOR -gt 13 ]]; then
+    EXTRA_ARGS="${EXTRA_ARGS} --enable-defaulting-webhook=true"
 fi
 
 bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
