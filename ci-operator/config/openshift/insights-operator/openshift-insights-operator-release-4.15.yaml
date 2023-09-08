@@ -25,6 +25,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: insights-operator
 promotion:
+  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -92,6 +93,42 @@ tests:
       - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
+      from: insights-operator-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-operator-e2e-tests-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh -k "not tp_only" --junitxml=${ARTIFACT_DIR}/test-report.xml
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      from: insights-operator-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-operator-test-time-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh -k "test_archive_uploaded_and_result_received" --junitxml=${ARTIFACT_DIR}/test-report.xml
       from: insights-operator-tests
       resources:
         requests:
