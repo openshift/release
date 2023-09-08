@@ -143,6 +143,28 @@ grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${
 #  manifest="$(basename "${item}")"
 #  cp "${item}" "${INSTALL_DIR}/cluster-manifests/${manifest##manifest_}"
 #done < <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.yaml" \) -print0)
+#
+
+
+cat > "${SHARED_DIR}"/manifest_kernelargs << EOF
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: worker
+  name: test-kernel-arguments-32
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+  kernelArguments:
+    - z=0
+EOF
+
+echo "listing install dir $INSTALL_DIR"
+ls -larth  $INSTALL_DIR
+
+
 gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
 
 if [ "${FIPS_ENABLED:-false}" = "true" ]; then

@@ -539,6 +539,7 @@ function co_check {
         exit $wait_co_ret
     fi
 }
+
 function create_must-gather_dir_for_case {
     MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO"
     # MOUDLE_NEED_MUST_GATHER_PER_CASE="MCO|OLM"
@@ -556,5 +557,12 @@ function create_must-gather_dir_for_case {
         # greater than 500M, if it is greater, please do not put it. or else, put must-gather into there.
     fi
 }
+
+echo "WAITING FOR DEBUG..."
+while [ ! -f "/tmp/continue" ]
+do
+    sleep 10
+done
+
 co_check
 run
