@@ -64,12 +64,20 @@ function detect_errors_on_boot(){
     local bmc_user="${3}" 
     local bmc_pass="${4}" 
     while true ; do 
-      echo "Searching for kernel panic in ${bmc_address%%.*} IPMI log..." | gawk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }'
+      echo "Searching for boot errors in ${bmc_address%%.*} IPMI log..." | gawk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }'
       result=$(grep -E "${KERNEL_PANIC_IDENTIFIER}|${BOOT_FAILURE_IDENTIFIER}" "${log_file}" || true;)
       if [ "$result" ] ; then
           echo "Detected boot error in ${bmc_address%%.*}, rebooting" | gawk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }'
           echo "Boot error: $result"
-          ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" chassis bootdev cdrom options=efiboot
+          boot_device=$(ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" chassis bootparam get 5 | grep "Boot Device Selector")
+          # - Boot Device Selector : Force Boot from CD/DVD
+          # - Boot Device Selector : Force PXE
+          boot_from="cdrom"
+          if [[ $boot_device =~ "PXE" ]]; then
+            boot_from="pxe"
+          fi
+          echo "Setting boot device to : $boot_from"
+          ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" chassis bootdev "$boot_from" options=efiboot
           ipmitool -I lanplus -H "$bmc_address" -U "$bmc_user" -P "$bmc_pass" power cycle
           # Use break or safely reset the content of ipmi log file to avoid infinite loop
           #break
@@ -84,9 +92,9 @@ function detect_errors_on_boot(){
 for bmhost in $(yq e -o=j -I=0 '.[]' "${OINK_DIR}/hosts.yaml"); do
   # shellcheck disable=SC1090
   . <(echo "$bmhost" | yq e 'to_entries | .[] | (.key + "=\"" + .value + "\"")')
-  IPMI_STDOUT_FILE="${ARTIFACT_DIR}/${name}_${bmc_address%%.*}_ipmi_stdout.txt"
-  IPMI_STDERR_FILE="${ARTIFACT_DIR}/${name}_${bmc_address%%.*}_ipmi_stderr.txt"
-  IPMI_KERNEL_FILE="${ARTIFACT_DIR}/${name}_${bmc_address%%.*}_ipmi_kp.txt"
+  IPMI_STDOUT_FILE="${ARTIFACT_DIR}/${bmc_address%%.*}_${name}_ipmi_stdout.txt"
+  IPMI_STDERR_FILE="${ARTIFACT_DIR}/${bmc_address%%.*}_${name}_ipmi_stderr.txt"
+  IPMI_KERNEL_FILE="${ARTIFACT_DIR}/${bmc_address%%.*}_${name}_ipmi_boot_errors.txt"
   touch "${IPMI_STDERR_FILE}" "${IPMI_STDOUT_FILE}" "${IPMI_KERNEL_FILE}"
   echo "SoL recording on ${bmc_address}"
   sleep 3600 \
