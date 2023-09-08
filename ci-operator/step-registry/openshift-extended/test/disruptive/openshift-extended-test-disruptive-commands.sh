@@ -289,6 +289,8 @@ function run {
     cat ./case_selected
     echo "-----------------------------------------------------"
 
+
+    sleep 28800
     # failures happening after this point should not be caught by the Overall CI test suite in RP
     touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
@@ -302,6 +304,9 @@ function run {
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     fi
+
+    sleep 28800
+
     set +x
     set +e
     rm -fr ./case_selected
