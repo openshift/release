@@ -100,6 +100,16 @@ if manager == "Self":
   except Exception as e:
     print("Failed to reset the BMC. Continuing anyway...")
 
+if manager == "iDRAC.Embedded.1":
+  print(f"Reset {bmc_address} iDrac controller")
+  try:
+    response = context.post(f"/redfish/v1/Managers/{manager}/Oem/Dell/DelliDRACCardService/Actions/DelliDRACCardService.iDRACReset",
+                            body={"Force": "Force"})
+    # Wait for the BMC to reset
+    time.sleep(300)
+  except Exception as e:
+    print("Failed to reset iDrac BMC. Continuing anyway...")
+
 print("Eject virtual media, if any...")
 response = context.post(
     f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.EjectMedia", body={})
