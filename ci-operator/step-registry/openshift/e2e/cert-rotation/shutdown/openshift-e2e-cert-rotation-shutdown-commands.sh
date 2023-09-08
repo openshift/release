@@ -130,6 +130,18 @@ run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
 
+# Approve certificates for workers, so that all operators would complete
+run-on-first-master "
+  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
+  until oc wait node --selector='node-role.kubernetes.io/worker' --for condition=Ready --timeout=30s; do
+    oc get nodes
+    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
+      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
+    fi
+    sleep 30
+  done
+"
+
 # Wait for operators to stabilize
 if
   ! oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m; then
