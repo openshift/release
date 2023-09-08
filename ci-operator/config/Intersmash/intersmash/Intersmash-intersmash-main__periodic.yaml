@@ -9,7 +9,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: intersmash-e2e
+- as: intersmash-e2e-periodic
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -17,12 +17,17 @@ tests:
     product: ocp
     timeout: 1h0m0s
     version: "4.12"
+  cron: 0 10 * * SAT
   steps:
     test:
-    - as: intersmash-build
+    - as: intersmash-periodic-build
       commands: |
         ls -la .ci/openshift-ci/build-root/
-        /bin/bash .ci/openshift-ci/build-root/e2e-test.sh
+        /bin/bash .ci/openshift-ci/build-root/e2e-test-prod.sh
+      credentials:
+      - mount_path: /var/run/registry-redhat-io-pull-secret
+        name: registry-redhat-io-pull-secret
+        namespace: test-credentials
       from: src
       resources:
         requests:
@@ -32,3 +37,4 @@ zz_generated_metadata:
   branch: main
   org: Intersmash
   repo: intersmash
+  variant: periodic
