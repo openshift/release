@@ -270,22 +270,14 @@ EOF
 # Skip the following network tests in 4.13 & 4.14 jobs until the below defect is fixed
 # https://issues.redhat.com/browse/OCPBUGS-12841
 # The underlying issue is same for below mentioned sig-network tests
-elif [ "${BRANCH}" == "4.13" ] && [ "${ARCH}" == "ppc64le" ]; then
-     cat > "${SHARED_DIR}/excluded_tests" << EOF
+elif ([ "${BRANCH}" == "4.13" ] || [ "${BRANCH}" == "4.14" ]) && [ "${ARCH}" == "ppc64le" ]; then
+      cat > "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
 "[sig-storage][Feature:DisableStorageClass][Serial] should not reconcile the StorageClass when StorageClassState is Unmanaged [Suite:openshift/conformance/serial]"
-"[sig-network] Networking Granular Checks: Services should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-network] Networking Granular Checks: Services should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-network] Services should be able to switch session affinity for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
-"[sig-network] Services should have session affinity timeout work for NodePort service [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-network] Services should have session affinity work for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 EOF
-elif [ "${BRANCH}" == "4.14" ] && [ "${ARCH}" == "ppc64le" ]; then
-     cat > "${SHARED_DIR}/excluded_tests" << EOF
-"[sig-apps] StatefulSet Basic StatefulSet functionality [StatefulSetBasic] should perform rolling updates and roll backs of template modifications with PVCs [Suite:openshift/conformance/parallel] [Suite:k8s]"
-"[sig-storage][Feature:DisableStorageClass][Serial] should remove the StorageClass when StorageClassState is Removed [Suite:openshift/conformance/serial]"
-"[sig-storage][Feature:DisableStorageClass][Serial] should not reconcile the StorageClass when StorageClassState is Unmanaged [Suite:openshift/conformance/serial]"
+  	if [ "${INSTALLER}" == "powervs" ]; then
+  	    cat >> "${SHARED_DIR}/excluded_tests" << EOF
 "[sig-network] Networking Granular Checks: Services should function for node-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] Networking Granular Checks: Services should function for pod-Service: http [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] Services should be able to switch session affinity for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
