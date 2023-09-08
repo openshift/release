@@ -15,7 +15,7 @@ ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
 git clone https://github.com/lenahorsley/e2e-benchmarking/ --depth=1
-pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
+pushd e2e-benchmarking/workloads/kube-burner
 export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD"
 export WORKLOAD=concurrent-builds
 
