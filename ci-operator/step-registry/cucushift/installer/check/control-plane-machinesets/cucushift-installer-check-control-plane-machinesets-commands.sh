@@ -65,10 +65,15 @@ if ! hasCPMS; then
     exit 0
 fi
 
+check_result=0
+
 # control-plane machinesets
 stderr=$(mktemp)
 stdout=$(mktemp)
 oc get controlplanemachinesets -n openshift-machine-api --no-headers 1>${stdout} 2>${stderr} || true
+
+echo "control-plane machinesets:"
+cat "${stdout}"
 
 curr_state=$(grep cluster ${stdout} | awk '{print $6}' || true)
 if [[ "${curr_state}" != "${EXPECTED_CPMS_STATE}" ]]; then
@@ -79,5 +84,36 @@ else
     echo "INFO: controlplanemachinesets does be ${EXPECTED_CPMS_STATE}."
 fi
 
-echo "control-plane machinesets:"
-cat "${stdout}"
+# control-plane machine name check
+# Machines
+err_output=$(mktemp)
+machine_output=$(mktemp)
+oc get machine -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=master --no-headers -owide 1>${machine_output} 2>${err_output}
+
+echo "Machines:"
+cat "${machine_output}"
+
+if grep -ir 'No resources found in openshift-machine-api namespace.' ${err_output}; then
+    echo "ERROR: No machines in openshift-machine-api namespace, but found controlplanemachinesets!"
+    check_result=1
+fi
+
+control_plane_nodes_count=$(cat "${machine_output}" | wc -l || true)
+excepted_count=$(cat "${machine_output}" | awk '{print $1}' | grep -iE "master-[0-9]{1}$" | wc -l || true)
+
+echo "control_plane_nodes_count: ${control_plane_nodes_count}"
+echo "excepted_count: ${excepted_count}"
+
+if (( ${excepted_count} < 1 )) || (( ${control_plane_nodes_count} < 1 )); then
+    echo "ERROR: control plane nodes count or expected nodes count is less than 1, exit now."
+    check_result=1
+fi
+
+if [[ "${excepted_count}" != "${control_plane_nodes_count}" ]]; then
+    echo "ERROR: One or more control plane machine name is not expected."
+    check_result=1
+else
+    echo "INFO: All control plane machine names are expected."
+fi
+
+exit ${check_result}
