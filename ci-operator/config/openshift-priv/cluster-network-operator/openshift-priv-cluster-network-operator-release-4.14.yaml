@@ -324,6 +324,23 @@ tests:
   steps:
     cluster_profile: aws
     workflow: hypershift-kubevirt-conformance
+- always_run: false
+  as: qe-perfscale-aws-ovn-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-ocp-qe-perfscale-ci-tests
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv
