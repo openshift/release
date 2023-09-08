@@ -6,6 +6,7 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
 HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
+INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
 
 echo "Using Host $IP_ADDRESS"
 
@@ -20,4 +21,4 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
-ssh "${IP_ADDRESS}" "sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger"
+ssh "${INSTANCE_PREFIX}" "sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger"
