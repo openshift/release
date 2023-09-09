@@ -232,6 +232,23 @@ case $CLUSTER_TYPE in
     done
   fi
 
+  # try to increase iops on master instance volumes to stabilize etcd performance
+  echo "Upgrading master instance boot volumes to 10iops-tier:"
+  MASTER_INSTANCE_IDS=$(oc get machine -n openshift-machine-api -ojson | \
+    jq -r '.items[] | select(.metadata.labels["machine.openshift.io/cluster-api-machine-role"] == "master") | .status.providerStatus.instanceId')
+  for master_instance_id in $MASTER_INSTANCE_IDS; do
+    volume_id=$(ic is instance-volume-attachments "${master_instance_id}" --output json | jq -r '.[].volume.id')
+    echo "- ${volume_id}"
+    ic is volume-update ${volume_id} --quiet --profile 10iops-tier > /dev/null 2>&1
+    updateRetValue=$?
+
+    if [ "${updateRetValue}" -eq 0 ]; then
+      echo "  success"
+    else
+      echo "  error: $?"
+    fi
+  done
+
   # explicitly disabling UDP aggregation since it is not supported on s390x. see https://issues.redhat.com/browse/OCPBUGS-18394
   oc create -oyaml -f - <<EOF
 apiVersion: v1
