@@ -115,12 +115,15 @@ case ${BASELINE_CAPABILITY_SET} in
   ;;
 "v4.11")
   enabled_capability_set="${v411}"
+  (( ocp_minor_version >=14 && ocp_major_version == 4 )) && enabled_capability_set="${enabled_capability_set} MachineAPI"
   ;;
 "v4.12")
   enabled_capability_set="${v412}"
+  (( ocp_minor_version >=14 && ocp_major_version == 4 )) && enabled_capability_set="${enabled_capability_set} MachineAPI"
   ;;
 "v4.13")
   enabled_capability_set="${v413}"
+  (( ocp_minor_version >=14 && ocp_major_version == 4 )) && enabled_capability_set="${enabled_capability_set} MachineAPI"
   ;;
 "v4.14")
   enabled_capability_set="${v414}"
@@ -135,6 +138,10 @@ esac
 
 if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
     enabled_capability_set="${enabled_capability_set} ${ADDITIONAL_ENABLED_CAPABILITIES}"
+else
+    readarray -t additional_caps_from_config_array < <(yq-go r "${SHARED_DIR}/install-config.yaml" "capabilities.additionalEnabledCapabilities[*]")
+    additional_caps_from_config=${additional_caps_from_config_array[*]}
+    [[ -n "${additional_caps_from_config}" ]] && enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config}"
 fi
 
 disabled_capability_set="${vCurrent}"
@@ -153,7 +160,10 @@ echo "enabled capability set: ${enabled_capability_set}"
 for cap in $enabled_capability_set; do
     if [[ "${cap}" == "Build" ]] || [[ "${cap}" == "DeploymentConfig" ]]; then
         resource="${caps_resource[$cap]}"
-        [[ "$(oc get ${resource} -A)" -ne 0 ]] && echo "ERROR: capability ${cap}: resources ${resource} -- not found!" && check_result=1
+        if ! oc get ${resource} -A &>/dev/null; then
+            echo "ERROR: capability ${cap}: resources ${resource} -- not found!"
+            check_result=1
+        fi
         continue
     fi
     for op in ${caps_operator[$cap]}; do
@@ -170,7 +180,10 @@ echo "disabled capability set: ${disabled_capability_set}"
 for cap in $disabled_capability_set; do
     if [[ "${cap}" == "Build" ]] || [[ "${cap}" == "DeploymentConfig" ]]; then
         resource="${caps_resource[$cap]}"
-        [[ "$(oc get ${resource} -A)" -eq 0 ]] && echo "ERROR: capability ${cap}: resources ${resource} -- found!" && check_result=1
+        if oc get ${resource} -A &>/dev/null; then
+            echo "ERROR: capability ${cap}: resources ${resource} -- found!"
+            check_result=1
+        fi
         continue
     fi
     for op in ${caps_operator[$cap]}; do
