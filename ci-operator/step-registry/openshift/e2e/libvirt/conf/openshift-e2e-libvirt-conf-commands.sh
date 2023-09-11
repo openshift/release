@@ -284,6 +284,7 @@ EOF
 "[sig-network] Services should have session affinity timeout work for NodePort service [LinuxOnly] [Suite:openshift/conformance/parallel] [Suite:k8s]"
 "[sig-network] Services should have session affinity work for NodePort service [LinuxOnly] [Conformance] [Suite:openshift/conformance/parallel/minimal] [Suite:k8s]"
 EOF
+    fi
 else
     echo "Executing all tests"
 fi
