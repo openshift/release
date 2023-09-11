@@ -21,7 +21,6 @@ export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=$CLUSTER_DATA_DIR
 
 RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
-            --clusters-install-data-directory $CLUSTER_DATA_DIR \
             --ocm-token=$OCM_TOKEN \
             --s3-bucket-name=$S3_BUCKET_NAME "
 
@@ -31,7 +30,7 @@ if [ -z "${CLUSTER_DATA_FILES}" ] ; then
   exit 1
 fi
 
-CLUSTER_DATA_CMD="--destroy-clusters-from-config-files "
+CLUSTER_DATA_CMD="--destroy-clusters-from-s3-config-files "
 for data_file in $CLUSTER_DATA_FILES; do
   CLUSTER_DATA_CMD+="${data_file},"
 done
