@@ -131,11 +131,11 @@ spec:
     enableCommonBootImageImport: false
   logVerbosityConfig:
     kubevirt:
-      virtLauncher: 8
-      virtHandler: 8
-      virtController: 8
-      virtApi: 8
-      virtOperator: 8
+      virtLauncher: 1
+      virtHandler: 3
+      virtController: 3
+      virtApi: 5
+      virtOperator: 5
 EOF
 
 oc wait hyperconverged -n openshift-cnv kubevirt-hyperconverged --for=condition=Available --timeout=15m
