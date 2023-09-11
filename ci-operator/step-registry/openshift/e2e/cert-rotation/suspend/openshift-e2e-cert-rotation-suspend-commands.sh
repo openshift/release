@@ -110,6 +110,7 @@ run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do
 # Copy system:admin's lb-ext kubeconfig locally and use it to access the cluster
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
+# Replace kubeconfig used in follow up steps with the updated one
 
 # Approve certificates for workers, so that all operators would complete
 run-on-first-master "
