@@ -20,8 +20,8 @@ else
 fi
 
 cd verification-tests
-# run long-duration tests in serial
-export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/long-duration"
+# run long duration tests in serial
+export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/longduration"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
 set -x
 cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @long-duration" -p junit || true
