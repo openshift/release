@@ -289,6 +289,7 @@ Resources:
           echo "fs.inotify.max_user_watches = 65536" >> /etc/sysctl.conf
           echo "fs.inotify.max_user_instances = 8192" >> /etc/sysctl.conf
           sysctl --system |& tee -a /tmp/init_output.txt
+          sysctl -a |& tee -a /tmp/init_output.txt
           echo "====== Running DNF Install ======" | tee -a /tmp/init_output.txt
           if ! ( sudo lsblk | grep 'xvdc' ); then
               echo "/dev/xvdc device not found, assuming this is metal host, skipping LVM configuration" |& tee -a /tmp/init_output
