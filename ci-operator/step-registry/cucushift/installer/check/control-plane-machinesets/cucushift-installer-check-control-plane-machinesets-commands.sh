@@ -15,6 +15,9 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # so that the credentials of the build farm registry can be saved in docker client config file.
 KUBECONFIG="" oc registry login
 
+version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+echo "OCP version: ${version}"
+
 # check if controlplanemachinesets is supported by the IaaS and the OCP version
 # return 0 if controlplanemachinesets is supported, otherwise 1
 function hasCPMS() {
@@ -42,8 +45,6 @@ function hasCPMS() {
         ;;
     esac    
 
-    version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
-    echo "OCP version: ${version}"
     if [ -n "${version}" ] && [ "$(printf '%s\n' "${REQUIRED_OCP_VERSION}" "${version}" | sort --version-sort | head -n1)" = "${REQUIRED_OCP_VERSION}" ]; then
         ret=0
     fi
@@ -59,7 +60,7 @@ then
 fi
 
 if ! hasCPMS; then
-    echo "INFO: 'controlplanemachinesets' is not supproted (OCP $(getVersion) on ${CLUSTER_TYPE}), skip checking"
+    echo "INFO: 'controlplanemachinesets' is not supproted (OCP ${version} on ${CLUSTER_TYPE}), skip checking"
     exit 0
 fi
 
