@@ -14,7 +14,7 @@ source ./venv_qe/bin/activate
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
-git clone https://github.com/lenahorsley/e2e-benchmarking/--depth=1
+git clone https://github.com/lenahorsley/e2e-benchmarking/ --depth=1
 pushd e2e-benchmarking/workloads/kube-burner
 export WORKLOAD=conc-builds
 
