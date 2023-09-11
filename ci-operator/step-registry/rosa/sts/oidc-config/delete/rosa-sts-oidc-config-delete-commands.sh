@@ -32,11 +32,13 @@ else
 fi
 
 # If the oidc config exists, do deletion.
-OIDC_CONFIG_FILE="${ARTIFACT_DIR}/oidc-config"
+OIDC_CONFIG_FILE="${SHARED_DIR}/oidc-config"
 if [[ -e "${OIDC_CONFIG_FILE}" ]]; then
   oidc_config_id=$(cat "${OIDC_CONFIG_FILE}" | jq -r '.id')
 
   echo "Start deleting the oidc config ${oidc_config_id}..."
   rosa delete oidc-config -y --mode auto --oidc-config-id ${oidc_config_id}
+else
+  echo "No oidc config created in the pre step"
 fi
 echo "Finish oidc config deletion."

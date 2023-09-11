@@ -97,7 +97,12 @@ function waitForReady() {
                 break
             fi
         else
-            node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/infra!=,node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+	    # Infra are not counted for non-HCP clusters
+	    if [[ "$HOSTED_CP" == "false" ]]; then
+		node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/infra!=,node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+	    else
+		node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+            fi
             if [[ "$node_count" -ge "$1" ]]; then
 	        if [[ "$successful_attempts" -lt "$desired_successful_attempts" ]]; then
    		    successful_attempts=$((successful_attempts+1))

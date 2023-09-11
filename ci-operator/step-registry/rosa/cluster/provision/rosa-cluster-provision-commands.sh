@@ -12,13 +12,16 @@ COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP}
 MULTI_AZ=${MULTI_AZ:-false}
-EC2_METADATA_HTTP_TOKENS=${EC2_METADATA_HTTP_TOKENS:-optional}
+EC2_METADATA_HTTP_TOKENS=${EC2_METADATA_HTTP_TOKENS:-"optional"}
 ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
 ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
+STORAGE_ENCRYPTION=${STORAGE_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
-CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
-ENABLE_BYOVPC="false"
+DISABLE_SCP_CHECKS=${DISABLE_SCP_CHECKS:-false}
+ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
+BYO_OIDC=${BYO_OIDC:-false}
 PRIVATE_SUBNET_ONLY="false"
+CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 
 # Define cluster name
 prefix="ci-rosa"
@@ -112,6 +115,11 @@ if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi
 
+DEFAULT_MP_LABELS_SWITCH=""
+if [[ ! -z "$DEFAULT_MACHINE_POOL_LABELS" ]] && [[ "$HOSTED_CP" == "false" ]]; then
+  DEFAULT_MP_LABELS_SWITCH="--default-mp-labels ${DEFAULT_MACHINE_POOL_LABELS}"
+fi
+
 EC2_METADATA_HTTP_TOKENS_SWITCH=""
 if [[ -n "${EC2_METADATA_HTTP_TOKENS}" && "$HOSTED_CP" != "true" ]]; then
   EC2_METADATA_HTTP_TOKENS_SWITCH="--ec2-metadata-http-tokens ${EC2_METADATA_HTTP_TOKENS}"
@@ -120,6 +128,11 @@ fi
 MULTI_AZ_SWITCH=""
 if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
+fi
+
+DISABLE_SCP_CHECKS_SWITCH=""
+if [[ "$DISABLE_SCP_CHECKS" == "true" ]]; then
+  DISABLE_SCP_CHECKS_SWITCH="--disable-scp-checks"
 fi
 
 # If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
@@ -140,6 +153,16 @@ fi
 ETCD_ENCRYPTION_SWITCH=""
 if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
   ETCD_ENCRYPTION_SWITCH="--etcd-encryption"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
+    ETCD_ENCRYPTION_SWITCH="${ETCD_ENCRYPTION_SWITCH} --etcd-encryption-kms-arn $kms_key_arn"
+  fi
+fi
+
+STORAGE_ENCRYPTION_SWITCH=""
+if [[ "$STORAGE_ENCRYPTION" == "true" ]]; then
+  kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
+  STORAGE_ENCRYPTION_SWITCH="--enable-customer-managed-key --kms-key-arn $kms_key_arn"
 fi
 
 DISABLE_WORKLOAD_MONITORING_SWITCH=""
@@ -149,7 +172,7 @@ fi
 
 HYPERSHIFT_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
-  HYPERSHIFT_SWITCH="--hosted-cp --classic-oidc-config"
+  HYPERSHIFT_SWITCH="--hosted-cp"
   if [[ "$ENABLE_SECTOR" == "true" ]]; then
     PROVISION_SHARD_ID=$(cat ${SHARED_DIR}/provision_shard_ids | head -n 1)
     if [[ -z "$PROVISION_SHARD_ID" ]]; then
@@ -161,6 +184,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
   fi
 
   ENABLE_BYOVPC="true"
+  # BYO_OIDC="true"
 fi
 
 FIPS_SWITCH=""
@@ -171,13 +195,6 @@ fi
 PRIVATE_SWITCH=""
 if [[ "$PRIVATE" == "true" ]]; then
   PRIVATE_SWITCH="--private"
-fi
-
-KMS_KEY_SWITCH=""
-if [[ "$ENABLE_CUSTOMER_MANAGED_KEY" == "true" ]]; then
-  # Get the kms keys from the previous steps, and replace the vaule here
-  KMS_KEY_ARN=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn)
-  KMS_KEY_SWITCH="--enable-customer-managed-key --kms-key-arn ${KMS_KEY_ARN}"
 fi
 
 PRIVATE_LINK_SWITCH=""
@@ -230,6 +247,7 @@ fi
 # STS options
 STS_SWITCH="--non-sts"
 ACCOUNT_ROLES_SWITCH=""
+BYO_OIDC_SWITCH=""
 if [[ "$STS" == "true" ]]; then
   STS_SWITCH="--sts"
 
@@ -237,7 +255,7 @@ if [[ "$STS" == "true" ]]; then
   ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
   echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
-  roleARNFile="${SHARED_DIR}/account-roles-arn"
+  roleARNFile="${SHARED_DIR}/account-roles-arns"
   account_intaller_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
   account_support_role_arn=$(cat "$roleARNFile" | { grep "Support-Role" || true; })
   account_worker_role_arn=$(cat "$roleARNFile" | { grep "Worker-Role" || true; })
@@ -255,6 +273,17 @@ if [[ "$STS" == "true" ]]; then
     fi      
     ACCOUNT_ROLES_SWITCH="${ACCOUNT_ROLES_SWITCH} --controlplane-iam-role ${account_control_plane_role_arn}"
   fi
+
+  if [[ "$BYO_OIDC" == "true" ]]; then
+    oidc_config_id=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
+    operator_roles_prefix=$(cat "${SHARED_DIR}/operator-roles-prefix")
+    BYO_OIDC_SWITCH="--oidc-config-id ${oidc_config_id} --operator-roles-prefix ${operator_roles_prefix}"
+  else
+    # For the hypershift cluster, as default, BYO OIDC is required. If we do not set BYO OIDC, the option --classic-oidc-config must be set.
+    if [[ "$HOSTED_CP" == "true" ]] ; then
+      BYO_OIDC_SWITCH="--classic-oidc-config"
+    fi
+  fi
 fi
 
 DRY_RUN_SWITCH=""
@@ -266,6 +295,7 @@ echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
 echo "  STS mode: ${STS}"
 echo "  Hypershift: ${HOSTED_CP}"
+echo "  Byo OIDC: ${BYO_OIDC}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 echo "  Multi-az: ${MULTI_AZ}"
@@ -275,7 +305,7 @@ echo "  Fips: ${FIPS}"
 echo "  Private: ${PRIVATE}"
 echo "  Private Link: ${PRIVATE_LINK}"
 echo "  Enable proxy: ${ENABLE_PROXY}"
-echo "  Enable customer managed key: ${ENABLE_CUSTOMER_MANAGED_KEY}"
+echo "  Enable customer managed key: ${STORAGE_ENCRYPTION}"
 echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
@@ -303,15 +333,18 @@ ${ACCOUNT_ROLES_SWITCH} \
 ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
 ${MULTI_AZ_SWITCH} \
 ${COMPUTE_NODES_SWITCH} \
+${BYO_OIDC_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${HYPERSHIFT_SWITCH} \
 ${SUBNET_ID_SWITCH} \
 ${FIPS_SWITCH} \
-${KMS_KEY_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
 ${PROXY_SWITCH} \
+${DISABLE_SCP_CHECKS_SWITCH} \
+${DEFAULT_MP_LABELS_SWITCH} \
+${STORAGE_ENCRYPTION_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 
@@ -328,21 +361,24 @@ rosa create cluster -y \
                     --cluster-name "${CLUSTER_NAME}" \
                     --region "${CLOUD_PROVIDER_REGION}" \
                     --version "${OPENSHIFT_VERSION}" \
-                    --channel-group ${CHANNEL_GROUP} \
+                    --channel-group "${CHANNEL_GROUP}" \
                     --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
-                    --tags ${TAGS} \
+                    --tags "${TAGS}" \
                     ${ACCOUNT_ROLES_SWITCH} \
                     ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
                     ${MULTI_AZ_SWITCH} \
                     ${COMPUTE_NODES_SWITCH} \
+                    ${BYO_OIDC_SWITCH} \
                     ${ETCD_ENCRYPTION_SWITCH} \
                     ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
                     ${SUBNET_ID_SWITCH} \
                     ${FIPS_SWITCH} \
-                    ${KMS_KEY_SWITCH} \
                     ${PRIVATE_SWITCH} \
                     ${PRIVATE_LINK_SWITCH} \
                     ${PROXY_SWITCH} \
+                    ${DISABLE_SCP_CHECKS_SWITCH} \
+                    ${DEFAULT_MP_LABELS_SWITCH} \
+                    ${STORAGE_ENCRYPTION_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
 

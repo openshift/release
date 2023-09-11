@@ -12,7 +12,7 @@ MP_MACHINE_TYPE=${MP_MACHINE_TYPE:-"m5.xlarge"}
 MP_ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
 USE_TUNING_CONFIG=${USE_TUNING_CONFIG:-false}
 USE_SPOT_INSTANCES=${USE_SPOT_INSTANCES:-false}
-SPOT_MAX_PRICE=${SPOT_MAX_PRICE:-"0.1"}
+SPOT_MAX_PRICE=${SPOT_MAX_PRICE:-"on-demand"}
 LOCAL_ZONE=${LOCAL_ZONE:-false}
 
 # Configure aws
@@ -77,13 +77,18 @@ fi
 LOCAL_ZONE_SWITCH=""
 if [[ "$LOCAL_ZONE" == "true" ]]; then
   LOCAL_ZONE_SWITCH=""
-  private_subnet_id=$(cat ${SHARED_DIR}/private_subnet_ids | tr -d "[']" | cut -d ',' -f 1)
-  if [[ -z "${private_subnet_id}" ]]; then
-    echo -e "The private_subnet_id is mandatory."
+  localzone_subnet_id=$(head -n 1 "${SHARED_DIR}/localzone_subnet_id")
+  if [[ -z "${localzone_subnet_id}" ]]; then
+    echo -e "The localzone_subnet_id is mandatory."
     exit 1
   fi
 
-  LOCAL_ZONE_SWITCH="--subnet ${private_subnet_id}"
+  LOCAL_ZONE_SWITCH="--subnet ${localzone_subnet_id}"
+fi
+
+MP_OPENSHIFT_VERSION_SWITCH=""
+if [[ ! -z "$MP_OPENSHIFT_VERSION" ]]; then
+  MP_OPENSHIFT_VERSION_SWITCH="--version ${MP_OPENSHIFT_VERSION}"
 fi
 
 # Create machine pool on the cluster
@@ -114,6 +119,7 @@ ${TUNING_CONFIG_SWITCH} \
 ${SPOT_INSTANCES_SWITCH} \
 ${AZ_SWITCH} \
 ${LOCAL_ZONE_SWITCH} \
+${MP_OPENSHIFT_VERSION_SWITCH} \
 ${AUTO_REPAIR_SWITCH}
 "
 
@@ -128,6 +134,7 @@ rosa create machinepool -y \
                         ${SPOT_INSTANCES_SWITCH} \
                         ${AZ_SWITCH} \
                         ${LOCAL_ZONE_SWITCH} \
+                        ${MP_OPENSHIFT_VERSION_SWITCH} \
                         ${AUTO_REPAIR_SWITCH}
 } 
 

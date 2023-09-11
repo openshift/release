@@ -35,24 +35,16 @@ machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
 MACHINE_POOL_OVERRIDES=""
 RESOURCE_POOL_DEF=""
 set +o errexit
-oc registry login
+# After cluster is set up, ci-operator make KUBECONFIG pointing to the installed cluster,
+# to make "oc registry login" interact with the build farm, set KUBECONFIG to empty,
+# so that the credentials of the build farm registry can be saved in docker client config file.
+# A direct connection is required while communicating with build-farm, instead of through proxy
+KUBECONFIG="" oc registry login
 
-function getVersion() {
-  local release_image=""
-  if [ -n "${RELEASE_IMAGE_INITIAL-}" ]; then
-    release_image=${RELEASE_IMAGE_INITIAL}
-  elif [ -n "${RELEASE_IMAGE_LATEST-}" ]; then
-    release_image=${RELEASE_IMAGE_LATEST}     
-  fi
-  
-  local version=""
-  if [ ${release_image} != "" ]; then
-    version=$(oc adm release info ${release_image} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)    
-  fi
-  echo "${version}"
-}
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
-VERSION=$(getVersion)
+VERSION=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
 
 set -o errexit
 

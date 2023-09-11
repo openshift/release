@@ -25,9 +25,9 @@ base_images:
     tag: operator-sdk
 build_root:
   image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.18
+    name: builder-priv
+    namespace: ocp-private
+    tag: rhel-8-golang-1.20-openshift-4.14
 canonical_go_repository: github.com/openshift/metallb-operator
 images:
 - dockerfile_path: Dockerfile.openshift
@@ -37,6 +37,13 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: metallb-operator
+- dockerfile_path: bundleci.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: metallb-operator-bundle
 operator:
   bundles:
   - as: operatorbundle
@@ -50,6 +57,7 @@ operator:
   - pullspec: quay.io/openshift/origin-metallb-frr:4.14
     with: pipeline:metallb-frr
 promotion:
+  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:

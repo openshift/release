@@ -67,7 +67,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230823-28504216ad --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230901-e9e5d470a5 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -438,21 +438,28 @@ __check_defined = \
 		$(error Undefined environment variable $1$(if $2, ($2))))
 
 # yq: https://github.com/mikefarah/yq
-yq ?= yq
 
+generate-hypershift-deployment: yq ?= yq
+generate-hypershift-deployment: TAG ?= latest
 generate-hypershift-deployment:
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
 
-	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/hypershift-cli:latest
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/hypershift-cli:${TAG}
 	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} \
 		--rm \
 		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
-		registry.ci.openshift.org/ci/hypershift-cli:latest \
+		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		install \
 		--oidc-storage-provider-s3-bucket-name=hypershift-oidc-provider \
 		--oidc-storage-provider-s3-credentials=/mgmt-aws \
 		--oidc-storage-provider-s3-region=us-east-1 \
-		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:latest \
+		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		--enable-uwm-telemetry-remote-write=false \
 		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hive/hypershift/hypershift-install.yaml
 .PHONY: generate-hypershift-deployment
+
+build-hypershift-deployment: TAG ?= $(shell date +%Y%m%d)
+build-hypershift-deployment:
+	echo Building HyperShift operator with tag $(TAG)
+	oc --context app.ci -n ci --as system:admin start-build -w hypershift-cli
+	oc --context app.ci -n ci --as system:admin tag hypershift-cli:latest hypershift-cli:$(TAG)
