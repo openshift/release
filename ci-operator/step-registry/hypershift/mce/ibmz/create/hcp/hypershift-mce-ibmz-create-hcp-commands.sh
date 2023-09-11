@@ -3,7 +3,7 @@
 set -xuo pipefail
 
 # Hosted Control Plane parameters
-hc_ns="clusters"
+hc_ns="hcp-ci"
 hc_name="agent-ibmz"
 hcp_ns="$hc_ns-$hc_name"
 
@@ -16,7 +16,7 @@ cat <<EOF | oc create -f -
 apiVersion: hive.openshift.io/v1
 kind: ClusterImageSet
 metadata:
-  name: img-${OCP_IMAGE_MULTI}-appsub
+  name: img-${hcp_ns}-appsub
 spec:
   releaseImage: ${OCP_IMAGE_MULTI}
 EOF

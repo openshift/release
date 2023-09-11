@@ -4,7 +4,7 @@ set -xuo pipefail
 
 infra_name="hcp-ci-$(echo -n $PROW_JOB_ID|cut -c-8)"
 plugins_list=("vpc-infrastructure" "cloud-object-storage" "cloud-dns-services")
-hc_ns="hcp"
+hc_ns="hcp-ci"
 hc_name="agent-ibmz"
 hcp_ns=$hc_ns-$hc_name
 
@@ -132,29 +132,29 @@ else
   exit 1
 fi
 
-echo "Creating the DNS zone $BASE_DOMAIN in the instance $infra_name-dns."
-dns_zone_id=$(ibmcloud dns zone-create $BASE_DOMAIN -i $infra_name-dns --output JSON | jq -r '.id')
+echo "Creating the DNS zone $hc_name.$BASE_DOMAIN in the instance $infra_name-dns."
+dns_zone_id=$(ibmcloud dns zone-create "$hc_name.$BASE_DOMAIN" -i $infra_name-dns --output JSON | jq -r '.id')
 if [ -z $dns_zone_id ]; then
-  echo "DNS zone $BASE_DOMAIN is not created properly as it is not possesing any ID."
+  echo "DNS zone $hc_name.$BASE_DOMAIN is not created properly as it is not possesing any ID."
   exit 1
 else 
-  echo "DNS zone $BASE_DOMAIN is created successfully in the instance $infra_name-dns."
+  echo "DNS zone $hc_name.$BASE_DOMAIN is created successfully in the instance $infra_name-dns."
 fi
 
-echo "Adding VPC network $infra_name-vpc to the DNS zone $BASE_DOMAIN."
+echo "Adding VPC network $infra_name-vpc to the DNS zone $hc_name.$BASE_DOMAIN."
 dns_network_state=$(ibmcloud dns permitted-network-add $dns_zone_id --type vpc --vpc-crn $vpc_crn -i $infra_name-dns --output JSON | jq -r '.state')
 if [ "$dns_network_state" != "ACTIVE" ]; then
-  echo "VPC network $infra_name-vpc which is added to the DNS zone $BASE_DOMAIN is not in ACTIVE state."
+  echo "VPC network $infra_name-vpc which is added to the DNS zone $hc_name.$BASE_DOMAIN is not in ACTIVE state."
   exit 1
 else 
-  echo "VPC network $infra_name-vpc is successfully added to the DNS zone $BASE_DOMAIN."
-  echo "DNS zone $BASE_DOMAIN is in the ACTIVE state."
+  echo "VPC network $infra_name-vpc is successfully added to the DNS zone $hc_name.$BASE_DOMAIN."
+  echo "DNS zone $hc_name.$BASE_DOMAIN is in the ACTIVE state."
 fi
 
 echo "Fetching the hosted cluster IP address for resolution"
 hc_ip=$(dig +short $(cat $SHARED_DIR/${hc_name}_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1))
 
-echo "Adding A records in the DNS zone $BASE_DOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
+echo "Adding A records in the DNS zone $hc_name.$BASE_DOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 $hc_ip -i $infra_name-dns
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api-int" --ipv4 $hc_ip -i $infra_name-dns
 if [ $? -eq 0 ]; then
