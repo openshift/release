@@ -1,32 +1,36 @@
 base_images:
   assisted-installer:
-    name: ocm-2.6
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.6
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.6
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.6
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
-    tag: ocm-2.6
+    tag: ocm-2.9
   assisted-service-scripts:
-    name: ocm-2.6
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.6
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra
+  assisted-test-infra-internal:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-test-infra-internal
   coreos-centos-stream8:
     name: stream8
     namespace: coreos
@@ -38,32 +42,39 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.37.1
-  openshift_release_golang-1.17:
+    tag: v1.53.1
+  openshift_release_golang-1.19:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.19
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.19
 images:
 - dockerfile_path: Dockerfile.image-service
   from: coreos-centos-stream8
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-image-service
 promotion:
-  name: ocm-2.6
+  name: ocm-2.9
   namespace: edge-infrastructure
 releases:
   latest:
-    integration:
-      name: "4.11"
-      namespace: ocp
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  latest-multi:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -79,7 +90,7 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: assisted-image-service
     env:
-      RELEASE_TAG_PREFIX: ocm-2.6
+      RELEASE_TAG_PREFIX: ocm-2.9
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -88,7 +99,7 @@ tests:
     dependencies:
       SOURCE_IMAGE_REF: assisted-image-service
     env:
-      RELEASE_TAG_PREFIX: ocm-2.6
+      RELEASE_TAG_PREFIX: ocm-2.9
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
@@ -100,6 +111,7 @@ tests:
   container:
     clone: true
     from: golangci-lint
+  skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -109,6 +121,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
+  skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: test-postsubmit
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
@@ -119,23 +132,6 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
-- as: e2e-metal-assisted
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.6
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-deploy-nodes
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.6
-        MAKEFILE_TARGET="deploy_nodes"
-    workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
@@ -144,10 +140,8 @@ tests:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ALLOW_CONVERGED_FLOW: "False"
     workflow: assisted-baremetal-operator-ztp
 zz_generated_metadata:
-  branch: release-ocm-2.6
+  branch: release-ocm-2.9
   org: openshift
   repo: assisted-image-service
