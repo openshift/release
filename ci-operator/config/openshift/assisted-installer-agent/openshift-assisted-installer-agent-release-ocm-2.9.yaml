@@ -1,34 +1,34 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.10
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.10
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-controller:
-    name: ocm-2.10
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.10
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
     name: assisted-service-index
     namespace: edge-infrastructure
-    tag: latest
+    tag: ocm-2.9
   assisted-service-scripts:
-    name: ocm-2.10
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.10
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra
   assisted-test-infra-internal:
-    name: ocm-2.10
+    name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
   coreos-centos-stream8:
@@ -60,7 +60,7 @@ images:
   from: src
   to: assisted-installer-agent-src
 promotion:
-  name: ocm-2.10
+  name: ocm-2.9
   namespace: edge-infrastructure
 releases:
   latest:
@@ -83,13 +83,15 @@ tests:
     cluster_profile: packet-assisted
     env:
       DOCKERFILE_IMAGE_PAIRS: |
-        Dockerfile.assisted_installer_agent , quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
+        Dockerfile.assisted_installer_agent , quay.io/edge-infrastructure/assisted-installer-agent-multi:ocm-2.9
     workflow: assisted-tools-multi-arch
 - as: mirror-nightly-image
   cron: '@daily'
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.9
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
@@ -97,6 +99,8 @@ tests:
   steps:
     dependencies:
       SOURCE_IMAGE_REF: assisted-installer-agent
+    env:
+      RELEASE_TAG_PREFIX: ocm-2.9
     test:
     - ref: assisted-baremetal-images-publish
 - as: lint
@@ -137,75 +141,6 @@ tests:
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-agent
-- as: e2e-metal-assisted
-  skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
-  steps:
-    cluster_profile: packet-assisted
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-ipv6
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        IPv6=yes
-        IPv4=no
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-single-node
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        NUM_MASTERS=1
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-cnv
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.12
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-lvm
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=lvm
-        MASTERS_COUNT=1
-        MASTER_MEMORY=18000
-        MASTER_CPU=9
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-odf
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.12
-      PACKET_PLAN: m3.large.x86
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        TEST_FUNC=test_deploy_day2_nodes_cloud
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-upgrade-agent
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        TEST=./src/tests/test_upgrade_agent.py
-        TEST_FUNC=test_upgrade_agent
-    workflow: assisted-baremetal
 - as: e2e-ai-operator-ztp
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
   steps:
@@ -215,13 +150,7 @@ tests:
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-oci-assisted
-  optional: true
-  steps:
-    cluster_profile: oci-assisted
-    workflow: assisted-oci
 zz_generated_metadata:
-  branch: master
+  branch: release-ocm-2.9
   org: openshift
   repo: assisted-installer-agent
-  variant: edge
