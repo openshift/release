@@ -408,10 +408,15 @@ spec:
         internal:
           networkSubnetCidr:
             - "$MACHINE_NETWORK"
+          excludeNetworkSubnetCidr:
+            - "$EXCLUDE_MACHINE_NETWORK"
         external:
           networkSubnetCidr:
             - "$MACHINE_NETWORK"
+          excludeNetworkSubnetCidr:
+            - "$EXCLUDE_MACHINE_NETWORK"
 EOF
+
 
   yq-go m -x -i  $dir/manifests/cluster-infrastructure-02-config.yml "${PATCH}"
 
@@ -555,6 +560,7 @@ cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
 MACHINE_NETWORK=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'networking.machineNetwork[0].cidr')
 echo ".machineNetwork[0].cidr = ${MACHINE_NETWORK}"
+EXCLUDE_MACHINE_NETWORK=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'networking.machineNetwork[1].cidr')
 
 echo "install-config.yaml"
 echo "-------------------"
