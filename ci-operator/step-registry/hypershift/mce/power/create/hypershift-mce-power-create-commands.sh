@@ -194,7 +194,9 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent \
     --base-domain=${HYPERSHIFT_BASE_DOMAIN} \
     --api-server-address=api.${HOSTED_CLUSTER_NAME}.${HYPERSHIFT_BASE_DOMAIN} \
     --ssh-key=${SSH_PUB_KEY_FILE}\
-    --release-image=${OCP_IMAGE_MULTI} --render > /tmp/hc-manifests/cluster-agent.yaml
+    --release-image=${OCP_IMAGE_MULTI} \
+    --control-plane-availability-policy=${CP_AVAILABILITY_POLICY} \
+    --render > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
 csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{6}"
