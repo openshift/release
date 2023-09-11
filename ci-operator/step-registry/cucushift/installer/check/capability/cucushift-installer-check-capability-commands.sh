@@ -139,9 +139,9 @@ esac
 if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
     enabled_capability_set="${enabled_capability_set} ${ADDITIONAL_ENABLED_CAPABILITIES}"
 else
+    declare -a additional_caps_from_config_array=()
     readarray -t additional_caps_from_config_array < <(yq-go r "${SHARED_DIR}/install-config.yaml" "capabilities.additionalEnabledCapabilities[*]")
-    additional_caps_from_config=${additional_caps_from_config_array[*]}
-    [[ -n "${additional_caps_from_config}" ]] && enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config}"
+    [[ ${#additional_caps_from_config_array[@]} -gt 0 ]] && enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config_array[*]}"
 fi
 
 disabled_capability_set="${vCurrent}"
