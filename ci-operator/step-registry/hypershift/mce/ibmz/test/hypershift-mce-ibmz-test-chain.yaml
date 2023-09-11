@@ -5,9 +5,9 @@ chain:
       cli: latest
       commands: |-
         set -x
-        
+        hc_name="agent-ibmz"
         echo "Waiting for clusteroperators to be ready"
-        export KUBECONFIG=${SHARED_DIR}/guest_kubeconfig
+        export KUBECONFIG=${SHARED_DIR}/${hc_name}_kubeconfig
         until \
           oc wait clusterversion/version --for='condition=Available=True' > /dev/null; do
           echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
@@ -20,9 +20,4 @@ chain:
         requests:
           cpu: 100m
           memory: 100Mi
-      dnsConfig:
-        nameservers:
-        - 0.0.0.0
-        searches: 
-        - "bastion-z.svc.cluster.local"
       timeout: 30m0s
