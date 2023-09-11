@@ -1,18 +1,18 @@
 base_images:
   manila-csi-driver-operator-test:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: manila-csi-driver-operator-test
   openstack-cinder-csi-driver-operator-test:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: openstack-cinder-csi-driver-operator-test
   openstack-installer:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: openstack-installer
   openstack-tests:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: openstack-tests
   stolostron:
@@ -24,13 +24,13 @@ releases:
     candidate:
       product: ocp
       relative: 1
-      stream: nightly
-      version: "4.14"
+      stream: ci
+      version: "4.15"
   latest:
     candidate:
       product: ocp
-      stream: nightly
-      version: "4.14"
+      stream: ci
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -40,7 +40,7 @@ resources:
       memory: 200Mi
 tests:
 - as: e2e-openstack-fips
-  minimum_interval: 144h
+  minimum_interval: 48h
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -64,13 +64,6 @@ tests:
   minimum_interval: 72h
   steps:
     cluster_profile: openstack-nfv
-    workflow: openshift-e2e-openstack-nfv-cgroupsv1
-- as: e2e-openstack-nfv-intel-kuryr
-  minimum_interval: 72h
-  steps:
-    cluster_profile: openstack-nfv
-    env:
-      NETWORK_TYPE: Kuryr
     workflow: openshift-e2e-openstack-nfv-cgroupsv1
 - as: e2e-openstack-nfv-mellanox
   minimum_interval: 72h
@@ -107,7 +100,7 @@ tests:
       NETWORK_TYPE: OpenShiftSDN
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn-parallel
-  minimum_interval: 72h
+  minimum_interval: 24h
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -115,28 +108,15 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-ovn-serial
-  minimum_interval: 72h
+  minimum_interval: 24h
   steps:
     cluster_profile: openstack-vexxhost
     env:
       ROTATE_CLOUD_CREDENTIALS: "true"
       TEST_SUITE: openshift/conformance/serial
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-kuryr
-  minimum_interval: 72h
-  steps:
-    cluster_profile: openstack-kuryr
-    env:
-      NETWORK_TYPE: Kuryr
-      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
-        the type from ExternalName to ClusterIP \| Pods should delete a collection
-        of pods \| Kubectl client Guestbook application should create and stop a working
-        application \| Services should serve multiport endpoints from pods \| Services
-        should serve a basic endpoint from pods
-      TEST_SUITE: kubernetes/conformance
-    workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-nfv-hwoffload
-  minimum_interval: 144h
+  minimum_interval: 48h
   steps:
     cluster_profile: openstack-hwoffload
     workflow: openshift-e2e-openstack-hwoffload-cgroupsv1
@@ -150,7 +130,7 @@ tests:
       TEST_SUITE: experimental/reliability/minimal
     workflow: openshift-e2e-openstack-upi
 - as: e2e-openstack-ovn-password
-  minimum_interval: 72h
+  minimum_interval: 24h
   steps:
     cluster_profile: openstack-vexxhost
     env:
@@ -179,7 +159,7 @@ tests:
     - as: openstack-test-cpms
       commands: |
         dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
-        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.14 --depth=1 $dir
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.15 --depth=1 $dir
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         cd $dir
         make e2e-presubmit e2e-periodic
@@ -202,7 +182,7 @@ tests:
     - as: openstack-test-cpms
       commands: |
         dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
-        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.14 --depth=1 $dir
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch release-4.15 --depth=1 $dir
         export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
         cd $dir
         test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
@@ -220,4 +200,4 @@ zz_generated_metadata:
   branch: main
   org: shiftstack
   repo: shiftstack-ci
-  variant: periodic-4.14
+  variant: periodic-4.15
