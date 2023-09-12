@@ -45,6 +45,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: bitbucket-no-pat-oauth-flow-raw-devfile-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-bitbucket-no-pat-oauth-flow-raw-devfile-url.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: bitbucket-no-pat-oauth-flow-ssh-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export BITBUCKET_PRIVATE_KEY=$(cat /usr/local/ci-secrets/bitbucket/bitbucket-private-key)
+        export BITBUCKET_PUBLIC_KEY=$(cat /usr/local/ci-secrets/bitbucket/bitbucket-public-key)
+        /bin/bash .ci/openshift-ci/test-bitbucket-no-pat-oauth-flow-ssh-url.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/bitbucket
+        name: bitbucket
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 - as: github-no-pat-oauth-flow
   steps:
     cluster_profile: gcp

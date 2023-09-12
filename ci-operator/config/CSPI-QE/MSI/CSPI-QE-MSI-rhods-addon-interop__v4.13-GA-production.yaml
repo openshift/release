@@ -7,6 +7,10 @@ base_images:
     name: ocp-addons-operators-cli
     namespace: ci
     tag: latest
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
   rhods-addon-tests:
     name: ods-ci
     namespace: ci
@@ -32,31 +36,29 @@ tests:
     env:
       ADDON1_CONFIG: name=managed-odh;notification-email=interop-qe-ms@redhat.com
       API_HOST: production
-      COMPUTE_MACHINE_TYPE: g4dn.2xlarge
-      FIPS: "true"
+      CLUSTER1_CONFIG: name=rosa-rhods;platform=rosa;region=us-east-2;version=4.13;channel-group=stable;compute-machine-type=g4dn.2xlarge;timeout=90m;replicas=2;fips=true;ocm-env=production
       FIREWATCH_CONFIG: |
         [
           {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
-          {"step": "operator-uninstall", "failure_type": "all", "classification": "Deprovisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
           {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
-          {"step": "addon-uninstall", "failure_type": "all", "classification": "Deprovisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
           {"step": "addon-tests-*", "failure_type": "all", "classification": "Addons tests", "jira_project": "RHODS", "jira_epic": "RHODS-10718"},
-          {"step": "rosa-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"}
+          {"step": "cluster-install-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 1}},
+          {"step": "cluster-uninstall-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 2}}
         ]
       FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
       FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
-      OPENSHIFT_VERSION: "4.13"
       OPERATOR1_CONFIG: name=gpu-operator-certified;namespace=nvidia-gpu-operator;source=certified-operators;target-namespaces=nvidia-gpu-operator,
       OPERATOR2_CONFIG: name=servicemeshoperator
       OPERATOR3_CONFIG: name=serverless-operator;namespace=openshift-serverless
       OPERATOR4_CONFIG: name=openshift-pipelines-operator-rh;namespace=openshift-pipelines;channel=latest
       OPERATOR5_CONFIG: name=nfd;namespace=openshift-nfd;target-namespaces=openshift-nfd,
       PARALLEL: "false"
-      REPLICAS: "2"
-      ROSA_LOGIN_ENV: production
+      PULL_SECRET_NAME: pull-secret
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
     test:
     - ref: addon-tests-rhods
-    workflow: addons-and-operators-aws-rosa
+    workflow: addons-and-operators
 - as: smoke-osd-rhods-addon-baseline-fips
   cron: 0 12 * * 6
   steps:
@@ -64,32 +66,29 @@ tests:
     env:
       ADDON1_CONFIG: name=managed-odh;notification-email=interop-qe-ms@redhat.com
       API_HOST: production
-      COMPUTE_MACHINE_TYPE: g4dn.2xlarge
-      COMPUTE_NODES: "2"
-      FIPS: "true"
+      CLUSTER1_CONFIG: name=aws-osd-rhods;platform=aws-osd;region=us-east-2;version=4.13;channel-group=stable;compute-machine-type=g4dn.2xlarge;timeout=90m;replicas=2;fips=true;ocm-env=production
       FIREWATCH_CONFIG: |
         [
-          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-436"},
-          {"step": "operator-uninstall", "failure_type": "all", "classification": "Deprovisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-436"},
-          {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-436"},
-          {"step": "addon-uninstall", "failure_type": "all", "classification": "Deprovisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-436"},
-          {"step": "addon-tests-*", "failure_type": "all", "classification": "Addons tests", "jira_project": "RHODS", "jira_epic": "RHODS-10716"},
-          {"step": "osd-ccs-*", "failure_type": "all", "classification":  "Cluster Creation - OSD", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-436"}
+          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
+          {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
+          {"step": "addon-tests-*", "failure_type": "all", "classification": "Addons tests", "jira_project": "RHODS", "jira_epic": "RHODS-10718"},
+          {"step": "cluster-install-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 1}},
+          {"step": "cluster-uninstall-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 2}}
         ]
       FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
       FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
-      MULTI_AZ: "false"
-      OCM_LOGIN_ENV: production
-      OPENSHIFT_VERSION: "4.13"
       OPERATOR1_CONFIG: name=gpu-operator-certified;namespace=nvidia-gpu-operator;source=certified-operators;target-namespaces=nvidia-gpu-operator,
       OPERATOR2_CONFIG: name=servicemeshoperator
       OPERATOR3_CONFIG: name=serverless-operator;namespace=openshift-serverless
       OPERATOR4_CONFIG: name=openshift-pipelines-operator-rh;namespace=openshift-pipelines;channel=latest
       OPERATOR5_CONFIG: name=nfd;namespace=openshift-nfd;target-namespaces=openshift-nfd,
       PARALLEL: "false"
+      PULL_SECRET_NAME: pull-secret
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
     test:
     - ref: addon-tests-rhods
-    workflow: addons-and-operators-aws-osd
+    workflow: addons-and-operators
 zz_generated_metadata:
   branch: rhods-addon-interop
   org: CSPI-QE
