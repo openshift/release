@@ -30,7 +30,6 @@ cat > gather_equinix_metadata.yaml <<-EOF
       until: equinix_metadata.status == 200
       retries: 5
       delay: 5
-      no_log: true
     - name: Filter and dump equinix metadata
       local_action:
         module: ansible.builtin.copy

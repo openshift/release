@@ -220,7 +220,6 @@ cat > packet-setup.yaml <<-EOF
         tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
         user_data: "{{ user_data | default(omit) }}"
       register: hosts
-      no_log: true
     - name: write device info to file
       copy:
         content="{{ hosts }}"
