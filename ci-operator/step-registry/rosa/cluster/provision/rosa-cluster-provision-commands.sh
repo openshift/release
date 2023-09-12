@@ -392,6 +392,9 @@ if [[ "$HOSTED_CP" == "true" ]]; then
   rosa logs install -c ${CLUSTER_ID} --watch
 fi
 
+# add additional sleep before checking cluster ready
+sleep 1800
+
 echo "Waiting for cluster ready..."
 start_time=$(date +"%s")
 while true; do
