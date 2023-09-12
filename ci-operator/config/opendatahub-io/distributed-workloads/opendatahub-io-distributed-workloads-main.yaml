@@ -1,8 +1,9 @@
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+  project_image:
+    dockerfile_literal: |
+      FROM registry.access.redhat.com/ubi8/ubi
+      RUN yum install -y --nodocs make git golang
+      RUN ln -s /cli/oc /usr/bin/kubectl
 releases:
   latest:
     release:
@@ -26,15 +27,17 @@ tests:
     - as: e2e-odh-dw
       cli: latest
       commands: |
+        git --version
+        unset GOFLAGS
         export CODEFLARE_TEST_OUTPUT_DIR=${ARTIFACT_DIR}
         export CODEFLARE_TEST_TIMEOUT_SHORT=1m
         export CODEFLARE_TEST_TIMEOUT_MEDIUM=5m
         export CODEFLARE_TEST_TIMEOUT_LONG=10m
         make install-opendatahub-operator
-        make install-codeflare-operator
+        make install-codeflare-operator-from-github
         make deploy-codeflare-from-filesystem
         sleep 60
-        cd tests && GOFLAGS=-mod=mod go test -v ./integration
+        cd tests && go test -v ./integration
       from: src
       resources:
         requests:

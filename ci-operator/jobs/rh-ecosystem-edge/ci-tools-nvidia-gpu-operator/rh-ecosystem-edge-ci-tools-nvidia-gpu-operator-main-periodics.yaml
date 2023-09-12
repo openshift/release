@@ -1,7 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build01
-  cron: 0 */23 * * *
+  cron: 0 */23 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -54,6 +54,261 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/nvidia-gpu-operator-e2e-1-11-x-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */23 * * 6
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: ci-tools-nvidia-gpu-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: "4.10"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.10-nvidia-gpu-operator-e2e-22-9-x
+  reporter_config:
+    slack:
+      channel: '#wg-edge-nvidia-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-22-9-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-22-9-x
+      - --variant=4.10
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-22-9-x-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */23 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: ci-tools-nvidia-gpu-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: "4.10"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.10-nvidia-gpu-operator-e2e-23-3-x
+  reporter_config:
+    slack:
+      channel: '#wg-edge-nvidia-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-23-3-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-23-3-x
+      - --variant=4.10
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-23-3-x-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */23 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: ci-tools-nvidia-gpu-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: "4.10"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.10"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.10-nvidia-gpu-operator-e2e-23-6-x
+  reporter_config:
+    slack:
+      channel: '#wg-edge-nvidia-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-23-6-x
+      - --variant=4.10
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -171,7 +426,92 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 */23 * * *
+  cron: 0 */23 * * 6
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: ci-tools-nvidia-gpu-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: "4.11"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.11"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.11-nvidia-gpu-operator-e2e-1-11-x
+  reporter_config:
+    slack:
+      channel: '#wg-edge-nvidia-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-1-11-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-1-11-x
+      - --variant=4.11
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-1-11-x-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */23 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -224,6 +564,176 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/nvidia-gpu-operator-e2e-22-9-x-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */23 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: ci-tools-nvidia-gpu-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: "4.11"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.11"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.11-nvidia-gpu-operator-e2e-23-3-x
+  reporter_config:
+    slack:
+      channel: '#wg-edge-nvidia-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-23-3-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-23-3-x
+      - --variant=4.11
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-23-3-x-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */23 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: ci-tools-nvidia-gpu-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: "4.11"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.11"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.11-nvidia-gpu-operator-e2e-23-6-x
+  reporter_config:
+    slack:
+      channel: '#wg-edge-nvidia-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-23-6-x
+      - --variant=4.11
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -341,7 +851,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 */23 * * *
+  cron: 0 */23 * * 6
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -526,6 +1036,91 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.12"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.12-nvidia-gpu-operator-e2e-23-6-x
+  reporter_config:
+    slack:
+      channel: '#wg-edge-nvidia-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-23-6-x
+      - --variant=4.12
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */23 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: ci-tools-nvidia-gpu-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: "4.12"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.12"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.12-nvidia-gpu-operator-e2e-master
   reporter_config:
     slack:
@@ -596,7 +1191,7 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 */23 * * 6
+  cron: 0 */23 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -611,7 +1206,7 @@ periodics:
     ci.openshift.io/generator: prowgen
     job-release: "4.13"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.13-nvidia-gpu-operator-e2e-22-9-x
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.13-nvidia-gpu-operator-e2e-23-3-x
   reporter_config:
     slack:
       channel: '#wg-edge-nvidia-ci'
@@ -630,8 +1225,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-22-9-x-cluster-profile
-      - --target=nvidia-gpu-operator-e2e-22-9-x
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-23-3-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-23-3-x
       - --variant=4.13
       command:
       - ci-operator
@@ -648,7 +1243,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/nvidia-gpu-operator-e2e-22-9-x-cluster-profile
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-23-3-x-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -681,7 +1276,92 @@ periodics:
         secretName: result-aggregator
 - agent: kubernetes
   cluster: build01
-  cron: 0 */23 * * 6
+  cron: 0 */23 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: ci-tools-nvidia-gpu-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: "4.13"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.13"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.13-nvidia-gpu-operator-e2e-23-6-x
+  reporter_config:
+    slack:
+      channel: '#wg-edge-nvidia-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-23-6-x
+      - --variant=4.13
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */23 * * *
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -777,11 +1457,11 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws
-    ci-operator.openshift.io/variant: "4.9"
+    ci-operator.openshift.io/variant: "4.14"
     ci.openshift.io/generator: prowgen
-    job-release: "4.9"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.9-nvidia-gpu-operator-e2e-1-10-x
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.14-nvidia-gpu-operator-e2e-23-6-x
   reporter_config:
     slack:
       channel: '#wg-edge-nvidia-ci'
@@ -800,9 +1480,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-1-10-x-cluster-profile
-      - --target=nvidia-gpu-operator-e2e-1-10-x
-      - --variant=4.9
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-23-6-x
+      - --variant=4.14
       command:
       - ci-operator
       image: ci-operator:latest
@@ -818,7 +1498,92 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/nvidia-gpu-operator-e2e-1-10-x-cluster-profile
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-23-6-x-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  cron: 0 */23 * * 6
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: main
+    org: rh-ecosystem-edge
+    repo: ci-tools-nvidia-gpu-operator
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: "4.14"
+    ci.openshift.io/generator: prowgen
+    job-release: "4.14"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-rh-ecosystem-edge-ci-tools-nvidia-gpu-operator-main-4.14-nvidia-gpu-operator-e2e-master
+  reporter_config:
+    slack:
+      channel: '#wg-edge-nvidia-ci'
+      job_states_to_report:
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :white_check_mark: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> :white_check_mark:
+        {{else}} :warning:  Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> :warning: {{end}}'
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/nvidia-gpu-operator-e2e-master-cluster-profile
+      - --target=nvidia-gpu-operator-e2e-master
+      - --variant=4.14
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/nvidia-gpu-operator-e2e-master-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
