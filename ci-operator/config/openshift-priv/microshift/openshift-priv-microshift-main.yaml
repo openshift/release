@@ -1,10 +1,10 @@
 base_images:
   cli:
-    name: 4.14-priv
+    name: 4.15-priv
     namespace: ocp-private
     tag: cli
   test-bin:
-    name: 4.14-priv
+    name: 4.15-priv
     namespace: ocp-private
     tag: tests
   test-runtime:
@@ -73,7 +73,7 @@ promotion:
   excluded_images:
   - microshift-test-payload
   - rebase-payload
-  name: 4.14-priv
+  name: 4.15-priv
   namespace: ocp-private
 releases:
   nightly-amd64:
@@ -95,7 +95,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: 4.14-priv
+  name: 4.15-priv
   namespace: ocp-private
 tests:
 - as: verify
@@ -131,45 +131,6 @@ tests:
     env:
       DRY_RUN: "y"
     workflow: openshift-microshift-rebase
-- always_run: false
-  as: e2e-openshift-conformance-reduced
-  cluster: build02
-  optional: true
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-02b8534ff4b424939
-    workflow: openshift-microshift-e2e-openshift-conformance-reduced-aws
-- always_run: false
-  as: e2e-openshift-conformance-reduced-arm
-  cluster: build02
-  optional: true
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-06df7225cc50ee1a3
-      EC2_INSTANCE_TYPE: c7g.4xlarge
-    workflow: openshift-microshift-e2e-openshift-conformance-reduced-aws
-- as: microshift-e2e
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-02b8534ff4b424939
-    workflow: openshift-microshift-e2e-microshift-tests-aws
-- as: microshift-e2e-arm
-  cluster: build02
-  optional: true
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-06df7225cc50ee1a3
-      EC2_INSTANCE_TYPE: c7g.4xlarge
-    workflow: openshift-microshift-e2e-microshift-tests-aws
 - as: microshift-metal-tests
   cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)

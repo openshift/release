@@ -79,21 +79,43 @@ function waitForReady() {
     max_attempts=60 # Max of 60 attempts with 30 sec wait time in between, for total of 60 min
     retry_api_count=0
     max_retry_api_attempts=5
+    # Nodes can cycle and may be all "Ready" during a check but not a moment later
+    # We look for X number of successful attempts in a row
+    successful_attempts=0
+    desired_successful_attempts=3
     for i in $( seq $max_attempts ); do
         NODE_STATE="$(oc get nodes || echo "ERROR")"
         if [[ ${NODE_STATE} == *"NotReady"*  || ${NODE_STATE} == *"SchedulingDisabled"* ]]; then
             FINAL_NODE_STATE="Fail"
             echo "Not all nodes have finished restarting - waiting for 30 seconds, attempt ${i}"
+	    successful_attempts=0
         elif [[ ${NODE_STATE} == "ERROR" ]]; then
-            retry_api_count++
+     	    retry_api_count=$((retry_api_count+1))
+	    successful_attempts=0
             if [[ "$retry_api_count" -gt "$max_retry_api_attempts" ]]; then
                 FINAL_NODE_STATE="Fail"
                 break
             fi
         else
-            echo "All nodes are ready to run workloads."
-            FINAL_NODE_STATE="Pass"
-            break
+	    # Infra are not counted for non-HCP clusters
+	    if [[ "$HOSTED_CP" == "false" ]]; then
+		node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/infra!=,node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+	    else
+		node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+            fi
+            if [[ "$node_count" -ge "$1" ]]; then
+	        if [[ "$successful_attempts" -lt "$desired_successful_attempts" ]]; then
+   		    successful_attempts=$((successful_attempts+1))
+	            echo "Successful attempts at Nodes being Ready in a row: $successful_attempts Want: $desired_successful_attempts"
+	        else
+                    echo "All nodes are ready to run workloads."
+                    FINAL_NODE_STATE="Pass"
+                    break
+	        fi
+            else
+                echo "Only $node_count/$1 worker nodes are ready."
+	        successful_attempts=0
+            fi
         fi
         export FINAL_NODE_STATE
         sleep 60
@@ -109,7 +131,7 @@ function waitForReady() {
 # Determine count of desired compute node count
 function getDesiredComputeCount {
   compute_count=$(rosa describe cluster -c "$CLUSTER_ID"  -o json  |jq -r '.nodes.compute')
-  if [ "$compute_count" = "null" ]; then 
+  if [[ "$compute_count" = "null" ]]; then 
     echo "--auto-scaling enabled, retrieving min_replicas count desired"
     desired_compute_count=$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r '.nodes.autoscale_compute.min_replicas') 
   else
@@ -117,7 +139,21 @@ function getDesiredComputeCount {
     desired_compute_count=$(rosa describe cluster -c "$CLUSTER_ID"  -o json  |jq -r '.nodes.compute')
   fi
   export desired_compute_count
-  echo "Desired worker node count: $desired_compute_count"
+  echo "Total desired node count: $desired_compute_count"
+}
+
+# Determine if node count needs to be revised due to day 2 op workaround for medium+ sized clusters
+function fixNodeScaling {
+  machine_pool=$(rosa list machinepool -c "$CLUSTER_ID" -o json)
+  if [[ "$HOSTED_CP" == "false" ]] && [[ `echo "$machine_pool" | jq -e '.[] | has("autoscaling")'` == "true" ]]; then
+    if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
+      if [[ `echo "$machine_pool" | jq -r '.[].autoscaling.min_replicas'` -ne ${MIN_REPLICAS} ]]; then
+        rosa edit machinepool -c "$CLUSTER_ID" worker --min-replicas "$MIN_REPLICAS"
+      fi
+    else
+      rosa edit machinepool -c "$CLUSTER_ID" worker --enable-autoscaling=false --replicas "$REPLICAS"
+    fi
+  fi
 }
 
 # Get cluster 
@@ -150,12 +186,15 @@ else
   exit 1
 fi
 
-# Get desired compute node count
-getDesiredComputeCount
-
 # Check if this is a HCP cluster
 is_hcp_cluster="$(rosa describe cluster -c "$CLUSTER_ID" -o json  | jq -r ".hypershift.enabled")"
 log "hypershift.enabled is set to $is_hcp_cluster"
+
+# Check if we modified the node counts to reduce day 2 op time and fix as necessary
+fixNodeScaling
+
+# Get desired compute node count
+getDesiredComputeCount
 
 ret=0
 echo "Wait for all nodes to be ready and schedulable."

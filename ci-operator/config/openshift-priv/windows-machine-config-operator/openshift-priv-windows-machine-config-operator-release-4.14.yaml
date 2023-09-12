@@ -38,7 +38,6 @@ operator:
 promotion:
   additional_images:
     windows-machine-config-operator-bundle: wmco-bundle
-  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -133,8 +132,17 @@ tests:
         sleep 10
         # Delete the deployment which will then be recreated by the subscription controller with the correct image
         oc delete deployment -n $WMCO_NS windows-machine-config-operator
-        # A short wait is required to ensure the deployment exists before `oc wait` is called. Otherwise it will error.
-        sleep 2m
+        # oc wait will immediately fail if the deployment does not exist yet, first retry until the deployment is
+        # created by the subscription controller
+        retries=0
+        while ! oc get -n $WMCO_NS deployment windows-machine-config-operator; do
+          if [[ $retries -eq 10 ]]; then
+            echo max retries hit
+            exit 1
+          fi
+          sleep 1m
+          retries=$((retries+1))
+        done
         oc wait --timeout=10m --for condition=Available -n $WMCO_NS deployment windows-machine-config-operator
       dependencies:
       - env: PREVIOUS_BUNDLE

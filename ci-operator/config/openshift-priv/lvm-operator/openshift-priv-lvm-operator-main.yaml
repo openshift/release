@@ -71,7 +71,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
-- as: lvm-operator-e2e-aws
+- as: lvm-operator-e2e-aws-sno
   steps:
     cluster_profile: aws
     dependencies:
@@ -89,6 +89,24 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: optional-operators-ci-operator-sdk-aws-sno
+- as: lvm-operator-e2e-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-storage
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: DISK_INSTALL=true make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: openshift-priv

@@ -1,6 +1,22 @@
 chain:
   as: hypershift-kubevirt-run-e2e-external
   steps:
+  - chain: hypershift-kubevirt-create
+    credentials:
+      - mount_path: /etc/ci-pull-credentials
+        name: ci-pull-credentials
+        namespace: test-credentials
+    dependencies:
+      - env: OCP_IMAGE_LATEST
+        name: release:latest
+      - env: OCP_IMAGE_PREVIOUS
+        name: release:initial
+      - env: CI_HYPERSHIFT_OPERATOR
+        name: pipeline:hypershift-operator
+  - ref: hypershift-kubevirt-install-hypershift
+    env:
+      - default: ${SHARED_DIR}/nested_kubeconfig
+        name: KUBECONFIG
   - as: run-e2e-external
     cli: latest
     commands: |-
@@ -15,21 +31,24 @@ chain:
           STORAGE_CLASS_FLAG="--e2e.etcd-storage-class=${ETCD_STORAGE_CLASS}"
         fi
       
-        # run (pseudo) external infra e2e test
-        oc create ns guest-infra-ns
+        export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig    
+      
+        # run external infra e2e test
+        oc --kubeconfig ${INFRA_KUBECONFIG} create ns guest-external-infra-ns
         bin/test-e2e \
                   --test.v \
                   --test.timeout=0 \
                   --test.run='^TestCreateCluster$' \
                   --e2e.node-pool-replicas=2 \
-                  --e2e.kubevirt-node-memory="6Gi" \
+                  --e2e.kubevirt-node-memory="8Gi" \
+                  --e2e.kubevirt-node-cores="4" \
                   --e2e.platform="KubeVirt" \
                   --e2e.latest-release-image=${OCP_IMAGE_LATEST} \
                   --e2e.previous-release-image=${OCP_IMAGE_PREVIOUS} \
                   --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
-                  --e2e.kubevirt-infra-kubeconfig=/tmp/secret/kubeconfig \
+                  --e2e.kubevirt-infra-kubeconfig=${INFRA_KUBECONFIG} \
                   ${STORAGE_CLASS_FLAG} \
-                  --e2e.kubevirt-infra-namespace=guest-infra-ns
+                  --e2e.kubevirt-infra-namespace=guest-external-infra-ns
 
     credentials:
       - mount_path: /etc/ci-pull-credentials
@@ -43,8 +62,10 @@ chain:
       - env: CI_HYPERSHIFT_OPERATOR
         name: pipeline:hypershift-operator
     env:
-      - default: ${SHARED_DIR}/management_cluster_kubeconfig
+      - default: ${SHARED_DIR}/nested_kubeconfig
         name: KUBECONFIG
+      - default: /tmp/secret/kubeconfig
+        name: INFRA_KUBECONFIG        
       - default: "true"
         name: RUN_EXTERNAL_INFRA_TEST
       - default: ""

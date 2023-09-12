@@ -69,9 +69,17 @@ ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
 
 vm_template="${ova_url##*/}"
 
+# shellcheck source=/dev/null
+source "${SHARED_DIR}/govc.sh"
+
+vsphere_version=$(govc about -json | jq -r .About.Version | awk -F'.' '{print $1}')
 
 # select a hardware version for testing
 hw_versions=(15 17 18 19)
+if [[ ${vsphere_version} -eq 8 ]]; then
+  hw_versions=(20)
+fi
+
 hw_available_versions=${#hw_versions[@]}
 selected_hw_version_index=$((RANDOM % ${hw_available_versions}))
 target_hw_version=${hw_versions[$selected_hw_version_index]}
@@ -88,18 +96,7 @@ declare dns_server
 declare vsphere_url
 source "${SHARED_DIR}/vsphere_context.sh"
 
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/govc.sh"
-
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
-
-# install-config for `None` platform type is expected
-declare platform_none="none: {}"
-if ! grep -F "${platform_none}" "${install_config}"
-then
-        echo "install-config contains platform other than None, can not proceed"
-        exit 1
-fi
 
 #set machine cidr if proxy is enabled
 if grep 'httpProxy' "${install_config}" ; then
@@ -173,6 +170,7 @@ rm -f openshift/99_openshift-cluster-api_master-machines-*.yaml
 echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
+if [[ ${PATCH_INFRA_MANIFEST:-} == "true" ]]; then
 ### Update platform spec in the infra resource
 echo "Patching infrastructure resource manifest with the 'External' platform type..."
 cat <<EOF > /tmp/infraPlatformSpecPatch.yml
@@ -188,6 +186,306 @@ status:
       external: {}
 EOF
 yq-go m -x -i "manifests/cluster-infrastructure-02-config.yml" "/tmp/infraPlatformSpecPatch.yml"
+
+else
+
+echo "Adding vSphere cloud controller manager manifests..."
+cat > "manifests/99_vsphere_cloud_controller_manager_namespace.yaml" <<-EOF
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    kubernetes.io/metadata.name: vsphere-cloud-controller-manager
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce-version: v1.24
+    pod-security.kubernetes.io/warn: privileged
+    security.openshift.io/scc.podSecurityLabelSync: "false"
+  name: vsphere-cloud-controller-manager
+spec:
+  finalizers:
+  - kubernetes
+EOF
+cat > "manifests/99_vsphere_cloud_controller_manager_sa.yaml" <<-EOF
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cloud-controller-manager
+  labels:
+    vsphere-cpi-infra: service-account
+    component: cloud-controller-manager
+  namespace: vsphere-cloud-controller-manager
+EOF
+cat > "manifests/99_vsphere_cloud_controller_manager_secret.yaml" <<-EOF
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vsphere-cloud-secret
+  labels:
+    vsphere-cpi-infra: secret
+    component: cloud-controller-manager
+  namespace: vsphere-cloud-controller-manager
+  # NOTE: this is just an example configuration, update with real values based on your environment
+stringData:
+  ${vsphere_url}.username: "${GOVC_USERNAME}"
+  ${vsphere_url}.password: "${GOVC_PASSWORD}"
+EOF
+cat > "manifests/99_vsphere_cloud_controller_manager_cm.yaml" <<-EOF
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vsphere-cloud-config
+  labels:
+    vsphere-cpi-infra: config
+    component: cloud-controller-manager
+  namespace: vsphere-cloud-controller-manager
+data:
+  # NOTE: this is just an example configuration, update with real values based on your environment
+  vsphere.conf: |
+    # Global properties in this section will be used for all specified vCenters unless overriden in VirtualCenter section.
+    global:
+      port: 443
+      # set insecureFlag to true if the vCenter uses a self-signed cert
+      insecureFlag: true
+      # settings for using k8s secret
+      secretName: vsphere-cloud-secret
+      secretNamespace: vsphere-cloud-controller-manager
+
+    # vcenter section
+    vcenter:
+      ${vsphere_url}:
+        server: ${vsphere_url}
+        datacenters:
+          - ${vsphere_datacenter}
+    # labels for regions and zones
+    #labels:
+    #  region: k8s-region
+    #  zone: k8s-zone
+EOF
+cat > "manifests/99_vsphere_cloud_controller_manager_rolebinding.yaml" <<-EOF
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: servicecatalog.k8s.io:apiserver-authentication-reader
+  labels:
+    vsphere-cpi-infra: role-binding
+    component: cloud-controller-manager
+  namespace: kube-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: extension-apiserver-authentication-reader
+subjects:
+  - apiGroup: ""
+    kind: ServiceAccount
+    name: cloud-controller-manager
+    namespace: vsphere-cloud-controller-manager
+  - apiGroup: ""
+    kind: User
+    name: cloud-controller-manager
+EOF
+cat > "manifests/99_vsphere_cloud_controller_manager_clusterrolebinding.yaml" <<-EOF
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: system:cloud-controller-manager
+  labels:
+    vsphere-cpi-infra: cluster-role-binding
+    component: cloud-controller-manager
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: system:cloud-controller-manager
+subjects:
+  - kind: ServiceAccount
+    name: cloud-controller-manager
+    namespace: vsphere-cloud-controller-manager
+  - kind: User
+    name: cloud-controller-manager
+EOF
+cat > "manifests/99_vsphere_cloud_controller_manager_clusterrole.yaml" <<-EOF
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:cloud-controller-manager
+  labels:
+    vsphere-cpi-infra: role
+    component: cloud-controller-manager
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - nodes
+    verbs:
+      - "*"
+  - apiGroups:
+      - ""
+    resources:
+      - nodes/status
+    verbs:
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - services/status
+    verbs:
+      - patch
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumes
+    verbs:
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - endpoints
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "coordination.k8s.io"
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+    - security.openshift.io
+    resourceNames:
+    - privileged
+    resources:
+    - securitycontextconstraints
+    verbs:
+    - use     
+EOF
+cat > "manifests/99_vsphere_cloud_controller_manager_ds.yaml" <<-EOF
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vsphere-cloud-controller-manager
+  labels:
+    component: cloud-controller-manager
+    tier: control-plane
+  namespace: vsphere-cloud-controller-manager
+spec:
+  selector:
+    matchLabels:
+      name: vsphere-cloud-controller-manager
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: vsphere-cloud-controller-manager
+        component: cloud-controller-manager
+        tier: control-plane
+    spec:
+      tolerations:
+        - key: node.cloudprovider.kubernetes.io/uninitialized
+          value: "true"
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          effect: NoSchedule
+          operator: Exists
+        - key: node-role.kubernetes.io/control-plane
+          effect: NoSchedule
+          operator: Exists
+        - key: node.kubernetes.io/not-ready
+          effect: NoSchedule
+          operator: Exists
+      securityContext:
+        runAsUser: 1001
+      serviceAccountName: cloud-controller-manager
+      priorityClassName: system-node-critical
+      containers:
+        - name: vsphere-cloud-controller-manager
+          image: gcr.io/cloud-provider-vsphere/cpi/release/manager:v1.27.0
+          env:                                           
+          - name: "KUBERNETES_SERVICE_HOST"              
+            value: "api-int.${cluster_domain}" 
+          - name: "KUBERNETES_SERVICE_PORT"    
+            value: "6443"                      
+          args:
+            - --cloud-provider=vsphere
+            - --v=2
+            - --cloud-config=/etc/cloud/vsphere.conf
+          volumeMounts:
+            - mountPath: /etc/cloud
+              name: vsphere-config-volume
+              readOnly: true
+          resources:
+            requests:
+              cpu: 200m
+      hostNetwork: true
+      volumes:
+        - name: vsphere-config-volume
+          configMap:
+            name: vsphere-cloud-config
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: node-role.kubernetes.io/control-plane
+                operator: Exists
+            - matchExpressions:
+              - key: node-role.kubernetes.io/master
+                operator: Exists
+EOF
+fi
 
 ### Make control-plane nodes unschedulable
 echo "Making control-plane nodes unschedulable..."

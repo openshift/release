@@ -53,68 +53,9 @@ case "$CLUSTER_TYPE" in
       echo "Adding additional ppc64le nodes"
       REGION="${LEASED_RESOURCE}"
       IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+      SERVICE_NAME=power-iaas
+      SERVICE_PLAN_NAME=power-virtual-server-group
 
-      WORKSPACE_NAME=rdr-mac-${REGION}-n1
-
-      PATH=${PATH}:/tmp
-      mkdir -p ${IBMCLOUD_HOME_FOLDER}
-      if [ -z "$(command -v ibmcloud)" ]
-      then
-        echo "ibmcloud CLI doesn't exist, installing"
-        curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
-      fi
-      
-      function ic() {
-        HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
-      }
-
-      # Check if jq,yq,git and openshift-install are installed
-      if [ -z "$(command -v yq)" ]
-      then
-      	echo "yq is not installed, proceed to installing yq"
-      	curl -L "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
-          -o /tmp/yq && chmod +x /tmp/yq
-      fi
-
-      if [ -z "$(command -v jq)" ]
-      then
-        echo "jq is not installed, proceed to installing jq"
-        curl -L "https://github.com/jqlang/jq/releases/download/jq-${JQ_VERSION}/jq-linux64" -o /tmp/jq && chmod +x /tmp/jq
-      fi
-
-      if [ -z "$(command -v openshift-install)" ]
-      then
-        echo "openshift-install is not installed, proceed to installing openshift-install"
-        curl -L https://mirror.openshift.com/pub/openshift-v4/multi/clients/ocp/stable/ppc64le/openshift-install-linux.tar.gz \
-          -o /tmp/openshift-install && chmod +x /tmp/openshift-install
-      fi
-
-      # upgrade go to GO_VERSION
-      if [ -z "$(command -v go)" ]
-      then
-        echo "go is not installed, proceed to installing go"
-        cd /tmp && wget -q https://go.dev/dl/go"${GO_VERSION}".linux-amd64.tar.gz && tar -C /tmp -xzf go"${GO_VERSION}".linux-amd64.tar.gz \
-          && export PATH=$PATH:/tmp/go/bin && export GOCACHE=/tmp/go && export GOPATH=/tmp/go && export GOMODCACHE="/tmp/go/pkg/mod"
-        if [ -z "$(command -v go)" ]
-        then
-          echo "Installed go successfully"
-        fi
-      fi
-
-      # build terraform from source using TERRAFORM_VERSION
-      cd "${IBMCLOUD_HOME_FOLDER}" && curl -L https://github.com/hashicorp/terraform/archive/refs/tags/v"${TERRAFORM_VERSION}".tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz \
-        && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz && cd "${IBMCLOUD_HOME_FOLDER}"/terraform-"${TERRAFORM_VERSION}" \
-        && go build -ldflags "-w -s -X 'github.com/hashicorp/terraform/version.dev=no'" -o bin/ . && cp bin/terraform /tmp/terraform
-      export PATH=$PATH:/tmp
-      t_ver1=$(/tmp/terraform -version)
-      echo "terraform version: ${t_ver1}"
-
-      export PATH
-      ic version
-      echo "Logging into IBMCLOUD"
-      RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
-
-      ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -r "${REGION}" -g "${RESOURCE_GROUP}"
       ic plugin install -f power-iaas
 
       # Before the workspace is created, download the automation code
@@ -130,6 +71,68 @@ case "$CLUSTER_TYPE" in
       echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
       echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
       echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
+
+      # create workspace for powervs from cli
+      echo "Display all the variable values:"
+      POWERVS_REGION=$(bash "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/scripts/region.sh "${REGION}")
+      echo "VPC Region is ${REGION}"
+      echo "PowerVS region is ${POWERVS_REGION}"
+      echo "Resource Group is ${RESOURCE_GROUP}"
+      ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" 2>&1 \
+        | tee /tmp/instance.id
+      
+      # Process the CRN into a variable
+      CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
+      export CRN
+      echo "${CRN}" > "${SHARED_DIR}"/POWERVS_SERVICE_CRN
+      sleep 30
+
+      # Tag the resource for easier deletion
+      ic resource tag-attach --tag-names "mac-power-worker" --resource-id "${CRN}" --tag-type user
+
+      # Waits for the created instance to become active... after 10 minutes it fails and exists
+      # Example content for TEMP_STATE
+      # active
+      # crn:v1:bluemix:public:power-iaas:osa21:a/3c24cb272ca44aa1ac9f6e9490ac5ecd:6632ebfa-ae9e-4b6c-97cd-c4b28e981c46::
+      COUNTER=0
+      SERVICE_STATE=""
+      while [ -z "${SERVICE_STATE}" ]
+      do
+        COUNTER=$((COUNTER+1)) 
+        TEMP_STATE="$(ic resource service-instances -g "${RESOURCE_GROUP}" --output json --type service_instance  | jq -r '.[] | select(.crn == "'"${CRN}"'") | .state')"
+        echo "Current State is: ${TEMP_STATE}"
+        echo ""
+        if [ "${TEMP_STATE}" == "active" ]
+        then
+          SERVICE_STATE="FOUND"
+        elif [[ $COUNTER -ge 20 ]]
+        then
+          SERVICE_STATE="ERROR"
+          echo "Service has not come up... login and verify"
+          exit 2
+        else
+          echo "Waiting for service to become active... [30 seconds]"
+          sleep 30
+        fi
+      done
+
+      echo "SERVICE_STATE: ${SERVICE_STATE}"
+
+      # This CRN is useful when manually destroying.
+      echo "PowerVS Service CRN: ${CRN}"
+
+      echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
+      echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
+
+      # The CentOS-Stream-8 image is stock-image on PowerVS.
+      # This image is available across all PowerVS workspaces.
+      # The VMs created using this image are used in support of ignition on PowerVS.
+      echo "Creating the Centos Stream Image"
+      echo "PowerVS Target CRN is: ${CRN}"
+      ic pi st "${CRN}"
+      ic pi images
+      ic pi image-create CentOS-Stream-8 --json
+      echo "Import image status is: $?"
 
       # Set the values to be used for generating var.tfvars
       POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
@@ -172,8 +175,8 @@ case "$CLUSTER_TYPE" in
           || sleep 120 \
           || /tmp/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
           || true
-
         exit 1
+
       fi
   fi
 ;;

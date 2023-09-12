@@ -67,7 +67,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230810-467d785354 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230901-e9e5d470a5 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -100,6 +100,16 @@ boskos-config:
 prow-config:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/determinize-prow-config:latest
 	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
+
+acknowledge-critical-fixes-only:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/tide-config-manager:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase acknowledge-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
+	$(MAKE) prow-config
+
+revert-acknowledge-critical-fixes-only:
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/tide-config-manager:latest
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
+	$(MAKE) prow-config
 
 branch-cut:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/config-brancher:latest
@@ -233,7 +243,7 @@ bump-pr:
 .PHONY: bump-pr
 
 job:
-	hack/job.sh "$(JOB)"
+	CONTAINER_ENGINE="$(CONTAINER_ENGINE)" VOLUME_MOUNT_FLAGS="$(VOLUME_MOUNT_FLAGS)" hack/job.sh "$(JOB)"
 .PHONY: job
 
 kerberos_id ?= dptp
@@ -427,20 +437,29 @@ __check_defined = \
 	$(if $(value $1),, \
 		$(error Undefined environment variable $1$(if $2, ($2))))
 
-generate-hypershift-deplyment:
+# yq: https://github.com/mikefarah/yq
+
+generate-hypershift-deployment: yq ?= yq
+generate-hypershift-deployment: TAG ?= latest
+generate-hypershift-deployment:
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
-	@:$(call check_defined, TMPDIR)
 
-	mkdir -p ${TMPDIR}/hypershift-cli
-	oc image extract registry.ci.openshift.org/ci/hypershift-cli:latest --path /usr/bin/hypershift:${TMPDIR}/hypershift-cli --confirm
-	chmod +x ${TMPDIR}/hypershift-cli/hypershift
-
-	${TMPDIR}/hypershift-cli/hypershift \
+	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/hypershift-cli:${TAG}
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} \
+		--rm \
+		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
+		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		install \
 		--oidc-storage-provider-s3-bucket-name=hypershift-oidc-provider \
-		--oidc-storage-provider-s3-credentials=${MGMT_AWS_CONFIG_PATH} \
+		--oidc-storage-provider-s3-credentials=/mgmt-aws \
 		--oidc-storage-provider-s3-region=us-east-1 \
-		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:latest \
+		--hypershift-image=registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
 		--enable-uwm-telemetry-remote-write=false \
-		render > $(CURDIR)/clusters/hive/hypershift/hypershift-install.yaml
-.PHONY: generate-hypershift-deplyment
+		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hive/hypershift/hypershift-install.yaml
+.PHONY: generate-hypershift-deployment
+
+build-hypershift-deployment: TAG ?= $(shell date +%Y%m%d)
+build-hypershift-deployment:
+	echo Building HyperShift operator with tag $(TAG)
+	oc --context app.ci -n ci --as system:admin start-build -w hypershift-cli
+	oc --context app.ci -n ci --as system:admin tag hypershift-cli:latest hypershift-cli:$(TAG)
