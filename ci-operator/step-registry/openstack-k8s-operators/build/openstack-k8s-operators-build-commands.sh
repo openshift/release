@@ -161,6 +161,11 @@ create_openstack_namespace
 DOCKER_REGISTRY_SECRET=pull-docker-secret
 oc create secret generic ${DOCKER_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/docker/config.json --type=kubernetes.io/dockerconfigjson
 
+# Auth needed by operator-sdk to pull images from internal
+export XDG_RUNTIME_DIR=${BASE_DIR}
+mkdir -p ${BASE_DIR}/containers
+ln -ns /secrets/internal/config.json ${BASE_DIR}/containers/auth.json
+
 # Secret for pushing containers - openstack namespace
 PUSH_REGISTRY_SECRET=push-quay-secret
 oc create secret generic ${PUSH_REGISTRY_SECRET} --from-file=.dockerconfigjson=/secrets/rdoquay/config.json --type=kubernetes.io/dockerconfigjson
