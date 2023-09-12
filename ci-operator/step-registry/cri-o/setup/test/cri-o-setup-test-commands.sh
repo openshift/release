@@ -26,3 +26,4 @@ if [ -n "$images" ]; then
 else
   echo "No images found that were created more than 2 weeks ago."
 fi
+
