@@ -50,16 +50,21 @@ chain:
         oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
           '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
 
-
+        INFRA=$(oc get infrastructure cluster -o=jsonpath='{.status.infrastructureName}')
+        ETCD_STORAGE_CLASS="" --etcd-storage-class gp3-csi
+        if [ "$INFRA" == "AWS" ]; then
+          echo "AWS infra detected. Setting --etcd-storage-class"
+          ETCD_STORAGE_CLASS="--etcd-storage-class gp3-csi"
+        fi
+        
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-        /tmp/${HYPERSHIFT_NAME} create cluster kubevirt ${ICSP_COMMAND} \
+        /tmp/${HYPERSHIFT_NAME} create cluster kubevirt ${ETCD_STORAGE_CLASS} ${ICSP_COMMAND} \
           --name ${CLUSTER_NAME} \
           --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
           --memory 16Gi \
           --cores 4 \
           --namespace local-cluster \
           --release-image ${RELEASE_IMAGE_LATEST} \
-          --etcd-storage-class gp3-csi \
           --pull-secret ${PULL_SECRET_PATH}
 
         oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
