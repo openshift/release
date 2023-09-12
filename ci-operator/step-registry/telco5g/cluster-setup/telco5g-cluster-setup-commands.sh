@@ -80,7 +80,7 @@ cat << EOF > $SHARED_DIR/get-cluster-name.yml
   gather_facts: false
   vars:
     cluster:
-      {"cnfdb4": {"port": 6443, "ip": "10.19.16.23", "hvip": "10.19.16.98"}}
+      {"cnfdb3": {"port": 6443, "ip": "10.19.16.20", "hvip": "10.19.16.98"}}
   tasks:
   - name: Wait 300 seconds, but only start checking after 10 seconds
     wait_for_connection:
