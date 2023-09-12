@@ -34,7 +34,11 @@ fi
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id" || true)
 if [[ -z "$CLUSTER_ID" ]]; then
-  CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-name")
+  CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-name" || true)
+  if [[ -z "$CLUSTER_ID" ]]; then
+    echo "No cluster is created. Softly exit the cluster deprovision."
+    exit 0
+  fi
 fi
 
 echo "Deleting cluster-id: ${CLUSTER_ID}"

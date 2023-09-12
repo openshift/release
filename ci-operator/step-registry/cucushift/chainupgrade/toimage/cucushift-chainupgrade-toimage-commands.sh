@@ -115,11 +115,6 @@ function rhel_repo(){
       replace: "{{ target_repo_version }}"
   - name: Clean up yum cache
     command: yum clean all
-  - name: Import GPG key on RHEL machines for the following upgrade task - Install downloaded packages
-    ignore_errors: true
-    rpm_key:
-      state: present
-      key: /etc/pki/rpm-gpg/RPM-GPG-KEY-redhat-release
 EOF
 
     ansible-inventory -i "${SHARED_DIR}/ansible-hosts" --list --yaml

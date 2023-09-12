@@ -4,12 +4,6 @@ chain:
     - as: run-e2e
       cli: latest
       commands: |-
-        # Complie
-        make
-        
-        # Install hypershift
-        bin/hypershift --version
-        bin/hypershift install --hypershift-image ${HYPERSHIFT_RELEASE_LATEST}
         
         # Running e2e test
         bin/test-e2e \
@@ -20,14 +14,16 @@ chain:
         --e2e.pull-secret-file=/etc/ci-pull-credentials/.dockerconfigjson \
         --e2e.base-domain=hypershift-ppc64le.com \
         --e2e.latest-release-image=${OCP_IMAGE_MULTI} \
-        --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST_CPO} \
+        --e2e.control-plane-operator-image=${HYPERSHIFT_RELEASE_LATEST} \
         --e2e.node-pool-replicas=2 \
         --e2e.powervs-resource-group=ibm-hypershift-dev \
-        --e2e.powervs-region=osa \
-        --e2e.powervs-zone=osa21 \
-        --e2e.powervs-vpc-region=jp-osa \
-        --e2e.powervs-proc-type=dedicated \
-        --e2e.powervs-processors=1
+        --e2e.powervs-region=syd \
+        --e2e.powervs-zone=syd04 \
+        --e2e.powervs-vpc-region=au-syd \
+        --e2e.powervs-sys-type=e980 \
+        --e2e-powervs-cloud-instance-id=b8d1fc6f-c7e1-4db7-8337-1192f2736063 \
+        --e2e-powervs-cloud-connection=rh-upstream-hypershift-powervs-ci-cc \
+        --e2e-powervs-vpc=rh-upstream-hypershift-powervs-ci-vpc
       credentials:
         - mount_path: /etc/hypershift-pool-powervs-credentials
           name: hypershift-pool-powervs-credentials
@@ -40,8 +36,6 @@ chain:
           name: release:multi-latest
         - env: HYPERSHIFT_RELEASE_LATEST
           name: hypershift-operator
-        - env: HYPERSHIFT_RELEASE_LATEST_CPO
-          name: hypershift
       env:
         - default: ${SHARED_DIR}/management_cluster_kubeconfig
           name: KUBECONFIG

@@ -38,5 +38,7 @@ if [[ -e "${OPERATOR_ROLES_PREFIX_FILE}" ]]; then
 
   echo "Start deleting the byo operator roles with the prefix ${OPERATOR_ROLES_PREFIX}..."
   rosa delete operator-roles -y --mode auto --prefix ${OPERATOR_ROLES_PREFIX}
+else
+  echo "No byo operator roles created in the pre step"
 fi
 echo "Finish byo operator roles deletion."

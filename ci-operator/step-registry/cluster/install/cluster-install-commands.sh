@@ -7,12 +7,14 @@ set -o verbose
 
 AWS_ACCESS_KEY_ID=$(grep "aws_access_key_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 AWS_SECRET_ACCESS_KEY=$(grep "aws_secret_access_key="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
+AWS_ACCOUNT_ID=$(grep "aws_account_id="  "${CLUSTER_PROFILE_DIR}/.awscred" | cut -d '=' -f2)
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
 DOCKER_CONFIG_JSON_PATH="${CLUSTER_PROFILE_DIR}/config.json"
 CLUSTER_DATA_DIR="/tmp/clusters-data"
 
 export AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY
+export AWS_ACCOUNT_ID
 export OCM_TOKEN
 export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
 
@@ -34,10 +36,6 @@ done
 
 RUN_COMMAND+="${CLUSTERS_CMD} "
 
-if [[ -n "${OCM_ENVIRONMENT}" ]]; then
-    RUN_COMMAND+=" --ocm-env=${OCM_ENVIRONMENT} "
-fi
-
 if [ "${PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
     RUN_COMMAND+=" --parallel"
 fi
@@ -55,9 +53,23 @@ echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-toke
 set +e
 ${RUN_COMMAND}
 return_code=$?
+
+if [ $NUM_CLUSTERS -eq 1 ]; then
+  CLUSTER_NAME=$(awk -F'.*name=|;' '{print $2}' <<< "$CLUSTERS_CMD")
+  CLUSTER_PLATFORM=$(awk -F'.*platform=|;' '{print $2}' <<< "$CLUSTERS_CMD")
+  CLUSTER_DATA_DIR="$CLUSTER_DATA_DIR/$CLUSTER_PLATFORM/$CLUSTER_NAME"
+  CLUSTER_AUTH_DIR="$CLUSTER_DATA_DIR/auth"
+  cp "$CLUSTER_AUTH_DIR/kubeconfig" "${SHARED_DIR}/kubeconfig"
+  cp "$CLUSTER_AUTH_DIR/kubeadmin-password" "${SHARED_DIR}/kubeadmin-password"
+  echo "$CLUSTER_NAME" > "${SHARED_DIR}/cluster-name"
+  grep 'api-url' "$CLUSTER_DATA_DIR/cluster_data.yaml" | cut -d' ' -f 2 > "${SHARED_DIR}/api.url"
+  grep 'console-url' "$CLUSTER_DATA_DIR/cluster_data.yaml"| cut -d' ' -f 2 > "${SHARED_DIR}/console.url"
+  grep 'cluster-id' "$CLUSTER_DATA_DIR/cluster_data.yaml"| cut -d' ' -f 2 > "${SHARED_DIR}/cluster-id"
+fi
+
 # Save cluster_data.yaml and kubeconfig files to be used during cluster deletion
 # find $CLUSTER_DATA_DIR  -name "cluster_data.yaml"  | tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" -T -
-tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" --exclude=*.json --exclude=*terraform* --exclude=*.zip --exclude=*.tf* --exclude=tls --exclude=*.log  -C /tmp/clusters-data .
+tar -zcvf "${SHARED_DIR}/clusters_data.tar.gz" --exclude=*.json --exclude=*terraform* --exclude=*.zip --exclude=*.tf* --exclude=tls --exclude=*.log  -C $CLUSTER_DATA_DIR .
 
 set -e
 exit "$return_code"

@@ -242,6 +242,10 @@ cat << EOF > ~/fetch-kubeconfig.yml
       replace: "    server: https://${CLUSTER_API_IP}:${CLUSTER_API_PORT}"
     delegate_to: localhost
 
+  - name: Add docker auth to enable pulling containers from CI registry
+    shell: >-
+      kcli ssh root@${CLUSTER_NAME}-installer
+      'oc set data secret/pull-secret -n openshift-config --from-file=.dockerconfigjson=/root/openshift_pull.json'
 EOF
 
 cat << EOF > ~/fetch-information.yml

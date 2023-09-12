@@ -13,7 +13,7 @@ POWERVS_VSI_NAME="${HOSTED_CLUSTER_NAME}-worker"
 POWERVS_VSI_MEMORY=16
 POWERVS_VSI_PROCESSORS=0.5
 POWERVS_VSI_PROC_TYPE="shared"
-POWERVS_VSI_SYS_TYPE="s922"
+POWERVS_VSI_SYS_TYPE="e980"
 
 # MCE agentserviceconfig configs
 export DB_VOLUME_SIZE="10Gi"
@@ -36,14 +36,21 @@ curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /t
 curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/bin/yq && chmod +x /tmp/bin/yq
 export PATH=$PATH:/tmp/bin
 
+MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
+HYPERSHIFT_CLI_NAME=hcp
+if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+ echo "MCE version is less than 2.4, use hypershift command"
+ HYPERSHIFT_CLI_NAME=hypershift
+fi
+
 # Installing hypershift cli
 echo "$(date) Installing hypershift cli"
-mkdir /tmp/hypershift_cli
-downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
-curl -k --output /tmp/hypershift.tar.gz ${downURL}
-tar -xvf /tmp/hypershift.tar.gz -C /tmp/hypershift_cli
-chmod +x /tmp/hypershift_cli/hypershift
-export PATH=$PATH:/tmp/hypershift_cli
+mkdir /tmp/${HYPERSHIFT_CLI_NAME}_cli
+downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_CLI_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+curl -k --output /tmp/${HYPERSHIFT_CLI_NAME}.tar.gz ${downURL}
+tar -xvf /tmp/${HYPERSHIFT_CLI_NAME}.tar.gz -C /tmp/${HYPERSHIFT_CLI_NAME}_cli
+chmod +x /tmp/${HYPERSHIFT_CLI_NAME}_cli/${HYPERSHIFT_CLI_NAME}
+export PATH=$PATH:/tmp/${HYPERSHIFT_CLI_NAME}_cli
 
 # IBM cloud login
 echo | ibmcloud login --apikey @"${AGENT_POWER_CREDENTIALS}/ibmcloud-apikey"
@@ -180,14 +187,16 @@ echo "$(date) Creating agent hosted cluster manifests"
 oc create ns ${HOSTED_CONTROL_PLANE_NAMESPACE}
 mkdir /tmp/hc-manifests
 
-hypershift create cluster agent \
+${HYPERSHIFT_CLI_NAME} create cluster agent \
     --name=${HOSTED_CLUSTER_NAME} \
     --pull-secret=${PULL_SECRET} \
     --agent-namespace=${HOSTED_CONTROL_PLANE_NAMESPACE} \
     --base-domain=${HYPERSHIFT_BASE_DOMAIN} \
     --api-server-address=api.${HOSTED_CLUSTER_NAME}.${HYPERSHIFT_BASE_DOMAIN} \
     --ssh-key=${SSH_PUB_KEY_FILE}\
-    --release-image=${OCP_IMAGE_MULTI} --render > /tmp/hc-manifests/cluster-agent.yaml
+    --release-image=${OCP_IMAGE_MULTI} \
+    --control-plane-availability-policy=${CP_AVAILABILITY_POLICY} \
+    --render > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
 csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{6}"
@@ -378,5 +387,5 @@ echo "$(date) Approved the agents, waiting for the installation to get completed
 oc wait --all=true agent -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m
 
 # Download guest cluster kubeconfig
-echo "$(date) Setup guest_kubeconfig"
-hypershift create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/guest_kubeconfig
+echo "$(date) Setup nested_kubeconfig"
+${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --name=${HOSTED_CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig

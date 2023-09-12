@@ -65,6 +65,7 @@ RETRIES=30
 CSV=
 for i in $(seq "${RETRIES}") max; do
   [[ "${i}" == "max" ]] && break
+  sleep 30
   if [[ -z "${CSV}" ]]; then
     echo "[Retry ${i}/${RETRIES}] The subscription is not yet available. Trying to get it..."
     CSV=$(oc get subscription -n "${LVM_OPERATOR_SUB_INSTALL_NAMESPACE}" "${LVM_OPERATOR_SUB_PACKAGE}" -o jsonpath='{.status.installedCSV}')
@@ -76,7 +77,6 @@ for i in $(seq "${RETRIES}") max; do
     break
   fi
   echo "Try ${i}/${RETRIES}: ${LVM_OPERATOR_SUB_PACKAGE} is not deployed yet. Checking again in 30 seconds"
-  sleep 30
 done
 
 if [[ "$i" == "max" ]]; then

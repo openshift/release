@@ -1,0 +1,214 @@
+base_images:
+  go-builder:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.19-openshift-4.13
+  golangci-lint:
+    name: golangci-lint
+    namespace: ci
+    tag: v1.53.1
+  operator-sdk:
+    name: "4.13"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: make manager
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- build_args:
+  - name: TARGET
+    value: manager
+  dockerfile_path: Dockerfile
+  to: kernel-module-management-operator
+- build_args:
+  - name: TARGET
+    value: manager-hub
+  dockerfile_path: Dockerfile
+  to: kernel-module-management-operator-hub
+- dockerfile_path: Dockerfile.signimage
+  to: kernel-module-management-signimage
+- dockerfile_path: Dockerfile.must-gather
+  to: kernel-module-management-must-gather
+- dockerfile_path: Dockerfile.worker
+  to: kernel-module-management-worker
+- dockerfile_literal: |
+    FROM ubi9-minimal
+    RUN rm -rf /etc/yum.repos.d/*
+    RUN curl http://base-4-13-rhel9.ocp.svc > /etc/yum.repos.d/base-4-13-rhel9.repo
+  to: ubi9-minimal-entitled
+- dockerfile_literal: |
+    FROM src
+    RUN wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq && \
+      chmod +x /usr/bin/yq
+  from: src
+  to: e2e-hub-yq
+operator:
+  bundles:
+  - as: operator-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  - as: hub-operator-bundle
+    dockerfile_path: bundle-hub.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-operator:latest
+    with: pipeline:kernel-module-management-operator
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-operator-hub:latest
+    with: pipeline:kernel-module-management-operator-hub
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-signimage:latest
+    with: pipeline:kernel-module-management-signimage
+  - pullspec: quay.io/edge-infrastructure/kernel-module-management-worker:latest
+    with: pipeline:kernel-module-management-worker
+promotion:
+  excluded_images:
+  - ubi9-minimal-entitled
+  - e2e-hub-yq
+  namespace: edge-infrastructure
+  tag: release-2.0
+  tag_by_commit: true
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.13"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit-tests
+  steps:
+    test:
+    - as: run-and-upload-codecov
+      commands: |
+        ci/prow/unit-tests
+        curl -Os https://uploader.codecov.io/latest/linux/codecov
+        chmod +x codecov
+        ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -C "${PULL_PULL_SHA}" -P "${PULL_NUMBER}" -B "${PULL_HEAD_REF}" -N "${PULL_BASE_SHA}"
+      credentials:
+      - mount_path: /var/run/secrets
+        name: codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          memory: 1Gi
+- as: unit-tests-postsubmit
+  postsubmit: true
+  steps:
+    test:
+    - as: run-and-upload-codecov
+      commands: |
+        ci/prow/unit-tests
+        curl -Os https://uploader.codecov.io/latest/linux/codecov
+        chmod +x codecov
+        ./codecov -t "$(cat /var/run/secrets/codecov-token)" -r "${REPO_OWNER}/${REPO_NAME}" -B "${PULL_BASE_REF}" -C "${PULL_BASE_SHA}"
+      credentials:
+      - mount_path: /var/run/secrets
+        name: codecov-token
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          memory: 1Gi
+- as: build
+  commands: ci/prow/build
+  container:
+    clone: true
+    from: go-builder
+- as: lint
+  commands: ci/prow/lint
+  container:
+    clone: true
+    from: golangci-lint
+- as: check-commits-count
+  commands: ci/prow/check-commits-count
+  container:
+    clone: true
+    from: go-builder
+- as: check-api-changes
+  steps:
+    test:
+    - as: check-api-changes
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        unset VERSION
+        ci/prow/check-api-changes
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace openshift-kmm
+        operator-sdk run bundle -n openshift-kmm "$OO_BUNDLE"
+        oc wait --for=condition=Available -n openshift-kmm --timeout=1m deployment/kmm-operator-controller-manager
+      dependencies:
+      - env: OO_BUNDLE
+        name: operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    - as: run-test
+      cli: latest
+      commands: |
+        oc project default
+        SKIP_MAKE_DEPLOY=true ./ci/prow/e2e-incluster-build
+      from: src
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+- as: e2e-hub
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  steps:
+    test:
+    - as: run-test
+      cli: latest
+      commands: |
+        unset GOFLAGS
+        oc project default
+        ./ci/prow/e2e-hub-spoke-incluster-build
+      dependencies:
+      - env: IMG
+        name: kernel-module-management-operator
+      - env: HUB_IMG
+        name: kernel-module-management-operator-hub
+      from: e2e-hub-yq
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 500Mi
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: release-2.0
+  org: rh-ecosystem-edge
+  repo: kernel-module-management
