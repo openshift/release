@@ -1513,7 +1513,6 @@ periodics:
     job-env: aws
     job-test: e2e
     job-type: upgrade
-    tag: "1"
   name: release-openshift-okd-fcos-installer-e2e-aws-upgrade-from-fcos-stable
   spec:
     containers:
@@ -1530,10 +1529,6 @@ periodics:
       command:
       - ci-operator
       env:
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: BRANCH
-        value: "4.10"
       - name: CLUSTER_TYPE
         value: aws
       - name: UNRESOLVED_CONFIG
@@ -1553,9 +1548,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: origin
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1621,7 +1613,6 @@ periodics:
     job-env: aws
     job-test: e2e
     job-type: upgrade
-    tag: "1"
   name: release-openshift-okd-scos-installer-e2e-aws-upgrade-from-scos-stable
   spec:
     containers:
@@ -1638,10 +1629,6 @@ periodics:
       command:
       - ci-operator
       env:
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: BRANCH
-        value: "4.13"
       - name: CLUSTER_TYPE
         value: aws
       - name: UNRESOLVED_CONFIG
@@ -1661,9 +1648,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "scos-$(BRANCH)"
-            namespace: origin
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1729,7 +1713,6 @@ periodics:
     job-env: aws
     job-test: e2e
     job-type: upgrade
-    tag: "1"
   name: release-openshift-okd-scos-installer-e2e-aws-upgrade-from-scos-next
   spec:
     containers:
@@ -1746,10 +1729,6 @@ periodics:
       command:
       - ci-operator
       env:
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: BRANCH
-        value: "4.13"
       - name: CLUSTER_TYPE
         value: aws
       - name: UNRESOLVED_CONFIG
@@ -1769,9 +1748,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "scos-$(BRANCH)"
-            namespace: origin
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1853,22 +1829,18 @@ periodics:
       command:
       - ci-operator
       env:
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: BRANCH
-        value: "4.10"
       - name: CLUSTER_TYPE
         value: gcp
       - name: UNRESOLVED_CONFIG
         value: |
           releases:
-              initial:
-                prerelease:
-                  product: okd
-                  version_bounds:
-                    lower: 4.13.0-0
-                    stream: 4-stable
-                    upper: 4.999.0-0
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-stable
+                  upper: 4.999.0-0
           resources:
             '*':
               limits:
@@ -1876,9 +1848,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: origin
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1962,50 +1931,43 @@ periodics:
       command:
       - ci-operator
       env:
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: BRANCH
-        value: "4.13"
       - name: CLUSTER_TYPE
         value: gcp
       - name: UNRESOLVED_CONFIG
         value: |
           releases:
-               initial:
-                 prerelease:
-                   product: okd
-                   version_bounds:
-                     lower: 4.13.0-0
-                     stream: 4-scos-stable
-                     upper: 4.999.0-0
-           resources:
-             '*':
-               limits:
-                 memory: 6Gi
-               requests:
-                 cpu: 100m
-                 memory: 200Mi
-           tag_specification:
-             name: "scos-$(BRANCH)"
-             namespace: origin
-           tests:
-           - as: e2e-$(CLUSTER_TYPE)
-             commands: TEST_SUITE=openshift/conformance/parallel run-tests
-             openshift_installer:
-               cluster_profile: "$(CLUSTER_TYPE)"
-           - as: e2e-$(CLUSTER_TYPE)-serial
-             commands: TEST_SUITE=openshift/conformance/serial run-tests
-             openshift_installer:
-               cluster_profile: "$(CLUSTER_TYPE)"
-           - as: e2e-$(CLUSTER_TYPE)-upgrade
-             commands: TEST_SUITE=all run-upgrade-tests
-             openshift_installer:
-               cluster_profile: "$(CLUSTER_TYPE)"
-               upgrade: true
-           - as: launch-$(CLUSTER_TYPE)
-             commands: sleep 9000 & wait
-             openshift_installer:
-               cluster_profile: "$(CLUSTER_TYPE)"
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-stable
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
@@ -2072,50 +2034,43 @@ periodics:
       command:
       - ci-operator
       env:
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: BRANCH
-        value: "4.13"
       - name: CLUSTER_TYPE
         value: gcp
       - name: UNRESOLVED_CONFIG
         value: |
           releases:
-               initial:
-                 prerelease:
-                   product: okd
-                   version_bounds:
-                     lower: 4.13.0-0
-                     stream: 4-scos-next
-                     upper: 4.999.0-0
-           resources:
-             '*':
-               limits:
-                 memory: 6Gi
-               requests:
-                 cpu: 100m
-                 memory: 200Mi
-           tag_specification:
-             name: "scos-$(BRANCH)"
-             namespace: origin
-           tests:
-           - as: e2e-$(CLUSTER_TYPE)
-             commands: TEST_SUITE=openshift/conformance/parallel run-tests
-             openshift_installer:
-               cluster_profile: "$(CLUSTER_TYPE)"
-           - as: e2e-$(CLUSTER_TYPE)-serial
-             commands: TEST_SUITE=openshift/conformance/serial run-tests
-             openshift_installer:
-               cluster_profile: "$(CLUSTER_TYPE)"
-           - as: e2e-$(CLUSTER_TYPE)-upgrade
-             commands: TEST_SUITE=all run-upgrade-tests
-             openshift_installer:
-               cluster_profile: "$(CLUSTER_TYPE)"
-               upgrade: true
-           - as: launch-$(CLUSTER_TYPE)
-             commands: sleep 9000 & wait
-             openshift_installer:
-               cluster_profile: "$(CLUSTER_TYPE)"
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-next
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
