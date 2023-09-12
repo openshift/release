@@ -1,12 +1,16 @@
 #!/bin/bash
 
-set -xuo pipefail
+set -x
 
+# Session variables
 infra_name="hcp-ci-$(echo -n $PROW_JOB_ID|cut -c-8)"
-plugins_list=("vpc-infrastructure" "cloud-object-storage" "cloud-dns-services")
+plugins_list=("vpc-infrastructure" "cloud-dns-services")
 hc_ns="hcp-ci"
 hc_name="agent-ibmz"
 hcp_ns=$hc_ns-$hc_name
+export IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
+export httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
+export httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip"})
 
 # Installing CLI tools
 set -e
@@ -20,15 +24,16 @@ if [ $? -eq 0 ]; then
 else
   set -e
   echo "ibmcloud CLI is not installed. Installing it now..."
-  wget -P $HOME/ https://download.clis.cloud.ibm.com/ibm-cloud-cli/$IBMCLOUD_CLI_VERSION/binaries/IBM_Cloud_CLI_${IBMCLOUD_CLI_VERSION}_linux_amd64.tgz
-  tar -xvf $HOME/IBM_Cloud_CLI_${IBMCLOUD_CLI_VERSION}_linux_amd64.tgz
-  cp $HOME/IBM_Cloud_CLI/ibmcloud /usr/bin/
+  curl -o /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/binaries/IBM_Cloud_CLI_${IC_CLI_VERSION}_linux_amd64.tgz
+  tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
+  export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
 fi 
 
 # Login to the IBM Cloud
 set -e
 echo "Logging into IBM Cloud by targetting the $IC_REGION region"
-ibmcloud login --apikey $IC_APIKEY -r $IC_REGION
+ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
+ibmcloud login --apikey $IC_API_KEY -r $IC_REGION
 set +e
 echo "Checking if the $plugins_list plugins are installed."
 for plugin in "${plugins_list[@]}"; do  
@@ -95,8 +100,8 @@ zvsi_rip_list=()
 zvsi_fip_list=()
 for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
   echo "Triggering the $infra_name-compute-$i zVSI creation on IBM Cloud in the VPC $infra_name-vpc"
-  vol_json=$(jq -n --arg v1 "$infra_name-compute-$i-volume" '{"name": $v1, "volume": {"name": $v1, "capacity": 250, "profile": {"name": "general-purpose"}}}')
-  ibmcloud is instance-create $infra_name-compute-$i $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $zvsi_image_id --keys $infra_name-key --resource-group-name $infra_name-rg --boot-volume $vol_json
+  vol_json=$(jq -n -c --arg volume "$infra_name-compute-$i-volume" '{"name": $volume, "volume": {"name": $volume, "capacity": 250, "profile": {"name": "general-purpose"}}}')
+  ibmcloud is instance-create $infra_name-compute-$i $infra_name-vpc $IC_REGION-1 $ZVSI_PROFILE $infra_name-sn --image $ZVSI_IMAGE --keys $infra_name-key --resource-group-name $infra_name-rg --boot-volume $vol_json
   set +e
   sleep 60
   zvsi_state=$(ibmcloud is instance $infra_name-compute-$i | awk '/Status/{print $2}')
@@ -108,6 +113,15 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
     zvsi_rip=$(ibmcloud is instance $infra_name-compute-$i --output json | jq -r '.primary_network_interface.primary_ip.address')
     zvsi_rip_list+=("$zvsi_rip")
   fi
+  sg_name=$(ibmcloud is instance $infra_name-compute-$i --output JSON | jq -r '.network_interfaces|.[].security_groups|.[].name')
+  echo "Adding an inbound rule in the $infra_name-compute-$i instance security group for ssh and scp."
+  ibmcloud is sg-rulec $sg_name inbound tcp --port-min 22 --port-max 22
+  if [ $? -eq 0 ]; then
+      echo "Successfully added the inbound rule."
+  else
+      echo "Failure while adding the inbound rule to the $infra_name-compute-$i instance security group."
+      exit 1
+  fi  
   nic_name=$(ibmcloud is in-nics $infra_name-compute-$i -q | grep -v ID | awk '{print $2}')
   echo "Creating a Floating IP for zVSI"
   zvsi_fip=$(ibmcloud is ipc $infra_name-compute-$i-ip --zone $IC_REGION-1 --resource-group-name $infra_name-rg | awk '/Address/{print $2}')
@@ -132,29 +146,29 @@ else
   exit 1
 fi
 
-echo "Creating the DNS zone $hc_name.$BASE_DOMAIN in the instance $infra_name-dns."
-dns_zone_id=$(ibmcloud dns zone-create "$hc_name.$BASE_DOMAIN" -i $infra_name-dns --output JSON | jq -r '.id')
+echo "Creating the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN in the instance $infra_name-dns."
+dns_zone_id=$(ibmcloud dns zone-create "$hc_name.$HYPERSHIFT_BASEDOMAIN" -i $infra_name-dns --output JSON | jq -r '.id')
 if [ -z $dns_zone_id ]; then
-  echo "DNS zone $hc_name.$BASE_DOMAIN is not created properly as it is not possesing any ID."
+  echo "DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN is not created properly as it is not possesing any ID."
   exit 1
 else 
-  echo "DNS zone $hc_name.$BASE_DOMAIN is created successfully in the instance $infra_name-dns."
+  echo "DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN is created successfully in the instance $infra_name-dns."
 fi
 
-echo "Adding VPC network $infra_name-vpc to the DNS zone $hc_name.$BASE_DOMAIN."
+echo "Adding VPC network $infra_name-vpc to the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN"
 dns_network_state=$(ibmcloud dns permitted-network-add $dns_zone_id --type vpc --vpc-crn $vpc_crn -i $infra_name-dns --output JSON | jq -r '.state')
 if [ "$dns_network_state" != "ACTIVE" ]; then
-  echo "VPC network $infra_name-vpc which is added to the DNS zone $hc_name.$BASE_DOMAIN is not in ACTIVE state."
+  echo "VPC network $infra_name-vpc which is added to the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN is not in ACTIVE state."
   exit 1
 else 
-  echo "VPC network $infra_name-vpc is successfully added to the DNS zone $hc_name.$BASE_DOMAIN."
-  echo "DNS zone $hc_name.$BASE_DOMAIN is in the ACTIVE state."
+  echo "VPC network $infra_name-vpc is successfully added to the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN."
+  echo "DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN is in the ACTIVE state."
 fi
 
 echo "Fetching the hosted cluster IP address for resolution"
 hc_ip=$(dig +short $(cat $SHARED_DIR/${hc_name}_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1))
 
-echo "Adding A records in the DNS zone $hc_name.$BASE_DOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
+echo "Adding A records in the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 $hc_ip -i $infra_name-dns
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api-int" --ipv4 $hc_ip -i $infra_name-dns
 if [ $? -eq 0 ]; then
@@ -177,33 +191,37 @@ echo "Creating Load balancer for workload distribution on compute nodes"
 lb_state=$(ibmcloud dns glb-create $dns_zone_id --name '*.apps' --default-pools $pool_id --fallback-pool $pool_id -i $infra_name-dns --output json | jq -r '.health')
 if [ "$lb_state" == "HEALTHY" ]; then
   echo "*.apps load balancing is created successfully and in healthy state."
-  pool_id=$()
 else 
   echo "Load balancer *.apps is not in healthy state under DNS instance $infra_name-dns."
   exit 1
 fi
 
-# Downloading the ipxe-script
-ipxe_script_url=$(oc get infraenv $hc_name -n $hcp_ns -ojsonpath='{.status.bootArtifacts.ipxeScript}')
-wget -O "$HOME/${hc_name}-ipxe-script" "${ipxe_script_url}"
-echo "HC_NAME $hc_name" >> $HOME/$hc_name-ipxe-script
+# Generating script for agent bootup execution on zVSI
+export initrd_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.initrd')
+export kernel_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.kernel')
+export rootfs_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.rootfs')
+ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null')
+echo "Downloading the rootfs image locally and transferring to HTTPD server"
+wget -O $HOME/rootfs.img "$rootfs_url"
+scp "${ssh_options[@]}" -i $httpd_vsi_key $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
+ssh "${ssh_options[@]}" -i $httpd_vsi_key root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs.img"
+echo "Downloading the setup script for pxeboot of agents"
+wget -O $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
+export minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
+export mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
+sed -i "s|INITRD_URL|${minitrd_url}|" $HOME/setup_pxeboot.sh 
+sed -i "s|KERNEL_URL|${mkernel_url}|" $HOME/setup_pxeboot.sh 
+sed -i "s|HTTPD_VSI_IP|${httpd_vsi_ip}|" $HOME/setup_pxeboot.sh 
+sudo chmod 700 $HOME/setup_pxeboot.sh
 
-# Booting up zVSI as agents
+# Booting up zVSIs as agents
 for fip in "${zvsi_fip_list[@]}"; do
-  echo "Transferring the ipxe-script to zVSI for agent bootup"
-  SSH_OPTIONS='PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null'
-  scp -o ${SSH_OPTIONS} $HOME/$hc_name-ipxe-script core@$fip:$HOME/$hc_name-ipxe-script
-  echo "Logging into the zVSI $fip"
-  ssh -o ${SSH_OPTIONS} core@$fip
-  export HC_NAME=$(cat ipxe-script | awk '/HC_NAME/{print $2}')
-  initrd_url=$(cat $HOME/$HC_NAME-ipxe-script | awk '/initrd --name/{print $4}')
-  kernel_url=$(cat $HOME/$HC_NAME-ipxe-script | awk '/kernel/{print $2}')
-  rootfs_url=$(cat $HOME/$HC_NAME-ipxe-script | awk '/kernel/{print $4}' | cut -d '=' -f 2,3,4)
-  curl -k -L -o "$HOME/initrd.img" "$initrd_url"
-  curl -k -L -o "$HOME/kernel.img" "$kernel_url"
-  sudo kexec -l $HOME/kernel.img --initrd="$HOME/initrd.img" --append="rd.neednet=1 coreos.live.rootfs_url=$rootfs_url random.trust_cpu=on rd.luks.options=discard ignition.firstboot ignition.platform.id=metal console=tty1 console=ttyS1,115200n8"
-  sudo kexec -e &
-  exit
+  echo "Transferring the setup script to zVSI $fip"
+  scp "${ssh_options[@]}" $HOME/setup_pxeboot.sh core@$fip:~/setup_pxeboot.sh
+  echo "Triggering the script in the zVSI $fip"
+  ssh "${ssh_options[@]}" core@$fip "~/setup_pxeboot.sh" &
+  sleep 60
+  echo "Successfully booted the zVSI $fip as agent"
 done
 
 # Wait for agents to join (max: 20 min)
@@ -223,7 +241,7 @@ agents=$(oc get agents -n $hcp_ns --no-headers | awk '{print $1}')
 agents=$(echo "$agents" | tr '\n' ' ')
 IFS=' ' read -ra agents_list <<< "$agents"
 for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
-     oc -n ${$hcp_ns} patch agent ${agents_list[i]} -p "{\"spec\":{\"installation_disk_id\":\"/dev/vda\",\"approved\":true,\"hostname\":\"compute-${i}.${HYPERSHIFT_BASEDOMAIN}\"}}" --type merge
+  oc -n $hcp_ns patch agent ${agents_list[i]} -p "{\"spec\":{\"approved\":true,\"hostname\":\"compute-$i.${HYPERSHIFT_BASEDOMAIN}\"}}" --type merge
 done
 
 # Scaling up nodepool

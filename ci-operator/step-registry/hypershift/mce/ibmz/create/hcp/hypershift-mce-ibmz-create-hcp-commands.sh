@@ -1,14 +1,14 @@
 #!/bin/bash
 
-set -xuo pipefail
+set -x
 
 # Hosted Control Plane parameters
-hc_ns="hcp-ci"
-hc_name="agent-ibmz"
-hcp_ns="$hc_ns-$hc_name"
+export hc_ns="hcp-ci"
+export hc_name="agent-ibmz"
+export hcp_ns="$hc_ns-$hc_name"
 
 # InfraEnv configs
-ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/lnxocp04-key"
+ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
 export ssh_key=$(cat ${ssh_key_file})
 
 # Creating cluster imageset
@@ -126,8 +126,8 @@ echo "$(date) AgentServiceConfig is ready"
 set +x
 # Setting up pull secret with brew token
 oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
-brew_token="${AGENT_IBMZ_CREDENTIALS}/brew-token"
-cat /tmp/.dockerconfigjson | jq --arg brew_token "$(cat ${brew_token})" '.auths += {"brew.registry.redhat.io": {"auth": $brew_token}}' > /tmp/pull-secret
+brew_token_file="${AGENT_IBMZ_CREDENTIALS}/brew-token"
+cat /tmp/.dockerconfigjson | jq --arg brew_token "$(cat ${brew_token_file})" '.auths += {"brew.registry.redhat.io": {"auth": $brew_token}}' > /tmp/pull-secret
 PULL_SECRET_FILE=/tmp/pull-secret
 set -x
 

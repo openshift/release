@@ -6,13 +6,17 @@ chain:
       commands: |-
         set -x
         hc_name="agent-ibmz"
-        echo "Waiting for clusteroperators to be ready"
+        echo "Checkinf for the cluster-operators status to be ready"
         export KUBECONFIG=${SHARED_DIR}/${hc_name}_kubeconfig
-        until \
-          oc wait clusterversion/version --for='condition=Available=True' > /dev/null; do
-          echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
-          oc get clusterversion 2>/dev/null || true
-          sleep 1s
+        while true; do
+            count=$(oc get co --no-headers| awk '$3 != "True" {print $1}' | wc -l)
+            if [ "$count" -eq 0 ]
+            then
+                echo "All the cluster operators are ready"
+                break
+            else
+                echo "All the cluster operators are not ready yet"
+            fi
         done
       from: tests
       grace_period: 15m0s

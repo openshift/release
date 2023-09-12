@@ -1,45 +1,34 @@
 chain:
   as: hypershift-mce-ibmz-destroy
+  env:
+  - name: HYPERSHIFT_NODE_COUNT
+    documentation: "The number of ibmz nodes to join the agent cluster"
   steps:
     - as: destroy-ibmz-hostedcluster
       cli: latest
-      env:
-      - name: HYPERSHIFT_NODE_COUNT
-        documentation: "The number of ibmz nodes to join the agent cluster"
       commands: |-
         set -x
-        
-        CLUSTERS_NAMESPACE="hcp-ci"
-        HOSTED_CLUSTER_NAME="agent-ibmz"
-        export HOSTED_CLUSTER_NAME
-        export HOSTED_CONTROL_PLANE_NAMESPACE="${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"
-        
-        # Scale in nodepool to 0 
-        oc -n ${CLUSTERS_NAMESPACE} scale nodepool ${HOSTED_CLUSTER_NAME} --replicas 0
-        
-        # Wait for compute nodes to detach
-        oc wait --for=jsonpath='{.status.replicas}'=0 np/${HOSTED_CLUSTER_NAME} -n ${CLUSTERS_NAMESPACE} --timeout=10m
 
-        # Delete agents
-        agents=$(oc get agents -n ${HOSTED_CONTROL_PLANE_NAMESPACE} --no-headers | awk '{print $1}')
+        export hc_ns="hcp-ci"
+        export hc_name="agent-ibmz"
+        export hcp_ns="${hc_ns}-${hc_name}"
+
+        echo "Scaling down nodepool ${hc_ns} to 0"
+        oc -n ${hc_ns} scale nodepool ${hc_name} --replicas 0
+
+        echo "Waiting for the compute nodes to successfully detach from the hosted cluster ${hc_name}"
+        oc wait --for=jsonpath='{.status.replicas}'=0 np/${hc_name} -n ${hc_ns} --timeout=10m
+
+        echo "Deleting agents from the namespace ${hcp_ns}"
+        agents=$(oc get agents -n ${hcp_ns} --no-headers | awk '{print $1}')
         agents=$(echo "$agents" | tr '\n' ' ')
         IFS=' ' read -ra agents_list <<< "$agents"
         for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
-            oc delete agent ${agents_list[i]} -n ${HOSTED_CONTROL_PLANE_NAMESPACE}
+            oc delete agent ${agents_list[i]} -n ${hcp_ns}
         done
 
-        # Delete Hosted Cluster
-        hypershift destroy cluster agent --name ${HOSTED_CLUSTER_NAME} --namespace ${CLUSTERS_NAMESPACE}
-      
-        # Destroying and removing the storage for VMs 
-        for ((i = 0; i < ${HYPERSHIFT_NODE_COUNT} ; i++)); do
-            echo "Deleting the VM agent-$i and it's storage"
-            virsh destroy agent-$i; virsh undefine agent-$i --remove-all-storage
-        done  
-
-        # Delete the initrd and kernel images (need to change the commands based on tobias comments)
-        echo "Deleting the initrd and kernel images used for agents bootup..."
-        rm /var/lib/libvirt/images/initrd.img /var/lib/libvirt/images/kernel.img 
+        echo "Triggering the hosted cluster ${hc_name} deletion"
+        hypershift destroy cluster agent --name ${hc_name} --namespace ${hc_ns}
       from: dev-scripts
       grace_period: 15m0s
       resources:
@@ -47,3 +36,4 @@ chain:
           cpu: 100m
           memory: 100Mi
       timeout: 30m0s
+    - ref: hypershift-mce-ibmz-destroy-zvsi_compute
