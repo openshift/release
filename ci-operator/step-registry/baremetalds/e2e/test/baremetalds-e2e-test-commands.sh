@@ -128,7 +128,7 @@ function suite() {
     fi
 
     set -x
-    openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
+    OPENSHIFT_SKIP_EXTERNAL_TESTS=true openshift-tests run "${TEST_SUITE}" ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER:-}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
         --junit-dir "${ARTIFACT_DIR}/junit"
