@@ -217,7 +217,7 @@ cat > packet-setup.yaml <<-EOF
         operating_system: ${PACKET_OS}
         plan: ${PACKET_PLAN}
         facility: ${PACKET_FACILITY}
-        tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME'), 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
+        tags: "{{ 'PR:', lookup('env', 'PULL_NUMBER'), 'Job name:', lookup('env', 'JOB_NAME')[:77], 'Job id:', lookup('env', 'PROW_JOB_ID') }}"
         user_data: "{{ user_data | default(omit) }}"
       register: hosts
       no_log: true
