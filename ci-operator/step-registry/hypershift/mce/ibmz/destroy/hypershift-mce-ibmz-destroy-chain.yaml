@@ -1,0 +1,39 @@
+chain:
+  as: hypershift-mce-ibmz-destroy
+  env:
+  - name: HYPERSHIFT_NODE_COUNT
+    documentation: "The number of ibmz nodes to join the agent cluster"
+  steps:
+    - as: destroy-ibmz-hostedcluster
+      cli: latest
+      commands: |-
+        set -x
+
+        export hc_ns="hcp-ci"
+        export hc_name="agent-ibmz"
+        export hcp_ns="${hc_ns}-${hc_name}"
+
+        echo "Scaling down nodepool ${hc_ns} to 0"
+        oc -n ${hc_ns} scale nodepool ${hc_name} --replicas 0
+
+        echo "Waiting for the compute nodes to successfully detach from the hosted cluster ${hc_name}"
+        oc wait --for=jsonpath='{.status.replicas}'=0 np/${hc_name} -n ${hc_ns} --timeout=10m
+
+        echo "Deleting agents from the namespace ${hcp_ns}"
+        agents=$(oc get agents -n ${hcp_ns} --no-headers | awk '{print $1}')
+        agents=$(echo "$agents" | tr '\n' ' ')
+        IFS=' ' read -ra agents_list <<< "$agents"
+        for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
+            oc delete agent ${agents_list[i]} -n ${hcp_ns}
+        done
+
+        echo "Triggering the hosted cluster ${hc_name} deletion"
+        hypershift destroy cluster agent --name ${hc_name} --namespace ${hc_ns}
+      from: dev-scripts
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 30m0s
+    - ref: hypershift-mce-ibmz-destroy-zvsi_compute
