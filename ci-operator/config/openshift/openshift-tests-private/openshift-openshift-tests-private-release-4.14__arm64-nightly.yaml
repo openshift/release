@@ -785,6 +785,22 @@ tests:
     test:
     - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-ipsec
+- as: aws-ipi-preserve-ign-f28
+  cron: 43 3 20 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
+      E2E_RUN_TAGS: '@arm64 and @aws-ipi and @network-ovnkubernetes and not @fips'
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.14'
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-preserve-bootstrap-ign
 - as: aws-ipi-private-disasterrecovery-f14
   cron: 4 10 13,28 * *
   steps:
