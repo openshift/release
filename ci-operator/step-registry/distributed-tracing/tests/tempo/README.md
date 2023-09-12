@@ -63,6 +63,10 @@ Use to execute the `Tempo E2E tests` [tempo-e2e-tests](https://github.com/grafan
   - **Definition**: Space seperated test cases to skip from the test run. Example "tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation".
   - **If left empty**: All the e2e tests are run.
 
+- `DOWNSTREAM_TESTS_COMMIT`
+  - **Definition**: The Tempo operator commit which has downstream release compatible test cases.".
+  - **If left empty**: The latest commit is used.
+
 ### Other:
 
 ## Custom Image:

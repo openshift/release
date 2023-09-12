@@ -11,6 +11,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.14"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -95,7 +99,6 @@ images:
 promotion:
   additional_images:
     artifacts: artifacts
-  disabled: true
   excluded_images:
   - machine-os-content
   - rhel-coreos
@@ -220,9 +223,10 @@ tests:
   container:
     from: src
 - as: verify-commits
-  commands: ARTIFACTS="${ARTIFACT_DIR}" openshift-hack/verify-commits.sh
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
   container:
-    from: src
+    from: commitchecker
 - as: k8s-e2e-gcp-ovn
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -337,6 +341,19 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-aws
+- as: k8s-conformance
+  interval: 48h
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: openshift-hack/conformance-k8s.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
 - as: e2e-aws-multitenant
   optional: true
   steps:
@@ -421,6 +438,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun
+- as: e2e-aws-crun-wasm
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-crun-wasm
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

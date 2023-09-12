@@ -65,7 +65,17 @@ echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 
 oc registry login
-oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credrequests" "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+ADDITIONAL_OC_EXTRACT_ARGS=""
+if [[ "${EXTRACT_MANIFEST_INCLUDED}" == "true" ]]; then
+  ADDITIONAL_OC_EXTRACT_ARGS="${ADDITIONAL_OC_EXTRACT_ARGS} --included --install-config=${SHARED_DIR}/install-config.yaml"
+fi
+echo "OC Version:"
+which oc
+oc version --client
+oc adm release extract --help
+oc adm release extract --credentials-requests --cloud=azure --to="/tmp/credrequests" ${ADDITIONAL_OC_EXTRACT_ARGS} "${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
+echo "CR manifest files:"
+ls "/tmp/credrequests"
 
 # Create manual credentials using client secret for openshift-cluster-api.
 # This is a temp workaround until cluster-api supports workload identity
@@ -91,15 +101,29 @@ metadata:
   namespace: openshift-cluster-api
 EOF
 
+# create metadata so cluster resource group is deleted in ipi-deprovision-deprovision
+cat > ${SHARED_DIR}/metadata.json << EOF
+{"infraID":"${CLUSTER_NAME}","azure":{"region":"${REGION}","resourceGroupName":"${CLUSTER_NAME}"}}
+EOF
+
+ADDITIONAL_CCOCTL_ARGS=""
+# Most of steps support FEATURE_SET var now, actually it can replace ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS
+# But for compatiblity, not break the exisitng jobs, keep ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS here.
+if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ] || [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
+  ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
+fi
+
 # create required credentials infrastructure and installer manifests
 ccoctl azure create-all \
   --name="${CLUSTER_NAME}" \
   --region="${REGION}" \
   --subscription-id="${AZURE_SUBSCRIPTION_ID}" \
+  --tenant-id="${AZURE_TENANT_ID}" \
   --credentials-requests-dir="/tmp/credrequests" \
   --dnszone-resource-group-name="${BASE_DOMAIN_RESOURCE_GROUP_NAME}" \
   --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
-  --output-dir="/tmp"
+  --output-dir="/tmp" \
+  ${ADDITIONAL_CCOCTL_ARGS}
 
 # Output authentication file for ci logs
 echo "Cluster authentication:"

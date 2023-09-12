@@ -4,11 +4,29 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-#Add manifest directory for kuttl
-mkdir /tmp/kuttl-manifests && cp /tmp/tempo-operator/minio.yaml /tmp/kuttl-manifests
+# If the DOWNSTREAM_TESTS_COMMIT variable is set, clone the repository with the specified commit
+if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
+  # Set the Go path and Go cache environment variables
+  export GOPATH=/tmp/go
+  export GOBIN=/tmp/go/bin
+  export GOCACHE=/tmp/.cache/go-build
+  export PATH=$PATH:$GOBIN
 
-#Copy the tempo-operator repo files to a writable directory by kuttl
-cp -R /tmp/tempo-operator /tmp/tempo-tests && cd /tmp/tempo-tests
+  # Create the /tmp/go/bin and build cache directories, and grant read and write permissions to all users
+  RUN mkdir -p /tmp/go/bin $GOCACHE \
+    && chmod -R 777 /tmp/go/bin $GOPATH $GOCACHE
+
+  git clone https://github.com/grafana/tempo-operator.git /tmp/tempo-tests
+  cd /tmp/tempo-tests
+  git checkout -b downstream-release "${DOWNSTREAM_TESTS_COMMIT}"
+  make build
+  mkdir /tmp/kuttl-manifests && cp minio.yaml /tmp/kuttl-manifests
+else
+  # Copy the tempo-operator repo files to a writable directory by kuttl
+  cp -R /tmp/tempo-operator /tmp/tempo-tests
+  cd /tmp/tempo-tests
+  mkdir /tmp/kuttl-manifests && cp minio.yaml /tmp/kuttl-manifests
+fi
 
 # Remove test cases to be skipped from the test run
 IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
@@ -23,7 +41,7 @@ for test in "${SKIP_TEST_ARRAY[@]}"; do
 done
 
 if [[ -n "$INVALID_TESTS" ]]; then
-  echo "These test cases are not valid to be skipped $INVALID_TESTS"
+  echo "These test cases are not valid to be skipped: $INVALID_TESTS"
 fi
 
 if [[ -n "$SKIP_TESTS_TO_REMOVE" ]]; then

@@ -173,3 +173,6 @@ echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
 
 PRODUCT_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.product.id')
 echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
+
+INFRA_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.infra_id')
+echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"

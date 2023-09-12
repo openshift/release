@@ -20,7 +20,6 @@ images:
 promotion:
   additional_images:
     jenkins-client-plugin-tests: src
-  disabled: true
   excluded_images:
   - jenkins
   - jenkins-maven-builder
@@ -58,6 +57,19 @@ tests:
       dependencies:
       - env: JENKINS_IMAGE
         name: pipeline:jenkins
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws-jenkins-client-plugin-continuous
+  cron: 0 */12 * * *
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
       from: src
       resources:
         requests:

@@ -146,17 +146,73 @@ def _add_origin_resources(gendoc):
                         }
                     },
                     "spec": {
+                        "initContainers": [
+                            {
+                                "name": "git-sync-init",
+                                "command": ["/git-sync"],
+                                "args": [
+                                    "--repo=https://github.com/openshift/release.git",
+                                    "--branch=master",
+                                    "--root=/tmp/git-sync",
+                                    "--one-time=true",
+                                    "--depth=1"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "GIT_SYNC_DEST",
+                                        "value": "release"
+                                    }
+                                ],
+                                "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
+                                "volumeMounts": [
+                                    {
+                                        "name": "release",
+                                        "mountPath": "/tmp/git-sync"
+                                    }
+                                ]
+                            }
+                        ],
                         "containers": [
+                            {
+                                "name": "git-sync",
+                                "command": ["/git-sync"],
+                                "args": [
+                                    "--repo=https://github.com/openshift/release.git",
+                                    "--branch=master",
+                                    "--wait=30",
+                                    "--root=/tmp/git-sync",
+                                    "--max-sync-failures=3"
+                                ],
+                                "env": [
+                                    {
+                                        "name": "GIT_SYNC_DEST",
+                                        "value": "release"
+                                    }
+                                ],
+                                "image": "registry.k8s.io/git-sync/git-sync:v3.6.2",
+                                "volumeMounts": [
+                                    {
+                                        "name": "release",
+                                        "mountPath": "/tmp/git-sync"
+                                    }
+                                ],
+                                "resources": {
+                                    "requests": {
+                                        "memory": "1Gi",
+                                        "cpu": "0.5",
+                                    }
+                                }
+                            },
                             {
                                 "command": [
                                     "/usr/bin/release-controller",
                                     "--release-namespace=origin",
                                     "--prow-config=/etc/config/config.yaml",
                                     "--supplemental-prow-config-dir=/etc/config",
-                                    "--job-config=/etc/job-config",
+                                    "--job-config=/var/repo/release/ci-operator/jobs",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=4.6:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tests",
                                     "--release-architecture=amd64",
                                     "-v=4",
                                     "--process-legacy-results"
@@ -219,7 +275,7 @@ def _add_origin_resources(gendoc):
                                     "--release-namespace=origin",
                                     "--prow-namespace=ci",
                                     "--job-namespace=ci-release",
-                                    "--tools-image-stream-tag=4.6:tests",
+                                    "--tools-image-stream-tag=release-controller-bootstrap:tests",
                                     "--release-architecture=amd64",
                                     "--enable-jira",
                                     "--jira-endpoint=https://issues.redhat.com",

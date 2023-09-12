@@ -2,6 +2,7 @@ binary_build_commands: make build --warn-undefined-variables
 build_root:
   from_repository: true
 promotion:
+  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -28,7 +29,12 @@ tests:
     from: bin
 - as: verify
   commands: |
-    make verify -k --warn-undefined-variables
+    make verify-scripts verify-codegen-crds -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-crd-schema
+  commands: |
+    make verify-crd-schema -k --warn-undefined-variables
   container:
     from: bin
 - as: verify-deps
@@ -49,7 +55,7 @@ tests:
 - as: verify-client-go
   commands: |
     dir=$GOPATH/src/github.com/openshift/client-go
-    git clone https://github.com/openshift/client-go $dir
+    git clone https://github.com/openshift/client-go --branch ${PULL_BASE_REF:-master} --single-branch $dir
     rm -rf $dir/vendor/github.com/openshift/api/*
     cp -Rf * $dir/vendor/github.com/openshift/api/
     rm -rf $dir/vendor/github.com/openshift/api/vendor

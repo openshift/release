@@ -52,7 +52,7 @@ EOF
 }
 
 function check_pod_log() {
-    index=`echo ${pod_name: -1}`
+    index=`echo ${pod_name: -5:-4}`
     # echo "index: $index"
     log=`oc -n $project logs $pod_name --tail=2`
     if $fips_enabled; then
@@ -78,47 +78,59 @@ function check_pod_log() {
     fi
 }
 
-images=("quay.io/openshift-qe-optional-operators/myapp:v1.16-1"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.16-2" 
-    "quay.io/openshift-qe-optional-operators/myapp:v1.16-3"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.16-4"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.17-1"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.17-2"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.17-3"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.17-4"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.18-1"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.18-2"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.18-3"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.18-4"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.19-el8-1"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.19-el8-2"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.19-el8-3"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.19-el8-4"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.19-el9-1"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.19-el9-2"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.19-el9-3"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.19-el9-4"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.20-el8-1"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.20-el8-2"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.20-el8-3"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.20-el8-4"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.20-el9-1"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.20-el9-2"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.20-el9-3"
-    "quay.io/openshift-qe-optional-operators/myapp:v1.20-el9-4"
+images=("quay.io/openshifttest/fips-or-die:go1.16-s1-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.16-s2-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.16-s3-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.16-s4-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.17-s1-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.17-s2-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.17-s3-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.17-s4-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.18-s1-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.18-s2-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.18-s3-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.18-s4-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.19-el8-s1-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.19-el8-s2-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.19-el8-s3-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.19-el8-s4-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.19-el9-s1-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.19-el9-s2-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.19-el9-s3-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.19-el9-s4-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.20-el8-s1-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.20-el8-s2-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.20-el8-s3-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.20-el8-s4-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.20-el9-s1-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.20-el9-s2-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.20-el9-s3-1.2.0"
+    "quay.io/openshifttest/fips-or-die:go1.20-el9-s4-1.2.0"
     )
 
 set_proxy
 run_command "oc whoami"
 run_command "oc version -o yaml"
-node_name=`oc get node -l node-role.kubernetes.io/master= -o=jsonpath="{.items[0].metadata.name}"`
-arch=`oc get node/$node_name -o=jsonpath="{.status.nodeInfo.architecture}"`
-if [[ $arch != "amd64" ]]; then
-    echo "Skip this test since it doesn't support $arch."
-    exit 0
-else
-    echo "Start to run test on $arch"
+
+run_command "oc extract secret/pull-secret -n openshift-config --confirm --to /tmp"; ret=$?
+if [[ $ret -eq 0 ]]; then
+    auths=`cat /tmp/.dockerconfigjson`
+    if [[ $auths =~ "5000" ]]; then
+        echo "This is a disconnected env, skip it."
+        exit 0
+    fi
 fi
+
+mapfile -t node_archs< <(oc get nodes -o jsonpath --template '{range .items[*]}{.status.nodeInfo.architecture}{"\n"}{end}' | sort -R | uniq -d)
+echo "The architectures included in the current cluster nodes are ${node_archs[*]}"
+### Skip ppc64le and s390x temporarily becasue the test images are not manifest list images now.
+NON_SUPPORTED_ARCHES=(arm64)
+for arch in "${node_archs[@]}"; do
+  if [[ "${NON_SUPPORTED_ARCHES[*]}" =~ $arch ]]; then
+      echo "Skip this test since it doesn't support $arch."
+      exit 0
+  fi
+done
 
 project="fips-or-die-$RANDOM"
 run_command "oc new-project $project"
@@ -130,6 +142,7 @@ fi
 
 # check if FIPS enabled
 fips_enabled=false
+node_name=`oc get node -l node-role.kubernetes.io/master= -o=jsonpath="{.items[0].metadata.name}"`
 str=`oc debug node/$node_name -- chroot /host fips-mode-setup --check`
 if [[ $str =~ "FIPS mode is enabled" ]]
 then
@@ -142,7 +155,7 @@ pass=true
 # create pods
 for image in "${images[@]}"; do 
     echo "image: $image"
-    tag=$(echo $image | awk '{print substr($0,47)}')
+    tag=$(echo $image | cut -d: -f2)
     echo "tag: $tag"
     pod_name=${tag//./}
     echo "pod name: $pod_name"
@@ -152,7 +165,7 @@ done
 
 # check pod's log
 for image in "${images[@]}"; do 
-    tag=$(echo $image | awk '{print substr($0,47)}')
+    tag=$(echo $image | cut -d: -f2)
     pod_name=${tag//./}
     echo "checking Pod $pod_name"
     # waiting for pod ready
@@ -171,9 +184,24 @@ for image in "${images[@]}"; do
     check_pod_log
 done
 
+mkdir -p "${ARTIFACT_DIR}/junit"
 if $pass; then
     echo "All tests pass!"
+    cat >"${ARTIFACT_DIR}/junit/fips-or-die-result.xml" <<EOF
+    <testsuite name="fips" tests="1" failures="0">
+        <testcase name="fips-or-die"/>
+    </testsuite>
+EOF
 else
     echo "Test fail, please check log."
-    return 1
+    cat >"${ARTIFACT_DIR}/junit/fips-or-die-result.xml" <<EOF
+    <testsuite name="fips" tests="1" failures="1">
+      <testcase name="fips-or-die">
+        <failure message="">Test fail, please check full log in Prow.</failure>
+        <system-out>
+          $log
+        </system-out>
+      </testcase>
+    </testsuite>
+EOF
 fi

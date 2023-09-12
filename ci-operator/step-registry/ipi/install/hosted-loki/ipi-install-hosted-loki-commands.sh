@@ -16,7 +16,9 @@ then
   exit 0
 fi
 
-if [[ "$JOB_NAME" =~ .*proxy.* ]]
+# Some kinds of jobs need to skip installing loki by default; but to make
+# sure we rightfully skip them, we have two different conditions.
+if [[ "$JOB_NAME" =~ .*proxy.* ]] || test -f "${SHARED_DIR}/proxy-conf.sh"
 then
   echo "Clusters using a proxy are not yet supported for loki"
   exit 0

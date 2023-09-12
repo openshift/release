@@ -43,6 +43,11 @@ CONFIG = {
         'us-east-1': 25,
         'ap-northeast-1': 5,
     },
+    'aws-terraform-qe-quota-slice': {
+        'ap-northeast-1': 2,
+        'us-east-1': 2,
+        'us-east-2': 2,
+    },
     'aws-sd-qe-quota-slice': {
         'us-west-2': 3,
     },
@@ -116,9 +121,6 @@ CONFIG = {
         'eastus': 6,
         'eastus2': 4,
         'northeurope': 4
-    },
-    'azure-marketplace-qe-quota-slice': {
-        'westus': 6
     },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5,
@@ -198,6 +200,7 @@ CONFIG = {
     'vsphere-connected-quota-slice':{},
     'vsphere-multizone-quota-slice':{},
     'vsphere-platform-none-quota-slice':{},
+    'vsphere-8-vpn-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -221,7 +224,6 @@ CONFIG = {
     'powervs-2-quota-slice': {
         'syd04': 1,
         'syd05': 1,
-        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
@@ -230,7 +232,7 @@ CONFIG = {
         'jp-tok': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'jp-osa': 3,
+        'au-syd': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
@@ -266,6 +268,9 @@ CONFIG = {
         'default': 50,
     },
     'aws-perfscale-quota-slice': {
+        'us-west-2': 10,
+    },
+    'aws-chaos-quota-slice': {
         'us-west-2': 10,
     }
 }
@@ -332,6 +337,9 @@ for i in range(200,204):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 for i in range(205,214):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
+for i in [1153,1179,1211,1225,1232,1243,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309,1364,1367,758,902]:
+    CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
+
 
 config = {
     'resources': [],
