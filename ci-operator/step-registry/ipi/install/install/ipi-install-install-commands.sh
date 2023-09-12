@@ -407,14 +407,12 @@ spec:
       nodeNetworking:
         internal:
           networkSubnetCidr:
-            - "$MACHINE_NETWORK"
-          excludeNetworkSubnetCidr:
-            - "$EXCLUDE_MACHINE_NETWORK"
+            - "$MACHINE_NETWORK_0"
+            - "$MACHINE_NETWORK_1"
         external:
           networkSubnetCidr:
-            - "$MACHINE_NETWORK"
-          excludeNetworkSubnetCidr:
-            - "$EXCLUDE_MACHINE_NETWORK"
+            - "$MACHINE_NETWORK_0"
+            - "$MACHINE_NETWORK_1"
 EOF
 
 
@@ -558,9 +556,8 @@ dir=/tmp/installer
 mkdir "${dir}/"
 cp "${SHARED_DIR}/install-config.yaml" "${dir}/"
 
-MACHINE_NETWORK=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'networking.machineNetwork[0].cidr')
-echo ".machineNetwork[0].cidr = ${MACHINE_NETWORK}"
-EXCLUDE_MACHINE_NETWORK=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'networking.machineNetwork[1].cidr')
+MACHINE_NETWORK_0=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'networking.machineNetwork[0].cidr')
+MACHINE_NETWORK_1=$(yq-go r "${SHARED_DIR}/install-config.yaml" 'networking.machineNetwork[1].cidr')
 
 echo "install-config.yaml"
 echo "-------------------"
