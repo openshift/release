@@ -12,7 +12,7 @@ IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
 export httpd_vsi_key
-httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip"})
+httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
 # Installing CLI tools
@@ -39,7 +39,7 @@ echo "Logging into IBM Cloud by targetting the $IC_REGION region"
 ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
 ibmcloud login --apikey $IC_API_KEY -r $IC_REGION
 set +e
-echo "Checking if the $plugins_list plugins are installed."
+echo "Installing the required ibmcloud plugins if not present."
 for plugin in "${plugins_list[@]}"; do  
   ibmcloud plugin list -q | grep $plugin
   if [ $? -ne 0 ]; then
@@ -170,7 +170,7 @@ else
 fi
 
 echo "Fetching the hosted cluster IP address for resolution"
-hc_ip=$(dig +short $(cat $SHARED_DIR/${hc_name}_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1))
+hc_ip=$(dig +short $(cat ${SHARED_DIR}/${hc_name}_kubeconfig) | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1))
 
 echo "Adding A records in the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 $hc_ip -i $infra_name-dns
@@ -226,9 +226,9 @@ sudo chmod 700 $HOME/setup_pxeboot.sh
 # Booting up zVSIs as agents
 for fip in "${zvsi_fip_list[@]}"; do
   echo "Transferring the setup script to zVSI $fip"
-  scp "${ssh_options[@]}" $HOME/setup_pxeboot.sh core@$fip:~/setup_pxeboot.sh
+  scp "${ssh_options[@]}" $HOME/setup_pxeboot.sh core@$fip:/var/home/core/setup_pxeboot.sh
   echo "Triggering the script in the zVSI $fip"
-  ssh "${ssh_options[@]}" core@$fip "~/setup_pxeboot.sh" &
+  ssh "${ssh_options[@]}" core@$fip "/var/home/core/setup_pxeboot.sh" &
   sleep 60
   echo "Successfully booted the zVSI $fip as agent"
 done

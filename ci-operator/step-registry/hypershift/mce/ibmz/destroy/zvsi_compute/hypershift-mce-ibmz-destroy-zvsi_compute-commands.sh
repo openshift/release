@@ -5,14 +5,12 @@ set -x
 # session variables
 infra_name="hcp-ci-$(echo -n $PROW_JOB_ID|cut -c-8)"
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
-hc_ns="hcp-ci"
 hc_name="agent-ibmz"
-hcp_ns=$hc_ns-$hc_name
-IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey"})
+IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
 export httpd_vsi_key
-httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip"})
+httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
 # Installing CLI tools
@@ -35,9 +33,19 @@ fi
 
 # Login to the IBM Cloud
 echo "Logging into IBM Cloud in the $IC_REGION region and $infra_name-rg resource group."
+ibmcloud config --check-version=false                               # To avoid manual prompt for updating CLI version
 ibmcloud login --apikey $IC_API_KEY -r $IC_REGION -g $infra_name-rg
-echo "Installing the JSON Querier(jq)."
-yum install jq -y
+echo "Installing the required ibmcloud plugins if not present."
+for plugin in "${plugins_list[@]}"; do  
+  ibmcloud plugin list -q | grep $plugin
+  if [ $? -ne 0 ]; then
+    echo "$plugin plugin is not installed. Installing it now..."
+    ibmcloud plugin install $plugin -f
+    echo "$plugin plugin is installed successfully."
+  else 
+    echo "$plugin plugin is already installed."
+  fi
+done
 
 # Deleting the DNS Service
 echo "Triggering the $infra_name-dns DNS instance deletion in the resource group $infra_name-rg."
@@ -63,7 +71,7 @@ for ((i = 0; i < $HYPERSHIFT_NODE_COUNT ; i++)); do
 done
 
 for status in "${vsi_delete_status[@]}"; do
-    if [ "$status" -eq 'false' ]; then
+    if [ "$status" = 'false' ]; then
         echo "$infra_name-compute instances are not deleted successfully in the $infra_name-vpc VPC."
         exit 1
     else 
@@ -72,7 +80,7 @@ for status in "${vsi_delete_status[@]}"; do
 done
 
 for status in "${fip_delete_status[@]}"; do
-    if [ "$status" -eq 'false' ]; then
+    if [ "$status" = 'false' ]; then
         echo "$infra_name-compute-ip floating IPs are not deleted successfully in the $infra_name-rg resource group."
         exit 1
     else 
