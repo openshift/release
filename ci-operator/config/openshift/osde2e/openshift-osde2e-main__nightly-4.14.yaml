@@ -27,6 +27,7 @@ tests:
         export AWS_ACCESS_KEY_ID=$(cat /usr/local/osde2e-rosa-stage/aws-access-key)
         export AWS_SECRET_ACCESS_KEY=$(cat /usr/local/osde2e-rosa-stage/aws-secret-access-key)
         export AWS_REGION=$(cat /usr/local/osde2e-rosa-stage/aws-region)
+        export REGISTRY_AUTH_FILE=/tmp/pull-secret/.dockerconfigjson
 
         go mod tidy
         go install github.com/onsi/ginkgo/v2/ginkgo
@@ -43,6 +44,9 @@ tests:
         namespace: test-credentials
       - mount_path: /usr/local/osde2e-rosa-stage
         name: osde2e-rosa-stage
+        namespace: test-credentials
+      - mount_path: /tmp/pull-secret
+        name: ci-pull-credentials
         namespace: test-credentials
       dependencies:
       - env: RELEASE_IMAGE_LATEST
