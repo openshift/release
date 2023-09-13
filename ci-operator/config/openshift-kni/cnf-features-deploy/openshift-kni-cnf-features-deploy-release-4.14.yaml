@@ -1,16 +1,16 @@
 base_images:
   base:
-    name: "4.15"
+    name: "4.14"
     namespace: ocp
     tag: base
   base-9:
-    name: "4.15"
+    name: "4.14"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
-    name: builder
-    namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+  openshift_release_golang-1.19:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
   os-min8:
     name: ubi-minimal
     namespace: ocp
@@ -24,9 +24,9 @@ images:
   dockerfile_path: cnf-tests/Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: cnf-tests
 - context_dir: tools/s2i-dpdk/
   dockerfile_path: Dockerfile
@@ -36,23 +36,23 @@ images:
   dockerfile_path: ztp/resource-generator/Containerfile
   from: os-min8
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    openshift_release_golang-1.19:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/openshift/release:golang-1.19
   to: ztp-site-generator
 promotion:
-  name: "4.15"
+  name: "4.14"
   namespace: ocp-kni
 releases:
   initial:
     integration:
-      name: "4.15"
+      name: "4.14"
       namespace: ocp
   latest:
     candidate:
       product: ocp
       stream: ci
-      version: "4.15"
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -109,6 +109,6 @@ tests:
           memory: 200Mi
     workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
-  branch: master
+  branch: release-4.14
   org: openshift-kni
   repo: cnf-features-deploy
