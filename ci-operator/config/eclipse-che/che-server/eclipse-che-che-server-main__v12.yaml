@@ -32,6 +32,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: gitlab-no-pat-oauth-flow-raw-devfile-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-gitlab-no-pat-oauth-flow-raw-devfile-url.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: gitlab-no-pat-oauth-flow-ssh-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITLAB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-private-key)
+        export GITLAB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-public-key)
+        /bin/bash .ci/openshift-ci/test-gitlab-no-pat-oauth-flow-ssh-url.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gitlab
+        name: gitlab
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 - as: bitbucket-no-pat-oauth-flow
   steps:
     cluster_profile: gcp
