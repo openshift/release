@@ -25,6 +25,7 @@ spec:
 EOF
 
 # additional os extension for 4.14+
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
 cp "${CLUSTER_PROFILE_DIR}/pull-secret" /tmp/pull-secret
 oc registry login --to /tmp/pull-secret
 ocp_version=$(oc adm release info --registry-config /tmp/pull-secret "${RELEASE_IMAGE_LATEST}" --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
