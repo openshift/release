@@ -284,6 +284,9 @@ function run {
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
+        # run scale up/down case in all jobs, it is a destructive case so run after all cases finished
+        extended-platform-tests run all --dry-run |grep 11111 |extended-platform-tests run --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/25436.log" \
+        --timeout "30m" --junit-dir="${ARTIFACT_DIR}/junit" -f - || ret_value=$?
     fi
     set +x
     set +e
