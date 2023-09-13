@@ -100,7 +100,6 @@ platform:
         datastore: mdcnc-ds-4
 
 networking:
-  networkType: OpenShiftSDN
   machineNetwork:
   - cidr: "${machine_cidr}"
 EOF
