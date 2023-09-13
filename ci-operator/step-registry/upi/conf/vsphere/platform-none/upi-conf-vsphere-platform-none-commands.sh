@@ -10,12 +10,11 @@ base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 PLATFORM_TYPE="none: {}"
 if [[ $PLATFORM_NAME != "none" ]]; then
   echo "platform name ${PLATFORM_NAME}, external CCM state ${EXTERNAL_CCM}"
-  if [[ $EXTERNAL_CCM != "enabled" ]]; then
   PLATFORM_TYPE="external:
     platformName: ${PLATFORM_NAME}
   "
-  else
-  PLATFORM_TYPE="external:
+  if [[ $EXTERNAL_CCM == "enabled" ]]; then
+    PLATFORM_TYPE="external:
     platformName: ${PLATFORM_NAME}
     cloudControllerManager: External
   "
