@@ -1,21 +1,20 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
-  cron: 0 */8 * * *
+  cluster: build05
+  cron: 20 4 * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
-  - base_ref: master
-    org: openshift-kni
-    repo: cnf-features-deploy
+  - base_ref: release-4.15
+    org: openshift
+    repo: cluster-etcd-operator
   labels:
-    ci-operator.openshift.io/cloud: gcp
-    ci-operator.openshift.io/cloud-cluster-profile: gcp
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/variant: periodics
     ci.openshift.io/generator: prowgen
     job-release: "4.15"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-kni-cnf-features-deploy-master-e2e-gcp-ovn-periodic
+  name: periodic-ci-openshift-cluster-etcd-operator-release-4.15-periodics-e2e-aws-etcd-recovery
   spec:
     containers:
     - args:
@@ -24,8 +23,9 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/e2e-gcp-ovn-periodic-cluster-profile
-      - --target=e2e-gcp-ovn-periodic
+      - --secret-dir=/usr/local/e2e-aws-etcd-recovery-cluster-profile
+      - --target=e2e-aws-etcd-recovery
+      - --variant=periodics
       command:
       - ci-operator
       image: ci-operator:latest
@@ -41,7 +41,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/e2e-gcp-ovn-periodic-cluster-profile
+      - mountPath: /usr/local/e2e-aws-etcd-recovery-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -64,12 +64,8 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      projected:
-        sources:
-        - secret:
-            name: cluster-secrets-gcp
-        - configMap:
-            name: cluster-profile-gcp
+      secret:
+        secretName: cluster-secrets-aws
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
