@@ -46,6 +46,11 @@ promotion:
   namespace: edge-infrastructure
   tag: latest
   tag_by_commit: true
+releases:
+  latest:
+    release:
+      channel: fast
+      version: "4.13"
 resources:
   '*':
     limits:
@@ -64,6 +69,28 @@ tests:
   commands: cargo clippy
   container:
     from: recert-check
+- always_run: false
+  as: e2e-aws-ovn-single-node-recert-serial
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/serial
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-recert
+- always_run: false
+  as: e2e-aws-ovn-single-node-recert-parallel
+  steps:
+    cluster_profile: aws-2
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_SUITE: openshift/conformance/parallel
+    observers:
+      enable:
+      - observers-resource-watch
+    workflow: openshift-e2e-aws-single-node-recert
 zz_generated_metadata:
   branch: main
   org: rh-ecosystem-edge
