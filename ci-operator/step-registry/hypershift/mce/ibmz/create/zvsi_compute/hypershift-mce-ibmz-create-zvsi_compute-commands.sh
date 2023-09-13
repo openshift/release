@@ -8,6 +8,7 @@ plugins_list=("vpc-infrastructure" "cloud-dns-services")
 hc_ns="hcp-ci"
 hc_name="agent-ibmz"
 hcp_ns=$hc_ns-$hc_name
+export hcp_ns
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
@@ -171,10 +172,11 @@ fi
 
 echo "Fetching the hosted cluster IP address for resolution"
 hc_ip=$(dig +short $(cat ${SHARED_DIR}/${hc_name}_kubeconfig) | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1))
+export hc_ip
 
 echo "Adding A records in the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
-ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 $hc_ip -i $infra_name-dns
-ibmcloud dns resource-record-create $dns_zone_id --type A --name "api-int" --ipv4 $hc_ip -i $infra_name-dns
+ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 "${hc_ip}" -i $infra_name-dns
+ibmcloud dns resource-record-create $dns_zone_id --type A --name "api-int" --ipv4 "${hc_ip}" -i $infra_name-dns
 if [ $? -eq 0 ]; then
   echo "Successfully added the A record of zVSI compute node IP to resolve the hosted cluster apis."
 else 
@@ -201,11 +203,11 @@ else
 fi
 
 # Generating script for agent bootup execution on zVSI
-initrd_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.initrd')
+initrd_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.initrd')
 export initrd_url
-kernel_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.kernel')
+kernel_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.kernel')
 export kernel_url
-rootfs_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.rootfs')
+rootfs_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
 export rootfs_url
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null')
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
