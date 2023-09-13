@@ -171,7 +171,7 @@ else
 fi
 
 echo "Fetching the hosted cluster IP address for resolution"
-hc_ip=$(dig +short $(cat ${SHARED_DIR}/${hc_name}_kubeconfig) | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1))
+hc_ip=$(dig +short "$(cat ${SHARED_DIR}/${hc_name}_kubeconfig)" | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1))
 
 echo "Adding A records in the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 $hc_ip -i $infra_name-dns
