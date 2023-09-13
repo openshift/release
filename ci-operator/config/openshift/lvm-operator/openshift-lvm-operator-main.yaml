@@ -11,19 +11,37 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "9"
-binary_build_commands: make build build-vgmanager
+binary_build_commands: |
+  go mod download
+  go build --ldflags "-s -w" -a -o /workspace/manager main.go
+  go build --ldflags "-s -w" -a -o /workspace/vgmanager cmd/vgmanager/main.go
+  go build --ldflags "-s -w" -a -o /workspace/metricsexporter cmd/metricsexporter/exporter.go
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.14
+  use_build_cache: true
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_literal: |
+    FROM ubi_minimal
+    # Update the image to get the latest CVE updates
+    RUN microdnf update -y && \
+        microdnf install -y openssl && \
+        microdnf install -y util-linux && \
+        microdnf clean all
+    WORKDIR /
+    COPY --from=placeholder:tag /workspace/manager .
+    COPY --from=placeholder:tag /workspace/vgmanager .
+    COPY --from=placeholder:tag /workspace/metricsexporter .
+    EXPOSE 23532
+    USER 65532:65532
+    ENTRYPOINT ["/manager"]
   from: ubi_minimal
   inputs:
     bin:
       as:
-      - golang:1.20
+      - placeholder:tag
   to: lvm-operator
 - context_dir: must-gather/
   dockerfile_path: Dockerfile
