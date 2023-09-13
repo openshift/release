@@ -12,7 +12,7 @@ base_images:
     namespace: ocp
     tag: "9"
 binary_build_commands: |
-  go mod download
+  export GOEXPERIMENT=strictfipsruntime
   go build --ldflags "-s -w" -a -o /workspace/manager main.go
   go build --ldflags "-s -w" -a -o /workspace/vgmanager cmd/vgmanager/main.go
   go build --ldflags "-s -w" -a -o /workspace/metricsexporter cmd/metricsexporter/exporter.go
@@ -89,7 +89,7 @@ tests:
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make test
   container:
-    from: test-bin
+    from: src
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
@@ -98,7 +98,7 @@ tests:
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
     make test
   container:
-    from: test-bin
+    from: src
   postsubmit: true
   secret:
     mount_path: /tmp/secret
@@ -115,7 +115,7 @@ tests:
     - as: e2e-test
       cli: latest
       commands: make e2e
-      from: test-bin
+      from: src
       resources:
         requests:
           cpu: 100m
@@ -133,7 +133,7 @@ tests:
     - as: e2e-test
       cli: latest
       commands: DISK_INSTALL=true make e2e
-      from: test-bin
+      from: src
       resources:
         requests:
           cpu: 100m
