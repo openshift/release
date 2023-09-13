@@ -122,10 +122,6 @@ EXTRAFILE=$SHARED_DIR/cir-extra
 BMJSON=$SHARED_DIR/bm.json
 if [ -e "$CIRFILE" ] && [ "$(cat $CIRFILE | jq -r .type)" == "cluster" ] ; then
     prepare_bmcluster
-elif [ -e "${SHARED_DIR}/bm.json" ] ; then
-    # Support for bm hosts from baremetalds-packet-setup
-    # TODO: Remove when all switched over
-    scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "root@${IP}:bm.json"
 fi
 
 # Additional mechanism to inject dev-scripts additional variables directly
