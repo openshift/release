@@ -1,0 +1,19 @@
+workflow:
+  as: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-mce-power-guest
+  steps:
+    pre:
+    - chain: cucushift-installer-rehearse-aws-ipi-ovn-ingress-nlb-provision
+    - ref: hypershift-mce-install
+    - ref: hypershift-mce-power-create
+    - chain: cucushift-hypershift-extended-enable-qe-catalogsource
+    - ref: cucushift-hypershift-extended-idp-htpasswd
+    - ref: cucushift-hypershift-extended-enable-guest
+    test:
+    - ref: cucushift-installer-check
+    post:
+    - ref: cucushift-hypershift-extended-disable-guest
+    - chain: hypershift-mce-power-dump
+    - ref: hypershift-mce-power-destroy
+    - chain: cucushift-installer-rehearse-aws-ipi-deprovision
+  documentation: |-
+    This is the workflow to trigger Prow's rehearsal test when submitting installer steps/chain/workflow
