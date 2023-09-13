@@ -8,9 +8,12 @@ plugins_list=("vpc-infrastructure" "cloud-dns-services")
 hc_ns="hcp-ci"
 hc_name="agent-ibmz"
 hcp_ns=$hc_ns-$hc_name
-export IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
-export httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
-export httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip"})
+IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
+export IC_API_KEY
+httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
+export httpd_vsi_key
+httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip"})
+export httpd_vsi_ip
 
 # Installing CLI tools
 set -e
@@ -26,7 +29,8 @@ else
   echo "ibmcloud CLI is not installed. Installing it now..."
   curl -o /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/binaries/IBM_Cloud_CLI_${IC_CLI_VERSION}_linux_amd64.tgz
   tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
-  export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
+  PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
+  export PATH
 fi 
 
 # Login to the IBM Cloud
@@ -197,9 +201,12 @@ else
 fi
 
 # Generating script for agent bootup execution on zVSI
-export initrd_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.initrd')
-export kernel_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.kernel')
-export rootfs_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.rootfs')
+initrd_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.initrd')
+export initrd_url
+kernel_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.kernel')
+export kernel_url
+rootfs_url=$(oc get infraenv/${hc_name} -n ${hcp_ns} -o json | jq -r '.status.bootArtifacts.rootfs')
+export rootfs_url
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null')
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
 wget -O $HOME/rootfs.img "$rootfs_url"
@@ -207,8 +214,10 @@ scp "${ssh_options[@]}" -i $httpd_vsi_key $HOME/rootfs.img root@$httpd_vsi_ip:/v
 ssh "${ssh_options[@]}" -i $httpd_vsi_key root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs.img"
 echo "Downloading the setup script for pxeboot of agents"
 wget -O $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
-export minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
-export mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
+minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
+export minitrd_url
+mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
+export mkernel_url
 sed -i "s|INITRD_URL|${minitrd_url}|" $HOME/setup_pxeboot.sh 
 sed -i "s|KERNEL_URL|${mkernel_url}|" $HOME/setup_pxeboot.sh 
 sed -i "s|HTTPD_VSI_IP|${httpd_vsi_ip}|" $HOME/setup_pxeboot.sh 

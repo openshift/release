@@ -8,9 +8,12 @@ plugins_list=("vpc-infrastructure" "cloud-dns-services")
 hc_ns="hcp-ci"
 hc_name="agent-ibmz"
 hcp_ns=$hc_ns-$hc_name
-export IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey"})
-export httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
-export httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip"})
+IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey"})
+export IC_API_KEY
+httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
+export httpd_vsi_key
+httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip"})
+export httpd_vsi_ip
 
 # Installing CLI tools
 set -e
@@ -26,7 +29,8 @@ else
     echo "ibmcloud CLI is not installed. Installing it now..."
     curl -o /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/binaries/IBM_Cloud_CLI_${IC_CLI_VERSION}_linux_amd64.tgz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
-    export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
+    PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
+    export PATH
 fi 
 
 # Login to the IBM Cloud

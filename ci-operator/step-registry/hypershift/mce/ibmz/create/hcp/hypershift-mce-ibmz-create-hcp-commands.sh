@@ -3,13 +3,17 @@
 set -x
 
 # Hosted Control Plane parameters
-export hc_ns="hcp-ci"
-export hc_name="agent-ibmz"
-export hcp_ns="$hc_ns-$hc_name"
+hc_ns="hcp-ci"
+export hc_ns
+hc_name="agent-ibmz"
+export hc_name
+hcp_ns="$hc_ns-$hc_name"
+export hcp_ns
 
 # InfraEnv configs
 ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
-export ssh_key=$(cat ${ssh_key_file})
+ssh_key=$(cat ${ssh_key_file})
+export ssh_key
 
 # Creating cluster imageset
 cat <<EOF | oc create -f -
@@ -44,13 +48,15 @@ downloadURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r 
 curl -k --output /tmp/hypershift.tar.gz ${downloadURL}
 tar -xvf /tmp/hypershift.tar.gz -C /tmp/hypershift_cli
 chmod +x /tmp/hypershift_cli/hypershift
-export PATH=$PATH:/tmp/hypershift_cli
+PATH=$PATH:/tmp/hypershift_cli
+export PATH
 
 # Installing required tools
 mkdir /tmp/bin
 curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
 curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/bin/yq && chmod +x /tmp/bin/yq
-export PATH=$PATH:/tmp/bin
+PATH=$PATH:/tmp/bin
+export PATH
 
 # Applying mirror config
 echo "$(date) Applying mirror config"
@@ -91,7 +97,8 @@ EOF
 
 # Creating AgentServiceConfig
 echo "$(date) Creating AgentServiceConfig"
-export OCP_RELEASE_VERSION=$(curl -s "$OCP_RELEASE_FILE_URL" | awk '/machine-os / { print $2 }')
+OCP_RELEASE_VERSION=$(curl -s "$OCP_RELEASE_FILE_URL" | awk '/machine-os / { print $2 }')
+export OCP_RELEASE_VERSION
 envsubst <<"EOF" | oc apply -f -
 apiVersion: agent-install.openshift.io/v1beta1
 kind: AgentServiceConfig
