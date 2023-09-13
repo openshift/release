@@ -19,7 +19,7 @@ done
 
 RUN_COMMAND="${RUN_COMMAND} ${OPERATORS_CMD}"
 
-if [ "${PARALLEL}" = "true" ]; then
+if [ "${PARALLEL_INSTALL}" = "true" ]; then
     RUN_COMMAND+=" --parallel"
 fi
 

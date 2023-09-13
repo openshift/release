@@ -22,7 +22,7 @@ done
 
 RUN_COMMAND="${RUN_COMMAND} ${ADDONS_CMD}"
 
-if [ "${PARALLEL}" = "true" ]; then
+if [ "${PARALLEL_INSTALL}" = "true" ]; then
     RUN_COMMAND+=" --parallel"
 fi
 
