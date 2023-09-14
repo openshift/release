@@ -34,6 +34,4 @@ RUN_COMMAND+=" install"
 
 echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
 
-sleep 1h
-
 ${RUN_COMMAND}
