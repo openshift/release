@@ -264,5 +264,12 @@ oc wait --timeout=5m --for=condition=ManagedClusterConditionAvailable -n local-c
 oc wait --timeout=5m --for=condition=ManagedClusterJoined -n local-cluster ManagedCluster/local-cluster
 echo "MCE local-cluster is ready!"
 
+PLAYLOADIMAGE=\$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+digest=\$(oc adm release info "\$PLAYLOADIMAGE" | grep hypershift | awk '{print \$2}')
+HO_OPERATOR_IMAGE=\$(echo "\$PLAYLOADIMAGE" | sed "s/@sha256:[^ ]*/@\$digest/")
+podman pull "\$HO_OPERATOR_IMAGE"
+
 set -x
 EOF
+
+oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"

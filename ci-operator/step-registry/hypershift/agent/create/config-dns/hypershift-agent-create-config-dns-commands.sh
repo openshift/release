@@ -12,7 +12,7 @@ CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
 echo "$CLUSTER_NAME" > /tmp/hostedcluster_name
 scp "${SSHOPTS[@]}" "/tmp/hostedcluster_name" "root@${IP}:/home/hostedcluster_name"
 
-# 检查IP_STACK变量的值
+
 if [ "$IP_STACK" = "v4" ]; then
   # shellcheck disable=SC2087
   ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF |& sed -e 's/.*auths.*/*** PULL_SECRET ***/g'
