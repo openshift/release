@@ -1,7 +1,7 @@
 workflow:
   as: hypershift-mce-agent-disconnected-conformance
   documentation: |-
-    The HyperShift agent conformance workflow executes tests against a new ephemeral
+    The HyperShift agent conformance workflow executes tests against a new ephemeral xxx
   steps:
     allow_best_effort_post_steps: true
     allow_skip_on_success: true
@@ -9,13 +9,17 @@ workflow:
     - ref: wait
     - chain: hypershift-mce-agent-destroy
     - ref: baremetalds-packet-gather-metadata
-    - chain: baremetalds-ofcir-post
+    - chain: baremetalds-ipi-post
     pre:
     - ref: assisted-baremetal-conf-devscripts
     - ref: assisted-baremetal-conf-user-data
-    - chain: baremetalds-ofcir-pre
-    - ref: hypershift-mce-install
+    - chain: baremetalds-ipi-pre
+    - ref: hypershift-mce-install-disconnected
+    - ref: hypershift-mce-agent-disconnected-nfs
+    - chain: hypershift-mce-agent-disconnected-create
+    - ref: hypershift-agent-create-add-worker
     env:
+      DISCONNECTED: "true"
       PACKET_PLAN: "m3.large.x86"
       USER_DATA_FILENAME: "user-data"
       NUM_EXTRA_WORKERS: "3"
@@ -26,6 +30,7 @@ workflow:
         VM_EXTRADISKS=true
         VM_EXTRADISKS_LIST=vda
         VM_EXTRADISKS_SIZE=1024G
+        WORKER_DISK=300
         EXTRA_WORKER_VCPU=8
         EXTRA_WORKER_MEMORY=16384
         EXTRA_WORKER_DISK=100

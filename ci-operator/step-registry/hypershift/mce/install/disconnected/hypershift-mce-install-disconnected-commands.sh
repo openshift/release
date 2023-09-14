@@ -248,6 +248,16 @@ echo "wait for mce to Available"
 oc wait --timeout=20m --for=condition=Available MultiClusterEngine/multiclusterengine-sample
 
 oc apply -f - <<END
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: hypershift-operator-install-flags
+  namespace: local-cluster
+data:
+  installFlagsToAdd: ""
+  installFlagsToRemove: "--enable-uwm-telemetry-remote-write"
+END
+oc apply -f - <<END
 apiVersion: cluster.open-cluster-management.io/v1
 kind: ManagedCluster
 metadata:
@@ -264,5 +274,18 @@ oc wait --timeout=5m --for=condition=ManagedClusterConditionAvailable -n local-c
 oc wait --timeout=5m --for=condition=ManagedClusterJoined -n local-cluster ManagedCluster/local-cluster
 echo "MCE local-cluster is ready!"
 
+PLAYLOADIMAGE=\$(oc get clusterversion version -ojsonpath='{.status.desired.image}')
+HO_OPERATOR_IMAGE="\${PLAYLOADIMAGE//@sha256:[^ ]*/@\$(oc adm release info "\$PLAYLOADIMAGE" | grep hypershift | awk '{print \$2}')}"
+podman pull "\$HO_OPERATOR_IMAGE"
+echo "\$HO_OPERATOR_IMAGE" > /home/ho_operator_image
+
+if [ ! -f /tmp/yq-v4 ]; then
+  curl -L "https://github.com/mikefarah/yq/releases/download/v4.30.5/yq_linux_\$(uname -m | sed 's/aarch64/arm64/;s/x86_64/amd64/')" \
+    -o /tmp/yq-v4 && chmod +x /tmp/yq-v4
+fi
+oc get imagecontentsourcepolicy -oyaml | /tmp/yq-v4 '.items[] | .spec.repositoryDigestMirrors' > /home/mgmt_iscp.yaml
 set -x
 EOF
+
+scp "${SSHOPTS[@]}" "root@${IP}:/home/ho_operator_image" "${SHARED_DIR}/ho_operator_image"
+oc get imagecontentsourcepolicy -o json | jq -r '.items[].spec.repositoryDigestMirrors[0].mirrors[0]' | head -n 1 | cut -d '/' -f 1 > "${SHARED_DIR}/mirror_registry_url"

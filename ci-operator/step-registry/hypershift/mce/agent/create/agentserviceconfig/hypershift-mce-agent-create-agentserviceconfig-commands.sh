@@ -57,6 +57,7 @@ cd "\${REPO_DIR}/deploy/operator"
 
 cat << VARS >> /root/config
 export DISCONNECTED="${DISCONNECTED:-}"
+export IP_STACK="${IP_STACK:-}"
 VARS
 
 source /root/config
@@ -64,3 +65,7 @@ source /root/config
 curl https://raw.githubusercontent.com/LiangquanLi930/deployhypershift/main/config_agentserviceconfig.sh | bash -x
 set -x
 EOF
+
+if [ "${DISCONNECTED}" = "true" ]; then
+  scp "${SSHOPTS[@]}" "root@${IP}:/etc/pki/ca-trust/source/anchors/registry.2.crt" "${SHARED_DIR}/registry.2.crt"
+fi
