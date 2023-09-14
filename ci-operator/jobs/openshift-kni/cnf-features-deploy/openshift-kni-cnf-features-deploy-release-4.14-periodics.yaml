@@ -1,26 +1,21 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
-  cron: 57 0  * * 0
+  cluster: build04
+  cron: 0 */8 * * *
   decorate: true
+  decoration_config:
+    skip_cloning: true
   extra_refs:
-  - base_ref: release-4.10
-    org: openshift
-    repo: aws-efs-csi-driver-operator
+  - base_ref: release-4.14
+    org: openshift-kni
+    repo: cnf-features-deploy
   labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp
     ci.openshift.io/generator: prowgen
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-aws-efs-csi-driver-operator-release-4.10-nightly-operator-e2e
-  reporter_config:
-    slack:
-      channel: '#forum-storage'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> :volcano:'
+  name: periodic-ci-openshift-kni-cnf-features-deploy-release-4.14-e2e-gcp-ovn-periodic
   spec:
     containers:
     - args:
@@ -29,8 +24,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/nightly-operator-e2e-cluster-profile
-      - --target=nightly-operator-e2e
+      - --secret-dir=/usr/local/e2e-gcp-ovn-periodic-cluster-profile
+      - --target=e2e-gcp-ovn-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -46,7 +41,7 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/nightly-operator-e2e-cluster-profile
+      - mountPath: /usr/local/e2e-gcp-ovn-periodic-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -69,8 +64,12 @@ periodics:
       secret:
         secretName: ci-pull-credentials
     - name: cluster-profile
-      secret:
-        secretName: cluster-secrets-aws
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
