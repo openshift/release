@@ -60,6 +60,7 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
   --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
   --release-image ${RELEASE_IMAGE} \
   --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
+  --node-selector "hypershift.openshift.io/control-plane=true" \
   --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
   --annotations "prow.k8s.io/job=${JOB_NAME}" \
   --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
@@ -101,7 +102,7 @@ bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${
 # Data for cluster bot.
 # The kubeadmin-password secret is reconciled only after the kas is available so we will wait up to 5 minutes for it to become available
 echo "Retrieving kubeadmin password"
-for _ in {1..20}; do
+for _ in {1..50}; do
   kubeadmin_pwd=`oc get secret --namespace=clusters ${CLUSTER_NAME}-kubeadmin-password --template='{{.data.password}}' | base64 -d` || true
   if [ -z $kubeadmin_pwd ]; then
     echo "kubeadmin password is not ready yet, waiting 15s"

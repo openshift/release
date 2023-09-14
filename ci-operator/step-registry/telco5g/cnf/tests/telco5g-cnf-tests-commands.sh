@@ -356,6 +356,26 @@ fi
 if [[ ${val_status} -ne 0 ]]; then
     status=${val_status}
 fi
+
+# Wait until number of nodes matches number of machines
+# Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
+for _ in $(seq 30); do
+    nodes="$(oc get nodes --no-headers | wc -l)"
+    machines="$(oc get machines -A --no-headers | wc -l)"
+    [ "$machines" -le "$nodes" ] && break
+    sleep 30
+done
+
+[ "$machines" -le "$nodes" ]
+
+# Wait for nodes to be ready
+# Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
+oc wait nodes --all --for=condition=Ready=true --timeout=10m
+
+# Waiting for clusteroperators to finish progressing
+# Ref.: https://github.com/openshift/release/blob/master/ci-operator/step-registry/openshift/e2e/test/openshift-e2e-test-commands.sh
+oc wait clusteroperators --all --for=condition=Progressing=false --timeout=10m
+
 # if validations passed and RUN_TESTS set, run the tests
 if [[ ${val_status} -eq 0 ]] && $RUN_TESTS; then
     echo "************ Running e2e tests ************"

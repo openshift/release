@@ -153,19 +153,16 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
 - as: verify-generated-code
-  cluster: build01
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
 - as: verify-generated-code-postsubmit
-  cluster: build01
   postsubmit: true
   steps:
     test:
     - ref: assisted-verify-generated-code
 - as: mirror-nightly-image
-  cluster: build01
   cron: '@daily'
   steps:
     dependencies:
@@ -175,7 +172,6 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: mirror-vcsref-image
-  cluster: build01
   postsubmit: true
   steps:
     dependencies:
@@ -185,13 +181,11 @@ tests:
     test:
     - ref: assisted-baremetal-images-publish
 - as: operator-publish
-  cluster: build01
   postsubmit: true
   steps:
     test:
     - ref: assisted-baremetal-operator-publish
 - as: lint
-  cluster: build01
   commands: |
     export GOCACHE=/tmp/
     export GOLANGCI_LINT_CACHE=/tmp/.cache
@@ -201,7 +195,6 @@ tests:
     from: assisted-service-build
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test
-  cluster: build01
   commands: |
     export ROOT_DIR=/tmp
     export COVER_PROFILE=/tmp/reports/unit_coverage.out
@@ -215,7 +208,6 @@ tests:
     name: assisted-service-codecov-token
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test-postsubmit
-  cluster: build01
   commands: |
     export ROOT_DIR=/tmp
     export COVER_PROFILE=/tmp/reports/unit_coverage.out
@@ -229,7 +221,6 @@ tests:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
 - as: subsystem-aws
-  cluster: build01
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -262,7 +253,6 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: subsystem-kubeapi-aws
-  cluster: build01
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -296,7 +286,6 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: e2e-ai-operator-ztp
-  cluster: build01
   run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
   steps:
     cluster_profile: packet-assisted
@@ -305,7 +294,6 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:stable
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters
-  cluster: build01
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -317,7 +305,6 @@ tests:
       NUM_EXTRA_WORKERS: "3"
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected
-  cluster: build01
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -327,96 +314,7 @@ tests:
       DISCONNECTED: "true"
       IP_STACK: v6
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-metal-assisted-tpmv2
-  cluster: build01
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        DISK_ENCRYPTION_ROLES=all
-        DISK_ENCRYPTION_MODE=tpmv2
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-net-suite
-  cluster: build01
-  run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        KUBE_API=true
-        ENABLE_KUBE_API=true
-        NUM_MASTERS=1
-        ISO_IMAGE_TYPE=minimal-iso
-        STATIC_IPS=true
-        TEST_FUNC=test_kubeapi
-        MAKEFILE_TARGET="test_kube_api_parallel"
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-day2
-  cluster: build01
-  optional: true
-  run_if_changed: ^(data/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        TEST_FUNC=test_deploy_day2_nodes_cloud
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-late-binding-single-node
-  cluster: build01
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-      POST_INSTALL_COMMANDS: |
-        export INDEX_IMAGE=quay.io/edge-infrastructure/assisted-service-index:ocm-2.5
-        export TEST_FUNC=test_late_binding_kube_api_sno
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
-  cluster: build01
-  optional: true
-  steps:
-    cluster_profile: packet-assisted
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-      POST_INSTALL_COMMANDS: |
-        export INDEX_IMAGE=quay.io/edge-infrastructure/assisted-service-index:ocm-2.5
-        export TEST_FUNC=test_late_binding_kube_api_sno
-        export HOLD_INSTALLATION=true
-        export KUBECONFIG=$(find ${KUBECONFIG} -type f)
-        make deploy_assisted_operator test_kube_api_parallel
-    workflow: assisted-baremetal
-- as: e2e-metal-assisted-capi
-  cluster: build01
-  optional: true
-  run_if_changed: ^(api/.*|internal/controller/controllers/.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      HYPERSHIFT_IMAGE: hypershift-operator
-      PROVIDER_IMAGE: cluster-api-provider-agent
-    env:
-      ASSISTED_CONFIG: |
-        SERVICE_BASE_REF=release-ocm-2.5
-        KUBE_API=yes
-        ENABLE_KUBE_API=true
-        MINIKUBE_DISK_SIZE=70g
-        MINIKUBE_RAM_MB=10240
-        TEST_FUNC=test_capi_provider
-        MAKEFILE_SETUP_TARGET="setup run deploy_capi_env"
-        MAKEFILE_TARGET="test_kube_api_parallel"
-      GATHER_CAPI_LOGS: "true"
-    workflow: assisted-baremetal
 - as: assisted-operator-catalog-publish
-  cluster: build01
   postsubmit: true
   steps:
     env:

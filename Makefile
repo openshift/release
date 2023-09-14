@@ -67,7 +67,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230829-df0ee1785b --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230908-12387e8f71 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -438,8 +438,9 @@ __check_defined = \
 		$(error Undefined environment variable $1$(if $2, ($2))))
 
 # yq: https://github.com/mikefarah/yq
-yq ?= yq
-TAG ?= latest
+
+generate-hypershift-deployment: yq ?= yq
+generate-hypershift-deployment: TAG ?= latest
 generate-hypershift-deployment:
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
 
@@ -456,3 +457,9 @@ generate-hypershift-deployment:
 		--enable-uwm-telemetry-remote-write=false \
 		render | $(yq) eval 'select(.kind != "Secret")' > clusters/hive/hypershift/hypershift-install.yaml
 .PHONY: generate-hypershift-deployment
+
+build-hypershift-deployment: TAG ?= $(shell date +%Y%m%d)
+build-hypershift-deployment:
+	echo Building HyperShift operator with tag $(TAG)
+	oc --context app.ci -n ci --as system:admin start-build -w hypershift-cli
+	oc --context app.ci -n ci --as system:admin tag hypershift-cli:latest hypershift-cli:$(TAG)

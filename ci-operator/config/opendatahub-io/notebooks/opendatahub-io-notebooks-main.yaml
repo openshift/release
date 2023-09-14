@@ -47,6 +47,10 @@ images:
   dockerfile_path: Dockerfile
   from: base-ubi8-python-3.8
   to: runtime-pytorch-ubi8-python-3.8
+- context_dir: jupyter/trustyai/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi8-python-3.8
+  to: jupyter-trustyai-ubi8-python-3.8
 - context_dir: runtimes/tensorflow/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: cuda-ubi8-python-3.8
@@ -302,6 +306,26 @@ tests:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-jupyter-tensorflow-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-trustyai-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-trustyai-ubi8-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-trustyai-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-jupyter-trustyai-ubi8-python-3-8-pr-image-mirror
+  skip_if_only_changed: ^docs/|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: jupyter-trustyai-ubi8-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: jupyter-trustyai-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-minimal-ubi8-python-3-8-image-mirror
   postsubmit: true
@@ -838,6 +862,23 @@ tests:
       dependencies:
       - env: JUPYTER_TENSORFLOW_IMAGE
         name: cuda-jupyter-tensorflow-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: jupyter-trustyai-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project jupyter-trustyai-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TRUSTYAI_IMAGE}"
+        make deploy9-jupyter-trustyai-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-jupyter-trustyai-ubi8-python-3.8
+        make undeploy9-jupyter-trustyai-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_TRUSTYAI_IMAGE
+        name: jupyter-trustyai-ubi8-python-3.8
       from: src
       resources:
         requests:
