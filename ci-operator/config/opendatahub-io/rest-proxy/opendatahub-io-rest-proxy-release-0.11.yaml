@@ -21,10 +21,10 @@ images:
   context_dir: .
   dockerfile_path: Dockerfile
   from: ubi_minimal
-  to: modelmesh
+  to: rest-proxy
 promotion:
   namespace: opendatahub-io
-  tag: stable
+  tag: v0.11.0
 releases:
   latest:
     release:
@@ -39,6 +39,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: unit
+  commands: HOME=/go GOFLAGS=-mod=mod make test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
 - as: fvt
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
@@ -49,10 +54,10 @@ tests:
     - as: modelmesh-serving-fvt
       commands: |
         export HOME=/go
-        STABLE_MANIFESTS=true CONTROLLERNAMESPACE=modelmesh-serving NAMESPACE=modelmesh-serving NAMESPACESCOPEMODE=true CUSTOM_IMG=modelmesh=${PR_MODELMESH_IMAGE} make e2e-test-for-odh
+        STABLE_MANIFESTS=true CONTROLLERNAMESPACE=modelmesh-serving NAMESPACE=modelmesh-serving NAMESPACESCOPEMODE=true CUSTOM_IMG=rest-proxy=${PR_REST_PROXY_IMAGE} make e2e-test-for-odh
       dependencies:
-      - env: PR_MODELMESH_IMAGE
-        name: modelmesh
+      - env: PR_REST_PROXY_IMAGE
+        name: rest-proxy
       from: modelmesh-serving-develop
       resources:
         requests:
@@ -63,18 +68,18 @@ tests:
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: modelmesh
+      SOURCE_IMAGE_REF: rest-proxy
     env:
-      IMAGE_REPO: modelmesh
+      IMAGE_REPO: rest-proxy
     workflow: opendatahub-io-ci-image-mirror
 - as: stable-image-mirror
   postsubmit: true
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: modelmesh
+      SOURCE_IMAGE_REF: rest-proxy
     env:
-      IMAGE_REPO: modelmesh
+      IMAGE_REPO: rest-proxy
       RELEASE_VERSION: stable
     workflow: opendatahub-io-ci-image-mirror
 - as: branch-image-mirror
@@ -82,12 +87,12 @@ tests:
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
     dependencies:
-      SOURCE_IMAGE_REF: modelmesh
+      SOURCE_IMAGE_REF: rest-proxy
     env:
-      IMAGE_REPO: modelmesh
+      IMAGE_REPO: rest-proxy
       IMAGE_TAG: v0.11.0
     workflow: opendatahub-io-ci-image-mirror
 zz_generated_metadata:
-  branch: release-v0.11.0
+  branch: release-0.11
   org: opendatahub-io
-  repo: modelmesh
+  repo: rest-proxy
