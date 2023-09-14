@@ -44,6 +44,8 @@ fi
 # Installing hypershift cli
 echo "$(date) Installing hypershift cli"
 mkdir /tmp/hypershift_cli
+oc get po 
+oc get ConsoleCLIDownload
 downloadURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
 curl -k --output /tmp/hypershift.tar.gz ${downloadURL}
 tar -xvf /tmp/hypershift.tar.gz -C /tmp/hypershift_cli
