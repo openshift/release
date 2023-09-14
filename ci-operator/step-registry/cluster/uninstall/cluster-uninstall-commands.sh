@@ -39,7 +39,7 @@ done
 
 RUN_COMMAND+=$(echo "${CLUSTER_DATA_CMD}" | sed 's/,$//g')
 
-if [ "${CLUSTER_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
+if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
     RUN_COMMAND+=" --parallel"
 fi
 
