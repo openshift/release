@@ -1,36 +1,25 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
-  cron: 57 0  * * 0
+  cluster: build01
+  cron: 0 0 * * *
   decorate: true
   extra_refs:
-  - base_ref: release-4.10
-    org: openshift
-    repo: aws-efs-csi-driver-operator
+  - base_ref: master
+    org: app-sre
+    repo: deployment-validation-operator
   labels:
-    ci-operator.openshift.io/cloud: aws
-    ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-openshift-aws-efs-csi-driver-operator-release-4.10-nightly-operator-e2e
-  reporter_config:
-    slack:
-      channel: '#forum-storage'
-      job_states_to_report:
-      - failure
-      - error
-      report_template: ':volcano: Job *{{.Spec.Job}}* ended with *{{.Status.State}}*.
-        <{{.Status.URL}}|View logs> :volcano:'
+  name: periodic-ci-app-sre-deployment-validation-operator-master-dvo-e2e-tests-periodic
   spec:
     containers:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/nightly-operator-e2e-cluster-profile
-      - --target=nightly-operator-e2e
+      - --target=dvo-e2e-tests-periodic
       command:
       - ci-operator
       image: ci-operator:latest
@@ -40,16 +29,14 @@ periodics:
         requests:
           cpu: 10m
       volumeMounts:
-      - mountPath: /etc/boskos
-        name: boskos
-        readOnly: true
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/nightly-operator-e2e-cluster-profile
-        name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/hive-hive-credentials
+        name: hive-hive-credentials
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -59,18 +46,12 @@ periodics:
         readOnly: true
     serviceAccountName: ci-operator
     volumes:
-    - name: boskos
-      secret:
-        items:
-        - key: credentials
-          path: credentials
-        secretName: boskos-credentials
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
-    - name: cluster-profile
+    - name: hive-hive-credentials
       secret:
-        secretName: cluster-secrets-aws
+        secretName: hive-hive-credentials
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

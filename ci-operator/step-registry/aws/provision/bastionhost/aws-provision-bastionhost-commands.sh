@@ -27,14 +27,16 @@ fi
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 # 1. get vpc id and public subnet
 if [[ ! -f "${SHARED_DIR}/vpc_id" && ! -f "${SHARED_DIR}/public_subnet_ids" ]]; then
-  if [[ -e ${SHARED_DIR}/metadata.json ]]; then
-    # for OCP
-    echo "Reading infra id from file metadata.json"
-    infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
-    echo "Looking up IDs for VPC ${infra_id} and subnet ${infra_id}-public-${REGION}a"
-    VpcId=$(aws --region ${REGION} ec2 describe-vpcs --filters Name=tag:"Name",Values=${infra_id}-vpc --query 'Vpcs[0].VpcId' --output text)
-    PublicSubnet=$(aws --region ${REGION} ec2 describe-subnets --filters "Name=tag:kubernetes.io/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=*public*" --query 'Subnets[0].SubnetId' --output text)
+  if [[ ! -f ${SHARED_DIR}/metadata.json ]]; then
+    echo "no vpc_id or public_subnet_ids found in ${SHARED_DIR} - and no metadata.json found, exiting"
+    exit 1
   fi
+  # for OCP
+  echo "Reading infra id from file metadata.json"
+  infra_id=$(jq -r '.infraID' ${SHARED_DIR}/metadata.json)
+  echo "Looking up IDs for VPC ${infra_id} and subnet ${infra_id}-public-${REGION}a"
+  VpcId=$(aws --region ${REGION} ec2 describe-vpcs --filters Name=tag:"Name",Values=${infra_id}-vpc --query 'Vpcs[0].VpcId' --output text)
+  PublicSubnet=$(aws --region ${REGION} ec2 describe-subnets --filters "Name=tag:kubernetes.io/cluster/${infra_id},Values=owned" "Name=tag:Name,Values=*public*" --query 'Subnets[0].SubnetId' --output text)
 else
   VpcId=$(cat "${SHARED_DIR}/vpc_id")
   PublicSubnet="$(yq-go r "${SHARED_DIR}/public_subnet_ids" '[0]')"
