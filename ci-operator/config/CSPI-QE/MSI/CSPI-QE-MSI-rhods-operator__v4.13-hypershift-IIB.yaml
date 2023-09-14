@@ -7,6 +7,10 @@ base_images:
     name: ocp-addons-operators-cli
     namespace: ci
     tag: latest
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
   rhods-addon-tests:
     name: ods-ci
     namespace: ci
@@ -29,29 +33,28 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: smoke-rosa-rhods-hypershift-fips
+- as: smoke-rosa-rhods-hypershift
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      COMPUTE_MACHINE_TYPE: m5.4xlarge
+      CLUSTER1_CONFIG: name=rhods-hpc;platform=hypershift;region=us-east-2;version=4.13;channel-group=stable;compute-machine-type=m5.4xlarge;timeout=90m;replicas=6;fips=false;ocm-env=stage
       FIREWATCH_CONFIG: |
         [
-          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-438"},
-          {"step": "operator-uninstall", "failure_type": "all", "classification": "Deprovisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-438"},
+          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
+          {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
           {"step": "addon-tests-*", "failure_type": "all", "classification": "Addons tests", "jira_project": "RHODS", "jira_epic": "RHODS-10718"},
-          {"step": "rosa-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-438"},
-          {"step": "aws-*", "failure_type": "all", "classification":  "Cluster Creation - AWS", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-438"},
-          {"step": "hypershift-*", "failure_type": "all", "classification": "Hypershift", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-438"}
+          {"step": "cluster-install-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 1}},
+          {"step": "cluster-uninstall-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 2}}
         ]
       FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
       FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
       INSTALL_FROM_IIB: "true"
-      OPENSHIFT_VERSION: "4.13"
       OPERATOR1_CONFIG: name=rhods-operator;namespace=redhat-ods-operator
-      REPLICAS: "6"
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
     test:
     - ref: addon-tests-rhods
-    workflow: operator-hypershift
+    workflow: operator
 zz_generated_metadata:
   branch: rhods-operator
   org: CSPI-QE
