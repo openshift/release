@@ -266,32 +266,6 @@ presubmits:
             cpu: 10m
     trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
   - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build04
-    context: ci/prow/build-clusters
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build-clusters
-    optional: true
-    rerun_command: /test build-clusters
-    spec:
-      containers:
-      - args:
-        - ./
-        command:
-        - hack/validate-ci-build-clusters.sh
-        image: registry.ci.openshift.org/ci/cluster-init:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: ((?m)^/test build-clusters,?(\s+|$))
-  - agent: kubernetes
     always_run: false
     branches:
     - ^master$
@@ -409,55 +383,6 @@ presubmits:
       - emptyDir: {}
         name: tmp
     trigger: (?m)^/test( | .* )build02-dry,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^master$
-    - ^master-
-    cluster: app.ci
-    context: ci/build-farm/build03-dry
-    decorate: true
-    labels:
-      ci.openshift.io/build-farm: build03
-      ci.openshift.io/generator: cluster-init
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build03-dry
-    rerun_command: /test build03-dry
-    run_if_changed: ^clusters/.*
-    spec:
-      containers:
-      - args:
-        - --config-dir=clusters/build-clusters/build03
-        - --as=
-        - --kubeconfig=/etc/build-farm-credentials/kubeconfig
-        command:
-        - applyconfig
-        env:
-        - name: HOME
-          value: /tmp
-        image: registry.ci.openshift.org/ci/applyconfig:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/build-farm-credentials
-          name: build-farm-credentials
-          readOnly: true
-        - mountPath: /tmp
-          name: tmp
-      serviceAccountName: config-updater
-      volumes:
-      - name: build-farm-credentials
-        secret:
-          items:
-          - key: sa.config-updater.build03.config
-            path: kubeconfig
-          secretName: config-updater
-      - emptyDir: {}
-        name: tmp
-    trigger: (?m)^/test( | .* )build03-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
