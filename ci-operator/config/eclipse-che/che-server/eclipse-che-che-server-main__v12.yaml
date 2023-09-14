@@ -227,6 +227,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: azure-no-pat-oauth-flow-raw-devfile-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-azure-no-pat-oauth-flow-raw-devfile-url.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: azure-no-pat-oauth-flow-ssh-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export AZURE_PRIVATE_KEY=$(cat /usr/local/ci-secrets/azure/azure-private-key)
+        export AZURE_PUBLIC_KEY=$(cat /usr/local/ci-secrets/azure/azure-public-key)
+        /bin/bash .ci/openshift-ci/test-azure-no-pat-oauth-flow-ssh-url.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/azure
+        name: dev-azure
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: eclipse-che
