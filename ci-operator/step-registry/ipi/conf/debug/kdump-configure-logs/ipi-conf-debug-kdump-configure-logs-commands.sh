@@ -15,13 +15,15 @@ EOF
 )
 
 echo "Creating kdump sysconfig"
-kdump_sysconfig=$(cat <<EOF | base64 -w 0
-KDUMP_COMMANDLINE_REMOVE="hugepages hugepagesz slub_debug quiet log_buf_len swiotlb"
-KDUMP_COMMANDLINE_APPEND="irqpoll nr_cpus=1 reset_devices cgroup_disable=memory mce=off numa=off udev.children-max=2 panic=10 rootflags=nofail acpi_no_memhotplug transparent_hugepage=never nokaslr novmcoredd hest_disable"
-KEXEC_ARGS="-s"
-KDUMP_IMG="vmlinuz"
+kdump_sysconfig=$(cat <<EOF
+KDUMP_COMMANDLINE_REMOVE="${KDUMP_COMMANDLINE_REMOVE}"
+KDUMP_COMMANDLINE_APPEND="${KDUMP_COMMANDLINE_APPEND}"
+KEXEC_ARGS="${KDUMP_KEXEC_ARGS}"
+KDUMP_IMG="${KDUMP_IMG}"
 EOF
 )
+echo "$kdump_sysconfig"
+base64_kdump_sysconfig=$(echo "$kdump_sysconfig" | base64 -w 0)
 
 echo "Configuring kernel dumps on $node_role nodes"
 cat >> "${SHARED_DIR}/manifest_99_kdump_machineconfig.yml" << EOF
@@ -43,7 +45,7 @@ spec:
           overwrite: true
           path: /etc/kdump.conf
         - contents:
-            source: data:text/plain;charset=utf-8;base64,${kdump_sysconfig}
+            source: data:text/plain;charset=utf-8;base64,${base64_kdump_sysconfig}
           mode: 420
           overwrite: true
           path: /etc/sysconfig/kdump
@@ -51,6 +53,12 @@ spec:
       units:
         - enabled: true
           name: kdump.service
-  kernelArguments:
-    - crashkernel=256M
 EOF
+
+echo "Crash kernel to ${CRASH_KERNEL_MEMORY}"
+cat >> "${SHARED_DIR}/manifest_99_kdump_machineconfig.yml" << EOF
+  kernelArguments:
+    - crashkernel="${CRASH_KERNEL_MEMORY}"
+EOF
+
+cat "${SHARED_DIR}/manifest_99_kdump_machineconfig.yml"
