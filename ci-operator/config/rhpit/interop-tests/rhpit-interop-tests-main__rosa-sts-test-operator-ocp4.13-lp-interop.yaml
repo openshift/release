@@ -20,7 +20,7 @@ releases:
   latest:
     candidate:
       product: ocp
-      stream: nightly
+      stream: ci
       version: "4.13"
 resources:
   '*':
@@ -35,7 +35,7 @@ tests:
   steps:
     cluster_profile: aws-cspi-qe
     env:
-      CLUSTER1_CONFIG: name=rosa-rhods;platform=rosa;region=us-east-2;version=4.13;channel-group=stable;compute-machine-type=g4dn.2xlarge;timeout=90m;replicas=2;fips=true;ocm-env=stage
+      CLUSTER1_CONFIG: name=rosa-rhods;platform=rosa;region=us-east-2;version=4.13;channel-group=stable;compute-machine-type=m5.4xlarge;timeout=90m;replicas=2;fips=true;ocm-env=stage
       FIREWATCH_CONFIG: |
         [
           {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "LPTOCPCI"},
@@ -45,8 +45,11 @@ tests:
       FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
       FIREWATCH_JIRA_SERVER: https://issues.redhat.com
       OPENSHIFT_VERSION: "4.13"
-      OPERATOR1_CONFIG: name=rhods-operator;namespace=redhat-ods-operator; timeout=600
-    workflow: addons-and-operators
+      #OPERATOR1_CONFIG: name=rhods-operator;namespace=redhat-ods-operator; timeout=600
+      PULL_SECRET_NAME: cluster-secrets
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
+    workflow: operator
 zz_generated_metadata:
   branch: main
   org: rhpit
