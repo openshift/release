@@ -57,3 +57,27 @@ while IFS= read -r i; do
   queue ${ARTIFACT_DIR}/metrics/${file}-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8443" --config /etc/origin/master/admin.kubeconfig'
   queue ${ARTIFACT_DIR}/metrics/${file}-controllers-heap oc --insecure-skip-tls-verify exec $i -- /bin/bash -c 'oc --insecure-skip-tls-verify get --raw /debug/pprof/heap --server "https://$( hostname ):8444" --config /etc/origin/master/admin.kubeconfig'
 done < /tmp/pods-api
+
+# Copied from https://steps.ci.openshift.org/reference/gather-extra
+echo "INFO: gathering the audit logs for each master"
+paths=(openshift-apiserver kube-apiserver oauth-apiserver etcd)
+for path in "${paths[@]}" ; do
+  output_dir="${ARTIFACT_DIR}/audit_logs/$path"
+  mkdir -p "$output_dir"
+
+  # Skip downloading of .terminating and .lock files.
+  oc adm node-logs --role=master --path="$path" | \
+    grep -v ".terminating" | \
+    grep -v ".lock" | \
+  tee "${output_dir}.audit_logs_listing"
+
+  # The ${output_dir}.audit_logs_listing file contains lines with the node and filename
+  # separated by a space.
+  while IFS= read -r item; do
+    node=$(echo $item |cut -d ' ' -f 1)
+    fname=$(echo $item |cut -d ' ' -f 2)
+    echo "INFO: Queueing download/gzip of ${path}/${fname} from ${node}";
+    echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
+    FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=${path}/${fname}
+  done < ${output_dir}.audit_logs_listing
+done
