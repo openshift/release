@@ -33,7 +33,8 @@ export WORKLOAD=node-density
 sleep 60;
 export ITERATIONS=1
 echo "######"
-export UUID="$(uuidgen)-cpt"
+UUID="$(uuidgen)-cpt"
+export UUID
 echo "######"$UUID
 export WORKLOAD=cluster-density-v2
 export EXTRA_FLAGS="--churn=true --churn-duration=1m --timeout=10m"
