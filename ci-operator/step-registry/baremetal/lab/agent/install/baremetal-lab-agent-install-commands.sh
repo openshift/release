@@ -319,6 +319,7 @@ case "${BOOT_MODE}" in
   # delete the userManagedNetworking field from AgentClusterInstall
   echo -e "\nDelete the userManagedNetworking field from AgentClusterInstall"
   sed -i '/userManagedNetworking/d' "${INSTALL_DIR}/cluster-manifests/agent-cluster-install.yaml"
+  cp -r "${INSTALL_DIR}/cluster-manifests/" "${ARTIFACT_DIR}/"
   ### Create ISO image
   echo -e "\nCreating image..."
   oinst agent create image
