@@ -45,7 +45,7 @@ fi
 MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
 HYPERSHIFT_CLI_NAME=hcp
 if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
- echo "MCE version is less than 2.4, use hypershift command"
+ echo "MCE version is less than 2.4, using the hypershift cli name."
  HYPERSHIFT_CLI_NAME=hypershift
 fi
 
@@ -103,7 +103,7 @@ EOF
 
 # Creating AgentServiceConfig
 echo "$(date) Creating AgentServiceConfig"
-OCP_RELEASE_VERSION=$(curl -s "$OCP_RELEASE_FILE_URL" | awk '/machine-os / { print $2 }')
+OCP_RELEASE_VERSION=$(curl -v "$OCP_RELEASE_FILE_URL" | awk '/machine-os / { print $2 }')
 export OCP_RELEASE_VERSION
 envsubst <<"EOF" | oc apply -f -
 apiVersion: agent-install.openshift.io/v1beta1
@@ -149,7 +149,7 @@ echo "$(date) Creating agent hosted cluster manifests"
 oc create ns ${hcp_ns}
 mkdir /tmp/hc-manifests
 
-hypershift create cluster agent \
+${HYPERSHIFT_CLI_NAME} create cluster agent \
     --name=${hc_name} \
     --pull-secret="${PULL_SECRET_FILE}" \
     --agent-namespace=${hcp_ns} \
@@ -219,4 +219,4 @@ echo "$(date) ISO Download url is ready"
 
 # Download hosted cluster kubeconfig
 echo "$(date) Create hosted cluster kubeconfig"
-hypershift create kubeconfig --namespace=${hc_ns} --name=${hc_name} >${SHARED_DIR}/${hc_name}_kubeconfig
+${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${hc_ns} --name=${hc_name} >${SHARED_DIR}/${hc_name}_kubeconfig
