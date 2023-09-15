@@ -36,9 +36,12 @@ do
     --query 'StackResources[].PhysicalResourceId' --output text | cut -d, -f1 >> /tmp/node-provider-IDs
 done
 
+echo "Locales"
+locale -a
+
 while IFS= read -r i; do
     mkdir -p "${SHARED_DIR}/nodes/${i}"
-    queue ${SHARED_DIR}/nodes/$i/console aws ec2 get-console-output --instance-id "${i}"
+    LC_LANG=C.utf8 queue ${SHARED_DIR}/nodes/$i/console aws ec2 get-console-output --instance-id "${i}"
 done < /tmp/node-provider-IDs
 
 for STACK_SUFFIX in compute-2 compute-1 compute-0 control-plane bootstrap proxy security infra vpc
