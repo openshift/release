@@ -140,6 +140,8 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
 brew_token_file="${AGENT_IBMZ_CREDENTIALS}/brew-token"
 cat /tmp/.dockerconfigjson | jq --arg brew_token "$(cat ${brew_token_file})" '.auths += {"brew.registry.redhat.io": {"auth": $brew_token}}' > /tmp/pull-secret
 PULL_SECRET_FILE=/tmp/pull-secret
+echo "[DEBUG] $(date) checking pull secret for debugging"
+cat ${PULL_SECRET_FILE}
 set -x
 
 # Creating agent hosted cluster manifests
@@ -189,9 +191,21 @@ do
     fi
 done
 
+echo "[DEBUG] $(date) Checking the rendered hc file"
+cat /tmp/hc-manifests/replacement.yaml
+
 # Applying agent cluster manifests
 echo "$(date) Applying agent cluster manifests"
 ls /tmp/hc-manifests/manifest_* | awk ' { print " -f " $1 } ' | xargs oc apply
+
+echo "[DEBUG] Waiting for 7 mins"
+sleep 420
+
+echo "[DEBUG] $(date) Describing HC"
+oc describe hc ${hc_name} -n ${hc_ns}
+
+echo "[DEBUG] $(date) Listing HCP pods"
+oc get po -n ${hcp_ns}
 
 oc wait --timeout=15m --for=condition=Available --namespace=${hc_ns} hostedcluster/${hc_name}
 echo "$(date) Agent cluster is available"
