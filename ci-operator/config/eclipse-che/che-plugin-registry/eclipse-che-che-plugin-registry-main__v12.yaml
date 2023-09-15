@@ -1,0 +1,46 @@
+build_root:
+  project_image:
+    dockerfile_path: .ci/openshift-ci/Dockerfile
+images:
+- dockerfile_path: build/dockerfiles/Dockerfile
+  to: che-plugin-registry
+releases:
+  initial:
+    integration:
+      name: "4.12"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.12"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: plugins-test-pr-check
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: plugins-pr-check
+      cli: latest
+      commands: |
+        /bin/bash .ci/openshift-ci/smoke-test.sh
+      dependencies:
+      - env: CHE_PLUGIN_REGISTRY
+        name: che-plugin-registry
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+zz_generated_metadata:
+  branch: main
+  org: eclipse-che
+  repo: che-plugin-registry
+  variant: v12
