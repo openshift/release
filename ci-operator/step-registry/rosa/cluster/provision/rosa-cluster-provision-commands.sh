@@ -20,6 +20,7 @@ DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
 DISABLE_SCP_CHECKS=${DISABLE_SCP_CHECKS:-false}
 ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
 BYO_OIDC=${BYO_OIDC:-false}
+ENABLE_AUDIT_LOG=${ENABLE_AUDIT_LOG:-false}
 PRIVATE_SUBNET_ONLY="false"
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 
@@ -128,6 +129,12 @@ fi
 MULTI_AZ_SWITCH=""
 if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
+fi
+
+AUDIT_LOG_SWITCH=""
+if [[ "$ENABLE_AUDIT_LOG" == "true" ]]; then
+  iam_role_arn=$(head -n 1 ${SHARED_DIR}/iam_role_arn)
+  AUDIT_LOG_SWITCH="--audit-log-arn $iam_role_arn"
 fi
 
 DISABLE_SCP_CHECKS_SWITCH=""
@@ -310,6 +317,7 @@ echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
+echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
@@ -345,6 +353,7 @@ ${PROXY_SWITCH} \
 ${DISABLE_SCP_CHECKS_SWITCH} \
 ${DEFAULT_MP_LABELS_SWITCH} \
 ${STORAGE_ENCRYPTION_SWITCH} \
+${AUDIT_LOG_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 
@@ -379,6 +388,7 @@ rosa create cluster -y \
                     ${DISABLE_SCP_CHECKS_SWITCH} \
                     ${DEFAULT_MP_LABELS_SWITCH} \
                     ${STORAGE_ENCRYPTION_SWITCH} \
+                    ${AUDIT_LOG_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
 

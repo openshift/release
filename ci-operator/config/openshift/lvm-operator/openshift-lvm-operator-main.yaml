@@ -18,6 +18,26 @@ build_root:
     namespace: ocp
     tag: rhel-9-golang-1.20-openshift-4.14
 images:
+- dockerfile_literal: |-
+    FROM ubi_minimal
+    RUN microdnf install -y make git python3 python3-pip
+    RUN pip3 install pre-commit
+
+    COPY --from=root:current /usr/lib/golang /usr/local/go
+    ENV PATH=$PATH:/usr/local/go/bin
+
+    ENV GOPATH=/tmp/go
+    RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
+    RUN mkdir /.local && chmod 777 /.local
+
+    ENV PRE_COMMIT_HOME=/.cache/precommit
+    ENV GOLANGCI_LINT_CACHE=/.cache/golangci
+  from: ubi_minimal
+  inputs:
+    root:
+      as:
+      - root:current
+  to: lvms-pre-commit
 - dockerfile_path: Dockerfile
   from: ubi_minimal
   to: lvm-operator
@@ -58,10 +78,13 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
   mkdir /.local && chmod 777 /.local
 tests:
-- as: verify
-  commands: make verify
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    pre-commit run --all-files --show-diff-on-failure
   container:
-    from: src
+    clone: true
+    from: lvms-pre-commit
 - as: unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)

@@ -73,11 +73,7 @@ done <   <( find "${SHARED_DIR}" \( -name "manifest_*.yml" -o -name "manifest_*.
 # For baremetal clusters ofcir has returned details about the hardware in the cluster
 # prepare those details into a format the devscripts understands
 function prepare_bmcluster() {
-    # The extra data is missing the square brackets to prevent ironic parsing it as json
-    # FIXME: this should be fixed in ofcir or ironic
-    echo "[" > $EXTRAFILE
-    jq -r .extra < $CIRFILE >> $EXTRAFILE
-    echo "]" >> $EXTRAFILE
+    jq -r .extra < $CIRFILE > $EXTRAFILE
 
     # dev-scripts can be used to provision baremetal (in place of the VM's it usually creates)
     # build the details of the bm nodes into a $NODES_FILE for consumption by dev-scripts
@@ -126,10 +122,6 @@ EXTRAFILE=$SHARED_DIR/cir-extra
 BMJSON=$SHARED_DIR/bm.json
 if [ -e "$CIRFILE" ] && [ "$(cat $CIRFILE | jq -r .type)" == "cluster" ] ; then
     prepare_bmcluster
-elif [ -e "${SHARED_DIR}/bm.json" ] ; then
-    # Support for bm hosts from baremetalds-packet-setup
-    # TODO: Remove when all switched over
-    scp "${SSHOPTS[@]}" "${SHARED_DIR}/bm.json" "root@${IP}:bm.json"
 fi
 
 # Additional mechanism to inject dev-scripts additional variables directly
