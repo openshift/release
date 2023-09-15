@@ -171,7 +171,6 @@ platform:
         folder: "/datacenter-2/vm/${cluster_name}"
 
 networking:
-  networkType: OpenShiftSDN
   machineNetwork:
   - cidr: "192.168.${third_octet}.0/24"
 EOF

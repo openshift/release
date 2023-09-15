@@ -66,6 +66,14 @@ echo "Wrote control_node_ips: $(cat /srv/control_node_ips), compute_node_ips: $(
 # Error: initializing source ...: tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time ... is after <now + 6m>"
 run-on-all-nodes "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
 
+# Disable telemeter - its unable to upload snapshots due to significant time skews
+run-on-first-master "
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
+  echo "telemeterClient:" > /tmp/config.yaml
+  echo "  enabled: false" >> /tmp/config.yaml
+  oc create configmap cluster-monitoring-config -n openshift-monitoring --from-file=config.yaml=/tmp/config.yaml
+"
+
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
 
@@ -129,6 +137,18 @@ run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do
 # Copy system:admin's lb-ext kubeconfig locally and use it to access the cluster
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
+
+# Approve certificates for workers, so that all operators would complete
+run-on-first-master "
+  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
+  until oc wait node --selector='node-role.kubernetes.io/worker' --for condition=Ready --timeout=30s; do
+    oc get nodes
+    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
+      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
+    fi
+    sleep 30
+  done
+"
 
 # Wait for operators to stabilize
 if

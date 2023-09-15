@@ -47,6 +47,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-etcd-operator
 promotion:
+  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -114,6 +115,23 @@ tests:
     cluster_profile: aws
     env:
       FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-operator-fips
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
     test:
     - as: test
       cli: latest
