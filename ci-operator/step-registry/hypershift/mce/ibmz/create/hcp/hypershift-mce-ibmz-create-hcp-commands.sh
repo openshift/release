@@ -103,8 +103,6 @@ EOF
 
 # Creating AgentServiceConfig
 echo "$(date) Creating AgentServiceConfig"
-# OCP_RELEASE_VERSION=$(curl -v "$OCP_RELEASE_FILE_URL" | awk '/machine-os / { print $2 }')
-# export OCP_RELEASE_VERSION
 envsubst <<"EOF" | oc apply -f -
 apiVersion: agent-install.openshift.io/v1beta1
 kind: AgentServiceConfig
