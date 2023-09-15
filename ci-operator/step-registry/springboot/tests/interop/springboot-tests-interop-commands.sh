@@ -19,7 +19,7 @@ function archive-results() {
         cp "${RESULTS_FILE}" "${ARTIFACT_DIR}/junit_springboot_interop_results.xml"
 
         echo "Copying ${LOGS_FOLDER} to ${ARTIFACT_DIR}/logs..."
-        cp "${LOGS_FOLDER}" "${ARTIFACT_DIR}/"
+        cp -r "${LOGS_FOLDER}" "${ARTIFACT_DIR}/"
     fi
 }
 
