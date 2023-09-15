@@ -112,3 +112,10 @@ queue ${ARTIFACT_DIR}/clusterinterceptors.json  oc --insecure-skip-tls-verify --
 queue ${ARTIFACT_DIR}/clustertriggerbindings.json  oc --insecure-skip-tls-verify --request-timeout=5s get clustertriggerbindings.triggers.tekton.dev -o json
 queue ${ARTIFACT_DIR}/clusterregistrars.json  oc --insecure-skip-tls-verify --request-timeout=5s get clusterregistrars.singapore.open-cluster-management.io -o json
 queue ${ARTIFACT_DIR}/gitopsservices.json  oc --insecure-skip-tls-verify --request-timeout=5s get gitopsservices.pipelines.openshift.io -o json
+
+
+# Must gather steps to collect OpenShift logs
+mkdir -p ${ARTIFACT_DIR}/must-gather-appstudio
+oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-appstudio > ${ARTIFACT_DIR}/must-gather-appstudio/must-gather.log
+mkdir -p ${ARTIFACT_DIR}/must-gather-network-appstudio
+oc --insecure-skip-tls-verify adm must-gather --timeout='10m' --dest-dir ${ARTIFACT_DIR}/must-gather-network-appstudio -- gather_network_logs > ${ARTIFACT_DIR}/must-gather-network-appstudio/must-gather-network.log
