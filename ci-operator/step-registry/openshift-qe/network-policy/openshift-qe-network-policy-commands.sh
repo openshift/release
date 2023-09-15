@@ -19,11 +19,10 @@ git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
 pushd e2e-benchmarking/workloads/kube-burner
 
 export JOB_TIMEOUT=${JOB_TIMEOUT:=21600}
+
 # UUID Generation
-echo "######"
-UUID="$(uuidgen)-cpt"
+UUID="CPT-$(uuidgen)"
 export UUID
-echo "######"$UUID
 
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 

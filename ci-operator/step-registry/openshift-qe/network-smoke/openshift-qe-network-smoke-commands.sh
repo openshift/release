@@ -18,10 +18,8 @@ pushd e2e-benchmarking/workloads/network-perf-v2
 oc delete ns netperf --wait=true --ignore-not-found=true
 
 # UUID Generation
-echo "######"
-UUID="$(uuidgen)-cpt"
+UUID="CPT-$(uuidgen)"
 export UUID
-echo "######"$UUID
 
 # Smoke Test
 ./run.sh

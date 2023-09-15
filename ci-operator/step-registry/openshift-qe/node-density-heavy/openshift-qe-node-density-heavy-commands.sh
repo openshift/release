@@ -21,11 +21,10 @@ git clone https://github.com/cloud-bulldozer/e2e-benchmarking
 pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAMESPACED_ITERATIONS --iterations-per-namespace=$ITERATIONS_PER_NAMESPACE"
 export WORKLOAD=node-density-heavy
+
 # UUID Generation
-echo "######"
-UUID="$(uuidgen)-cpt"
+UUID="CPT-$(uuidgen)"
 export UUID
-echo "######"$UUID
 
 export CLEANUP_WHEN_FINISH=true
 
