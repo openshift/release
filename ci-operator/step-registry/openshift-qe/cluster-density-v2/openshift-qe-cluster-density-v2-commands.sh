@@ -24,7 +24,7 @@ iteration_multiplier=$(($ITERATION_MULTIPLIER_ENV))
 export ITERATIONS=$(($iteration_multiplier*$current_worker_count))
 export WORKLOAD=cluster-density-v2
 echo "######"
-export UUID="{`uuidgen`-cpt}"
+export UUID=$(uuidgen)-cpt
 echo "######"$UUID
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"

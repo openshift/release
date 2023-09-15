@@ -23,7 +23,7 @@ export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAME
 export WORKLOAD=node-density-heavy
 # UUID Generation
 echo "######"
-export UUID="{`uuidgen`-cpt}"
+export UUID=$(uuidgen)-cpt
 echo "######"$UUID
 
 export CLEANUP_WHEN_FINISH=true
