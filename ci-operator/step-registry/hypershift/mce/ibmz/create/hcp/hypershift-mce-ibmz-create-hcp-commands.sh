@@ -11,7 +11,7 @@ hcp_ns="$hc_ns-$hc_name"
 export hcp_ns
 
 # InfraEnv configs
-ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
+ssh_key_file="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
 ssh_key=$(cat ${ssh_key_file})
 export ssh_key
 
