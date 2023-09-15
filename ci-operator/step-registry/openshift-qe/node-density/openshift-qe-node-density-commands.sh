@@ -20,7 +20,8 @@ export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_RE
 export WORKLOAD=node-density
 # UUID Generation
 echo "######"
-export UUID="$(uuidgen)-cpt"
+UUID="$(uuidgen)-cpt"
+export UUID
 echo "######"$UUID
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"

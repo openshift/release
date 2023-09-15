@@ -23,7 +23,8 @@ set_pods_per_node(){
 
 set_pods_per_node
 echo "######"
-export UUID="$(uuidgen)-cpt"
+UUID="$(uuidgen)-cpt"
+export UUID
 echo "######"$UUID
 export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --pod-ready-threshold=180000ms --timeout=10m"
 export WORKLOAD=node-density

@@ -24,7 +24,8 @@ export ES_INDEX="ingress-performance"
 
 # UUID Generation
 echo "######"
-export UUID="$(uuidgen)-cpt"
+UUID="$(uuidgen)-cpt"
+export UUID
 echo "######"$UUID
 
 # Start the Workload
