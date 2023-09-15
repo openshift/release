@@ -19,7 +19,7 @@ oc delete ns netperf --wait=true --ignore-not-found=true
 
 # UUID Generation
 echo "######"
-export UUID=$(uuidgen)-cpt
+export UUID="$(uuidgen)-cpt"
 echo "######"$UUID
 
 # Smoke Test
