@@ -156,8 +156,13 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent \
     --base-domain=${HYPERSHIFT_BASEDOMAIN} \
     --api-server-address=api.${hc_name}.${HYPERSHIFT_BASEDOMAIN} \
     --ssh-key=${ssh_key_file} \
+    --control-plane-availability-policy "SingleReplica" \
+    --infra-availability-policy "SingleReplica" \
     --namespace $hc_ns \
     --release-image=${OCP_IMAGE_MULTI} --render > /tmp/hc-manifests/cluster-agent.yaml
+
+echo "[DEBUG] Checking the rendered file"
+cat /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
 csplit -f /tmp/hc-manifests/manifest_ -k /tmp/hc-manifests/cluster-agent.yaml /---/ "{6}"
@@ -191,7 +196,7 @@ do
     fi
 done
 
-echo "[DEBUG] $(date) Checking the rendered hc file"
+echo "[DEBUG] $(date) Checking the rendered hc file after modification"
 cat /tmp/hc-manifests/replacement.yaml
 
 # Applying agent cluster manifests
@@ -199,7 +204,7 @@ echo "$(date) Applying agent cluster manifests"
 ls /tmp/hc-manifests/manifest_* | awk ' { print " -f " $1 } ' | xargs oc apply
 
 echo "[DEBUG] Waiting for 7 mins"
-sleep 420
+sleep 300
 
 echo "[DEBUG] $(date) Describing HC"
 oc describe hc ${hc_name} -n ${hc_ns}
