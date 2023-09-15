@@ -313,6 +313,12 @@ grep -v "password\|username\|pullSecret" "${SHARED_DIR}/agent-config.yaml" > "${
 gnu_arch=$(echo "$architecture" | sed 's/arm64/aarch64/;s/amd64/x86_64/;')
 case "${BOOT_MODE}" in
 "iso")
+
+  echo -e "\nCreating manifests..."
+  oinst agent create cluster-manifests
+  # delete the userManagedNetworking field from AgentClusterInstall
+  echo -e "\nDelete the userManagedNetworking field from AgentClusterInstall"
+  sed -i '/userManagedNetworking/d' "${INSTALL_DIR}/cluster-manifests/agent-cluster-install.yaml"
   ### Create ISO image
   echo -e "\nCreating image..."
   oinst agent create image
