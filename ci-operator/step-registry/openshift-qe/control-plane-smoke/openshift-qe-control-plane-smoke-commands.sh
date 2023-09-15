@@ -22,12 +22,18 @@ set_pods_per_node(){
 }
 
 set_pods_per_node
+echo "######"
+export UUID="{`uuidgen`-cpt}"
+echo "######"$UUID
 export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --pod-ready-threshold=180000ms --timeout=10m"
 export WORKLOAD=node-density
 ./run.sh
 
 sleep 60;
 export ITERATIONS=1
+echo "######"
+export UUID="{`uuidgen`-cpt}"
+echo "######"$UUID
 export WORKLOAD=cluster-density-v2
 export EXTRA_FLAGS="--churn=true --churn-duration=1m --timeout=10m"
 ./run.sh

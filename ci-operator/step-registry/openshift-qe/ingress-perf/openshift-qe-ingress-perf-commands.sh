@@ -23,7 +23,8 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 export ES_INDEX="ingress-performance"
 
 # UUID Generation
-export UUID = "{`uuidgen`-cpt}"
+echo "######"
+export UUID="{`uuidgen`-cpt}"
 echo "######"$UUID
 
 # Start the Workload

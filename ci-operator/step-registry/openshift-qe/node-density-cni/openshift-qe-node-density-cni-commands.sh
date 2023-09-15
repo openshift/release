@@ -21,6 +21,10 @@ export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAME
 export WORKLOAD=node-density-cni
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
+# UUID Generation
+echo "######"
+export UUID="{`uuidgen`-cpt}"
+echo "######"$UUID
 
 rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
 ./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
