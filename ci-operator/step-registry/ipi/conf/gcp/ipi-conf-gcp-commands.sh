@@ -21,7 +21,7 @@ fi
 # be active savings plans targeting this machine class.
 master_type=""
 # Temporary test to see if this helps the consistent high CPU alerts
-master_type_suffix="-custom-8-16384"
+master_type_suffix="-custom-6-16384"
 #master_type_suffix="-standard-4"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   master_type_suffix="-standard-32"
