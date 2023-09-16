@@ -28,10 +28,10 @@ if [ $? -eq 0 ]; then
 else
     set -e
     echo "ibmcloud CLI is not installed. Installing it now..."
+    mkdir /tmp/ibm_cloud_cli
     curl -o /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/binaries/IBM_Cloud_CLI_${IC_CLI_VERSION}_linux_amd64.tgz
     tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
-    PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
-    export PATH
+    export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
 fi 
 
 # Login to the IBM Cloud

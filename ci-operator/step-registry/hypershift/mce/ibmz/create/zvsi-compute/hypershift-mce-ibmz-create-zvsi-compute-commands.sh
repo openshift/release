@@ -19,7 +19,10 @@ export httpd_vsi_ip
 # Installing CLI tools
 set -e
 echo "Installing required CLI tools"
-yum install -y wget jq bind-utils
+mkdir /tmp/bin
+curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
+PATH=$PATH:/tmp/bin
+export PATH
 set +e
 echo "Checking if ibmcloud CLI is installed."
 ibmcloud -v
@@ -28,10 +31,10 @@ if [ $? -eq 0 ]; then
 else
   set -e
   echo "ibmcloud CLI is not installed. Installing it now..."
+  mkdir /tmp/ibm_cloud_cli
   curl -o /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/binaries/IBM_Cloud_CLI_${IC_CLI_VERSION}_linux_amd64.tgz
   tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
-  PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
-  export PATH
+  export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
 fi 
 
 # Login to the IBM Cloud
@@ -210,11 +213,11 @@ rootfs_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.boot
 export rootfs_url
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null')
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
-wget -O $HOME/rootfs.img "$rootfs_url"
+curl -o $HOME/rootfs.img "$rootfs_url"
 scp "${ssh_options[@]}" -i $httpd_vsi_key $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
 ssh "${ssh_options[@]}" -i $httpd_vsi_key root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs.img"
 echo "Downloading the setup script for pxeboot of agents"
-wget -O $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
+curl -o $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
 minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
 export minitrd_url
 mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
