@@ -16,7 +16,10 @@ export httpd_vsi_ip
 # Installing CLI tools
 set -e
 echo "Installing required CLI tools"
-sudo yum install -y jq
+mkdir /tmp/bin
+curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
+PATH=$PATH:/tmp/bin
+export PATH
 set +e
 echo "Checking if ibmcloud CLI is installed."
 ibmcloud -v

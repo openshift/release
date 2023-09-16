@@ -19,7 +19,7 @@ export httpd_vsi_ip
 # Installing CLI tools
 set -e
 echo "Installing required CLI tools"
-sudo yum install -y wget jq bind-utils
+yum install -y wget jq bind-utils
 set +e
 echo "Checking if ibmcloud CLI is installed."
 ibmcloud -v
@@ -222,7 +222,7 @@ export mkernel_url
 sed -i "s|INITRD_URL|${minitrd_url}|" $HOME/setup_pxeboot.sh 
 sed -i "s|KERNEL_URL|${mkernel_url}|" $HOME/setup_pxeboot.sh 
 sed -i "s|HTTPD_VSI_IP|${httpd_vsi_ip}|" $HOME/setup_pxeboot.sh 
-sudo chmod 700 $HOME/setup_pxeboot.sh
+chmod 700 $HOME/setup_pxeboot.sh
 
 # Booting up zVSIs as agents
 for fip in "${zvsi_fip_list[@]}"; do
