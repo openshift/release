@@ -10,26 +10,43 @@ output_path="${ARTIFACT_DIR}/kdump"
 
 # Gather the kdump logs from the specified node, if they exist
 function gather_kdump_logs_from_node {
-  # Get the debug pods name
-  debug_pod=$(oc debug --to-namespace="default" node/"$1" -o jsonpath='{.metadata.name}')
+  echo "Gathering kdump logs for ""$1"""
 
   # Start the debug pod and force it to stay up until removed
-  oc debug --to-namespace="default" node/"$1" -- /bin/bash -c 'sleep 300' > /dev/null 2>&1 &
+  oc debug --to-namespace="default" node/"$1" -- /bin/bash -c 'sleep 300'  > /dev/null 2>&1 &
 
-  #Mimic a normal oc call, i.e pause between two successive calls to allow pod to register
-  sleep 2
-  oc wait -n "default" --for=condition=Ready pod/"$debug_pod" --timeout=30s
+  # Check every few seconds to let the pod come up
+  TIMEOUT=10
+  SECONDS=0
+  debug_pod=""
+  until [[ -n "${debug_pod}" ]]; do
+    if ((SECONDS > $TIMEOUT)); then
+      break
+    fi
+
+    # Get the debug pods name
+    debug_pod=$(oc get pods --namespace="default" 2>/dev/null | grep "$1-debug" | cut -d' ' -f1 || true)
+    sleep 2
+  done
 
   if [ -z "$debug_pod" ]
   then
     echo "Debug pod for node ""$1"" never activated"
   else
+    echo "Pod name is: ${debug_pod}"
+
+    # Wait for the debug pod to be ready
+    oc wait -n "default" --for=condition=Ready pod/"$debug_pod" --timeout=30s
+
     # Copy kdump logs out of node and supress stdout
     echo "Copying kdump logs on node ""$1"""
-    oc cp --loglevel 1 -n "default" "${debug_pod}:/host${log_path}" "${output_path}/${1}_kdump_logs"  > /dev/null 2>&1
+    oc cp --loglevel 1 -n "default" "${debug_pod}:/host${log_path}" "${output_path}/${1}_kdump_logs/"  > /dev/null 2>&1
 
     # Cleanup the debug pod
     oc delete pod "$debug_pod" -n "default"
+
+    # Remove directory if empty so we don't count it later
+    rmdir "${output_path}/${1}_kdump_logs" > /dev/null 2>&1
   fi
 }
 
@@ -51,7 +68,8 @@ function package_kdump_logs {
     kdump_folders="$(find ${output_path}/*/ -type d)"
   fi
   
-  num_kdump_folders="$(echo -n "${kdump_folders}" | grep -c "^" || true)"
+  # Only count the root directories
+  num_kdump_folders="$(echo -n "${kdump_folders}" | grep -c "\_kdump\_logs\/$" || true)"
 
   echo "INFO: Found kdump folder(s) from ${num_kdump_folders} node(s)"
 
