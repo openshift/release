@@ -18,6 +18,7 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   --agent-namespace="clusters-${CLUSTER_NAME}" \
   --base-domain=${BASEDOMAIN} \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
+  --node-upgrade-type="InPlace" \
   --release-image ${RELEASE_IMAGE}
 
 echo "Waiting for cluster to become available"
