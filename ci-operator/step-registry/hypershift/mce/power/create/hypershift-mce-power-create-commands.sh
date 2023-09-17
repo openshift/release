@@ -196,6 +196,7 @@ ${HYPERSHIFT_CLI_NAME} create cluster agent \
     --ssh-key=${SSH_PUB_KEY_FILE}\
     --release-image=${OCP_IMAGE_MULTI} \
     --control-plane-availability-policy=${CP_AVAILABILITY_POLICY} \
+    --node-upgrade-type="InPlace"
     --render > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
