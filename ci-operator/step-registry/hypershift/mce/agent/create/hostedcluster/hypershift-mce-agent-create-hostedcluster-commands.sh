@@ -35,7 +35,7 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   --agent-namespace="${CLUSTER_NAMESPACE}" \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
-  --node-upgrade-type="InPlace"
+  --node-upgrade-type="InPlace" \
   --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN}
 
 if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
