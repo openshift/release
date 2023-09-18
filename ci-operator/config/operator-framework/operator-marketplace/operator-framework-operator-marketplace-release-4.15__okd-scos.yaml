@@ -3,21 +3,22 @@ base_images:
     name: "4.15"
     namespace: origin
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.12
+    tag: rhel-8-golang-1.20-openshift-4.14
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile.okd
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.12:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.12
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: operator-marketplace
 promotion:
+  disabled: true
   name: scos-4.15
   namespace: origin
 releases:
@@ -36,11 +37,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: e2e-gcp
+- as: e2e-aws
   optional: true
   steps:
-    cluster_profile: gcp
-    workflow: openshift-e2e-gcp
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.15
   org: operator-framework

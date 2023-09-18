@@ -7,6 +7,14 @@ base_images:
     name: ocp-addons-operators-cli
     namespace: ci
     tag: latest
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
+  rhoam-addon-tests:
+    name: integreatly-operator-test-external
+    namespace: ci
+    tag: master
   rhods-addon-tests:
     name: ods-ci
     namespace: ci
@@ -37,23 +45,25 @@ tests:
     env:
       ADDON1_CONFIG: name=managed-odh;notification-email=interop-qe-ms@redhat.com
       ADDON2_CONFIG: name=managed-api-service;addon-managed-api-service=1;rosa-cli-required=true;notification-email=interop-qe-ms@redhat.com;rosa=true
+      CLUSTER1_CONFIG: name=rhods-rhoam;platform=rosa;region=us-east-2;version=4.13;channel-group=stable;compute-machine-type=m5.4xlarge;timeout=90m;replicas=6;fips=true;ocm-env=stage
       FIREWATCH_CONFIG: |
         [
+          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
           {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
-          {"step": "addon-uninstall", "failure_type": "all", "classification": "Deprovisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
           {"step": "addon-tests-*", "failure_type": "all", "classification": "Addons tests", "jira_project": "RHODS", "jira_epic": "RHODS-10718"},
-          {"step": "rosa-*", "failure_type": "all", "classification": "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"},
-          {"step": "aws-*", "failure_type": "all", "classification": "Cluster Creation - AWS", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435"}
+          {"step": "cluster-install-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 1}},
+          {"step": "cluster-uninstall-*", "failure_type": "all", "classification":  "Cluster Creation - ROSA", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-435", "group": {"name": "cluster-provision", "priority": 2}}
         ]
       FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
       FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
-      OPENSHIFT_VERSION: "4.13"
       PARALLEL: "false"
-      REPLICAS: "6"
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
       TEST_MARKER: RHOAM-RHODS
     test:
+    - ref: addon-tests-rhoam
     - ref: addon-tests-rhods
-    workflow: addon-aws-rosa
+    workflow: addon
 zz_generated_metadata:
   branch: rhods-rhoam
   org: CSPI-QE

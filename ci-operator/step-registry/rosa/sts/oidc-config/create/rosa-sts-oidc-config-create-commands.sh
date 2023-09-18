@@ -42,8 +42,8 @@ if [[ "$OIDC_CONFIG_MANAGED" == "false" ]]; then
   # if [[ "$HOSTED_CP" == "true" ]]; then
   #   account_installer_role_name="${ACCOUNT_ROLES_PREFIX}-HCP-ROSA-Installer-Role"
   # fi
-  # account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arn" | { grep "${account_installer_role_name}" || true; })
-  account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arn" | { grep "Installer-Role" || true; })  
+  # account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arns" | { grep "${account_installer_role_name}" || true; })
+  account_installer_role_arn=$(cat "${SHARED_DIR}/account-roles-arns" | { grep "Installer-Role" || true; })  
   MANAGED_SWITCH="${MANAGED_SWITCH} --prefix ${OIDC_CONFIG_PREFIX} --installer-role-arn ${account_installer_role_arn}"
 fi
 
@@ -53,3 +53,9 @@ rosa create oidc-config -y --mode auto --output json\
                         ${MANAGED_SWITCH} \
                         > "${SHARED_DIR}/oidc-config"
 cat "${SHARED_DIR}/oidc-config"
+oidc_config_id=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
+
+# Create oidc provider
+echo "Create the oidc provider based on the byo oic config ..."
+rosa create oidc-provider -y --mode auto --oidc-config-id $oidc_config_id
+

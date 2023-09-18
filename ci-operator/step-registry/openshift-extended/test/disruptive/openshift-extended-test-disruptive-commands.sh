@@ -195,7 +195,7 @@ oc get clusterversion version -o yaml || true
 # execute the cases
 function run {
     test_scenarios=""
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     echo "TEST_SCENARIOS: \"${TEST_SCENARIOS:-}\""
     echo "TEST_ADDITIONAL: \"${TEST_ADDITIONAL:-}\""
     echo "TEST_IMPORTANCE: \"${TEST_IMPORTANCE}\""

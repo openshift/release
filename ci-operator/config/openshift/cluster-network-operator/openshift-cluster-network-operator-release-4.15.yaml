@@ -35,6 +35,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-network-operator
 promotion:
+  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -317,6 +318,77 @@ tests:
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: e2e-aws-hypershift-ovn-kubevirt
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: hypershift-kubevirt-conformance
+- always_run: false
+  as: qe-perfscale-aws-ovn-medium-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-medium-node-density-cni
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-node-density-cni
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-node-density-cni
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

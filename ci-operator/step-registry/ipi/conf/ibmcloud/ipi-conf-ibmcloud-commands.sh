@@ -13,6 +13,8 @@ fi
 workers=3
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
     workers=0
+elif [ -n "${WORKERS}" ]; then
+    workers="${WORKERS}"
 fi
 
 master_type=null

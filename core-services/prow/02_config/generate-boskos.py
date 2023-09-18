@@ -337,8 +337,8 @@ for i in range(200,204):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 for i in range(205,214):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
-for i in [1148,1197,1207,1225,1227,1229,1232,1233,1234,1235,1237,1238,1240,1243,1246,1249,1254,1255,1260,1271,1272,1274,1279,1284,1287,1289,1296,1298,1300,1302,956]:
-    CONFIG['vsphere-8-vpn-quota-slice']['ci-vlan-{}'.format(i)] = 1
+for i in [1153,1179,1211,1225,1232,1243,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309,1364,1367,758,902]:
+    CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
 
 
 config = {

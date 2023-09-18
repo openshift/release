@@ -260,8 +260,13 @@ else
 fi
 
 echo "Adding debug tools link to sippy for intervals"
+if [[ "${JOB_TYPE}" == "presubmit" ]]; then
+  extra_args="${JOB_NAME}/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+else
+  extra_args="${JOB_NAME}"
+fi
 cat >> ${SHARED_DIR}/custom-links.txt << EOF
-<a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+<a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/${extra_args}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
 EOF
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.

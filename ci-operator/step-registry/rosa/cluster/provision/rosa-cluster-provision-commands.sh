@@ -15,10 +15,12 @@ MULTI_AZ=${MULTI_AZ:-false}
 EC2_METADATA_HTTP_TOKENS=${EC2_METADATA_HTTP_TOKENS:-"optional"}
 ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
 ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
+STORAGE_ENCRYPTION=${STORAGE_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
 DISABLE_SCP_CHECKS=${DISABLE_SCP_CHECKS:-false}
 ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
 BYO_OIDC=${BYO_OIDC:-false}
+ENABLE_AUDIT_LOG=${ENABLE_AUDIT_LOG:-false}
 PRIVATE_SUBNET_ONLY="false"
 CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
 
@@ -129,6 +131,12 @@ if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
 fi
 
+AUDIT_LOG_SWITCH=""
+if [[ "$ENABLE_AUDIT_LOG" == "true" ]]; then
+  iam_role_arn=$(head -n 1 ${SHARED_DIR}/iam_role_arn)
+  AUDIT_LOG_SWITCH="--audit-log-arn $iam_role_arn"
+fi
+
 DISABLE_SCP_CHECKS_SWITCH=""
 if [[ "$DISABLE_SCP_CHECKS" == "true" ]]; then
   DISABLE_SCP_CHECKS_SWITCH="--disable-scp-checks"
@@ -152,6 +160,16 @@ fi
 ETCD_ENCRYPTION_SWITCH=""
 if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
   ETCD_ENCRYPTION_SWITCH="--etcd-encryption"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
+    ETCD_ENCRYPTION_SWITCH="${ETCD_ENCRYPTION_SWITCH} --etcd-encryption-kms-arn $kms_key_arn"
+  fi
+fi
+
+STORAGE_ENCRYPTION_SWITCH=""
+if [[ "$STORAGE_ENCRYPTION" == "true" ]]; then
+  kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
+  STORAGE_ENCRYPTION_SWITCH="--enable-customer-managed-key --kms-key-arn $kms_key_arn"
 fi
 
 DISABLE_WORKLOAD_MONITORING_SWITCH=""
@@ -184,13 +202,6 @@ fi
 PRIVATE_SWITCH=""
 if [[ "$PRIVATE" == "true" ]]; then
   PRIVATE_SWITCH="--private"
-fi
-
-KMS_KEY_SWITCH=""
-if [[ "$ENABLE_CUSTOMER_MANAGED_KEY" == "true" ]]; then
-  # Get the kms keys from the previous steps, and replace the vaule here
-  KMS_KEY_ARN=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn)
-  KMS_KEY_SWITCH="--enable-customer-managed-key --kms-key-arn ${KMS_KEY_ARN}"
 fi
 
 PRIVATE_LINK_SWITCH=""
@@ -251,7 +262,7 @@ if [[ "$STS" == "true" ]]; then
   ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
   echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
-  roleARNFile="${SHARED_DIR}/account-roles-arn"
+  roleARNFile="${SHARED_DIR}/account-roles-arns"
   account_intaller_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
   account_support_role_arn=$(cat "$roleARNFile" | { grep "Support-Role" || true; })
   account_worker_role_arn=$(cat "$roleARNFile" | { grep "Worker-Role" || true; })
@@ -301,11 +312,12 @@ echo "  Fips: ${FIPS}"
 echo "  Private: ${PRIVATE}"
 echo "  Private Link: ${PRIVATE_LINK}"
 echo "  Enable proxy: ${ENABLE_PROXY}"
-echo "  Enable customer managed key: ${ENABLE_CUSTOMER_MANAGED_KEY}"
+echo "  Enable customer managed key: ${STORAGE_ENCRYPTION}"
 echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
+echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
@@ -335,12 +347,13 @@ ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${HYPERSHIFT_SWITCH} \
 ${SUBNET_ID_SWITCH} \
 ${FIPS_SWITCH} \
-${KMS_KEY_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
 ${PROXY_SWITCH} \
 ${DISABLE_SCP_CHECKS_SWITCH} \
 ${DEFAULT_MP_LABELS_SWITCH} \
+${STORAGE_ENCRYPTION_SWITCH} \
+${AUDIT_LOG_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 
@@ -369,12 +382,13 @@ rosa create cluster -y \
                     ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
                     ${SUBNET_ID_SWITCH} \
                     ${FIPS_SWITCH} \
-                    ${KMS_KEY_SWITCH} \
                     ${PRIVATE_SWITCH} \
                     ${PRIVATE_LINK_SWITCH} \
                     ${PROXY_SWITCH} \
                     ${DISABLE_SCP_CHECKS_SWITCH} \
                     ${DEFAULT_MP_LABELS_SWITCH} \
+                    ${STORAGE_ENCRYPTION_SWITCH} \
+                    ${AUDIT_LOG_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
 
