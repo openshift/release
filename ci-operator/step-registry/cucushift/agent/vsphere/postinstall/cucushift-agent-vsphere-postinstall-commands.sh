@@ -107,6 +107,6 @@ fi
 
 oc patch clusterversion version --type json -p '[{"op": "remove", "path": "/spec/channel"}]}]'
 
-oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=30m
+oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=60m
 
 oc get co
