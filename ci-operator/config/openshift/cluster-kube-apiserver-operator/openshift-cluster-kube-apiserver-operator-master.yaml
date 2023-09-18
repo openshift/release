@@ -19,6 +19,14 @@ base_images:
     name: ocm-2.9
     namespace: edge-infrastructure
     tag: assisted-service
+  assisted-service-scripts:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
+  assisted-service-index:
+    name: assisted-service-index
+    namespace: edge-infrastructure
+    tag: latest
   assisted-test-infra:
     name: ocm-2.9
     namespace: edge-infrastructure
@@ -363,7 +371,7 @@ tests:
     cluster_profile: packet-sno
     env:
       SKEW: +90d
-    workflow: openshift-e2e-cert-rotation-suspend-sno
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
 - always_run: false
   as: e2e-metal-ovn-sno-cert-rotation-shutdown-180d
   optional: true
@@ -371,7 +379,7 @@ tests:
     cluster_profile: packet-sno
     env:
       SKEW: +180d
-    workflow: openshift-e2e-cert-rotation-suspend-sno
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
 - always_run: false
   as: e2e-metal-ovn-sno-cert-rotation-shutdown-360d
   optional: true
@@ -379,12 +387,14 @@ tests:
     cluster_profile: packet-sno
     env:
       SKEW: +360d
-    workflow: openshift-e2e-cert-rotation-suspend-sno
+    workflow: openshift-e2e-cert-rotation-shutdown-sno
 - always_run: false
   as: e2e-metal-ovn-ha-cert-rotation-shutdown-90d
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      INDEX_IMAGE: assisted-service-index
     env:
       SKEW: +90d
     workflow: openshift-e2e-cert-rotation-shutdown
@@ -393,6 +403,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      INDEX_IMAGE: assisted-service-index
     env:
       SKEW: +180d
     workflow: openshift-e2e-cert-rotation-shutdown
@@ -401,6 +413,8 @@ tests:
   optional: true
   steps:
     cluster_profile: packet-assisted
+    dependencies:
+      INDEX_IMAGE: assisted-service-index
     env:
       SKEW: +360d
     workflow: openshift-e2e-cert-rotation-shutdown
