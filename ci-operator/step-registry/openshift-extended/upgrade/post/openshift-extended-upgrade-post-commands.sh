@@ -186,7 +186,7 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 # execute the cases
 function run {
     test_scenarios=""
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&"
     echo "TEST_SCENARIOS_POSTUPG: \"${TEST_SCENARIOS_POSTUPG:-}\""
     echo "TEST_ADDITIONAL_POSTUPG: \"${TEST_ADDITIONAL_POSTUPG:-}\""
     echo "TEST_FILTERS: \"${TEST_FILTERS:-}\""
