@@ -1,0 +1,19 @@
+workflow:
+  as: openshift-e2e-aws-cert-rotation
+  steps:
+    pre:
+    - chain: ipi-conf-aws
+    - ref: ipi-conf-manual-creds
+    - ref: aws-provision-cco-manual-users-static
+    - ref: ipi-conf-manual-creds-remove-unnecessary-creds
+    - chain: ipi-install
+    - chain: aws-provision-bastionhost
+    test:
+    - ref: openshift-e2e-aws-cert-rotation
+    post:
+    - ref: aws-deprovision-stacks
+    - ref: aws-deprovision-s3buckets
+    - ref: ipi-deprovision-deprovision
+    - ref: aws-deprovision-users-and-policies
+  documentation: |-
+    This workflow executes HA installation on AWS, rolls time forward for 90 days and verifies that the cluster correctly reconfigures itself
