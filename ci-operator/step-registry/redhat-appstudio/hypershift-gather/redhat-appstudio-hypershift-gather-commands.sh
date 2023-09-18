@@ -60,6 +60,7 @@ done < /tmp/pods-api
 
 # Copied from https://steps.ci.openshift.org/reference/gather-extra
 echo "INFO: gathering the audit logs for each master"
+set -x
 paths=(openshift-apiserver kube-apiserver oauth-apiserver etcd)
 for path in "${paths[@]}" ; do
   output_dir="${ARTIFACT_DIR}/audit_logs/$path"
@@ -81,3 +82,5 @@ for path in "${paths[@]}" ; do
     FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=${path}/${fname}
   done < ${output_dir}.audit_logs_listing
 done
+
+set +x
