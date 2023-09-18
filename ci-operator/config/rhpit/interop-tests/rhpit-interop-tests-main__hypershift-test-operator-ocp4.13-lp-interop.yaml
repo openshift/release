@@ -1,0 +1,60 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  ocp-addons-operators-cli:
+    name: ocp-addons-operators-cli
+    namespace: ci
+    tag: latest
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+tests:
+- as: hypershift-test-operator
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CLUSTER1_CONFIG: name=hypr;platform=hypershift;region=us-east-2;version=4.13;channel-group=stable;compute-machine-type=m5.4xlarge;timeout=90m;replicas=6;fips=false;ocm-env=stage
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "LPTOCPCI"},
+          {"step": "operator-uninstall", "failure_type": "all", "classification": "Deprovisioning - Operators", "jira_project": "LPTOCPCI"},
+          {"step": "rosa-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster (ROSA)", "jira_project": "LPTOCPCI"},
+          {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster (AWS)", "jira_project": "LPTOCPCI"},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPTOCPCI"},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI"},
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OPENSHIFT_VERSION: "4.13"
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
+    workflow: operator
+zz_generated_metadata:
+  branch: main
+  org: rhpit
+  repo: interop-tests
+  variant: hypershift-test-operator-ocp4.13-lp-interop
