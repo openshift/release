@@ -10,19 +10,11 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.53.1
-  hypershift-operator:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: hypershift-operator
-  hypershift-tests:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    tag: v1.48.0
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.19-openshift-4.13
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
@@ -31,9 +23,9 @@ images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: cluster-network-operator
 promotion:
   name: 4.14-priv
@@ -153,12 +145,6 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-ovn-dualstack
-- always_run: false
-  as: e2e-azure-ovn-manual-oidc
-  optional: true
-  steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-gcp-ovn
   steps:
     cluster_profile: gcp
@@ -254,9 +240,10 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-single-node
 - as: e2e-hypershift-ovn
+  optional: true
   steps:
     cluster_profile: hypershift
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-conformance
 - as: lint
   commands: |
     export GOCACHE=/tmp/
@@ -305,40 +292,6 @@ tests:
     - chain: network-mtu-migration-increase
     - ref: openshift-e2e-test
     workflow: openshift-e2e-gcp-sdn
-  timeout: 5h0m0s
-- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
-- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      GATEWAY_MODE: local
-    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
-- as: e2e-aws-hypershift-ovn-kubevirt
-  optional: true
-  steps:
-    cluster_profile: aws
-    workflow: hypershift-kubevirt-conformance
-- always_run: false
-  as: qe-perfscale-aws-ovn-cluster-density
-  optional: true
-  steps:
-    cluster_profile: aws-perfscale
-    env:
-      BASE_DOMAIN: perfscale.devcluster.openshift.com
-      COMPUTE_NODE_REPLICAS: "120"
-      COMPUTE_NODE_TYPE: m5.xlarge
-      SIZE_VARIANT: large
-    post:
-    - chain: ipi-aws-post
-    pre:
-    - chain: ipi-aws-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    workflow: openshift-qe-control-plane
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.14

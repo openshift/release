@@ -3,18 +3,10 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: base
-  commitchecker:
-    name: commitchecker
-    namespace: ci
-    tag: "4.14"
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
-  tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.14"
+    tag: rhel-8-golang-1.19-openshift-4.13
 binary_build_commands: make
 build_root:
   from_repository: true
@@ -23,9 +15,9 @@ images:
 - dockerfile_path: Dockerfile.openshift.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: aws-ebs-csi-driver
 promotion:
   name: 4.14-priv
@@ -61,24 +53,10 @@ tests:
     make test
   container:
     from: src
-- as: e2e-aws-ovn-upgrade
-  steps:
-    cluster_profile: aws
-    workflow: openshift-upgrade-aws
 - as: e2e-aws-csi
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-csi
-- as: e2e-aws-csi-extended
-  optional: true
-  steps:
-    cluster_profile: aws-qe
-    workflow: openshift-e2e-aws-csi-extended
-- as: verify-commits
-  commands: |
-    commitchecker --start ${PULL_BASE_SHA:-master}
-  container:
-    from: commitchecker
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

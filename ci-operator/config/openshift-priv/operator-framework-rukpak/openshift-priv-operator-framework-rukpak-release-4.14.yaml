@@ -3,24 +3,23 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: base
-  commitchecker:
-    name: commitchecker
-    namespace: ci
-    tag: "4.14"
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
-  from_repository: true
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
 canonical_go_repository: github.com/openshift/operator-framework-rukpak
 images:
-- dockerfile_path: openshift/Dockerfile
+- dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: olm-rukpak
 promotion:
   name: 4.14-priv
@@ -47,43 +46,30 @@ tests:
   commands: make verify
   container:
     from: src
-- as: verify-deps
-  commands: |
-    # Verify main repo deps
-    make -f openshift/Makefile verify-deps
-    # Verify openshift dir
-    cd openshift && make verify-deps
-  container:
-    from: src
-- as: verify-manifests
-  commands: make -f openshift/Makefile verify-manifests
-  container:
-    from: src
-- as: verify-commits
-  commands: make -f openshift/Makefile verify-commits
-  container:
-    from: src
-- as: verify-commits-shared
-  commands: commitchecker --start ${PULL_BASE_SHA:-main}
-  container:
-    from: commitchecker
 - as: lint
-  commands: |
-    export XDG_CACHE_HOME=/tmp/.cache
-    make lint
+  commands: make lint
   container:
     from: src
 - as: unit
   commands: make test-unit
   container:
     from: src
-- as: openshift-e2e-aws
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+- as: e2e
+  optional: true
   steps:
-    cluster_profile: aws
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-aws
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: make e2e
+      dependencies:
+      - env: OLM_RUKPAK_IMAGE
+        name: olm-rukpak
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

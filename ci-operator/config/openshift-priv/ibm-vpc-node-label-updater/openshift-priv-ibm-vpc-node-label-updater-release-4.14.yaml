@@ -3,14 +3,10 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
-  tests-private:
-    name: tests-private
-    namespace: ci
-    tag: "4.14"
+    tag: rhel-8-golang-1.19-openshift-4.13
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -19,9 +15,9 @@ images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: ibm-vpc-node-label-updater
 promotion:
   name: 4.14-priv
@@ -54,13 +50,6 @@ tests:
   steps:
     cluster_profile: ibmcloud
     workflow: openshift-e2e-ibmcloud-csi
-- as: e2e-ibmcloud-csi-extended
-  optional: true
-  steps:
-    cluster_profile: ibmcloud-qe
-    env:
-      TEST_SCENARIOS: \[CSI-Driver\]|\[IBM-VPC-BLOCK-CSI\]
-    workflow: openshift-e2e-ibmcloud-csi-extended
 - as: verify-deps
   steps:
     test:

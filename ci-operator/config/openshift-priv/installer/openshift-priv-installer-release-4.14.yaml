@@ -39,14 +39,18 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: cli
-  ocp_4.14_cli:
-    name: 4.14-priv
-    namespace: ocp-private
-    tag: cli
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.18-openshift-4.12:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.18-openshift-4.12
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.13
+  origin_4.12_cli:
+    name: "4.14"
+    namespace: origin
+    tag: cli
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/installer
@@ -54,23 +58,29 @@ images:
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: installer
 - dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: installer-artifacts
 - dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: libvirt-installer
 - dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
   from: base
@@ -78,39 +88,44 @@ images:
     ocp_4.10_cli:
       as:
       - registry.ci.openshift.org/ocp/4.10:cli
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
   to: upi-installer
 - dockerfile_path: images/openstack/Dockerfile.ci
   from: base
   inputs:
-    ocp_4.14_cli:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/4.14:cli
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    origin_4.12_cli:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/origin/4.12:cli
   to: openstack-installer
 - dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: baremetal-installer
 - dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.18-openshift-4.12:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: ovirt-installer
 - dockerfile_literal: |
     FROM src
     COPY oc /usr/bin/oc
     RUN ln -s /usr/bin/oc /usr/bin/kubectl
-    RUN dnf install -y nmstate
     # Cache dir must be accessible when running the integration tests
     RUN mkdir /.cache -m 0777
   from: src
@@ -180,9 +195,6 @@ resources:
     requests:
       cpu: "3"
       memory: 5Gi
-test_binary_build_commands: |
-  # Some agent-based installer tests require nmstatectl
-  dnf install -y nmstate
 tests:
 - as: unit
   commands: |
@@ -190,7 +202,7 @@ tests:
     go tool cover -o $ARTIFACT_DIR/cover.txt -func /tmp/coverprofile.out
     go tool cover -o $ARTIFACT_DIR/cover.html -html /tmp/coverprofile.out
   container:
-    from: test-bin
+    from: src
   skip_if_only_changed: (^docs/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)
 - as: aro-unit
   commands: go test ./pkg/... -tags=aro
@@ -230,22 +242,16 @@ tests:
   skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^images/(agent|alibabacloud|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: aws
-    env:
-      USER_TAGS: |
-        keyA valueA
-        keyB valueB
-        keyC valueC
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-proxy
+- as: e2e-aws-ovn-proxy
   optional: true
+  run_if_changed: aws
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-proxy
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-upi-proxy
+- as: e2e-aws-upi-proxy
   optional: true
   steps:
     cluster_profile: aws
@@ -265,16 +271,10 @@ tests:
     cluster_profile: aws-local-zones
     env:
       BASE_DOMAIN: vmc-ci.devcluster.openshift.com
+    leases:
+    - env: LEASED_RESOURCE
+      resource_type: aws-local-zones-quota-slice
     workflow: openshift-e2e-aws-local-zones-byo-vpc
-  timeout: 6h0m0s
-- as: e2e-aws-ovn-localzones
-  optional: true
-  run_if_changed: aws
-  steps:
-    cluster_profile: aws-local-zones
-    env:
-      BASE_DOMAIN: vmc-ci.devcluster.openshift.com
-    workflow: openshift-e2e-aws-local-zones
   timeout: 6h0m0s
 - as: e2e-aws-ovn-imdsv2
   optional: true
@@ -286,14 +286,14 @@ tests:
     workflow: openshift-e2e-aws
   timeout: 6h0m0s
 - as: e2e-gcp-ovn
-  run_if_changed: (gcp|google)
+  run_if_changed: gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
   timeout: 6h0m0s
 - as: e2e-gcp-secureboot
   optional: true
-  run_if_changed: (gcp|google)
+  run_if_changed: gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-secureboot
@@ -313,7 +313,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-gcp-ovn-shared-vpc
   optional: true
-  run_if_changed: (gcp|google)
+  run_if_changed: gcp
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-sharednetwork
@@ -333,12 +333,12 @@ tests:
   timeout: 6h0m0s
 - as: e2e-azure-ovn-resourcegroup
   optional: true
+  run_if_changed: azure
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-resourcegroup
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-upgrade
+- as: e2e-aws-ovn-upgrade
   optional: true
   steps:
     cluster_profile: aws
@@ -365,7 +365,7 @@ tests:
   timeout: 6h0m0s
 - as: e2e-gcp-ovn-xpn
   optional: true
-  run_if_changed: (gcp|google)
+  run_if_changed: ^(ipi/gcp/.*)
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
@@ -376,8 +376,7 @@ tests:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-upi
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-workers-rhel8
+- as: e2e-aws-ovn-workers-rhel8
   optional: true
   steps:
     cluster_profile: aws
@@ -385,15 +384,13 @@ tests:
       PLATFORM_VERSION: "8.4"
     workflow: openshift-e2e-aws-workers-rhel
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-aws-ovn-disruptive
+- as: e2e-aws-ovn-disruptive
   optional: true
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-disruption
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-gcp-upgrade
+- as: e2e-gcp-upgrade
   optional: true
   steps:
     cluster_profile: gcp
@@ -488,6 +485,14 @@ tests:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-nfv-intel
+  optional: true
+  run_if_changed: openstack
+  steps:
+    cluster_profile: openstack-nfv
+    workflow: openshift-e2e-openstack-nfv
+  timeout: 6h0m0s
 - as: e2e-openstack-proxy
   optional: true
   run_if_changed: openstack
@@ -495,59 +500,13 @@ tests:
     cluster_profile: openstack-vh-mecha-central
     workflow: openshift-e2e-openstack-proxy
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-openstack-nfv-intel
-  optional: true
-  run_if_changed: openstack
-  steps:
-    cluster_profile: openstack-nfv
-    workflow: openshift-e2e-openstack-nfv-cgroupsv1
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-openstack-externallb
+- as: e2e-openstack-externallb-techpreview
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-openstack-external-lb
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-openstack-ccpmso
-  optional: true
-  steps:
-    cluster_profile: openstack-vexxhost
-    test:
-    - as: openstack-test-cpms
-      commands: |
-        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
-        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
-        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
-        cd $dir
-        make e2e-presubmit
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-e2e-openstack-ipi
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-openstack-ccpmso-zone
-  optional: true
-  steps:
-    cluster_profile: openstack-kuryr
-    test:
-    - as: openstack-test-cpms
-      commands: |
-        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
-        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
-        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
-        cd $dir
-        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
-        make e2e-presubmit
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-e2e-openstack-ipi
   timeout: 6h0m0s
 - as: openstack-manifests
   run_if_changed: openstack
@@ -560,12 +519,6 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
-  timeout: 6h0m0s
-- as: e2e-vsphere-static-ovn
-  optional: true
-  steps:
-    cluster_profile: vsphere-8
-    workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-vsphere-upi
   run_if_changed: (^(upi/vsphere/.*)|^(images/installer/Dockerfile\.upi.*))
@@ -587,8 +540,7 @@ tests:
     cluster_profile: vsphere-multizone
     workflow: openshift-e2e-vsphere-zones
   timeout: 6h0m0s
-- always_run: false
-  as: e2e-crc
+- as: e2e-crc
   optional: true
   steps:
     cluster_profile: gcp
@@ -607,6 +559,13 @@ tests:
   steps:
     cluster_profile: packet-assisted
     workflow: assisted-baremetal
+  timeout: 6h0m0s
+- as: e2e-ovirt-sdn
+  optional: true
+  run_if_changed: ovirt
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-minimal
   timeout: 6h0m0s
 - as: e2e-aws-ovn-single-node
   optional: true
@@ -699,30 +658,6 @@ tests:
     cluster_profile: equinix-ocp-metal
     workflow: agent-e2e-compact-ipv4
   timeout: 6h0m0s
-- as: e2e-agent-compact-ipv4-none-platform
-  cluster: build05
-  optional: true
-  run_if_changed: /agent/
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        AGENT_PLATFORM_TYPE=none
-    workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
-- as: e2e-agent-compact-ipv4-appliance
-  cluster: build05
-  optional: true
-  run_if_changed: /agent/
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=COMPACT_IPV4
-        AGENT_USE_APPLIANCE_MODEL=true
-    workflow: agent-e2e-compact-ipv4
-  timeout: 6h0m0s
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
@@ -735,22 +670,10 @@ tests:
         AGENT_USE_ZTP_MANIFESTS=true
     workflow: agent-e2e-generic
   timeout: 6h0m0s
-- as: e2e-agent-sno-ipv4-pxe
-  cluster: build05
-  optional: true
-  run_if_changed: /agent/
-  steps:
-    cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=SNO_IPV4
-        AGENT_E2E_TEST_BOOT_MODE=PXE
-    workflow: agent-e2e-generic
-  timeout: 6h0m0s
 - as: e2e-agent-ha-dualstack
   cluster: build05
   optional: true
-  run_if_changed: /agent/
+  skip_if_only_changed: (^(docs|upi|hack)/)|((^|/)OWNERS(_ALIASES)?$)|((^|/)[A-Z]+\.md$)|(^(data/.*|images|pkg/.*|terraform/providers)/(alibabacloud|aws|azure|azurestack|baremetal|gcp|ibmcloud|libvirt|nutanix|openstack|ovirt|powervs|vsphere)/)
   steps:
     cluster_profile: equinix-ocp-metal
     env:
@@ -759,19 +682,6 @@ tests:
         MIRROR_IMAGES=true
     workflow: agent-e2e-generic
   timeout: 6h0m0s
-- as: e2e-aws-ovn-public-subnets
-  optional: true
-  run_if_changed: /aws/subnet.go
-  steps:
-    cluster_profile: aws
-    workflow: openshift-e2e-aws-publicsubnets
-  timeout: 6h0m0s
-- always_run: false
-  as: e2e-openstack-dualstack-techpreview
-  optional: true
-  steps:
-    cluster_profile: openstack-hwoffload
-    workflow: openshift-e2e-openstack-dualstack
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

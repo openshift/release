@@ -7,6 +7,11 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: cd ./scripts/bumper && go install -mod=mod ./...
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-olm
@@ -28,11 +33,30 @@ images:
 - dockerfile_path: base.Dockerfile
   from: src
   to: ci-image
+- context_dir: scripts/bumper
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/bumper
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: olm-bumper
 promotion:
   excluded_images:
   - ci-image
+  - olm-bumper
   name: 4.15-priv
   namespace: ocp-private
+  to:
+  - additional_images:
+      olm-bumper: olm-bumper
+    excluded_images:
+    - '*'
+    namespace: operator-lifecycle-manager
+    tag: latest
 releases:
   initial:
     integration:
