@@ -39,14 +39,14 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
-  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    tag: rhel-8-golang-1.19-openshift-4.13
+  ocp_builder_rhel-9-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.19-openshift-4.13
   ocp_os:
     name: "4.14"
     namespace: ocp
@@ -57,12 +57,12 @@ images:
 - dockerfile_path: Dockerfile.rhel7
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
-    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+    ocp_builder_rhel-9-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
   to: machine-config-operator
 - dockerfile_literal: |
     FROM registry.ci.openshift.org/ocp/4.13:rhel-coreos
@@ -166,7 +166,6 @@ tests:
   container:
     from: src
   optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: e2e-gcp-upgrade
   optional: true
   steps:
@@ -203,7 +202,6 @@ tests:
       resources:
         requests:
           cpu: 100m
-      timeout: 2h30m0s
     workflow: ipi-gcp
 - as: e2e-aws-ovn-upgrade
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -246,18 +244,6 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-upi
-- as: e2e-vsphere-upi-zones
-  optional: true
-  steps:
-    cluster_profile: vsphere-multizone
-    workflow: openshift-e2e-vsphere-upi-zones
-  timeout: 6h0m0s
-- as: e2e-vsphere-zones
-  optional: true
-  steps:
-    cluster_profile: vsphere-multizone
-    workflow: openshift-e2e-vsphere-zones
-  timeout: 6h0m0s
 - as: e2e-metal-ipi
   cluster: build05
   optional: true
@@ -334,18 +320,13 @@ tests:
     env:
       RT_ENABLED: "true"
     workflow: openshift-e2e-gcp
-- as: e2e-gcp-ovn-rt-upgrade
-  optional: true
-  steps:
-    cluster_profile: gcp-openshift-gce-devel-ci-2
-    workflow: openshift-upgrade-gcp-ovn-rt
 - as: e2e-gcp-single-node
   optional: true
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-single-node
 - as: e2e-gcp-op-single-node
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  optional: true
   steps:
     cluster_profile: gcp
     test:
@@ -384,22 +365,18 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-externallb
+- as: e2e-openstack-externallb-techpreview
   optional: true
   steps:
     cluster_profile: openstack-vh-mecha-central
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-openstack-external-lb
 - as: e2e-hypershift
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
+  optional: true
   steps:
     cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
-- always_run: false
-  as: e2e-openstack-dualstack-techpreview
-  optional: true
-  steps:
-    cluster_profile: openstack-hwoffload
-    workflow: openshift-e2e-openstack-dualstack
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

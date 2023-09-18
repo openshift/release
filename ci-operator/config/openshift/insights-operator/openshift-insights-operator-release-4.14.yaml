@@ -10,19 +10,19 @@ base_images:
   insights-operator-tests:
     name: insights-operator-tests
     namespace: ci
-    tag: latest
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    tag: "4.13"
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
   from_repository: true
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: insights-operator
 promotion:
   name: "4.14"
@@ -49,24 +49,9 @@ tests:
   container:
     from: src
 - as: unit
-  commands: |
-    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make unit
+  commands: make test
   container:
     from: src
-  secret:
-    mount_path: /tmp/secret
-    name: insights-operator-codecov-token
-- as: publish-coverage
-  commands: |
-    export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
-    make coverage
-  container:
-    from: src
-  postsubmit: true
-  secret:
-    mount_path: /tmp/secret
-    name: insights-operator-codecov-token
 - as: e2e
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$|_test.go$
   steps:
@@ -87,7 +72,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui and not tp_only"
+      commands: pytest.sh -m "not ui"
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -107,7 +92,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -k "not tp_only" --junitxml=${ARTIFACT_DIR}/test-report.xml
+      commands: pytest.sh --junitxml=${ARTIFACT_DIR}/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -128,27 +113,6 @@ tests:
     - as: test
       cli: latest
       commands: pytest.sh -k "test_archive_uploaded_and_result_received" --junitxml=${ARTIFACT_DIR}/test-report.xml
-      from: insights-operator-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
-- as: e2e-gcp-ovn-techpreview
-  steps:
-    cluster_profile: gcp
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: insights-live
-    test:
-    - as: test
-      cli: latest
-      commands: pytest.sh -m "not ui and techpreview"
-      credentials:
-      - mount_path: /secrets
-        name: insights-qa
-        namespace: test-credentials
       from: insights-operator-tests
       resources:
         requests:

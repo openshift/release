@@ -3,18 +3,18 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.19-openshift-4.13
 build_root:
   from_repository: true
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
   to: cluster-storage-operator
 promotion:
   name: "4.14"
@@ -43,10 +43,6 @@ tests:
   commands: make verify
   container:
     from: src
-- as: verify-kustomize-assets
-  commands: ./hack/verify-manifest.sh
-  container:
-    from: src
 - as: e2e-aws-ovn
   steps:
     cluster_profile: aws
@@ -69,7 +65,12 @@ tests:
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-csi
-- as: e2e-ovn-vsphere
+- as: e2e-ovirt
+  optional: true
+  steps:
+    cluster_profile: ovirt
+    workflow: openshift-e2e-ovirt-csi
+- as: e2e-vsphere-ovn
   optional: true
   steps:
     cluster_profile: vsphere
@@ -86,12 +87,6 @@ tests:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
     workflow: openshift-e2e-vsphere-csi
-- always_run: false
-  as: e2e-azure-manual-oidc
-  optional: true
-  steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-ovn
   optional: true
   steps:
@@ -134,10 +129,11 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: hypershift-aws-e2e-external
+- as: e2e-hypershift-ovn-conformance
+  optional: true
   steps:
     cluster_profile: hypershift
-    workflow: hypershift-aws-e2e-external
+    workflow: hypershift-aws-conformance
 - as: verify-deps
   steps:
     test:
