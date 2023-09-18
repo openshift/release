@@ -14,6 +14,12 @@ export ENABLE_PRINT_EVENT_STDOUT=true
 
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
 
+# add for hosted kubeconfig in the hosted cluster env
+if test -f "${SHARED_DIR}/nested_kubeconfig"
+then
+    export GUEST_KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
+fi
+
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
 # create link for oc to kubectl
@@ -186,7 +192,7 @@ oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 # execute the cases
 function run {
     test_scenarios=""
-    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&"
+    hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;NonPreRelease&;PstChkUpgrade&"
     echo "TEST_SCENARIOS_POSTUPG: \"${TEST_SCENARIOS_POSTUPG:-}\""
     echo "TEST_ADDITIONAL_POSTUPG: \"${TEST_ADDITIONAL_POSTUPG:-}\""
     echo "TEST_FILTERS: \"${TEST_FILTERS:-}\""
