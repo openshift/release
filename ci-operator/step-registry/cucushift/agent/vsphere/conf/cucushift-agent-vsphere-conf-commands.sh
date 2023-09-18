@@ -255,6 +255,7 @@ export VSPHERE_VCENTER="${vsphere_url}"
 export VSPHERE_DATACENTER="${vsphere_datacenter}"
 export VSPHERE_DATASTORE="${vsphere_datastore}"
 export VSPHERE_PASSWORD='${GOVC_PASSWORD}'
+export VSPHERE_NETWORK='${vsphere_portgroup}'
 EOF
 
 echo "Copying kubeconfig to the shared directory..."
