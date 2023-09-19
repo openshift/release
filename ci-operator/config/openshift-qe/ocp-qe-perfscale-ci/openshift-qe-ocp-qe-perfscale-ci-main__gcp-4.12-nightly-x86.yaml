@@ -5,7 +5,7 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-gcp-413
+  to: ocp-qe-perfscale-ci
 promotion:
   namespace: ci
   tag: latest
@@ -14,81 +14,68 @@ releases:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.12"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: ocp-qe-perfscale-gcp-cp-24nodes-periodic
+- as: perfscale-control-plane-5nodes-periodic
   cron: 29 5 */1 * 1-5
   steps:
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "24"
+      WORKER_REPLICA_COUNT: "5"
     post:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
     - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-control-plane
-- as: ocp-qe-perfscale-ci-tests-net-perf
-  cron: 29 5 */1 * 1-5
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      WORKER_REPLICA_COUNT: "6"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
-    workflow: openshift-qe-data-path-tests
-  timeout: 5h0m0s
 - always_run: false
-  as: ocp-qe-perfscale-router-perf-gcp
+  as: perfscale-gcp-router-perf-5nodes
   steps:
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "24"
+      WORKER_REPLICA_COUNT: "5"
     post:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
     - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
     workflow: openshift-qe-router-perf
-- as: ocp-qe-perfscale-node-density-cni-gcp
-  cron: 0 12 * * 1
+- always_run: false
+  as: perfscale-gcp-node-density-heavy-5nodes
   steps:
     cluster_profile: gcp-qe
     env:
-      WORKER_REPLICA_COUNT: "24"
+      WORKER_REPLICA_COUNT: "5"
     post:
     - chain: ipi-gcp-post
     pre:
     - chain: ipi-gcp-pre
-    - chain: create-infra-move-ingress-monitoring-registry
     - chain: workers-scale
-    workflow: openshift-qe-node-density-cni
-- as: ocp-qe-perfscale-node-density-heavy-gcp
-  cron: 0 12 * * 1
-  steps:
-    cluster_profile: gcp-qe
-    env:
-      WORKER_REPLICA_COUNT: "24"
-    post:
-    - chain: ipi-gcp-post
-    pre:
-    - chain: ipi-gcp-pre
     - chain: create-infra-move-ingress-monitoring-registry
-    - chain: workers-scale
     workflow: openshift-qe-node-density-heavy
+- always_run: false
+  as: perfscale-gcp-network-policy-5nodes
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      WORKER_REPLICA_COUNT: "5"
+    post:
+    - chain: ipi-gcp-post
+    pre:
+    - chain: ipi-gcp-pre
+    - chain: workers-scale
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-network-policy
+  timeout: 8h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
-  variant: gcp-4.13
+  variant: gcp-4.12-nightly-x86
