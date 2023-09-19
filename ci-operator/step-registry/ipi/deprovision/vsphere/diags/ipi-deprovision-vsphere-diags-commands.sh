@@ -123,7 +123,7 @@ function collect_diagnostic_data {
                   govc metric.sample -dc="${datacenter}" -d=80 -n=180 ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.txt
                   govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true ${full_hostpath} ${host_metrics} > ${vcenter_state}/${hostname}.metrics.json
                   govc object.collect -dc="${datacenter}" "${vm_host}" triggeredAlarmState &> "${vcenter_state}/${hostname}_alarms.log"
-                  HOST_METRIC_FILE="${hostname}.metrics.json"
+                  HOST_METRIC_FILE="${vcenter_state}/${hostname}.metrics.json"
                   JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$HOST_METRIC_FILE" --arg host "$hostname" '.hosts[.hosts | length] |= .+ {"file": $file, "name": $host}')
               fi
           fi
@@ -142,7 +142,7 @@ function collect_diagnostic_data {
           echo "$(date -u --rfc-3339=seconds) - capture console image from $vm"
           govc vm.console -dc="${datacenter}" -vm.ipath="${vm}" -capture "${vcenter_state}/${vmname}.png"
 
-          METRIC_FILE="${vmname}.metrics.json"
+          METRIC_FILE="${vcenter_state}/${vmname}.metrics.json"
           JSON_DATA=$(echo "${JSON_DATA}" | jq -r --arg file "$METRIC_FILE" --arg vm "$vmname" '.vms[.vms | length] |= .+ {"file": $file, "name": $vm}')
       done
   done
@@ -150,7 +150,62 @@ function collect_diagnostic_data {
   echo "{\"hw_version\":  \"${target_hw_version}\", \"cloud\": \"${cloud_where_run}\"}" > "${ARTIFACT_DIR}/runtime-config.json"
   echo ${JSON_DATA} > "${vcenter_state}/metric-files.json"
 
+  write_html
+
   set -e
+}
+
+function write_html() {
+  echo "Generating HTML"
+  generate_vm_input
+  generate_host_input
+  write_results_html
+}
+
+function generate_vm_input() {
+  IFS=$'\n' read -d '' -r -a VMS <<< "$(jq -r '.vms[]|.name' ${vcenter_state}/metric-files.json)"
+  # shellcheck disable=SC2089
+  VM_INPUT="<select name='vm-instances' id='vm-instances' class='vm-instances' onchange='loadVMData()'>"
+
+  for VM in "${VMS[@]}"; do
+    echo "Processing ${VM}"
+    VM_INPUT="${VM_INPUT}<option value='${VM}'>${VM}</option>"
+  done
+
+  VM_INPUT="${VM_INPUT}</select>"
+}
+
+function generate_host_input() {
+  IFS=$'\n' read -d '' -r -a HOSTS <<< "$(jq -r '.hosts[]|.name' ${vcenter_state}/metric-files.json)"
+  # shellcheck disable=SC2089
+  HOST_INPUT="<select name='host-instances' id='host-instances' class='host-instances' onchange='loadHostData()'>"
+
+  for HOST in "${HOSTS[@]}"; do
+    echo "Processing ${HOST}"
+    HOST_INPUT="${HOST_INPUT}<option value='${HOST}'>${HOST}</option>"
+  done
+
+  HOST_INPUT="${HOST_INPUT}</select>"
+}
+
+function embed_vm_data() {
+  IFS=$'\n' read -d '' -r -a VMS <<< "$(jq -r '.vms[]|.name' ${vcenter_state}/metric-files.json)"
+  for VM in "${VMS[@]}"; do
+    echo "<script type='application/json' id='${VM}'>" >> ${RESULT_HTML}
+    FILE=$(jq -r --arg VM "${VM}" '.vms[] | select(.name == $VM) | .file' ${vcenter_state}/metric-files.json)
+    cat $FILE >> ${RESULT_HTML}
+    echo "</script>" >> ${RESULT_HTML}
+  done
+}
+
+function embed_host_data() {
+  IFS=$'\n' read -d '' -r -a HOSTS <<< "$(jq -r '.hosts[]|.name' ${vcenter_state}/metric-files.json)"
+  for HOST in "${HOSTS[@]}"; do
+    echo "<script type='application/json' id='${HOST}'>" >> ${RESULT_HTML}
+    FILE=$(jq -r --arg HOST "${HOST}" '.hosts[] | select(.name == $HOST) | .file' ${vcenter_state}/metric-files.json)
+    cat $FILE >> ${RESULT_HTML}
+    echo "</script>" >> ${RESULT_HTML}
+  done
 }
 
 function write_results_html() {
@@ -162,7 +217,6 @@ function write_results_html() {
     <meta charset="utf-8">
     <title>vSphere Metrics</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6" crossorigin="anonymous">
-    <script src="./diag-results.js"></script>
     <style>
   div#nav-col ul {
     list-style: none;
@@ -182,7 +236,7 @@ function write_results_html() {
   .chart-container {
     position: relative;
     margin: auto;
-    height: 40vh;
+    height: 800px;
     width: 80vw;
   }
 
@@ -224,7 +278,10 @@ function write_results_html() {
       <div id="vm-data-content">
         <h1>Virtual Machines</h1>
         <hr>
-        <select name="vm-instances" id="vm-instances" class="vm-instances" onchange="loadVMData()"></select>
+EOF
+  # shellcheck disable=SC2090
+  echo ${VM_INPUT} >> ${RESULT_HTML}
+  cat >> ${RESULT_HTML} << EOF
         <div id="chart-div">
           <div class="chart-container">
             <canvas id="cpu-usage"></canvas>
@@ -251,7 +308,10 @@ function write_results_html() {
       <div id="host-data-content">
         <h1>Hosts</h1>
         <hr>
-        <select name="host-instances" id="host-instances" class="host-instances" onchange="loadHostData()"></select>
+EOF
+  # shellcheck disable=SC2090
+  echo ${HOST_INPUT} >> ${RESULT_HTML}
+  cat >> ${RESULT_HTML} << EOF
         <div id="chart-div">
           <div class="chart-container">
             <canvas id="host-cpu-usage-avg"></canvas>
@@ -268,6 +328,10 @@ function write_results_html() {
     </script>
     <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js">
     </script>
+EOF
+  embed_vm_data
+  embed_host_data
+  cat >> ${RESULT_HTML} << EOF
     <script>
 // main vue entry point
 var app = new Vue({
@@ -300,7 +364,6 @@ app.changeContent('summary')
     </script>
 
     <script>
-  getMetricFiles()
   var targetNode = document.getElementById('content');
   var observer = new MutationObserver(function(){
       if (document.getElementById("content").children[0].id == "vm-data-content") {
@@ -316,37 +379,13 @@ app.changeContent('summary')
   observerConfig.attributes = getBoolean("True");
   observerConfig.childList = getBoolean("True");
   observer.observe(targetNode, observerConfig);
-    </script>
-  </body>
-</html>
-EOF
-}
-
-function write_results_js() {
-  # Create diag-resultss.html
-  RESULT_JS="${ARTIFACT_DIR}/vcenter_state/diag-results.js"
-  cat >> ${RESULT_JS} << EOF
-async function loadMetricData(url) {
-  let myjson;
-  fetch(url).then(
-      function(u){ return u.json(); }
-    ).then(
-      function(json){
-        myjson = json;
-      }
-    );
-
-  return myjson;
-}
 
 function getBoolean(val) {
   return val.toLowerCase() === "True".toLowerCase();
 }
 
 async function processMaster(url, metricLabel, chart, prefix) {
-  const master0 = await fetch(url).then(
-    function(u){ return u.json(); }
-  );
+  const master0 = JSON.parse(document.getElementById(url).innerHTML);
   console.log(master0)
 
   var labels = [];
@@ -382,42 +421,6 @@ async function processMaster(url, metricLabel, chart, prefix) {
   console.log(newData);
   chart.data = newData;
   chart.update();
-}
-
-async function getMetricFiles() {
-  const filesInfo = await fetch("./metric-files.json").then(
-    function(u){ return u.json(); }
-  );
-
-  var selectInput = document.getElementById('vm-instances');
-  selectInput.innerHTML = [];
-
-  // Load VM Data Files
-  var options = []
-  for (vm of filesInfo.vms) {
-    console.log(vm)
-
-    var opt = document.createElement('option');
-
-    options.push("<option value='" + vm.file + "'>" + vm.name + "</option>");
-  }
-  selectInput.innerHTML = options.join();
-  //processMaster(filesInfo.files[0].file, Chart.getChart("readiness"));
-
-  // Clear Host List
-  var hostInput = document.getElementById('host-instances');
-  hostInput.innerHTML = [];
-
-  // Load Host Data Files
-  options = []
-  for (host of filesInfo.hosts) {
-    console.log(host)
-
-    var opt = document.createElement('option');
-
-    options.push("<option value='" + host.file + "'>" + host.name + "</option>");
-  }
-  hostInput.innerHTML = options.join();
 }
 
 function loadVMData() {
@@ -494,9 +497,10 @@ function createHostGraphs() {
   this.hostCpuUsageAvgGraph = new Chart(hostCpuUsageAvgCtx, getGraphConfig("Host CPU Usage Average", getBoolean("False")));
   this.hostCpuReadinessGraph = new Chart(hostCpuReadinessCtx, getGraphConfig("Host CPU Readiness", getBoolean("True")));
 }
+    </script>
+  </body>
+</html>
 EOF
 }
 
 collect_diagnostic_data
-write_results_html
-write_results_js
