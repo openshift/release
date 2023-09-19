@@ -1,0 +1,68 @@
+base_images:
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  hypershift-operator-initial:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-operator
+  test-bin:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-tests
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
+binary_build_commands: make build
+build_root:
+  from_repository: true
+images:
+- from: base
+  inputs:
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+  to: hypershift-operator
+- dockerfile_path: Dockerfile.control-plane
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: hypershift
+releases:
+  initial:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: hypershift-omr-tests-omr-ocp414-disconnected
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    workflow: hypershift-kubevirt-e2e-disconnected
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: hypershift
+  variant: omr-ocp414
