@@ -30,12 +30,18 @@ if [ -z "${CLUSTER_DATA_FILES}" ] ; then
   exit 1
 fi
 
+NUM_CLUSTERS=0
 CLUSTER_DATA_CMD="--destroy-clusters-from-s3-config-files "
 for data_file in $CLUSTER_DATA_FILES; do
   CLUSTER_DATA_CMD+="${data_file},"
+  NUM_CLUSTERS=$(( NUM_CLUSTERS + 1))
 done
 
 RUN_COMMAND+=$(echo "${CLUSTER_DATA_CMD}" | sed 's/,$//g')
+
+if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
+    RUN_COMMAND+=" --parallel"
+fi
 
 if [[ -n "${S3_BUCKET_PATH}" ]]; then
     RUN_COMMAND+=" --s3-bucket-path=${S3_BUCKET_PATH} "
