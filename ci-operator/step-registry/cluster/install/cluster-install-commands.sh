@@ -64,6 +64,7 @@ fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
 
+sleep 2h
 set +e
 ${RUN_COMMAND}
 return_code=$?
