@@ -17,7 +17,70 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
 fi
 
 openshift_install_path="/var/lib/openshift-install"
-third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${LEASED_RESOURCE}"))
+
+SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+
+# shellcheck source=/dev/null
+declare vsphere_datacenter
+declare vsphere_datastore
+declare vsphere_cluster
+declare dns_server
+declare vsphere_url
+declare vlanid
+declare primaryrouterhostname
+declare vsphere_portgroup
+source "${SHARED_DIR}/vsphere_context.sh"
+
+if [[ ${vsphere_portgroup} == *"segment"* ]]; then
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
+
+  machine_cidr="192.168.${third_octet}.0/25"
+  bootstrap_ip_address="192.168.${third_octet}.3"
+  lb_ip_address="192.168.${third_octet}.2"
+
+  read -r compute_ip_addresses <<EOM
+["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
+EOM
+
+  read -r control_plane_ip_addresses <<EOM
+["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
+EOM
+else
+
+  if ! jq -e --arg VLANID "$vlanid" '. | has($VLANID)' "${SUBNETS_CONFIG}"; then
+    echo "VLAN ID: ${vlanid} does not exist in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+    exit 1
+  fi
+
+  # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
+
+  lb_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
+  bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
+  machine_cidr=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+  dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+
+
+  lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
+  bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
+  machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
+
+  tempaddrs=()
+  for n in {4..6}; do
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  done
+
+  printf -v control_plane_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
+
+  tempaddrs=()
+  for n in {7..9}; do
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+  done
+
+  printf -v compute_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  compute_ip_addresses="[${compute_ip_addresses%,}]"
+
+fi
 
 export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
@@ -26,15 +89,15 @@ export OPENSHIFT_INSTALL_INVOKER=openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_
 
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
 # Create basedomain.txt
-echo "vmc-ci.devcluster.openshift.com" > "${SHARED_DIR}"/basedomain.txt
+echo "vmc-ci.devcluster.openshift.com" >"${SHARED_DIR}"/basedomain.txt
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
 
 # Create clustername.txt
-echo "${NAMESPACE}-${UNIQUE_HASH}" > "${SHARED_DIR}"/clustername.txt
+echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/clustername.txt
 cluster_name=$(<"${SHARED_DIR}"/clustername.txt)
 
 # Create clusterdomain.txt
-echo "${cluster_name}.${base_domain}" > "${SHARED_DIR}"/clusterdomain.txt
+echo "${cluster_name}.${base_domain}" >"${SHARED_DIR}"/clusterdomain.txt
 cluster_domain=$(<"${SHARED_DIR}"/clusterdomain.txt)
 
 ssh_pub_key_path="${CLUSTER_PROFILE_DIR}/ssh-publickey"
@@ -44,14 +107,14 @@ legacy_installer_json="${openshift_install_path}/rhcos.json"
 fcos_json_file="${openshift_install_path}/fcos.json"
 
 if [[ -f "$fcos_json_file" ]]; then
-    legacy_installer_json=$fcos_json_file
+  legacy_installer_json=$fcos_json_file
 fi
 
 # https://github.com/openshift/installer/blob/master/docs/user/overview.md#coreos-bootimages
 # This code needs to handle pre-4.8 installers though too.
 if openshift-install coreos print-stream-json 2>/tmp/err.txt >${SHARED_DIR}/coreos.json; then
-   echo "Using stream metadata"
-   ova_url=$(jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location' < ${SHARED_DIR}/coreos.json)
+  echo "Using stream metadata"
+  ova_url=$(jq -r '.architectures.x86_64.artifacts.vmware.formats.ova.disk.location' <${SHARED_DIR}/coreos.json)
 else
   if ! grep -qF 'unknown command \"coreos\"' /tmp/err.txt; then
     echo "Unhandled error from openshift-install" 1>&2
@@ -64,7 +127,7 @@ else
 fi
 rm -f /tmp/err.txt
 
-echo "${ova_url}" > "${SHARED_DIR}"/ova_url.txt
+echo "${ova_url}" >"${SHARED_DIR}"/ova_url.txt
 ova_url=$(<"${SHARED_DIR}"/ova_url.txt)
 
 vm_template="${ova_url##*/}"
@@ -87,29 +150,22 @@ echo "$(date -u --rfc-3339=seconds) - Selected hardware version ${target_hw_vers
 vm_template=${vm_template}-hw${target_hw_version}
 
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
-echo "export target_hw_version=${target_hw_version}" >> ${SHARED_DIR}/vsphere_context.sh
-# shellcheck source=/dev/null
-declare vsphere_datacenter
-declare vsphere_datastore
-declare vsphere_cluster
-declare dns_server
-declare vsphere_url
-source "${SHARED_DIR}/vsphere_context.sh"
+echo "export target_hw_version=${target_hw_version}" >>${SHARED_DIR}/vsphere_context.sh
 
 echo "$(date -u --rfc-3339=seconds) - Extend install-config.yaml ..."
 
 #set machine cidr if proxy is enabled
-if grep 'httpProxy' "${install_config}" ; then
-  cat >> "${install_config}" << EOF
+if grep 'httpProxy' "${install_config}"; then
+  cat >>"${install_config}" <<EOF
 networking:
   machineNetwork:
-  - cidr: "192.168.${third_octet}.0/25"
+  - cidr: "$machine_cidr"
 EOF
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
-cat > "${SHARED_DIR}/terraform.tfvars" <<-EOF
-machine_cidr = "192.168.${third_octet}.0/25"
+cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
+machine_cidr = "${machine_cidr}"
 vm_template = "${vm_template}"
 vsphere_cluster = "${vsphere_cluster}"
 vsphere_datacenter = "${vsphere_datacenter}"
@@ -122,16 +178,17 @@ cluster_domain = "${cluster_domain}"
 ssh_public_key_path = "${ssh_pub_key_path}"
 compute_memory = "16384"
 compute_num_cpus = "4"
-vm_network = "${LEASED_RESOURCE}"
+vm_network = "${vsphere_portgroup}"
 vm_dns_addresses = ["${dns_server}"]
-bootstrap_ip_address = "192.168.${third_octet}.3"
-lb_ip_address = "192.168.${third_octet}.2"
-compute_ip_addresses = ["192.168.${third_octet}.7","192.168.${third_octet}.8","192.168.${third_octet}.9"]
-control_plane_ip_addresses = ["192.168.${third_octet}.4","192.168.${third_octet}.5","192.168.${third_octet}.6"]
+
+bootstrap_ip_address = "${bootstrap_ip_address}"
+lb_ip_address = "${lb_ip_address}"
+compute_ip_addresses = ${compute_ip_addresses}
+control_plane_ip_addresses = ${control_plane_ip_addresses}
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Create secrets.auto.tfvars..."
-cat > "${SHARED_DIR}/secrets.auto.tfvars" <<-EOF
+cat >"${SHARED_DIR}/secrets.auto.tfvars" <<-EOF
 vsphere_password="${GOVC_PASSWORD}"
 vsphere_user="${GOVC_USERNAME}"
 ipam_token=""
@@ -141,9 +198,9 @@ dir=/tmp/installer
 mkdir "${dir}/"
 pushd ${dir}
 cp -t "${dir}" \
-    "${SHARED_DIR}/install-config.yaml"
+  "${SHARED_DIR}/install-config.yaml"
 
-echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_START"
+echo "$(date +%s)" >"${SHARED_DIR}/TEST_TIME_INSTALL_START"
 
 ### Create manifests
 echo "Creating manifests..."
@@ -171,9 +228,9 @@ echo "Removing compute machinesets..."
 rm -f openshift/99_openshift-cluster-api_worker-machineset-*.yaml
 
 if [[ ${PATCH_INFRA_MANIFEST:-} == "true" ]]; then
-### Update platform spec in the infra resource
-echo "Patching infrastructure resource manifest with the 'External' platform type..."
-cat <<EOF > /tmp/infraPlatformSpecPatch.yml
+  ### Update platform spec in the infra resource
+  echo "Patching infrastructure resource manifest with the 'External' platform type..."
+  cat <<EOF >/tmp/infraPlatformSpecPatch.yml
 spec:
   platformSpec:
     type: External
@@ -185,12 +242,12 @@ status:
       type: External
       external: {}
 EOF
-yq-go m -x -i "manifests/cluster-infrastructure-02-config.yml" "/tmp/infraPlatformSpecPatch.yml"
+  yq-go m -x -i "manifests/cluster-infrastructure-02-config.yml" "/tmp/infraPlatformSpecPatch.yml"
 
 else
 
-echo "Adding vSphere cloud controller manager manifests..."
-cat > "manifests/99_vsphere_cloud_controller_manager_namespace.yaml" <<-EOF
+  echo "Adding vSphere cloud controller manager manifests..."
+  cat >"manifests/99_vsphere_cloud_controller_manager_namespace.yaml" <<-EOF
 ---
 apiVersion: v1
 kind: Namespace
@@ -207,7 +264,7 @@ spec:
   finalizers:
   - kubernetes
 EOF
-cat > "manifests/99_vsphere_cloud_controller_manager_sa.yaml" <<-EOF
+  cat >"manifests/99_vsphere_cloud_controller_manager_sa.yaml" <<-EOF
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -218,7 +275,7 @@ metadata:
     component: cloud-controller-manager
   namespace: vsphere-cloud-controller-manager
 EOF
-cat > "manifests/99_vsphere_cloud_controller_manager_secret.yaml" <<-EOF
+  cat >"manifests/99_vsphere_cloud_controller_manager_secret.yaml" <<-EOF
 ---
 apiVersion: v1
 kind: Secret
@@ -233,7 +290,7 @@ stringData:
   ${vsphere_url}.username: "${GOVC_USERNAME}"
   ${vsphere_url}.password: "${GOVC_PASSWORD}"
 EOF
-cat > "manifests/99_vsphere_cloud_controller_manager_cm.yaml" <<-EOF
+  cat >"manifests/99_vsphere_cloud_controller_manager_cm.yaml" <<-EOF
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -266,7 +323,7 @@ data:
     #  region: k8s-region
     #  zone: k8s-zone
 EOF
-cat > "manifests/99_vsphere_cloud_controller_manager_rolebinding.yaml" <<-EOF
+  cat >"manifests/99_vsphere_cloud_controller_manager_rolebinding.yaml" <<-EOF
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -289,7 +346,7 @@ subjects:
     kind: User
     name: cloud-controller-manager
 EOF
-cat > "manifests/99_vsphere_cloud_controller_manager_clusterrolebinding.yaml" <<-EOF
+  cat >"manifests/99_vsphere_cloud_controller_manager_clusterrolebinding.yaml" <<-EOF
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -309,7 +366,7 @@ subjects:
   - kind: User
     name: cloud-controller-manager
 EOF
-cat > "manifests/99_vsphere_cloud_controller_manager_clusterrole.yaml" <<-EOF
+  cat >"manifests/99_vsphere_cloud_controller_manager_clusterrole.yaml" <<-EOF
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -408,9 +465,9 @@ rules:
     resources:
     - securitycontextconstraints
     verbs:
-    - use     
+    - use
 EOF
-cat > "manifests/99_vsphere_cloud_controller_manager_ds.yaml" <<-EOF
+  cat >"manifests/99_vsphere_cloud_controller_manager_ds.yaml" <<-EOF
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -453,11 +510,11 @@ spec:
       containers:
         - name: vsphere-cloud-controller-manager
           image: gcr.io/cloud-provider-vsphere/cpi/release/manager:v1.27.0
-          env:                                           
-          - name: "KUBERNETES_SERVICE_HOST"              
-            value: "api-int.${cluster_domain}" 
-          - name: "KUBERNETES_SERVICE_PORT"    
-            value: "6443"                      
+          env:
+          - name: "KUBERNETES_SERVICE_HOST"
+            value: "api-int.${cluster_domain}"
+          - name: "KUBERNETES_SERVICE_PORT"
+            value: "6443"
           args:
             - --cloud-provider=vsphere
             - --v=2
@@ -492,10 +549,9 @@ echo "Making control-plane nodes unschedulable..."
 sed -i "s;mastersSchedulable: true;mastersSchedulable: false;g" manifests/cluster-scheduler-02-config.yml
 
 ### Check hybrid network manifest
-if test -f "${SHARED_DIR}/manifest_cluster-network-03-config.yml"
-  then
-    echo "Applying hybrid network manifest..."
-    cp "${SHARED_DIR}/manifest_cluster-network-03-config.yml" manifests/cluster-network-03-config.yml
+if test -f "${SHARED_DIR}/manifest_cluster-network-03-config.yml"; then
+  echo "Applying hybrid network manifest..."
+  cp "${SHARED_DIR}/manifest_cluster-network-03-config.yml" manifests/cluster-network-03-config.yml
 fi
 
 ### Create Ignition configs
@@ -507,7 +563,7 @@ wait "$!"
 ret="$?"
 set -e
 
-echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_INSTALL_END"
+echo "$(date +%s)" >"${SHARED_DIR}/TEST_TIME_INSTALL_END"
 
 cp "${dir}/.openshift_install.log" "${ARTIFACT_DIR}/.openshift_install.log"
 
@@ -516,10 +572,10 @@ if [ $ret -ne 0 ]; then
 fi
 
 cp -t "${SHARED_DIR}" \
-    "${dir}/auth/kubeadmin-password" \
-    "${dir}/auth/kubeconfig" \
-    "${dir}/metadata.json" \
-    "${dir}"/*.ign
+  "${dir}/auth/kubeadmin-password" \
+  "${dir}/auth/kubeconfig" \
+  "${dir}/metadata.json" \
+  "${dir}"/*.ign
 
 # Removed tar of openshift state. Not enough room in SHARED_DIR with terraform state
 

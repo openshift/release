@@ -8,7 +8,7 @@ echo "$(date -u --rfc-3339=seconds) - Collecting vCenter performance data and al
 echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..."
 # shellcheck source=/dev/null
 declare cloud_where_run
-
+declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
 function collect_diagnostic_data {
@@ -98,23 +98,23 @@ function collect_diagnostic_data {
 
   JSON_DATA='{"vms": [], "hosts": []}'
   IFS=$'\n' read -d '' -r -a all_hosts <<< "$(govc find . -type h -runtime.powerState poweredOn)"
-  IFS=$'\n' read -d '' -r -a networks <<< "$(govc find -type=n -i=true -name ${LEASED_RESOURCE})"
+  IFS=$'\n' read -d '' -r -a networks <<< "$(govc find -type=n -i=true -name ${vsphere_portgroup})"
   for network in "${networks[@]}"; do
-          
-      IFS=$'\n' read -d '' -r -a vms <<< "$(govc find . -type m -runtime.powerState poweredOn -network $network)"            
+
+      IFS=$'\n' read -d '' -r -a vms <<< "$(govc find . -type m -runtime.powerState poweredOn -network $network)"
       if [ -z ${vms:-} ]; then
         govc find . -type m -runtime.powerState poweredOn -network $network
         echo "No VMs found"
         continue
       fi
-      for vm in "${vms[@]}"; do        
+      for vm in "${vms[@]}"; do
           datacenter=$(echo "$vm" | cut -d'/' -f 2)
           vm_host="$(govc vm.info -dc="${datacenter}" ${vm} | grep "Host:" | awk -F "Host:         " '{print $2}')"
-          
+
           if [ ! -z "${vm_host}" ]; then
               hostname=$(echo "${vm_host}" | rev | cut -d'/' -f 1 | rev)
-              if [ ! -f "${vcenter_state}/${hostname}.metrics.txt" ]; then                  
-                  full_hostpath=$(for host in "${all_hosts[@]}"; do echo ${host} | grep ${vm_host}; done)                  
+              if [ ! -f "${vcenter_state}/${hostname}.metrics.txt" ]; then
+                  full_hostpath=$(for host in "${all_hosts[@]}"; do echo ${host} | grep ${vm_host}; done)
                   if [ -z "${full_hostpath:-}" ]; then
                     continue
                   fi
@@ -128,12 +128,12 @@ function collect_diagnostic_data {
               fi
           fi
           echo "Collecting VM metrics for ${vm}"
-          vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)          
+          vmname=$(echo "$vm" | rev | cut -d'/' -f 1 | rev)
           govc metric.sample -dc="${datacenter}" -d=80 -n=180 $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.txt
           govc metric.sample -dc="${datacenter}" -d=80 -n=180 -t=true -json=true $vm ${vm_metrics} > ${vcenter_state}/${vmname}.metrics.json
 
           echo "Collecting alarms from ${vm}"
-          govc object.collect -dc="${datacenter}" "${vm}" triggeredAlarmState &> "${vcenter_state}/${vmname}_alarms.log"    
+          govc object.collect -dc="${datacenter}" "${vm}" triggeredAlarmState &> "${vcenter_state}/${vmname}_alarms.log"
 
           # press ENTER on the console if screensaver is running
           echo "Keystoke enter in ${vmname} console"
