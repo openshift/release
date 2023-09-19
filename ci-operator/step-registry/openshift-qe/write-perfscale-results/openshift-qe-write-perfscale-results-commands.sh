@@ -25,12 +25,12 @@ export GSHEET_KEY_LOCATION
 sa_email=$(jq -r .client_email ${GSHEET_KEY_LOCATION})
 echo "$sa_email"
 
-export EMAIL_ID_FOR_RESULTS_SHEET=prubenda@redhat.com
+export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
 mkdir sandman
 
 git clone https://github.com/openshift-qe/ocp-qe-perfscale-ci.git sandman -b main
-git clone https://github.com/paigerube14/ocp-qe-perfscale-ci.git -b prow_write
+git clone https://github.com/openshift-qe/ocp-qe-perfscale-ci.git -b write-scale-ci-results
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
