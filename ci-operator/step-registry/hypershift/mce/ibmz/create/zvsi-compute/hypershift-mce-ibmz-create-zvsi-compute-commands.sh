@@ -11,8 +11,6 @@ hcp_ns=$hc_ns-$hc_name
 export hcp_ns
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
-httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
-export httpd_vsi_key
 httpd_vsi_pub_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
 export httpd_vsi_pub_key
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
@@ -216,10 +214,15 @@ kernel_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.boot
 export kernel_url
 rootfs_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
 export rootfs_url
-tmp_ssh_key="/tmp/http-vsi-key"
-cp ${httpd_vsi_key} ${tmp_ssh_key}
+tmp_ssh_key="/tmp/httpd-vsi-key"
+cp "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" ${tmp_ssh_key}
 chmod 0600 ${tmp_ssh_key}
-echo "[DEBUG] Checking the ssh key file"
+sed -i 's/\\n/\n/g' ${tmp_ssh_key}
+echo "[DEBUG] Checking the ssh key file in /etc"
+ls -lart /etc/hypershift-agent-ibmz-credentials/
+cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
+echo "[DEBUG] Checking the ssh key file /tmp"
+ls -lart /tmp/
 cat ${tmp_ssh_key}
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${tmp_ssh_key}")
 echo "Downloading the rootfs image locally and transferring to HTTPD server"

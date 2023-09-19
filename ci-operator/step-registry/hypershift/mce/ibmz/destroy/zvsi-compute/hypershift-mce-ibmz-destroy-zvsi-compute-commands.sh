@@ -8,8 +8,6 @@ plugins_list=("vpc-infrastructure" "cloud-dns-services")
 hc_name="agent-ibmz"
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
-httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
-export httpd_vsi_key
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
@@ -129,8 +127,9 @@ ibmcloud resource group-delete $infra_name-rg -f
 echo "Successfully completed the destruction of all the resources that are created during the CI."
 
 # Deleting the rootfs image from the HTTPD server
-tmp_ssh_key="/tmp/http-vsi-key"
-cp ${httpd_vsi_key} ${tmp_ssh_key}
+tmp_ssh_key="/tmp/httpd-vsi-key"
+cp "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" ${tmp_ssh_key}
 chmod 0600 ${tmp_ssh_key}
-ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i ${tmp_ssh_key} root@$httpd_vsi_ip "rm -rf /var/www/html/rootfs.img"
+sed -i 's/\\n/\n/g' ${tmp_ssh_key}
+ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${tmp_ssh_key}" root@$httpd_vsi_ip "rm -rf /var/www/html/rootfs.img"
 set +e
