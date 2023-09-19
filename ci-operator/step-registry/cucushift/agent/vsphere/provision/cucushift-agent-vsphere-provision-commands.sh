@@ -17,6 +17,7 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 declare target_hw_version
 declare vsphere_datacenter
 declare vsphere_datastore
+declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
 installer_dir=/tmp/installer
@@ -55,7 +56,7 @@ for ((i = 0; i < total_host; i++)); do
     -g=coreos64Guest \
     -c=${cpu} \
     -disk=120GB \
-    -net="${LEASED_RESOURCE}" \
+    -net="${vsphere_portgroup}" \
     -firmware=efi \
     -on=false \
     -version vmx-"${target_hw_version}" \
@@ -78,7 +79,7 @@ for ((i = 0; i < total_host; i++)); do
 
   govc vm.network.change \
     -vm="/${vsphere_datacenter}/vm/${vm_name}" \
-    -net "${LEASED_RESOURCE}" \
+    -net "${vsphere_portgroup}" \
     -net.address "${mac_addresses[$i]}" ethernet-0
 
   govc vm.power \

@@ -442,7 +442,7 @@ for manifest_name in os.listdir("./"):
       break
 ' || return 1
   popd
-  
+
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -505,16 +505,9 @@ ibmcloud*)
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
-vsphere)
+vsphere*)
     export VSPHERE_PERSIST_SESSION=true
-    declare cloud_where_run
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/vsphere_context.sh"
-    if [ "$cloud_where_run" == "IBMC-DEVQE" ]; then
-        export SSL_CERT_FILE=/var/run/devqe-secrets/vcenter-certificate
-    else
-        export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
-    fi
+    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
@@ -593,7 +586,7 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
 case $JOB_NAME in
-  *vsphere*)
+  *vsphere)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
     max=1
     ;;
