@@ -13,6 +13,8 @@ IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 httpd_vsi_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
 export httpd_vsi_key
+httpd_vsi_pub_key="${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-pub-key"
+export httpd_vsi_pub_key
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
 
@@ -72,7 +74,7 @@ fi
 # Create SSH key
 set -e
 echo "Creating an SSH key in the resource group $infra_name-rg"
-ibmcloud is key-create $infra_name-key @$HOME/.ssh/id_rsa.pub --resource-group-name $infra_name-rg
+ibmcloud is key-create $infra_name-key @$httpd_vsi_pub_key --resource-group-name $infra_name-rg
 ibmcloud is keys --resource-group-name $infra_name-rg | grep -i $infra_name-key
 set +e
 
@@ -212,13 +214,13 @@ kernel_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.boot
 export kernel_url
 rootfs_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
 export rootfs_url
-ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null')
+ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${httpd_vsi_key}")
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
-curl -o $HOME/rootfs.img "$rootfs_url"
-scp "${ssh_options[@]}" -i $httpd_vsi_key $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
-ssh "${ssh_options[@]}" -i $httpd_vsi_key root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs.img"
+curl --output $HOME/rootfs.img "$rootfs_url"
+scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
+ssh "${ssh_options[@]}" root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs.img"
 echo "Downloading the setup script for pxeboot of agents"
-curl -o $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
+curl --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
 minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
 export minitrd_url
 mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
