@@ -187,7 +187,6 @@ trap 'echo "$(date +%s)" > "${SHARED_DIR}/TEST_TIME_TEST_END"' EXIT
 # check if the cluster is ready
 oc version --client
 oc wait nodes --all --for=condition=Ready=true --timeout=15m
-oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m
 
 # execute the cases
 function run {
@@ -423,4 +422,50 @@ function check_case_selected {
         echo "do not find case"
     fi
 }
+function cocheck_junit_generate {
+    co=$1
+    step_type=$2
+    recognize_co="yes"
+    sub_team=$(python3 ${REPORT_HANDLE_PATH}/handleresult.py -a comap -co ${co})
+    if [ "W${sub_team}W" == "WNoCOW" ]; then
+        echo "the CO ${co} is not recognized, set default as OLM with subteam so that Kui add it"
+        sub_team="OLM"
+        recognize_co="no"
+    fi
+    hcj_file="import-${sub_team}.xml"
+    resultfile=`ls -rt -1 ${hcj_file} 2>&1 || true`
+    if (echo $resultfile | grep -q -E "no matches found") || (echo $resultfile | grep -q -E "No such file or directory") ; then
+        echo "no junt xml for ${co} yet"
+        hcj_file=""
+    fi
+    hcj_ret=0
+    if [ "W${hcj_file}W" == "WW" ]; then
+        python3 ${REPORT_HANDLE_PATH}/handleresult.py -a hcj -st "${step_type}" -co "${co}" -s "${sub_team}" -r "${recognize_co}" ||  hcj_ret=$?
+    else
+        python3 ${REPORT_HANDLE_PATH}/handleresult.py -a hcj -i ${hcj_file} -st "${step_type}" -co "${co}" -s "${sub_team}" -r "${recognize_co}" || hcj_ret=$?
+    fi
+    if ! [ "W${hcj_ret}W" == "W0W" ]; then
+        echo "${co} junit file is not generated correctly"
+        rm -fr "import-${sub_team}bak.xml"
+        return
+    fi
+    cp -fr "import-${sub_team}bak.xml" "import-${sub_team}.xml"
+    rm -fr "import-${sub_team}bak.xml"
+}
+function co_check {
+    wait_co_ret=0
+    oc wait clusteroperators --all --for=condition=Progressing=false --timeout=15m  || wait_co_ret=$?
+    if ! [ "W${wait_co_ret}W" == "W0W" ]; then
+        for clusteroperator in $(oc get co -ojson|jq -r '.items[] | select(.status.conditions[] | select(.type == "Progressing" and .status == "True")) | .metadata.name')
+        do
+            echo "${clusteroperator}'s progressing status is not expected"
+            oc get co ${clusteroperator} -o yaml || true
+            cocheck_junit_generate ${clusteroperator} "pstupg" || true
+        done
+        mkdir -p "${ARTIFACT_DIR}/junit/" || true
+        cp -fr import-*.xml "${ARTIFACT_DIR}/junit/" || true
+        exit $wait_co_ret
+    fi
+}
+co_check
 run

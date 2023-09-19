@@ -22,7 +22,6 @@ ci_operator_dir="${base_dir}/ci-operator"
 cp -r "${ci_operator_dir}" "${workdir}"
 
 ci-operator-prowgen --from-dir "${ci_operator_dir}/config" --to-dir "${workdir}/ci-operator/jobs"
-sanitize-prow-jobs --prow-jobs-dir "${workdir}/ci-operator/jobs" --config-path core-services/sanitize-prow-jobs/_config.yaml
 
 if ! diff -Naupr "${ci_operator_dir}/jobs/" "${workdir}/ci-operator/jobs/"> "${workdir}/diff"; then
 	cat << EOF

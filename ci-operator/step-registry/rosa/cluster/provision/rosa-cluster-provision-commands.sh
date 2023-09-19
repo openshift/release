@@ -131,6 +131,17 @@ if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
 fi
 
+COMPUTER_NODE_ZONES_SWITCH=""
+if [[ ! -z "$AVAILABILITY_ZONES" ]]; then
+  AVAILABILITY_ZONES=$(echo $AVAILABILITY_ZONES | sed -E "s|(\w+)|${CLOUD_PROVIDER_REGION}&|g")
+  COMPUTER_NODE_ZONES_SWITCH="--availability-zones ${AVAILABILITY_ZONES}"
+fi
+
+COMPUTER_NODE_DISK_SIZE_SWITCH=""
+if [[ ! -z "$WORKER_DISK_SIZE" ]]; then
+  COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
+fi
+
 AUDIT_LOG_SWITCH=""
 if [[ "$ENABLE_AUDIT_LOG" == "true" ]]; then
   iam_role_arn=$(head -n 1 ${SHARED_DIR}/iam_role_arn)
@@ -354,6 +365,8 @@ ${DISABLE_SCP_CHECKS_SWITCH} \
 ${DEFAULT_MP_LABELS_SWITCH} \
 ${STORAGE_ENCRYPTION_SWITCH} \
 ${AUDIT_LOG_SWITCH} \
+${COMPUTER_NODE_ZONES_SWITCH} \
+${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 
@@ -389,6 +402,8 @@ rosa create cluster -y \
                     ${DEFAULT_MP_LABELS_SWITCH} \
                     ${STORAGE_ENCRYPTION_SWITCH} \
                     ${AUDIT_LOG_SWITCH} \
+                    ${COMPUTER_NODE_ZONES_SWITCH} \
+                    ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
 
