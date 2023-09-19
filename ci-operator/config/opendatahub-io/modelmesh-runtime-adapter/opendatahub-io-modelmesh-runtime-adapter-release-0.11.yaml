@@ -44,26 +44,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
-- as: fvt
-  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
-  steps:
-    cluster_profile: aws
-    env:
-      COMPUTE_NODE_TYPE: m5.2xlarge
-    test:
-    - as: modelmesh-serving-fvt
-      commands: |
-        export HOME=/go
-        STABLE_MANIFESTS=true CONTROLLERNAMESPACE=modelmesh-serving NAMESPACE=modelmesh-serving NAMESPACESCOPEMODE=true CUSTOM_IMG=modelmesh-runtime-adapter=${PR_MODELMESH_RUNTIME_ADAPTER_IMAGE} make e2e-test-for-odh
-      dependencies:
-      - env: PR_MODELMESH_RUNTIME_ADAPTER_IMAGE
-        name: modelmesh-runtime-adapter
-      from: modelmesh-serving-develop
-      resources:
-        requests:
-          cpu: 2000m
-          memory: 3Gi
-    workflow: ipi-aws
 - as: pr-image-mirror
   skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
   steps:
