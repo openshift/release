@@ -47,6 +47,7 @@ if [ $NUM_CLUSTERS -eq 1 ]; then
   fi
 fi
 
+
 RUN_COMMAND+="${CLUSTERS_CMD} "
 
 if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
