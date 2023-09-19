@@ -25,7 +25,7 @@ export GSHEET_KEY_LOCATION
 sa_email=$(jq -r .client_email ${GSHEET_KEY_LOCATION})
 echo "$sa_email"
 
-export EMAIL_ID_FOR_RESULTS_SHEET=prubenda@redhat.com
+export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
 mkdir sandman
 
