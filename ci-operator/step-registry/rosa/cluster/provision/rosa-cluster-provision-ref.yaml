@@ -21,15 +21,24 @@ ref:
   - name: STS
     default: "true"
     documentation: If the cluster is deployed with AWS Security Token Service (STS) instead of IAM credentials, it is a STS cluster.
+  - name: HOSTED_CP
+    default: "false"
+    documentation: Enable the use of hosted control planes (HyperShift).
   - name: COMPUTE_MACHINE_TYPE
     default: ""
     documentation: The instance size for compute nodes. If not specified, a default will be chosen appropriate for your cluster_profile.
+  - name: WORKER_DISK_SIZE
+    default: ""
+    documentation: Machine pool root disk size with a **unit suffix** like GiB or TiB, e.g. 200GiB.
   - name: REGION
     default: ""
     documentation: Use a specific AWS region, overriding the LEASED_RESOURCE environment variable in the cluster_profile.
   - name: MULTI_AZ
     default: "false"
     documentation: Set to 'true' if you want to deploy a cluster across muiltiple availability zones.
+  - name: AVAILABILITY_ZONES
+    default: ""
+    documentation: The availability zones to use when installing a non-BYOVPC cluster. Format should be a comma-separated list, etc. 'a,b'.
   - name: REPLICAS
     default: "2"
     documentation: Number of compute nodes to provision. Single zone clusters need at least 2 nodes, multizone clusters need at least 3 nodes. It is only valid while enable_autoscaling is false.
@@ -42,6 +51,9 @@ ref:
   - name: MAX_REPLICAS
     default: "6"
     documentation: The max number of the compute nodes. It is valid when the enable_autoscaling is true. The value should be a multiple of three for multizone clusters. The value must not less that the min_replica.
+  - name: DEFAULT_MACHINE_POOL_LABELS
+    default: ""
+    documentation: Labels for the default machine pool. Format should be a comma-separated list of 'key=value'.
   - name: OPENSHIFT_VERSION
     default: ""
     documentation: The openshift version for rosa to install (e.g. "4.10.12"). Specify a major/minor (e.g. "4.10") to get the latest version from that stream.
@@ -51,51 +63,45 @@ ref:
   - name: EC_BUILD
     default: "false"
     documentation: Set to 'true' to choose the engineer candidate openshift version.
-  - name: EC2_METADATA_HTTP_TOKENS
-    default: "optional"
-    documentation: Configure the use of IMDSv2 for ec2 instances, the supported values are [optional, required].
+  - name: ENABLE_BYOVPC
+    default: "false"
+    documentation: Use the customized VPC to install the cluster.
   - name: ETCD_ENCRYPTION
     default: "false"
     documentation: Add etcd encryption. By default etcd data is encrypted at rest. This option configures etcd encryption on top of existing storage encryption.
   - name: STORAGE_ENCRYPTION
     default: "false"
     documentation: Add storage encryption to encrypt EBS instance volumes with the KMS key.
-  - name: DISABLE_WORKLOAD_MONITORING
-    default: "false"
-    documentation: Enables you to monitor your own projects in isolation from Red Hat Site Reliability Engineer (SRE) platform metrics.
-  - name: FIPS
-    default: "false"
-    documentation: Create cluster that uses FIPS Validated / Modules in Process cryptographic libraries.
   - name: PRIVATE
     default: "false"
     documentation: Restrict master API endpoint and application routes to direct, private connectivity.
   - name: PRIVATE_LINK
     default: "false"
     documentation: Provides private connectivity between VPCs, AWS services, and your on-premises networks, without exposing your traffic to the public internet.
-  - name: CLUSTER_TAGS
-    default: ""
-    documentation: Apply user defined tags to all resources created by ROSA in AWS. Tags are comma separated example - 'foo:bar,bar:baz', The default value is "prowci:${CLUSTER_NAME}".
-  - name: DEFAULT_MACHINE_POOL_LABELS
-    default: ""
-    documentation: Labels for the default machine pool. Format should be a comma-separated list of 'key=value'.
   - name: ENABLE_PROXY
     default: "false"
     documentation: Use proxy to create HTTP/HTTPs connections outside the cluster.
-  - name: ENABLE_BYOVPC
-    default: "false"
-    documentation: Use the customized VPC to install the cluster.
-  - name: ENABLE_AUDIT_LOG
-    default: "false"
-    documentation: Enable Forwarding audit logs to AWS CloudWatch.
-  - name: DISABLE_SCP_CHECKS
-    default: "false"
-    documentation: Indicates if cloud permission checks are disabled when attempting installation of the cluster.
-  - name: HOSTED_CP
-    default: "false"
-    documentation: Enable the use of hosted control planes (HyperShift).
   - name: BYO_OIDC
     default: "false"
     documentation: Use the customized OIDC Config and operator-roles to install the cluster.
+  - name: ENABLE_AUDIT_LOG
+    default: "false"
+    documentation: Enable Forwarding audit logs to AWS CloudWatch.
+  - name: EC2_METADATA_HTTP_TOKENS
+    default: "optional"
+    documentation: Configure the use of IMDSv2 for ec2 instances, the supported values are [optional, required].
+  - name: DISABLE_WORKLOAD_MONITORING
+    default: "false"
+    documentation: Enables you to monitor your own projects in isolation from Red Hat Site Reliability Engineer (SRE) platform metrics.
+  - name: DISABLE_SCP_CHECKS
+    default: "false"
+    documentation: Indicates if cloud permission checks are disabled when attempting installation of the cluster.
+  - name: FIPS
+    default: "false"
+    documentation: Create cluster that uses FIPS Validated / Modules in Process cryptographic libraries.
+  - name: CLUSTER_TAGS
+    default: ""
+    documentation: Apply user defined tags to all resources created by ROSA in AWS. Tags are comma separated example - 'foo:bar,bar:baz', The default value is "prowci:${CLUSTER_NAME}".
   - name: ENABLE_SECTOR
     default: "false"
     documentation: Enable the sector to specify the provision shard to provision the hosted control planes (HyperShift) cluster.
