@@ -1,9 +1,11 @@
 cluster_groups:
   bastion:
+  - build01
   - build02
   build_farm:
   - app.ci
   - arm01
+  - build01
   - build02
   - build03
   - build04
@@ -14,6 +16,7 @@ cluster_groups:
   - vsphere02
   non_app_ci:
   - arm01
+  - build01
   - build02
   - build03
   - build04
@@ -25,6 +28,7 @@ cluster_groups:
   non_app_ci_arm:
   - arm01
   non_osd_x86:
+  - build01
   - build02
   - vsphere
   osd_global_pull_secret:
@@ -1723,6 +1727,9 @@ secret_configs:
         email_field: email
         item: registry.redhat.io-pull-secret
         registry_url: registry.redhat.io
+      - auth_field: token_image-puller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build01.ci.openshift.org
       - auth_field: token_image-puller_build02_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build02.ci.openshift.org
@@ -1762,6 +1769,9 @@ secret_configs:
         email_field: email
         item: registry.redhat.io-pull-secret
         registry_url: registry.redhat.io
+      - auth_field: token_image-puller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build01.ci.openshift.org
       - auth_field: token_image-puller_build02_reg_auth_value.txt
         item: build_farm
         registry_url: registry.build02.ci.openshift.org
@@ -2081,12 +2091,18 @@ secret_configs:
       field: redhat-developer-service-binding-operator
       item: codecov-tokens
   to:
+  - cluster: build01
+    name: redhat-developer-service-binding-operator-codecov-token
+    namespace: ci
   - cluster: build02
     name: redhat-developer-service-binding-operator-codecov-token
     namespace: ci
 - from:
     app.ci.config:
       field: sa.pod-scaler.app.ci.config
+      item: pod-scaler
+    build01.config:
+      field: sa.pod-scaler.build01.config
       item: pod-scaler
     build02.config:
       field: sa.pod-scaler.build02.config
@@ -2108,6 +2124,9 @@ secret_configs:
       item: pod-scaler
     sa.pod-scaler.app.ci.token.txt:
       field: sa.pod-scaler.app.ci.token.txt
+      item: pod-scaler
+    sa.pod-scaler.build01.token.txt:
+      field: sa.pod-scaler.build01.token.txt
       item: pod-scaler
     sa.pod-scaler.build02.token.txt:
       field: sa.pod-scaler.build02.token.txt
@@ -2140,6 +2159,17 @@ secret_configs:
       item: build_farm
   to:
   - cluster: arm01
+    name: ci-operator
+    namespace: test-credentials
+- from:
+    kubeconfig:
+      field: sa.ci-operator.build01.config
+      item: build_farm
+    sa.ci-operator.build01.token.txt:
+      field: sa.ci-operator.build01.token.txt
+      item: build_farm
+  to:
+  - cluster: build01
     name: ci-operator
     namespace: test-credentials
 - from:
@@ -2236,6 +2266,17 @@ secret_configs:
   to:
   - cluster: app.ci
     name: aws-ci-infra-ci-app-ci-audit-logs-uploader-credentials
+    namespace: api-audit-log
+- from:
+    AWS_ACCESS_KEY_ID:
+      field: AWS_ACCESS_KEY_ID
+      item: aws_ci_infra_ci-build01-audit-logs-uploader
+    AWS_SECRET_ACCESS_KEY:
+      field: AWS_SECRET_ACCESS_KEY
+      item: aws_ci_infra_ci-build01-audit-logs-uploader
+  to:
+  - cluster: build01
+    name: aws-ci-infra-ci-build01-audit-logs-uploader-credentials
     namespace: api-audit-log
 - from:
     AWS_ACCESS_KEY_ID:
@@ -3156,6 +3197,20 @@ secret_configs:
 - from:
     AWS_ACCESS_KEY_ID:
       field: AWS_ACCESS_KEY_ID
+      item: cert-manager
+    AWS_SECRET_ACCESS_KEY:
+      field: AWS_SECRET_ACCESS_KEY
+      item: cert-manager
+    key.json:
+      field: service-account.json
+      item: cert-issuer
+  to:
+  - cluster: build01
+    name: cert-issuer
+    namespace: cert-manager
+- from:
+    AWS_ACCESS_KEY_ID:
+      field: AWS_ACCESS_KEY_ID
       item: cert-manager-multi01
     AWS_SECRET_ACCESS_KEY:
       field: AWS_SECRET_ACCESS_KEY
@@ -3332,6 +3387,33 @@ secret_configs:
 - from:
     .dockerconfigjson:
       dockerconfigJSON:
+      - auth_field: token_image-puller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_field: token_image-puller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_image-puller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build01.ci.openshift.org
+      - auth_field: token_image-pusher_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        item: quay-io-push-credentials
+        registry_url: quay.io/openshift/ci
+  to:
+  - cluster: build01
+    name: registry-push-credentials-ci-central
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build01
+    name: registry-push-credentials-ci-central
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
       - auth_field: token_image-puller_build02_reg_auth_value.txt
         item: build_farm
         registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
@@ -3469,6 +3551,34 @@ secret_configs:
     namespace: ci
     type: kubernetes.io/dockerconfigjson
   - cluster: arm01
+    name: registry-pull-credentials
+    namespace: test-credentials
+    type: kubernetes.io/dockerconfigjson
+- from:
+    .dockerconfigjson:
+      dockerconfigJSON:
+      - auth_field: token_image-puller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc.cluster.local:5000
+      - auth_field: token_image-puller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: image-registry.openshift-image-registry.svc:5000
+      - auth_field: token_image-puller_build01_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.build01.ci.openshift.org
+      - auth_field: token_image-puller_app.ci_reg_auth_value.txt
+        item: build_farm
+        registry_url: registry.ci.openshift.org
+      - auth_field: auth
+        email_field: email
+        item: quay.io-pull-secret
+        registry_url: quay.io
+  to:
+  - cluster: build01
+    name: registry-pull-credentials
+    namespace: ci
+    type: kubernetes.io/dockerconfigjson
+  - cluster: build01
     name: registry-pull-credentials
     namespace: test-credentials
     type: kubernetes.io/dockerconfigjson
@@ -4979,6 +5089,7 @@ secret_configs:
 user_secrets_target_clusters:
 - app.ci
 - arm01
+- build01
 - build02
 - build03
 - build04
