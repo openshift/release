@@ -177,7 +177,8 @@ else
 fi
 
 echo "Fetching the hosted cluster IP address for resolution"
-hc_ip=$(dig +short "$(cat ${SHARED_DIR}/${hc_name}_kubeconfig)" | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1)
+hc_url=$(cat ${SHARED_DIR}/${hc_name}_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1)
+hc_ip=$(dig +short $hc_url)
 
 echo "Adding A records in the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 $hc_ip -i $infra_name-dns
@@ -186,6 +187,7 @@ if [ $? -eq 0 ]; then
   echo "Successfully added the A record of zVSI compute node IP to resolve the hosted cluster apis."
 else 
   echo "A record addition is not successful."
+  exit 1
 fi
 
 echo "Creating origin pool in the DNS instances for load balancing the compute nodes"
@@ -216,11 +218,11 @@ rootfs_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.boot
 export rootfs_url
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${httpd_vsi_key}")
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
-curl --output $HOME/rootfs.img "$rootfs_url"
+curl -k -L --output $HOME/rootfs.img "$rootfs_url"
 scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
 ssh "${ssh_options[@]}" root@$httpd_vsi_ip "chmod 644 /var/www/html/rootfs.img"
 echo "Downloading the setup script for pxeboot of agents"
-curl --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
+curl -k -L --output $HOME/setup_pxeboot.sh "http://$httpd_vsi_ip:80/setup_pxeboot.sh"
 minitrd_url="${initrd_url//&/\\&}"                                 # Escaping & while replacing the URL
 export minitrd_url
 mkernel_url="${kernel_url//&/\\&}"                                 # Escaping & while replacing the URL
