@@ -84,6 +84,9 @@ run-on-all-nodes "echo 'KUBELET_NODEIP_HINT=192.168.127.1' | sudo tee /etc/defau
 # Shutdown nodes
 mapfile -d ' ' -t VMS < <( virsh list --all --name )
 for vm in ${VMS[@]}; do
+  if [[ "${vm}" == "minikube" ]]; then
+    continue
+  fi
   virsh shutdown ${vm}
   until virsh domstate ${vm} | grep "shut off"; do
     echo "${vm} still running"
@@ -98,6 +101,9 @@ sudo timedatectl status
 
 # Start nodes again
 for vm in ${VMS[@]}; do
+  if [[ "${vm}" == "minikube" ]]; then
+    continue
+  fi
   virsh start ${vm}
   until virsh domstate ${vm} | grep "running"; do
     echo "${vm} still not yet running"
