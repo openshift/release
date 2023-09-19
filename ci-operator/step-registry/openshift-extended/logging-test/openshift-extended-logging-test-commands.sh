@@ -277,17 +277,29 @@ function run {
     echo "done to handle result"
     if [ "W${ret_value}W" == "W0W" ]; then
         echo "success"
-        exit 0
+    else
+        echo "fail"
     fi
-    echo "fail"
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
         echo "force success exit"
         exit 1
     fi
-    echo "normal exit"
-    exit 0
+
+    # summarize test results
+    echo "Summarizing test result..."
+    mapfile -t test_suite_failures < <(grep -r -E 'testsuite.*failures="[1-9][0-9]*"' "${ARTIFACT_DIR}" | grep -o -E 'failures="[0-9]+"' | sed -E 's/failures="([0-9]+)"/\1/')
+    failures=0
+    for (( i=0; i<${#test_suite_failures[@]}; ++i ))
+    do
+        let failures+=${test_suite_failures[$i]}
+    done
+    if [ $((failures)) == 0 ]; then
+        echo "All tests have passed"
+    else
+        echo "${failures} failures in openshift-extended-logging-test" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report-openshift-extended-test-failures"
+    fi
 }
 
 # select the cases per FILTERS
