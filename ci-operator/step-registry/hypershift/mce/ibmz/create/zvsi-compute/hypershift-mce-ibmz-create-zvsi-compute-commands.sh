@@ -178,7 +178,7 @@ fi
 
 echo "Fetching the hosted cluster IP address for resolution"
 hc_url=$(cat ${SHARED_DIR}/${hc_name}_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1)
-hc_ip=$(dig +short $hc_url)
+hc_ip=$(dig +short $hc_url | head -1)
 
 echo "Adding A records in the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 $hc_ip -i $infra_name-dns
@@ -253,6 +253,9 @@ for ((i=50; i>=1; i--)); do
   if [ "$agents_count" -eq ${HYPERSHIFT_NODE_COUNT} ]; then
     echo "Agents attached"
     break
+  elif [ "$i" -eq 1 ]; then
+    echo "[ERROR] Only $agents_count Agents joined the cluster even after 20 mins..., 0 retries left"
+    exit 1
   else
     echo "Waiting for agents to join the cluster..., $i retries left"
   fi
@@ -280,6 +283,9 @@ for ((i=60; i>=1; i--)); do
   if [ "$node_count" -eq $HYPERSHIFT_NODE_COUNT ]; then
     echo "Compute nodes attached"
     break
+  elif [ "$i" -eq 1 ]; then
+    echo "[ERROR] Only $node_count Compute nodes attached to the cluster even after 30 mins..., 0 retries left"
+    exit 1
   else
     echo "Waiting for Compute nodes to join..., $i retries left"
   fi
@@ -292,6 +298,9 @@ for ((i=30; i>=1; i--)); do
   if [ "$not_ready_count" -eq 0 ]; then
     echo "All Compute nodes are Ready"
     break
+  elif [ "$i" -eq 1 ]; then
+    echo "[ERROR] $not_ready_count Compute nodes are not in ready state even after 12 mins..., 0 retries left"
+    exit 1
   else
     echo "Waiting for Compute nodes to be Ready..., $i retries left"
   fi
