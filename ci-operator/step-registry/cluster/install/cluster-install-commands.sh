@@ -47,7 +47,6 @@ if [ $NUM_CLUSTERS -eq 1 ]; then
   fi
 fi
 
-
 RUN_COMMAND+="${CLUSTERS_CMD} "
 
 if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
@@ -64,7 +63,6 @@ fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
 
-sleep 2h
 set +e
 ${RUN_COMMAND}
 return_code=$?
