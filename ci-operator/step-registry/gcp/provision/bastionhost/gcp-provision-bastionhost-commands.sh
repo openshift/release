@@ -82,7 +82,7 @@ MACHINE_TYPE="n2-standard-2"
 echo "${REGION}" >> "${SHARED_DIR}/proxyregion"
 
 bastion_name="${CLUSTER_NAME}-bastion"
-gcloud compute instances create "${bastion_name}" \
+CMD="gcloud compute instances create ${bastion_name} \
   --image=${IMAGE_NAME} \
   --image-project=${IMAGE_PROJECT} \
   --boot-disk-size=200GB \
@@ -91,7 +91,13 @@ gcloud compute instances create "${bastion_name}" \
   --network=${NETWORK} \
   --subnet=${CONTROL_PLANE_SUBNET} \
   --zone=${ZONE_0} \
-  --tags="${bastion_name}"
+  --tags=${bastion_name}"
+
+if [[ "${ATTACH_SA}" == "yes" ]]; then
+  CMD="${CMD} --service-account ${BASTION_SA} --scopes cloud-platform"
+fi
+echo "Running Command: ${CMD}"
+eval "${CMD}"
 
 echo "Created bastion instance"
 echo "Waiting for the proxy service starting running..." && sleep 60s
