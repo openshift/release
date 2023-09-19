@@ -123,7 +123,7 @@ fi
 # Machines
 err_output=$(mktemp)
 machine_output=$(mktemp)
-oc get machine -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=master --no-headers -owide 1>${machine_output} 2>${err_output}
+oc get machines.machine.openshift.io -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=master --no-headers -owide 1>${machine_output} 2>${err_output}
 
 echo "Machines:"
 cat "${machine_output}"
