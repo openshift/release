@@ -21,6 +21,11 @@ if [[ "${EC2_AMI}" == "" ]]; then
   exit 1
 fi
 
+ec2Type="VirtualMachine"
+if [[ "$EC2_INSTANCE_TYPE" =~ c[0-9]+[gn].metal ]]; then
+  ec2Type="MetalMachine"
+fi
+
 ami_id=${EC2_AMI}
 instance_type=${EC2_INSTANCE_TYPE}
 host_device_name="/dev/xvdc"
@@ -44,8 +49,20 @@ echo -e "AMI ID: $ami_id"
 cat > "${cf_tpl_file}" << EOF
 AWSTemplateFormatVersion: 2010-09-09
 Description: Template for RHEL machine Launch
-
+Conditions:
+  AddSecondaryVolume: !Not [!Equals [!Ref EC2Type, 'MetalMachine']]
+Mappings:
+ VolumeSize:
+   MetalMachine:
+     PrimaryVolumeSize: "300"
+     SecondaryVolumeSize: "0"
+   VirtualMachine:
+     PrimaryVolumeSize: "200"
+     SecondaryVolumeSize: "10"
 Parameters:
+  EC2Type:
+    Default: 'VirtualMachine'
+    Type: String
   VpcCidr:
     AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/(1[6-9]|2[0-4]))$
     ConstraintDescription: CIDR block parameter must be in the form x.x.x.x/16-24.
@@ -249,14 +266,15 @@ Resources:
       BlockDeviceMappings:
       - DeviceName: /dev/sda1
         Ebs:
-          VolumeSize: "300"
+          VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, PrimaryVolumeSize]
           VolumeType: gp3
-          Iops: 16000
-      - DeviceName: /dev/sdc
-        Ebs:
-          VolumeSize: "200"
-          VolumeType: gp3
-          Iops: 16000
+      - !If
+        - AddSecondaryVolume
+        - DeviceName: /dev/sdc
+          Ebs:
+            VolumeSize: !FindInMap [VolumeSize, !Ref EC2Type, SecondaryVolumeSize]
+            VolumeType: gp3
+        - !Ref AWS::NoValue
       PrivateDnsNameOptions:
         EnableResourceNameDnsARecord: true
         HostnameType: resource-name
@@ -265,10 +283,21 @@ Resources:
           #!/bin/bash -xe
           echo "====== Authorizing public key ======" | tee -a /tmp/init_output.txt
           echo "\${PublicKeyString}" >> /home/ec2-user/.ssh/authorized_keys
+          # Use the same defaults as OCP to avoid failing requests to apiserver, such as
+          # requesting logs.
+          echo "====== Updating inotify =====" | tee -a /tmp/init_output.txt
+          echo "fs.inotify.max_user_watches = 65536" >> /etc/sysctl.conf
+          echo "fs.inotify.max_user_instances = 8192" >> /etc/sysctl.conf
+          sysctl --system |& tee -a /tmp/init_output.txt
+          sysctl -a |& tee -a /tmp/init_output.txt
           echo "====== Running DNF Install ======" | tee -a /tmp/init_output.txt
+          if ! ( sudo lsblk | grep 'xvdc' ); then
+              echo "/dev/xvdc device not found, assuming this is metal host, skipping LVM configuration" |& tee -a /tmp/init_output
+              exit 0
+          fi
           sudo dnf install -y lvm2 |& tee -a /tmp/init_output.txt
 
-          # NOTE: wrappig script vars with {} since the cloudformation will see
+          # NOTE: wrapping script vars with {} since the cloudformation will see
           # them as cloudformation vars instead.
           echo "====== Creating PV ======" | tee -a /tmp/init_output.txt
           sudo pvcreate "\${HostDeviceName}" |& tee -a /tmp/init_output.txt
@@ -308,6 +337,7 @@ aws --region "$REGION" cloudformation create-stack --stack-name "${stack_name}" 
         ParameterKey=Machinename,ParameterValue="${stack_name}"  \
         ParameterKey=AmiId,ParameterValue="${ami_id}" \
         ParameterKey=HostDeviceName,ParameterValue="${host_device_name}" \
+        ParameterKey=EC2Type,ParameterValue="${ec2Type}" \
         ParameterKey=PublicKeyString,ParameterValue="$(cat ${CLUSTER_PROFILE_DIR}/ssh-publickey)"
 
 echo "Created stack"

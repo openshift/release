@@ -1,0 +1,93 @@
+base_images:
+  modelmesh-serving-develop:
+    name: modelmesh-serving-develop
+    namespace: opendatahub-io
+    tag: v0.11.0
+  ubi_minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: Containerfile
+  from: ubi_minimal
+  to: odh-model-controller
+promotion:
+  namespace: opendatahub-io
+  tag: v0.11.0
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: HOME=/go GOFLAGS=-mod=mod make test
+  container:
+    from: src
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
+- as: fvt
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
+  steps:
+    cluster_profile: aws
+    env:
+      COMPUTE_NODE_TYPE: m5.2xlarge
+    test:
+    - as: modelmesh-serving-fvt
+      commands: |
+        export HOME=/go
+        STABLE_MANIFESTS=true CONTROLLERNAMESPACE=modelmesh-serving NAMESPACE=modelmesh-serving NAMESPACESCOPEMODE=true CUSTOM_IMG=odh-model-controller=${PR_ODH_MODEL_CONTROLLER_IMAGE} make e2e-test-for-odh
+      dependencies:
+      - env: PR_ODH_MODEL_CONTROLLER_IMAGE
+        name: odh-model-controller
+      from: modelmesh-serving-develop
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 3Gi
+    workflow: ipi-aws
+- as: pr-image-mirror
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-model-controller
+    env:
+      IMAGE_REPO: odh-model-controller
+    workflow: opendatahub-io-ci-image-mirror
+- as: stable-image-mirror
+  postsubmit: true
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-model-controller
+    env:
+      IMAGE_REPO: odh-model-controller
+      RELEASE_VERSION: stable
+    workflow: opendatahub-io-ci-image-mirror
+- as: branch-image-mirror
+  postsubmit: true
+  skip_if_only_changed: ^(?:.*\/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE|.*\.develop)$
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: odh-model-controller
+    env:
+      IMAGE_REPO: odh-model-controller
+      IMAGE_TAG: v0.11.0
+    workflow: opendatahub-io-ci-image-mirror
+zz_generated_metadata:
+  branch: release-0.11
+  org: opendatahub-io
+  repo: odh-model-controller

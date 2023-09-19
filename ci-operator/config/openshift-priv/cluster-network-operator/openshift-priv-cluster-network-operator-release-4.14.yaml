@@ -36,7 +36,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-network-operator
 promotion:
-  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -319,6 +318,28 @@ tests:
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: e2e-aws-hypershift-ovn-kubevirt
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: hypershift-kubevirt-conformance
+- always_run: false
+  as: qe-perfscale-aws-ovn-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-control-plane
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.14
   org: openshift-priv

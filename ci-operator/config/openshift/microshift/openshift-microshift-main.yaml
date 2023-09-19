@@ -1,10 +1,10 @@
 base_images:
   cli:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: cli
   test-bin:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: tests
   test-runtime:
@@ -72,20 +72,20 @@ promotion:
   excluded_images:
   - microshift-test-payload
   - rebase-payload
-  name: "4.14"
+  name: "4.15"
   namespace: ocp
 releases:
   nightly-amd64:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
   nightly-arm64:
     candidate:
       architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.14"
+      version: "4.15"
 resources:
   '*':
     limits:
@@ -94,7 +94,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tag_specification:
-  name: "4.14"
+  name: "4.15"
   namespace: ocp
 tests:
 - as: verify
@@ -130,45 +130,6 @@ tests:
     env:
       DRY_RUN: "y"
     workflow: openshift-microshift-rebase
-- always_run: false
-  as: e2e-openshift-conformance-reduced
-  cluster: build02
-  optional: true
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-02b8534ff4b424939
-    workflow: openshift-microshift-e2e-openshift-conformance-reduced-aws
-- always_run: false
-  as: e2e-openshift-conformance-reduced-arm
-  cluster: build02
-  optional: true
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-06df7225cc50ee1a3
-      EC2_INSTANCE_TYPE: c7g.4xlarge
-    workflow: openshift-microshift-e2e-openshift-conformance-reduced-aws
-- as: microshift-e2e
-  cluster: build02
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-02b8534ff4b424939
-    workflow: openshift-microshift-e2e-microshift-tests-aws
-- as: microshift-e2e-arm
-  cluster: build02
-  optional: true
-  run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
-  steps:
-    cluster_profile: aws
-    env:
-      EC2_AMI: ami-06df7225cc50ee1a3
-      EC2_INSTANCE_TYPE: c7g.4xlarge
-    workflow: openshift-microshift-e2e-microshift-tests-aws
 - as: microshift-metal-tests
   cluster: build02
   run_if_changed: ^(assets/.*|cmd/.*|etcd/.*|pkg/.*|packaging/.*|test/.*|vendor/.*|go\.sum|go\.mod|Makefile|.*\.sh)
@@ -201,6 +162,24 @@ tests:
       EC2_AMI: ami-02b8534ff4b424939
       EC2_INSTANCE_TYPE: c5n.metal
     workflow: openshift-microshift-e2e-metal-tests
+- as: ocp-metal-nightly
+  cluster: build02
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      EC2_AMI: ami-02b8534ff4b424939
+      EC2_INSTANCE_TYPE: c5n.metal
+    workflow: openshift-microshift-e2e-metal-tests
+- as: ocp-conformance-nightly
+  cluster: build02
+  cron: 0 1 * * *
+  steps:
+    cluster_profile: aws
+    env:
+      BRANCH: main
+      EC2_AMI: ami-02b8534ff4b424939
+    workflow: openshift-microshift-e2e-conformance-from-source
 zz_generated_metadata:
   branch: main
   org: openshift

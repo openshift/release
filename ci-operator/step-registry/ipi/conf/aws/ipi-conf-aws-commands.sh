@@ -335,3 +335,13 @@ compute:
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_edge}"
 fi
+
+if [[ "${PRESERVE_BOOTSTRAP_IGNITION}" == "yes" ]]; then
+  patch_bootstrap_ignition="${SHARED_DIR}/install-config-bootstrap_ignition.yaml.patch"
+  cat > "${patch_bootstrap_ignition}" << EOF
+platform:
+  aws:
+    preserveBootstrapIgnition: true
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_bootstrap_ignition}"
+fi

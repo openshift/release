@@ -122,9 +122,6 @@ CONFIG = {
         'eastus2': 4,
         'northeurope': 4
     },
-    'azure-marketplace-qe-quota-slice': {
-        'westus': 6
-    },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5,
         'usgovtexas': 5
@@ -146,6 +143,9 @@ CONFIG = {
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
         'us-central1': 70,
+    },
+    'gcp-arm64-quota-slice': {
+        'us-central1': 30,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
@@ -235,7 +235,7 @@ CONFIG = {
         'jp-tok': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'jp-osa': 3,
+        'au-syd': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
@@ -340,8 +340,8 @@ for i in range(200,204):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 for i in range(205,214):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
-for i in [956]:
-    CONFIG['vsphere-8-vpn-quota-slice']['ci-vlan-{}'.format(i)] = 1
+for i in [1153,1179,1211,1225,1232,1243,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309,1364,1367,758,902]:
+    CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
 
 
 config = {

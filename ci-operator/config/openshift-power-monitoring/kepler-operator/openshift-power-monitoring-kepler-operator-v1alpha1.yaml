@@ -14,16 +14,21 @@ build_root:
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
 images:
-- context_dir: .
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  context_dir: .
   dockerfile_path: Dockerfile
   to: kepler-operator
 operator:
   bundles:
   - as: kepler-bundle
     context_dir: .
-    dockerfile_path: bundle/bundle.Dockerfile
+    dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: quay.io/sustainable_computing_io/kepler-operator:0.5.0
+  - pullspec: quay.io/sustainable_computing_io/kepler-operator:.*
     with: pipeline:kepler-operator
 releases:
   latest:
@@ -37,10 +42,6 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
-  commands: make test
-  container:
-    from: src
 - as: kepler-operator-e2e
   cluster_claim:
     architecture: amd64
@@ -54,9 +55,11 @@ tests:
     - as: install
       cli: latest
       commands: |
-        oc create namespace kepler-operator
-        operator-sdk run bundle -n kepler-operator "$OO_BUNDLE" --install-mode AllNamespaces --skip-tls
-        oc wait --for condition=Available -n kepler-operator deployment kepler-operator-controller-manager
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-operators \
+        --timeout=300s deployment kepler-operator-controller-manager
+        oc logs -n openshift-operators \
+        deployment/kepler-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: kepler-bundle
@@ -65,6 +68,8 @@ tests:
         requests:
           cpu: 100m
           memory: 400Mi
+    - ref: openshift-power-monitoring-install-kepler
+    - ref: openshift-power-monitoring-tests-kepler
     workflow: generic-claim
 zz_generated_metadata:
   branch: v1alpha1

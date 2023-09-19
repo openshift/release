@@ -6,7 +6,21 @@ set -o pipefail
 
 function set-cluster-version-spec-update-service() {
     local payload_version
-    payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+    local jsonpath_flag
+
+    if oc adm release info --help | grep "\-\-output=" -A 1 | grep -q jsonpath; then
+        jsonpath_flag=true
+    else
+        echo "this oc does not support jsonpath output"
+        oc adm release info --help | grep "\-o, \-\-output=" -A 1
+        jsonpath_flag=false
+    fi
+
+    if [[ "${jsonpath_flag}" == "true" ]]; then
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.version}")"
+    else
+        payload_version="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep -oP '(?<=^  Version:  ).*$')"
+    fi
     echo "Release payload version: ${payload_version}"
 
     if [[ ! -f ${dir}/manifests/cvo-overrides.yaml ]]; then
@@ -32,10 +46,14 @@ function set-cluster-version-spec-update-service() {
     # Determine architecture that Cincinnati would use: check metadata for release.openshift.io/architecture key
     # and fall back to manifest-declared architecture
     local payload_arch
-    payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
-    if [[ -z "${payload_arch}" ]]; then
-        echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
-        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.config.architecture}")"
+    if [[ "${jsonpath_flag}" == "true" ]]; then
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.metadata.metadata.release\.openshift\.io/architecture}")"
+        if [[ -z "${payload_arch}" ]]; then
+            echo 'Payload architecture not found in .metadata.metadata["release.openshift.io/architecture"], using .config.architecture'
+            payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" -o "jsonpath={.config.architecture}")"
+        fi
+    else
+        payload_arch="$(oc adm release info "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" | grep "^OS/Arch: " | cut -d/ -f3)"
     fi
     local payload_arch_param
     if [[ -n "${payload_arch}" ]]; then
@@ -424,7 +442,7 @@ for manifest_name in os.listdir("./"):
       break
 ' || return 1
   popd
-  
+
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -487,16 +505,9 @@ ibmcloud*)
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
-vsphere)
+vsphere*)
     export VSPHERE_PERSIST_SESSION=true
-    declare cloud_where_run
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/vsphere_context.sh"
-    if [ "$cloud_where_run" == "IBMC-DEVQE" ]; then
-        export SSL_CERT_FILE=/var/run/devqe-secrets/vcenter-certificate
-    else
-        export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
-    fi
+    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
@@ -575,7 +586,7 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
 case $JOB_NAME in
-  *vsphere*)
+  *vsphere)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
     max=1
     ;;

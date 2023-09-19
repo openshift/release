@@ -138,6 +138,81 @@ tests:
           cpu: 1000m
           memory: 512Mi
     workflow: optional-operators-ci-gcp
+- as: operator-e2e-aws-periodic
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable-1.2
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: CLUSTER_PROFILE=aws make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator-1.2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-aws
+- as: operator-e2e-azure-periodic
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: azure4
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable-1.2
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: CLUSTER_PROFILE=azure make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator-1.2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-azure
+- as: operator-e2e-gcp-periodic
+  cron: 0 4 * * *
+  steps:
+    cluster_profile: gcp
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: stable-1.2
+      OO_INSTALL_NAMESPACE: openshift-adp
+      OO_PACKAGE: oadp-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      cli: latest
+      commands: CLUSTER_PROFILE=gcp make test-e2e
+      credentials:
+      - mount_path: /var/run/oadp-credentials
+        name: oadp-credentials
+        namespace: test-credentials
+      from: test-oadp-operator-1.2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 512Mi
+    workflow: optional-operators-ci-gcp
 zz_generated_metadata:
   branch: oadp-1.2
   org: openshift

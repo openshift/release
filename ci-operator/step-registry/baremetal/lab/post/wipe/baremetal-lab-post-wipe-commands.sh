@@ -12,13 +12,20 @@ if [ "${SELF_MANAGED_NETWORK}" != "true" ]; then
   exit 0
 fi
 
+SSHOPTS=(-o 'ConnectTimeout=5'
+  -o 'StrictHostKeyChecking=no'
+  -o 'UserKnownHostsFile=/dev/null'
+  -o 'ServerAliveInterval=90'
+  -o LogLevel=ERROR
+  -i "${CLUSTER_PROFILE_DIR}/ssh-key")
+
 function umount_virtual_media() {
   ### Sushy doesn't support NFS as TransferProtcolType, and some servers' BMCs (in particular the ones of the arm64 servers)
   ##  are not 100% compliant with the Redfish standard. Therefore, relying on the raw redfish python library.
   bmc_address="${1}"
   bmc_username="${2}"
   bmc_password="${3}"
-  echo "Mounting the ISO image in ${bmc_address} via virtual media..."
+  echo "Unmounting the ISO image in ${bmc_address} via virtual media..."
   python3 - "${bmc_address}" "${bmc_username}" "${bmc_password}" <<'EOF'
 import redfish
 import sys
@@ -30,15 +37,21 @@ bmc_password = sys.argv[3]
 
 context = redfish.redfish_client(bmc_address, username=bmc_username, password=bmc_password)
 context.login(auth=redfish.AuthMethod.BASIC)
-response = context.get("/redfish/v1/Managers/")
+response = context.get("/redfish/v1/Systems/")
 manager = response.dict.get("Members")[0]["@odata.id"].split("/")[-1]
-response = context.get(f"/redfish/v1/Managers/{manager}/VirtualMedia/")
-removable_disk = list(filter((lambda x: x["@odata.id"].find("CD") != -1),
-                             response.dict.get("Members")))[0]["@odata.id"].split("/")[-1]
+response = context.get(f"/redfish/v1/Systems/{manager}/VirtualMedia/")
+#removable_disk = list(filter((lambda x: x["@odata.id"].find("CD") != -1),
+#                             response.dict.get("Members")))[0]["@odata.id"].split("/")[-1]
 
-print("Eject virtual media, if any")
+print("Eject virtual media 1, if any")
 response = context.post(
-    f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.EjectMedia", body={})
+    f"/redfish/v1/Systems/{manager}/VirtualMedia/1/Actions/VirtualMedia.EjectMedia", body={})
+print(response.text)
+print(response.status)
+
+print("Eject virtual media 2, if any")
+response = context.post(
+    f"/redfish/v1/Systems/{manager}/VirtualMedia/2/Actions/VirtualMedia.EjectMedia", body={})
 print(response.text)
 print(response.status)
 EOF
@@ -82,6 +95,7 @@ function reset_host() {
   local bmc_user="${2}"
   local bmc_pass="${3}"
   local name="${4}"
+  local pdu_uri="${5}"
   echo "Rebooting host ${bmc_address//.*/} (${name})"
   ipmitool -I lanplus -H "$bmc_address" \
     -U "$bmc_user" -P "$bmc_pass" \
@@ -110,6 +124,23 @@ function reset_host() {
   if ! wait_for_power_down "$bmc_address" "$bmc_user" "$bmc_pass" "${name}"; then
     echo "$bmc_address" >> /tmp/failed
   fi
+  [ -z "${pdu_uri}" ] && return 0
+  pdu_host=${pdu_uri%%/*}
+  pdu_socket=${pdu_uri##*/}
+  pdu_creds=${pdu_host%%@*}
+  pdu_host=${pdu_host##*@}
+  pdu_user=${pdu_creds%%:*}
+  pdu_pass=${pdu_creds##*:}
+  # pub-priv key auth is not supported by the PDUs
+  echo "${pdu_pass}" > /tmp/ssh-pass
+
+  timeout -s 9 10m sshpass -f /tmp/ssh-pass ssh "${SSHOPTS[@]}" "${pdu_user}@${pdu_host}" <<EOF || true
+olReboot $pdu_socket
+quit
+EOF
+  if ! wait_for_power_down "$bmc_address" "$bmc_user" "$bmc_pass" "${name}"; then
+    echo "$bmc_address" >> /tmp/failed
+  fi
 }
 
 # This step wipes the disk used to install coreos in the hosts.
@@ -128,7 +159,7 @@ for bmhost in $(yq e -o=j -I=0 '.[]' "${SHARED_DIR}/hosts.yaml"); do
     echo "Error while unmarshalling hosts entries"
     exit 1
   fi
-  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${name}" &
+  reset_host "${bmc_address}" "${bmc_user}" "${bmc_pass}" "${name}" "${pdu_uri:-}" &
 done
 
 wait

@@ -110,6 +110,7 @@ images:
     FROM src
     COPY oc /usr/bin/oc
     RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y nmstate
     # Cache dir must be accessible when running the integration tests
     RUN mkdir /.cache -m 0777
   from: src
@@ -120,6 +121,7 @@ images:
         source_path: /usr/bin/oc
   to: src-oc
 promotion:
+  disabled: true
   excluded_images:
   - src-oc
   name: 4.15-priv
@@ -500,7 +502,7 @@ tests:
   run_if_changed: openstack
   steps:
     cluster_profile: openstack-nfv
-    workflow: openshift-e2e-openstack-nfv
+    workflow: openshift-e2e-openstack-nfv-cgroupsv1
   timeout: 6h0m0s
 - always_run: false
   as: e2e-openstack-externallb
@@ -671,7 +673,7 @@ tests:
     workflow: openshift-e2e-ibmcloud
   timeout: 6h0m0s
 - as: e2e-nutanix-ovn
-  cluster: build01
+  cluster: build03
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
   steps:
@@ -679,7 +681,7 @@ tests:
     workflow: openshift-e2e-nutanix-ovn
   timeout: 6h0m0s
 - as: e2e-nutanix-sdn
-  cluster: build01
+  cluster: build03
   optional: true
   run_if_changed: (^(data/.*|pkg/.*|images)/nutanix/)|(^vendor/github.com/nutanix.*/)
   steps:
@@ -765,6 +767,12 @@ tests:
     cluster_profile: aws
     workflow: openshift-e2e-aws-publicsubnets
   timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-dualstack-techpreview
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    workflow: openshift-e2e-openstack-dualstack
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

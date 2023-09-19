@@ -56,10 +56,24 @@ function copy-file-from-first-master {
 
 ssh-keyscan -H ${control_nodes[@]} ${compute_nodes[@]} >> ~/.ssh/known_hosts
 
-# Prepull tools image on the nodes. "baremetalds-sno-gather" step uses it to run sos report
+# Save found node IPs for "gather-cert-rotation" step
+echo -n "${control_nodes[@]}" > /srv/control_node_ips
+echo -n "${compute_nodes[@]}" > /srv/compute_node_ips
+
+echo "Wrote control_node_ips: $(cat /srv/control_node_ips), compute_node_ips: $(cat /srv/compute_node_ips)"
+
+# Prepull tools image on the nodes. "gather-cert-rotation" step uses it to run sos report
 # However, if time is too far in the future the pull will fail with "Trying to pull registry.redhat.io/rhel8/support-tools:latest...
 # Error: initializing source ...: tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time ... is after <now + 6m>"
-run-on "${control_nodes} ${compute_nodes}" "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
+run-on-all-nodes "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
+
+# Disable telemeter - its unable to upload snapshots due to significant time skews
+run-on-first-master "
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
+  echo "telemeterClient:" > /tmp/config.yaml
+  echo "  enabled: false" >> /tmp/config.yaml
+  oc create configmap cluster-monitoring-config -n openshift-monitoring --from-file=config.yaml=/tmp/config.yaml
+"
 
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
@@ -87,13 +101,15 @@ run-on-all-nodes "systemctl restart kubelet"
 run-on-first-master "
 export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
 until oc get nodes; do sleep 30; done
-oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready=Unknown --timeout=${COMMAND_TIMEOUT} || true
+sleep 5m
 until oc wait node --selector='node-role.kubernetes.io/master' --for condition=Ready --timeout=30s; do
+  oc get nodes
   if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
     oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
   fi
   sleep 30
 done
+oc get nodes
 "
 
 # Wait for kube-apiserver operator to generate new localhost-recovery kubeconfig
@@ -102,6 +118,18 @@ run-on-first-master "while diff -q ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE}; do
 # Copy system:admin's lb-ext kubeconfig locally and use it to access the cluster
 run-on-first-master "cp ${KUBECONFIG_LB_EXT} ${KUBECONFIG_REMOTE} && chown core:core ${KUBECONFIG_REMOTE}"
 copy-file-from-first-master "${KUBECONFIG_REMOTE}" "${KUBECONFIG_REMOTE}"
+
+# Approve certificates for workers, so that all operators would complete
+run-on-first-master "
+  export KUBECONFIG=${KUBECONFIG_NODE_DIR}/localhost-recovery.kubeconfig
+  until oc wait node --selector='node-role.kubernetes.io/worker' --for condition=Ready --timeout=30s; do
+    oc get nodes
+    if ! oc wait csr --all --for condition=Approved=True --timeout=30s; then
+      oc get csr | grep Pending | cut -f1 -d' ' | xargs oc adm certificate approve || true
+    fi
+    sleep 30
+  done
+"
 
 # Wait for operators to stabilize
 if
@@ -120,7 +148,6 @@ EOF
 chmod +x "${SHARED_DIR}"/time-skew-test.sh
 scp "${SSHOPTS[@]}" "${SHARED_DIR}"/time-skew-test.sh "root@${IP}:/usr/local/bin"
 
-#sleep infinity
 timeout \
 	--kill-after 10m \
 	120m \

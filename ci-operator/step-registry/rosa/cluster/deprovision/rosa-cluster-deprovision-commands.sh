@@ -34,7 +34,11 @@ fi
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id" || true)
 if [[ -z "$CLUSTER_ID" ]]; then
-  CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-name")
+  CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-name" || true)
+  if [[ -z "$CLUSTER_ID" ]]; then
+    echo "No cluster is created. Softly exit the cluster deprovision."
+    exit 0
+  fi
 fi
 
 echo "Deleting cluster-id: ${CLUSTER_ID}"
@@ -50,6 +54,8 @@ if [[ "$STS" == "true" ]]; then
   echo "Deleting oidc-provider"
   rosa delete oidc-provider -c "${CLUSTER_ID}" -y -m auto
 fi
+echo "Do a smart 120 sleeping to make sure the processes are complted."
+sleep 120
 
-echo "Cluster is no longer accessible; delete successful"
+echo "Cluster is no longer accessible; delete successful."
 exit 0
