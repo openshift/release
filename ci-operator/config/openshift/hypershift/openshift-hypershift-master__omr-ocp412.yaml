@@ -1,0 +1,38 @@
+base_images:
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: hypershift-omr-tests-omr-ocp412-disconnected
+  cron: 0 12 * * 5
+  steps:
+    cluster_profile: aws-qe
+    post:
+    - chain: hypershift-aws-ipi-disconnected-private-deprovision
+    test:
+    - chain: hypershift-aws-ipi-disconnected-private-provision
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: hypershift
+  variant: omr-ocp412
