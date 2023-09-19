@@ -216,7 +216,12 @@ kernel_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.boot
 export kernel_url
 rootfs_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
 export rootfs_url
-ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${httpd_vsi_key}")
+tmp_ssh_key="/tmp/http-vsi-key"
+cp ${httpd_vsi_key} ${tmp_ssh_key}
+chmod 0600 ${tmp_ssh_key}
+echo "[DEBUG] Checking the ssh key file"
+cat ${tmp_ssh_key}
+ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${tmp_ssh_key}")
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
 curl -k -L --output $HOME/rootfs.img "$rootfs_url"
 scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
