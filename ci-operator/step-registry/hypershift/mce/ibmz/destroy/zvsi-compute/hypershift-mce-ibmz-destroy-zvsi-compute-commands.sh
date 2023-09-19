@@ -29,8 +29,8 @@ else
     set -e
     echo "ibmcloud CLI is not installed. Installing it now..."
     mkdir /tmp/ibm_cloud_cli
-    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/IBM_Cloud_CLI_${IC_CLI_VERSION}_linux_amd64.tgz
-    tar -xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
+    curl --output /tmp/IBM_CLOUD_CLI_amd64.tar.gz https://download.clis.cloud.ibm.com/ibm-cloud-cli/${IC_CLI_VERSION}/IBM_Cloud_CLI_${IC_CLI_VERSION}_amd64.tar.gz
+    tar xvzf /tmp/IBM_CLOUD_CLI_amd64.tar.gz -C /tmp/ibm_cloud_cli
     export PATH=${PATH}:/tmp/ibm_cloud_cli/Bluemix_CLI/bin
     set +e
 fi 
