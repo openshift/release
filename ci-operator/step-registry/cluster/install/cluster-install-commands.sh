@@ -50,7 +50,7 @@ fi
 
 RUN_COMMAND+="${CLUSTERS_CMD} "
 
-if [ "${PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
+if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
     RUN_COMMAND+=" --parallel"
 fi
 

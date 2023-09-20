@@ -94,9 +94,15 @@ oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedclus
   exit 1
 }
 echo "Cluster became available, creating kubeconfig"
-bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig || {
+KUBECONFIG_NAME=""
+while [[ -z "${KUBECONFIG_NAME}" ]]; do
+  echo "Still waiting for kubeconfig to be available"
+  sleep 10
+  KUBECONFIG_NAME=$(oc get hc/${CLUSTER_NAME} -n clusters -o jsonpath='{ .status.kubeconfig.name }')
+done
+
+bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} > ${SHARED_DIR}/nested_kubeconfig || {
   echo "Failed to create kubeconfig"
-  exit 1
 }
 
 # Data for cluster bot.

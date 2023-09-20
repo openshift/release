@@ -132,9 +132,10 @@ cat > ${SHARED_DIR}/metadata.json << EOF
 EOF
 
 ADDITIONAL_CCOCTL_ARGS=""
-# Most of steps support FEATURE_SET var now, actually it can replace ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS
-# But for compatiblity, not break the exisitng jobs, keep ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS here.
-if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ] || [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
+# ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS enables the relevant job for each operator to decide
+# independantly if it needs the --enable-tech-preview added to the ccoctl command. It is very
+# different from the TechPreviewNoUpgrade FEATURE_SET, which toggles cluster wide.
+if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ]; then
   ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
 fi
 

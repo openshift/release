@@ -4,7 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-# ensure LEASED_RESOURCE is set
+# ensure vsphere_portgroup is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
   exit 1
@@ -14,12 +14,13 @@ echo "$(date -u --rfc-3339=seconds) - sourcing context from vsphere_context.sh..
 # shellcheck source=/dev/null
 declare vsphere_datacenter
 declare vsphere_url
+declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
 
 declare -a vips
-mapfile -t vips < "${SHARED_DIR}/vips.txt"
+mapfile -t vips <"${SHARED_DIR}/vips.txt"
 
 CONFIG="${SHARED_DIR}/install-config.yaml"
 base_domain=$(<"${SHARED_DIR}"/basedomain.txt)
@@ -31,7 +32,7 @@ if [[ "$JOB_NAME" == *"4.12-e2e-vsphere-zones"* ]]; then
   TECH_PREVIEW_NO_UPGRADE="featureSet: TechPreviewNoUpgrade"
 fi
 
-cat >> "${CONFIG}" << EOF
+cat >>"${CONFIG}" <<EOF
 baseDomain: $base_domain
 ${TECH_PREVIEW_NO_UPGRADE}
 controlPlane:
@@ -60,7 +61,7 @@ platform:
     vCenter: "${vsphere_url}"
     username: "${GOVC_USERNAME}"
     password: ${GOVC_PASSWORD}
-    network: ${LEASED_RESOURCE}
+    network: ${vsphere_portgroup}
     datacenter: "${vsphere_datacenter}"
     cluster: vcs-mdcnc-workload-1
     defaultDatastore: mdcnc-ds-shared
@@ -71,7 +72,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-1
         networks:
-        - ${LEASED_RESOURCE}
+        - ${vsphere_portgroup}
         datastore: mdcnc-ds-1
     - name: us-east-2
       region: us-east
@@ -79,7 +80,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-2
         networks:
-        - ${LEASED_RESOURCE}
+        - ${vsphere_portgroup}
         datastore: mdcnc-ds-2
     - name: us-east-3
       region: us-east
@@ -87,7 +88,7 @@ platform:
       topology:
         computeCluster: /${vsphere_datacenter}/host/vcs-mdcnc-workload-3
         networks:
-        - ${LEASED_RESOURCE}
+        - ${vsphere_portgroup}
         datastore: mdcnc-ds-3
     - name: us-west-1
       region: us-west
@@ -96,7 +97,7 @@ platform:
         datacenter: datacenter-2
         computeCluster: /datacenter-2/host/vcs-mdcnc-workload-4
         networks:
-        - ${LEASED_RESOURCE}
+        - ${vsphere_portgroup}
         datastore: mdcnc-ds-4
 
 networking:
@@ -141,4 +142,3 @@ EOF
 #        spec:
 #          storageClassName: sc-zone-us-east-1a
 #EOF
-

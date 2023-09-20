@@ -144,6 +144,9 @@ CONFIG = {
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
         'us-central1': 70,
     },
+    'gcp-arm64-quota-slice': {
+        'us-central1': 30,
+    },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
     'metal-quota-slice': {

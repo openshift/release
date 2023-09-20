@@ -6,11 +6,10 @@ set -o pipefail
 
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
-    echo "$(date -u --rfc-3339=seconds) - failed to acquire lease"
-    exit 1
+  echo "$(date -u --rfc-3339=seconds) - failed to acquire lease"
+  exit 1
 fi
 
-LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
 
 declare vsphere_datacenter
 declare vsphere_datastore
@@ -21,18 +20,41 @@ declare vsphere_resource_pool
 declare vsphere_url
 declare LEASE_NUMBER
 declare VCENTER_AUTH_PATH
+declare vlanid
+declare router
+declare phydc
+declare primaryrouterhostname
+declare vsphere_portgroup
 
-# For leases >= 221, run on the IBM Cloud vSphere env
-if [ ${LEASE_NUMBER} -ge 221 ]; then
-  echo Scheduling job on IBM Cloud instance
-  VCENTER_AUTH_PATH=/var/run/vault/devqe-secrets/secrets.sh
-  vsphere_url="vcenter.devqe.ibmc.devcluster.openshift.com"
-  vsphere_datacenter="DEVQEdatacenter"
-  cloud_where_run="IBMC-DEVQE"
-  dns_server="192.168.${LEASE_NUMBER}.1"
-  vsphere_resource_pool="/DEVQEdatacenter/host/DEVQEcluster/Resources/ipi-ci-clusters"
-  vsphere_cluster="DEVQEcluster"
-  vsphere_datastore="vsanDatastore"
+SUBNETS_CONFIG=/var/run/vault/vsphere-config/subnets.json
+declare vsphere_url
+
+if [[ ${LEASED_RESOURCE} == *"segment"* ]]; then
+  # notes: jcallen: to keep backward compatiability with existing vsphere env(s)
+  vsphere_portgroup="${LEASED_RESOURCE}"
+  LEASE_NUMBER=$((${LEASED_RESOURCE//[!0-9]/}))
+else
+  LEASE_NUMBER=-1
+  # notes: jcallen: split the LEASED_RESOURCE e.g. bcr01a.dal10.1153
+  # into: primary router hostname, datacenter and vlan id
+
+  router=$(awk -F. '{print $1}' <(echo "${LEASED_RESOURCE}"))
+  phydc=$(awk -F. '{print $2}' <(echo "${LEASED_RESOURCE}"))
+  vlanid=$(awk -F. '{print $3}' <(echo "${LEASED_RESOURCE}"))
+  primaryrouterhostname="${router}.${phydc}"
+
+  # notes: jcallen: all new subnets resides on port groups named: ci-vlan-#### where #### is the vlan id.
+  vsphere_portgroup="ci-vlan-${vlanid}"
+
+  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
+    echo "VLAN ID: ${vlanid} does not exist on ${primaryrouterhostname} in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
+    exit 1
+  fi
+
+  vsphere_url=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].virtualcenter' "${SUBNETS_CONFIG}")
+
+  dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
+
 fi
 
 source /var/run/vault/vsphere-config/load-vsphere-env-config.sh
@@ -47,7 +69,7 @@ vsphere_user="${vcenter_usernames[$account_loc]}"
 vsphere_password="${vcenter_passwords[$account_loc]}"
 
 echo "$(date -u --rfc-3339=seconds) - Creating govc.sh file..."
-cat >> "${SHARED_DIR}/govc.sh" << EOF
+cat >>"${SHARED_DIR}/govc.sh" <<EOF
 export GOVC_URL="${vsphere_url}"
 export GOVC_USERNAME="${vsphere_user}"
 export GOVC_PASSWORD="${vsphere_password}"
@@ -58,7 +80,7 @@ export GOVC_RESOURCE_POOL=${vsphere_resource_pool}
 EOF
 
 echo "$(date -u --rfc-3339=seconds) - Creating vsphere_context.sh file..."
-cat >> "${SHARED_DIR}/vsphere_context.sh" << EOF
+cat >>"${SHARED_DIR}/vsphere_context.sh" <<EOF
 export vsphere_url="${vsphere_url}"
 export vsphere_cluster="${vsphere_cluster}"
 export vsphere_resource_pool="${vsphere_resource_pool}"
@@ -66,6 +88,10 @@ export dns_server="${dns_server}"
 export cloud_where_run="${cloud_where_run}"
 export vsphere_datacenter="${vsphere_datacenter}"
 export vsphere_datastore="${vsphere_datastore}"
+export vsphere_portgroup="${vsphere_portgroup}"
+export vlanid="${vlanid:-unset}"
+export phydc="${phydc:-unset}"
+export primaryrouterhostname="${primaryrouterhostname:-unset}"
 EOF
 
 # shellcheck source=/dev/null
@@ -91,12 +117,12 @@ fi
 # but should eventually be cleaned up.
 set +e
 for i in "${!DATACENTERS[@]}"; do
-  echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${LEASED_RESOURCE} in DC ${DATACENTERS[$i]} and destroy"
-  DATACENTER=$(echo -n ${DATACENTERS[$i]} |  tr -d '\n')
-  govc ls -json "/${DATACENTER}/network/${LEASED_RESOURCE}" |\
-      jq '.elements[]?.Object.Vm[]?.Value' |\
-      xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |\
-      jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |\
-      xargs -I {} --no-run-if-empty govc vm.destroy {}
+  echo "$(date -u --rfc-3339=seconds) - Find virtual machines attached to ${vsphere_portgroup} in DC ${DATACENTERS[$i]} and destroy"
+  DATACENTER=$(echo -n ${DATACENTERS[$i]} | tr -d '\n')
+  govc ls -json "/${DATACENTER}/network/${vsphere_portgroup}" |
+    jq '.elements[]?.Object.Vm[]?.Value' |
+    xargs -I {} --no-run-if-empty govc ls -json -L VirtualMachine:{} |
+    jq '.elements[].Path | select((contains("ova") or test("\\bci-segment-[0-9]?[0-9]?[0-9]-bastion\\b")) | not)' |
+    xargs -I {} --no-run-if-empty govc vm.destroy {}
 done
 set -e
