@@ -128,8 +128,9 @@ echo "Successfully completed the destruction of all the resources that are creat
 
 # Deleting the rootfs image from the HTTPD server
 tmp_ssh_key="/tmp/httpd-vsi-key"
-cp "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" ${tmp_ssh_key}
+echo "-----BEGIN OPENSSH PRIVATE KEY-----" > ${tmp_ssh_key}
+cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" >> ${tmp_ssh_key}
+echo "-----END OPENSSH PRIVATE KEY-----" >> ${tmp_ssh_key}
 chmod 0600 ${tmp_ssh_key}
-sed -i 's/\\n/\n/g' ${tmp_ssh_key}
 ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${tmp_ssh_key}" root@$httpd_vsi_ip "rm -rf /var/www/html/rootfs.img"
 set +e

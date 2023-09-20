@@ -2,21 +2,6 @@
 
 set -x
 
-
-#DEBUG Statements 
-tmp_ssh_key="/tmp/httpd-vsi-key"
-cp "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" ${tmp_ssh_key}
-chmod 0600 ${tmp_ssh_key}
-cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" > /tmp/inital_private
-sed -i '1s/^/a/' /tmp/inital_private  
-cat /tmp/inital_private
-cat ${tmp_ssh_key} | tr -d '\n' | sed 's/\\n/\n/g' > /tmp/new_private
-echo "key after sed"
-cat /tmp/new_private
-
-# DEBUG ENDS
-exit 1
-
 # Session variables
 infra_name="hcp-ci-$(echo -n $PROW_JOB_ID|cut -c-8)"
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
@@ -230,20 +215,16 @@ export kernel_url
 rootfs_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
 export rootfs_url
 tmp_ssh_key="/tmp/httpd-vsi-key"
-cp "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" ${tmp_ssh_key}
+echo "-----BEGIN OPENSSH PRIVATE KEY-----" > ${tmp_ssh_key}
+cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" >> ${tmp_ssh_key}
+echo "-----END OPENSSH PRIVATE KEY-----" >> ${tmp_ssh_key}
 chmod 0600 ${tmp_ssh_key}
-cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" > /tmp/inital_private
-cat /tmp/inital_private
-cat ${tmp_ssh_key} | tr -d '\n' | sed 's/\\n/\n/g' > /tmp/new_private
-chmod 0600 /tmp/new_private
-echo "[DEBUG] Checking the ssh key file in /etc"
-ls -lart /etc/hypershift-agent-ibmz-credentials/
-cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
-cat /tmp/new_private
-echo "[DEBUG] Checking the ssh key file /tmp"
-ls -lart /tmp/
+echo "[DEBUG] Validating the private key"
+set -e
 cat ${tmp_ssh_key}
-ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i /tmp/new_private )
+ssh-keygen -l -f ${tmp_ssh_key}
+set +e
+ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${tmp_ssh_key}")
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
 curl -k -L --output $HOME/rootfs.img "$rootfs_url"
 scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
