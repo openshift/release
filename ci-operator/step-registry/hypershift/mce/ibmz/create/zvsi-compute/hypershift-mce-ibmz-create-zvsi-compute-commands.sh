@@ -217,14 +217,15 @@ export rootfs_url
 tmp_ssh_key="/tmp/httpd-vsi-key"
 cp "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" ${tmp_ssh_key}
 chmod 0600 ${tmp_ssh_key}
-sed -i 's/\\n/\n/g' ${tmp_ssh_key}
+cat ${tmp_ssh_key} | tr -d '\n' | sed 's/\\n/\n/g' > /tmp/new_private
 echo "[DEBUG] Checking the ssh key file in /etc"
 ls -lart /etc/hypershift-agent-ibmz-credentials/
 cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
+cat /tmp/new_private
 echo "[DEBUG] Checking the ssh key file /tmp"
 ls -lart /tmp/
 cat ${tmp_ssh_key}
-ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${tmp_ssh_key}")
+ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i /tmp/new_private )
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
 curl -k -L --output $HOME/rootfs.img "$rootfs_url"
 scp "${ssh_options[@]}" $HOME/rootfs.img root@$httpd_vsi_ip:/var/www/html/rootfs.img 
