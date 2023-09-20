@@ -250,8 +250,6 @@ for fip in "${zvsi_fip_list[@]}"; do
   echo "Successfully booted the zVSI $fip as agent"
 done
 
-exit 1
-
 # Wait for agents to join (max: 20 min)
 for ((i=50; i>=1; i--)); do
   agents_count=$(oc get agents -n $hcp_ns --no-headers | wc -l)
