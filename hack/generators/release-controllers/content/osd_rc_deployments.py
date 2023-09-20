@@ -222,7 +222,11 @@ def _add_osd_rc_deployment(gendoc):
 
     # Creating Cluster Groups for the AMD64 jobs...
     if context.arch == 'x86_64':
+<<<<<<< HEAD
         extra_rc_args.append('--cluster-group=build02,build03,build04,build05')
+=======
+        extra_rc_args.append('--cluster-group=build01,build02,build04,build05')
+>>>>>>> d3362014836 (remove build03 from r-c)
         extra_rc_args.append('--cluster-group=vsphere')
 
     gendoc.append({
