@@ -2,6 +2,21 @@
 
 set -x
 
+
+#DEBUG Statements 
+tmp_ssh_key="/tmp/httpd-vsi-key"
+cp "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" ${tmp_ssh_key}
+chmod 0600 ${tmp_ssh_key}
+cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" > /tmp/inital_private
+sed -i '1s/^/a/' /tmp/inital_private  
+cat /tmp/inital_private
+cat ${tmp_ssh_key} | tr -d '\n' | sed 's/\\n/\n/g' > /tmp/new_private
+echo "key after sed"
+cat /tmp/new_private
+
+# DEBUG ENDS
+exit 1
+
 # Session variables
 infra_name="hcp-ci-$(echo -n $PROW_JOB_ID|cut -c-8)"
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
