@@ -5,7 +5,7 @@ build_root:
     tag: latest
 images:
 - dockerfile_path: prow/Dockerfile
-  to: ocp-qe-perfscale-ci-loaded-upgrade-412z
+  to: ocp-qe-perfscale-ci-loaded-upgrade-412to413
 promotion:
   namespace: ci
   tag: latest
@@ -13,27 +13,32 @@ releases:
   latest:
     release:
       channel: candidate
-      version: "4.12"
+      version: "4.13"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: perfscale-rosa-multiaz-6nodes-stage-loaded-upgrade412
+- as: perfscale-rosa-multiaz-24nodes-stage-loaded-upgrade413
   cron: 0 8 * * 3
   steps:
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: candidate
+      COMPUTE_MACHINE_TYPE: m5.2xlarge
+      ENABLE_AUTOSCALING: "false"
       GC: "false"
       HOSTED_CP: "false"
+      IDP_TIMEOUT: "1200"
       IF_INTERMEDIATE_UPGRADE: "false"
       MULTI_AZ: "true"
-      OPENSHIFT_VERSION: 4.12.27
+      OPENSHIFT_VERSION: 4.12.28
+      READY_WAIT_TIMEOUT: 30m
       REGION: us-west-2
-      REPLICAS: "6"
+      REPLICAS: "24"
       ROSA_LOGIN_ENV: staging
+      USER_COUNT: "30"
     test:
     - ref: ipi-install-rbac
     - ref: openshift-cluster-bot-rbac
@@ -45,4 +50,4 @@ zz_generated_metadata:
   branch: main
   org: openshift-qe
   repo: ocp-qe-perfscale-ci
-  variant: rosa-candidate-4.12-latest-loaded-upgrade-from-4.12
+  variant: rosa-4.13-candidate-x86-loaded-upgrade-from-4.12
