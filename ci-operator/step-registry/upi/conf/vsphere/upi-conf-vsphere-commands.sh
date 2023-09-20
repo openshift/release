@@ -58,23 +58,28 @@ else
 
   dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
 
-
   lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
   bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
   machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
 
+  printf "***** DEBUG %s %s %s %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
+
   tempaddrs=()
   for n in {4..6}; do
-    tempaddrs+=("$(jq -r --argjson N $n --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   done
+
+  printf "**** DEBUG %s ******\n" "${tempaddrs[@]}"
 
   printf -v control_plane_ip_addresses "\"%s\"," "${tempaddrs[@]}"
   control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
 
   tempaddrs=()
   for n in {7..9}; do
-    tempaddrs+=("$(jq -r --argjson N $n --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   done
+
+  printf "**** DEBUG %s ******\n" "${tempaddrs[@]}"
 
   printf -v compute_ip_addresses "\"%s\"," "${tempaddrs[@]}"
   compute_ip_addresses="[${compute_ip_addresses%,}]"
