@@ -217,7 +217,10 @@ export rootfs_url
 tmp_ssh_key="/tmp/httpd-vsi-key"
 cp "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" ${tmp_ssh_key}
 chmod 0600 ${tmp_ssh_key}
+cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" > /tmp/inital_private
+cat /tmp/inital_private
 cat ${tmp_ssh_key} | tr -d '\n' | sed 's/\\n/\n/g' > /tmp/new_private
+chmod 0600 /tmp/new_private
 echo "[DEBUG] Checking the ssh key file in /etc"
 ls -lart /etc/hypershift-agent-ibmz-credentials/
 cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key"
@@ -250,6 +253,8 @@ for fip in "${zvsi_fip_list[@]}"; do
   sleep 60
   echo "Successfully booted the zVSI $fip as agent"
 done
+
+exit 1
 
 # Wait for agents to join (max: 20 min)
 for ((i=50; i>=1; i--)); do
