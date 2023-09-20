@@ -10,6 +10,8 @@ IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
 httpd_vsi_ip=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-ip")
 export httpd_vsi_ip
+HYPERSHIFT_NODE_COUNT=2
+export HYPERSHIFT_NODE_COUNT
 
 # Installing CLI tools
 set -e
