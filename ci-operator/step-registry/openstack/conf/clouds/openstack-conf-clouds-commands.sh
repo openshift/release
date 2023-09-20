@@ -10,13 +10,19 @@ info() {
 
 CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> 084813c239a (openstack: Fix resourcenames dependency (#43371))
 CLUSTER_NAME=''
 if [ -r "${SHARED_DIR}/CLUSTER_NAME" ]; then
 	CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 fi
+<<<<<<< HEAD
 =======
 CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 >>>>>>> 907c590c5d0 (openstack: Tag application credentials (#43348))
+=======
+>>>>>>> 084813c239a (openstack: Fix resourcenames dependency (#43371))
 
 clouds_yaml="$(mktemp)"
 cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml" "$clouds_yaml"
