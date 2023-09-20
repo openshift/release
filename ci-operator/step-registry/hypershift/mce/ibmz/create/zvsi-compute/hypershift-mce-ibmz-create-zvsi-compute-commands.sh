@@ -214,10 +214,15 @@ kernel_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.boot
 export kernel_url
 rootfs_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
 export rootfs_url
+ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
+export ssh_key_string
 tmp_ssh_key="/tmp/httpd-vsi-key"
-echo "-----BEGIN OPENSSH PRIVATE KEY-----" > ${tmp_ssh_key}
-cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" >> ${tmp_ssh_key}
-echo "-----END OPENSSH PRIVATE KEY-----" >> ${tmp_ssh_key}
+envsubst <<"EOF" >${tmp_ssh_key}
+-----BEGIN OPENSSH PRIVATE KEY-----
+${ssh_key_string}
+
+-----END OPENSSH PRIVATE KEY-----
+EOF
 chmod 0600 ${tmp_ssh_key}
 echo "[DEBUG] Validating the private key"
 set -e

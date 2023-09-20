@@ -127,10 +127,15 @@ ibmcloud resource group-delete $infra_name-rg -f
 echo "Successfully completed the destruction of all the resources that are created during the CI."
 
 # Deleting the rootfs image from the HTTPD server
+ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
+export ssh_key_string
 tmp_ssh_key="/tmp/httpd-vsi-key"
-echo "-----BEGIN OPENSSH PRIVATE KEY-----" > ${tmp_ssh_key}
-cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key" >> ${tmp_ssh_key}
-echo "-----END OPENSSH PRIVATE KEY-----" >> ${tmp_ssh_key}
+envsubst <<"EOF" >${tmp_ssh_key}
+-----BEGIN OPENSSH PRIVATE KEY-----
+${ssh_key_string}
+
+-----END OPENSSH PRIVATE KEY-----
+EOF
 chmod 0600 ${tmp_ssh_key}
 ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -i "${tmp_ssh_key}" root@$httpd_vsi_ip "rm -rf /var/www/html/rootfs.img"
 set +e
