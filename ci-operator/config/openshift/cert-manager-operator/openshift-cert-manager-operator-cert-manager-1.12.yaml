@@ -2,19 +2,23 @@ base_images:
   cert-manager-cainjector:
     name: cert-manager-cainjector
     namespace: ci
-    tag: v1.11.5
+    tag: v1.12.4
   cert-manager-controller:
     name: cert-manager-controller
     namespace: ci
-    tag: v1.11.5
+    tag: v1.12.4
   cert-manager-webhook:
     name: cert-manager-webhook
     namespace: ci
-    tag: v1.11.5
-  ocp_builder_rhel-9-golang-1.19-openshift-4.13:
+    tag: v1.12.4
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.13
+    tag: rhel-9-golang-1.20-openshift-4.14
   ubi:
     name: ubi
     namespace: ocp
@@ -26,9 +30,9 @@ images:
 - dockerfile_path: images/ci/Dockerfile
   from: ubi
   inputs:
-    ocp_builder_rhel-9-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: cert-manager-operator
 operator:
   bundles:
@@ -37,16 +41,12 @@ operator:
   substitutions:
   - pullspec: openshift.io/cert-manager-operator:latest
     with: pipeline:cert-manager-operator
-  - pullspec: quay.io/jetstack/cert-manager-controller:v1.11.5
+  - pullspec: quay.io/jetstack/cert-manager-controller:v1.12.4
     with: cert-manager-controller
-  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.11.5
+  - pullspec: quay.io/jetstack/cert-manager-webhook:v1.12.4
     with: cert-manager-webhook
-  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.11.5
+  - pullspec: quay.io/jetstack/cert-manager-cainjector:v1.12.4
     with: cert-manager-cainjector
-promotion:
-  disabled: true
-  name: "4.14"
-  namespace: ocp
 releases:
   initial:
     integration:
@@ -82,12 +82,11 @@ tests:
   steps:
     cluster_profile: aws
     dependencies:
-      OO_INDEX: ci-index-cert-manager-operator-bundle
+      OO_BUNDLE: cert-manager-operator-bundle
     env:
-      OO_CHANNEL: stable-v1
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: cert-manager-operator
-      OO_PACKAGE: cert-manager-operator
-      OO_TARGET_NAMESPACES: '!install'
+      OO_SECURITY_CONTEXT: restricted
     test:
     - as: test
       cli: latest
@@ -96,8 +95,8 @@ tests:
       resources:
         requests:
           cpu: 100m
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
-  branch: cert-manager-1.11
+  branch: cert-manager-1.12
   org: openshift
   repo: cert-manager-operator
