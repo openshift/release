@@ -14,7 +14,10 @@ declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/govc.sh"
+<<<<<<< HEAD
 
+=======
+>>>>>>> dc4c9bfe368 ([phase-2] RELEASE_IMAGE_INITIAL take higher priority than RELEASE_IMAGE_LATEST (#43192))
 
 if [ -z "${RHCOS_VM_TEMPLATE}" ]; then
   installer_bin=$(which openshift-install)
