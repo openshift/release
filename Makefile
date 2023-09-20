@@ -68,10 +68,14 @@ release-controllers: update_crt_crd
 
 checkconfig:
 <<<<<<< HEAD
+<<<<<<< HEAD
 	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230908-12387e8f71 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 =======
 	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230908-12387e8f71 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 >>>>>>> a78aa5834ac (Bumping Prow and Boskos (#43335))
+=======
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230908-12387e8f71 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+>>>>>>> e9c1ade2047 (Clean up Makefile (#41627))
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
