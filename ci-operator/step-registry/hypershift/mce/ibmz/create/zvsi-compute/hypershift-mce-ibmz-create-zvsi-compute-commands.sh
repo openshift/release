@@ -314,3 +314,6 @@ for ((i=30; i>=1; i--)); do
   fi
   sleep 25
 done
+
+#DEBUG
+oc get no --kubeconfig="${SHARED_DIR}/${hc_name}_kubeconfig"
