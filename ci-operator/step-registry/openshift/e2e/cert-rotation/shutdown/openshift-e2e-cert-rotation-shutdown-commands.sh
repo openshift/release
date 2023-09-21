@@ -154,10 +154,6 @@ if
     oc get nodes
     oc get co | grep -v "True\s\+False\s\+False"
     exit 1
-else
-  oc get nodes
-  oc get co
-  oc get clusterversion
 fi
 exit 0
 
@@ -173,3 +169,5 @@ timeout \
 	"root@${IP}" \
 	/usr/local/bin/time-skew-test.sh \
 	${SKEW}
+
+scp "${SSHOPTS[@]}" "root@${IP}:/tmp/lb-ext.kubeconfig" ${SHARED_DIR}/kubeconfig
