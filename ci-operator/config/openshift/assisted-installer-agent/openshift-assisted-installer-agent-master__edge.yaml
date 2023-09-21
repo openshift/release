@@ -44,16 +44,26 @@ base_images:
     namespace: openshift
     tag: golang-1.18
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.assisted_installer_agent-build
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
-  from: coreos-centos-stream8
   inputs:
+    coreos-centos-stream8:
+      as:
+      - quay.io/centos/centos:stream8
     openshift_release_golang-1.18:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-installer-agent
+- dockerfile_path: Dockerfile.assisted_installer_agent-build
+  inputs:
+    coreos-centos-stream8:
+      as:
+      - quay.io/centos/centos:stream8
+    openshift_release_golang-1.18:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.18
+  to: assisted-installer-agent-build
 - dockerfile_literal: |
     FROM base
     COPY . .
@@ -101,18 +111,22 @@ tests:
     - ref: assisted-baremetal-images-publish
 - as: lint
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-agent-build
   skip_if_only_changed: ^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-agent-build
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-agent-codecov-token
@@ -122,7 +136,8 @@ tests:
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-agent-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret

@@ -32,6 +32,39 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: gitlab-no-pat-oauth-flow-raw-devfile-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-gitlab-no-pat-oauth-flow-raw-devfile-url.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: gitlab-no-pat-oauth-flow-ssh-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITLAB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-private-key)
+        export GITLAB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-public-key)
+        /bin/bash .ci/openshift-ci/test-gitlab-no-pat-oauth-flow-ssh-url.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gitlab
+        name: gitlab
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 - as: bitbucket-no-pat-oauth-flow
   steps:
     cluster_profile: gcp
@@ -132,6 +165,8 @@ tests:
       cli: latest
       commands: |
         export GITHUB_PAT=$(cat /usr/local/ci-secrets/github/gh-pat)
+        export GITHUB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/github/github-private-key)
+        export GITHUB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/github/github-public-key)
         /bin/bash .ci/openshift-ci/test-github-with-pat-setup-flow.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/github
@@ -151,6 +186,8 @@ tests:
       cli: latest
       commands: |
         export GITLAB_PAT=$(cat /usr/local/ci-secrets/gitlab/gl-pat)
+        export GITLAB_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-private-key)
+        export GITLAB_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitlab/gitlab-public-key)
         /bin/bash .ci/openshift-ci/test-gitlab-with-pat-setup-flow.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/gitlab
@@ -170,6 +207,8 @@ tests:
       cli: latest
       commands: |
         export AZURE_PAT=$(cat /usr/local/ci-secrets/azure/azure-pat)
+        export AZURE_PRIVATE_KEY=$(cat /usr/local/ci-secrets/azure/azure-private-key)
+        export AZURE_PUBLIC_KEY=$(cat /usr/local/ci-secrets/azure/azure-public-key)
         /bin/bash .ci/openshift-ci/test-azure-with-pat-setup-flow.sh
       credentials:
       - mount_path: /usr/local/ci-secrets/azure
@@ -188,6 +227,59 @@ tests:
     - as: che-server-test
       cli: latest
       commands: /bin/bash .ci/openshift-ci/test-azure-no-pat-oauth-flow.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: azure-no-pat-oauth-flow-raw-devfile-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: /bin/bash .ci/openshift-ci/test-azure-no-pat-oauth-flow-raw-devfile-url.sh
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: azure-no-pat-oauth-flow-ssh-url
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export AZURE_PRIVATE_KEY=$(cat /usr/local/ci-secrets/azure/azure-private-key)
+        export AZURE_PUBLIC_KEY=$(cat /usr/local/ci-secrets/azure/azure-public-key)
+        /bin/bash .ci/openshift-ci/test-azure-no-pat-oauth-flow-ssh-url.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/azure
+        name: dev-azure
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: git-no-pat-oauth-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GOGS_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gogs/gogs-private-key)
+        export GOGS_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gogs/gogs-public-key)
+        /bin/bash .ci/openshift-ci/test-git-no-pat-oauth-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gogs
+        name: gogs
+        namespace: test-credentials
       from: src
       resources:
         requests:

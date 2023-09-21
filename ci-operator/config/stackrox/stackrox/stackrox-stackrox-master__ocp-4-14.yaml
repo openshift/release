@@ -1,0 +1,99 @@
+base_images:
+  ubi-minimal:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: apollo-ci
+    namespace: stackrox
+    tag: stackrox-test-0.3.59
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 4000Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- always_run: false
+  as: qa-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: ebpf-qa-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: ebpf
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: operator-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      TEST_SUITE: ocp-operator-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: sensor-integration-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-sensor-integration-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: ui-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: compliance-e2e-tests
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-compliance-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: master
+  org: stackrox
+  repo: stackrox
+  variant: ocp-4-14

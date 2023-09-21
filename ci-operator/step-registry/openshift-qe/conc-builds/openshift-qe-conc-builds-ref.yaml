@@ -1,0 +1,35 @@
+ref:
+  as: openshift-qe-conc-builds
+  from_image:
+    namespace: ci
+    name: ocp-qe-perfscale-ci
+    tag: latest
+  timeout: 4h
+  commands: openshift-qe-conc-builds-commands.sh
+  credentials:
+  - namespace: test-credentials # this entry injects the custom credential
+    name: ocp-qe-perfscale-es
+    mount_path: /secret
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  env:
+  - name: BUILD_LIST
+    default: "1 8 15 30 45 60 75"
+    documentation: |-
+      Define the build list. 
+  - name: APP_LIST
+    default: "cakephp"
+    documentation: |-
+      Define the app list.  
+  - name: POD_READY_THRESHOLD
+    default: "180000ms"
+    documentation: |-
+      Define the maximum number of pods to deploy on each labeled node.
+  - name: OUTPUT_FILE
+    default: "kube-burner.out"
+    documentation: |-
+      File in which we will parse to find uuid, start and end time
+  documentation: >-
+    This step runs the perfscale conc-builds workload in the deployed cluster
