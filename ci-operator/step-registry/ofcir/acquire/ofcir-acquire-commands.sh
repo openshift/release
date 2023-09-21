@@ -76,20 +76,8 @@ function getCIR(){
     IPFILE=$SHARED_DIR/server-ip
     CIRFILE=$SHARED_DIR/cir
 
-    if ! timeout 10s curl -kfX POST -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL?name=$JOB_NAME/$BUILD_ID&type=$CIRTYPE" -o $CIRFILE ; then
-        return 1
-    fi
-
-    NAME=$(jq -r .name < $CIRFILE)
-
-    # wait upto 30 minutes for a CIR
-    for _ in $(seq 60) ; do
-        curl -kfs -H "X-OFCIRTOKEN: $OFCIRTOKEN" "$OFCIRURL/$NAME" -o $CIRFILE
-        if [ "$(jq -r .status < $CIRFILE)" == "in use" ] ; then
-            break
-        fi
-        sleep 30
-    done
+    NAME=cir-0088
+    echo '{"ip":"10.10.129.130","type":"cluster","extra":"[{\"bmcip\":\"10.10.128.101\",\"mac\":\"F8:F2:1E:A8:27:81\"},{\"bmcip\":\"10.10.128.102\",\"mac\":\"F8:F2:1E:A8:28:01\"},{\"bmcip\":\"10.10.128.103\",\"mac\":\"F8:F2:1E:A8:0D:B1\"},{\"bmcip\":\"10.10.128.104\",\"mac\":\"F8:F2:1E:B3:10:81\"},{\"bmcip\":\"10.10.128.105\",\"mac\":\"F8:F2:1E:A8:27:51\"}]"}' > $CIRFILE
 
     jq -r .ip < $CIRFILE > $IPFILE
     if [ "$(cat $IPFILE)" == "" ] ; then
