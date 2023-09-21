@@ -130,7 +130,7 @@ echo "Resource Group ID: $rg_id"
 instance_ids=$(ibmcloud resource reclamations --output json | jq -r --arg rid "$rg_id" '.[]|select(.resource_group_id == $rid)|.id' | tr '\n' ' ')
 IFS=' ' read -ra instance_id_list <<< "$instance_ids"
 if [ ${#instance_id_list[@]} -gt 0 ]; then
-    echo "Reclamation Instance IDs : $instance_id_list"
+    echo "Reclamation Instance IDs : ${instance_id_list[@]}"
     for instance_id in "${instance_id_list[@]}"; do
         echo "Deleting the reclamation instance id $instance_id"
         ibmcloud resource reclamation-delete $instance_id -f 
@@ -143,7 +143,7 @@ echo "Verifying if any service instances are present in the $infra_name-rg resou
 si_names=$(ibmcloud resource service-instances --type all -g $infra_name-rg -q | grep -v Name | awk '{print $1}' | tr '\n' ' ')
 IFS=' ' read -ra si_names_list <<< "$si_names"
 if [ ${#si_names_list[@]} -gt 0 ]; then
-    echo "Service Instance Names : $si_names_list"
+    echo "Service Instance Names : ${si_names_list[@]}"
     for si_name in "${si_names_list[@]}"; do
         echo "Deleting the service instance $si_name"
         ibmcloud resource service-instance-delete $si_name -g $infra_name-rg -f --recursive
