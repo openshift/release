@@ -90,9 +90,12 @@ for status in "${fip_delete_status[@]}"; do
     fi
 done
 
+sleep 60
+
 # Deleting the subnet
 echo "Triggering the $infra_name-sn subnet deletion in the $infra_name-vpc VPC."
-sn_delete_status=$(ibmcloud is subnet-delete $infra_name-sn --vpc $infra_name-vpc --output JSON -f | jq -r '.[]|.result')
+sn_delete_json=$(ibmcloud is subnet-delete $infra_name-sn --vpc $infra_name-vpc --output JSON -f | jq -r '.[]|.result')
+sn_delete_status=$(echo "$sn_delete_json" | jq -r '.[]|.result')
 if [ $sn_delete_status == "true" ]; then
     echo "Successfully deleted the subnet $infra_name-sn in the $infra_name-vpc VPC."
 else 
