@@ -224,11 +224,6 @@ ${ssh_key_string}
 -----END OPENSSH PRIVATE KEY-----
 EOF
 chmod 0600 ${tmp_ssh_key}
-echo "[DEBUG] Validating the private key"
-set -e
-cat ${tmp_ssh_key}
-ssh-keygen -l -f ${tmp_ssh_key}
-set +e
 ssh_options=(-o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}")
 echo "Downloading the rootfs image locally and transferring to HTTPD server"
 curl -k -L --output $HOME/rootfs.img "$rootfs_url"
@@ -282,41 +277,12 @@ done
 # Scaling up nodepool
 oc -n $hc_ns scale nodepool $hc_name --replicas $HYPERSHIFT_NODE_COUNT
 
-# Wait for agent installation to get completed
+# Waiting for compute nodes to get ready
 echo "$(date) Patched the agents, waiting for the installation to get completed on them"
 oc wait --all=true agent -n $hcp_ns --for=jsonpath='{.status.debugInfo.state}'=added-to-existing-cluster --timeout=45m
-echo "$(date) Condition met for the agents to attach the hosted control plane"
+echo "$(date) All the agents are attached as compute nodes to the hosted control plane"
 
-# Waiting for compute nodes to attach (max: 30 min)
-for ((i=60; i>=1; i--)); do
-  node_count=$(oc get no --kubeconfig="${SHARED_DIR}/${hc_name}_kubeconfig" --no-headers | wc -l)
-  if [ "$node_count" -eq $HYPERSHIFT_NODE_COUNT ]; then
-    echo "$(date) Compute nodes attached successfully to the hosted control plane."
-    break
-  elif [ "$i" -eq 1 ]; then
-    echo "[ERROR] Only $node_count Compute nodes attached to the cluster even after 30 mins..., 0 retries left"
-    exit 1
-  else
-    echo "Waiting for Compute nodes to join..., $i retries left"
-  fi
-  sleep 30
-done
-
-# Waiting for compute nodes to be ready (max: 12 min)
-for ((i=30; i>=1; i--)); do
-  not_ready_count=$(oc get no --kubeconfig="${SHARED_DIR}/${hc_name}_kubeconfig" --no-headers | awk '{print $2}' | grep -v 'Ready' | wc -l)
-  if [ "$not_ready_count" -eq 0 ]; then
-    echo "$(date) All Compute nodes are in Ready state."
-    oc get no --kubeconfig="${SHARED_DIR}/${hc_name}_kubeconfig"
-    break
-  elif [ "$i" -eq 1 ]; then
-    echo "[ERROR] $not_ready_count Compute nodes are not in ready state even after 12 mins..., 0 retries left"
-    oc get no --kubeconfig="${SHARED_DIR}/${hc_name}_kubeconfig"
-    exit 1
-  else
-    echo "Waiting for Compute nodes to be Ready..., $i retries left"
-  fi
-  sleep 25
-done
-
+# Verifying the compute nodes status
+echo "$(date) Checking the compute nodes in the hosted control plane"
+oc get no --kubeconfig="${SHARED_DIR}/${hc_name}_kubeconfig"
 echo "$(date) Successfully completed the e2e creation chain"

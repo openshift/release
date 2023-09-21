@@ -94,8 +94,7 @@ sleep 60
 
 # Deleting the subnet
 echo "Triggering the $infra_name-sn subnet deletion in the $infra_name-vpc VPC."
-sn_delete_json=$(ibmcloud is subnet-delete $infra_name-sn --vpc $infra_name-vpc --output JSON -f | jq -r '.[]|.result')
-sn_delete_status=$(echo "$sn_delete_json" | jq -r '.[]|.result')
+sn_delete_status=$(ibmcloud is subnet-delete $infra_name-sn --vpc $infra_name-vpc --output JSON -f | jq -r '.[]|.result')
 if [ $sn_delete_status == "true" ]; then
     echo "Successfully deleted the subnet $infra_name-sn in the $infra_name-vpc VPC."
 else 
@@ -141,4 +140,5 @@ ${ssh_key_string}
 EOF
 chmod 0600 ${tmp_ssh_key}
 ssh -o 'PreferredAuthentications=publickey' -o 'StrictHostKeyChecking=no' -o 'UserKnownHostsFile=/dev/null' -o 'ServerAliveInterval=60' -i "${tmp_ssh_key}" root@$httpd_vsi_ip "rm -rf /var/www/html/rootfs.img"
+echo "$(date) Successfully completed the e2e deletion chain"
 set +e
