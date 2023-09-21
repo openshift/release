@@ -9,13 +9,13 @@ export hc_name
 hcp_ns="${hc_ns}-${hc_name}"
 export hcp_ns
 
-echo "Scaling down nodepool ${hc_ns} to 0"
+echo "$(date) Scaling down nodepool ${hc_ns} to 0"
 oc -n ${hc_ns} scale nodepool ${hc_name} --replicas 0
 
-echo "Waiting for the compute nodes to successfully detach from the hosted cluster ${hc_name}"
+echo "$(date) Waiting for the compute nodes to successfully detach from the hosted cluster ${hc_name}"
 oc wait --for=jsonpath='{.status.replicas}'=0 np/${hc_name} -n ${hc_ns} --timeout=10m
 
-echo "Deleting agents from the namespace ${hcp_ns}"
+echo "$(date) Deleting agents from the namespace ${hcp_ns}"
 agents=$(oc get agents -n ${hcp_ns} --no-headers | awk '{print $1}')
 agents=$(echo "$agents" | tr '\n' ' ')
 IFS=' ' read -ra agents_list <<< "$agents"
@@ -39,5 +39,6 @@ tar -xvf /tmp/${HYPERSHIFT_CLI_NAME}.tar.gz -C /tmp/${HYPERSHIFT_CLI_NAME}_cli
 chmod +x /tmp/${HYPERSHIFT_CLI_NAME}_cli/${HYPERSHIFT_CLI_NAME}
 export PATH=$PATH:/tmp/${HYPERSHIFT_CLI_NAME}_cli
 
-echo "Triggering the hosted cluster ${hc_name} deletion"
+echo "$(date) Triggering the hosted cluster ${hc_name} deletion"
 ${HYPERSHIFT_CLI_NAME} destroy cluster agent --name ${hc_name} --namespace ${hc_ns}
+echo "$(date) Hosted cluster ${hc_name} deletion is successful"
