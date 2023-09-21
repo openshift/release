@@ -23,4 +23,4 @@ EOF
 # Sleep for 60 seconds to wait for the resource to be created
 sleep 60
 
-oc wait deployments -n mtr --all=true --for condition=Available --timeout=350s
+oc wait deployments -n mtr --all=true --for condition=Available --timeout=1800s
