@@ -19,7 +19,7 @@ export GSHEET_KEY_LOCATION
 git clone https://github.com/cloud-bulldozer/e2e-benchmarking --depth=1
 pushd e2e-benchmarking/workloads/router-perf-v2
 # UUID Generation
-UUID="CPT-$(uuidgen)"
+UUID="perfscale-cpt-$(uuidgen)"
 export UUID
 # ES configuration
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
