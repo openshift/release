@@ -266,6 +266,26 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: git-no-pat-oauth-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GOGS_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gogs/gogs-private-key)
+        export GOGS_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gogs/gogs-public-key)
+        /bin/bash .ci/openshift-ci/test-git-no-pat-oauth-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gogs
+        name: gogs
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: eclipse-che
