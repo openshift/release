@@ -18,7 +18,7 @@ pushd e2e-benchmarking/workloads/network-perf-v2
 oc delete ns netperf --wait=true --ignore-not-found=true
 
 # UUID Generation
-UUID="CPT-$(uuidgen)"
+UUID="perfscale-cpt-$(uuidgen)"
 export UUID
 
 # Smoke Test
