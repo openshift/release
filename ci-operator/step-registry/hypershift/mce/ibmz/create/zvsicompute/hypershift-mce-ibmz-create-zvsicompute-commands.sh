@@ -250,6 +250,9 @@ for fip in "${zvsi_fip_list[@]}"; do
   echo "Successfully booted the zVSI $fip as agent"
 done
 
+# Deleting the resources downloaded in the pod
+rm -f $HOME/setup_pxeboot.sh  $HOME/rootfs.img
+
 # Wait for agents to join (max: 20 min)
 for ((i=50; i>=1; i--)); do
   agents_count=$(oc get agents -n $hcp_ns --no-headers | wc -l)
