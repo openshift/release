@@ -122,6 +122,9 @@ else
     exit 1
 fi
 
+echo "Waiting for resources to get deleted completely before deleting the resource group"
+sleep 60
+
 # Deleting the resource group
 set -e
 echo "Verifying if any resource reclamations are present in the $infra_name-rg resource group"
