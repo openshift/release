@@ -65,9 +65,22 @@ if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
   ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
 fi
 
+ccoctl_ouptut="/tmp/ccoctl_output"
 echo "> Create required credentials infrastructure and installer manifests for workload identity"
 export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
-ccoctl gcp create-all --name="${infra_name}" --project="${PROJECT}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" ${ADDITIONAL_CCOCTL_ARGS}
+ccoctl gcp create-all --name="${infra_name}" --project="${PROJECT}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" ${ADDITIONAL_CCOCTL_ARGS} &> "${ccoctl_ouptut}"
+cat "${ccoctl_ouptut}"
+
+# oidc_pool and oidc_provider is using the same name as infra_name, so not have to enable the follwoing lines yet
+# save oidc_provider info for upgrade
+#oidc_pool=$(grep "Workload identity pool created" "${ccoctl_ouptut}" | awk -F"name " '{print $NF}')
+#oidc_provider=$(grep "workload identity provider created" "${ccoctl_ouptut}" | awk -F"name " '{print $NF}')
+#if [[ -n "${oidc_oidc_pool}" ]] && [[ -n "${oidc_provider}" ]]; then
+#  echo "Saving oidc_pool: ${oidc_pool}"
+#  echo "Saving oidc_provider: ${oidc_provider}"
+#  echo "${oidc_pool}" > "${SHARED_DIR}/gcp_oidc_provider"
+#  echo "${oidc_provider}" >> "${SHARED_DIR}/gcp_oidc_provider"
+#fi
 
 echo "> Copy generated service account signing from ccoctl target directory into shared directory"
 cp -v "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"

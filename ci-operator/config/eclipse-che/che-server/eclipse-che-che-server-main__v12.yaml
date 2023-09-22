@@ -266,6 +266,45 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
+- as: gitea-no-pat-oauth-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITEA_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitea/gitea-private-key)
+        export GITEA_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitea/gitea-public-key)
+        /bin/bash .ci/openshift-ci/test-gitea-no-pat-oauth-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gitea
+        name: gitea
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: gitea-with-pat-setup-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITEA_PAT=$(cat /usr/local/ci-secrets/gitea/gitea-pat)
+        /bin/bash .ci/openshift-ci/test-gitea-with-pat-setup-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gitea
+        name: gitea
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
 zz_generated_metadata:
   branch: main
   org: eclipse-che
