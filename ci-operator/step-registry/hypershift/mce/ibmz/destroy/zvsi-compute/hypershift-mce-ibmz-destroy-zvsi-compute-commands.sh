@@ -142,19 +142,6 @@ else
     echo "No resource reclamations present in $infra_name-rg"
 fi
 
-echo "Verifying if any service instances are present in the $infra_name-rg resource group"
-si_names=$(ibmcloud resource service-instances --type all -g $infra_name-rg -q | grep -v Name | awk '{print $1}' | tr '\n' ' ')
-IFS=' ' read -ra si_names_list <<< "$si_names"
-if [ ${#si_names_list[@]} -gt 0 ]; then
-    echo "Service Instance Names :" "${si_names_list[@]}"
-    for si_name in "${si_names_list[@]}"; do
-        echo "Deleting the service instance $si_name"
-        ibmcloud resource service-instance-delete $si_name -g $infra_name-rg -f --recursive
-    done
-else
-    echo "No left-over service instances in $infra_name-rg"
-fi
-
 echo "Triggering the $infra_name-rg resource group deletion in the $IC_REGION region."
 ibmcloud resource group-delete $infra_name-rg -f
 echo "Successfully completed the destruction of all the resources that are created during the CI."
