@@ -40,19 +40,33 @@ fi
 echo Cluster successfully created at $createdAt
 
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-
-for _ in {1..10}; do
-  bin/hypershift destroy cluster aws \
-    --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
+if [[ -z "${POWERVS_BASE_DOMAIN}" ]]; then
+  for _ in {1..10}; do
+   bin/hypershift destroy cluster aws \
+     --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
+     --name ${CLUSTER_NAME} \
+     --infra-id ${INFRA_ID} \
+     --region ${HYPERSHIFT_AWS_REGION} \
+     --base-domain ${DOMAIN} \
+     --cluster-grace-period 40m
+   if [ $? == 0 ]; then
+     break
+   else
+     echo 'Failed to delete the cluster, retrying...'
+   fi
+  done
+else
+  bin/hypershift destroy cluster powervs \
     --name ${CLUSTER_NAME} \
     --infra-id ${INFRA_ID} \
-    --region ${HYPERSHIFT_AWS_REGION} \
-    --base-domain ${DOMAIN} \
+    --region ${POWERVS_REGION} \
+    --zone ${POWERVS_ZONE} \
+    --vpc-region ${POWERVS_VPC_REGION} \
+    --resource-group ${POWERVS_RESOURCE_GROUP} \
+    --base-domain ${POWERVS_BASE_DOMAIN} \
+    --cloud-instance-id ${POWERVS_GUID} \
+    --vpc ${VPC} \
+    --cloud-connection ${CLOUD_CONNECTION} \
     --cluster-grace-period 40m
-  if [ $? == 0 ]; then
-    break
-  else
-    echo 'Failed to delete the cluster, retrying...'
-  fi
-done
+fi
 echo "$(date) Finished deleting cluster"
