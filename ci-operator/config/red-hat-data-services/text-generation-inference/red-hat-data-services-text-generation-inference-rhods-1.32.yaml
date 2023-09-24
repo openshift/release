@@ -1,0 +1,39 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+images:
+- build_args:
+  - name: DOCKER_BUILDKIT
+    value: "1"
+  - name: BUILDKIT_PROGRESS
+    value: plain
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: text-generation-inference
+promotion:
+  namespace: red-hat-data-services
+  tag: rhods-1.32-final
+resources:
+  '*':
+    limits:
+      cpu: "20"
+      memory: 16Gi
+    requests:
+      cpu: "20"
+      memory: 16Gi
+tests:
+- as: stable-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: text-generation-inference
+    env:
+      IMAGE_REPO: text-generation-inference
+      RELEASE_VERSION: rhods-1.32
+    workflow: red-hat-data-services-ci-image-mirror
+zz_generated_metadata:
+  branch: rhods-1.32
+  org: red-hat-data-services
+  repo: text-generation-inference

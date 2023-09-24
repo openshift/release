@@ -12,27 +12,55 @@ COMPUTE_MACHINE_TYPE=${COMPUTE_MACHINE_TYPE:-"m5.xlarge"}
 OPENSHIFT_VERSION=${OPENSHIFT_VERSION:-}
 CHANNEL_GROUP=${CHANNEL_GROUP}
 MULTI_AZ=${MULTI_AZ:-false}
-EC2_METADATA_HTTP_TOKENS=${EC2_METADATA_HTTP_TOKENS:-optional}
+EC2_METADATA_HTTP_TOKENS=${EC2_METADATA_HTTP_TOKENS:-"optional"}
 ENABLE_AUTOSCALING=${ENABLE_AUTOSCALING:-false}
 ETCD_ENCRYPTION=${ETCD_ENCRYPTION:-false}
+STORAGE_ENCRYPTION=${STORAGE_ENCRYPTION:-false}
 DISABLE_WORKLOAD_MONITORING=${DISABLE_WORKLOAD_MONITORING:-false}
-CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
-ENABLE_BYOVPC="false"
+DISABLE_SCP_CHECKS=${DISABLE_SCP_CHECKS:-false}
+ENABLE_BYOVPC=${ENABLE_BYOVPC:-false}
+ENABLE_PROXY=${ENABLE_PROXY:-false}
+BYO_OIDC=${BYO_OIDC:-false}
+ENABLE_AUDIT_LOG=${ENABLE_AUDIT_LOG:-false}
+FIPS=${FIPS:-false}
+PRIVATE=${PRIVATE:-false}
+PRIVATE_LINK=${PRIVATE_LINK:-false}
 PRIVATE_SUBNET_ONLY="false"
+CLUSTER_TIMEOUT=${CLUSTER_TIMEOUT}
+
+# Record Cluster Configurations
+cluster_config_file="${SHARED_DIR}/cluster-config"
+function record_cluster() {
+  if [ $# -eq 2 ]; then
+    location="."
+    key=$1
+    value=$2
+  else
+    location=".$1"
+    key=$2
+    value=$3
+  fi
+
+  payload=$(cat $cluster_config_file)
+  if [[ "$value" == "true" ]] || [[ "$value" == "false" ]]; then
+    echo $payload | jq "$location += {\"$key\":$value}" > $cluster_config_file
+  else
+    echo $payload | jq "$location += {\"$key\":\"$value\"}" > $cluster_config_file
+  fi
+}
 
 # Define cluster name
 prefix="ci-rosa"
-if [[ "$STS" == "true" ]]; then
-  prefix="ci-rosa-s"
-elif [[ "$HOSTED_CP" == "true" ]]; then
+if [[ "$HOSTED_CP" == "true" ]]; then
   # The rosa hypershift must be a STS cluster.
   STS="true"
-  prefix="ci-rosa-h"
+  prefix="ci-rosa-h"  
+elif [[ "$STS" == "true" ]]; then
+  prefix="ci-rosa-s"
 fi
 subfix=$(openssl rand -hex 2)
 CLUSTER_NAME=${CLUSTER_NAME:-"$prefix-$subfix"}
 echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
-
 
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
@@ -106,40 +134,42 @@ fi
 # fi
 echo "Choosing openshift version ${OPENSHIFT_VERSION}"
 
-# Switches
 TAGS="prowci:${CLUSTER_NAME}"
 if [[ ! -z "$CLUSTER_TAGS" ]]; then
   TAGS="${TAGS},${CLUSTER_TAGS}"
 fi
 
-EC2_METADATA_HTTP_TOKENS_SWITCH=""
-if [[ -n "${EC2_METADATA_HTTP_TOKENS}" && "$HOSTED_CP" != "true" ]]; then
-  EC2_METADATA_HTTP_TOKENS_SWITCH="--ec2-metadata-http-tokens ${EC2_METADATA_HTTP_TOKENS}"
-fi
+cat > ${cluster_config_file} << EOF
+{
+  "name": "${CLUSTER_NAME}",
+  "sts": ${STS},
+  "hypershift": ${HOSTED_CP},
+  "region": "${CLOUD_PROVIDER_REGION}",
+  "version": {
+    "channel_group": "${CHANNEL_GROUP}",
+    "raw_id": "${OPENSHIFT_VERSION}"
+  },
+  "tags": "${TAGS}",
+  "multi_az": ${MULTI_AZ},
+  "disable_scp_checks": ${DISABLE_SCP_CHECKS},
+  "disable_workload_monitoring": ${DISABLE_WORKLOAD_MONITORING},
+  "etcd_encryption": ${ETCD_ENCRYPTION},
+  "enable_customer_managed_key": ${STORAGE_ENCRYPTION},
+  "fips": ${FIPS},
+  "private": ${PRIVATE},
+  "private_link": ${PRIVATE_LINK}
+}
+EOF
 
+# Switches
 MULTI_AZ_SWITCH=""
 if [[ "$MULTI_AZ" == "true" ]]; then
   MULTI_AZ_SWITCH="--multi-az"
 fi
 
-# If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
-# This requires a second step in the waiting for nodes phase where we put the config back to the desired setup.
-COMPUTE_NODES_SWITCH=""
-if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
-  if [[ ${MIN_REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
-    COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas 3 --max-replicas ${MAX_REPLICAS}"
-  else
-    COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"
-  fi
-elif [[ ${REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
-  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas 3 --max-replicas ${REPLICAS}"
-else
-  COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
-fi
-
-ETCD_ENCRYPTION_SWITCH=""
-if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
-  ETCD_ENCRYPTION_SWITCH="--etcd-encryption"
+DISABLE_SCP_CHECKS_SWITCH=""
+if [[ "$DISABLE_SCP_CHECKS" == "true" ]]; then
+  DISABLE_SCP_CHECKS_SWITCH="--disable-scp-checks"
 fi
 
 DISABLE_WORKLOAD_MONITORING_SWITCH=""
@@ -147,9 +177,80 @@ if [[ "$DISABLE_WORKLOAD_MONITORING" == "true" ]]; then
   DISABLE_WORKLOAD_MONITORING_SWITCH="--disable-workload-monitoring"
 fi
 
+DEFAULT_MP_LABELS_SWITCH=""
+if [[ ! -z "$DEFAULT_MACHINE_POOL_LABELS" ]] && [[ "$HOSTED_CP" == "false" ]]; then
+  DEFAULT_MP_LABELS_SWITCH="--default-mp-labels ${DEFAULT_MACHINE_POOL_LABELS}"
+  record_cluster "default_mp_labels" ${DEFAULT_MACHINE_POOL_LABELS}
+fi
+
+EC2_METADATA_HTTP_TOKENS_SWITCH=""
+if [[ -n "${EC2_METADATA_HTTP_TOKENS}" && "$HOSTED_CP" == "false" ]]; then
+  EC2_METADATA_HTTP_TOKENS_SWITCH="--ec2-metadata-http-tokens ${EC2_METADATA_HTTP_TOKENS}"
+  record_cluster "ec2_metadata_http_tokens" ${EC2_METADATA_HTTP_TOKENS}
+fi
+
+COMPUTER_NODE_ZONES_SWITCH=""
+if [[ ! -z "$AVAILABILITY_ZONES" ]]; then
+  AVAILABILITY_ZONES=$(echo $AVAILABILITY_ZONES | sed -E "s|(\w+)|${CLOUD_PROVIDER_REGION}&|g")
+  COMPUTER_NODE_ZONES_SWITCH="--availability-zones ${AVAILABILITY_ZONES}"
+  record_cluster "availability_zones" ${AVAILABILITY_ZONES}
+fi
+
+COMPUTER_NODE_DISK_SIZE_SWITCH=""
+if [[ ! -z "$WORKER_DISK_SIZE" ]]; then
+  COMPUTER_NODE_DISK_SIZE_SWITCH="--worker-disk-size ${WORKER_DISK_SIZE}"
+  record_cluster "worker_disk_size" ${WORKER_DISK_SIZE}
+fi
+
+AUDIT_LOG_SWITCH=""
+if [[ "$ENABLE_AUDIT_LOG" == "true" ]]; then
+  iam_role_arn=$(head -n 1 ${SHARED_DIR}/iam_role_arn)
+  AUDIT_LOG_SWITCH="--audit-log-arn $iam_role_arn"
+  record_cluster "audit_log_arn" $iam_role_arn
+fi
+
+# If the node count is >=24 we enable autoscaling with max replicas set to the replica count so we can bypass the day2 rollout.
+# This requires a second step in the waiting for nodes phase where we put the config back to the desired setup.
+COMPUTE_NODES_SWITCH=""
+if [[ ${REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
+  MIN_REPLICAS=3
+  MAX_REPLICAS=${REPLICAS}
+  ENABLE_AUTOSCALING=true
+fi
+record_cluster "autoscaling" "enabled" ${ENABLE_AUTOSCALING}
+
+if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
+  if [[ ${MIN_REPLICAS} -ge 24 ]] && [[ "$HOSTED_CP" == "false" ]]; then
+    MIN_REPLICAS=3
+  fi
+  COMPUTE_NODES_SWITCH="--enable-autoscaling --min-replicas ${MIN_REPLICAS} --max-replicas ${MAX_REPLICAS}"  
+  record_cluster "nodes" "max_replicas" ${MIN_REPLICAS}
+  record_cluster "nodes" "min_replicas" ${MAX_REPLICAS}
+else
+  COMPUTE_NODES_SWITCH="--replicas ${REPLICAS}"
+  record_cluster "nodes" "replicas" ${REPLICAS}
+fi
+
+ETCD_ENCRYPTION_SWITCH=""
+if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
+  ETCD_ENCRYPTION_SWITCH="--etcd-encryption"
+  if [[ "$HOSTED_CP" == "true" ]]; then
+    kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
+    ETCD_ENCRYPTION_SWITCH="${ETCD_ENCRYPTION_SWITCH} --etcd-encryption-kms-arn $kms_key_arn"
+    record_cluster "encrption" "etcd_encryption_kms_arn" $kms_key_arn
+  fi
+fi
+
+STORAGE_ENCRYPTION_SWITCH=""
+if [[ "$STORAGE_ENCRYPTION" == "true" ]]; then
+  kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
+  STORAGE_ENCRYPTION_SWITCH="--enable-customer-managed-key --kms-key-arn $kms_key_arn"
+  record_cluster "encrption" "kms_key_arn" $kms_key_arn
+fi
+
 HYPERSHIFT_SWITCH=""
 if [[ "$HOSTED_CP" == "true" ]]; then
-  HYPERSHIFT_SWITCH="--hosted-cp --classic-oidc-config"
+  HYPERSHIFT_SWITCH="--hosted-cp"
   if [[ "$ENABLE_SECTOR" == "true" ]]; then
     PROVISION_SHARD_ID=$(cat ${SHARED_DIR}/provision_shard_ids | head -n 1)
     if [[ -z "$PROVISION_SHARD_ID" ]]; then
@@ -158,9 +259,11 @@ if [[ "$HOSTED_CP" == "true" ]]; then
     fi
 
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
+    record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
   fi
 
   ENABLE_BYOVPC="true"
+  # BYO_OIDC="true"
 fi
 
 FIPS_SWITCH=""
@@ -171,13 +274,6 @@ fi
 PRIVATE_SWITCH=""
 if [[ "$PRIVATE" == "true" ]]; then
   PRIVATE_SWITCH="--private"
-fi
-
-KMS_KEY_SWITCH=""
-if [[ "$ENABLE_CUSTOMER_MANAGED_KEY" == "true" ]]; then
-  # Get the kms keys from the previous steps, and replace the vaule here
-  KMS_KEY_ARN=$(head -n 1 ${SHARED_DIR}/aws_kms_key_arn)
-  KMS_KEY_SWITCH="--enable-customer-managed-key --kms-key-arn ${KMS_KEY_ARN}"
 fi
 
 PRIVATE_LINK_SWITCH=""
@@ -203,8 +299,12 @@ if [[ "$ENABLE_PROXY" == "true" ]]; then
     echo -e "Using proxy with requested additional trust bundle"
     PROXY_SWITCH="${PROXY_SWITCH} --additional-trust-bundle-file ${trust_bundle_file}"
   fi
-
   ENABLE_BYOVPC="true"
+
+  record_cluster "proxy" "enabled" ${ENABLE_PROXY}
+  record_cluster "proxy" "http" $proxy_private_url
+  record_cluster "proxy" "https" $proxy_private_url
+  record_cluster "proxy" "trust_bundle_file" $trust_bundle_file  
 fi
 
 SUBNET_ID_SWITCH=""
@@ -218,40 +318,64 @@ if [[ "$ENABLE_BYOVPC" == "true" ]]; then
   
   if [[ "${PRIVATE_SUBNET_ONLY}" == "true" ]] ; then
     SUBNET_ID_SWITCH="--subnet-ids ${PRIVATE_SUBNET_IDs}"
+    record_cluster "subnets" "private_subnet_ids" ${PRIVATE_SUBNET_IDs}
   else
     if [[ -z "${PUBLIC_SUBNET_IDs}" ]] ; then
       echo -e "The public_subnet_ids are mandatory."
       exit 1
     fi
     SUBNET_ID_SWITCH="--subnet-ids ${PUBLIC_SUBNET_IDs},${PRIVATE_SUBNET_IDs}"
+    record_cluster "subnets" "private_subnet_ids" ${PRIVATE_SUBNET_IDs}
+    record_cluster "subnets" "public_subnet_ids" ${PUBLIC_SUBNET_IDs}
   fi
 fi
 
 # STS options
 STS_SWITCH="--non-sts"
 ACCOUNT_ROLES_SWITCH=""
+BYO_OIDC_SWITCH=""
 if [[ "$STS" == "true" ]]; then
   STS_SWITCH="--sts"
 
   # Account roles
   ACCOUNT_ROLES_PREFIX=$(cat "${SHARED_DIR}/account-roles-prefix")
-  echo -e "Validate the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
-  Account_Installer_Role_Name="${ACCOUNT_ROLES_PREFIX}-Installer-Role"
-  Account_ControlPlane_Role_Name="${ACCOUNT_ROLES_PREFIX}-ControlPlane-Role"
-  Account_Support_Role_Name="${ACCOUNT_ROLES_PREFIX}-Support-Role"
-  Account_Worker_Role_Name="${ACCOUNT_ROLES_PREFIX}-Worker-Role"
+  echo -e "Get the ARNs of the account roles with the prefix ${ACCOUNT_ROLES_PREFIX}"
 
-  roleARNList=$(rosa list account-roles -o json | jq -r '.[].RoleARN')
-
-  Account_Installer_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Installer_Role_Name}" || true; })
-  Account_ControlPlane_Role_ARN=$(echo "$roleARNList" | { grep "${Account_ControlPlane_Role_Name}" || true; })
-  Account_Support_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Support_Role_Name}" || true; })
-  Account_Worker_Role_ARN=$(echo "$roleARNList" | { grep "${Account_Worker_Role_Name}" || true; })
-  if [[ -z "${Account_ControlPlane_Role_ARN}" ]] || [[ -z "${Account_Installer_Role_ARN}" ]] || [[ -z "${Account_Support_Role_ARN}" ]] || [[ -z "${Account_Worker_Role_ARN}" ]]; then
+  roleARNFile="${SHARED_DIR}/account-roles-arns"
+  account_intaller_role_arn=$(cat "$roleARNFile" | { grep "Installer-Role" || true; })
+  account_support_role_arn=$(cat "$roleARNFile" | { grep "Support-Role" || true; })
+  account_worker_role_arn=$(cat "$roleARNFile" | { grep "Worker-Role" || true; })
+  if [[ -z "${account_intaller_role_arn}" ]] || [[ -z "${account_support_role_arn}" ]] || [[ -z "${account_worker_role_arn}" ]]; then
     echo -e "One or more account roles with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
     exit 1
+  fi  
+  ACCOUNT_ROLES_SWITCH="--role-arn ${account_intaller_role_arn} --support-role-arn ${account_support_role_arn} --worker-iam-role ${account_worker_role_arn}"
+  record_cluster "aws.sts" "role_arn" $account_intaller_role_arn
+  record_cluster "aws.sts" "support_role_arn" $account_support_role_arn
+  record_cluster "aws.sts" "worker_role_arn" $account_worker_role_arn
+
+  if [[ "$HOSTED_CP" == "false" ]]; then
+    account_control_plane_role_arn=$(cat "$roleARNFile" | { grep "ControlPlane-Role" || true; })
+    if [[ -z "${account_control_plane_role_arn}" ]]; then
+      echo -e "The control plane account role with the prefix ${ACCOUNT_ROLES_PREFIX} do not exist"
+      exit 1
+    fi      
+    ACCOUNT_ROLES_SWITCH="${ACCOUNT_ROLES_SWITCH} --controlplane-iam-role ${account_control_plane_role_arn}"
+    record_cluster "aws.sts" "control_plane_role_arn" $account_control_plane_role_arn
   fi
-  ACCOUNT_ROLES_SWITCH="--role-arn ${Account_Installer_Role_ARN} --controlplane-iam-role ${Account_ControlPlane_Role_ARN} --support-role-arn ${Account_Support_Role_ARN} --worker-iam-role ${Account_Worker_Role_ARN}"
+
+  if [[ "$BYO_OIDC" == "true" ]]; then
+    oidc_config_id=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
+    operator_roles_prefix=$(cat "${SHARED_DIR}/operator-roles-prefix")
+    BYO_OIDC_SWITCH="--oidc-config-id ${oidc_config_id} --operator-roles-prefix ${operator_roles_prefix}"
+    record_cluster "aws.sts" "oidc_config_id" $oidc_config_id
+    record_cluster "aws.sts" "operator_roles_prefix" $operator_roles_prefix
+  else
+    # For the hypershift cluster, as default, BYO OIDC is required. If we do not set BYO OIDC, the option --classic-oidc-config must be set.
+    if [[ "$HOSTED_CP" == "true" ]] ; then
+      BYO_OIDC_SWITCH="--classic-oidc-config"
+    fi
+  fi
 fi
 
 DRY_RUN_SWITCH=""
@@ -263,6 +387,7 @@ echo "Parameters for cluster request:"
 echo "  Cluster name: ${CLUSTER_NAME}"
 echo "  STS mode: ${STS}"
 echo "  Hypershift: ${HOSTED_CP}"
+echo "  Byo OIDC: ${BYO_OIDC}"
 echo "  Compute machine type: ${COMPUTE_MACHINE_TYPE}"
 echo "  Cloud provider region: ${CLOUD_PROVIDER_REGION}"
 echo "  Multi-az: ${MULTI_AZ}"
@@ -272,11 +397,12 @@ echo "  Fips: ${FIPS}"
 echo "  Private: ${PRIVATE}"
 echo "  Private Link: ${PRIVATE_LINK}"
 echo "  Enable proxy: ${ENABLE_PROXY}"
-echo "  Enable customer managed key: ${ENABLE_CUSTOMER_MANAGED_KEY}"
+echo "  Enable customer managed key: ${STORAGE_ENCRYPTION}"
 echo "  Enable ec2 metadata http tokens: ${EC2_METADATA_HTTP_TOKENS}"
 echo "  Enable etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
 echo "  Enable Byovpc: ${ENABLE_BYOVPC}"
+echo "  Enable audit log: ${ENABLE_AUDIT_LOG}"
 echo "  Cluster Tags: ${TAGS}"
 if [[ "$ENABLE_AUTOSCALING" == "true" ]]; then
   echo "  Enable autoscaling: ${ENABLE_AUTOSCALING}"
@@ -300,15 +426,21 @@ ${ACCOUNT_ROLES_SWITCH} \
 ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
 ${MULTI_AZ_SWITCH} \
 ${COMPUTE_NODES_SWITCH} \
+${BYO_OIDC_SWITCH} \
 ${ETCD_ENCRYPTION_SWITCH} \
 ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
 ${HYPERSHIFT_SWITCH} \
 ${SUBNET_ID_SWITCH} \
 ${FIPS_SWITCH} \
-${KMS_KEY_SWITCH} \
 ${PRIVATE_SWITCH} \
 ${PRIVATE_LINK_SWITCH} \
 ${PROXY_SWITCH} \
+${DISABLE_SCP_CHECKS_SWITCH} \
+${DEFAULT_MP_LABELS_SWITCH} \
+${STORAGE_ENCRYPTION_SWITCH} \
+${AUDIT_LOG_SWITCH} \
+${COMPUTER_NODE_ZONES_SWITCH} \
+${COMPUTER_NODE_DISK_SIZE_SWITCH} \
 ${DRY_RUN_SWITCH}
 "
 
@@ -325,21 +457,27 @@ rosa create cluster -y \
                     --cluster-name "${CLUSTER_NAME}" \
                     --region "${CLOUD_PROVIDER_REGION}" \
                     --version "${OPENSHIFT_VERSION}" \
-                    --channel-group ${CHANNEL_GROUP} \
+                    --channel-group "${CHANNEL_GROUP}" \
                     --compute-machine-type "${COMPUTE_MACHINE_TYPE}" \
-                    --tags ${TAGS} \
+                    --tags "${TAGS}" \
                     ${ACCOUNT_ROLES_SWITCH} \
                     ${EC2_METADATA_HTTP_TOKENS_SWITCH} \
                     ${MULTI_AZ_SWITCH} \
                     ${COMPUTE_NODES_SWITCH} \
+                    ${BYO_OIDC_SWITCH} \
                     ${ETCD_ENCRYPTION_SWITCH} \
                     ${DISABLE_WORKLOAD_MONITORING_SWITCH} \
                     ${SUBNET_ID_SWITCH} \
                     ${FIPS_SWITCH} \
-                    ${KMS_KEY_SWITCH} \
                     ${PRIVATE_SWITCH} \
                     ${PRIVATE_LINK_SWITCH} \
                     ${PROXY_SWITCH} \
+                    ${DISABLE_SCP_CHECKS_SWITCH} \
+                    ${DEFAULT_MP_LABELS_SWITCH} \
+                    ${STORAGE_ENCRYPTION_SWITCH} \
+                    ${AUDIT_LOG_SWITCH} \
+                    ${COMPUTER_NODE_ZONES_SWITCH} \
+                    ${COMPUTER_NODE_DISK_SIZE_SWITCH} \
                     ${DRY_RUN_SWITCH} \
                     > "${CLUSTER_INFO}"
 
@@ -380,8 +518,15 @@ rosa describe cluster -c ${CLUSTER_ID} -o json
 # Print console.url and api.url
 API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 CONSOLE_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.console.url')
-
 if [[ "${API_URL}" == "null" ]]; then
+  # If api.url is null, call ocm-qe to analyze the root cause.
+  if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
+    slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")
+    slack_message='{"text": "Warning: the api.url for the cluster '"${CLUSTER_ID}"' is null. Sleep 20 hours for debugging. <@UD955LPJL> <@UEEQ10T4L>"}'
+    curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
+    sleep 72000
+  fi
+
   port="6443"
   if [[ "$HOSTED_CP" == "true" ]]; then
     port="443"

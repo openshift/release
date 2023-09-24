@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST}"
+echo "RELEASE_IMAGE_LATEST_FROM_BUILD_FARM: ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM}"
 export HOME="${HOME:-/tmp/home}"
 export XDG_RUNTIME_DIR="${HOME}/run"
 export REGISTRY_AUTH_PREFERENCE=podman # TODO: remove later, used for migrating oc from docker to podman
@@ -13,21 +15,8 @@ mkdir -p "${XDG_RUNTIME_DIR}"
 # so that the credentials of the build farm registry can be saved in docker client config file.
 KUBECONFIG="" oc registry login
 
-# get OCP version, e.g. "4.12"
-function getVersion() {
-  local release_image=""
-  if [ -n "${RELEASE_IMAGE_INITIAL-}" ]; then
-    release_image=${RELEASE_IMAGE_INITIAL}
-  elif [ -n "${RELEASE_IMAGE_LATEST-}" ]; then
-    release_image=${RELEASE_IMAGE_LATEST}     
-  fi
-  
-  local version=""
-  if [ ${release_image} != "" ]; then
-    version=$(oc adm release info ${release_image} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)    
-  fi
-  echo "${version}"
-}
+version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} --output=json | jq -r '.metadata.version' | cut -d. -f 1,2)
+echo "OCP version: ${version}"
 
 # check if controlplanemachinesets is supported by the IaaS and the OCP version
 # return 0 if controlplanemachinesets is supported, otherwise 1
@@ -47,7 +36,7 @@ function hasCPMS() {
         # 4.13+
         REQUIRED_OCP_VERSION="4.13"
         ;;
-    nutanix)
+    nutanix*)
         # 4.14+
         REQUIRED_OCP_VERSION="4.14"
         ;;
@@ -56,12 +45,36 @@ function hasCPMS() {
         ;;
     esac    
 
-    version=$(getVersion)
-    #echo "OCP version: ${version}"
     if [ -n "${version}" ] && [ "$(printf '%s\n' "${REQUIRED_OCP_VERSION}" "${version}" | sort --version-sort | head -n1)" = "${REQUIRED_OCP_VERSION}" ]; then
         ret=0
     fi
     return ${ret}
+}
+
+# check if the cluster is by IPI or UPI
+# return 0 if it is an IPI cluster, otherwise 1
+function isIPI() {
+    #oc get machines -n openshift-machine-api -o json | jq -r '.items[].metadata.labels."machine.openshift.io/cluster-api-machine-role"' | grep master
+    oc get cm -n openshift-config openshift-install -o yaml
+    if [ $? -eq 0 ]; then
+        # an IPI cluster
+        return 0
+    else
+        # a UPI cluster
+        return 1
+    fi
+}
+
+# check if it is a Single-Node cluster
+# return 0 if SNO cluster, otherwise 1
+function isSNO() {
+    local nodes_count
+    nodes_count=$(oc get nodes --no-headers | wc -l)
+    if (( ${nodes_count} == 1 )); then
+        return 0
+    else
+        return 1
+    fi
 }
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
@@ -72,15 +85,30 @@ then
     source "${SHARED_DIR}/proxy-conf.sh"
 fi
 
-if ! hasCPMS; then
-    echo "INFO: 'controlplanemachinesets' is not supproted (OCP $(getVersion) on ${CLUSTER_TYPE}), skip checking"
+if ! isIPI; then
+    echo "INFO: 'controlplanemachinesets' is not available on UPI cluster, skip."
     exit 0
 fi
+
+if isSNO; then
+    echo "INFO: 'controlplanemachinesets' is not available on Single-Node cluster, skip."
+    exit 0
+fi
+
+if ! hasCPMS; then
+    echo "INFO: 'controlplanemachinesets' is not supproted (OCP ${version} on ${CLUSTER_TYPE}), skip."
+    exit 0
+fi
+
+check_result=0
 
 # control-plane machinesets
 stderr=$(mktemp)
 stdout=$(mktemp)
 oc get controlplanemachinesets -n openshift-machine-api --no-headers 1>${stdout} 2>${stderr} || true
+
+echo "control-plane machinesets:"
+cat "${stdout}"
 
 curr_state=$(grep cluster ${stdout} | awk '{print $6}' || true)
 if [[ "${curr_state}" != "${EXPECTED_CPMS_STATE}" ]]; then
@@ -91,5 +119,36 @@ else
     echo "INFO: controlplanemachinesets does be ${EXPECTED_CPMS_STATE}."
 fi
 
-echo "control-plane machinesets:"
-cat "${stdout}"
+# control-plane machine name check
+# Machines
+err_output=$(mktemp)
+machine_output=$(mktemp)
+oc get machines.machine.openshift.io -n openshift-machine-api --selector machine.openshift.io/cluster-api-machine-type=master --no-headers -owide 1>${machine_output} 2>${err_output}
+
+echo "Machines:"
+cat "${machine_output}"
+
+if grep -ir 'No resources found in openshift-machine-api namespace.' ${err_output}; then
+    echo "ERROR: No machines in openshift-machine-api namespace, but found controlplanemachinesets!"
+    check_result=1
+fi
+
+control_plane_nodes_count=$(cat "${machine_output}" | wc -l || true)
+excepted_count=$(cat "${machine_output}" | awk '{print $1}' | grep -iE "master-[0-9]{1}$" | wc -l || true)
+
+echo "control_plane_nodes_count: ${control_plane_nodes_count}"
+echo "excepted_count: ${excepted_count}"
+
+if (( ${excepted_count} < 1 )) || (( ${control_plane_nodes_count} < 1 )); then
+    echo "ERROR: control plane nodes count or expected nodes count is less than 1, exit now."
+    check_result=1
+fi
+
+if [[ "${excepted_count}" != "${control_plane_nodes_count}" ]]; then
+    echo "ERROR: One or more control plane machine name is not expected."
+    check_result=1
+else
+    echo "INFO: All control plane machine names are expected."
+fi
+
+exit ${check_result}

@@ -1,0 +1,74 @@
+base_images:
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "9"
+binary_build_commands: NO_DOCKER=1 make build
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: ubi
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+  to: multiarch-manager-operator
+releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: fmt
+  commands: NO_DOCKER=1 make fmt && make verify-diff
+  container:
+    from: src
+- as: vet
+  commands: NO_DOCKER=1 make vet && make verify-diff
+  container:
+    from: src
+- as: goimports
+  commands: NO_DOCKER=1 make goimports && make verify-diff
+  container:
+    from: src
+- as: lint
+  commands: NO_DOCKER=1 make lint && make verify-diff
+  container:
+    from: src
+- as: sast
+  commands: NO_DOCKER=1 make gosec && make verify-diff
+  container:
+    from: src
+- as: manifests
+  commands: NO_DOCKER=1 make manifests && make verify-diff
+  container:
+    from: src
+- as: generate
+  commands: NO_DOCKER=1 make generate && make verify-diff
+  container:
+    from: src
+- as: unit
+  commands: NO_DOCKER=1 make test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: multiarch-manager-operator

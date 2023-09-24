@@ -10,6 +10,18 @@ log(){
     echo -e "\033[1m$(date "+%d-%m-%YT%H:%M:%S") " "${*}\033[0m"
 }
 
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        echo "setting the proxy"
+        # cat "${SHARED_DIR}/proxy-conf.sh"
+        echo "source ${SHARED_DIR}/proxy-conf.sh"
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        echo "no proxy setting."
+    fi
+}
+set_proxy
+
 # Display only node details 
 function listNodeDetails() {
     echo "List node details"
@@ -97,7 +109,12 @@ function waitForReady() {
                 break
             fi
         else
-            node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/infra!=,node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+	    # Infra are not counted for non-HCP clusters
+	    if [[ "$HOSTED_CP" == "false" ]]; then
+		node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/infra!=,node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+	    else
+		node_count="$(oc get nodes --no-headers -l node-role.kubernetes.io/worker --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)"
+            fi
             if [[ "$node_count" -ge "$1" ]]; then
 	        if [[ "$successful_attempts" -lt "$desired_successful_attempts" ]]; then
    		    successful_attempts=$((successful_attempts+1))
