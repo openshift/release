@@ -3,8 +3,12 @@ base_images:
     name: "4.15"
     namespace: origin
     tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
   ocp_4.10_cli:
-    name: "4.10"
+    name: "4.15"
     namespace: ocp
     tag: cli
   ocp_4.14_cli:
@@ -15,16 +19,12 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
-  rhel-7:
-    name: builder
-    namespace: ocp
-    tag: rhel-7-golang-1.16-openshift-4.10
 build_root:
   from_repository: true
 images:
 - build_args:
   - name: TAGS
-    value: okd
+    value: fcos
   dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
@@ -34,7 +34,7 @@ images:
   to: installer
 - build_args:
   - name: TAGS
-    value: okd
+    value: fcos
   dockerfile_path: images/installer-artifacts/Dockerfile.rhel
   from: installer
   inputs:
@@ -44,7 +44,7 @@ images:
   to: installer-artifacts
 - build_args:
   - name: TAGS
-    value: libvirt okd
+    value: libvirt fcos
   dockerfile_path: images/libvirt/Dockerfile.ci
   from: base
   inputs:
@@ -54,9 +54,9 @@ images:
   to: libvirt-installer
 - build_args:
   - name: TAGS
-    value: okd
-  dockerfile_path: images/installer/Dockerfile.upi.ci
-  from: rhel-7
+    value: fcos
+  dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+  from: base
   inputs:
     ocp_4.10_cli:
       as:
@@ -67,7 +67,7 @@ images:
   to: upi-installer
 - build_args:
   - name: TAGS
-    value: okd
+    value: fcos
   dockerfile_path: images/openstack/Dockerfile.ci
   from: base
   inputs:
@@ -80,7 +80,7 @@ images:
   to: openstack-installer
 - build_args:
   - name: TAGS
-    value: baremetal libvirt okd
+    value: baremetal libvirt fcos
   dockerfile_path: images/baremetal/Dockerfile.ci
   from: base
   inputs:
@@ -90,7 +90,7 @@ images:
   to: baremetal-installer
 - build_args:
   - name: TAGS
-    value: okd
+    value: fcos
   dockerfile_path: images/installer/Dockerfile.ci
   from: base
   inputs:
@@ -192,6 +192,20 @@ tests:
   steps:
     cluster_profile: vsphere
     workflow: openshift-e2e-vsphere
+- as: e2e-agent-compact-ipv4
+  cluster: build05
+  optional: true
+  run_if_changed: /agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-compact-ipv4
+- as: e2e-agent-sno-ipv6
+  cluster: build05
+  optional: true
+  run_if_changed: /agent/
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: agent-e2e-sno-ipv6
 zz_generated_metadata:
   branch: release-4.15
   org: openshift
