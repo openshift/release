@@ -266,19 +266,38 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: ipi-gcp
-- as: git-no-pat-oauth-flow
+- as: gitea-no-pat-oauth-flow
   steps:
     cluster_profile: gcp
     test:
     - as: che-server-test
       cli: latest
       commands: |
-        export GOGS_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gogs/gogs-private-key)
-        export GOGS_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gogs/gogs-public-key)
-        /bin/bash .ci/openshift-ci/test-git-no-pat-oauth-flow.sh
+        export GITEA_PRIVATE_KEY=$(cat /usr/local/ci-secrets/gitea/gitea-private-key)
+        export GITEA_PUBLIC_KEY=$(cat /usr/local/ci-secrets/gitea/gitea-public-key)
+        /bin/bash .ci/openshift-ci/test-gitea-no-pat-oauth-flow.sh
       credentials:
-      - mount_path: /usr/local/ci-secrets/gogs
-        name: gogs
+      - mount_path: /usr/local/ci-secrets/gitea
+        name: gitea
+        namespace: test-credentials
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: gitea-with-pat-setup-flow
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: che-server-test
+      cli: latest
+      commands: |
+        export GITEA_PAT=$(cat /usr/local/ci-secrets/gitea/gitea-pat)
+        /bin/bash .ci/openshift-ci/test-gitea-with-pat-setup-flow.sh
+      credentials:
+      - mount_path: /usr/local/ci-secrets/gitea
+        name: gitea
         namespace: test-credentials
       from: src
       resources:
