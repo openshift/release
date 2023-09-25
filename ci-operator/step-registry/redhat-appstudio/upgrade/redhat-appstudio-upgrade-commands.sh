@@ -98,7 +98,7 @@ git config --global credential.helper "store --file ${GIT_CREDS_PATH}"
 echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
 cd "$(mktemp -d)"
-git clone --branch RHTAP-456 "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
+git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
 git version
 
 export PR=2444
