@@ -98,8 +98,8 @@ CONFIG = {
     },
     'azure-arm64-quota-slice': {
         'centralus': 3,
+        'southcentralus': 3,
         'eastus': 3,
-        'eastus2': 3,
         'westus2': 3
     },
     'azurestack-quota-slice': {
