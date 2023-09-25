@@ -20,21 +20,7 @@ EOF
 
 # Check if Windup is deployed
 
-# Sleep for 5 seconds to wait for the resource to be created
-sleep 5
+# Sleep for 60 seconds to wait for the resource to be created
+sleep 60
 
-RETRIES=60
-for try in $(seq "$RETRIES"); do
-    READY=$(oc get windup -n mtr -o=jsonpath='{.items[0].status.conditions[1].status}')
-    if [[ $READY == "True" ]]; then
-        echo "Windup is ready."
-        break
-    else
-        if [ $try == $RETRIES ]; then
-            echo "Error deploying Windup, exiting now"
-            exit 1
-        fi
-        echo "Try ${try}/${RETRIES}: Windup deployment is not ready. Checking again in 30 seconds"
-        sleep 30
-    fi
-done
+oc wait deployments -n mtr --all=true --for condition=Available --timeout=1800s
