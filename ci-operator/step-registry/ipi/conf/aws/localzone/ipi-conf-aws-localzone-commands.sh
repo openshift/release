@@ -21,9 +21,12 @@ compute:
   replicas: ${LOCALZONE_WORKER_NUMBER}
   platform:
     aws:
-      type: ${LOCALZONE_INSTANCE_TYPE}
       zones: ${local_zones_str}
 EOF
+
+if [[ ${LOCALZONE_INSTANCE_TYPE} != "" ]]; then
+  echo "      type: ${LOCALZONE_INSTANCE_TYPE}" >> ${PATCH}
+fi
 
 # use localzone id
 if [[ -e "${SHARED_DIR}/localzone_subnet_id" ]]; then
