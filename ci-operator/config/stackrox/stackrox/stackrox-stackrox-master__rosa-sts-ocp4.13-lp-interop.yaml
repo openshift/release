@@ -1,0 +1,54 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  openshift-cli-installer:
+    name: openshift-cli-installer
+    namespace: ci
+    tag: latest
+  rosa:
+    name: automation-flavors
+    namespace: stackrox
+    tag: rosa-0.7.6
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 200m
+      memory: 200Mi
+test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
+tests:
+- as: rosa-sts-qa-e2e-tests
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CHANNEL_GROUP: stable
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "LPTOCPCI"},
+          {"step": "cluster-install", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster (ROSA)", "jira_project": "LPTOCPCI"},
+          {"step": "cluster-uninstall", "failure_type": "all", "classification": "Infrastructure Deprovisioning - Cluster (ROSA)", "jira_project": "LPTOCPCI"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OPENSHIFT_VERSION: "4.13"
+    test:
+    - ref: stackrox-e2e
+    workflow: firewatch-rosa-aws-sts
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: master
+  org: stackrox
+  repo: stackrox
+  variant: rosa-sts-ocp4.13-lp-interop

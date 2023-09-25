@@ -463,3 +463,19 @@ build-hypershift-deployment:
 	echo Building HyperShift operator with tag $(TAG)
 	oc --context app.ci -n ci --as system:admin start-build -w hypershift-cli
 	oc --context app.ci -n ci --as system:admin tag hypershift-cli:latest hypershift-cli:$(TAG)
+
+analyse-deps:
+	@snyk test --project-name=release --org=red-hat-org
+.PHONY: analyse-deps
+
+ARTIFACTS ?= "."
+
+analyse-code:
+	@snyk code test --project-name=release --org=red-hat-org --sarif --sarif-file-output=${ARTIFACTS}/snyk.sarif.json > /dev/null || true
+
+	@echo The following vulnerabilities fingerprints are found:
+	@jq -r '.runs[].results[].fingerprints[]' ${ARTIFACTS}/snyk.sarif.json | awk 'NR==FNR { b[$$0] = 1; next } !b[$$0]' .snyk-ignore -
+
+	@echo Full vulnerabilities report is available at ${ARTIFACTS}/snyk.sarif.json
+
+.PHONY: analyse-code
