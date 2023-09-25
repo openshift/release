@@ -9,17 +9,18 @@ export KUBECONFIG=${SHARED_DIR}/kubeconfig
 # cd to writeable directory
 cd /tmp/
 
-git clone https://github.com/stolostron/policy-collection.git
+git clone https://github.com/gparvin/policy-collection.git
+cd policy-collection/deploy/ 
+git checkout change-thanos-data
 
 sleep 60
 
-cd policy-collection/deploy/ 
 echo 'y' | ./deploy.sh -p policygenerator/policy-sets/stable/openshift-plus -n policies -u https://github.com/stolostron/policy-collection.git -a openshift-plus
 
 sleep 120
 
 # wait for policies to be compliant
-RETRIES=30
+RETRIES=40
 for try in $(seq "${RETRIES}"); do
   if [[ $(oc get policies -n policies) != *"NonCompliant"* ]]; then
     echo "OPP policyset is applied and compliant"
@@ -32,4 +33,7 @@ for try in $(seq "${RETRIES}"); do
     echo "Try ${try}/${RETRIES}: Policies are not compliant. Checking again in 30 seconds"
     sleep 30
   fi
+  oc get secret -n openshift-storage noobaa-admin || echo "Secret doesn't exist yet"
+  oc get secret -n open-cluster-management-observability thanos-object-storage || echo "Secret doesn't exist yet"
+  oc get ObjectBucket obc-openshift-storage-obc-observability -o yaml || echo "Bucket doesn't exist yet"
 done
