@@ -36,6 +36,38 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 6h0m0s
+- as: perfscale-rosa-multiaz-control-plane-24nodes-periodic
+  cron: 0 15 * * 6
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.14"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "24"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
+- as: perfscale-rosa-multiaz-node-density-heavy-24nodes-periodic
+  cron: 0 18 * * 6
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.14"
+      PODS_PER_NODE: "100"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "24"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: rosa-aws-sts
 zz_generated_metadata:
   branch: main
   org: openshift-qe
