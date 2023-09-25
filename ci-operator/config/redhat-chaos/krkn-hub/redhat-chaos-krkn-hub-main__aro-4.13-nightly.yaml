@@ -1,4 +1,8 @@
 base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
   os:
     name: centos
     namespace: openshift
@@ -13,6 +17,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   from: os
   to: krkn-hub-aro
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-prow-aro
 releases:
   initial:
     integration:
@@ -35,6 +42,9 @@ tests:
   cron: 0 8 */2 * *
   steps:
     cluster_profile: azure-qe
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     test:
     - chain: redhat-chaos-krkn-hub-tests
     workflow: openshift-qe-installer-azure-aro
