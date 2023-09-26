@@ -27,10 +27,15 @@ chain:
 
         CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
         
+        echo "scale nodepool replicas => 0"
+        oc scale nodepool ${CLUSTER_NAME} -n local-cluster --replicas 0
+        oc delete bmh -n local-cluster-${CLUSTER_NAME} --all
+        
         echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
         /tmp/${HYPERSHIFT_NAME} destroy cluster agent \
           --name ${CLUSTER_NAME} \
-          --namespace local-cluster
+          --namespace local-cluster \
+          --cluster-grace-period 40m
 
         echo "$(date) Finished deleting cluster"
         
@@ -45,4 +50,4 @@ chain:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 30m0s
+      timeout: 50m0s
