@@ -1,3 +1,8 @@
+base_images:
+  installer:
+    name: "4.14"
+    namespace: ocp
+    tag: installer
 binary_build_commands: go build -o /bin/prune .
 build_root:
   from_repository: true
@@ -5,10 +10,22 @@ images:
 - dockerfile_literal: FROM bin
   from: bin
   to: shiftstack-prune-image
+- dockerfile_literal: |-
+    FROM src
+    RUN dnf -y install python3-openstackclient python3-octaviaclient jq && dnf clean all
+    ADD openshift-install /usr/bin/openshift-install
+    RUN python -m pip install yq
+  from: src
+  inputs:
+    installer:
+      paths:
+      - destination_dir: .
+        source_path: /bin/openshift-install
+  to: openstack-installer
 resources:
   '*':
     limits:
-      memory: 2Gi
+      memory: 1Gi
     requests:
       cpu: 100m
       memory: 200Mi
@@ -22,6 +39,48 @@ tests:
   commands: go vet ./...
   container:
     from: src
+- as: cleanup-vexxhost
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vexxhost
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-openstack-nfv
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-nfv
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-openstack-hwoffload
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-hwoffload
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-vh-mecha-central
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-central
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-vh-mecha-az0
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-vh-mecha-az0
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
+- as: cleanup-kuryr
+  interval: 1h
+  steps:
+    env:
+      CLUSTER_TYPE_OVERRIDE: openstack-kuryr
+      OPENSTACK_AUTHENTICATION_METHOD: password
+    workflow: shiftstack-cleanup
 zz_generated_metadata:
   branch: main
   org: shiftstack
