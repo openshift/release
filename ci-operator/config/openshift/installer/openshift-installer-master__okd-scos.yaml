@@ -7,6 +7,14 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_4.10_cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  ocp_4.14_cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -34,6 +42,32 @@ images:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: installer-artifacts
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+  from: base
+  inputs:
+    ocp_4.10_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.10:cli
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: upi-installer
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/openstack/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_4.14_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:cli
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: openstack-installer
 - build_args:
   - name: TAGS
     value: baremetal libvirt scos

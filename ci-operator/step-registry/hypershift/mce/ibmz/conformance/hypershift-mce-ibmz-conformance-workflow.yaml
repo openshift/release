@@ -1,0 +1,21 @@
+workflow:
+  as: hypershift-mce-ibmz-conformance
+  documentation: |-
+    The HyperShift mce ibmz conformance workflow executes tests against a new ephemeral Hypershift Agent cluster
+    created on ibmz Nodes to validate the cluster creation reaches completed state.
+  steps:
+    pre:
+      - ref: ingress-aws-nlb-manifest
+      - chain: ipi-aws-pre
+      - ref: hypershift-mce-install
+      - chain: hypershift-mce-ibmz-create
+    test:
+      - chain: hypershift-mce-ibmz-test
+    post:
+      - chain: hypershift-mce-ibmz-destroy
+      - chain: ipi-aws-post
+    env:
+      HYPERSHIFT_BASEDOMAIN: 'openshiftipi.com'
+      HYPERSHIFT_NODE_COUNT: 2
+      IC_CLI_VERSION: '2.16.1'
+      IC_REGION: 'jp-tok'
