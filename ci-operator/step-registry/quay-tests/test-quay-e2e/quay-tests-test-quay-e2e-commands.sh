@@ -4,6 +4,7 @@ set -euo pipefail
 
 #Set Kubeconfig:
 cd quay-frontend-tests
+pwd
 skopeo -v
 oc version
 terraform version
