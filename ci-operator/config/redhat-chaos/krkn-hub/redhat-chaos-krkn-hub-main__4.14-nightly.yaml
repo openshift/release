@@ -1,4 +1,8 @@
 base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
   os:
     name: centos
     namespace: openshift
@@ -9,6 +13,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   from: os
   to: krkn-hub-414
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-main-prow-414
 releases:
   initial:
     integration:
@@ -33,6 +40,9 @@ tests:
     cluster_profile: aws
     env:
       SPOT_INSTANCES: "true"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
     - chain: ipi-aws-post
     pre:
