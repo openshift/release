@@ -170,7 +170,7 @@ case "$CLUSTER_TYPE" in
       sleep 30
 
       # Tag the resource for easier deletion
-      ic resource tag-attach --tag-names "mac-power-worker" --resource-id "${CRN}" --tag-type user
+      ic resource tag-attach --tag-names "mac-power-worker-${CLEAN_VERSION}" --resource-id "${CRN}" --tag-type user
 
       # Waits for the created instance to become active... after 10 minutes it fails and exists
       # Example content for TEMP_STATE

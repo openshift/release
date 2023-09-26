@@ -125,7 +125,7 @@ then
 fi
 
 # Report the straggler workspaces with tag 'mac-power-worker'
-EXTRA_CRNS=$(ic resource search "tags:\"mac-power-worker\"" --output json | jq -r '.items[].crn')
+EXTRA_CRNS=$(ic resource search "tags:\"mac-power-worker-${CLEAN_VERSION}\"" --output json | jq -r '.items[].crn')
 echo "Checking the Straggler Workspaces: "
 echo "${EXTRA_CRNS}"
 for T_CRN in ${EXTRA_CRNS//'\n'/ }
