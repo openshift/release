@@ -43,23 +43,28 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.53.1
-  openshift_release_golang-1.19:
+  openshift_release_golang-1.20:
     name: release
     namespace: openshift
-    tag: golang-1.19
+    tag: golang-1.20
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.19
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.image-service
-  from: coreos-centos-stream8
   inputs:
-    openshift_release_golang-1.19:
+    coreos-centos-stream8:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.19
+      - quay.io/centos/centos:stream8
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-image-service
+- dockerfile_path: Dockerfile.image-service-build
+  inputs:
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+  to: assisted-image-service-build
 promotion:
   name: ocm-2.10
   namespace: edge-infrastructure
@@ -80,9 +85,6 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |
-  make build-openshift-ci-test-bin
-  go mod vendor
 tests:
 - as: mirror-nightly-image
   cron: '@daily'
@@ -110,10 +112,13 @@ tests:
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: test
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-image-service-build
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
@@ -123,7 +128,8 @@ tests:
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-image-service-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret

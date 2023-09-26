@@ -21,7 +21,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: perfscale-rosa-multiaz-cluster-density-v2-24nodes-periodic
+- as: perfscale-rosa-multiaz-control-plane-24nodes-periodic
   cron: 0 8 * * 4
   steps:
     cluster_profile: aws-perfscale-qe
@@ -33,7 +33,7 @@ tests:
       OPENSHIFT_VERSION: "4.12"
       REPLICAS: "24"
     test:
-    - ref: openshift-qe-cluster-density-v2
+    - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
 - always_run: false
   as: perfscale-rosa-multiaz-cluster-density-v2-3nodes
@@ -48,22 +48,6 @@ tests:
       REPLICAS: "3"
     test:
     - chain: openshift-qe-cluster-density-v2
-    workflow: rosa-aws-sts
-- always_run: false
-  as: perfscale-rosa-multiaz-node-density-v2-24nodes
-  steps:
-    cluster_profile: aws-perfscale-qe
-    env:
-      CHANNEL_GROUP: nightly
-      COMPUTE_MACHINE_TYPE: m5.xlarge
-      ENABLE_AUTOSCALING: "false"
-      MULTI_AZ: "true"
-      OPENSHIFT_VERSION: "4.12"
-      PODS_PER_NODE: "100"
-      READY_WAIT_TIMEOUT: 30m
-      REPLICAS: "24"
-    test:
-    - chain: openshift-qe-node-density
     workflow: rosa-aws-sts
 - always_run: false
   as: perfscale-rosa-multiaz-data-path-9nodes
