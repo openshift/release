@@ -10,6 +10,16 @@ then
     exit 0
 fi
 
+function cleanup_ibmcloud_powervs() {
+  local version = "${1}"
+  local workspace_name = "${2}"
+  echo "Cleaning up prior runs - version: ${version} - workspace_name: ${workspace_name}"
+  ic pi sl
+
+  ic tg gws
+  echo "Done cleaning up prior runs"
+}
+
 function get_ready_nodes_count() {
   oc get nodes \
     -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' | \
@@ -55,7 +65,11 @@ case "$CLUSTER_TYPE" in
       IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
       SERVICE_NAME=power-iaas
       SERVICE_PLAN_NAME=power-virtual-server-group
-      WORKSPACE_NAME=rdr-mac-${REGION}-n1
+
+      # Generates a workspace name like rdr-mac-4-14-au-syd-n1
+      # this keeps the workspace unique
+      CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
+      WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}-n1
 
       PATH=${PATH}:/tmp
       mkdir -p ${IBMCLOUD_HOME_FOLDER}
@@ -90,22 +104,35 @@ case "$CLUSTER_TYPE" in
           -o /tmp/openshift-install && chmod +x /tmp/openshift-install
       fi
 
-      # upgrade go to GO_VERSION
-      if [ -z "$(command -v go)" ]
+      # short-circuit to download and install terraform
+      echo "Attempting to install terraform using gzip"
+      curl -o "${IBMCLOUD_HOME_FOLDER}"/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
+        && gunzip "${IBMCLOUD_HOME_FOLDER}"/terraform.gz \
+        && chmod +x "${IBMCLOUD_HOME_FOLDER}"/terraform \
+        || true
+
+      if [ ! -f /tmp/terraform ]
       then
-        echo "go is not installed, proceed to installing go"
-        cd /tmp && wget -q https://go.dev/dl/go"${GO_VERSION}".linux-amd64.tar.gz && tar -C /tmp -xzf go"${GO_VERSION}".linux-amd64.tar.gz \
-          && export PATH=$PATH:/tmp/go/bin && export GOCACHE=/tmp/go && export GOPATH=/tmp/go && export GOMODCACHE="/tmp/go/pkg/mod"
+        echo "Manually building the terraform code"
+        # upgrade go to GO_VERSION
         if [ -z "$(command -v go)" ]
         then
-          echo "Installed go successfully"
+          echo "go is not installed, proceed to installing go"
+          cd /tmp && wget -q https://go.dev/dl/go"${GO_VERSION}".linux-amd64.tar.gz && tar -C /tmp -xzf go"${GO_VERSION}".linux-amd64.tar.gz \
+            && export PATH=$PATH:/tmp/go/bin && export GOCACHE=/tmp/go && export GOPATH=/tmp/go && export GOMODCACHE="/tmp/go/pkg/mod"
+          if [ -z "$(command -v go)" ]
+          then
+            echo "Installed go successfully"
+          fi
         fi
+
+        # build terraform from source using TERRAFORM_VERSION
+        echo "terraform is not installed, proceed to installing terraform"
+        cd "${IBMCLOUD_HOME_FOLDER}" && curl -L https://github.com/hashicorp/terraform/archive/refs/tags/v"${TERRAFORM_VERSION}".tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz \
+          && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz && cd "${IBMCLOUD_HOME_FOLDER}"/terraform-"${TERRAFORM_VERSION}" \
+          && go build -ldflags "-w -s -X 'github.com/hashicorp/terraform/version.dev=no'" -o bin/ . && cp bin/terraform /tmp/terraform
       fi
 
-      # build terraform from source using TERRAFORM_VERSION
-      cd "${IBMCLOUD_HOME_FOLDER}" && curl -L https://github.com/hashicorp/terraform/archive/refs/tags/v"${TERRAFORM_VERSION}".tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz \
-        && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz && cd "${IBMCLOUD_HOME_FOLDER}"/terraform-"${TERRAFORM_VERSION}" \
-        && go build -ldflags "-w -s -X 'github.com/hashicorp/terraform/version.dev=no'" -o bin/ . && cp bin/terraform /tmp/terraform
       export PATH=$PATH:/tmp
       t_ver1=$(/tmp/terraform -version)
       echo "terraform version: ${t_ver1}"
@@ -117,6 +144,9 @@ case "$CLUSTER_TYPE" in
 
       ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -r "${REGION}" -g "${RESOURCE_GROUP}"
       ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage power-iaas is
+
+      # Run Cleanup
+      cleanup_ibmcloud_powervs "${CLEAN_VERSION}" "${WORKSPACE_NAME}"
 
       # Before the workspace is created, download the automation code
       cd "${IBMCLOUD_HOME_FOLDER}" \
@@ -209,11 +239,28 @@ case "$CLUSTER_TYPE" in
       # created resources. The FAILED_DEPLOY flag is only exported on a fail
       FAILED_DEPLOY=""
       cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
+
       cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
         && /tmp/terraform init -upgrade -no-color \
-        && /tmp/terraform plan -var-file=data/var.tfvars -no-color \
-        && /tmp/terraform apply -var-file=data/var.tfvars -auto-approve -no-color \
-        || export FAILED_DEPLOY="true"
+        && /tmp/terraform plan -var-file=data/var.tfvars -no-color
+      for COUNT in $(seq 5)
+      do
+        FAILED_DEPLOY=""
+        cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
+          && /tmp/terraform apply -var-file=data/var.tfvars -auto-approve -no-color \
+          || export FAILED_DEPLOY="true"
+        if [ -n "${FAILED_DEPLOY}" ]
+        then
+          echo "Destroying ${COUNT}" 
+          cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
+            && /tmp/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
+            || sleep 60 \
+            && /tmp/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color
+        else
+          echo "completed deployment"
+          break
+        fi
+      done
 
       echo "Shared Directory: copy the terraform.tfstate"
       cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate

@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Generates a workspace name like rdr-mac-4-14-au-syd-n1
+# this keeps the workspace unique per version
+CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
+WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}-n1
+
 # var.tfvars used to provision the powervs nodes is copied to the ${SHARED_DIR}
 echo "Invoking upi deprovision heterogeneous powervs"
 
@@ -51,14 +56,24 @@ then
   tar -czC "${ARTIFACT_DIR}/must-gather-ppc64le" -f "${ARTIFACT_DIR}/must-gather-ppc64le.tar.gz" .
   rm -rf "${ARTIFACT_DIR}"/must-gather-ppc64le
 
+  # short-circuit to download and install terraform
+  curl -o "${IBMCLOUD_HOME_FOLDER}"/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
+    && gunzip "${IBMCLOUD_HOME_FOLDER}"/terraform.gz \
+    && chmod +x "${IBMCLOUD_HOME_FOLDER}"/terraform \
+    || true
+
   # build terraform
-  cd "${IBMCLOUD_HOME_FOLDER}" \
-    && curl -L "https://github.com/hashicorp/terraform/archive/refs/tags/v${TERRAFORM_VERSION}.tar.gz" \
-      -o "${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz" \
-    && tar -xzf "${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz" \
-    && cd "${IBMCLOUD_HOME_FOLDER}/terraform-${TERRAFORM_VERSION}" \
-    && go build -ldflags "-w -s -X 'github.com/hashicorp/terraform/version.dev=no'" -o bin/ . \
-    && cp bin/terraform /tmp/terraform
+  if [ ! -f /tmp/terraform ]
+  then
+    cd "${IBMCLOUD_HOME_FOLDER}" \
+      && curl -L "https://github.com/hashicorp/terraform/archive/refs/tags/v${TERRAFORM_VERSION}.tar.gz" \
+        -o "${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz" \
+      && tar -xzf "${IBMCLOUD_HOME_FOLDER}/terraform.tar.gz" \
+      && cd "${IBMCLOUD_HOME_FOLDER}/terraform-${TERRAFORM_VERSION}" \
+      && go build -ldflags "-w -s -X 'github.com/hashicorp/terraform/version.dev=no'" -o bin/ . \
+      && cp bin/terraform /tmp/terraform
+  fi
+
   export PATH=$PATH:/tmp
   t_ver1=$(/tmp/terraform -version)
   echo "terraform version: ${t_ver1}"
@@ -116,6 +131,9 @@ echo "${EXTRA_CRNS}"
 for T_CRN in ${EXTRA_CRNS//'\n'/ }
 do
   echo "-Straggler Workspace: ${T_CRN}"
+
+
+
   ic pi st "${T_CRN}"
 
   echo "-- Cloud Connection --"
