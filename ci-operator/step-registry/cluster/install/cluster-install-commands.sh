@@ -50,7 +50,7 @@ fi
 
 RUN_COMMAND+="${CLUSTERS_CMD} "
 
-if [ "${PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
+if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
     RUN_COMMAND+=" --parallel"
 fi
 
@@ -60,6 +60,10 @@ fi
 
 if [[ -n "${PULL_SECRET_NAME}" ]]; then
     RUN_COMMAND+=" --registry-config-file=/var/run/secrets/ci.openshift.io/cluster-profile/${PULL_SECRET_NAME} --docker-config-file ${DOCKER_CONFIG_JSON_PATH}"
+fi
+
+if [[ -n "${GCP_SERVICE_ACCOUNT_NAME}" ]]; then
+    RUN_COMMAND+=" --gcp-service-account-file=${CLUSTER_PROFILE_DIR}/${GCP_SERVICE_ACCOUNT_NAME} "
 fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"

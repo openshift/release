@@ -81,5 +81,5 @@ done
 if [ $((failures)) == 0 ]; then
     echo "All tests have passed"
 else
-    echo "${failures} failures in cucushift-e2e" | tee -a "${SHARED_DIR}/cucushift-e2e-failures"
+    echo "${failures} failures in cucushift-e2e" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report-cucushift-failures"
 fi
