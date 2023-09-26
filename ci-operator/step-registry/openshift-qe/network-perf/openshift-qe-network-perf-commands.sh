@@ -32,3 +32,4 @@ export TOLERANCE=90
 rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
 
 WORKLOAD=full-run.yaml ./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+#to run rosa npt 13
