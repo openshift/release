@@ -94370,6 +94370,46 @@ periodics:
     repo: release
   interval: 12h
   labels:
+    ci.openshift.io/build-farm: build09
+    ci.openshift.io/generator: cluster-init
+    ci.openshift.io/role: infra
+  name: periodic-openshift-release-master-build09-apply
+  spec:
+    containers:
+    - args:
+      - --config-dir=clusters/build-clusters/build09
+      - --as=
+      - --kubeconfig=/etc/build-farm-credentials/kubeconfig
+      - --confirm=true
+      command:
+      - applyconfig
+      image: applyconfig:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/build-farm-credentials
+        name: build-farm-credentials
+        readOnly: true
+    serviceAccountName: config-updater
+    volumes:
+    - name: build-farm-credentials
+      secret:
+        items:
+        - key: sa.config-updater.build09.config
+          path: kubeconfig
+        secretName: config-updater
+- agent: kubernetes
+  cluster: app.ci
+  decorate: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 12h
+  labels:
     ci.openshift.io/build-farm: multi01
     ci.openshift.io/generator: cluster-init
     ci.openshift.io/role: infra
