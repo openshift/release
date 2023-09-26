@@ -102,7 +102,10 @@ tests:
 - as: sonarcloud
   commands: |
     export TMP_BIN="/tmp/bin"
-    export HOME="/tmp"
+    export mcgh_dir=$(mktemp -d -t mcgh-XXXXX)
+    export HOME="$mcgh_dir"
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "${XDG_CONFIG_HOME}"
     make setup_envtest
     export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
     export SELF="make -f /opt/build-harness/Makefile.prow"
@@ -117,7 +120,10 @@ tests:
 - as: sonarcloud-post-submit
   commands: |
     export TMP_BIN="/tmp/bin"
-    export HOME="/tmp"
+    export mcgh_dir=$(mktemp -d -t mcgh-XXXXX)
+    export HOME="$mcgh_dir"
+    export XDG_CONFIG_HOME=$HOME/.config
+    mkdir -p "${XDG_CONFIG_HOME}"
     make setup_envtest
     export KUBEBUILDER_ASSETS="$(${TMP_BIN}/setup-envtest use --use-env -p path)"
     export SELF="make -f /opt/build-harness/Makefile.prow"
