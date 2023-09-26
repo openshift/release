@@ -35,6 +35,22 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-jupyter-datascience-ubi8-python-3.8
   to: jupyter-pytorch-ubi8-python-3.8
+- context_dir: jupyter/trustyai/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi8-python-3.8
+  to: jupyter-trustyai-ubi8-python-3.8
+- context_dir: habana/1.9.0/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi8-python-3.8
+  to: habana-jupyter-1.9.0-ubi8-python-3.8
+- context_dir: habana/1.10.0/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi8-python-3.8
+  to: habana-jupyter-1.10.0-ubi8-python-3.8
+- context_dir: habana/1.11.0/ubi8-python-3.8
+  dockerfile_path: Dockerfile
+  from: jupyter-datascience-ubi8-python-3.8
+  to: habana-jupyter-1.11.0-ubi8-python-3.8
 - context_dir: runtimes/minimal/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: base-ubi8-python-3.8
@@ -47,10 +63,6 @@ images:
   dockerfile_path: Dockerfile
   from: base-ubi8-python-3.8
   to: runtime-pytorch-ubi8-python-3.8
-- context_dir: jupyter/trustyai/ubi8-python-3.8
-  dockerfile_path: Dockerfile
-  from: jupyter-datascience-ubi8-python-3.8
-  to: jupyter-trustyai-ubi8-python-3.8
 - context_dir: runtimes/tensorflow/ubi8-python-3.8
   dockerfile_path: Dockerfile
   from: cuda-ubi8-python-3.8
@@ -326,6 +338,66 @@ tests:
       IMAGE_REPO: workbench-images
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: jupyter-trustyai-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-habana-1-9-0-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: habana-jupyter-1.9.0-ubi8-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: habana-jupyter-1.9.0-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-habana-1-9-0-ubi8-python-3-8-pr-image-mirror
+  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/1.9.0\/ubi8-python-3.8\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: habana-jupyter-1.9.0-ubi8-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: habana-jupyter-1.9.0-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-habana-1-10-0-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: habana-jupyter-1.10.0-ubi8-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: habana-jupyter-1.10.0-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-habana-1-10-0-ubi8-python-3-8-pr-image-mirror
+  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/1.10.0\/ubi8-python-3.8\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: habana-jupyter-1.10.0-ubi8-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: habana-jupyter-1.10.0-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-habana-1-11-0-ubi8-python-3-8-image-mirror
+  postsubmit: true
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: habana-jupyter-1.11.0-ubi8-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: habana-jupyter-1.11.0-ubi8-python-3.8
+    workflow: opendatahub-io-ci-image-mirror
+- as: notebook-habana-1-11-0-ubi8-python-3-8-pr-image-mirror
+  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/1.11.0\/ubi8-python-3.8\/*)
+  steps:
+    dependencies:
+      SOURCE_IMAGE_REF: habana-jupyter-1.11.0-ubi8-python-3.8
+    env:
+      IMAGE_REPO: workbench-images
+      IMAGE_TAG: YearIndex
+      RELEASE_VERSION: habana-jupyter-1.11.0-ubi8-python-3.8
     workflow: opendatahub-io-ci-image-mirror
 - as: runtime-minimal-ubi8-python-3-8-image-mirror
   postsubmit: true
@@ -872,10 +944,10 @@ tests:
       commands: |
         oc new-project jupyter-trustyai-ubi8-python-3-8
         IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_TRUSTYAI_IMAGE}"
-        make deploy9-jupyter-trustyai-ubi8-python-3.8 \
+        make deploy8-jupyter-trustyai-ubi8-python-3.8 \
             -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
         make test-jupyter-trustyai-ubi8-python-3.8
-        make undeploy9-jupyter-trustyai-ubi8-python-3.8
+        make undeploy8-jupyter-trustyai-ubi8-python-3.8
       dependencies:
       - env: JUPYTER_TRUSTYAI_IMAGE
         name: jupyter-trustyai-ubi8-python-3.8
@@ -1151,6 +1223,63 @@ tests:
       dependencies:
       - env: JUPYTER_ANACONDA_IMAGE
         name: jupyter-datascience-anaconda-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: ipi-gcp
+- as: habana-notebooks-e2e-tests
+  run_if_changed: (base\/ubi8-python-3.8\/*)|(jupyter\/minimal\/ubi8-python-3.8\/*)|(jupyter\/datascience\/ubi8-python-3.8\/*)|(habana\/*)
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: habana-jupyter-1.9.0-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project habana-jupyter-1.9.0-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_HABANA_1_9_0_IMAGE}"
+        make deploy8-habana-1.9.0-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-habana-1.9.0-ubi8-python-3.8
+        make undeploy8-habana-1.9.0-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_HABANA_1_9_0_IMAGE
+        name: habana-jupyter-1.9.0-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: habana-jupyter-1.10.0-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project habana-jupyter-1.10.0-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_HABANA_1_10_0_IMAGE}"
+        make deploy8-habana-1.10.0-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-habana-1.10.0-ubi8-python-3.8
+        make undeploy8-habana-1.10.0-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_HABANA_1_10_0_IMAGE
+        name: habana-jupyter-1.10.0-ubi8-python-3.8
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: habana-jupyter-1.11.0-ubi8-python-3.8-test-e2e
+      cli: latest
+      commands: |
+        oc new-project habana-jupyter-1.11.0-ubi8-python-3-8
+        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_HABANA_1_11_0_IMAGE}"
+        make deploy8-habana-1.11.0-ubi8-python-3.8 \
+            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
+        make test-habana-1.11.0-ubi8-python-3.8
+        make undeploy8-habana-1.11.0-ubi8-python-3.8
+      dependencies:
+      - env: JUPYTER_HABANA_1_11_0_IMAGE
+        name: habana-jupyter-1.11.0-ubi8-python-3.8
       from: src
       resources:
         requests:
