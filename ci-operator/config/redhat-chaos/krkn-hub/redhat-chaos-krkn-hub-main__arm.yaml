@@ -1,4 +1,8 @@
 base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
   os:
     name: centos
     namespace: openshift
@@ -9,6 +13,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   from: os
   to: krkn-hub-arm
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-prow-arm
 releases:
   arm64-latest:
     candidate:
@@ -39,6 +46,9 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       OCP_ARCH: arm64
       SPOT_INSTANCES: "true"
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     post:
     - chain: ipi-aws-post
     pre:
