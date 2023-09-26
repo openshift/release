@@ -132,7 +132,7 @@ case "$CLUSTER_TYPE" in
       echo "Resource Group is ${RESOURCE_GROUP}"
       ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" 2>&1 \
         | tee /tmp/instance.id
-      
+
       # Process the CRN into a variable
       CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
       export CRN
@@ -232,30 +232,6 @@ case "$CLUSTER_TYPE" in
         ic resource service-instance-delete "${POWERVS_SERVICE_INSTANCE_ID}" -g "${RESOURCE_GROUP}" --force --recursive \
           || true
         exit 1
-      else
-        echo "Worker Status is: "
-        oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'
-        echo "Cluster Operator is: "
-        oc get co
-        IDX=0
-        while [ "$IDX" -lt "121" ]
-        do
-            FAL_COUNT=$(oc get co -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Available")].status}{"\n"}{end}' | grep False | wc -l)
-            if [ "${FAL_COUNT}" -eq "0" ]
-            then
-              break
-            fi
-            if [ "${IDX}" -eq "60" ]
-            then
-              echo "Exceeded the wait time of >120 minutes"
-              exit 3
-            fi
-            oc get co -o yaml
-            echo "waiting for the cluster operators to return to operation"
-            sleep 60
-            IDX=$(($IDX + 1))
-        done
-        
       fi
   fi
 ;;
