@@ -24,7 +24,7 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: distributed-tracing-tests-dast
+- as: distributed-tracing-tests-acceptance
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -32,21 +32,12 @@ tests:
     product: ocp
     timeout: 3h0m0s
     version: "4.13"
-  cron: 0 6 * * 0
   steps:
-    env:
-      DT_TEST_TYPE: DAST
-      EO_SUB_CHANNEL: stable-5.7
-      EO_SUB_SOURCE: redhat-operators
     test:
-    - ref: operatorhub-subscribe-elasticsearch-operator
-    - ref: operatorhub-subscribe-amq-streams
-    - ref: distributed-tracing-install-jaeger-product
-    - ref: distributed-tracing-install-tempo-product
-    - ref: distributed-tracing-install-opentelemetry-product
-    - ref: distributed-tracing-tests-common
+    - chain: distributed-tracing-tests-common
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
   org: openshift
   repo: distributed-tracing-qe
+  variant: ocp4.13-amd64
