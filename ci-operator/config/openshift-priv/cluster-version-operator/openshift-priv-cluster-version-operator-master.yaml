@@ -4,8 +4,8 @@ base_images:
     namespace: ci
     tag: v1.53.1
   ocp_4.15_base:
-    name: "4.15"
-    namespace: ocp
+    name: 4.15-priv
+    namespace: ocp-private
     tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
@@ -93,6 +93,16 @@ tests:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:latest
       OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:initial
     workflow: openshift-upgrade-azure
+- as: e2e-hypershift-conformance
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
+- as: e2e-hypershift
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
 zz_generated_metadata:
   branch: master
   org: openshift-priv
