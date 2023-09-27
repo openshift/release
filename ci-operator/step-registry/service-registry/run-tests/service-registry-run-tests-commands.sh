@@ -15,7 +15,7 @@ function copyArtifacts() {
   cp target/surefire-reports/*.xml "${ARTIFACT_DIR}"
 }
 
-trap copyArtifacts EXIT
+trap copyArtifacts SIGINT SIGTERM ERR EXIT
 
 echo "Run the tests"
 ./scripts/run-interop-tests.sh
