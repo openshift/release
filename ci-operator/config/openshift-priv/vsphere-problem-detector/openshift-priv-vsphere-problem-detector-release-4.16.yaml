@@ -1,0 +1,78 @@
+base_images:
+  base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+binary_build_commands: make
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/vsphere-problem-detector
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: vsphere-problem-detector
+promotion:
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-vsphere
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-csi-extended
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    env:
+      TEST_SCENARIOS: \[CSI-Driver\]|\[vSphere CSI Driver\]|\[vSphere-CSI-Driver-Operator\]|\[vSphere-Problem-Detector\]
+    workflow: openshift-e2e-vsphere-csi-extended
+- as: e2e-vsphere-zones
+  optional: true
+  steps:
+    cluster_profile: vsphere-multizone
+    workflow: openshift-e2e-vsphere-zones
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-priv
+  repo: vsphere-problem-detector

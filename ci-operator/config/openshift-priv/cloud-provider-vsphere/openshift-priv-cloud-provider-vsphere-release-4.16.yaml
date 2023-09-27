@@ -1,0 +1,71 @@
+base_images:
+  base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+binary_build_commands: make binaries
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/kubernetes/cloud-provider-vsphere
+images:
+- dockerfile_path: openshift-hack/images/cloud-controller-manager-openshift.Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: vsphere-cloud-controller-manager
+promotion:
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test-unit-ci
+  container:
+    from: src
+- as: verify-git-history
+  commands: make verify-history
+  container:
+    from: src
+  optional: true
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: e2e-vsphere-ovn
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere
+- as: e2e-vsphere-ovn-upgrade
+  optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-upgrade-vsphere
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-priv
+  repo: cloud-provider-vsphere
