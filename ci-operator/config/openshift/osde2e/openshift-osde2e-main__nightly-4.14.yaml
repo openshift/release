@@ -70,6 +70,23 @@ tests:
     - ref: osde2e-cleanup
     test:
     - ref: osde2e-test
+- as: rosa-sts-e2e-conformance
+  cron: 0 0 1 1 *
+  steps:
+    env:
+      CONFIGS: rosa,sts,stage,test-harness
+      INSTALL_LATEST_NIGHTLY: "4.14"
+      SECRET_LOCATIONS: /usr/local/osde2e-common,/usr/local/osde2e-trt-credentials
+      SKIP_DESTROY_CLUSTER: "true"
+      SKIP_MUST_GATHER: "true"
+      TEST_TYPE: suite
+    post:
+    - chain: gather
+    - ref: osde2e-cleanup
+    pre:
+    - ref: osde2e-test
+    test:
+    - ref: openshift-e2e-test
 zz_generated_metadata:
   branch: main
   org: openshift
