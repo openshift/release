@@ -30,4 +30,5 @@ export UUID
 rm -rf "${SHARED_DIR}/${index_data.json:?}"
 ./run.sh
 
-cp index_data.json ${SHARED_DIR}/index_data.json
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json

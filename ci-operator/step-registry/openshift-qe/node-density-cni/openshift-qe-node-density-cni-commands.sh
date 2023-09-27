@@ -29,4 +29,4 @@ export UUID
 rm -rf "${SHARED_DIR}/${index_data.json:?}"
 ./run.sh
 
-jq ".iterations = $PODS_PER_NODE" index_data.json >> ${SHARED_DIR}/index_data.json
+jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json

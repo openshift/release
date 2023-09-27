@@ -36,4 +36,5 @@ export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 rm -rf "${SHARED_DIR}/${index_data.json:?}"
 ./run.sh
 
-jq ".iterations = $PODS_PER_NODE" index_data.json >> ${SHARED_DIR}/index_data.json
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+jq ".iterations = $PODS_PER_NODE" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json

@@ -49,4 +49,5 @@ export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 rm -rf "${SHARED_DIR}/${index_data.json:?}"
 ./ingress-performance.sh 
 
-cp index_data.json ${SHARED_DIR}/index_data.json
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json
