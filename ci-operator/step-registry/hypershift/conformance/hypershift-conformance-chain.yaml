@@ -6,7 +6,7 @@ chain:
     commands: |-
       CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
-      export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(echo -n clusters-${CLUSTER_NAME}|sed 's#\.#-#g')"
+      export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
       export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
       [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
@@ -95,7 +95,21 @@ chain:
       openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit"
+        --junit-dir "${ARTIFACT_DIR}/junit" 2>&1 | tee /tmp/openshift-tests.log
+      
+      exit_code=${PIPESTATUS[0]}
+                
+      # If this line is shown in the openshift-tests output, all of the conformance test cases passed,
+      # but the monitor test has failed. Currently we're ignoring MonitorTest failures until we resolve:
+      # https://issues.redhat.com/browse/CNV-33717
+      if [[ -n "${SKIP_MONITOR_TEST}" ]] && [[ $(grep "failed due to a MonitorTest failure" /tmp/openshift-tests.log) ]];
+      then
+        echo "overriding Monitor Test Failure"
+        exit_code=0
+      fi
+      
+      exit ${exit_code}
+
     credentials:
     - mount_path: /etc/hypershift-pool-aws-credentials
       name: hypershift-pool-aws-credentials
@@ -117,6 +131,11 @@ chain:
         It is suggested to test the regex to make sure that it matches with the available tests.
         Tests can be listed by using 'openshift-tests run --dry-run (...)'. Sometimes, the tests
         that are printed in Prow won't exactly match the list returned by openshift-tests.
+    - name: SKIP_MONITOR_TEST
+      default: ""
+      documentation: |-
+        if non-empty, ignores job failure which is as a result of a failure of the MonitorTest suite.
+        All conformance test cases need to pass for the job to pass, though.
     resources:
       requests:
         cpu: "3"
