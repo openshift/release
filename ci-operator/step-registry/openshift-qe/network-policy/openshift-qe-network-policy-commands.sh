@@ -47,3 +47,5 @@ echo $JOB_ITERATIONS is JOB_ITERATIONS
 export JOB_ITERATIONS
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 ./run.sh
+
+jq ".iterations = $JOB_ITERATIONS" index_data.json >>index_data_temp.json && cp index_data_temp.json index_data.json 

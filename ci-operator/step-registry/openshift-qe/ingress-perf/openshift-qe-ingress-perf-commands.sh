@@ -27,5 +27,7 @@ UUID="perfscale-cpt-$(uuidgen)"
 export UUID
 
 # Start the Workload
-rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
-./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+rm -rf "${SHARED_DIR}/${index_data.json:?}"
+./run.sh
+
+cp index_data.json ${SHARED_DIR}/index_data.json
