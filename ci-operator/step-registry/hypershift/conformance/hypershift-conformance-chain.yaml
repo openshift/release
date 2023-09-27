@@ -58,16 +58,6 @@ chain:
       kubevirt)
           export TEST_PROVIDER='{"type":"kubevirt"}'
 
-          # These are known tests that will not pass with the KubeVirt Platform right now
-          # Resolving these test skips are all being tracked in this epic, https://issues.redhat.com/browse/CNV-30259
-          #
-          # https://issues.redhat.com/browse/CNV-30268
-          if [[ -z "$TEST_SKIPS" ]]; then
-              TEST_SKIPS='should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer'
-          else
-              TEST_SKIPS=$TEST_SKIPS'\|should serve endpoints on same port and different protocol for internal traffic on Type LoadBalancer'
-          fi
-
           # This looks counterintuitive. Here's an explanation.
           #
           # There technically isn't a parallel minimal test suite. Some of the older KubeVirt
@@ -75,12 +65,18 @@ chain:
           #
           # By using the "openshift/conformance/parallel" test suite, but filtering out
           # everything that matches exactly to the "openshift/conformance/parallel" test suite,
-          # we are left with just the "openshift/conformance/parallel/minmal" test entries.
+          # we are left with just the "openshift/conformance/parallel/minimal" test entries.
           #
           # This might not be the best long term solution, but these older KubeVirt platform
           # tests won't be maintained for long and are not a part of any GA.
+          
+          PIPE="\|"
+          # if $TEST_SKIPS is empty then $PIPE should be empty too
+          if [[ -z "$TEST_SKIPS" ]]; then
+            PIPE=""          
+          fi
           if [[ "${TEST_SUITE}" == "openshift/conformance/parallel/minimal" ]]; then
-              TEST_SKIPS=$TEST_SKIPS"\|\[Suite:openshift/conformance/parallel\]"
+              TEST_SKIPS=$TEST_SKIPS"${PIPE}\[Suite:openshift/conformance/parallel\]"
               TEST_SUITE="openshift/conformance/parallel"
           fi
 
