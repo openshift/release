@@ -7,6 +7,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+  shellcheck:
+    name: shellcheck
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: ci-tools-build-root
@@ -50,6 +54,11 @@ tests:
   container:
     clone: false
     from: centos
+- as: shellcheck
+  commands: for f in $(git diff --name-only | grep -E ".*.sh$"); do echo -e "\nVerifying
+    $f..."; shellcheck -s bash "$f"; done
+  container:
+    from: shellcheck
 zz_generated_metadata:
   branch: master
   org: openshift-qe

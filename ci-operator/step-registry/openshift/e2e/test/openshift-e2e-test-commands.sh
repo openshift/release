@@ -105,7 +105,7 @@ fi
 
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
-gcp)
+gcp|gcp-arm64)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
     # In k8s 1.24 this is required to run GCP PD tests. See: https://github.com/kubernetes/kubernetes/pull/109541
     export ENABLE_STORAGE_GCE_PD_DRIVER="yes"
@@ -172,7 +172,7 @@ esac
 mkdir -p /tmp/output
 cd /tmp/output
 
-if [[ "${CLUSTER_TYPE}" == gcp ]]; then
+if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64"  ]]; then
     pushd /tmp
     curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
     tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz

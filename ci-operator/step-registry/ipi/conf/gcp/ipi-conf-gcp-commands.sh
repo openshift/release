@@ -20,7 +20,9 @@ fi
 # Do not change the default family type without consulting with cloud financial operations as their may
 # be active savings plans targeting this machine class.
 master_type=""
-master_type_suffix="-standard-4"
+# Temporary test to see if this helps the consistent high CPU alerts and random test failures
+master_type_suffix="-custom-6-16384"
+#master_type_suffix="-standard-4"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
   master_type_suffix="-standard-32"
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
@@ -31,7 +33,9 @@ fi
 if [ "${OCP_ARCH}" = "amd64" ]; then
   master_type="e2${master_type_suffix}"
 elif [ "${OCP_ARCH}" = "arm64" ]; then
-  master_type="t2a${master_type_suffix}"
+  # TODO: revert back to master_type_suffix if/when we switch back to standard
+  # custom sizes are not supported by arm64 VMs
+  master_type="t2a-standard-4"
 fi
 
 cat >> "${CONFIG}" << EOF
