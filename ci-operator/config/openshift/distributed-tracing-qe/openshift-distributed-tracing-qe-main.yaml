@@ -25,27 +25,27 @@ resources:
       memory: 200Mi
 tests:
 - as: distributed-tracing-tests-dast
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 3h0m0s
-    version: "4.13"
   cron: 0 6 * * 0
   steps:
+    cluster_profile: aws-qe
     env:
+      AMQ_SOURCE: dt-catalogsource
+      BASE_DOMAIN: qe.devcluster.openshift.com
       DT_TEST_TYPE: DAST
       EO_SUB_CHANNEL: stable-5.7
-      EO_SUB_SOURCE: redhat-operators
+      EO_SUB_SOURCE: dt-catalogsource
+      JAEGER_SOURCE: dt-catalogsource
+      OTEL_SOURCE: dt-catalogsource
+      TEMPO_SOURCE: dt-catalogsource
     test:
+    - ref: distributed-tracing-install-catalogsource
     - ref: operatorhub-subscribe-elasticsearch-operator
     - ref: operatorhub-subscribe-amq-streams
     - ref: distributed-tracing-install-jaeger-product
     - ref: distributed-tracing-install-tempo-product
     - ref: distributed-tracing-install-opentelemetry-product
     - ref: distributed-tracing-tests-common
-    workflow: generic-claim
+    workflow: cucushift-installer-rehearse-aws-ipi
 zz_generated_metadata:
   branch: main
   org: openshift
