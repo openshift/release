@@ -2,17 +2,29 @@
 
 set -o pipefail
 
-echo "Setting the BREW_DOCKERCONFIGJSON"
+echo "Copying the /var/run/brew-pullsecret/.dockerconfigjson file to ${SHARED_DIR}/pull-secret-build-farm.json"
 
-# add brew pull secret 
-BREW_DOCKERCONFIGJSON=${BREW_DOCKERCONFIGJSON:-'/var/run/brew-pullsecret/.dockerconfigjson'}
-
-echo "The BREW_DOCKERCONFIGJSON variable is set"
-
-echo "Copying the BREW_DOCKERCONFIGJSON variable to ${SHARED_DIR}/pull-secret-build-farm.json"
-
-# copy brew pull secret to HostedCluster
-# >> appends
-echo "$BREW_DOCKERCONFIGJSON" >> ${SHARED_DIR}/pull-secret-build-farm.json
+# > rewrites content of ${SHARED_DIR}/pull-secret-build-farm.json
+cat /var/run/brew-pullsecret/.dockerconfigjson > ${SHARED_DIR}/pull-secret-build-farm.json
 
 echo "BREW_DOCKERCONFIGJSON has been copied"
+
+# For hypershift clusters, ICSPs must be specified in the HostedCluster spec.
+echo "ICSP file is set to ${SHARED_DIR}/operators-image-content-sources.yaml"
+
+cat > "${SHARED_DIR}/operators-image-content-sources.yaml" << EOF
+- mirrors:
+  - brew.registry.redhat.io
+  source: registry.redhat.io
+- mirrors:
+  - brew.registry.redhat.io
+  source: registry.stage.redhat.io
+- mirrors:
+  - brew.registry.redhat.io
+  source: registry-proxy.engineering.redhat.com
+- mirrors:
+  - brew.registry.redhat.io
+  source: registry-proxy-stage.engineering.redhat.com
+EOF
+
+echo "Content to ICSP file has been copied"
