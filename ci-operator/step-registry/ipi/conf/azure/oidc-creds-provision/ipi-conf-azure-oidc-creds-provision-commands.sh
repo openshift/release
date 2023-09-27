@@ -140,6 +140,7 @@ if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ]; then
 fi
 
 # create required credentials infrastructure and installer manifests
+ccoctl_ouptut="/tmp/ccoctl_output"
 ccoctl azure create-all \
   --name="${CLUSTER_NAME}" \
   --region="${REGION}" \
@@ -149,7 +150,16 @@ ccoctl azure create-all \
   --dnszone-resource-group-name="${BASE_DOMAIN_RESOURCE_GROUP_NAME}" \
   --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
   --output-dir="/tmp" \
-  ${ADDITIONAL_CCOCTL_ARGS}
+  ${ADDITIONAL_CCOCTL_ARGS} &> "${ccoctl_ouptut}"
+cat "${ccoctl_ouptut}"
+
+# get oidc_provider_issuer_url from `oc get Authentication cluster -o json`, so not have to enable the follwoing lines yet 
+# save oidc_provider info for upgrade
+#oidc_provider_issuer_url=$(grep "Issuer URL .* is" "${ccoctl_ouptut}" | awk -F"is " '{print $NF}')
+#if [[ -n "${oidc_provider_issuer_url}" ]]; then
+#  echo "Saving oidc_provider_arn: ${oidc_provider_issuer_url}"
+#  echo "${oidc_provider_issuer_url}" > "${SHARED_DIR}/azure_oidc_provider_issuer_url"
+#fi
 
 # Output authentication file for ci logs
 echo "Cluster authentication:"

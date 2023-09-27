@@ -1,4 +1,8 @@
 base_images:
+  cerberus.prow:
+    name: cerberus
+    namespace: chaos
+    tag: cerberus-prow
   os:
     name: centos
     namespace: openshift
@@ -9,6 +13,9 @@ images:
 - dockerfile_path: prow/Dockerfile
   from: os
   to: krkn-hub-rosa-hp
+- dockerfile_path: cerberus/Dockerfile_prow
+  from: cerberus.prow
+  to: cerberus-prow-rosa-412
 promotion:
   namespace: ci
   tag: latest
@@ -33,6 +40,9 @@ tests:
       OPENSHIFT_VERSION: "4.12"
       REGION: us-east-2
       ROSA_LOGIN_ENV: production
+    observers:
+      enable:
+      - redhat-chaos-cerberus
     test:
     - ref: redhat-chaos-pod-scenarios-random-system-pods
     workflow: rosa-aws-sts-hypershift
