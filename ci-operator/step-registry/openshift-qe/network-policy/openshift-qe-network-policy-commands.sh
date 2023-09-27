@@ -47,7 +47,8 @@ echo $JOB_ITERATIONS is JOB_ITERATIONS
 export JOB_ITERATIONS
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-rm -rf "${SHARED_DIR}/${"index_data.json":?}"
+OUTPUT_FILE="index_data.json"
+rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
 
 ./run.sh
 

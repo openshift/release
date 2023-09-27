@@ -36,7 +36,7 @@ jq -r 'to_entries[] | "\(.key)\t\(.value)"' ${SHARED_DIR}/index_data.json |
   while read key val
   do
     cap_key=$(echo $key | awk ' { print toupper($1) }')
-    $(export $cap_key=$val)
+    export $cap_key=$val
   done 
 
 env

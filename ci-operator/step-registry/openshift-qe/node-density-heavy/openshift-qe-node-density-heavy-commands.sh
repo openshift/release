@@ -33,7 +33,8 @@ export COMPARISON_CONFIG="clusterVersion.json podLatency.json containerMetrics.j
 export GEN_CSV=true
 export EMAIL_ID_FOR_RESULTS_SHEET='ocp-perfscale-qe@redhat.com'
 
-rm -rf "${SHARED_DIR}/${"index_data.json":?}"
+OUTPUT_FILE="index_data.json"
+rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
 ./run.sh
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
