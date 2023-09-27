@@ -1,0 +1,53 @@
+base_images:
+  base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: rhel-8-release-golang-1.19-openshift-4.12
+canonical_go_repository: github.com/kedacore/keda-olm-operator
+images:
+- from: base
+  to: custom-metrics-autoscaler-operator
+promotion:
+  name: "4.16"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: env && GOFLAGS="" make fmt
+  container:
+    from: src
+- as: govet
+  commands: env && GOFLAGS="" make vet
+  container:
+    from: src
+- as: cma-check-all-csv
+  commands: env && GOFLAGS="" make cma-check-all-csv
+  container:
+    from: src
+- as: cma-verify-history
+  commands: env && GOFLAGS="" hack/cma-verify-history.sh
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: custom-metrics-autoscaler-operator

@@ -1,0 +1,33 @@
+binary_build_commands: make install
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+promotion:
+  name: "4.16"
+  namespace: ocp
+releases:
+  latest:
+    integration:
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: |-
+    go install -mod=mod github.com/onsi/ginkgo/v2/ginkgo@latest
+    unset GOFLAGS
+    make unit-test
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.16
+  org: terraform-redhat
+  repo: terraform-provider-rhcs
