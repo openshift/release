@@ -18,14 +18,14 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
-cat <<EOF > /tmp/iso.sh
+cat <<'EOF' > /tmp/iso.sh
 #!/bin/bash
 set -xeuo pipefail
 
 if ! sudo subscription-manager status >&/dev/null; then
     sudo subscription-manager register \
-        --org="\$(cat /tmp/subscription-manager-org)" \
-        --activationkey="\$(cat /tmp/subscription-manager-act-key)"
+        --org="$(cat /tmp/subscription-manager-org)" \
+        --activationkey="$(cat /tmp/subscription-manager-act-key)"
 fi
 
 chmod 0755 ~
@@ -36,12 +36,18 @@ cp /tmp/ssh-privatekey ~/.ssh/id_rsa
 chmod 0400 ~/.ssh/id_rsa*
 
 # Set up the pull secret in the expected location
-export PULL_SECRET="\${HOME}/.pull-secret.json"
-cp /tmp/pull-secret "\${PULL_SECRET}"
+export PULL_SECRET="${HOME}/.pull-secret.json"
+cp /tmp/pull-secret "${PULL_SECRET}"
 
 cd ~/microshift
 
 ./test/bin/ci_phase_iso_build.sh
+
+workers_services=$(sudo systemctl list-units | awk '/osbuild-worker@/ {print $1} /osbuild-composer\.service/ {print $1}')
+while IFS= read -r service; do
+    journalctl -u "${service}" &> /tmp/osbuilder-logs/${service}.log
+done <<<"${workers_services}"
+
 sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
 EOF
 chmod +x /tmp/iso.sh
