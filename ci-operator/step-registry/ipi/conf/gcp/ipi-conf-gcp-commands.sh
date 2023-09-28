@@ -33,7 +33,9 @@ fi
 if [ "${OCP_ARCH}" = "amd64" ]; then
   master_type="e2${master_type_suffix}"
 elif [ "${OCP_ARCH}" = "arm64" ]; then
-  master_type="t2a${master_type_suffix}"
+  # TODO: revert back to master_type_suffix if/when we switch back to standard
+  # custom sizes are not supported by arm64 VMs
+  master_type="t2a-standard-4"
 fi
 
 cat >> "${CONFIG}" << EOF

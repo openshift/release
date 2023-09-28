@@ -10,10 +10,9 @@ if [[ -n "${DOWNSTREAM_TESTS_COMMIT}" ]]; then
   export GOPATH=/tmp/go
   export GOBIN=/tmp/go/bin
   export GOCACHE=/tmp/.cache/go-build
-  export PATH=$PATH:$GOBIN
 
   # Create the /tmp/go/bin and build cache directories, and grant read and write permissions to all users
-  RUN mkdir -p /tmp/go/bin $GOCACHE \
+  mkdir -p /tmp/go/bin $GOCACHE \
     && chmod -R 777 /tmp/go/bin $GOPATH $GOCACHE
 
   git clone https://github.com/grafana/tempo-operator.git /tmp/tempo-tests
