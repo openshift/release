@@ -31,6 +31,10 @@ base_images:
     name: 4.14-priv
     namespace: ocp-private
     tag: base
+  ocp_4.14_tools:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: tools
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -58,14 +62,15 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  from: tools
   inputs:
+    ocp_4.14_tools:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:tools
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
-  from: base
   inputs:
     base-machine-with-rpms:
       as:
@@ -96,8 +101,10 @@ images:
   to: rhel-coreos
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
-  from: base
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
