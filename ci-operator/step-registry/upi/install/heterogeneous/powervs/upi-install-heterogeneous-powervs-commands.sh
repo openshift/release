@@ -10,13 +10,98 @@ then
     exit 0
 fi
 
+# Cleans up the failed prior jobs
 function cleanup_ibmcloud_powervs() {
-  local version = "${1}"
-  local workspace_name = "${2}"
+  local version="${1}"
+  local workspace_name="${2}"
+  local region="${3}"
+  local resource_group="${4}"
+  local api_key="${5}"
   echo "Cleaning up prior runs - version: ${version} - workspace_name: ${workspace_name}"
-  ic pi sl
 
-  ic tg gws
+  echo "Cleaning up the Transit Gateways"
+  RESOURCE_GROUP_ID=$(ic resource groups --output json | jq -r '.[] | select(.name == "'${resource_group}'").id')
+  for GW in $(ic tg gateways --output json | jq -r '.[].id')
+  do
+    echo "Checking the resource_group and location for the transit gateways ${GW}"
+    VALID_GW=$(ic tg gw "${GW}" --output json | jq -r '. | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")')
+    if [ -n "${VALID_GW}" ]
+    then
+      TG_CRN=$(echo "${VALID_GW}" | jq -r '.crn')
+      TAGS=$(ic resource search "crn:\"${TG_CRN}\"" --output json | jq -r '.items[].tags[]' | grep "mac-cicd-${version}")
+      if [ -n "${TAGS}" ]
+      then
+        for CS in $(ic tg connections "${GW}" --output json | jq -r '.[].id')
+        do 
+          ic tg connection-delete "${GW}" "${CS}" --force
+          sleep 30
+        done
+        ic tg gwd "${GW}" --force
+        echo "waiting up a minute while the Transit Gateways are removed"
+        sleep 60
+      fi
+    fi
+  done
+
+  echo "reporting out the remaining TGs in the resource_group and region"
+  ic tg gws --output json | jq -r '.[] | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")'
+
+  echo "Cleaning up workspaces for ${workspace_name}"
+  for CRN in $(ic pi sl 2> /dev/null | grep "${workspace_name}" | awk '{print $1}')
+  do
+    echo "Targetting power cloud instance"
+    ic pi st "${CRN}"
+
+    echo "Deleting the PVM Instances"
+    for INSTANCE_ID in $(ic pi ins --json | jq -r '.pvmInstances[].pvmInstanceID')
+    do
+      echo "Deleting PVM Instance ${INSTANCE_ID}"
+      ic pi ind "${INSTANCE_ID}" --delete-data-volumes
+    done
+    sleep 60
+
+    echo "Deleting the Cloud Connections"
+    for CC_INSTANCE_ID in $(ic pi cons --json | jq -r '.cloudConnections[] | select(.name | contains("mac-cloud-conn")).cloudConnectionID')
+    do
+      echo "Deleting Cloud Connection Instance ${CC_INSTANCE_ID}"
+      ic pi cond "${CC_INSTANCE_ID}"
+      sleep 60
+    done
+
+    echo "Deleting the Images"
+    for IMAGE_ID in $(ic pi imgs --json | jq -r '.images[].imageID')
+    do
+      echo "Deleting Images ${IMAGE_ID}"
+      ic pi image-delete "${IMAGE_ID}"
+      sleep 60
+    done
+
+    if [ -n "$(ic pi nets 2>&1| grep DHCP)" ]
+    then
+       curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-darwin-amd64"
+       chmod +x /tmp/pvsadm
+
+       POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
+
+       IC_API_KEY="${api_key}" ./bin/pvsadm dhcpserver list --instance-id ${POWERVS_SERVICE_INSTANCE_ID} || true
+       IC_API_KEY="${api_key}" ./bin/pvsadm dhcpserver delete --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --id "$(ic pi nets 2>&1| grep DHCP | awk '{print $1}')" 
+       sleep 60
+    fi
+
+    echo "Deleting the Network"
+    for NETWORK_ID in $(ic pi nets 2>&1| awk '{print $1}')
+    do
+      echo "Deleting network ${NETWORK_ID}"
+      ic pi network-delete "${NETWORK_ID}"
+      sleep 60
+    done
+
+    ic resource service-instance-update "${CRN}" --allow-cleanup true
+    sleep 30
+    ic resource service-instance-delete "${CRN}" --force --recursive
+    echo "Done Deleting the ${CRN}"
+  done
+
   echo "Done cleaning up prior runs"
 }
 
@@ -60,6 +145,9 @@ case "$CLUSTER_TYPE" in
   # Add code for ppc64le
   if [ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "ppc64le" ]
   then
+      # Saving the OCP VERSION so we can use in a subsequent deprovision
+      echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
+
       echo "Adding additional ppc64le nodes"
       REGION="${LEASED_RESOURCE}"
       IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
@@ -106,7 +194,7 @@ case "$CLUSTER_TYPE" in
 
       # short-circuit to download and install terraform
       echo "Attempting to install terraform using gzip"
-      curl -o "${IBMCLOUD_HOME_FOLDER}"/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
+      curl -L -o "${IBMCLOUD_HOME_FOLDER}"/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
         && gunzip "${IBMCLOUD_HOME_FOLDER}"/terraform.gz \
         && chmod +x "${IBMCLOUD_HOME_FOLDER}"/terraform \
         || true
@@ -146,7 +234,7 @@ case "$CLUSTER_TYPE" in
       ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage power-iaas is
 
       # Run Cleanup
-      cleanup_ibmcloud_powervs "${CLEAN_VERSION}" "${WORKSPACE_NAME}"
+      cleanup_ibmcloud_powervs "${CLEAN_VERSION}" "${WORKSPACE_NAME}" "${REGION}" "${RESOURCE_GROUP}" "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 
       # Before the workspace is created, download the automation code
       cd "${IBMCLOUD_HOME_FOLDER}" \
@@ -160,7 +248,7 @@ case "$CLUSTER_TYPE" in
       echo "VPC Region is ${REGION}"
       echo "PowerVS region is ${POWERVS_REGION}"
       echo "Resource Group is ${RESOURCE_GROUP}"
-      ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" 2>&1 \
+      ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup 2>&1 \
         | tee /tmp/instance.id
 
       # Process the CRN into a variable
@@ -204,7 +292,6 @@ case "$CLUSTER_TYPE" in
       echo "PowerVS Service CRN: ${CRN}"
 
       echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
-      echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
 
       # The CentOS-Stream-8 image is stock-image on PowerVS.
       # This image is available across all PowerVS workspaces.

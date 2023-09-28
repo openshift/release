@@ -2,15 +2,16 @@
 
 # Generates a workspace name like rdr-mac-4-14-au-syd-n1
 # this keeps the workspace unique per version
+OCP_VERSION=$(cat "${SHARED_DIR}/OCP_VERSION")
+REGION="${LEASED_RESOURCE}"
 CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
 WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}-n1
 
 # var.tfvars used to provision the powervs nodes is copied to the ${SHARED_DIR}
-echo "Invoking upi deprovision heterogeneous powervs"
+echo "Invoking upi deprovision heterogeneous powervs for ${WORKSPACE_NAME}"
 
 IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
 mkdir -p "${IBMCLOUD_HOME_FOLDER}"
-REGION="${LEASED_RESOURCE}"
 
 if [ -z "$(command -v ibmcloud)" ]
 then
@@ -79,7 +80,6 @@ then
   echo "terraform version: ${t_ver1}"
 
   echo "Destroy the terraform"
-  OCP_VERSION=$(cat "${SHARED_DIR}/OCP_VERSION")
   # Fetch the ocp4-upi-compute-powervs repo to perform deprovisioning
   cd "${IBMCLOUD_HOME_FOLDER}" && curl -L "https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-${OCP_VERSION}.tar.gz" -o "${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz" \
       && tar -xzf "${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz" \
@@ -124,43 +124,4 @@ then
   fi
 fi
 
-# Report the straggler workspaces with tag 'mac-power-worker'
-EXTRA_CRNS=$(ic resource search "tags:\"mac-power-worker-${CLEAN_VERSION}\"" --output json | jq -r '.items[].crn')
-echo "Checking the Straggler Workspaces: "
-echo "${EXTRA_CRNS}"
-for T_CRN in ${EXTRA_CRNS//'\n'/ }
-do
-  echo "-Straggler Workspace: ${T_CRN}"
-
-
-
-  ic pi st "${T_CRN}"
-
-  echo "-- Cloud Connection --"
-  ic pi cons --json | jq -r '.cloudConnections[] | .name,.cloudConnectionID' || true
-
-  echo "-- Network --"
-  ic pi nets
-
-  # Rare case when no volumes or instances are ever created in the workspace.
-  echo "-- Volumes --"
-  ic pi vols || true
-
-  echo "-- Instances --"
-  ic pi ins || true
-
-  COUNT_INS=$(ibmcloud pi ins --json | jq -r '.pvmInstances[]' | wc -l)
-  COUNT_NETS=$(ibmcloud pi nets --json | jq -r '.networks[]' | wc -l)
-  TOTAL=$((COUNT_INS + COUNT_NETS))
-
-  echo "TOTAL RESOURCES: ${TOTAL}"
-  RESOURCE_GROUP=$(cat "${SHARED_DIR}/RESOURCE_GROUP")
-  ic resource service-instance-delete "${T_CRN}" -g "${RESOURCE_GROUP}" --force --recursive \
-    || true
-
-  echo "-- Gateway --"
-  echo "TIP: only delete your gateway"
-  ic tg gateways
-done
-echo "Done Checking"
 echo "IBM Cloud PowerVS resources destroyed successfully"
