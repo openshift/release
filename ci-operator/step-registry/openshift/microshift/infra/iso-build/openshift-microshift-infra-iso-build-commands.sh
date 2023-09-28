@@ -41,12 +41,16 @@ cp /tmp/pull-secret "${PULL_SECRET}"
 
 cd ~/microshift
 
-./test/bin/ci_phase_iso_build.sh
+collect_osbuild_logs(){
+    mkdir /tmp/osbuilder-logs
+    workers_services=$(sudo systemctl list-units | awk '/osbuild-worker@/ {print $1} /osbuild-composer\.service/ {print $1}')
+    while IFS= read -r service; do
+        journalctl -u "${service}" &> /tmp/osbuilder-logs/${service}.log
+    done <<<"${workers_services}"
+}
+trap 'collect_osbuild_logs' EXIT
 
-workers_services=$(sudo systemctl list-units | awk '/osbuild-worker@/ {print $1} /osbuild-composer\.service/ {print $1}')
-while IFS= read -r service; do
-    journalctl -u "${service}" &> /tmp/osbuilder-logs/${service}.log
-done <<<"${workers_services}"
+./test/bin/ci_phase_iso_build.sh
 
 sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
 EOF
