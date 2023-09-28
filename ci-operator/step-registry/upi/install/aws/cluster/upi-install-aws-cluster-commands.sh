@@ -165,6 +165,7 @@ PUBLIC_SUBNETS="$(echo "${VPC_JSON}" | jq '.[] | select(.OutputKey == "PublicSub
 # Adapt step aws-provision-tags-for-byo-vpc, which is required by Ingress operator testing.
 echo ${VPC_ID} > "${SHARED_DIR}/vpc_id"
 echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PrivateSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/private_subnet_ids"
+echo ${VPC_JSON} | jq -c '[.[] | select(.OutputKey=="PublicSubnetIds") | .OutputValue | split(",")[]]' | sed "s/\"/'/g" > "${SHARED_DIR}/public_subnet_ids"
 
 cf_params_infra=${ARTIFACT_DIR}/cf_params_infra.json
 add_param_to_json ClusterName "${CLUSTER_NAME}" "${cf_params_infra}"

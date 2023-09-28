@@ -94,7 +94,7 @@ if __name__ == "__main__":
         for test in all_tests_list:
             test_name = test['as']
             print("updating test job - %s" % test_name)
-            command = "generate-cron-entry.sh %s %s %s" % (test_name, target_file,
+            command = "generate-cron-entry.sh %s %s %s" % (test_name, os.path.basename(target_file),
                                                            "--force" if force_generation else "")
             cron_output = shell(command)["out"]
             if cron_output.startswith(cron_prefix):

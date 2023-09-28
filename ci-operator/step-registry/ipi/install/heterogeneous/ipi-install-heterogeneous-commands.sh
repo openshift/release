@@ -130,6 +130,122 @@ case $CLUSTER_TYPE in
   MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.vmSize = \"${ADDITIONAL_WORKER_VM_TYPE}\"
        | .spec.template.spec.providerSpec.value.image.resourceID = \"${resource_id}\"" <<< "$MACHINE_SET")
 ;;
+*gcp*)
+  echo "Extracting gcp boot image..."
+  workers_addi_rhcos_image_project=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
+    yq-v4 ".data.stream
+      | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.images.gcp.project")
+  workers_addi_rhcos_image_name=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | \
+    yq-v4 ".data.stream
+      | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.images.gcp.name")
+  MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.machineType = \"${ADDITIONAL_WORKER_VM_TYPE}\"
+                     | .spec.template.spec.providerSpec.value.disks[0].image = \"projects/$workers_addi_rhcos_image_project/global/images/$workers_addi_rhcos_image_name\"
+              " <<< "${MACHINE_SET}")
+;;
+*ibmcloud*)
+  FULL_CLUSTER_NAME=$(yq-v4 '.metadata.labels."machine.openshift.io/cluster-api-cluster"' <<< $MACHINE_SET)
+  REGION="${LEASED_RESOURCE}"
+  RESOURCE_GROUP=$(yq-v4 ".spec.template.spec.providerSpec.value.resourceGroup" <<< $MACHINE_SET)
+
+  IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+  mkdir -p ${IBMCLOUD_HOME_FOLDER}
+
+  if [ -z "$(command -v ibmcloud)" ]; then
+    echo "ibmcloud CLI doesn't exist, installing"
+    curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
+  fi
+
+  function ic() {
+    HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
+  }
+
+  ic version
+  ic login --quiet --apikey @${CLUSTER_PROFILE_DIR}/ibmcloud-api-key -r ${REGION} -g ${RESOURCE_GROUP}
+  ic plugin install --quiet -f cloud-internet-services vpc-infrastructure cloud-object-storage
+
+  case $ADDITIONAL_WORKER_ARCHITECTURE in
+  s390x)
+    # there currently is no suitable os type for rhcos 8/9 for s390x
+    OS_NAME=red-8-s390x-byol
+  ;;
+  x86_64 | amd64)
+    OS_NAME=rhel-coreos-stable-amd64
+  ;;
+  *)
+    echo "Additional worker architecture \"${ADDITIONAL_WORKER_ARCHITECTURE}\" not supported for provider ibmcloud"
+    exit 5
+  esac
+
+  # ensure that a suitable image for the target architecture exists. If it doesn't, download the image and upload it to
+  # cloud object storage (cos), then create an image.
+  RHCOS_IMAGE_NAME=${FULL_CLUSTER_NAME}-rhcos-${ADDITIONAL_WORKER_ARCHITECTURE}
+  IMAGE_EXISTS=$(ic is images --output json | jq ".[] | select(.name == \"${RHCOS_IMAGE_NAME}\") | [ .name ] | length")
+  if [ "${IMAGE_EXISTS}" != "1" ]; then
+    echo "Image \"${RHCOS_IMAGE_NAME}\" does not exist, creating"
+    BUCKET_NAME=${FULL_CLUSTER_NAME}-vsi-image
+    RHCOS_IMAGE_URL=$(oc -n openshift-machine-config-operator get configmap/coreos-bootimages -oyaml | yq-v4 ".data.stream | eval(.).architectures.${ADDITIONAL_WORKER_ARCHITECTURE}.artifacts.ibmcloud.formats.[].disk.location")
+    if [ -z $RHCOS_IMAGE_URL ]; then
+      echo "Image location for architecture ${ADDITIONAL_WORKER_ARCHITECTURE} could not be found"
+      exit 5
+    fi
+    QCOW_GZ_BASENAME=$(basename ${RHCOS_IMAGE_URL})
+    QCOW_GZ_FILE_LOCATION=/tmp/${QCOW_GZ_BASENAME}
+    QCOW_NAME=$(basename -s .gz ${QCOW_GZ_BASENAME})
+    QCOW_FILE_LOCATION=/tmp/${QCOW_NAME}
+
+    echo "Downloading image from ${RHCOS_IMAGE_URL} (to ${QCOW_GZ_FILE_LOCATION})"
+    curl -s -L -o ${QCOW_GZ_FILE_LOCATION} ${RHCOS_IMAGE_URL}
+
+    echo "Extracting image"
+    gunzip -f ${QCOW_GZ_FILE_LOCATION}
+
+    echo "Uploading image to bucket ${BUCKET_NAME} under key ${QCOW_NAME}"
+    ic cos object-put --bucket ${BUCKET_NAME} --key ${QCOW_NAME} --body ${QCOW_FILE_LOCATION} --region ${REGION}
+    COS_URL="cos://${REGION}/${BUCKET_NAME}/${QCOW_NAME}"
+
+    echo "Creating image ${RHCOS_IMAGE_NAME} from ${COS_URL} with OS ${OS_NAME}"
+    ic is image-create ${RHCOS_IMAGE_NAME} --file ${COS_URL} --os-name ${OS_NAME} --resource-group-name ${RESOURCE_GROUP}
+  else
+    echo "Image \"${RHCOS_IMAGE_NAME}\" exists, reusing"
+  fi
+
+  # security groups do not correctly apply port ranges to s390x nodes in IBM Cloud VPC right now.
+  # for now, allow connections between the VSIs as a workaround.
+  if [ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "s390x" ]; then
+    echo "Patching security groups to allow all TCP/UDP traffic between amd64 and s390x VSIs"
+    SECURITY_GROUPS=$(yq-v4 '.spec.template.spec.providerSpec.value.primaryNetworkInterface.securityGroups | join(" ")' <<< $MACHINE_SET)
+    for security_group in $SECURITY_GROUPS; do
+      echo $security_group
+
+      # remove all groups that are specific port ranges inside the security group for udp and tcp
+      rules_to_delete=$(\
+        ic is security-group $security_group --output json | \
+        jq -r ".rules[] | select((.protocol | index(\"udp\", \"tcp\")) and (.direction == \"inbound\") and (.remote.name == \"${security_group}\")) | .id")
+
+      if [ "${rules_to_delete}" ]; then
+        ic is security-group-rule-delete --force $security_group $rules_to_delete
+      fi
+
+      for protocol in tcp udp; do
+        ic is security-group-rule-add $security_group inbound $protocol --remote $security_group --port-min 1 --port-max 65535
+      done
+    done
+  fi
+
+  # explicitly disabling UDP aggregation since it is not supported on s390x. see https://issues.redhat.com/browse/OCPBUGS-18394
+  oc create -oyaml -f - <<EOF
+apiVersion: v1
+kind: ConfigMap
+data:
+  disable-udp-aggregation: "true"
+metadata:
+  name: udp-aggregation-config
+  namespace: openshift-network-operator
+EOF
+
+  MACHINE_SET=$(yq-v4 ".spec.template.spec.providerSpec.value.profile = \"${ADDITIONAL_WORKER_VM_TYPE}\"
+       | .spec.template.spec.providerSpec.value.image = \"${RHCOS_IMAGE_NAME}\"" <<< "$MACHINE_SET")
+;;
 *)
   echo "Adding workers with a different ISA for jobs using the cluster type ${CLUSTER_TYPE} is not implemented yet..."
   exit 4

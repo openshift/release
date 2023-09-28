@@ -1,0 +1,36 @@
+workflow:
+  as: optional-operators-cvp-common-hypershift
+  steps:
+    cluster_profile: aws-2
+    env:
+      HYPERSHIFT_BASE_DOMAIN: hypershift.aws-2.ci.openshift.org
+      OO_CHANNEL: "4.3"
+      OO_INSTALL_NAMESPACE: '!create'
+      OO_PACKAGE: e2e-test-operator
+      OO_TARGET_NAMESPACES: '!install'
+      PYXIS_URL: ""
+      CUSTOM_SCORECARD_TESTCASE: ""
+      TEST_MODE: "cvp"
+    dependency_overrides:
+      BUNDLE_IMAGE: brew.registry.redhat.io/rh-osbs-stage/e2e-e2e-test-operator-bundle-container:8.0-11
+      OO_INDEX: brew.registry.redhat.io/rh-osbs-stage/iib:40523
+    pre:
+    - ref: optional-operators-configure-brew-pull-secret-for-hypershift
+    - chain: hypershift-hostedcluster-create
+    - ref: optional-operators-configure-proxy-registry
+    - ref: optional-operators-cvp-common-apply-secrets
+    - ref: optional-operators-subscribe
+    test:
+    - ref: optional-operators-cvp-common-scorecard
+    - ref: optional-operators-cvp-common-test
+    post:
+    - chain: gather
+    - chain: hypershift-hostedcluster-destroy
+  documentation: |-
+    Installs a HyperShift cluster with a cluster profile aws-2, install an optional
+    operator using the input index image, package and channel, and execute a
+    common suite of CVP tests to validate the optional operator.
+
+    Important: Parameter values in `env` are supposed to be used only in rehearsals
+    and serve as "testing defaults". Production jobs should always override them
+    via `cvp-trigger`.

@@ -19,13 +19,23 @@ fi
 
 # Do not change the default family type without consulting with cloud financial operations as their may
 # be active savings plans targeting this machine class.
-master_type=e2-standard-4
+master_type=""
+# Temporary test to see if this helps the consistent high CPU alerts and random test failures
+master_type_suffix="-custom-6-16384"
+#master_type_suffix="-standard-4"
 if [[ "${SIZE_VARIANT}" == "xlarge" ]]; then
-  master_type=e2-standard-32
+  master_type_suffix="-standard-32"
 elif [[ "${SIZE_VARIANT}" == "large" ]]; then
-  master_type=e2-standard-16
+  master_type_suffix="-standard-16"
 elif [[ "${SIZE_VARIANT}" == "compact" ]]; then
-  master_type=e2-standard-8
+  master_type_suffix="-standard-8"
+fi
+if [ "${OCP_ARCH}" = "amd64" ]; then
+  master_type="e2${master_type_suffix}"
+elif [ "${OCP_ARCH}" = "arm64" ]; then
+  # TODO: revert back to master_type_suffix if/when we switch back to standard
+  # custom sizes are not supported by arm64 VMs
+  master_type="t2a-standard-4"
 fi
 
 cat >> "${CONFIG}" << EOF
@@ -35,6 +45,7 @@ platform:
     projectID: ${GCP_PROJECT}
     region: ${GCP_REGION}
 controlPlane:
+  architecture: ${OCP_ARCH}
   name: master
   platform:
     gcp:
@@ -44,7 +55,8 @@ controlPlane:
         diskSizeGB: 200
   replicas: ${masters}
 compute:
-- name: worker
+- architecture: ${OCP_ARCH}
+  name: worker
   replicas: ${workers}
   platform:
     gcp:

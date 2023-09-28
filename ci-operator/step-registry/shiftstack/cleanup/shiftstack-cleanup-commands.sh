@@ -4,5 +4,7 @@ set -Eeuo pipefail
 
 export OS_CLOUD
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+export CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-${CLUSTER_TYPE:-}}"
+SLACK_HOOK="$(</var/run/slack-hooks/shiftstack-bot)"
 
-./clean-ci-resources.sh -o "${ARTIFACT_DIR}/result.json" --delete-everything-older-than-5-hours
+prune --resource-ttl="$RESOURCE_TTL" --slack-hook="$SLACK_HOOK" --no-dry-run > "${ARTIFACT_DIR}/result.json"

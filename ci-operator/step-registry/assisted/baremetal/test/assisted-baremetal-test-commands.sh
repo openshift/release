@@ -34,22 +34,38 @@ echo "### Copying test-list file"
 scp "${SSHOPTS[@]}" "${SHARED_DIR}/test-list" "root@${IP}:/tmp/test-list"
 
 echo "### Running tests"
-timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << EOF
+timeout --kill-after 10m 120m ssh "${SSHOPTS[@]}" "root@${IP}" bash - << "EOF"
     # prepending each printed line with a timestamp
-    exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), \$0 }') 2>&1
+    exec > >(awk '{ print strftime("[%Y-%m-%d %H:%M:%S]"), $0 }') 2>&1
 
-    for kubeconfig in \$(find \${KUBECONFIG} -type f); do
-        export KUBECONFIG=\${kubeconfig}
-        name=\$(basename \${kubeconfig})
-        openshift-tests run "openshift/conformance/parallel" --dry-run | \
+    for kubeconfig in $(find ${KUBECONFIG} -type f); do
+        export KUBECONFIG=${kubeconfig}
+        name=$(basename ${kubeconfig})
+
+        stderr=$( { openshift-tests run "openshift/conformance/parallel" --dry-run | \
             grep -Ff /tmp/test-list | \
-            openshift-tests run -o /tmp/artifacts/e2e_\${name}.log --junit-dir /tmp/artifacts/reports -f -
+            openshift-tests run -o /tmp/artifacts/e2e_${name}.log --junit-dir /tmp/artifacts/reports -f - ;} 2>&1)
+        exit_code=$?
+        
+        # TODO: remove this part once we fully handle the problem described at
+        # https://issues.redhat.com/browse/MGMT-15555.
+        # After 'openshift-tests' finishes validating the tests, it checks
+        # the extra monitoring tests, so the following line only excludes those
+        # kind of failures (rather than excluding all runs where the monitoring
+        # tests have failed).
+        if [[ "${stderr}" == *"failed due to a MonitorTest failure" ]]; then
+            continue
+        fi
+
+        if [[ ${exit_code} -ne 0 ]]; then
+            exit ${exit_code}
+        fi
     done
 EOF
 
 
-rv=$?
+exit_code=$?
 
 set -e
-echo "### Done! (${rv})"
-exit $rv
+echo "### Done! (${exit_code})"
+exit $exit_code

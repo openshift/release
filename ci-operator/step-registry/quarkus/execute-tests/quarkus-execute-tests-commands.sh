@@ -36,7 +36,7 @@ mvn -B -V clean verify -fae \
 echo "Copying results and xmls to ${ARTIFACT_DIR}"
 PROJECTS=config,lifecycle-application,http/http-minimum,http/http-minimum-reactive,sql-db/sql-app,monitoring/microprofile-opentracing
 for PROJECT in ${PROJECTS//","/" "}; do
-  for FILE in ./$PROJECT/target/failsafe-reports/*.xml; do
+  for FILE in ./$PROJECT/target/failsafe-reports/TEST-*.xml; do
     FILENAME=$(basename $FILE)
     echo $FILENAME
     cp $FILE ${ARTIFACT_DIR}/junit_${FILENAME}

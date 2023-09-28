@@ -129,6 +129,30 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: ocp-e2e-ibmcloud-ovn-multi-s390x
+  cron: 17 5,17 * * *
+  steps:
+    cluster_profile: ibmcloud-multi-s390x
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: s390x
+      ADDITIONAL_WORKER_VM_TYPE: bz2-4x16
+      BASE_DOMAIN: ocp-dev-ppc64le.com
+      LOKI_ENABLED: "false"
+      RESOURCE_GROUP: ibmcloud-multi-s390x-rg
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
+    workflow: openshift-e2e-ibmcloud-heterogeneous
 - as: ocp-e2e-aws-ovn-heterogeneous-upgrade
   interval: 72h
   steps:
@@ -156,7 +180,8 @@ tests:
         extract should extract\| Image info should display\| Image layer subresource\|
         oc tag should change image\| when installed on the cluster should\| OpenShift
         alerting rules\| The HAProxy router should\| egressrouter cni resources\|
-        pod should start\| pod sysctls
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     workflow: openshift-e2e-aws-heterogeneous
 - as: ocp-e2e-serial-aws-ovn-heterogeneous
   cron: 19 23 * * 2
@@ -292,6 +317,39 @@ tests:
       COMPUTE_NODE_TYPE: m6g.xlarge
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-serial
+- as: ocp-e2e-ibmcloud-ovn-multi-ppc64le
+  cron: 20 11,23 * * *
+  steps:
+    cluster_profile: ibmcloud-multi-ppc64le
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: ppc64le
+      BASE_DOMAIN: ocp-dev-ppc64le.com
+      GO_VERSION: 1.20.7
+      JQ_VERSION: "1.6"
+      LOKI_ENABLED: "false"
+      OCP_VERSION: "4.14"
+      RESOURCE_GROUP: ipi-cicd-resource-group
+      TERRAFORM_VERSION: 1.5.5
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod\| Managed cluster should have same number
+        of Machines and Nodes \| Managed cluster should have machine resources \|
+        should not have pod creation failures during install \| DNS should answer
+        queries using the local DNS endpoint \| events should not repeat pathologically
+        for ns/openshift-etcd
+      WORKERS: "2"
+      YQ_VERSION: 4.30.5
+    workflow: openshift-e2e-ibmcloud-heterogeneous-upi
 - as: ocp-e2e-azure-ovn-arm64
   interval: 72h
   steps:
@@ -396,7 +454,9 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.14"
+      MASTER_MEMORY: "34816"
       TEST_TYPE: conformance-parallel
+      USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt
 - as: ocp-image-ecosystem-ovn-remote-libvirt-ppc64le
   cluster: build01
@@ -469,21 +529,22 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-ovn-ppc64le-powervs
   cluster: build01
-  cron: 0 0,6,12,18 * * *
+  cron: 0 0,6 * * *
   steps:
-    cluster_profile: powervs-1
+    cluster_profile: powervs-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
     env:
       ARCH: ppc64le
       BRANCH: "4.14"
+      INSTALLER: powervs
       TEST_TYPE: conformance-parallel
     workflow: openshift-e2e-powervs-ipi
 - as: ocp-e2e-serial-ovn-ppc64le-powervs
   cluster: build01
-  cron: 0 1,7,13,19 * * *
+  cron: 0 1,7 * * *
   steps:
-    cluster_profile: powervs-1
+    cluster_profile: powervs-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
     env:
@@ -511,11 +572,22 @@ tests:
         extract should extract\| Image info should display\| Image layer subresource\|
         oc tag should change image\| when installed on the cluster should\| OpenShift
         alerting rules\| The HAProxy router should\| egressrouter cni resources\|
-        pod should start\| pod sysctls
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     test:
     - ref: ipi-install-heterogeneous
     - ref: openshift-e2e-test
     workflow: openshift-e2e-azure
+- as: ocp-e2e-gcp-ovn-arm64
+  cron: 0 11 * * 0
+  steps:
+    cluster_profile: gcp-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
   branch: master
   org: openshift

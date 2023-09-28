@@ -1,83 +1,70 @@
 base_images:
-  base:
-    name: 4.13-priv
-    namespace: ocp-private
-    tag: base
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
   must-gather:
-    name: 4.13-priv
+    name: 4.14-priv
     namespace: ocp-private
     tag: must-gather
-  opm-builder:
-    name: opm-builder
-    namespace: ci
-    tag: v1.14.3
   ubi_minimal:
     name: ubi-minimal
     namespace: ocp
-    tag: "8"
+    tag: "9"
 binary_build_commands: make build build-vgmanager
 build_root:
   image_stream_tag:
     name: builder-priv
     namespace: ocp-private
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.20-openshift-4.14
 canonical_go_repository: github.com/openshift/lvm-operator
 images:
+- dockerfile_literal: |-
+    FROM ubi_minimal
+    RUN microdnf install -y make git python3 python3-pip
+    RUN pip3 install pre-commit
+
+    COPY --from=root:current /usr/lib/golang /usr/local/go
+    ENV PATH=$PATH:/usr/local/go/bin
+
+    ENV GOPATH=/tmp/go
+    RUN mkdir /.cache ${GOPATH} && chmod 775 -R /.cache ${GOPATH}
+    RUN mkdir /.local && chmod 777 /.local
+
+    ENV PRE_COMMIT_HOME=/.cache/precommit
+    ENV GOLANGCI_LINT_CACHE=/.cache/golangci
+  from: ubi_minimal
+  inputs:
+    root:
+      as:
+      - root:current
+  to: lvms-pre-commit
 - dockerfile_path: Dockerfile
   from: ubi_minimal
   to: lvm-operator
-- dockerfile_path: bundle.Dockerfile
-  from: base
-  to: lvm-operator-bundle
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/upstream-opm-builder:v1.19.5 AS builder
-    RUN opm index add \
-    --bundles "${BUNDLE_IMG}" \
-    --out-dockerfile index.Dockerfile \
-    --generate
-  from: opm-builder
-  to: lvm-operator-index-gen
-- dockerfile_literal: |
-    FROM quay.io/operator-framework/opm:latest
-    LABEL operators.operatorframework.io.index.database.v1=/database/index.db
-    COPY database/index.db /database/index.db
-    EXPOSE 50051
-    ENTRYPOINT ["/bin/opm"]
-    CMD ["registry", "serve", "--database", "/database/index.db"]
-  from: opm-builder
-  inputs:
-    lvm-operator-index-gen:
-      paths:
-      - destination_dir: .
-        source_path: /database
-  to: lvm-operator-deps-index
 - context_dir: must-gather/
   dockerfile_path: Dockerfile
   from: must-gather
   to: lvms-must-gather
 operator:
   bundles:
-  - as: lvm-operator-static-deps
-    base_index: lvm-operator-deps-index
+  - as: lvm-operator-bundle
     dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/lvms_dev/lvms-operator:latest
     with: pipeline:lvm-operator
 promotion:
-  excluded_images:
-  - lvm-operator-index-gen
-  - lvm-operator-deps-index
-  name: lvm-operator-latest-priv
   namespace: ocp-private
+  tag: 4.14-priv
 releases:
   initial:
     integration:
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.13-priv
+      name: 4.14-priv
       namespace: ocp-private
 resources:
   '*':
@@ -91,10 +78,13 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
   mkdir /.local && chmod 777 /.local
 tests:
-- as: verify
-  commands: make verify
+- as: precommit-check
+  commands: |
+    export SKIP=no-commit-to-branch
+    pre-commit run --all-files --show-diff-on-failure
   container:
-    from: src
+    clone: true
+    from: lvms-pre-commit
 - as: unit-test
   commands: |
     export CODECOV_TOKEN=$(cat /tmp/secret/CODECOV_TOKEN)
@@ -104,51 +94,42 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: lvm-operator-codecov-token
-- as: lvm-operator-bundle-e2e-aws
+- as: lvm-operator-e2e-aws-sno
   steps:
     cluster_profile: aws
     dependencies:
-      MUST_GATHER_IMG: lvms-must-gather
-      OO_INDEX: ci-index-lvm-operator-static-deps
+      OO_BUNDLE: lvm-operator-bundle
     env:
-      DISK_INSTALL: "true"
-      LVM_OPERATOR_INSTALL: "false"
-      LVM_OPERATOR_UNINSTALL: "false"
-      LVMS_MUST_GATHER_DIR: ${ARTIFACT_DIR}/lvms-must-gather
-      OO_CHANNEL: alpha
+      OO_INSTALL_MODE: OwnNamespace
       OO_INSTALL_NAMESPACE: openshift-storage
-      OO_PACKAGE: lvms-operator
-      OO_TARGET_NAMESPACES: '!install'
-    post:
-    - as: lvms-must-gather
-      cli: latest
-      commands: mkdir -p "LVMS_MUST_GATHER_DIR"; oc --insecure-skip-tls-verify adm
-        must-gather --dest-dir "LVMS_MUST_GATHER_DIR"
-      dependencies:
-      - env: MUST_GATHER_IMG
-        name: lvms-must-gather
-      env:
-      - name: LVMS_MUST_GATHER_DIR
-      from: src
-      resources:
-        requests:
-          cpu: 100m
     test:
-    - as: e2e-test-aws
-      commands: make e2e-test
-      dependencies:
-      - env: OO_INDEX
-        name: ci-index
-      env:
-      - name: LVM_OPERATOR_INSTALL
-      - name: LVM_OPERATOR_UNINSTALL
-      - name: DISK_INSTALL
+    - as: e2e-test
+      cli: latest
+      commands: make e2e
       from: test-bin
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws-sno
+- as: lvm-operator-e2e-aws
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: lvm-operator-bundle
+    env:
+      OO_INSTALL_MODE: OwnNamespace
+      OO_INSTALL_NAMESPACE: openshift-storage
+    test:
+    - as: e2e-test
+      cli: latest
+      commands: DISK_INSTALL=true make e2e
+      from: test-bin
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: openshift-priv

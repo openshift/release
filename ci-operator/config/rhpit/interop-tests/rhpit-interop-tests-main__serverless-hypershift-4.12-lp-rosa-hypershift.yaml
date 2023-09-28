@@ -1,0 +1,58 @@
+base_images:
+  upi-installer:
+    name: "4.12"
+    namespace: ocp
+    tag: upi-installer
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      memory: 8Gi
+    requests:
+      cpu: "1"
+      memory: 4Gi
+tests:
+- as: serverless-aws-rosa-hypershift-412
+  cron: 0 10 25 12 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "aws-*", "failure_type": "all", "classification": "Infrastructure AWS", "jira_project": "LPTOCPCI"},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPTOCPCI"},
+          {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
+          {"step": "osd-*", "failure_type": "all", "classification": "User Setup", "jira_project": "LPTOCPCI"},
+          {"step": "rosa-*", "failure_type": "all", "classification":  "Cluster Creation", "jira_project": "LPTOCPCI"},
+          {"step": "install-operators", "failure_type": "all", "classification": "Infrastructure Provisioning - Operators", "jira_project": "LPTOCPCI"},
+          {"step": "cucushift-hypershift-*", "failure_type": "all", "classification": "Cluster Health Check", "jira_project": "LPTOCPCI"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      OCM_LOGIN_ENV: staging
+      OPENSHIFT_VERSION: "4.12"
+      OPERATORS: |
+        [
+           {"name": "serverless-operator", "source": "redhat-operators", "channel": "!default", "install_namespace": "openshift-serverless", "operator_group": "serverless-operator-group"}
+        ]
+      REGION: us-west-2
+      ROSA_LOGIN_ENV: staging
+    test:
+    - ref: install-operators
+    - ref: cucushift-hypershift-extended-health-check
+    workflow: firewatch-rosa-aws-sts-hypershift
+zz_generated_metadata:
+  branch: main
+  org: rhpit
+  repo: interop-tests
+  variant: serverless-hypershift-4.12-lp-rosa-hypershift

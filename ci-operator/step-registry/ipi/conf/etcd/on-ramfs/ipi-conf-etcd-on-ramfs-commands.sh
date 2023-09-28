@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+if [[ "${USE_RAMFS:=false}" == "true" ]]; then
+
 cat >> "${SHARED_DIR}/manifest_etcd-on-ramfs-mc.yml" << EOF
 kind: MachineConfig
 apiVersion: machineconfiguration.openshift.io/v1
@@ -32,3 +34,5 @@ spec:
           name: var-lib-etcd.mount
           enabled: true
 EOF
+
+fi

@@ -1,14 +1,14 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -16,17 +16,21 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
-  coreos-centos-stream8:
-    name: stream8
+  assisted-test-infra-internal:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-test-infra-internal
+  coreos-centos-stream9:
+    name: stream9
     namespace: coreos
-    tag: "8"
+    tag: "9"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -36,40 +40,46 @@ base_images:
     namespace: openshift
     tag: golang-1.19
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.assisted-installer-build
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted-installer
-  from: coreos-centos-stream8
   inputs:
+    coreos-centos-stream9:
+      as:
+      - quay.io/centos/centos:stream9
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer
 - dockerfile_path: Dockerfile.assisted-installer-controller
-  from: coreos-centos-stream8
   inputs:
+    coreos-centos-stream9:
+      as:
+      - quay.io/centos/centos:stream9
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer-controller
+- dockerfile_path: Dockerfile.assisted-installer-build
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: assisted-installer-build
 promotion:
-  name: ocm-2.9
+  name: ocm-2.10
   namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |
-  go mod vendor
-  mkdir /.cache && chmod 775 -R /.cache ${GOPATH}
 tests:
 - as: publish-multi-arch-images
   postsubmit: true
@@ -118,33 +128,41 @@ tests:
     - ref: assisted-baremetal-images-publish
 - as: lint
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export GOLANGCI_LINT_CACHE=/tmp/.cache
     export GOPROXY=https://proxy.golang.org
     make lint
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-build
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: format-check
   commands: make format-check
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-build
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test
   commands: |
+    export GOCACHE=/tmp/gocache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-build
   secret:
     mount_path: /tmp/secret
     name: assisted-installer-codecov-token
   skip_if_only_changed: ^docs/|^\.github/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
 - as: unit-test-postsubmit
   commands: |
+    export GOCACHE=/tmp/gocache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make REPORTS=${ARTIFACT_DIR} unit-test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-installer-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret
@@ -210,6 +228,11 @@ tests:
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-ztp
+- as: e2e-oci-assisted
+  optional: true
+  steps:
+    cluster_profile: oci-assisted
+    workflow: assisted-oci
 zz_generated_metadata:
   branch: master
   org: openshift

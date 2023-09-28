@@ -21,17 +21,9 @@ export CLUSTER_NAME
 export OCM_TOKEN
 export ROBOT_EXTRA_ARGS
 export RUN_SCRIPT_ARGS
+export CLUSTER_ID
 
-mkdir $ARTIFACT_DIR/results
-
-# delete IDPs before running testsuite
-if [ "${API_HOST}" = "stage" ]; then
-    API_URL=https://api.stage.openshift.com/
-else
-    API_URL=https://api.openshift.com/
-fi
-ocm login --url=$API_URL --token=$OCM_TOKEN
-ocm delete idp rosa-htpasswd --cluster=$CLUSTER_ID
+mkdir "$ARTIFACT_DIR/results"
 
 # running RHODS testsuite
 ./ods_ci/build/run.sh

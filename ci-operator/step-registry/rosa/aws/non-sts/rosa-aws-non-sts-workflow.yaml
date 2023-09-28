@@ -1,0 +1,19 @@
+workflow:
+  as: rosa-aws-non-sts
+  steps:
+    env:
+      STS: "false"
+      COMPUTE_MACHINE_TYPE: "c5.xlarge"
+      REPLICAS: "4"
+      MULTI_AZ: "false"
+      ETCD_ENCRYPTION: "false"
+      DISABLE_WORKLOAD_MONITORING: "true"
+    pre:
+    - chain: rosa-cluster-provision
+    - ref: osd-ccs-conf-idp-htpasswd-multi-users
+    - ref: rosa-cluster-wait-ready-nodes
+    post:
+    - chain: rosa-cluster-deprovision
+  documentation: |-
+    This workflow installs a rosa non-sts cluster. The cluster is set with htpasswd idp, and the login informations are stored under $SHARED_DIR/api.login.
+    After finish testing, the cluster will be deprovsioned.

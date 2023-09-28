@@ -1,18 +1,18 @@
 base_images:
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   assisted-service-index:
@@ -20,17 +20,17 @@ base_images:
     namespace: edge-infrastructure
     tag: latest
   assisted-service-scripts:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service-scripts
   assisted-test-infra:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra
-  coreos-centos-stream8:
-    name: stream8
-    namespace: coreos
-    tag: "8"
+  assisted-test-infra-internal:
+    name: ocm-2.10
+    namespace: edge-infrastructure
+    tag: assisted-test-infra-internal
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -38,47 +38,46 @@ base_images:
   golangci-lint:
     name: golangci-lint
     namespace: ci
-    tag: v1.37.1
-  openshift_release_golang-1.17:
+    tag: v1.53.1
+  openshift_release_golang-1.20:
     name: release
     namespace: openshift
-    tag: golang-1.17
+    tag: golang-1.20
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.17
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.image-service
-  from: coreos-centos-stream8
   inputs:
-    openshift_release_golang-1.17:
+    openshift_release_golang-1.20:
       as:
-      - registry.ci.openshift.org/openshift/release:golang-1.17
+      - registry.ci.openshift.org/openshift/release:golang-1.20
   to: assisted-image-service
+- dockerfile_path: Dockerfile.image-service-build
+  inputs:
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+  to: assisted-image-service-build
 promotion:
-  name: ocm-2.9
+  name: ocm-2.10
   namespace: edge-infrastructure
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
   latest-multi:
     candidate:
       architecture: multi
       product: ocp
       stream: nightly
-      version: "4.13"
+      version: "4.14"
 resources:
   '*':
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: |
-  make build-openshift-ci-test-bin
-  go mod vendor
 tests:
 - as: mirror-nightly-image
   cron: '@daily'
@@ -106,10 +105,13 @@ tests:
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
 - as: test
   commands: |
+    export GOCACHE=/tmp/gocache
+    export GOMODCACHE=/tmp/gomodcache
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-image-service-build
   secret:
     mount_path: /tmp/secret
     name: assisted-image-service-codecov-token
@@ -119,7 +121,8 @@ tests:
     export CODECOV_TOKEN=$(cat /tmp/secret/codecov-token)
     make test
   container:
-    from: test-bin
+    clone: true
+    from: assisted-image-service-build
   postsubmit: true
   secret:
     mount_path: /tmp/secret
@@ -147,9 +150,9 @@ tests:
       ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
-        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
-        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        AGENT_DOCKER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-agent-rhel8:latest
+        CONTROLLER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-reporter-rhel8:latest
+        INSTALLER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-rhel8:latest
     workflow: assisted-equinix
 - as: e2e-ai-operator-ztp
   skip_if_only_changed: ^\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|LICENSE)$
@@ -160,6 +163,11 @@ tests:
       INDEX_IMAGE: assisted-service-index
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
     workflow: assisted-baremetal-operator-ztp
+- as: e2e-oci-assisted
+  optional: true
+  steps:
+    cluster_profile: oci-assisted
+    workflow: assisted-oci
 zz_generated_metadata:
   branch: main
   org: openshift

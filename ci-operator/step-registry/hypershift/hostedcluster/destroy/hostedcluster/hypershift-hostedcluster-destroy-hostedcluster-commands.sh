@@ -31,12 +31,28 @@ else
   echo "$HOSTED_CLUSTER_FILE does not exist. Defaulting to the default cluster name: $CLUSTER_NAME."
 fi
 
+createdAt=`oc -n clusters get hostedclusters $CLUSTER_NAME -o jsonpath='{.metadata.annotations.created-at}'`
+if [ -z $createdAt ]; then
+  echo Cluster is broken, skipping...
+  oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "broken=true"
+  exit 0
+fi
+echo Cluster successfully created at $createdAt
+
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-bin/hypershift destroy cluster aws \
-  --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
-  --name ${CLUSTER_NAME} \
-  --infra-id ${INFRA_ID} \
-  --region ${HYPERSHIFT_AWS_REGION} \
-  --base-domain ${DOMAIN} \
-  --cluster-grace-period 40m
+
+for _ in {1..10}; do
+  bin/hypershift destroy cluster aws \
+    --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
+    --name ${CLUSTER_NAME} \
+    --infra-id ${INFRA_ID} \
+    --region ${HYPERSHIFT_AWS_REGION} \
+    --base-domain ${DOMAIN} \
+    --cluster-grace-period 40m
+  if [ $? == 0 ]; then
+    break
+  else
+    echo 'Failed to delete the cluster, retrying...'
+  fi
+done
 echo "$(date) Finished deleting cluster"

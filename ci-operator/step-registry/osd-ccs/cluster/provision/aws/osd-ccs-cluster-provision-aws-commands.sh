@@ -141,6 +141,7 @@ mkdir -p "${SHARED_DIR}"
 CLUSTER_ID=$(cat "${ARTIFACT_DIR}/cluster.txt" | jq '.id' | tr -d '"')
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 echo "Waiting for cluster ready..."
 start_time=$(date +"%s")
@@ -172,3 +173,6 @@ echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
 
 PRODUCT_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.product.id')
 echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
+
+INFRA_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.infra_id')
+echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"

@@ -11,6 +11,10 @@ base_images:
     name: cincinnati-graph-data
     namespace: cincinnati-ci-public
     tag: stable
+  operator-sdk:
+    name: "4.13"
+    namespace: origin
+    tag: operator-sdk
 build_root:
   image_stream_tag:
     name: release
@@ -23,6 +27,16 @@ images:
 - dockerfile_path: dev/Dockerfile
   from: base
   to: cincinnati-graph-data-container
+operator:
+  bundles:
+  - as: cincinnati-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
+  substitutions:
+  - pullspec: quay.io/cincinnati/cincinnati:latest
+    with: pipeline:cincinnati_operand_latest
+  - pullspec: controller:latest
+    with: pipeline:cincinnati-operator
 releases:
   latest:
     release:
@@ -53,6 +67,31 @@ tests:
   commands: make unit-test
   container:
     from: src
+- as: install-bundle
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace install-osus-here
+        operator-sdk run bundle -n install-osus-here "$OO_BUNDLE"
+        oc wait --for condition=Available -n install-osus-here deployment updateservice-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: cincinnati-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1000Mi
+    workflow: generic-claim
 - as: operator-e2e-410
   cluster_claim:
     architecture: amd64

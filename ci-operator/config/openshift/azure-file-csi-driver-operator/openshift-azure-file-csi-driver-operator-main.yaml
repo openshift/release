@@ -1,12 +1,12 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
   tests-private:
     name: tests-private
     namespace: ci
@@ -18,25 +18,25 @@ images:
 - dockerfile_path: Dockerfile.openshift
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: azure-file-csi-driver-operator
 - dockerfile_path: Dockerfile.test
   from: src
   to: azure-file-csi-driver-operator-test
 promotion:
-  name: "4.14"
+  name: "4.15"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -58,6 +58,10 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure-csi-file
+- as: e2e-azure-ovn-upgrade
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-upgrade-azure
 - as: e2e-azure-file-nfs-csi
   steps:
     cluster_profile: azure4
@@ -73,6 +77,12 @@ tests:
   steps:
     test:
     - ref: go-verify-deps
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 zz_generated_metadata:
   branch: main
   org: openshift

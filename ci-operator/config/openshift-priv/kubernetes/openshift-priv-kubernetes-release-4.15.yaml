@@ -11,6 +11,10 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: cli
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.14"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -23,6 +27,10 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: oc-rpms
+  ocp_4.14_base:
+    name: 4.14-priv
+    namespace: ocp-private
+    tag: base
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -41,8 +49,10 @@ build_root:
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -95,6 +105,7 @@ images:
 promotion:
   additional_images:
     artifacts: artifacts
+  disabled: true
   excluded_images:
   - machine-os-content
   - rhel-coreos
@@ -219,9 +230,10 @@ tests:
   container:
     from: src
 - as: verify-commits
-  commands: ARTIFACTS="${ARTIFACT_DIR}" openshift-hack/verify-commits.sh
+  commands: |
+    commitchecker --start ${PULL_BASE_SHA:-master}
   container:
-    from: src
+    from: commitchecker
 - as: k8s-e2e-gcp-ovn
   steps:
     cluster_profile: gcp-openshift-gce-devel-ci-2
@@ -420,6 +432,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun
+- as: e2e-aws-crun-wasm
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-crun-wasm
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

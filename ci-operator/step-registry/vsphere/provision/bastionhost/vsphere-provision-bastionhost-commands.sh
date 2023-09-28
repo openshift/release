@@ -6,17 +6,20 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+declare vsphere_portgroup
+source "${SHARED_DIR}/vsphere_context.sh"
+
 CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 bastion_name="${CLUSTER_NAME}-bastion"
 bastion_ignition_file="${SHARED_DIR}/${CLUSTER_NAME}-bastion.ign"
 if [[ ! -f "${bastion_ignition_file}" ]]; then
   echo "'${bastion_ignition_file}' not found, abort." && exit 1
 fi
-bastion_ignition_base64=$(base64 -w0 < "${bastion_ignition_file}")
+bastion_ignition_base64=$(base64 -w0 <"${bastion_ignition_file}")
 
 if [[ -z "${BASTION_HOST_SUBNET}" ]]; then
   echo "Not define env BASTION_HOST_SUBNET, bastion host will be provisioned in network defined as LEASED_RESOURCE..."
-  BASTION_HOST_SUBNET=${LEASED_RESOURCE}
+  BASTION_HOST_SUBNET=${vsphere_portgroup}
 fi
 
 echo "$(date -u --rfc-3339=seconds) - Configuring govc exports..."
@@ -27,12 +30,11 @@ source "${SHARED_DIR}/govc.sh"
 echo "$(date -u --rfc-3339=seconds) - Get avaiable ova template..."
 vm_template="${BASTION_OVA_URI##*/}"
 
-if [[ "$(govc vm.info ${vm_template} | wc -c)" -eq 0 ]]
-then
+if [[ "$(govc vm.info ${vm_template} | wc -c)" -eq 0 ]]; then
   if [[ "$(govc vm.info ${vm_template}-bastion | wc -c)" -eq 0 ]]; then
     echo "${vm_template} and ${vm_template}-bastion does not exist, creating it from ${BASTION_OVA_URI}..."
 
-    cat > /tmp/rhcos.json << EOF
+    cat >/tmp/rhcos.json <<EOF
 {
    "DiskProvisioning": "thin",
    "MarkAsTemplate": false,
@@ -69,7 +71,7 @@ loop=10
 while [ ${loop} -gt 0 ]; do
   bastion_ip=$(govc vm.info -json ${vm_folder}/${bastion_name} | jq -r .VirtualMachines[].Summary.Guest.IpAddress)
   if [ "x${bastion_ip}" == "x" ]; then
-    loop=$(( loop - 1 ))
+    loop=$((loop - 1))
     sleep 30
   else
     break
@@ -81,7 +83,7 @@ if [ "x${bastion_ip}" == "x" ]; then
   exit 1
 fi
 
-echo "${vm_folder}/${bastion_name}" > "${SHARED_DIR}/bastion_host_path"
+echo "${vm_folder}/${bastion_name}" >"${SHARED_DIR}/bastion_host_path"
 echo "Bastion host created."
 
 #Create dns for bastion host
@@ -99,10 +101,10 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
 
   bastion_host_dns="${bastion_name}.${base_domain}"
   bastion_hosted_zone_id="$(aws route53 list-hosted-zones-by-name \
-            --dns-name "${base_domain}" \
-            --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
-            --output text)"
-  echo "${bastion_hosted_zone_id}" > "${SHARED_DIR}/bastion-hosted-zone.txt"
+    --dns-name "${base_domain}" \
+    --query "HostedZones[? Config.PrivateZone != \`true\` && Name == \`${base_domain}.\`].Id" \
+    --output text)"
+  echo "${bastion_hosted_zone_id}" >"${SHARED_DIR}/bastion-hosted-zone.txt"
 
   dns_create_str=""
   dns_delete_str=""
@@ -112,11 +114,11 @@ if [[ "${REGISTER_MIRROR_REGISTRY_DNS}" == "yes" ]]; then
   dns_create_str="${upsert_str},${dns_create_str}"
   dns_delete_str="${delete_str},${dns_delete_str}"
 
-  cat > "${SHARED_DIR}"/bastion-host-dns-create.json <<EOF
+  cat >"${SHARED_DIR}"/bastion-host-dns-create.json <<EOF
 {"Comment": "Create public OpenShift DNS records for bastion host on vSphere","Changes": [${dns_create_str::-1}]}
 EOF
 
-  cat > "${SHARED_DIR}"/bastion-host-dns-delete.json <<EOF
+  cat >"${SHARED_DIR}"/bastion-host-dns-delete.json <<EOF
 {"Comment": "Delete public OpenShift DNS records for bastion host on vSphere","Changes": [${dns_delete_str::-1}]}
 EOF
 
@@ -126,19 +128,19 @@ EOF
   echo "DNS records created."
 
   MIRROR_REGISTRY_URL="${bastion_host_dns}:5000"
-  echo "${MIRROR_REGISTRY_URL}" > "${SHARED_DIR}/mirror_registry_url"
+  echo "${MIRROR_REGISTRY_URL}" >"${SHARED_DIR}/mirror_registry_url"
 fi
 
 #Save bastion information
-echo "${bastion_ip}" > "${SHARED_DIR}/bastion_private_address"
-echo "core" > "${SHARED_DIR}/bastion_ssh_user"
+echo "${bastion_ip}" >"${SHARED_DIR}/bastion_private_address"
+echo "core" >"${SHARED_DIR}/bastion_ssh_user"
 
 proxy_credential=$(cat /var/run/vault/proxy/proxy_creds)
 proxy_private_url="http://${proxy_credential}@${bastion_ip}:3128"
-echo "${proxy_private_url}" > "${SHARED_DIR}/proxy_private_url"
+echo "${proxy_private_url}" >"${SHARED_DIR}/proxy_private_url"
 
 # echo proxy IP to ${SHARED_DIR}/proxyip
-echo "${bastion_ip}" > "${SHARED_DIR}/proxyip"
+echo "${bastion_ip}" >"${SHARED_DIR}/proxyip"
 
 echo "Sleeping 5 mins, make sure that the bastion host is fully started."
 sleep 300

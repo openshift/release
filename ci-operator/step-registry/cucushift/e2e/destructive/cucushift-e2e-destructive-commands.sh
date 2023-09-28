@@ -4,6 +4,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+FORCE_SKIP_TAGS="customer security"
+
 cp -Lrvf "${KUBECONFIG}" /tmp/kubeconfig
 
 #shellcheck source=${SHARED_DIR}/runtime_env
@@ -13,18 +15,19 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
-if [ -z "${E2E_SKIP_TAGS}" ] ; then
-    export E2E_SKIP_TAGS="not @customer and not @security"
-else
-    export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not @customer and not @security"
-fi
+for tag in ${FORCE_SKIP_TAGS} ; do
+    if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
+        export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not $tag"
+    fi
+done
 
 cd verification-tests
 # run destructive tests in serial
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/destructive"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
 set -x
-cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS}" -p junit || true
+cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @destructive and not @console" -p junit || true
+cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and @destructive and @console and @smoke" -p junit || true
 set +x
 
 # only exit 0 if junit result has no failures

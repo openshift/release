@@ -55,15 +55,6 @@ trap cleanup EXIT
 
 mkdir -p "${HOME}"
 
-# Override the upstream docker.io registry due to issues with rate limiting
-# https://bugzilla.redhat.com/show_bug.cgi?id=1895107
-# sjenning: TODO: use of personal repo is temporary; should find long term location for these mirrored images
-export KUBE_TEST_REPO_LIST=${HOME}/repo_list.yaml
-cat <<EOF > ${KUBE_TEST_REPO_LIST}
-dockerLibraryRegistry: quay.io/sjenning
-dockerGluster: quay.io/sjenning
-EOF
-
 # if the cluster profile included an insights secret, install it to the cluster to
 # report support data from the support-operator
 if [[ -f "${CLUSTER_PROFILE_DIR}/insights-live.yaml" ]]; then
@@ -114,7 +105,7 @@ fi
 
 # set up cloud-provider-specific env vars
 case "${CLUSTER_TYPE}" in
-gcp)
+gcp|gcp-arm64)
     export GOOGLE_APPLICATION_CREDENTIALS="${GCP_SHARED_CREDENTIALS_FILE}"
     # In k8s 1.24 this is required to run GCP PD tests. See: https://github.com/kubernetes/kubernetes/pull/109541
     export ENABLE_STORAGE_GCE_PD_DRIVER="yes"
@@ -169,7 +160,7 @@ openstack*)
     fi
     ;;
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
-ibmcloud)
+ibmcloud*)
     export TEST_PROVIDER='{"type":"ibmcloud"}'
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
@@ -181,7 +172,7 @@ esac
 mkdir -p /tmp/output
 cd /tmp/output
 
-if [[ "${CLUSTER_TYPE}" == gcp ]]; then
+if [[ "${CLUSTER_TYPE}" == "gcp" || "${CLUSTER_TYPE}" == "gcp-arm64"  ]]; then
     pushd /tmp
     curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
     tar -xzf google-cloud-sdk-256.0.0-linux-x86_64.tar.gz
@@ -216,12 +207,25 @@ function upgrade_conformance() {
     local exit_code=0 &&
     upgrade || exit_code=$? &&
     PROGRESSING="$(oc get -o jsonpath='{.status.conditions[?(@.type == "Progressing")].status}' clusterversion version)" &&
-    if test False = "${PROGRESSING}"
+    HISTORY_LENGTH="$(oc get -o jsonpath='{range .status.history[*]}{.version}{"\n"}{end}' clusterversion version | wc -l)" &&
+    if test 2 -gt "${HISTORY_LENGTH}"
     then
-        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
-    else
+        echo "Skipping conformance suite because ClusterVersion only has ${HISTORY_LENGTH} entries, so an update was not run"
+    elif test False != "${PROGRESSING}"
+    then
         echo "Skipping conformance suite because post-update ClusterVersion Progressing=${PROGRESSING}"
+    else
+        TEST_LIMIT_START_TIME="$(date +%s)" TEST_SUITE=openshift/conformance/parallel suite || exit_code=$?
     fi &&
+    return $exit_code
+}
+
+# upgrade_rt runs the rt test suite, the upgrade, and the rt test suite again, and exits with an error if any calls fail
+function upgrade_rt() {
+    local exit_code=0 &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
+    upgrade || exit_code=$? &&
+    TEST_SUITE=openshift/nodes/realtime suite || exit_code=$? &&
     return $exit_code
 }
 
@@ -456,6 +460,9 @@ upgrade)
     ;;
 upgrade-paused)
     upgrade_paused
+    ;;
+upgrade-rt)
+    upgrade_rt
     ;;
 suite-conformance)
     suite

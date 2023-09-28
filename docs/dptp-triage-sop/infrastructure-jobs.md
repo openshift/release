@@ -208,7 +208,7 @@ The repo is in a bad state where someone has pushed directly to the future relea
 #### Resolution
 
 1. Identify the owner(s) of the repo
-2. Reach out and tag them in `#forum-testplatform` asking them to clean up the affected branch.
+2. Reach out and tag them in `#forum-ocp-testplatform` asking them to clean up the affected branch.
 3. This job runs hourly, so silencing the alert until they can clean it up is a good idea. 
 
 
@@ -277,3 +277,31 @@ This could be due to a tag being created, and then subsequently deleted and re-c
 Reach out to the repo owner(s) to confirm that this is the case. If they have the permissions, they can delete the tag
 in
 the private repo themselves. Otherwise, utilize the bot account to delete the tag.
+
+## `periodic-image-mirroring-supplemental-ci-images`
+This job [mirrors external images to the CI registry](https://docs.ci.openshift.org/docs/how-tos/external-images/) `registry.ci.openshift.org`.
+
+### Symptom
+
+```
+ error: unable to push manifest to registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2: errors:
+manifest blob unknown: blob unknown to registry
+```
+
+#### Culprit
+The image data might be corrupted somehow.
+
+#### Resolution
+Mirror the broken image(s) manually with `--force`:
+
+```console
+$ oc --context app.ci -n ci extract secret/registry-push-credentials-ci-central --to=/tmp --keys .dockerconfigjson --confirm
+/tmp/.dockerconfigjson
+
+### find the source and destination of the mirroring
+$ rg registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2 ./core-services 
+./core-services/image-mirroring/supplemental-ci-images/mapping_supplemental_ci_images_ci
+100:quay.io/kubevirt/prom-metrics-linter:v0.0.2 registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2
+
+$ oc image mirror --keep-manifest-list --skip-multiple-scopes --force --registry-config /tmp/.dockerconfigjson quay.io/kubevirt/prom-metrics-linter:v0.0.2 registry.ci.openshift.org/ci/prom-metrics-linter:v0.0.2
+```

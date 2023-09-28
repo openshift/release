@@ -8,11 +8,10 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 export HOME=/tmp
 
-if [[ -z "$RELEASE_IMAGE_LATEST" ]]; then
-  echo "RELEASE_IMAGE_LATEST is an empty string, exiting"
+if [ -z "$OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE" ]; then
+  echo "OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE is an empty string, exiting"
   exit 1
 fi
-export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="${RELEASE_IMAGE_LATEST}"
 
 # Ensure ignition assets are configured with the correct invoker to track CI jobs.
 export OPENSHIFT_INSTALL_INVOKER="openshift-internal-ci/${JOB_NAME_SAFE}/${BUILD_ID}"
@@ -57,7 +56,7 @@ python -c '
 import yaml;
 path = "install-config.yaml";
 data = yaml.load(open(path));
-data["compute"] = [ { "name": "worker", "replicas": 0 } ];
+data["compute"][0]["replicas"] = 0;
 open(path, "w").write(yaml.dump(data, default_flow_style=False))'
 
 ### Enable private cluster setting (optional)

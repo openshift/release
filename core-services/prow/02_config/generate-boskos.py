@@ -47,9 +47,12 @@ CONFIG = {
         'ap-northeast-1': 2,
         'us-east-1': 2,
         'us-east-2': 2,
+<<<<<<< HEAD
         'us-west-1': 2,
         'us-west-2': 2,
         
+=======
+>>>>>>> origin/master
     },
     'aws-sd-qe-quota-slice': {
         'us-west-2': 3,
@@ -81,6 +84,12 @@ CONFIG = {
     'aws-perf-qe-quota-slice': {
         'us-west-2': 3,
     },
+    'aws-perfscale-qe-quota-slice': {
+        'us-west-2': 10,
+    },
+    'aws-perfscale-lrc-qe-quota-slice': {
+        'us-west-2': 5,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
@@ -95,8 +104,8 @@ CONFIG = {
     },
     'azure-arm64-quota-slice': {
         'centralus': 3,
+        'southcentralus': 3,
         'eastus': 3,
-        'eastus2': 3,
         'westus2': 3
     },
     'azurestack-quota-slice': {
@@ -119,15 +128,12 @@ CONFIG = {
         'eastus2': 4,
         'northeurope': 4
     },
-    'azure-marketplace-qe-quota-slice': {
-        'westus': 6
-    },
     'azuremag-qe-quota-slice': {
         'usgovvirginia': 5,
         'usgovtexas': 5
     },
     'equinix-ocp-metal-quota-slice': {
-        'default': 40,
+        'default': 50,
     },
     'equinix-ocp-metal-qe-quota-slice': {
         'default': 40,
@@ -143,6 +149,9 @@ CONFIG = {
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
         'us-central1': 70,
+    },
+    'gcp-arm64-quota-slice': {
+        'us-central1': 30,
     },
     'libvirt-s390x-quota-slice': {},
     'libvirt-ppc64le-quota-slice': {},
@@ -191,16 +200,32 @@ CONFIG = {
         'default': 50,
     },
     'vsphere-quota-slice':{},
+    'vsphere-2-quota-slice':{},
     'vsphere-8-quota-slice':{},
     'vsphere-ibm-7-quota-slice':{
         'default': 5
     },
-    'vsphere-discon-quota-slice':{},
     'vsphere-dis-quota-slice':{},
+    'vsphere-dis-2-quota-slice':{
+        'default': 5
+    },
     'vsphere-clusterbot-quota-slice':{},
+    'vsphere-clusterbot-2-quota-slice':{
+        'default': 5
+    },
     'vsphere-connected-quota-slice':{},
+    'vsphere-connected-2-quota-slice':{
+        'default': 5
+    },
     'vsphere-multizone-quota-slice':{},
+    'vsphere-multizone-2-quota-slice':{
+        'default': 5
+    },
     'vsphere-platform-none-quota-slice':{},
+    'vsphere-platform-none-2-quota-slice':{
+        'default': 5
+    },
+    'vsphere-8-vpn-quota-slice':{},
     'osd-ephemeral-quota-slice': {
         'default': 15,
     },
@@ -224,7 +249,6 @@ CONFIG = {
     'powervs-2-quota-slice': {
         'syd04': 1,
         'syd05': 1,
-        'tok04': 1
     },
     'ibmcloud-quota-slice': {
         'us-east': 7,
@@ -233,7 +257,7 @@ CONFIG = {
         'jp-tok': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'jp-osa': 3,
+        'au-syd': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
@@ -269,6 +293,9 @@ CONFIG = {
         'default': 50,
     },
     'aws-perfscale-quota-slice': {
+        'us-west-2': 10,
+    },
+    'aws-chaos-quota-slice': {
         'us-west-2': 10,
     }
 }
@@ -310,17 +337,11 @@ for i in range(89,93):
 for i in range(94,109):
     CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(130,133):
-    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
-
-for i in range(134,140):
-    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
+for i in [1148,1197,1207,1225,1227,1229,1232,1233,1234,1235]:
+    CONFIG['vsphere-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
 for i in range(56,60):
     CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
-
-for i in range(60,64):
-    CONFIG['vsphere-discon-quota-slice']['qe-discon-segment-{}'.format(i)] = 1
 
 for i in range(230,235):
     CONFIG['vsphere-dis-quota-slice']['devqe-segment-{}-disconnected'.format(i)] = 1
@@ -334,10 +355,13 @@ for i in range(223,229):
 for i in range(151,158):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
-for i in range(200,204):
+for i in range(202,204):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 for i in range(205,214):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
+for i in [1153,1179,1211,1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309,758,902]:
+    CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
+
 
 config = {
     'resources': [],
