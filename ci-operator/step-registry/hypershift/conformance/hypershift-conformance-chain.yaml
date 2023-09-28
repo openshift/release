@@ -8,7 +8,6 @@ chain:
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
       export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
-      CSI_CONFORMANCE_EXITCODE=0
       [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -66,16 +65,17 @@ chain:
           cat ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
           export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
           openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" > /tmp/tests_hs_kv_csi
-          TEST_ARGS="${TEST_ARGS:-} --max-parallel-tests 1 --file /tmp/tests_hs_kv_csi"
+          CSI_TEST_ARGS="${TEST_ARGS:-} --max-parallel-tests 1 --file /tmp/tests_hs_kv_csi"
           echo "${ARTIFACT_DIR}/csi"
           # Make sure the csi artifacts can be stored
           mkdir -p "${ARTIFACT_DIR}/csi"
-          openshift-tests run openshift/csi ${TEST_ARGS:-} \
+          openshift-tests run openshift/csi ${CSI_TEST_ARGS:-} \
             --provider "${TEST_PROVIDER}" \
             -o "${ARTIFACT_DIR}/csi/e2e.log" \
             --junit-dir "${ARTIFACT_DIR}/csi/junit"
-          CSI_CONFORMANCE_EXITCODE=$?
-          TEST_ARGS=""
+          if [ $? -ne 0 ]; then
+            TEST_SUITE_FAILURE_MSG="KubeVirt CSI conformance tests returned failure(s)"
+          fi
 
           # This looks counterintuitive. Here's an explanation.
           #
@@ -126,9 +126,13 @@ chain:
         echo "overriding Monitor Test Failure"
         exit_code=0
       fi
-      
-      exit ${exit_code}
 
+      if [ -n "$TEST_SUITE_FAILURE_MSG" ]; then
+        echo "Cluster type: $CLUSTER_TYPE encountered a failure condition: $TEST_SUITE_FAILURE_MSG"
+        exit_code=1
+      fi
+
+      exit ${exit_code}
     credentials:
     - mount_path: /etc/hypershift-pool-aws-credentials
       name: hypershift-pool-aws-credentials
