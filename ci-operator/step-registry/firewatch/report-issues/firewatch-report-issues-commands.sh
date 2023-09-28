@@ -14,3 +14,10 @@ if [ "$FIREWATCH_FAIL_WITH_TEST_FAILURES" = "true" ]; then
 fi
 
 eval "$command"
+
+gitleaks detect \
+  --no-git \
+  --source /tmp/${BUILD_ID} \
+  --report-path ${ARTIFACT_DIR}/junit_gitleaks_report.xml \
+  --report-format junit \
+  --redact

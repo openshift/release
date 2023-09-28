@@ -7,7 +7,32 @@ images:
 - context_dir: .
   dockerfile_path: Dockerfile
   to: main
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi9/ubi:latest
+    WORKDIR /go/src/github.com/zricethezav/gitleaks
+    RUN dnf install git golang -y && \
+        git clone https://github.com/gitleaks/gitleaks.git . && \
+        VERSION=$(git describe --tags --abbrev=0) \
+        CGO_ENABLED=0 \
+        go build -o bin/gitleaks -ldflags "-X="github.com/zricethezav/gitleaks/v8/cmd.Version=${VERSION}
+  to: gitleaks-build
+- dockerfile_literal: |-
+    FROM main as firewatch
+    RUN apt-get update -y && \
+    apt-get install git -y && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+    COPY --from=gitleaks-build /go/src/github.com/zricethezav/gitleaks/bin/gitleaks /usr/bin/
+  from: main
+  inputs:
+    gitleaks-build:
+      as:
+      - gitleaks-build
+  to: firewatch-gitleaks
 promotion:
+  additional_images:
+    firewatch-gitleaks: firewatch-gitleaks
   name: firewatch
   namespace: cspi-qe
 resources:
