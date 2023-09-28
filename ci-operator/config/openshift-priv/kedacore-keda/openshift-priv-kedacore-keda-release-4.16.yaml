@@ -1,0 +1,51 @@
+base_images:
+  base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/kedacore-keda
+images:
+- from: base
+  to: custom-metrics-autoscaler
+promotion:
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: env && GOFLAGS="" make fmt
+  container:
+    from: src
+- as: govet
+  commands: env && GOFLAGS="" make vet
+  container:
+    from: src
+- as: cma-verify-history
+  commands: env && GOFLAGS="" hack/cma-verify-history.sh
+  container:
+    from: src
+- as: clientset-verify
+  commands: mkdir /tmp/codecopy && cp -a * /tmp/codecopy && cd /tmp/codecopy && make
+    clientset-generate
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-priv
+  repo: kedacore-keda
