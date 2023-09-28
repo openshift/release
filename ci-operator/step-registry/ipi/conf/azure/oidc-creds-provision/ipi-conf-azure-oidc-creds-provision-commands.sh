@@ -102,11 +102,6 @@ popd
 echo "CR manifest files:"
 ls "/tmp/credrequests"
 
-# create metadata so cluster resource group is deleted in ipi-deprovision-deprovision
-cat > ${SHARED_DIR}/metadata.json << EOF
-{"infraID":"${CLUSTER_NAME}","azure":{"region":"${REGION}","resourceGroupName":"${CLUSTER_NAME}"}}
-EOF
-
 ADDITIONAL_CCOCTL_ARGS=""
 # ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS enables the relevant job for each operator to decide
 # independantly if it needs the --enable-tech-preview added to the ccoctl command. It is very
@@ -143,7 +138,7 @@ cat "/tmp/manifests/cluster-authentication-02-config.yaml"
 echo -e "\n"
 
 # save the resource_group name for use by ipi-conf-azure-provisioned-resourcegroup
-echo $CLUSTER_NAME > ${SHARED_DIR}/resourcegroup
+echo $CLUSTER_NAME > ${SHARED_DIR}/resourcegroup_cluster
 
 # copy generated service account signing from ccoctl target directory into shared directory
 cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"
