@@ -31,14 +31,14 @@ git clone https://github.com/paigerube14/ocp-qe-perfscale-ci.git -b write-to_she
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-
 jq -r 'to_entries[] | "\(.key)\t\(.value)"' ${SHARED_DIR}/index_data.json |
   while read key val
   do
     cap_key=$(echo $key | awk ' { print toupper($1) }')
-    export $cap_key=$val
+    echo "export $cap_key=$val" >> index.sh
   done 
 
+source index.sh
 env
 
 pushd ocp-qe-perfscale-ci
