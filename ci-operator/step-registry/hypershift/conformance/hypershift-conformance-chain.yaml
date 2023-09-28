@@ -8,6 +8,7 @@ chain:
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
       export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+      CSI_CONFORMANCE_EXITCODE=0
       [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
@@ -58,6 +59,24 @@ chain:
       kubevirt)
           export TEST_PROVIDER='{"type":"kubevirt"}'
 
+          set +e
+          export TEST_CSI_DRIVER_MANIFEST="kubevirt-driver.yaml"
+          curl -L -o ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/master/hack/test-driver.yaml
+          sed -i 's/FromExistingClassName: kubevirt/FromExistingClassName: kubevirt-csi-infra-default/' ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+          cat ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+          export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+          openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" > /tmp/tests_hs_kv_csi
+          TEST_ARGS="${TEST_ARGS:-} --max-parallel-tests 1 --file /tmp/tests_hs_kv_csi"
+          echo "${ARTIFACT_DIR}/csi"
+          # Make sure the csi artifacts can be stored
+          mkdir -p "${ARTIFACT_DIR}/csi"
+          openshift-tests run openshift/csi ${TEST_ARGS:-} \
+            --provider "${TEST_PROVIDER}" \
+            -o "${ARTIFACT_DIR}/csi/e2e.log" \
+            --junit-dir "${ARTIFACT_DIR}/csi/junit"
+          CSI_CONFORMANCE_EXITCODE=$?
+          TEST_ARGS=""
+
           # This looks counterintuitive. Here's an explanation.
           #
           # There technically isn't a parallel minimal test suite. Some of the older KubeVirt
@@ -84,6 +103,7 @@ chain:
       *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
       esac
 
+      set -e
       if [[ -n "${TEST_SKIPS}" ]]; then
           TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
           echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
@@ -91,7 +111,6 @@ chain:
           echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
       fi
-
       openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
