@@ -67,6 +67,14 @@ Use to execute the `OpenTelemetry E2E tests` [opentelemetry-e2e-tests](https://g
   - **Definition**: The Target Allocator image used in testing".
   - **If left empty**: No image is set.
 
+- `SKIP_TESTS`
+  - **Definition**: Space seperated test cases to skip from the test run. Example "tests/e2e/ingress tests/e2e/ingress-subdomains".
+  - **If left empty**: All the e2e tests are run.
+
+- `DOWNSTREAM_TESTS_COMMIT`
+  - **Definition**: The OpenTelemetry operator commit which has downstream release compatible test cases.".
+  - **If left empty**: The latest commit is used.
+
 ### Other:
 
 ## Custom Image:
