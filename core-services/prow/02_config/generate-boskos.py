@@ -47,12 +47,6 @@ CONFIG = {
         'ap-northeast-1': 2,
         'us-east-1': 2,
         'us-east-2': 2,
-<<<<<<< HEAD
-        'us-west-1': 2,
-        'us-west-2': 2,
-        
-=======
->>>>>>> origin/master
     },
     'aws-sd-qe-quota-slice': {
         'us-west-2': 3,
