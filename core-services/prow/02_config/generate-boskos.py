@@ -212,9 +212,7 @@ CONFIG = {
         'default': 5
     },
     'vsphere-multizone-quota-slice':{},
-    'vsphere-multizone-2-quota-slice':{
-        'default': 5
-    },
+    'vsphere-multizone-2-quota-slice':{},
     'vsphere-platform-none-quota-slice':{},
     'vsphere-platform-none-2-quota-slice':{
         'default': 5
@@ -349,10 +347,15 @@ for i in range(223,229):
 for i in range(151,158):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
+for i in [1287,1289,1296,1298,1300,1302]:
+    CONFIG['vsphere-multizone-2-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
+
 for i in range(202,204):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
+
 for i in range(205,214):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
+
 for i in [1153,1179,1211,1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309,758,902]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
 
