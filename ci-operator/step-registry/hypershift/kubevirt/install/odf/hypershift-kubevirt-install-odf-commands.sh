@@ -4,8 +4,27 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+INFRA_OCP_VERSION=$(oc get clusterversion version -o jsonpath='{.status.desired.version}' | awk -F "." '{print $1"."$2}')
+DEFAULT_ODF_OPERATOR_CHANNEL=""
+case $INFRA_OCP_VERSION in
+"4.14")
+  # pre-release ocp 4.14 only has access to stable odf 4.13
+  DEFAULT_ODF_OPERATOR_CHANNEL="stable-4.13"
+  ;;
+"4.13")
+  DEFAULT_ODF_OPERATOR_CHANNEL="stable-4.13"
+  ;;
+"4.12")
+  DEFAULT_ODF_OPERATOR_CHANNEL="stable-4.12"
+  ;;
+*)
+  # update this catch all wildcard to stable-4.14 once the odf 4.14 is released
+  DEFAULT_ODF_OPERATOR_CHANNEL="stable-4.13"
+  ;;
+esac
+
 ODF_INSTALL_NAMESPACE=openshift-storage
-ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-'stable-4.12'}"
+ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-${DEFAULT_ODF_OPERATOR_CHANNEL}}"
 ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
 ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp3-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-100}Gi"
@@ -21,56 +40,6 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: "${ODF_INSTALL_NAMESPACE}"
-EOF
-
-# TODO remove this override once https://issues.redhat.com/browse/CLOUDDST-18990 is resolved
-# ODF isn't in the 4.14 catalog, which causes the install to fail. This workaround
-# should work for both 4.13 and 4.14, which are the only two versions being tested
-# at this point in time.
-#
-# Override the subscription source
-ODF_SUBSCRIPTION_SOURCE="redhat-operators-4-13"
-# create the custom catalog source that points to 4.13 regardless of the OCP version
-oc apply -f - <<EOF
-apiVersion: operators.coreos.com/v1alpha1
-kind: CatalogSource
-metadata:
-  annotations:
-    operatorframework.io/managed-by: marketplace-operator
-    target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-  generation: 5
-  name: redhat-operators-4-13
-  namespace: openshift-marketplace
-spec:
-  displayName: Red Hat Operators
-  grpcPodConfig:
-    nodeSelector:
-      kubernetes.io/os: linux
-      node-role.kubernetes.io/master: ""
-    priorityClassName: system-cluster-critical
-    securityContextConfig: restricted
-    tolerations:
-    - effect: NoSchedule
-      key: node-role.kubernetes.io/master
-      operator: Exists
-    - effect: NoExecute
-      key: node.kubernetes.io/unreachable
-      operator: Exists
-      tolerationSeconds: 120
-    - effect: NoExecute
-      key: node.kubernetes.io/not-ready
-      operator: Exists
-      tolerationSeconds: 120
-  icon:
-    base64data: ""
-    mediatype: ""
-  image: registry.redhat.io/redhat/redhat-operator-index:v4.13
-  priority: -100
-  publisher: Red Hat
-  sourceType: grpc
-  updateStrategy:
-    registryPoll:
-      interval: 10m
 EOF
 
 # deploy new operator group
