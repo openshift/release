@@ -95,6 +95,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.15"
+  oldest-supported-z-rollback:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -587,6 +592,18 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
   timeout: 6h0m0s
+- as: e2e-aws-ovn-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
 - as: e2e-aws-sdn-upgrade
   interval: 168h
   steps:
