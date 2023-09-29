@@ -120,7 +120,16 @@ if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
 fi
 
 # create required credentials infrastructure and installer manifests
-ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
+ccoctl_ouptut="/tmp/ccoctl_output"
+ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" &> "${ccoctl_ouptut}"
+cat "${ccoctl_ouptut}"
+
+# save oidc_provider info for upgrade
+oidc_provider_arn=$(grep "Identity Provider created with ARN:" "${ccoctl_ouptut}" | awk -F"ARN: " '{print $NF}')
+if [[ -n "${oidc_provider_arn}" ]]; then
+  echo "Saving oidc_provider_arn: ${oidc_provider_arn}"
+  echo "${oidc_provider_arn}" > "${SHARED_DIR}/aws_oidc_provider_arn"
+fi
 
 # copy generated service account signing from ccoctl target directory into shared directory
 cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"

@@ -23,7 +23,7 @@ export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --namespaced-iterations=$NAME
 export WORKLOAD=node-density-heavy
 
 # UUID Generation
-UUID="CPT-$(uuidgen)"
+UUID="perfscale-cpt-$(uuidgen)"
 export UUID
 
 export CLEANUP_WHEN_FINISH=true

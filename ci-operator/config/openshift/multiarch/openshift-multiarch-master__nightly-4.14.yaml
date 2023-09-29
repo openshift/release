@@ -150,7 +150,8 @@ tests:
         extract should extract\| Image info should display\| Image layer subresource\|
         oc tag should change image\| when installed on the cluster should\| OpenShift
         alerting rules\| The HAProxy router should\| egressrouter cni resources\|
-        pod should start\| pod sysctls
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     workflow: openshift-e2e-ibmcloud-heterogeneous
 - as: ocp-e2e-aws-ovn-heterogeneous-upgrade
   interval: 72h
@@ -179,7 +180,8 @@ tests:
         extract should extract\| Image info should display\| Image layer subresource\|
         oc tag should change image\| when installed on the cluster should\| OpenShift
         alerting rules\| The HAProxy router should\| egressrouter cni resources\|
-        pod should start\| pod sysctls
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
     workflow: openshift-e2e-aws-heterogeneous
 - as: ocp-e2e-serial-aws-ovn-heterogeneous
   cron: 19 23 * * 2
@@ -339,11 +341,12 @@ tests:
         extract should extract\| Image info should display\| Image layer subresource\|
         oc tag should change image\| when installed on the cluster should\| OpenShift
         alerting rules\| The HAProxy router should\| egressrouter cni resources\|
-        pod should start\| pod sysctls\| Managed cluster should have same number of
-        Machines and Nodes \| Managed cluster should have machine resources \| should
-        not have pod creation failures during install \| DNS should answer queries
-        using the local DNS endpoint \| events should not repeat pathologically for
-        ns/openshift-etcd
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod\| Managed cluster should have same number
+        of Machines and Nodes \| Managed cluster should have machine resources \|
+        should not have pod creation failures during install \| DNS should answer
+        queries using the local DNS endpoint \| events should not repeat pathologically
+        for ns/openshift-etcd
       WORKERS: "2"
       YQ_VERSION: 4.30.5
     workflow: openshift-e2e-ibmcloud-heterogeneous-upi
@@ -451,7 +454,9 @@ tests:
     env:
       ARCH: ppc64le
       BRANCH: "4.14"
+      MASTER_MEMORY: "34816"
       TEST_TYPE: conformance-parallel
+      USE_RAMFS: "true"
     workflow: openshift-e2e-libvirt
 - as: ocp-image-ecosystem-ovn-remote-libvirt-ppc64le
   cluster: build01
@@ -524,9 +529,9 @@ tests:
     workflow: openshift-e2e-libvirt
 - as: ocp-e2e-ovn-ppc64le-powervs
   cluster: build01
-  cron: 0 0,6,12,18 * * *
+  cron: 0 0,6 * * *
   steps:
-    cluster_profile: powervs-1
+    cluster_profile: powervs-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
     env:
@@ -537,9 +542,9 @@ tests:
     workflow: openshift-e2e-powervs-ipi
 - as: ocp-e2e-serial-ovn-ppc64le-powervs
   cluster: build01
-  cron: 0 1,7,13,19 * * *
+  cron: 0 1,7 * * *
   steps:
-    cluster_profile: powervs-1
+    cluster_profile: powervs-2
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:ppc64le-latest
     env:
@@ -573,6 +578,16 @@ tests:
     - ref: ipi-install-heterogeneous
     - ref: openshift-e2e-test
     workflow: openshift-e2e-azure
+- as: ocp-e2e-gcp-ovn-arm64
+  cron: 0 11 * * 0
+  steps:
+    cluster_profile: gcp-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      COMPUTE_NODE_TYPE: t2a-standard-4
+      OCP_ARCH: arm64
+    workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
   branch: master
   org: openshift

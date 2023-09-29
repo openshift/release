@@ -20,54 +20,40 @@ Host ${IP_ADDRESS}
 EOF
 chmod 0600 "${HOME}/.ssh/config"
 
+cat << EOF > /tmp/config.yaml
+apiServer:
+  subjectAltNames:
+  - ${IP_ADDRESS}
+EOF
+
 cat <<EOF > /tmp/install.sh
 #!/bin/bash
 set -xeuo pipefail
 
-rpm --rebuilddb
-dnf install subscription-manager -y
-
-subscription-manager register \
+sudo subscription-manager register \
   --org="$(cat /var/run/rhsm/subscription-manager-org)" \
   --activationkey="$(cat /var/run/rhsm/subscription-manager-act-key)"
 
-mkdir -p /etc/microshift
-cat << EOF2 > /etc/microshift/config.yaml
-apiServer:
-  subjectAltNames:
-  - ${IP_ADDRESS}
-EOF2
-
-useradd -m -G wheel microshift
-echo -e 'microshift\tALL=(ALL)\tNOPASSWD: ALL' > /etc/sudoers.d/microshift
-
-OPTS=""
-if grep "\-\-no-build-deps" /tmp/configure-vm.sh; then
-  OPTS="--no-build-deps --force-firewall"
-fi
-cd /home/microshift && sudo -nu microshift bash -x /tmp/configure-vm.sh --no-build \${OPTS} /tmp/pull-secret
-
-mkdir -p /tmp/rpms
-tar -xhvf /tmp/rpms.tar --strip-components 2 -C /tmp/rpms
-dnf localinstall -y \$(find /tmp/rpms/ -iname "*\$(uname -p)*" -or -iname '*noarch*')
-
-# 4.12 and 4.13 don't set up cri-o pull secret in case of --no-build
-if [ ! -e /etc/crio/openshift-pull-secret ]; then
-    cp /tmp/pull-secret /etc/crio/openshift-pull-secret
-    chmod 600 /etc/crio/openshift-pull-secret
-fi
+sudo mkdir -p /etc/microshift
+sudo mv /tmp/config.yaml /etc/microshift/config.yaml
+tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
+cd ~/microshift
+./scripts/devenv-builder/configure-vm.sh --force-firewall --no-build /tmp/pull-secret
+sudo dnf clean all -y
+make rpm
+sudo dnf localinstall -y ./_output/rpmbuild/RPMS/*/*.rpm
+sudo systemctl enable --now crio
+sudo systemctl enable --now microshift
 EOF
 chmod +x /tmp/install.sh
 
+tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
+
 scp \
-  /rpms.tar \
   /tmp/install.sh \
-  /microshift/scripts/devenv-builder/configure-vm.sh \
   "${CLUSTER_PROFILE_DIR}/pull-secret" \
+  /tmp/microshift.tgz \
+  /tmp/config.yaml \
   "${INSTANCE_PREFIX}:/tmp"
 
-ssh "${INSTANCE_PREFIX}" "sudo /tmp/install.sh"
-
-echo 1 > "${SHARED_DIR}/num_vms"
-echo "${HOST_USER}" > "${SHARED_DIR}/vm_user_0"
-echo 22 > "${SHARED_DIR}/vm_ssh_port_0"
+ssh "${INSTANCE_PREFIX}" "/tmp/install.sh"
