@@ -391,3 +391,13 @@ ${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${CLUSTERS_NAMESPACE} --nam
 # Setting nodeSelector on ingresscontroller  to first agent to make sure router pod spawns on first agent,
 # since *.apps DNS record is pointing to first agent's IP.
 oc patch ingresscontroller default -n openshift-ingress-operator -p '{"spec": {"nodePlacement": {"nodeSelector": { "matchLabels": { "kubernetes.io/hostname": "'"${INSTANCE_NAMES[0]}"'"}}, "tolerations": [{ "effect": "NoSchedule", "key": "kubernetes.io/hostname", "operator": "Exists"}]}}}' --type=merge --kubeconfig=${SHARED_DIR}/nested_kubeconfig
+
+cat <<EOF> "${SHARED_DIR}/proxy-conf.sh"
+export HTTP_PROXY=http://${BASTION}:2005/
+export HTTPS_PROXY=http://${BASTION}:2005/
+export NO_PROXY="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+
+export http_proxy=http://${BASTION}:2005/
+export https_proxy=http://${BASTION}:2005/
+export no_proxy="static.redhat.com,redhat.io,amazonaws.com,quay.io,openshift.org,openshift.com,svc,github.com,githubusercontent.com,google.com,googleapis.com,fedoraproject.org,cloudfront.net,localhost,127.0.0.1"
+EOF
