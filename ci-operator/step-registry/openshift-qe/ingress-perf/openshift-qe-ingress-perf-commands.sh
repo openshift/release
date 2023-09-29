@@ -23,7 +23,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 export ES_INDEX="ingress-performance"
 
 # UUID Generation
-UUID="perfscale-cpt-$(uuidgen)"
+UUID="CPT-$(uuidgen)"
 export UUID
 
 # Start the Workload
