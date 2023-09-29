@@ -238,12 +238,11 @@ networking:
 EOF
 fi
 
-
 echo "$(date -u --rfc-3339=seconds) - ***** DEBUG ***** DNS: ${dns_server}"
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
-machine_cidr = "192.168.${third_octet}.0/25"
+machine_cidr = "${machine_cidr}"
 vm_template = "${vm_template}"
 vsphere_server = "${vsphere_url}"
 ipam = "ipam.vmc.ci.openshift.org"
