@@ -1,25 +1,37 @@
+base_images:
+  openshift_release_golang-1.19:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
 build_root:
   project_image:
     dockerfile_path: openshift/ci-operator/build-image/Dockerfile
+images:
+- dockerfile_path: openshift/ci-operator/knative-images/controller/Dockerfile
+  inputs:
+    openshift_release_golang-1.19:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.19
+  to: knative-eventing-istio-controller
 promotion:
   additional_images:
     eventing-istio-src: src
   namespace: openshift
-  tag: knative-v1.8
+  tag: knative-v1.9
 resources:
   '*':
     requests:
       cpu: 500m
       memory: 1Gi
 tests:
-- as: e2e-tests-aws-ocp-412
+- as: e2e-tests-aws-ocp-413
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   steps:
     allow_best_effort_post_steps: true
     post:
@@ -46,20 +58,23 @@ tests:
     - as: test
       cli: latest
       commands: make e2e-tests
+      dependencies:
+      - env: KNATIVE_EVENTING_ISTIO_CONTROLLER
+        name: knative-eventing-istio-controller
       from: src
       resources:
         requests:
           cpu: 100m
       timeout: 4h0m0s
     workflow: generic-claim
-- as: e2e-tests-aws-ocp-412-continuous
+- as: e2e-tests-aws-ocp-413-continuous
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
     timeout: 1h0m0s
-    version: "4.12"
+    version: "4.13"
   cron: 0 5 * * 2,6
   steps:
     allow_best_effort_post_steps: true
@@ -87,6 +102,9 @@ tests:
     - as: test
       cli: latest
       commands: make e2e-tests
+      dependencies:
+      - env: KNATIVE_EVENTING_ISTIO_CONTROLLER
+        name: knative-eventing-istio-controller
       from: src
       resources:
         requests:
@@ -94,7 +112,7 @@ tests:
       timeout: 4h0m0s
     workflow: generic-claim
 zz_generated_metadata:
-  branch: release-v1.8
+  branch: release-v1.9
   org: openshift-knative
   repo: eventing-istio
-  variant: "412"
+  variant: "413"
