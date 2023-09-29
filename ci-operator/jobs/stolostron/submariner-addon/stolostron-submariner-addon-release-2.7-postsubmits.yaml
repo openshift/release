@@ -55,43 +55,56 @@ postsubmits:
         secret:
           secretName: result-aggregator
   - agent: kubernetes
+    always_run: true
     branches:
     - ^release-2\.7$
     cluster: build01
     decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci.openshift.io/generator: prowgen
     name: branch-ci-stolostron-submariner-addon-release-2.7-publish
     spec:
       containers:
       - args:
-        - -f
-        - /opt/build-harness/Makefile.prow
-        - osci/publish
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --secret-dir=/secrets/ci-pull-credentials
+        - --target=publish
         command:
-        - make
-        env:
-        - name: OSCI_COMPONENT_NAME
-          value: submariner-addon
-        - name: OSCI_COMPONENT_VERSION
-          value: 0.5.0
-        - name: OSCI_IMAGE_REMOTE_REPO_SRC
-          value: registry.ci.openshift.org/stolostron
-        - name: SELF
-          value: make -f /opt/build-harness/Makefile.prow
-        image: registry.ci.openshift.org/stolostron/builder:go1.20-linux
+        - ci-operator
+        image: ci-operator:latest
         imagePullPolicy: Always
         name: ""
         resources:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/github
-          name: acm-cicd-github
+        - mountPath: /secrets/ci-pull-credentials
+          name: ci-pull-credentials
+          readOnly: true
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: acm-cicd-github
+      - name: ci-pull-credentials
         secret:
-          secretName: acm-cicd-github
+          secretName: ci-pull-credentials
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
   - agent: kubernetes
     branches:
     - ^release-2\.7$
