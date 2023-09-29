@@ -9,7 +9,7 @@ oc registry login --to=${SHARED_DIR}/pull-secret-build-farm.json
 echo "Set KUBECONFIG to Hive cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
-if [[ -z "${POWERVS_BASE_DOMAIN}" ]]; then
+if [[ "${PLATFORM}" == "aws" ]]; then
   AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
   if [[ ! -f "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" ]]; then
     echo "AWS credentials file ${AWS_GUEST_INFRA_CREDENTIALS_FILE} not found"
@@ -23,9 +23,12 @@ if [[ -z "${POWERVS_BASE_DOMAIN}" ]]; then
     exit 1
   fi
   RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
-else
+elif [[ "${PLATFORM}" == "powervs" ]]; then
   echo "DOMAIN is ${POWERVS_BASE_DOMAIN}"
   RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_MULTI_LATEST}
+else
+  echo "Currently only AWS and PowerVS platforms are supported"
+  exit 1
 fi
 
 # We don't have the value of HYPERSHIFT_RELEASE_LATEST when we set CONTROLPLANE_OPERATOR_IMAGE so we
@@ -50,7 +53,7 @@ if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
 fi
 
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-if [[ -z "${POWERVS_BASE_DOMAIN}" ]]; then
+if [[ "${PLATFORM}" == "aws" ]]; then
   /usr/bin/hypershift create cluster aws \
     ${EXTRA_ARGS} \
     --name ${CLUSTER_NAME} \

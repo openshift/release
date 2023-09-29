@@ -4,7 +4,7 @@ set -euox pipefail
 echo "Set KUBECONFIG to Hive cluster"
 export KUBECONFIG=/var/run/hypershift-workload-credentials/kubeconfig
 
-if [[ -z "${POWERVS_BASE_DOMAIN}" ]]; then
+if [[ "${PLATFORM}" == "aws" ]]; then
   AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
   if [[ ! -f "${AWS_GUEST_INFRA_CREDENTIALS_FILE}" ]]; then
     echo "AWS credentials file ${AWS_GUEST_INFRA_CREDENTIALS_FILE} not found"
@@ -42,7 +42,7 @@ fi
 echo Cluster successfully created at $createdAt
 
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
-if [[ -z "${POWERVS_BASE_DOMAIN}" ]]; then
+if [[ "${PLATFORM}" == "aws" ]]; then
   for _ in {1..10}; do
    bin/hypershift destroy cluster aws \
      --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE}  \
@@ -57,7 +57,7 @@ if [[ -z "${POWERVS_BASE_DOMAIN}" ]]; then
      echo 'Failed to delete the cluster, retrying...'
    fi
   done
-else
+elif [[ "${PLATFORM}" == "powervs" ]]; then
   bin/hypershift destroy cluster powervs \
     --name ${CLUSTER_NAME} \
     --infra-id ${INFRA_ID} \
@@ -70,5 +70,8 @@ else
     --vpc ${VPC} \
     --cloud-connection ${CLOUD_CONNECTION} \
     --cluster-grace-period 40m
+else
+  echo "Unsupported platform. Cluster deletion failed."
+  exit 1
 fi
 echo "$(date) Finished deleting cluster"
