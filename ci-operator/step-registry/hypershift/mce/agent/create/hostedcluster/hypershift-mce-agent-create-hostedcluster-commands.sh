@@ -35,7 +35,8 @@ oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   --agent-namespace="${CLUSTER_NAMESPACE}" \
   --namespace local-cluster \
   --base-domain=${BASEDOMAIN} \
-  --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN}
+  --api-server-address=api.${CLUSTER_NAME}.${BASEDOMAIN} \
+  --image-content-sources "${SHARED_DIR}/mgmt_iscp.yaml"
 
 if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
   echo "MCE version is less than 2.4"

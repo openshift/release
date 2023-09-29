@@ -1,0 +1,66 @@
+base_images:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.19-openshift-4.14
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.17
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+  to: baremetal-hardware-event-proxy
+promotion:
+  name: "4.16"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-basic
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-basic
+      cli: latest
+      commands: |
+        # Make kubectl available by creating a symlink to oc.
+        pushd "$CLI_DIR"
+        if [ ! -f kubectl ]; then
+            ln -s oc kubectl
+        fi
+        popd
+        export VERSION=latest
+        export PROXY_IMG=${IMAGE_HW_EVENT_PROXY}
+        make test-ci
+      dependencies:
+      - env: IMAGE_HW_EVENT_PROXY
+        name: pipeline:baremetal-hardware-event-proxy
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: openshift-e2e-aws
+zz_generated_metadata:
+  branch: release-4.16
+  org: redhat-cne
+  repo: hw-event-proxy

@@ -61,7 +61,8 @@ if [[ -z "${LEASED_RESOURCE}" ]]; then
   exit 1
 fi
 
-CONFIG_PLATFORM="  platform: {}"
+PLATFORM_ARGS_COMPUTE=( )
+PLATFORM_ARGS_WORKER=( )
 POWERVS_ZONE=${LEASED_RESOURCE}
 case "${LEASED_RESOURCE}" in
    "lon04")
@@ -78,8 +79,8 @@ case "${LEASED_RESOURCE}" in
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_OSA21")
       POWERVS_REGION=osa
       VPCREGION=jp-osa
-      # https://www.gnu.org/software/bash/manual/html_node/ANSI_002dC-Quoting.html#ANSI_002dC-Quoting
-      CONFIG_PLATFORM=$'  platform:\n    powervs:\n      sysType: e980'
+      PLATFORM_ARGS_COMPUTE+=( "sysType" "e980" )
+      PLATFORM_ARGS_WORKER+=( "sysType" "e980" )
    ;;
    "sao01")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_SAO01")
@@ -114,6 +115,60 @@ case "${LEASED_RESOURCE}" in
    ;;
 esac
 
+echo "CONTROL_PLANE_REPLICAS=${CONTROL_PLANE_REPLICAS}"
+echo "WORKER_REPLICAS=${WORKER_REPLICAS}"
+# Are we performing a Single Node OpenShift cluster deploy?
+if [[ "${CONTROL_PLANE_REPLICAS}" == "1" && "${WORKER_REPLICAS}" == "0" ]]; then
+  PLATFORM_ARGS_COMPUTE+=( "procType" "Dedicated" )
+  PLATFORM_ARGS_COMPUTE+=( "processors" 6 )
+fi
+
+FILE=$(mktemp)
+
+trap '/bin/rm ${FILE}' EXIT
+
+cat << '___EOF___' > ${FILE}
+import sys
+import yaml
+
+nargs = len(sys.argv)
+if ((nargs % 2) == 0):
+	raise ValueError("Error: Usage: program key value [ key value ]*")
+
+# Remove the first argument
+nargs -= 1
+
+cfg = {}
+cfg["platform"] = {}
+cfg["platform"]["powervs"] = {}
+
+# Loop through key/value pairs
+index = 1
+while index < nargs:
+	key = sys.argv[index]
+	value = sys.argv[index+1]
+	try:
+		value = int(value)
+	except ValueError:
+		pass
+	cfg["platform"]["powervs"][key] = value
+	index += 2
+
+# Create YAML output
+output = yaml.safe_dump(cfg, default_flow_style=False)
+
+# Insert two spaces before every line in order to match outside spacing
+print('  '.join(('\n'+output).splitlines(True))[1:].rstrip())
+___EOF___
+
+pip3 install pyyaml --user
+echo "PLATFORM_ARGS_COMPUTE=${PLATFORM_ARGS_COMPUTE[*]}"
+echo "PLATFORM_ARGS_WORKER=${PLATFORM_ARGS_WORKER[*]}"
+CONFIG_PLATFORM_COMPUTE=$(python3 ${FILE} "${PLATFORM_ARGS_COMPUTE[@]}")
+CONFIG_PLATFORM_WORKER=$(python3 ${FILE} "${PLATFORM_ARGS_WORKER[@]}")
+echo "CONFIG_PLATFORM_COMPUTE=${CONFIG_PLATFORM_COMPUTE}"
+echo "CONFIG_PLATFORM_WORKER=${CONFIG_PLATFORM_WORKER}"
+
 cat > "${SHARED_DIR}/powervs-conf.yaml" << EOF
 CLUSTER_NAME: ${CLUSTER_NAME}
 POWERVS_SERVICE_INSTANCE_ID: ${POWERVS_SERVICE_INSTANCE_ID}
@@ -133,14 +188,14 @@ compute:
 - architecture: ppc64le
   hyperthreading: Enabled
   name: worker
-${CONFIG_PLATFORM}
-  replicas: 2
+${CONFIG_PLATFORM_WORKER}
+  replicas: ${WORKER_REPLICAS}
 controlPlane:
   architecture: ppc64le
   hyperthreading: Enabled
   name: master
-${CONFIG_PLATFORM}
-  replicas: 3
+${CONFIG_PLATFORM_COMPUTE}
+  replicas: ${CONTROL_PLANE_REPLICAS}
 networking:
   clusterNetwork:
   - cidr: 10.128.0.0/14
