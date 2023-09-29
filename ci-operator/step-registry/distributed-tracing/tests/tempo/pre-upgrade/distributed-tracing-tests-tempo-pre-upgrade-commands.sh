@@ -28,7 +28,7 @@ else
 fi
 
 # Remove test cases to be skipped from the test run
-IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$SKIP_TESTS"
+IFS=' ' read -ra SKIP_TEST_ARRAY <<< "$PRE_UPG_SKIP_TESTS"
 SKIP_TESTS_TO_REMOVE=""
 INVALID_TESTS=""
 for test in "${SKIP_TEST_ARRAY[@]}"; do
