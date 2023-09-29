@@ -165,6 +165,14 @@ ibmcloud*)
     IC_API_KEY="$(< "${CLUSTER_PROFILE_DIR}/ibmcloud-api-key")"
     export IC_API_KEY
     ;;
+powervs*)
+    #export TEST_PROVIDER='{"type":"powervs"}' # TODO In the future, powervs will be a supprted test type
+    export TEST_PROVIDER='{"type":"ibmcloud"}'
+    IC_API_KEY=$(sed -e 's,^.*"apikey":",,' -e 's,".*$,,' ${SHARED_DIR}/powervs-config.json)
+    IBMCLOUD_API_KEY=${IC_API_KEY}
+    export IC_API_KEY
+    export IBMCLOUD_API_KEY
+    ;;
 nutanix) export TEST_PROVIDER='{"type":"nutanix"}' ;;
 *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
 esac
