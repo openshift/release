@@ -9,8 +9,17 @@ build_root:
     namespace: openshift
     tag: golang-1.19
 images:
-- context_dir: .
-  dockerfile_path: Dockerfile
+- dockerfile_literal: |-
+    FROM registry.access.redhat.com/ubi8/openjdk-11:latest
+    USER root
+    RUN microdnf -y install util-linux
+    RUN mkdir -p /tmp/rhscl_openshift_dir/openjdk
+    WORKDIR /tmp/rhscl_openshift_dir/openjdk
+    COPY . .
+    RUN chgrp -R 0 /tmp/rhscl_openshift_dir/openjdk && \
+        chmod -R g=u /tmp/rhscl_openshift_dir/openjdk && \
+        chgrp -R 0 /home && \
+        chmod -R g=u /home
   to: rh-openjdk-runner
 releases:
   latest:
