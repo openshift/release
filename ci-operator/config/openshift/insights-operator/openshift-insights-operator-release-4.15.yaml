@@ -98,42 +98,6 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
-- as: insights-operator-e2e-tests-periodic
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: gcp
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: insights-live
-    test:
-    - as: test
-      cli: latest
-      commands: pytest.sh -k "not tp_only" --junitxml=${ARTIFACT_DIR}/test-report.xml
-      credentials:
-      - mount_path: /secrets
-        name: insights-qa
-        namespace: test-credentials
-      from: insights-operator-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
-- as: insights-operator-test-time-periodic
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: gcp
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: insights-live
-    test:
-    - as: test
-      cli: latest
-      commands: pytest.sh -k "test_archive_uploaded_and_result_received" --junitxml=${ARTIFACT_DIR}/test-report.xml
-      from: insights-operator-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
 - as: e2e-gcp-ovn-techpreview
   steps:
     cluster_profile: gcp
