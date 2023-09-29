@@ -348,7 +348,7 @@ for i in range(151,158):
     CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in [1287,1289,1296,1298,1300,1302]:
-    CONFIG['vsphere-multizone-2-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
+    CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
 
 for i in range(202,204):
     CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
