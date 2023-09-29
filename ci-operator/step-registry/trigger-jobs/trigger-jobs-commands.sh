@@ -8,6 +8,27 @@ GANGWAY_API_TOKEN=$(cat $SECRETS_DIR/gangway-api-token)
 WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
 URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
 
+echo "Check to make sure we do not run this testing against the same build twice."
+if [[ "$JOB_NAME" == *"self-managed"* ]]; then
+    LATEST_BUILD_ID=$(curl -s "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/logs/$JOB_NAME/latest-build.txt")
+    LATEST_OCP_BUILD=$(curl -s "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/logs/$JOB_NAME/${LATEST_BUILD_ID}/artifacts/release/artifacts/release-images-latest" | jq -r '.metadata.name')
+    CURRENT_OCP_BUILD=$(oc get istag release:latest -o json | jq '.image.dockerImageMetadata.Config.Labels."io.openshift.release"')
+    CURRENT_OCP_BUILD="${CURRENT_OCP_BUILD//\"}"
+
+    if [[ $LATEST_OCP_BUILD == "$CURRENT_OCP_BUILD" ]]; then
+        echo "OCP build from previous run: $LATEST_OCP_BUILD"
+        echo "OCP build for this current run: $CURRENT_OCP_BUILD"
+        echo "These builds are the same so we will not trigger the Interop LP weekly testing"
+        exit 1
+    else
+        echo "OCP build from previous run: $LATEST_OCP_BUILD"
+        echo "OCP build for this current run: $CURRENT_OCP_BUILD"
+        echo "The build is not the same as the previous run... continuing to trigger weekly testing."
+    fi
+else
+    echo "We are not running the self-managed weekly job this check will be skipped."
+fi
+
 echo "# Printing the jobs-to-trigger JSON:"
 jq -c '.[]' "$WEEKLY_JOBS"
 
@@ -40,10 +61,10 @@ failed_jobs=""
 
 echo ""
 echo "# Loop through the trigger weekly jobs file using jq and issue a command for each job where 'active' is true"
-jq -r '.[] | select(.active == true) | .job_name' "$WEEKLY_JOBS" | while IFS= read -r job_name; do
-  echo "Issuing trigger for active job: $job_name"
+jq -r '.[] | select(.active == true) | .job_name' "$WEEKLY_JOBS" | while IFS= read -r job; do
+  echo "Issuing trigger for active job: $job"
   for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
-    response=$(curl -s -X POST -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/$job_name" -w "%{http_code}\n" -o /dev/null)
+    response=$(curl -s -X POST -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/$job" -w "%{http_code}\n" -o /dev/null)
     
     if [ "$response" -eq 200 ]; then
       echo "Trigger returned a 200 status code"
@@ -57,8 +78,8 @@ jq -r '.[] | select(.active == true) | .job_name' "$WEEKLY_JOBS" | while IFS= re
   done
 
   if [ "$response" -ne 200 ]; then
-    echo "Trigger for active job: $job_name FAILED, a manual re-run is needed for $job_name"
-    failed_jobs+="$job_name "  # Concatenate the job_name to the string of failed jobs
+    echo "Trigger for active job: $job FAILED, a manual re-run is needed for $job"
+    failed_jobs+="$job "  # Concatenate the job to the string of failed jobs
   fi
 
 done
