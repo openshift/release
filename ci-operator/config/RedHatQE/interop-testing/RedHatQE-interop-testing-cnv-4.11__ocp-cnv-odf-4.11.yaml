@@ -3,10 +3,6 @@ base_images:
     name: "4.11"
     namespace: ocp
     tag: cli
-  cnv-tests:
-    name: cnv-tests
-    namespace: cnv-qe
-    tag: "4.11"
   ocs-ci-tests:
     name: ocs-ci-container
     namespace: ci
@@ -20,6 +16,10 @@ build_root:
     name: release
     namespace: openshift
     tag: golang-1.18
+images:
+- context_dir: cnv-ci
+  dockerfile_path: Dockerfile
+  to: cnv-ci
 releases:
   latest:
     candidate:
@@ -38,16 +38,18 @@ tests:
     cluster_profile: aws-interop-qe
     env:
       BASE_DOMAIN: release-ci.cnv-qe.rhood.us
+      OCP_VERSION: "4.11"
+      ODF_OPERATOR_CHANNEL: stable-4.11
+      ODF_VERSION_MAJOR_MINOR: "4.11"
       WORKER_INSTANCE_TYPE: c5n.metal
     test:
-    - ref: interop-tests-deploy-cnv
-    - ref: interop-tests-deploy-odf
     - chain: cucushift-installer-check-cluster-health
+    - ref: interop-tests-deploy-odf
     - ref: interop-tests-ocs-tests
-    - ref: interop-tests-cnv-tests-smoke
+    - ref: interop-tests-cnv-tests-e2e-deploy
     workflow: cucushift-installer-rehearse-aws-upi
 zz_generated_metadata:
-  branch: main
+  branch: cnv-4.11
   org: RedHatQE
-  repo: cnv-tests
+  repo: interop-testing
   variant: ocp-cnv-odf-4.11
