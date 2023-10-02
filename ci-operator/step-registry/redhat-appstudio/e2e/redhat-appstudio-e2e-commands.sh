@@ -23,7 +23,6 @@ QUAY_OAUTH_TOKEN_RELEASE_SOURCE=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/
 QUAY_OAUTH_TOKEN_RELEASE_DESTINATION=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/quay-oauth-token-release-destination)
 PYXIS_STAGE_KEY=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-key)
 PYXIS_STAGE_CERT=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/pyxis-stage-cert)
-OPENSHIFT_API="$(yq e '.clusters[0].cluster.server' $KUBECONFIG)"
 OPENSHIFT_USERNAME="kubeadmin"
 PREVIOUS_RATE_REMAINING=0
 OAUTH_REDIRECT_PROXY_URL=$(cat /usr/local/ci-secrets/redhat-appstudio-qe/oauth-redirect-proxy-url)
@@ -82,14 +81,14 @@ EOF
 
 # Define a new environment for BYOC pointing to a kubeconfig with token. RHTAP environments only supports kubeconfig with token:
 # See: https://issues.redhat.com/browse/GITOPSRVCE-554
-BYOC_KUBECONFIG="/tmp/token-kubeconfig"
-cp "$KUBECONFIG" "$BYOC_KUBECONFIG"
-if [[ -s "$BYOC_KUBECONFIG" ]]; then
-    echo -e "byoc kubeconfig exists!"
-else
-    echo "Kubeconfig not exists in $BYOC_KUBECONFIG... Aborting job"
-    exit 1
-fi
+# BYOC_KUBECONFIG="/tmp/token-kubeconfig"
+# cp "$KUBECONFIG" "$BYOC_KUBECONFIG"
+# if [[ -s "$BYOC_KUBECONFIG" ]]; then
+#     echo -e "byoc kubeconfig exists!"
+# else
+#     echo "Kubeconfig not exists in $BYOC_KUBECONFIG... Aborting job"
+#     exit 1
+# fi
 
 git config --global user.name "redhat-appstudio-qe-bot"
 git config --global user.email redhat-appstudio-qe-bot@redhat.com
