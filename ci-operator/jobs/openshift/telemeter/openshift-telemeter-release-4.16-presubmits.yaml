@@ -361,6 +361,39 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
+    - ^release-4.16$
+    - ^release-4.16-
+    cluster: build03
+    context: ci/prow/generate
+    decorate: true
+    labels:
+      ci.openshift.io/manually-branched: "true"
+    name: pull-ci-openshift-telemeter-release-4.16-master-generate
+    rerun_command: /test generate
+    spec:
+      containers:
+      - args:
+        - -c
+        - make generate && git diff --exit-code
+        command:
+        - sh
+        env:
+        - name: GO111MODULE
+          value: "on"
+        - name: GOPATH
+          value: /go:/home/prow/go
+        - name: USER
+          value: deadbeef
+        image: quay.io/coreos/jsonnet-ci
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 500m
+    trigger: (?m)^/test generate
+  - agent: kubernetes
+    always_run: true
+    branches:
     - ^release-4\.16$
     - ^release-4\.16-
     cluster: build03
