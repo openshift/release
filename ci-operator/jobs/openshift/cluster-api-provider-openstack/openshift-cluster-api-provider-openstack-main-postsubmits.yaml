@@ -3,14 +3,14 @@ postsubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build04
+    - ^main$
+    cluster: build03
     decorate: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-cluster-api-provider-openstack-master-images
+    name: branch-ci-openshift-cluster-api-provider-openstack-main-images
     path_alias: sigs.k8s.io/cluster-api-provider-openstack
     spec:
       containers:
@@ -33,6 +33,9 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -44,6 +47,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
