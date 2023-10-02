@@ -6,9 +6,6 @@ set -o pipefail
 
 status=0
 
-echo "tempuser:x:$(id -u):$(id -g):tempuser:${HOME}:/bin/bash" >> /etc/passwd
-echo "tempuser:x:$(id -G | cut -d' ' -f 2):" >> /etc/group
-
 for JDK_VER in $OPENJDK_VERSION
 do
     status1=0

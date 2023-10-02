@@ -13,6 +13,11 @@ images:
     FROM registry.access.redhat.com/ubi8/openjdk-11
     USER root
     RUN microdnf -y install util-linux
+    RUN adduser \
+        -m \
+        --system \
+        --shell /bin/bash  \
+        maven-runner
     RUN mkdir -p /tmp/rhscl_openshift_dir/openjdk
     WORKDIR /tmp/rhscl_openshift_dir/openjdk
     COPY . .
@@ -21,6 +26,7 @@ images:
         chgrp -R 0 /home && \
         chmod -R g=u /home
     RUN chmod g=u /etc/passwd /etc/group
+    USER maven-runner
   to: rh-openjdk-runner
 releases:
   latest:
@@ -54,6 +60,7 @@ tests:
       FIREWATCH_JIRA_SERVER: https://issues.redhat.com
       OPENJDK_VERSION: 8 11 17
     test:
+    - ref: rh-openjdk-setup
     - ref: rh-openjdk-test
     workflow: firewatch-ipi-aws
 zz_generated_metadata:
