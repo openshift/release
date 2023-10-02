@@ -74,8 +74,10 @@ chain:
             -o "${ARTIFACT_DIR}/csi/e2e.log" \
             --junit-dir "${ARTIFACT_DIR}/csi/junit"
           if [ $? -ne 0 ]; then
+            TEST_SUITE_EXIT_CODE=$?
             TEST_SUITE_FAILURE_MSG="KubeVirt CSI conformance tests returned failure(s)"
           fi
+          set -e
 
           # This looks counterintuitive. Here's an explanation.
           #
@@ -103,7 +105,6 @@ chain:
       *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
       esac
 
-      set -e
       if [[ -n "${TEST_SKIPS}" ]]; then
           TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
           echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
@@ -128,7 +129,7 @@ chain:
       fi
 
       if [ -n "$TEST_SUITE_FAILURE_MSG" ]; then
-        echo "Cluster type: $CLUSTER_TYPE encountered a failure condition: $TEST_SUITE_FAILURE_MSG"
+        echo "Cluster type $CLUSTER_TYPE encountered a failure condition: $TEST_SUITE_FAILURE_MSG, exit code: $TEST_SUITE_EXIT_CODE"
         exit_code=1
       fi
 
