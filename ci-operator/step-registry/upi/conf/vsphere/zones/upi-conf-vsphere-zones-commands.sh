@@ -273,14 +273,14 @@ failure_domains = [
         cluster = "vcs-mdcnc-workload-2"
         datastore = "mdcnc-ds-2"
         network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 df b2 de b8 24 7b-db a6 e2 9b eb be 85 30"
+        distributed_virtual_switch_uuid = "50 05 1b 07 19 2b 0b 0a-eb 90 98 54 1d c5 b5 19"
     },
     {
         datacenter = "IBMCloud"
         cluster = "vcs-mdcnc-workload-3"
         datastore = "mdcnc-ds-3"
         network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 f2 28 9e 27 86 0c-da 17 16 22 e9 47 20 e3"
+        distributed_virtual_switch_uuid = "50 05 1b 07 19 2b 0b 0a-eb 90 98 54 1d c5 b5 19"
     },
     {
         datacenter = "datacenter-2"
