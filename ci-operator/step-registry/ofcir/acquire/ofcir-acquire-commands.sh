@@ -100,9 +100,8 @@ function getCIR(){
 #CLUSTERTYPE can be one of "virt", "virt-arm64" or "baremetal"
 CIRTYPE=host
 [ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster
-[ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host-arm
+[ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host_arm
 [ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_lab_small
-
 
 if [[ ! "$RELEASE_IMAGE_LATEST" =~ build05 ]] ; then
     echo "WARNING: Attempting to contact lab ofcir API from the wrong cluster, must be build05 to succeed"

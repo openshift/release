@@ -3,7 +3,7 @@ workflow:
   steps:
     env:
       STS: "true"
-      COMPUTE_MACHINE_TYPE: "m5.2xlarge"
+      COMPUTE_MACHINE_TYPE: "m5.xlarge"
       ENABLE_AUTOSCALING: "true"
       MIN_REPLICAS: "3"
       MAX_REPLICAS: "6"
@@ -19,6 +19,10 @@ workflow:
       DISABLE_SCP_CHECKS: "false"
       EC2_METADATA_HTTP_TOKENS: "required"
       DEFAULT_MACHINE_POOL_LABELS: "prowci=true"
+      MP_MACHINE_TYPE: "g4dn.2xlarge"
+      MP_REPLICAS: "1"
+      LOCAL_ZONE: "true"
+      LOCALZONE_WORKER_ASSIGN_PUBLIC_IP: "no"
     pre:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
@@ -27,6 +31,9 @@ workflow:
     - ref: rosa-sts-kms-key-create
     - chain: rosa-cluster-provision
     - ref: aws-provision-tags-for-byo-vpc
+    - ref: aws-provision-localzone-subnet
+    - ref: rosa-conf-tags-for-localzone-subnet
+    - ref: rosa-conf-machine-pool
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
     - ref: rosa-cluster-wait-ready-nodes
     post:

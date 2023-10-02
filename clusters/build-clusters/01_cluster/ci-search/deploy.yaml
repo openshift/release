@@ -141,3 +141,27 @@ spec:
       resources:
         requests:
           storage: 100Gi
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: cert-issuer
+  name: ci-search
+  namespace: ci-search
+spec:
+  ingressClassName: openshift-default
+  rules:
+  - host: search.ci.openshift.org
+    http:
+      paths:
+      - backend:
+          service:
+            name: search
+            port:
+              number: 80
+        pathType: ImplementationSpecific
+  tls:
+  - hosts:
+    - search.ci.openshift.org
+    secretName: ci-search-tls

@@ -1,0 +1,114 @@
+base_images:
+  base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+  base-9:
+    name: "4.14"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+  os-min8:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+binary_build_commands: make build
+build_root:
+  project_image:
+    dockerfile_path: openshift-ci/Dockerfile.tools
+images:
+- context_dir: .
+  dockerfile_path: cnf-tests/Dockerfile.openshift
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: cnf-tests
+- context_dir: tools/s2i-dpdk/
+  dockerfile_path: Dockerfile
+  from: base-9
+  to: dpdk
+- context_dir: .
+  dockerfile_path: ztp/resource-generator/Containerfile
+  from: os-min8
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: ztp-site-generator
+promotion:
+  name: "4.14"
+  namespace: ocp-kni
+releases:
+  initial:
+    integration:
+      name: "4.14"
+      namespace: ocp
+  latest:
+    candidate:
+      product: ocp
+      stream: ci
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ci
+  commands: make ci-job
+  container:
+    from: src
+- as: e2e-gcp-ovn
+  skip_if_only_changed: ^ztp
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e-gcp-ovn
+      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-ovn
+- as: e2e-aws-ran-profile
+  optional: true
+  steps:
+    cluster_profile: aws
+    test:
+    - as: e2e-aws-ran-profile
+      commands: FEATURES_ENVIRONMENT=cn-ran-overlays FEATURES=ran-profile-gcp SKIP_TESTS="xt_u32
+        container-mount-namespace gatekeeper n3000 fec metallb sro multinetworkpolicy"
+        make validate-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-aws-ovn
+- as: e2e-gcp-ovn-periodic
+  cron: 0 */8 * * *
+  steps:
+    cluster_profile: gcp
+    env:
+      COMPUTE_NODE_TYPE: n2-standard-8
+    test:
+    - as: e2e-gcp-ovn-periodic
+      commands: FEATURES_ENVIRONMENT=ci IPERF3_BITRATE_OVERRIDE="300000000" make functests-on-ci
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: openshift-e2e-gcp-ovn
+zz_generated_metadata:
+  branch: release-4.14
+  org: openshift-kni
+  repo: cnf-features-deploy

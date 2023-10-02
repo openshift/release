@@ -306,6 +306,7 @@ tests:
         oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
           bash -c \
           "cd /work;
+          export DOCKER_CONFIG='' ;
           entrypoint \
           prow/integ-suite-kind.sh \
           test.integration.helm.kube.presubmit"
@@ -337,6 +338,17 @@ tests:
       '-t [maistra-3.0] Automator: Update charts from maistra/istio' \
       -m update_charts_istio_3.0 \
       -b maistra-3.0
+  container:
+    from: src
+  postsubmit: true
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
+- as: update-proxy
+  commands: |
+    export GITHUB_TOKEN=$(cat /creds-github/token)
+    git clone --depth=1 --single-branch -b maistra-3.0-pre https://github.com/maistra/proxy.git
+    ./proxy/update-proxy.sh
   container:
     from: src
   postsubmit: true

@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: 26 0 * * *
   decorate: true
   decoration_config:
@@ -15,6 +15,17 @@ periodics:
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-rhobs-observability-operator-main-periodic-e2e-test-harness
+  reporter_config:
+    slack:
+      channel: '#observability-operator-cicd'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -42,6 +53,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /secrets/osde2e-common
         name: osde2e-common
         readOnly: true
@@ -62,6 +76,9 @@ periodics:
     - name: aws-qe-obo
       secret:
         secretName: aws-qe-obo
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: osde2e-common
       secret:
         secretName: osde2e-common
@@ -95,6 +112,17 @@ periodics:
     job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-rhobs-observability-operator-main-periodic-ocp414-compat
+  reporter_config:
+    slack:
+      channel: '#observability-operator-cicd'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:
@@ -126,6 +154,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -146,6 +177,9 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-aws-qe
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

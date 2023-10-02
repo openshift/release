@@ -1,0 +1,101 @@
+base_images:
+  base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+  ocp_4.14_cli:
+    name: "4.16"
+    namespace: ocp
+    tag: cli
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: images/sdn/Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_4.14_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:cli
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
+  to: sdn
+- dockerfile_path: images/kube-proxy/Dockerfile.rhel
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: kube-proxy
+promotion:
+  name: "4.16"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 6Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    HOME=$( mktemp -d )
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-aws-sdn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-sdn
+- as: e2e-aws-sdn-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws-sdn
+- as: e2e-gcp-sdn
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-sdn
+- as: e2e-aws-sdn-multitenant
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-sdn-multi
+- as: e2e-aws-sdn-serial
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-sdn-serial
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: sdn

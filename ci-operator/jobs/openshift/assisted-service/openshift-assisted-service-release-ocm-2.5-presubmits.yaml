@@ -34,6 +34,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -42,6 +45,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -54,7 +60,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.5$
     - ^release-ocm-2\.5-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-ai-operator-ztp
     decorate: true
     decoration_config:
@@ -62,7 +68,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.5-e2e-ai-operator-ztp
@@ -98,6 +103,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -118,6 +126,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-packet-assisted
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -130,7 +141,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.5$
     - ^release-ocm-2\.5-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-ai-operator-ztp-3masters
     decorate: true
     decoration_config:
@@ -138,7 +149,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.5-e2e-ai-operator-ztp-3masters
@@ -173,6 +183,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -193,6 +206,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-packet-assisted
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -205,7 +221,7 @@ presubmits:
     branches:
     - ^release-ocm-2\.5$
     - ^release-ocm-2\.5-
-    cluster: build01
+    cluster: build05
     context: ci/prow/e2e-ai-operator-ztp-disconnected
     decorate: true
     decoration_config:
@@ -213,7 +229,6 @@ presubmits:
     labels:
       ci-operator.openshift.io/cloud: packet-edge
       ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.5-e2e-ai-operator-ztp-disconnected
@@ -248,6 +263,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -268,6 +286,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-packet-assisted
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -275,464 +296,6 @@ presubmits:
         secret:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )e2e-ai-operator-ztp-disconnected,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-ocm-2\.5$
-    - ^release-ocm-2\.5-
-    cluster: build01
-    context: ci/prow/e2e-metal-assisted-capi
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/cluster: build01
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.5-e2e-metal-assisted-capi
-    optional: true
-    rerun_command: /test e2e-metal-assisted-capi
-    run_if_changed: ^(api/.*|internal/controller/controllers/.*)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-capi-cluster-profile
-        - --target=e2e-metal-assisted-capi
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-capi-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-capi,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-ocm-2\.5$
-    - ^release-ocm-2\.5-
-    cluster: build01
-    context: ci/prow/e2e-metal-assisted-day2
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/cluster: build01
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.5-e2e-metal-assisted-day2
-    optional: true
-    rerun_command: /test e2e-metal-assisted-day2
-    run_if_changed: ^(data/.*)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-day2-cluster-profile
-        - --target=e2e-metal-assisted-day2
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-day2-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-day2,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-ocm-2\.5$
-    - ^release-ocm-2\.5-
-    cluster: build01
-    context: ci/prow/e2e-metal-assisted-kube-api-late-binding-single-node
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/cluster: build01
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.5-e2e-metal-assisted-kube-api-late-binding-single-node
-    optional: true
-    rerun_command: /test e2e-metal-assisted-kube-api-late-binding-single-node
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-late-binding-single-node-cluster-profile
-        - --target=e2e-metal-assisted-kube-api-late-binding-single-node
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-kube-api-late-binding-single-node-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-kube-api-late-binding-single-node,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-ocm-2\.5$
-    - ^release-ocm-2\.5-
-    cluster: build01
-    context: ci/prow/e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/cluster: build01
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.5-e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
-    optional: true
-    rerun_command: /test e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node-cluster-profile
-        - --target=e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-kube-api-late-unbinding-ipv4-single-node,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-ocm-2\.5$
-    - ^release-ocm-2\.5-
-    cluster: build01
-    context: ci/prow/e2e-metal-assisted-kube-api-net-suite
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/cluster: build01
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.5-e2e-metal-assisted-kube-api-net-suite
-    rerun_command: /test e2e-metal-assisted-kube-api-net-suite
-    run_if_changed: ^(cmd/.*|data/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-kube-api-net-suite-cluster-profile
-        - --target=e2e-metal-assisted-kube-api-net-suite
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-kube-api-net-suite-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-kube-api-net-suite,?($|\s.*)
-  - agent: kubernetes
-    always_run: false
-    branches:
-    - ^release-ocm-2\.5$
-    - ^release-ocm-2\.5-
-    cluster: build01
-    context: ci/prow/e2e-metal-assisted-tpmv2
-    decorate: true
-    decoration_config:
-      skip_cloning: true
-    labels:
-      ci-operator.openshift.io/cloud: packet-edge
-      ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
-      ci-operator.openshift.io/cluster: build01
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-assisted-service-release-ocm-2.5-e2e-metal-assisted-tpmv2
-    optional: true
-    rerun_command: /test e2e-metal-assisted-tpmv2
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
-        - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/e2e-metal-assisted-tpmv2-cluster-profile
-        - --target=e2e-metal-assisted-tpmv2
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
-        - mountPath: /usr/local/e2e-metal-assisted-tpmv2-cluster-profile
-          name: cluster-profile
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
-      - name: ci-pull-credentials
-        secret:
-          secretName: ci-pull-credentials
-      - name: cluster-profile
-        secret:
-          secretName: cluster-secrets-packet-assisted
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )e2e-metal-assisted-tpmv2,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -767,6 +330,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -775,6 +341,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -787,13 +356,12 @@ presubmits:
     branches:
     - ^release-ocm-2\.5$
     - ^release-ocm-2\.5-
-    cluster: build01
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.5-lint
@@ -818,6 +386,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -826,6 +397,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -869,6 +443,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -877,6 +454,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -889,13 +469,12 @@ presubmits:
     branches:
     - ^release-ocm-2\.5$
     - ^release-ocm-2\.5-
-    cluster: build01
+    cluster: build05
     context: ci/prow/subsystem-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.5-subsystem-aws
@@ -928,6 +507,9 @@ presubmits:
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -942,6 +524,9 @@ presubmits:
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -954,13 +539,12 @@ presubmits:
     branches:
     - ^release-ocm-2\.5$
     - ^release-ocm-2\.5-
-    cluster: build01
+    cluster: build05
     context: ci/prow/subsystem-kubeapi-aws
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.5-subsystem-kubeapi-aws
@@ -993,6 +577,9 @@ presubmits:
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1007,6 +594,9 @@ presubmits:
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1019,13 +609,12 @@ presubmits:
     branches:
     - ^release-ocm-2\.5$
     - ^release-ocm-2\.5-
-    cluster: build01
+    cluster: build05
     context: ci/prow/unit-test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.5-unit-test
@@ -1054,6 +643,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1065,6 +657,9 @@ presubmits:
       - name: assisted-service-codecov-token
         secret:
           secretName: assisted-service-codecov-token
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1077,13 +672,12 @@ presubmits:
     branches:
     - ^release-ocm-2\.5$
     - ^release-ocm-2\.5-
-    cluster: build01
+    cluster: build05
     context: ci/prow/verify-generated-code
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cluster: build01
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-assisted-service-release-ocm-2.5-verify-generated-code
@@ -1112,6 +706,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1123,6 +720,9 @@ presubmits:
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

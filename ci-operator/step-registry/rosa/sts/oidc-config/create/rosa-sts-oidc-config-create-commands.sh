@@ -53,3 +53,9 @@ rosa create oidc-config -y --mode auto --output json\
                         ${MANAGED_SWITCH} \
                         > "${SHARED_DIR}/oidc-config"
 cat "${SHARED_DIR}/oidc-config"
+oidc_config_id=$(cat "${SHARED_DIR}/oidc-config" | jq -r '.id')
+
+# Create oidc provider
+echo "Create the oidc provider based on the byo oic config ..."
+rosa create oidc-provider -y --mode auto --oidc-config-id $oidc_config_id
+

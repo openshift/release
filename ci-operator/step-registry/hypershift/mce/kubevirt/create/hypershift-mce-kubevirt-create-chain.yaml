@@ -17,11 +17,18 @@ chain:
           source "${SHARED_DIR}/proxy-conf.sh"
         fi
 
+        MCE_VERSION=$(oc get "$(oc get multiclusterengines -oname)" -ojsonpath="{.status.currentVersion}" | cut -c 1-3)
+        HYPERSHIFT_NAME=hcp
+        if (( $(echo "$MCE_VERSION < 2.4" | bc -l) )); then
+          echo "MCE version is less than 2.4, use hypershift command"
+          HYPERSHIFT_NAME=hypershift
+        fi
+
         arch=$(arch)
         if [ "$arch" == "x86_64" ]; then
-          downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/hypershift.tar.gz ${downURL}
-          cd /tmp && tar -xvf /tmp/hypershift.tar.gz
-          chmod +x /tmp/hypershift
+          downURL=$(oc get ConsoleCLIDownload ${HYPERSHIFT_NAME}-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href') && curl -k --output /tmp/${HYPERSHIFT_NAME}.tar.gz ${downURL}
+          cd /tmp && tar -xvf /tmp/${HYPERSHIFT_NAME}.tar.gz
+          chmod +x /tmp/${HYPERSHIFT_NAME}
           cd -
         fi
 
@@ -43,14 +50,20 @@ chain:
         oc patch ingresscontroller -n openshift-ingress-operator default --type=json -p \
           '[{ "op": "add", "path": "/spec/routeAdmission", "value": {wildcardPolicy: "WildcardsAllowed"}}]'
 
+        ETCD_STORAGE_CLASS=""
+        if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "AWS" ]; then
+          echo "AWS infra detected. Setting --etcd-storage-class"
+          ETCD_STORAGE_CLASS="--etcd-storage-class gp3-csi"
+        fi
 
         echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
-        /tmp/hypershift create cluster kubevirt ${ICSP_COMMAND} \
+        /tmp/${HYPERSHIFT_NAME} create cluster kubevirt ${ETCD_STORAGE_CLASS} ${ICSP_COMMAND} \
           --name ${CLUSTER_NAME} \
           --node-pool-replicas ${HYPERSHIFT_NODE_COUNT} \
           --memory 16Gi \
           --cores 4 \
           --namespace local-cluster \
+          --release-image ${RELEASE_IMAGE_LATEST} \
           --pull-secret ${PULL_SECRET_PATH}
 
         oc annotate hostedclusters -n local-cluster ${CLUSTER_NAME} "cluster.open-cluster-management.io/managedcluster-name=${CLUSTER_NAME}" --overwrite
@@ -76,7 +89,7 @@ chain:
         echo "Waiting for cluster to become available"
         oc wait --timeout=30m --for=condition=Available --namespace=local-cluster hostedcluster/${CLUSTER_NAME}
         echo "Cluster became available, creating kubeconfig"
-        /tmp/hypershift create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
+        /tmp/${HYPERSHIFT_NAME} create kubeconfig --namespace=local-cluster --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig
 
         if [ "$(oc get infrastructure cluster -o=jsonpath='{.status.platformStatus.type}')" == "BareMetal" ]; then
           exit 0

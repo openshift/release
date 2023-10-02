@@ -103,20 +103,17 @@ test_binary_build_commands: |
   mkdir /.cache && chmod 775 -R /.cache && chmod 775 -R $GOPATH
 tests:
 - as: verify-generated-code
-  cluster: build01
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
 - as: lint
-  cluster: build01
   commands: export GOLANGCI_LINT_CACHE=/tmp/.cache && export GOPROXY=https://proxy.golang.org
     && make lint
   container:
     from: test-bin
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test
-  cluster: build01
   commands: |
     export ROOT_DIR=/tmp
     export COVER_PROFILE=/tmp/reports/unit_coverage.out
@@ -130,7 +127,6 @@ tests:
     name: assisted-service-codecov-token
   skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: subsystem-aws
-  cluster: build01
   cluster_claim:
     architecture: amd64
     cloud: aws
@@ -161,7 +157,6 @@ tests:
           memory: 200Mi
     workflow: generic-claim
 - as: subsystem-kubeapi-aws
-  cluster: build01
   cluster_claim:
     architecture: amd64
     cloud: aws

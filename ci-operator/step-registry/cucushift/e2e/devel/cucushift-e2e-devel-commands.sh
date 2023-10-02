@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 PARALLEL_CUCUMBER_OPTIONS='--verbose-process-command --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number'
+FORCE_SKIP_TAGS="customer security"
 
 function show_time_used() {
     local time_start test_type time_used
@@ -33,11 +34,11 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
-if [ -z "${E2E_SKIP_TAGS}" ] ; then
-    export E2E_SKIP_TAGS="not @customer and not @security"
-else
-    export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not @customer and not @security"
-fi
+for tag in ${FORCE_SKIP_TAGS} ; do
+    if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
+        export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not $tag"
+    fi
+done
 echo "E2E_RUN_TAGS is '${E2E_RUN_TAGS}'"
 echo "E2E_SKIP_TAGS is '${E2E_SKIP_TAGS}'"
 

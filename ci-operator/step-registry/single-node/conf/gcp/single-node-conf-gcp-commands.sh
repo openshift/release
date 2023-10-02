@@ -5,6 +5,9 @@ set -o nounset
 set -o pipefail
 
 SINGLE_NODE_GCP_INSTANCE_TYPE="n2-standard-16"
+if [ "${OCP_ARCH}" = "arm64" ]; then
+  SINGLE_NODE_GCP_INSTANCE_TYPE="t2a-standard-16"
+fi
 
 echo "Updating install-config.yaml to a single ${SINGLE_NODE_GCP_INSTANCE_TYPE} control plane node and 0 workers"
 

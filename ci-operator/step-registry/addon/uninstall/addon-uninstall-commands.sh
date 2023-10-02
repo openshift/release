@@ -21,7 +21,7 @@ done
 
 RUN_COMMAND="${RUN_COMMAND} ${ADDONS_CMD}"
 
-if [ "${PARALLEL}" = "true" ]; then
+if [ "${ADDONS_OPERATORS_RUN_IN_PARALLEL}" = "true" ]; then
     RUN_COMMAND+=" --parallel"
 fi
 

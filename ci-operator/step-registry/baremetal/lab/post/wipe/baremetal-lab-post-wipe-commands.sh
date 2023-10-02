@@ -25,7 +25,7 @@ function umount_virtual_media() {
   bmc_address="${1}"
   bmc_username="${2}"
   bmc_password="${3}"
-  echo "Mounting the ISO image in ${bmc_address} via virtual media..."
+  echo "Unmounting the ISO image in ${bmc_address} via virtual media..."
   python3 - "${bmc_address}" "${bmc_username}" "${bmc_password}" <<'EOF'
 import redfish
 import sys
@@ -37,15 +37,21 @@ bmc_password = sys.argv[3]
 
 context = redfish.redfish_client(bmc_address, username=bmc_username, password=bmc_password)
 context.login(auth=redfish.AuthMethod.BASIC)
-response = context.get("/redfish/v1/Managers/")
+response = context.get("/redfish/v1/Systems/")
 manager = response.dict.get("Members")[0]["@odata.id"].split("/")[-1]
-response = context.get(f"/redfish/v1/Managers/{manager}/VirtualMedia/")
-removable_disk = list(filter((lambda x: x["@odata.id"].find("CD") != -1),
-                             response.dict.get("Members")))[0]["@odata.id"].split("/")[-1]
+response = context.get(f"/redfish/v1/Systems/{manager}/VirtualMedia/")
+#removable_disk = list(filter((lambda x: x["@odata.id"].find("CD") != -1),
+#                             response.dict.get("Members")))[0]["@odata.id"].split("/")[-1]
 
-print("Eject virtual media, if any")
+print("Eject virtual media 1, if any")
 response = context.post(
-    f"/redfish/v1/Managers/{manager}/VirtualMedia/{removable_disk}/Actions/VirtualMedia.EjectMedia", body={})
+    f"/redfish/v1/Systems/{manager}/VirtualMedia/1/Actions/VirtualMedia.EjectMedia", body={})
+print(response.text)
+print(response.status)
+
+print("Eject virtual media 2, if any")
+response = context.post(
+    f"/redfish/v1/Systems/{manager}/VirtualMedia/2/Actions/VirtualMedia.EjectMedia", body={})
 print(response.text)
 print(response.status)
 EOF

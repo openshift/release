@@ -67,6 +67,14 @@ echo "Wrote control_node_ips: $(cat /srv/control_node_ips), compute_node_ips: $(
 # Error: initializing source ...: tls: failed to verify certificate: x509: certificate has expired or is not yet valid: current time ... is after <now + 6m>"
 run-on-all-nodes "podman pull --authfile /var/lib/kubelet/config.json registry.redhat.io/rhel8/support-tools:latest"
 
+# Disable telemeter - its unable to upload snapshots due to significant time skews
+run-on-first-master "
+  export KUBECONFIG=/etc/kubernetes/static-pod-resources/kube-apiserver-certs/secrets/node-kubeconfigs/lb-ext.kubeconfig
+  echo "telemeterClient:" > /tmp/config.yaml
+  echo "  enabled: false" >> /tmp/config.yaml
+  oc create configmap cluster-monitoring-config -n openshift-monitoring --from-file=config.yaml=/tmp/config.yaml
+"
+
 # Stop chrony service on all nodes
 run-on-all-nodes "systemctl disable chronyd --now"
 

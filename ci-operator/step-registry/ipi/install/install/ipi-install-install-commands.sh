@@ -366,7 +366,7 @@ EOF
 
   cp "${dir}/bootstrap.ign" "${config_dir}/bootstrap_initial.ign"
   # We're using ancient fcct as glibc in installer container is 1.28
-  curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-x86_64-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
+  curl -sL https://github.com/coreos/butane/releases/download/v0.7.0/fcct-"$(uname -m)"-unknown-linux-gnu >/tmp/fcct && chmod ug+x /tmp/fcct
   /tmp/fcct --pretty --strict -d "${config_dir}" "${config_dir}/fcct.yml" > "${dir}/bootstrap.ign"
 }
 
@@ -375,7 +375,8 @@ function inject_boot_diagnostics() {
   local dir=${1}
 
   if [ ! -f /tmp/yq ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
+    -o /tmp/yq && chmod +x /tmp/yq
   fi
 
   PATCH="${SHARED_DIR}/machinesets-boot-diagnostics.yaml.patch"
@@ -400,7 +401,8 @@ function inject_spot_instance_config() {
   local dir=${1}
 
   if [ ! -f /tmp/yq ]; then
-    curl -L https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_amd64 -o /tmp/yq && chmod +x /tmp/yq
+    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
+    -o /tmp/yq && chmod +x /tmp/yq
   fi
 
   PATCH="${SHARED_DIR}/machinesets-spot-instances.yaml.patch"
@@ -442,7 +444,12 @@ for manifest_name in os.listdir("./"):
       break
 ' || return 1
   popd
-  
+
+}
+
+function get_arch() {
+  ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
+  echo "${ARCH}"
 }
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
@@ -505,16 +512,9 @@ ibmcloud*)
     ;;
 alibabacloud) export ALIBABA_CLOUD_CREDENTIALS_FILE=${SHARED_DIR}/alibabacreds.ini;;
 kubevirt) export KUBEVIRT_KUBECONFIG=${HOME}/.kube/config;;
-vsphere)
+vsphere*)
     export VSPHERE_PERSIST_SESSION=true
-    declare cloud_where_run
-    # shellcheck source=/dev/null
-    source "${SHARED_DIR}/vsphere_context.sh"
-    if [ "$cloud_where_run" == "IBMC-DEVQE" ]; then
-        export SSL_CERT_FILE=/var/run/devqe-secrets/vcenter-certificate
-    else
-        export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
-    fi
+    export SSL_CERT_FILE=/var/run/vsphere8-secrets/vcenter-certificate
     ;;
 openstack-osuosl) ;;
 openstack-ppc64le) ;;
@@ -593,7 +593,7 @@ export TF_LOG_PATH="${dir}/terraform.txt"
 # forcing a retest of the entire job, try the installation again if
 # the installer exits with 4, indicating an infra problem.
 case $JOB_NAME in
-  *vsphere*)
+  *vsphere)
     # Do not retry because `cluster destroy` doesn't properly clean up tags on vsphere.
     max=1
     ;;

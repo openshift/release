@@ -1,0 +1,139 @@
+base_images:
+  base:
+    name: "4.16"
+    namespace: ocp
+    tag: base
+  driver-operand:
+    name: "4.16"
+    namespace: ocp
+    tag: aws-efs-csi-driver
+  livenessprobe-operand:
+    name: "4.16"
+    namespace: ocp
+    tag: csi-livenessprobe
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+  operator-index:
+    name: redhat-operator-index
+    namespace: ci
+    tag: v4.10
+  provisioner-operand:
+    name: "4.16"
+    namespace: ocp
+    tag: csi-external-provisioner
+  proxy-operand:
+    name: "4.16"
+    namespace: ocp
+    tag: kube-rbac-proxy
+  registrar-operand:
+    name: "4.16"
+    namespace: ocp
+    tag: csi-node-driver-registrar
+  tests-private:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+binary_build_commands: make
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: aws-efs-csi-driver-operator
+- dockerfile_path: Dockerfile.create_efs
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: aws-efs-csi-operator-create-efs
+operator:
+  bundles:
+  - as: aws-efs-csi-driver-operator-bundle
+    base_index: operator-index
+    context_dir: config
+    dockerfile_path: bundle.Dockerfile
+    update_graph: replaces
+  substitutions:
+  - pullspec: quay.io/openshift/origin-aws-efs-csi-driver:latest
+    with: pipeline:driver-operand
+  - pullspec: quay.io/openshift/origin-csi-external-provisioner:latest
+    with: pipeline:provisioner-operand
+  - pullspec: quay.io/openshift/origin-csi-node-driver-registrar:latest
+    with: pipeline:registrar-operand
+  - pullspec: quay.io/openshift/origin-csi-livenessprobe:latest
+    with: pipeline:livenessprobe-operand
+  - pullspec: quay.io/openshift/origin-kube-rbac-proxy:latest
+    with: pipeline:proxy-operand
+  - pullspec: quay.io/openshift/origin-aws-efs-csi-driver-operator:latest
+    with: pipeline:aws-efs-csi-driver-operator
+promotion:
+  name: "4.16"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: operator-e2e
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SUITE: openshift/csi
+    workflow: openshift-e2e-aws-csi-efs
+- as: operator-e2e-extended
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OO_INDEX: ci-index-aws-efs-csi-driver-operator-bundle
+    env:
+      OO_CHANNEL: stable
+      TEST_SCENARIOS: \[CSI-Driver\]|\[AWS-EFS-CSI\]|\[AWS-EFS-CSI-Driver-Operator\]
+    workflow: openshift-e2e-aws-csi-efs-extended
+- as: verify-deps
+  steps:
+    test:
+    - ref: go-verify-deps
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: aws-efs-csi-driver-operator

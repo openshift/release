@@ -15,9 +15,9 @@ source "${SHARED_DIR}"/platform-conf.sh
 oc get nodes
 
 # Backup
-oc get secret vsphere-creds -o yaml -n kube-system > "${SHARED_DIR}"/creds_backup.yaml
-oc get cm cloud-provider-config -o yaml -n openshift-config > "${SHARED_DIR}"/cloud-provider-config_backup.yaml
-oc get infrastructures.config.openshift.io -o yaml > "${SHARED_DIR}"/infrastructures.config.openshift.io_backup.yaml
+oc get secret vsphere-creds -o yaml -n kube-system >"${SHARED_DIR}"/creds_backup.yaml
+oc get cm cloud-provider-config -o yaml -n openshift-config >"${SHARED_DIR}"/cloud-provider-config_backup.yaml
+oc get infrastructures.config.openshift.io -o yaml >"${SHARED_DIR}"/infrastructures.config.openshift.io_backup.yaml
 
 cat <<EOF | oc replace -f -
 apiVersion: v1
@@ -92,7 +92,7 @@ items:
             datacenter: ${VSPHERE_DATACENTER}
             datastore: /${VSPHERE_DATACENTER}/datastore/${VSPHERE_DATASTORE}
             networks:
-            - ${LEASED_RESOURCE}
+            - ${VSPHERE_NETWORK}
           zone: generated-zone
         nodeNetworking:
           external: {}
@@ -107,12 +107,6 @@ fi
 
 oc patch clusterversion version --type json -p '[{"op": "remove", "path": "/spec/channel"}]}]'
 
-until \
-  oc wait --all=true clusteroperator --for='condition=Available=True' >/dev/null && \
-  oc wait --all=true clusteroperator --for='condition=Progressing=False' >/dev/null && \
-  oc wait --all=true clusteroperator --for='condition=Degraded=False' >/dev/null;  do
-    echo "$(date --rfc-3339=seconds) Clusteroperators not yet ready"
-    sleep 1s
-done
+oc adm wait-for-stable-cluster --minimum-stable-period=5m --timeout=60m
 
 oc get co

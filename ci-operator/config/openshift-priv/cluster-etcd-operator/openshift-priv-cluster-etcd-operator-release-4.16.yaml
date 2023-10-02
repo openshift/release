@@ -1,0 +1,246 @@
+base_images:
+  assisted-image-service:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-image-service
+  assisted-installer:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-installer
+  assisted-installer-agent:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-installer-agent
+  assisted-installer-controller:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-installer-controller
+  assisted-service:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-service
+  assisted-test-infra:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-test-infra
+  base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+binary_build_commands: make build --warn-undefined-variables
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/cluster-etcd-operator
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
+  to: cluster-etcd-operator
+promotion:
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: "3"
+      memory: 1Gi
+test_binary_build_commands: make build GO_BUILD_FLAGS:='-race' --warn-undefined-variables
+tests:
+- as: verify
+  commands: |
+    make verify -k --warn-undefined-variables
+  container:
+    from: bin
+- as: verify-deps
+  commands: |
+    make verify-deps -k --warn-undefined-variables
+  container:
+    from: src
+- as: unit
+  commands: |
+    make test-unit JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+  container:
+    from: test-bin
+- as: e2e-agnostic-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-agnostic-ovn-upgrade
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-upgrade-gcp
+- as: e2e-aws-disruptive
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption
+- as: e2e-aws-disruptive-ovn
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-disruption-ovn
+- as: e2e-gcp-disruptive
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-disruption
+- as: e2e-gcp-disruptive-ovn
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-disruption-ovn
+- as: e2e-operator
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-operator-fips
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+      FIPS_ENABLED: "true"
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        make test-e2e JUNITFILE=${ARTIFACT_DIR}/junit_report.xml --warn-undefined-variables
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-aws
+  optional: true
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-azure
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure
+- as: e2e-gcp
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-metal-ipi
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v4
+        NETWORK_TYPE=OpenShiftSDN
+    workflow: baremetalds-e2e
+- as: e2e-metal-ipi-serial-ipv4
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    workflow: baremetalds-e2e-serial-ipv4
+- as: e2e-metal-ipi-ovn-ipv6
+  cluster: build05
+  optional: true
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        IP_STACK=v6
+        NETWORK_TYPE=OVNKubernetes
+    workflow: baremetalds-e2e
+- as: e2e-metal-assisted
+  optional: true
+  steps:
+    cluster_profile: packet-assisted
+    workflow: assisted-baremetal
+- as: e2e-aws-ovn-single-node
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-single-node
+- as: e2e-metal-single-node-live-iso
+  optional: true
+  steps:
+    cluster_profile: packet-sno
+    workflow: baremetalds-sno
+- as: configmap-scale
+  steps:
+    cluster_profile: aws
+    workflow: openshift-perfscale-e2e-configmap-scale
+- as: e2e-aws-ovn-serial
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-serial
+- as: e2e-aws-ovn-etcd-scaling
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-etcd-scaling
+- as: e2e-gcp-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp-etcd-scaling
+- as: e2e-azure-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-etcd-scaling
+- as: e2e-vsphere-ovn-etcd-scaling
+  optional: true
+  steps:
+    cluster_profile: vsphere
+    workflow: openshift-e2e-vsphere-etcd-scaling
+- as: e2e-aws-etcd-recovery
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws-etcd-recovery
+- as: e2e-gcp-qe-no-capabilities
+  optional: true
+  steps:
+    cluster_profile: gcp-qe
+    env:
+      BASELINE_CAPABILITY_SET: None
+    test:
+    - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-gcp-upi
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-priv
+  repo: cluster-etcd-operator

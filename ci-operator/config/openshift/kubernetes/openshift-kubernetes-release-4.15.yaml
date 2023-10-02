@@ -27,6 +27,14 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: oc-rpms
+  ocp_4.14_base:
+    name: "4.14"
+    namespace: ocp
+    tag: base
+  ocp_4.14_tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -45,21 +53,24 @@ build_root:
 canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
-  from: base
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  from: tools
   inputs:
+    ocp_4.14_tools:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:tools
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
-  from: base
   inputs:
     base-machine-with-rpms:
       as:
@@ -90,8 +101,10 @@ images:
   to: rhel-coreos
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
-  from: base
   inputs:
+    ocp_4.14_base:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:base
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
@@ -426,6 +439,10 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-crun
+- as: e2e-aws-crun-wasm
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-crun-wasm
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

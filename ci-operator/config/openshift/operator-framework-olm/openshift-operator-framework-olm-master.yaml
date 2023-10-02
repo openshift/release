@@ -7,6 +7,10 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
   os:
     name: centos
     namespace: origin
@@ -21,6 +25,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: operator-lifecycle-manager
 - dockerfile_path: operator-registry.Dockerfile
   from: base
@@ -28,20 +35,23 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: operator-registry
 - dockerfile_path: base.Dockerfile
   from: src
   to: ci-image
-- dockerfile_literal: |-
-    FROM quay.io/centos/centos:stream8
-    ADD bumper /usr/bin/bumper
-    ENTRYPOINT ["bumper"]
+- context_dir: scripts/bumper
   from: os
   inputs:
     bin:
       paths:
       - destination_dir: .
         source_path: /go/bin/bumper
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: olm-bumper
 promotion:
   excluded_images:
@@ -49,13 +59,6 @@ promotion:
   - olm-bumper
   name: "4.15"
   namespace: ocp
-  to:
-  - additional_images:
-      olm-bumper: olm-bumper
-    excluded_images:
-    - '*'
-    namespace: operator-lifecycle-manager
-    tag: latest
 releases:
   initial:
     integration:

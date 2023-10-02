@@ -1,0 +1,67 @@
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: ocp-self-managed-layered-product-interop
+  cron: 0 6 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "trigger-jobs", "failure_type": "all", "classification": "self-managed Trigger Failure", "jira_project": "LPTOCPCI"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      JSON_TRIGGER_LIST: self-managed-lp-interop-jobs
+    post:
+    - ref: firewatch-report-issues
+    test:
+    - ref: trigger-jobs
+- as: ocp-self-managed-lp-watcher-bot-message
+  cron: 0 20 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      WATCHER_BOT_JOB_FILE: self-managed-lp-interop-jobs
+      WATCHER_BOT_JOB_GROUP_NAME: OCP Self Managed Layered Product Scenarios
+    test:
+    - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
+- as: rosa-sts-hypershift-layered-product-interop
+  cron: 0 10 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "trigger-jobs", "failure_type": "all", "classification": "Rosa-sts-hypershift Trigger Failure", "jira_project": "LPTOCPCI"}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
+      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
+      JSON_TRIGGER_LIST: rosa-sts-hypershift-lp-interop-jobs
+    post:
+    - ref: firewatch-report-issues
+    test:
+    - ref: trigger-jobs
+- as: rosa-sts-hypershift-lp-watcher-bot-message
+  cron: 0 20 * * 1
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      WATCHER_BOT_JOB_FILE: rosa-sts-hypershift-lp-interop-jobs
+      WATCHER_BOT_JOB_GROUP_NAME: ROSA STS Hypershift Layered Product Scenarios
+    test:
+    - ref: trigger-jobs-interop-ocp-watcher-bot-send-message
+zz_generated_metadata:
+  branch: main
+  org: rhpit
+  repo: interop-tests
+  variant: weekly_trigger
