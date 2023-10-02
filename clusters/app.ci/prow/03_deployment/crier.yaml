@@ -22,7 +22,7 @@ items:
   kind: Deployment
   metadata:
     namespace: ci
-    name: crier-apps-auth
+    name: crier
     labels:
       app: prow
       component: crier
@@ -36,13 +36,11 @@ items:
       matchLabels:
         app: prow
         component: crier
-        flavor: apps-auth
     template:
       metadata:
         labels:
           app: prow
           component: crier
-          flavor: apps-auth
       spec:
         serviceAccountName: crier
         initContainers:
@@ -90,8 +88,7 @@ items:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
           - --job-config-path=/var/repo/release/ci-operator/jobs
-          - --github-app-id=$(GITHUB_APP_ID)
-          - --github-app-private-key-path=/etc/github/cert
+          - --github-token-path=/etc/github/oauth
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
@@ -103,16 +100,10 @@ items:
           - --projected-token-file=/var/sa-token/token
           - --kubeconfig-dir=/etc/build-farm-credentials
           - --kubeconfig-suffix=config
-          env:
-          - name: GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: openshift-prow-github-app
-                key: appid
           volumeMounts:
           - name: service-account-token
             mountPath: /var/sa-token
-          - name: github-app-credentials
+          - name: oauth
             mountPath: /etc/github
             readOnly: true
           - name: slack
@@ -139,9 +130,9 @@ items:
             sources:
             - serviceAccountToken:
                 path: token
-        - name: github-app-credentials
+        - name: oauth
           secret:
-            secretName: openshift-prow-github-app
+            secretName: github-credentials-openshift-merge-robot
         - name: slack
           secret:
             secretName: slack-credentials-prow
