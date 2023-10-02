@@ -1,32 +1,30 @@
-postsubmits:
-  openshift-priv/cluster-api-provider-openstack:
+presubmits:
+  RedHatQE/interop-testing:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^master$
-    cluster: build04
+    - ^cnv-4\.13$
+    - ^cnv-4\.13-
+    cluster: build03
+    context: ci/prow/ocp-cnv-odf-4.13-images
     decorate: true
     decoration_config:
-      oauth_token_secret:
-        key: oauth
-        name: github-credentials-openshift-ci-robot-private-git-cloner
-    hidden: true
+      skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
+      ci-operator.openshift.io/variant: ocp-cnv-odf-4.13
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-priv-cluster-api-provider-openstack-master-images
-    path_alias: sigs.k8s.io/cluster-api-provider-openstack
+      job-release: "4.13"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-RedHatQE-interop-testing-cnv-4.13-ocp-cnv-odf-4.13-images
+    rerun_command: /test ocp-cnv-odf-4.13-images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --oauth-token-path=/usr/local/github-credentials/oauth
-        - --promote
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
+        - --variant=ocp-cnv-odf-4.13
         command:
         - ci-operator
         image: ci-operator:latest
@@ -39,17 +37,11 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
-        - mountPath: /usr/local/github-credentials
-          name: github-credentials-openshift-ci-robot-private-git-cloner
-          readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
-          readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
           readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
@@ -62,9 +54,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )ocp-cnv-odf-4.13-images,?($|\s.*)
