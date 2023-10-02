@@ -3,29 +3,22 @@ base_images:
     name: 4.15-priv
     namespace: ocp-private
     tag: base
-  ci-artifacts:
-    name: master
-    namespace: psap
-    tag: ci-artifacts
   ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.15
+binary_build_commands: make build
 build_root:
   from_repository: true
-canonical_go_repository: github.com/openshift/cluster-nfd-operator
+canonical_go_repository: sigs.k8s.io/cluster-api-provider-openstack
 images:
-- dockerfile_path: Dockerfile
+- dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
     ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
-  to: cluster-nfd-operator
-operator:
-  bundles:
-  - context_dir: manifests/stable
-    dockerfile_path: bundle.Dockerfile
+  to: openstack-machine-controllers
 promotion:
   name: 4.15-priv
   namespace: ocp-private
@@ -45,26 +38,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
+- as: test
   commands: make test
   container:
     from: src
-- as: verify
-  commands: make verify
-  container:
-    from: src
-- as: e2e-aws
-  steps:
-    cluster_profile: aws
-    dependencies:
-      OO_INDEX: ci-index
-    env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: '!create'
-      OO_PACKAGE: nfd
-      OO_TARGET_NAMESPACES: '!install'
-    workflow: optional-operators-ci-aws
 zz_generated_metadata:
-  branch: master
+  branch: main
   org: openshift-priv
-  repo: cluster-nfd-operator
+  repo: cluster-api-provider-openstack

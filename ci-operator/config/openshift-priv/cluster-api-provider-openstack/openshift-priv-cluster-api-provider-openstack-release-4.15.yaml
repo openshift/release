@@ -39,63 +39,10 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- as: unit
+- as: test
   commands: make test
   container:
     from: src
-- as: gofmt
-  commands: IS_CONTAINER=TRUE make fmt
-  container:
-    from: src
-- as: govet
-  commands: IS_CONTAINER=TRUE make vet
-  container:
-    from: src
-- as: golint
-  commands: IS_CONTAINER=TRUE make lint
-  container:
-    from: src
-- as: e2e-upgrade
-  optional: true
-  steps:
-    cluster_profile: openstack-vexxhost
-    workflow: openshift-upgrade-openstack
-- as: e2e-openstack
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      TEST_SUITE: experimental/reliability/minimal
-    workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-parallel
-  optional: true
-  steps:
-    cluster_profile: openstack-vexxhost
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      TEST_SUITE: openshift/conformance/parallel
-    workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-proxy
-  optional: true
-  skip_if_only_changed: ^docs/
-  steps:
-    cluster_profile: openstack-vh-mecha-central
-    workflow: openshift-e2e-openstack-proxy
-- as: e2e-openstack-operator
-  optional: true
-  steps:
-    cluster_profile: openstack-vexxhost
-    test:
-    - as: test
-      cli: latest
-      commands: JUNIT_DIR=${ARTIFACT_DIR} make test-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: openshift-e2e-openstack-ipi
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv
