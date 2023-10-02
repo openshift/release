@@ -59,19 +59,19 @@ done
 
 echo -e "[INFO] Start tests with user: ${GITHUB_USER}"
 
-yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
-if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
-    OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
-elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then
-    # Recommendation from hypershift qe team in slack channel..
-    OPENSHIFT_PASSWORD="$(cat ${SHARED_DIR}/kubeadmin-password)"
-else
-    echo "Kubeadmin password file is empty... Aborting job"
-    exit 1
-fi
+# yq -i 'del(.clusters[].cluster.certificate-authority-data) | .clusters[].cluster.insecure-skip-tls-verify=true' $KUBECONFIG
+# if [[ -s "$KUBEADMIN_PASSWORD_FILE" ]]; then
+#     OPENSHIFT_PASSWORD="$(cat $KUBEADMIN_PASSWORD_FILE)"
+# elif [[ -s "${SHARED_DIR}/kubeadmin-password" ]]; then
+#     # Recommendation from hypershift qe team in slack channel..
+#     OPENSHIFT_PASSWORD="$(cat ${SHARED_DIR}/kubeadmin-password)"
+# else
+#     echo "Kubeadmin password file is empty... Aborting job"
+#     exit 1
+# fi
 
 timeout --foreground 5m bash  <<- "EOF"
-    while ! oc login "$OPENSHIFT_API" -u "$OPENSHIFT_USERNAME" -p "$OPENSHIFT_PASSWORD" --insecure-skip-tls-verify=true; do
+    while ! oc login https://api.cluster-wrrt9.wrrt9.sandbox2370.opentlc.com:6443 -u admin -p szvUT6onI8A95uMr --insecure-skip-tls-verify=true; do
             sleep 20
     done
 EOF
@@ -101,7 +101,7 @@ echo "https://${GITHUB_USER}:${GITHUB_TOKEN}@github.com" > "${GIT_CREDS_PATH}"
 
 cd "$(mktemp -d)"
 
-git clone --branch main "https://${GITHUB_TOKEN}@github.com/redhat-appstudio/e2e-tests.git" .
-make ci/prepare/e2e-branch
+git clone --branch RHTAP-1700 "https://${GITHUB_TOKEN}@github.com/psturc/e2e-tests.git" .
+# make ci/prepare/e2e-branch
 
 make ci/test/e2e
