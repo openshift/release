@@ -89,13 +89,13 @@ function cleanup_ibmcloud_powervs() {
 
     if [ -n "$(ic pi nets 2> /dev/null | grep DHCP || true)" ]
     then
-       curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-darwin-amd64"
+       curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
        chmod +x /tmp/pvsadm
 
        POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
 
-       NET_ID=$(IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver list --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --skip_headers --one_output | awk '{print $2}' | grep -v ID | grep -v '|' | sed '/^$/d')
-       IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver delete --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --id "${NET_ID}" 
+       NET_ID=$(IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver list --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --skip_headers --one_output | awk '{print $2}' | grep -v ID | grep -v '|' | sed '/^$/d' || true)
+       IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver delete --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --id "${NET_ID}" || true
        sleep 60
     fi
 
