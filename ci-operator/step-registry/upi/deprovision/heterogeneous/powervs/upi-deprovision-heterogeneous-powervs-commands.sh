@@ -60,14 +60,6 @@ function cleanup_ibmcloud_powervs() {
       sleep 60
     done
 
-    echo "Deleting the Cloud Connections"
-    for CC_INSTANCE_ID in $(ic pi cons --json | jq -r '.cloudConnections[] | select(.name | contains("mac-cloud-conn")).cloudConnectionID')
-    do
-      echo "Deleting Cloud Connection Instance ${CC_INSTANCE_ID}"
-      ic pi cond "${CC_INSTANCE_ID}"
-      sleep 60
-    done
-
     echo "Deleting the Images"
     for IMAGE_ID in $(ic pi imgs --json | jq -r '.images[].imageID')
     do
@@ -191,9 +183,9 @@ then
 
   echo "Destroy the terraform"
   # Fetch the ocp4-upi-compute-powervs repo to perform deprovisioning
-  cd "${IBMCLOUD_HOME_FOLDER}" && curl -L "https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-${OCP_VERSION}.tar.gz" -o "${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz" \
+  cd "${IBMCLOUD_HOME_FOLDER}" && curl -L "https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-${OCP_VERSION}-per.tar.gz" -o "${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz" \
       && tar -xzf "${IBMCLOUD_HOME_FOLDER}/ocp-${OCP_VERSION}.tar.gz" \
-      && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs"
+      && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}-per" "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs"
   # copy the var.tfvars file from ${SHARED_DIR}
   cp "${SHARED_DIR}/var.tfvars" ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/data/var.tfvars
   cp "${SHARED_DIR}/terraform.tfstate" ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs/terraform.tfstate

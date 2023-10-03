@@ -71,14 +71,6 @@ function cleanup_ibmcloud_powervs() {
       sleep 60
     done
 
-    echo "Deleting the Cloud Connections"
-    for CC_INSTANCE_ID in $(ic pi cons --json | jq -r '.cloudConnections[] | select(.name | contains("mac-cloud-conn")).cloudConnectionID')
-    do
-      echo "Deleting Cloud Connection Instance ${CC_INSTANCE_ID}"
-      ic pi cond "${CC_INSTANCE_ID}"
-      sleep 60
-    done
-
     echo "Deleting the Images"
     for IMAGE_ID in $(ic pi imgs --json | jq -r '.images[].imageID')
     do
@@ -250,16 +242,17 @@ case "$CLUSTER_TYPE" in
       RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
 
       ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -r "${REGION}" -g "${RESOURCE_GROUP}"
-      ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage power-iaas is
+      ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage power-iaas is tg
 
       # Run Cleanup
       cleanup_ibmcloud_powervs "${CLEAN_VERSION}" "${WORKSPACE_NAME}" "${REGION}" "${RESOURCE_GROUP}" "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 
       # Before the workspace is created, download the automation code
+      # release-4.14-per
       cd "${IBMCLOUD_HOME_FOLDER}" \
-        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}".tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
+        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}"-per.tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
         && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
-        && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs
+        && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}-per" "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs
 
       # create workspace for powervs from cli
       echo "Display all the variable values:"
