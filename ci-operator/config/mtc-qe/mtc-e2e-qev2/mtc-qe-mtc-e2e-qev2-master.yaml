@@ -1,0 +1,60 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  mtc-apps-deployer:
+    name: mtc-apps-deployer
+    namespace: mtc-qe
+    tag: master
+  mtc-python-client:
+    name: mtc-python-client
+    namespace: mtc-qe
+    tag: master
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- context_dir: .
+  dockerfile_path: dockerfiles/interop/Dockerfile
+  inputs:
+    mtc-apps-deployer:
+      paths:
+      - destination_dir: mtc-apps-deployer.tar.gz
+        source_path: /mtc-apps-deployer.tar.gz
+    mtc-python-client:
+      paths:
+      - destination_dir: mtc-python-client.tar.gz
+        source_path: /mtc-python-client.tar.gz
+  to: mtc-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: mtc-interop-aws
+  cron: 0 6 25 12 *
+  steps:
+    cluster_profile: aws-cspi-qe
+    env:
+      CLUSTER1_CONFIG: name=mtc-aws-ipi-target;base_domain=cspilp.interop.ccitredhat.com;platform=aws;region=us-east-2;version=4.14;stream=nightly;worker_flavor=m5.xlarge
+      CLUSTER2_CONFIG: name=mtc-aws-ipi-source;base_domain=cspilp.interop.ccitredhat.com;platform=aws;region=us-east-2;version=4.14;stream=nightly;worker_flavor=m5.xlarge
+      PULL_SECRET_NAME: pull-secret
+      S3_BUCKET_NAME: openshift-cli-installer-cspi-interop
+      S3_BUCKET_PATH: openshift-ci
+    test:
+    - ref: mtc-prepare-clusters
+    workflow: cluster
+zz_generated_metadata:
+  branch: master
+  org: mtc-qe
+  repo: mtc-e2e-qev2
