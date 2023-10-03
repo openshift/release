@@ -35,3 +35,4 @@ rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
 
 folder_name=$(ls -t -d /tmp/*/ | head -1)
 jq ".iterations = $ITERATIONS" $folder_name/index_data.json >> ${SHARED_DIR}/index_data.json
+# 3 October 2023 test
