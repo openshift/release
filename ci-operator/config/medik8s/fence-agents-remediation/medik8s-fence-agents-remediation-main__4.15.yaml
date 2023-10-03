@@ -16,7 +16,9 @@ images:
   to: fence-agents-remediation
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: my-bundle
+    dockerfile_path: bundle.Dockerfile
+    skip_building_index: true
   substitutions:
   - pullspec: quay.io/medik8s/fence-agents-remediation-operator:.*
     with: pipeline:fence-agents-remediation
@@ -32,6 +34,11 @@ resources:
       cpu: 500m
       memory: 1000Mi
 tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -70,7 +77,7 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
