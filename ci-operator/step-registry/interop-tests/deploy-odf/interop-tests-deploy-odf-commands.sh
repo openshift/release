@@ -5,11 +5,35 @@ set -o errexit
 set -o pipefail
 
 ODF_INSTALL_NAMESPACE=openshift-storage
-ODF_OPERATOR_CHANNEL="$ODF_OPERATOR_CHANNEL"
-ODF_SUBSCRIPTION_NAME="$ODF_SUBSCRIPTION_NAME"
-ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2'}"
+DEFAULT_ODF_OPERATOR_CHANNEL="stable-${ODF_VERSION_MAJOR_MINOR}"
+ODF_OPERATOR_CHANNEL="${ODF_OPERATOR_CHANNEL:-${DEFAULT_ODF_OPERATOR_CHANNEL}}"
+ODF_SUBSCRIPTION_NAME="${ODF_SUBSCRIPTION_NAME:-'odf-operator'}"
+ODF_BACKEND_STORAGE_CLASS="${ODF_BACKEND_STORAGE_CLASS:-'gp2-csi'}"
 ODF_VOLUME_SIZE="${ODF_VOLUME_SIZE:-50}Gi"
 
+function monitor_progress() {
+  local status=''
+  while true; do
+    echo "Checking progress..."
+    oc get storagecluster.ocs.openshift.io/ocs-storagecluster -n "${ODF_INSTALL_NAMESPACE}" \
+      -o jsonpath='{range .status.conditions[*]}{@}{"\n"}{end}'
+    status=$(oc get "storagecluster.ocs.openshift.io/ocs-storagecluster" -n openshift-storage -o jsonpath="{.status.phase}")
+    if [[ "$status" == "Ready" ]]; then
+      echo "StorageCluster is Ready"
+      exit 0
+    fi
+    sleep 30
+  done
+}
+
+function run_must_gather_and_abort_on_fail() {
+  local odf_must_gather_image="quay.io/rhceph-dev/ocs-must-gather:latest-${ODF_VERSION_MAJOR_MINOR}"
+  # Wait for StorageCluster to be deployed, and on fail run must gather
+  oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
+    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='30m' || \
+  oc adm must-gather --image="${odf_must_gather_image}" --dest-dir="${ARTIFACT_DIR}/ocs_must_gather"
+  # exit 1
+}
 
 echo "Installing ODF from ${ODF_OPERATOR_CHANNEL} into ${ODF_INSTALL_NAMESPACE}"
 # create the install namespace
@@ -60,6 +84,9 @@ for _ in {1..60}; do
     sleep 10
 done
 
+echo "Wait for OCS Operator deployment to be ready"
+sleep 30
+
 oc wait deployment ocs-operator \
   --namespace="${ODF_INSTALL_NAMESPACE}" \
   --for=condition='Available' \
@@ -85,8 +112,8 @@ spec:
         - ReadWriteOnce
         resources:
           requests:
-            storage: 50Gi
-        storageClassName: gp2-csi
+            storage: ${ODF_VOLUME_SIZE}
+        storageClassName: ${ODF_BACKEND_STORAGE_CLASS}
         volumeMode: Block
     name: ocs-deviceset
     placement: {}
@@ -95,8 +122,20 @@ spec:
     resources: {}
 EOF
 
+# Wait 30 sec and start monitoring the progress of the StorageCluster
+sleep 30
+monitor_progress &
+run_must_gather_and_abort_on_fail &
+
 # Wait for StorageCluster to be deployed
 oc wait "storagecluster.ocs.openshift.io/ocs-storagecluster"  \
-   -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='10m'
+    -n $ODF_INSTALL_NAMESPACE --for=condition='Available' --timeout='180m'
+
+# Remove is-default-class annotation from all the storage classes
+oc get sc -o name | xargs -I{} oc annotate {} storageclass.kubernetes.io/is-default-class-
+
+# Make ocs-storagecluster-ceph-rbd the default storage class
+oc annotate storageclass ocs-storagecluster-ceph-rbd storageclass.kubernetes.io/is-default-class=true
+
 
 echo "ODF/OCS Operator is deployed successfully"

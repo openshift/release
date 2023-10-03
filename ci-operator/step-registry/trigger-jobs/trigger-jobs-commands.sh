@@ -8,27 +8,6 @@ GANGWAY_API_TOKEN=$(cat $SECRETS_DIR/gangway-api-token)
 WEEKLY_JOBS="$SECRETS_DIR/$JSON_TRIGGER_LIST"
 URL="https://gangway-ci.apps.ci.l2s4.p1.openshiftapps.com"
 
-echo "Check to make sure we do not run this testing against the same build twice."
-if [[ "$JOB_NAME" == *"self-managed"* ]]; then
-    LATEST_BUILD_ID=$(curl -s "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/logs/$JOB_NAME/latest-build.txt")
-    LATEST_OCP_BUILD=$(curl -s "https://gcsweb-ci.apps.ci.l2s4.p1.openshiftapps.com/gcs/origin-ci-test/logs/$JOB_NAME/${LATEST_BUILD_ID}/artifacts/release/artifacts/release-images-latest" | jq -r '.metadata.name')
-    CURRENT_OCP_BUILD=$(oc get istag release:latest -o json | jq '.image.dockerImageMetadata.Config.Labels."io.openshift.release"')
-    CURRENT_OCP_BUILD="${CURRENT_OCP_BUILD//\"}"
-
-    if [[ $LATEST_OCP_BUILD == "$CURRENT_OCP_BUILD" ]]; then
-        echo "OCP build from previous run: $LATEST_OCP_BUILD"
-        echo "OCP build for this current run: $CURRENT_OCP_BUILD"
-        echo "These builds are the same so we will not trigger the Interop LP weekly testing"
-        exit 1
-    else
-        echo "OCP build from previous run: $LATEST_OCP_BUILD"
-        echo "OCP build for this current run: $CURRENT_OCP_BUILD"
-        echo "The build is not the same as the previous run... continuing to trigger weekly testing."
-    fi
-else
-    echo "We are not running the self-managed weekly job this check will be skipped."
-fi
-
 echo "# Printing the jobs-to-trigger JSON:"
 jq -c '.[]' "$WEEKLY_JOBS"
 
