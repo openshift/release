@@ -1,4 +1,8 @@
 base_images:
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
   os:
     name: centos
     namespace: origin
@@ -12,7 +16,8 @@ images:
   to: fence-agents-remediation
 operator:
   bundles:
-  - dockerfile_path: bundle.Dockerfile
+  - as: my-bundle
+    dockerfile_path: bundle.Dockerfile
   substitutions:
   - pullspec: quay.io/medik8s/fence-agents-remediation-operator:.*
     with: pipeline:fence-agents-remediation
@@ -28,25 +33,45 @@ resources:
       cpu: 500m
       memory: 1000Mi
 tests:
+- as: test
+  commands: make test
+  container:
+    from: src
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
 - as: openshift-e2e
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: my-bundle
     env:
-      OO_CHANNEL: stable
       OO_INSTALL_NAMESPACE: far-install
-      OO_PACKAGE: fence-agents-remediation
-      OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e
+    - as: e2e-install
       cli: latest
-      commands: export OPERATOR_NS="far-install" && make ocp-aws-credentials test-e2e
+      commands: |
+        oc create namespace "$OO_INSTALL_NAMESPACE"
+        operator-sdk run bundle -n "$OO_INSTALL_NAMESPACE" "$OO_BUNDLE" # install FAR
+        oc wait --for condition=Available -n "$OO_INSTALL_NAMESPACE" deployment fence-agents-remediation-controller-manager # wait until the deployment is ready
+      env:
+      - name: OO_INSTALL_NAMESPACE
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: export OPERATOR_NS="$OO_INSTALL_NAMESPACE" && make ocp-aws-credentials
+        test-e2e
+      env:
+      - name: OO_INSTALL_NAMESPACE
       from: src
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
-    workflow: optional-operators-ci-aws
+    workflow: optional-operators-ci-operator-sdk-aws
 zz_generated_metadata:
   branch: main
   org: medik8s
