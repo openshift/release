@@ -3,6 +3,10 @@ base_images:
     name: centos
     namespace: origin
     tag: stream8
+  operator-sdk:
+    name: "4.15"
+    namespace: origin
+    tag: operator-sdk
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -33,14 +37,34 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      OO_CHANNEL: stable
-      OO_INSTALL_NAMESPACE: far-install
-      OO_PACKAGE: fence-agents-remediation
-      OO_TARGET_NAMESPACES: '!all'
+      INSTALL_NAMESPACE: far-install
     test:
-    - as: e2e
+    - as: e2e-install
       cli: latest
-      commands: export OPERATOR_NS="far-install" && make ocp-aws-credentials test-e2e
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+
+        # workaround for OLM pod not running with restricted PSA - OCP 4.15+
+        oc label --overwrite ns "$INSTALL_NAMESPACE" security.openshift.io/scc.podSecurityLabelSync=false
+        oc label --overwrite ns "$INSTALL_NAMESPACE" pod-security.kubernetes.io/enforce=privileged
+
+        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE" # install FAR
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment fence-agents-remediation-controller-manager # wait until the deployment is ready 
+      dependencies:
+      - env: OO_BUNDLE # expose env. var. $OO_BUNDLE to the test
+        name: my-bundle # the value of $OO_BUNDLE is resolved by the pull spec of the bundle image
+      env:
+      - name: INSTALL_NAMESPACE
+      from: operator-sdk # the image operator-sdk defined above in base_images
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: e2e-test
+      cli: latest
+      commands: export OPERATOR_NS="$INSTALL_NAMESPACE" && make ocp-aws-credentials test-e2e
+      env:
+      - name: INSTALL_NAMESPACE
       from: src
       resources:
         requests:
