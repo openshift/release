@@ -169,9 +169,6 @@ CONFIG = {
     'openstack-hwoffload-quota-slice': {
         'default': 5,
     },
-    'openstack-kuryr-quota-slice': {
-        'default': 2,
-    },
     'openstack-nfv-quota-slice': {
         'default': 5,
     },
