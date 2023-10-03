@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build04
     context: ci/prow/snyk-code
     decorate: true
     labels:
@@ -32,38 +32,6 @@ presubmits:
           requests:
             cpu: "1"
     trigger: (?m)^/test( | .* )snyk-code,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/snyk-deps
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ci-tools-master-snyk-deps
-    optional: true
-    rerun_command: /test snyk-deps
-    spec:
-      containers:
-      - args:
-        - analyse-deps
-        command:
-        - make
-        env:
-        - name: SNYK_TOKEN
-          valueFrom:
-            secretKeyRef:
-              key: api-token
-              name: snyk-credentials
-        image: snyk-cli:go1.19
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: "1"
-    trigger: (?m)^/test( | .* )snyk-deps,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
@@ -2970,15 +2938,13 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build04
     context: ci/prow/rosa-sts-ocp4.13-lp-interop-rosa-sts-qa-e2e-tests
     decorate: true
     decoration_config:
       skip_cloning: true
       timeout: 5h0m0s
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws-cspi-qe
       ci-operator.openshift.io/variant: rosa-sts-ocp4.13-lp-interop
       ci.openshift.io/generator: prowgen
       job-release: "4.13"
@@ -2989,11 +2955,10 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/rosa-sts-qa-e2e-tests-cluster-profile
         - --target=rosa-sts-qa-e2e-tests
         - --variant=rosa-sts-ocp4.13-lp-interop
         command:
@@ -3005,16 +2970,17 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/rosa-sts-qa-e2e-tests-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -3024,18 +2990,15 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws-cspi-qe
+          secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -3048,7 +3011,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build04
     context: ci/prow/shell-unit-tests
     decorate: true
     decoration_config:

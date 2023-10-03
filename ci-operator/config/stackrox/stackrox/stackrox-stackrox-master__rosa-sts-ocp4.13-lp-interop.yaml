@@ -30,22 +30,22 @@ resources:
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: rosa-sts-qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
   steps:
-    cluster_profile: aws-cspi-qe
     env:
-      CHANNEL_GROUP: stable
-      FIREWATCH_CONFIG: |
+      OPERATORS: |
         [
-          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "LPTOCPCI"},
-          {"step": "cluster-install", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster (ROSA)", "jira_project": "LPTOCPCI"},
-          {"step": "cluster-uninstall", "failure_type": "all", "classification": "Infrastructure Deprovisioning - Cluster (ROSA)", "jira_project": "LPTOCPCI"}
+            {"name": "ansible", "source": "redhat-operators", "channel": "stable-2.4", "install_namespace": "aap", "operator_group":"aap", "target_namespaces": "aap"}
         ]
-      FIREWATCH_DEFAULT_JIRA_PROJECT: LPTOCPCI
-      FIREWATCH_JIRA_SERVER: https://issues.redhat.com
-      OPENSHIFT_VERSION: "4.13"
     test:
+    - ref: install-operators
     - ref: stackrox-e2e
-    workflow: firewatch-rosa-aws-sts
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: master
