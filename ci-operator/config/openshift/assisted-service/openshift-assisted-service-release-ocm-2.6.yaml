@@ -325,41 +325,6 @@ tests:
           cpu: 100m
           memory: 200Mi
     workflow: generic-claim
-- as: subsystem-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  cron: 00 00 */1 * 0-5
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-        export PERSISTENT_STORAGE="False"
-        export GENERATE_CRD='false'
-        unset GOFLAGS
-        make ci-deploy-for-subsystem
-        oc get pods
-        make test
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      - env: IMAGE_SERVICE
-        name: assisted-image-service
-      from: assisted-service-subsystem
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
 - as: subsystem-kubeapi-aws
   cluster_claim:
     architecture: amd64
@@ -369,42 +334,6 @@ tests:
     timeout: 1h0m0s
     version: "4.10"
   run_if_changed: ^(cmd/.*|deploy/.*|hack/.*|internal/.*|pkg/.*|tools/.*|subsystem/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-  steps:
-    allow_best_effort_post_steps: true
-    test:
-    - as: subsystem-deploy-and-run
-      cli: latest
-      commands: |
-        export BUILD_TYPE=CI
-        export REPORTS=${ARTIFACT_DIR}
-        export TARGET=oc
-        export PERSISTENT_STORAGE="False"
-        export GENERATE_CRD='false'
-        unset GOFLAGS
-        make ci-deploy-for-subsystem
-        oc get pods
-        make enable-kube-api-for-subsystem
-        make test-kube-api
-      dependencies:
-      - env: SERVICE
-        name: assisted-service
-      - env: IMAGE_SERVICE
-        name: assisted-image-service
-      from: assisted-service-subsystem
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    workflow: generic-claim
-- as: subsystem-kubeapi-aws-periodic
-  cluster_claim:
-    architecture: amd64
-    cloud: aws
-    owner: openshift-ci
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.10"
-  cron: 00 00 */1 * 0-5
   steps:
     allow_best_effort_post_steps: true
     test:
@@ -442,30 +371,7 @@ tests:
     env:
       ALLOW_CONVERGED_FLOW: "False"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-periodic
-  cron: 25 04 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ALLOW_CONVERGED_FLOW: "False"
-    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-3masters
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ALLOW_CONVERGED_FLOW: "False"
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=3
-      NUM_EXTRA_WORKERS: "3"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-3masters-periodic
-  cron: 45 04 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -479,18 +385,6 @@ tests:
     workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-disconnected
   run_if_changed: ^(cmd/.*|data/.*|deploy/operator/.*|hack/.*|internal/.*|pkg/.*|tools/.*|Dockerfile\..*|Makefile|go\.mod|go\.sum|swagger.yaml)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ALLOW_CONVERGED_FLOW: "False"
-      DISCONNECTED: "true"
-      IP_STACK: v6
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-disconnected-periodic
-  cron: 50 04 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
@@ -515,37 +409,8 @@ tests:
         NUMBER_OF_DAY2_HOSTS=1
       NUM_EXTRA_WORKERS: "2"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-sno-day2-workers-periodic
-  cron: 05 05 */1 * 0-5
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ALLOW_CONVERGED_FLOW: "False"
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=1
-        NUMBER_OF_DAY2_HOSTS=1
-      NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
 - as: e2e-ai-operator-ztp-sno-day2-workers-late-binding
   optional: true
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    env:
-      ALLOW_CONVERGED_FLOW: "False"
-      ASSISTED_ZTP_CONFIG: |
-        SPOKE_CONTROLPLANE_AGENTS=1
-        NUMBER_OF_DAY2_HOSTS=1
-        DAY2_LATE_BINDING=True
-      NUM_EXTRA_WORKERS: "2"
-    workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-sno-day2-workers-late-binding-periodic
-  cron: 25 05 */1 * 0-5
   steps:
     cluster_profile: packet-assisted
     dependencies:
