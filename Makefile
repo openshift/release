@@ -8,13 +8,13 @@ export SKIP_PULL ?= false
 
 VOLUME_MOUNT_FLAGS = :z
 ifeq ($(CONTAINER_ENGINE), docker)
-	USER=--user $(shell id -u):$(shell id -g)
+	CONTAINER_USER=--user $(shell id -u):$(shell id -g)
 else
 	ifeq ($(shell uname -s), Darwin)
 		# if you're running podman on macOS, don't set the SELinux label
 		VOLUME_MOUNT_FLAGS =
 	endif
-	USER=
+	CONTAINER_USER=
 endif
 
 help:
@@ -67,7 +67,7 @@ release-controllers: update_crt_crd
 	./hack/generators/release-controllers/generate-release-controllers.py .
 
 checkconfig:
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230927-4613add0a1 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" gcr.io/k8s-prow/checkconfig:v20230927-4613add0a1 --config-path /release/core-services/prow/02_config/_config.yaml --supplemental-prow-config-dir=/release/core-services/prow/02_config --job-config-path /release/ci-operator/jobs/ --plugin-config /release/core-services/prow/02_config/_plugins.yaml --supplemental-plugin-config-dir /release/core-services/prow/02_config --strict --exclude-warning long-job-names --exclude-warning mismatched-tide-lenient
 
 jobs: ci-operator-checkconfig
 	$(MAKE) ci-operator-prowgen
@@ -75,62 +75,62 @@ jobs: ci-operator-checkconfig
 
 ci-operator-checkconfig:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/ci-operator-checkconfig:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/ci-operator-checkconfig:latest --config-dir /ci-operator/config --registry /ci-operator/step-registry
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/ci-operator-checkconfig:latest --config-dir /ci-operator/config --registry /ci-operator/step-registry
 .PHONY: ci-operator-checkconfig
 
 ci-operator-config:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/determinize-ci-operator:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/config:/ci-operator/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/determinize-ci-operator:latest --config-dir /ci-operator/config --confirm
 
 ci-operator-prowgen:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/ci-operator-prowgen:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go registry.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo $(WHAT)
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/go/src/github.com/openshift/release$(VOLUME_MOUNT_FLAGS)" -e GOPATH=/go registry.ci.openshift.org/ci/ci-operator-prowgen:latest --from-release-repo --to-release-repo $(WHAT)
 
 sanitize-prow-jobs:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/sanitize-prow-jobs:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml $(WHAT)
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm --ulimit nofile=16384:16384 -v "$(CURDIR)/ci-operator/jobs:/ci-operator/jobs$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/core-services/sanitize-prow-jobs:/core-services/sanitize-prow-jobs$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/sanitize-prow-jobs:latest --prow-jobs-dir /ci-operator/jobs --config-path /core-services/sanitize-prow-jobs/_config.yaml $(WHAT)
 
 registry-metadata:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/generate-registry-metadata:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator/step-registry:/ci-operator/step-registry$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/generate-registry-metadata:latest --registry /ci-operator/step-registry
 
 boskos-config:
 	cd core-services/prow/02_config && ./generate-boskos.py
 
 prow-config:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/determinize-prow-config:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/determinize-prow-config:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --sharded-plugin-config-base-dir /config
 
 acknowledge-critical-fixes-only:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/tide-config-manager:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase acknowledge-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
+	$(CONTAINER_ENGINE) run $(CONTAINER_USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(REPOS):/repos" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase acknowledge-critical-fixes-only --repos-guarded-by-ack-critical-fixes /repos
 	$(MAKE) prow-config
 
 revert-acknowledge-critical-fixes-only:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/tide-config-manager:latest
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
+	$(CONTAINER_ENGINE) run $(CONTAINER_USER) --platform linux/${GO_ARCH} --rm -v "$(CURDIR)/core-services/prow/02_config:/config$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/tide-config-manager:latest --prow-config-dir /config --sharded-prow-config-base-dir /config --lifecycle-phase revert-critical-fixes-only
 	$(MAKE) prow-config
 
 branch-cut:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/config-brancher:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR)/ci-operator:/ci-operator$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --current-release=4.8 --future-release=4.9 --bump-release=4.9 --confirm
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/ci-operator:/ci-operator$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/config-brancher:latest --config-dir /ci-operator/config --current-release=4.8 --future-release=4.9 --bump-release=4.9 --confirm
 	$(MAKE) update
 
 new-repo:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/repo-init:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -it -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/repo-init:latest --release-repo /release
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -it -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/repo-init:latest --release-repo /release
 	$(MAKE) update
 
 validate-step-registry:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/ci-operator-configresolver:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/prow$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/step-registry$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/ci-operator-configresolver:latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR)/core-services/prow/02_config:/prow$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/config:/config$(VOLUME_MOUNT_FLAGS)" -v "$(CURDIR)/ci-operator/step-registry:/step-registry$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/ci-operator-configresolver:latest --config /config --registry /step-registry --prow-config /prow/_config.yaml --validate-only
 
 refresh-bugzilla-prs:
 	./hack/refresh-bugzilla-prs.sh
 
 python-validation:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/python-validation:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/python-validation:latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/python-validation:latest cd /release && pylint --rcfile=hack/.pylintrc --ignore=lib,image-mirroring --persistent=n hack
 
 # LEGACY TARGETS
 # You should not need to add new targets here.
@@ -271,7 +271,7 @@ build_farm_credentials_folder:
 
 update-ci-build-clusters:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/cluster-init:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/cluster-init:latest -release-repo=/release -create-pr=false -update=true
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/cluster-init:latest -release-repo=/release -create-pr=false -update=true
 .PHONY: update-ci-build-clusters
 
 verify-app-ci:
@@ -279,7 +279,7 @@ verify-app-ci:
 
 mixins:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/dashboards-validation:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --user=$(UID) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/openshift-user-workload-monitoring/mixins install all
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --user=$(UID) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/dashboards-validation:latest make -C /release/clusters/app.ci/openshift-user-workload-monitoring/mixins install all
 .PHONY: mixins
 
 # Runs e2e secrets generation and sync to clusters.
@@ -303,13 +303,13 @@ new-pool-admins:
 
 openshift-image-mirror-mappings:
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/promoted-image-governor:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/promoted-image-governor:latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) --rm -v "$(CURDIR):/release$(VOLUME_MOUNT_FLAGS)" registry.ci.openshift.org/ci/promoted-image-governor:latest --ci-operator-config-path /release/ci-operator/config --release-controller-mirror-config-dir /release/core-services/release-controller/_releases --openshift-mapping-dir /release/core-services/image-mirroring/openshift --openshift-mapping-config /release/core-services/image-mirroring/openshift/_config.yaml
 .PHONY: openshift-image-mirror-mappings
 
 config_updater_vault_secret:
 	@[[ $$cluster ]] || (echo "ERROR: \$$cluster must be set"; exit 1)
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/applyconfig:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) \
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
 		-v "$(CURDIR)/clusters/build-clusters/common:/manifests$(VOLUME_MOUNT_FLAGS)" \
 		-v "$(kubeconfig_path):/_kubeconfig$(VOLUME_MOUNT_FLAGS)" \
@@ -335,7 +335,7 @@ build_farm_day2:
 update_github_ldap_mapping_config_map:
 	ldapsearch -LLL -x -h ldap.corp.redhat.com -b ou=users,dc=redhat,dc=com '(rhatSocialURL=GitHub*)' rhatSocialURL uid 2>&1 | tee /tmp/out
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull $(CONTAINER_ENGINE_OPTS) registry.ci.openshift.org/ci/ldap-users-from-github-owners-files:latest
-	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(USER) \
+	$(CONTAINER_ENGINE) run $(CONTAINER_ENGINE_OPTS) $(CONTAINER_USER) \
 		--rm \
 		-v "/tmp:/tmp$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/ldap-users-from-github-owners-files:latest \
@@ -445,7 +445,7 @@ generate-hypershift-deployment:
 	@:$(call check_defined, MGMT_AWS_CONFIG_PATH)
 
 	$(SKIP_PULL) || $(CONTAINER_ENGINE) pull --platform linux/${GO_ARCH} registry.ci.openshift.org/ci/hypershift-cli:${TAG}
-	$(CONTAINER_ENGINE) run $(USER) --platform linux/${GO_ARCH} \
+	$(CONTAINER_ENGINE) run $(CONTAINER_USER) --platform linux/${GO_ARCH} \
 		--rm \
 		-v "$(MGMT_AWS_CONFIG_PATH):/mgmt-aws$(VOLUME_MOUNT_FLAGS)" \
 		registry.ci.openshift.org/ci/hypershift-cli:${TAG} \
