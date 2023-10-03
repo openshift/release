@@ -1,12 +1,12 @@
 base_images:
-  os:
-    name: centos
-    namespace: origin
-    tag: stream8
   operator-sdk:
     name: "4.12"
     namespace: origin
     tag: operator-sdk
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
 binary_build_commands: make build
 build_root:
   from_repository: true
@@ -44,29 +44,30 @@ tests:
   steps:
     cluster_profile: aws
     env:
-      INSTALL_NAMESPACE: far-install
+      OO_INSTALL_NAMESPACE: far-install
     test:
     - as: e2e-install
       cli: latest
       commands: |
-        oc create namespace "$INSTALL_NAMESPACE" 
-        operator-sdk run bundle -n "$INSTALL_NAMESPACE" "$OO_BUNDLE" # install FAR
-        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment fence-agents-remediation-controller-manager # wait until the deployment is ready 
+        oc create namespace "$OO_INSTALL_NAMESPACE"
+        operator-sdk run bundle -n "$OO_INSTALL_NAMESPACE" "$OO_BUNDLE" # install FAR
+        oc wait --for condition=Available -n "$OO_INSTALL_NAMESPACE" deployment fence-agents-remediation-controller-manager # wait until the deployment is ready
       dependencies:
-      - env: OO_BUNDLE # expose env. var. $OO_BUNDLE to the test
-        name: my-bundle # the value of $OO_BUNDLE is resolved by the pull spec of the bundle image
+      - env: OO_BUNDLE
+        name: my-bundle
       env:
-      - name: INSTALL_NAMESPACE
-      from: operator-sdk # the image operator-sdk defined above in base_images
+      - name: OO_INSTALL_NAMESPACE
+      from: operator-sdk
       resources:
         requests:
           cpu: 100m
           memory: 200Mi
     - as: e2e-test
       cli: latest
-      commands: export OPERATOR_NS="$INSTALL_NAMESPACE" && make ocp-aws-credentials test-e2e
+      commands: export OPERATOR_NS="$OO_INSTALL_NAMESPACE" && make ocp-aws-credentials
+        test-e2e
       env:
-      - name: INSTALL_NAMESPACE
+      - name: OO_INSTALL_NAMESPACE
       from: src
       resources:
         requests:
