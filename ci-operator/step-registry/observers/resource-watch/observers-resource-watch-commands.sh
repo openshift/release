@@ -22,7 +22,7 @@ function cleanup() {
 
   exit 0
 }
-trap cleanup EXIT
+trap cleanup INT TERM
 
 # $KUBECONFIG could not be available when the observer first starts
 echo "waiting for $KUBECONFIG or $KUBECONFIGMINIMAL to exist"
