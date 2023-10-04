@@ -1,8 +1,8 @@
 base_images:
-  operator-sdk:
-    name: "4.15"
-    namespace: origin
-    tag: operator-sdk
+  cli-operator-sdk:
+    name: cli-operator-sdk
+    namespace: ocp
+    tag: v1.30.0
   os:
     name: centos
     namespace: origin
@@ -48,19 +48,6 @@ tests:
     env:
       OO_INSTALL_NAMESPACE: far-install
     test:
-    - as: e2e-install
-      cli: latest
-      commands: |
-        oc create namespace "$OO_INSTALL_NAMESPACE"
-        operator-sdk run bundle -n "$OO_INSTALL_NAMESPACE" "$OO_BUNDLE" # install FAR
-        oc wait --for condition=Available -n "$OO_INSTALL_NAMESPACE" deployment fence-agents-remediation-controller-manager # wait until the deployment is ready
-      env:
-      - name: OO_INSTALL_NAMESPACE
-      from: operator-sdk
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
     - as: e2e-test
       cli: latest
       commands: export OPERATOR_NS="$OO_INSTALL_NAMESPACE" && make ocp-aws-credentials
