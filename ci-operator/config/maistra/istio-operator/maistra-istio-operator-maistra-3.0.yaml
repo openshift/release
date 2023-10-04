@@ -22,7 +22,7 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: maistra-istio-operator-unit-3-0
+- as: unit
   commands: |
     make test \
     GOBIN="/gobin" \
@@ -33,7 +33,7 @@ tests:
   container:
     from: src
   timeout: 1h0m0s
-- as: maistra-istio-operator-gencheck-3-0
+- as: gencheck
   commands: |
     make gen-check \
     GOBIN="/gobin" \
@@ -43,7 +43,7 @@ tests:
   container:
     from: src
   timeout: 30m0s
-- as: maistra-istio-operator-lint-3-0
+- as: lint
   commands: |
     make lint \
     GOBIN="/gobin" \
@@ -67,7 +67,7 @@ tests:
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
     test:
-    - as: istio-operator-copy-src
+    - as: copy-src
       cli: latest
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
@@ -111,7 +111,7 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
-- as: istio-operator-integration-test-3-0
+- as: integration-ocp
   steps:
     cluster_profile: aws
     dependencies:
@@ -122,7 +122,7 @@ tests:
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
     test:
-    - as: istio-operator-copy-src
+    - as: copy-src
       cli: latest
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
@@ -138,7 +138,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: istio-operator-integration-test
+    - as: integration-ocp
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
@@ -168,6 +168,7 @@ tests:
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
 - as: scorecard
+  optional: true
   steps:
     cluster_profile: aws-2
     env:
@@ -213,7 +214,7 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-hypershift
-- as: nightly-images-3-0
+- as: nightly-images
   cron: 00 03 * * *
   steps:
     cluster_profile: aws
