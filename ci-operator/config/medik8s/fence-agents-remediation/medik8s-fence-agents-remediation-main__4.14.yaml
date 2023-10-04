@@ -43,6 +43,8 @@ tests:
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
     cluster_profile: aws
+    dependencies:
+      OO_BUNDLE: my-bundle
     env:
       OO_INSTALL_NAMESPACE: far-install
     test:
@@ -52,9 +54,6 @@ tests:
         oc create namespace "$OO_INSTALL_NAMESPACE"
         operator-sdk run bundle -n "$OO_INSTALL_NAMESPACE" "$OO_BUNDLE" # install FAR
         oc wait --for condition=Available -n "$OO_INSTALL_NAMESPACE" deployment fence-agents-remediation-controller-manager # wait until the deployment is ready
-      dependencies:
-      - env: OO_BUNDLE
-        name: my-bundle
       env:
       - name: OO_INSTALL_NAMESPACE
       from: operator-sdk
