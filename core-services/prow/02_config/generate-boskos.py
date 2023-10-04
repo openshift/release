@@ -169,9 +169,6 @@ CONFIG = {
     'openstack-hwoffload-quota-slice': {
         'default': 5,
     },
-    'openstack-kuryr-quota-slice': {
-        'default': 2,
-    },
     'openstack-nfv-quota-slice': {
         'default': 5,
     },
@@ -249,7 +246,7 @@ CONFIG = {
         'jp-tok': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'au-syd': 3,
+        'us-south': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
