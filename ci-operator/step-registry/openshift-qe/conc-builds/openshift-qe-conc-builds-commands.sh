@@ -14,7 +14,9 @@ source ./venv_qe/bin/activate
 ES_PASSWORD=$(cat "/secret/password")
 ES_USERNAME=$(cat "/secret/username")
 
-git clone https://github.com/lenahorsley/e2e-benchmarking/ --depth=1
+export KUBE_BURNER_URL="https://github.com/cloud-bulldozer/kube-burner/releases/download/v0.17.3/kube-burner-0.17.3-Linux-x86_64.tar.gz"
+
+git clone https://github.com/cloud-bulldozer/e2e-benchmarking/ --depth=1
 pushd e2e-benchmarking/workloads/kube-burner
 export WORKLOAD=concurrent-builds
 
