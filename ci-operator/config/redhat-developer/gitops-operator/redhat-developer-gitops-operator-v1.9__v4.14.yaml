@@ -4,7 +4,7 @@ base_images:
     namespace: ocp
     tag: cli
   operator-sdk:
-    name: "4.13"
+    name: "4.14"
     namespace: origin
     tag: operator-sdk
 build_root:
@@ -49,17 +49,30 @@ resources:
       memory: 6Gi
 tests:
 - as: kuttl-sequential
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.14"
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
-    cluster_profile: aws
+    env:
+      INSTALL_NAMESPACE: openshift-gitops-operator
     test:
     - as: install
       cli: latest
-      commands: "operator-sdk run bundle -n openshift-operators \"$OO_BUNDLE\"\noc
-        get pods -n openshift-operators \n"
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        oc get ns "$INSTALL_NAMESPACE" -o yaml
+        operator-sdk run bundle --security-context-config restricted -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment openshift-gitops-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: gitops-operator-bundle
+      env:
+      - name: INSTALL_NAMESPACE
       from: operator-sdk
       resources:
         requests:
@@ -74,19 +87,26 @@ tests:
         requests:
           cpu: "2"
           memory: 6Gi
-    workflow: ipi-aws
+    workflow: generic-claim
 - as: kuttl-parallel
   skip_if_only_changed: ^docs/|\.(md|adoc)$|^(README|LICENSE|OWNERS)$
   steps:
     cluster_profile: aws
+    env:
+      INSTALL_NAMESPACE: openshift-gitops-operator
     test:
     - as: install
       cli: latest
-      commands: "operator-sdk run bundle -n openshift-operators \"$OO_BUNDLE\"\noc
-        get pods -n openshift-operators \n"
+      commands: |
+        oc create namespace "$INSTALL_NAMESPACE"
+        oc get ns "$INSTALL_NAMESPACE" -o yaml
+        operator-sdk run bundle --security-context-config restricted -n "$INSTALL_NAMESPACE" "$OO_BUNDLE"
+        oc wait --for condition=Available -n "$INSTALL_NAMESPACE" deployment openshift-gitops-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: gitops-operator-bundle
+      env:
+      - name: INSTALL_NAMESPACE
       from: operator-sdk
       resources:
         requests:

@@ -992,12 +992,10 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/v4.14-kuttl-sequential
     decorate: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci-operator.openshift.io/variant: v4.14
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
@@ -1008,11 +1006,10 @@ presubmits:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/kuttl-sequential-cluster-profile
         - --target=kuttl-sequential
         - --variant=v4.14
         command:
@@ -1024,16 +1021,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/kuttl-sequential-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -1046,18 +1041,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
