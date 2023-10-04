@@ -9,6 +9,18 @@ build_root:
     namespace: ci
     tag: upstream-master
   use_build_cache: true
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ci/maistra-builder:upstream-master
+    # Git checks if the user that owns the files on the filesystem match the
+    # current user.  We need to disable this check because tests in Prow are
+    # running with a random user.
+    RUN git config --system --add safe.directory '*'
+  inputs:
+    src:
+      as:
+      - registry.ci.openshift.org/ci/maistra-builder:upstream-master
+  to: src-test
 releases:
   latest:
     release:
@@ -31,7 +43,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     TEST_FLAGS="-v"
   container:
-    from: src
+    from: src-test
   timeout: 1h0m0s
 - as: gencheck
   commands: |
@@ -41,7 +53,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
   timeout: 30m0s
 - as: lint
   commands: |
@@ -51,7 +63,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
   timeout: 20m0s
 - as: push-images
   steps:
@@ -75,7 +87,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
@@ -104,7 +116,7 @@ tests:
       - name: GOCACHE
       - name: GOBIN
       - name: GOMODCACHE
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
@@ -132,7 +144,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
@@ -160,7 +172,7 @@ tests:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
@@ -234,7 +246,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
@@ -267,7 +279,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
