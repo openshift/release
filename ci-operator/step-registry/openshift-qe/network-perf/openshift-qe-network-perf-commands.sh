@@ -25,8 +25,7 @@ export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-tes
 
 export TOLERANCE=90
 
-OUTPUT_FILE="index_data.json"
-rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
+rm -f ${SHARED_DIR}/index.json
 
 WORKLOAD=full-run.yaml ./run.sh
 
