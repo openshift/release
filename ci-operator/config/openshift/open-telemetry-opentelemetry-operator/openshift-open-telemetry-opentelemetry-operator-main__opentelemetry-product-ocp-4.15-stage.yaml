@@ -1,0 +1,59 @@
+base_images:
+  cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
+images:
+- context_dir: .
+  dockerfile_path: ./tests/e2e-openshift/Dockerfile
+  to: opentelemetry-tests-runner
+- dockerfile_path: ./cmd/otel-allocator/Dockerfile
+  to: opentelemetry-target-allocator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: opentelemetry-stage-tests
+  cron: 0 6 * 10 1
+  steps:
+    cluster_profile: aws-qe
+    env:
+      AMQ_SOURCE: dt-catalogsource
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      DOWNSTREAM_TESTS_COMMIT: c5e438ba41bec98e3ef54e41417ab01789ef156b
+      EO_SUB_CHANNEL: stable-5.7
+      EO_SUB_SOURCE: dt-catalogsource
+      JAEGER_SOURCE: dt-catalogsource
+      OTEL_SOURCE: dt-catalogsource
+      SKIP_TESTS: tests/e2e/instrumentation-go tests/e2e/instrumentation-apache-httpd
+        tests/e2e/targetallocator-features tests/e2e/smoke-targetallocator tests/e2e/prometheus-config-validation
+        tests/e2e/instrumentation-sdk
+      TEMPO_SOURCE: dt-catalogsource
+    test:
+    - ref: distributed-tracing-install-catalogsource
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: distributed-tracing-install-jaeger-product
+    - ref: distributed-tracing-install-tempo-product
+    - ref: distributed-tracing-tests-opentelemetry
+    workflow: cucushift-installer-rehearse-aws-ipi
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: open-telemetry-opentelemetry-operator
+  variant: opentelemetry-product-ocp-4.15-stage
