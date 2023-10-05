@@ -148,7 +148,6 @@ tests:
           "export KUBECONFIG=/work/ci-kubeconfig && \
           export TAG=PR-${PULL_NUMBER} && \
           docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
-          make docker-build docker-push && \
           make deploy && \
           make test.integration.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
@@ -169,7 +168,7 @@ tests:
     workflow: servicemesh-istio-e2e-profile
 - as: integration-kind
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
@@ -203,7 +202,6 @@ tests:
           "export KUBECONFIG=/work/ci-kubeconfig && \
           export TAG=PR-${PULL_NUMBER} && \
           docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
-          make docker-build docker-push && \
           make test.integration.kind"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
@@ -220,7 +218,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-profile
+    workflow: servicemesh-istio-e2e-hypershift
 - as: scorecard
   optional: true
   steps:
