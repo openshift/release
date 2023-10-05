@@ -1,0 +1,116 @@
+kind: List
+apiVersion: v1
+items:
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      namespace: ci
+      labels:
+        app: prow
+        component: pipeline-controller
+      name: pipeline-controller
+    spec:
+      ports:
+        - name: metrics
+          port: 9090
+          protocol: TCP
+          targetPort: 9090
+      selector:
+        app: prow
+        component: pipeline-controller
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      namespace: ci
+      name: pipeline-controller-apps-auth
+      labels:
+        app: prow
+        component: pipeline-controller
+    spec:
+      replicas: 1
+      revisionHistoryLimit: 2
+      strategy:
+        type: Recreate
+      selector:
+        matchLabels:
+          app: prow
+          component: pipeline-controller
+          flavor: apps-auth
+      template:
+        metadata:
+          labels:
+            app: prow
+            component: pipeline-controller
+            flavor: apps-auth
+        spec:
+          serviceAccountName: pipeline-controller
+          initContainers:
+            - name: git-sync-init
+              command:
+                - /git-sync
+              args:
+                - --repo=https://github.com/openshift/release.git
+                - --branch=master
+                - --root=/tmp/git-sync
+                - --one-time=true
+                - --depth=1
+              env:
+                - name: GIT_SYNC_DEST
+                  value: release
+              image: registry.k8s.io/git-sync/git-sync:v3.6.2
+              volumeMounts:
+                - name: release
+                  mountPath: /tmp/git-sync
+          containers:
+            - name: git-sync
+              command:
+                - /git-sync
+              args:
+                - --repo=https://github.com/openshift/release.git
+                - --branch=master
+                - --wait=30
+                - --root=/tmp/git-sync
+                - --max-sync-failures=3
+              env:
+                - name: GIT_SYNC_DEST
+                  value: release
+              image: registry.k8s.io/git-sync/git-sync:v3.6.2
+              volumeMounts:
+                - name: release
+                  mountPath: /tmp/git-sync
+              resources:
+                requests:
+                  memory: "1Gi"
+                  cpu: "0.5"
+            - name: pipeline-controller
+              image: registry.ci.openshift.org/ci/pipeline-controller:latest
+              args:
+                - --config-path=/etc/config/config.yaml
+                - --supplemental-prow-config-dir=/etc/config
+                - --job-config-path=/var/repo/release/ci-operator/jobs
+                - --github-token-path=/etc/oauth/oauth
+                - --github-endpoint=http://ghproxy
+                - --github-endpoint=https://api.github.com
+                - --github-graphql-endpoint=http://ghproxy/graphql
+              resources:
+                requests:
+                  memory: "3Gi"
+                  cpu: "600m"
+              volumeMounts:
+                - name: github-token
+                  mountPath: /etc/oauth
+                  readOnly: true
+                - name: config
+                  mountPath: /etc/config
+                  readOnly: true
+                - name: release
+                  mountPath: /var/repo
+          volumes:
+            - name: github-token
+              secret:
+                secretName: github-credentials-openshift-ci-robot
+            - name: config
+              configMap:
+                name: config
+            - name: release
+              emptyDir: {}
