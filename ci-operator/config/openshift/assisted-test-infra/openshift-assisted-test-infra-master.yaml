@@ -561,6 +561,18 @@ tests:
         TEST_FUNC=test_networking
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-bond
+  optional: true
+  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IS_BONDED=true
+        TEST_FUNC=test_networking
+      PACKET_PLAN: m3.large.x86
+      TEST_SUITE: full
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite-periodic
   cron: 30 04 */1 * 0-5
   steps:
@@ -568,6 +580,17 @@ tests:
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
+        TEST_FUNC=test_networking
+      PACKET_PLAN: m3.large.x86
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-bond-periodic
+  cron: 45 03 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IS_BONDED=true
         TEST_FUNC=test_networking
       PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
