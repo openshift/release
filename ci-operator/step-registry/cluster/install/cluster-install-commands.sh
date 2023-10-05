@@ -66,6 +66,10 @@ if [[ -n "${GCP_SERVICE_ACCOUNT_NAME}" ]]; then
     RUN_COMMAND+=" --gcp-service-account-file=${CLUSTER_PROFILE_DIR}/${GCP_SERVICE_ACCOUNT_NAME} "
 fi
 
+if [ "${COLLECT_MUST_GATHER}" = "true" ]; then
+  RUN_COMMAND+=" --must-gather-output-dir=${ARTIFACT_DIR} "
+fi
+
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
 
 set +e
