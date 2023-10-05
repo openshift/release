@@ -2,6 +2,8 @@
 
 set -Eeuo pipefail
 
+export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
+
 function wait_for_network() {
     # Wait up to 2 minutes for the network to be ready
     for _ in $(seq 1 12); do
