@@ -10,6 +10,7 @@ set -x
 oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
 
 echo "Preparing nodes"
+oc label nodes node-role.kubernetes.io/worker='' --selector='node-role.kubernetes.io/control-plane' --overwrite
 oc label nodes cluster.ocs.openshift.io/openshift-storage='' --selector='node-role.kubernetes.io/worker' --overwrite
 
 oc apply -f - <<EOF
