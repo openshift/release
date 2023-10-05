@@ -36,7 +36,7 @@ function gather_kdump_logs_from_node {
     echo "Pod name is: ${debug_pod}"
 
     # Wait for the debug pod to be ready
-    oc wait -n "default" --for=condition=Ready pod/"$debug_pod" --timeout=30s
+    oc wait -n "default" --for=condition=Ready pod/"$debug_pod" --timeout=60s
 
     # Copy kdump logs out of node and supress stdout
     echo "Copying kdump logs on node ""$1"""
@@ -64,7 +64,8 @@ function package_kdump_logs {
   kdump_folders=""
 
   # Check if we got kdump output from any of the nodes
-  if find ${output_path}/*/ -type d; then
+  if find ${output_path}/*/ -type d > /dev/null 2>&1; then
+    echo "INFO: Crash logs detected"
     kdump_folders="$(find ${output_path}/*/ -type d)"
   fi
   

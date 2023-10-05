@@ -1,25 +1,28 @@
-postsubmits:
-  opendatahub-io/opendatahub-operator:
+presubmits:
+  oadp-qe/oadp-e2e-qe:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^feature-rearchitecture$
-    cluster: build05
+    - ^release-v1\.2$
+    - ^release-v1\.2-
+    cluster: build03
+    context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-opendatahub-io-opendatahub-operator-feature-rearchitecture-opendatahub-operator-image-mirror
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-oadp-qe-oadp-e2e-qe-release-v1.2-images
+    rerun_command: /test images
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --oauth-token-path=/usr/local/github-credentials/oauth
         - --report-credentials-file=/etc/report/credentials
-        - --secret-dir=/secrets/ci-pull-credentials
-        - --target=opendatahub-operator-image-mirror
+        - --target=[images]
         command:
         - ci-operator
         image: ci-operator:latest
@@ -29,11 +32,11 @@ postsubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /secrets/ci-pull-credentials
-          name: ci-pull-credentials
-          readOnly: true
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /usr/local/github-credentials
+          name: github-credentials-openshift-ci-robot-private-git-cloner
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -46,9 +49,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: ci-pull-credentials
+      - name: github-credentials-openshift-ci-robot-private-git-cloner
         secret:
-          secretName: ci-pull-credentials
+          secretName: github-credentials-openshift-ci-robot-private-git-cloner
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -58,3 +61,4 @@ postsubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )images,?($|\s.*)
