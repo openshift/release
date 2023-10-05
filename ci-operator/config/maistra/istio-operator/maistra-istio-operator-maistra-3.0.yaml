@@ -7,8 +7,20 @@ build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
-    tag: "3.0"
+    tag: upstream-master
   use_build_cache: true
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ci/maistra-builder:upstream-master
+    # Git checks if the user that owns the files on the filesystem match the
+    # current user.  We need to disable this check because tests in Prow are
+    # running with a random user.
+    RUN git config --system --add safe.directory '*'
+  inputs:
+    src:
+      as:
+      - registry.ci.openshift.org/ci/maistra-builder:upstream-master
+  to: src-test
 releases:
   latest:
     release:
@@ -31,7 +43,7 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     TEST_FLAGS="-v"
   container:
-    from: src
+    from: src-test
   timeout: 1h0m0s
 - as: gencheck
   commands: |
@@ -41,7 +53,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
   timeout: 30m0s
 - as: lint
   commands: |
@@ -51,7 +63,7 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
   timeout: 20m0s
 - as: push-images
   steps:
@@ -62,7 +74,7 @@ tests:
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -90,6 +102,7 @@ tests:
           sh -c \
           "docker login -u='maistra-dev+prow' \
           -p=${QUAY_PASS} quay.io; \
+          cd /work && \
           make docker-build docker-push \
           IMAGE=quay.io/maistra-dev/istio-ubi9-operator:PR-${PULL_NUMBER}"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
@@ -104,7 +117,7 @@ tests:
       - name: GOCACHE
       - name: GOBIN
       - name: GOMODCACHE
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
@@ -117,7 +130,7 @@ tests:
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
@@ -148,6 +161,7 @@ tests:
           "export KUBECONFIG=/work/ci-kubeconfig && \
           export TAG=PR-${PULL_NUMBER} && \
           docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+          cd /work && \
           make docker-build docker-push && \
           make deploy && \
           make test.integration.ocp"
@@ -160,7 +174,7 @@ tests:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
       - name: XDG_CACHE_HOME
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
@@ -220,7 +234,7 @@ tests:
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
     test:
@@ -254,6 +268,7 @@ tests:
           sh -c \
           "git config --global user.email 'dgrimm@redhat.com'; \
            git config --global user.name 'Daniel Grimm'; \
+           cd /work && \
            make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
@@ -266,7 +281,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m
