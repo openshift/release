@@ -33,7 +33,7 @@ fi
 NUM_CLUSTERS=0
 CLUSTER_DATA_CMD="--destroy-clusters-from-s3-config-files "
 for data_file in $CLUSTER_DATA_FILES; do
-  CLUSTER_DATA_CMD+="${data_file},"
+  CLUSTER_DATA_CMD+="$(dirname "${data_file}"),"
   NUM_CLUSTERS=$(( NUM_CLUSTERS + 1))
 done
 

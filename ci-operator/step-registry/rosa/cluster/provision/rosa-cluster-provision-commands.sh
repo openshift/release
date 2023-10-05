@@ -263,7 +263,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
   fi
 
   ENABLE_BYOVPC="true"
-  # BYO_OIDC="true"
+  BYO_OIDC="true"
 fi
 
 FIPS_SWITCH=""
@@ -370,11 +370,6 @@ if [[ "$STS" == "true" ]]; then
     BYO_OIDC_SWITCH="--oidc-config-id ${oidc_config_id} --operator-roles-prefix ${operator_roles_prefix}"
     record_cluster "aws.sts" "oidc_config_id" $oidc_config_id
     record_cluster "aws.sts" "operator_roles_prefix" $operator_roles_prefix
-  else
-    # For the hypershift cluster, as default, BYO OIDC is required. If we do not set BYO OIDC, the option --classic-oidc-config must be set.
-    if [[ "$HOSTED_CP" == "true" ]] ; then
-      BYO_OIDC_SWITCH="--classic-oidc-config"
-    fi
   fi
 fi
 

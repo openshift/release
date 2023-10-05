@@ -44,6 +44,21 @@ spec:
   config:
     ignition:
       version: 3.2.0
+    systemd:
+      units:
+      - name: ipsecenabler.service
+        enabled: true
+        contents: |
+         [Unit]
+         Description=Enable ipsec service after os extension installation
+         Before=kubelet.service
+
+         [Service]
+         Type=oneshot
+         ExecStart=systemctl enable --now ipsec.service
+
+         [Install]
+         WantedBy=multi-user.target
   extensions:
     - ipsec
 EOF

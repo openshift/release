@@ -815,7 +815,6 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
       TEST_SCENARIOS: DR_Testing
     test:
-    - ref: cucushift-helper-service-build-info
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-private
@@ -833,7 +832,6 @@ tests:
       TEST_SCENARIOS: API_Server
       TEST_TIMEOUT: "600"
     test:
-    - ref: cucushift-helper-service-build-info
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-private
 - as: aws-ipi-private-f28-longduration-cloud
@@ -1067,26 +1065,6 @@ tests:
       TAG_VERSION: '@4.15'
     test:
     - chain: openshift-e2e-test-qe-destructive
-    workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-baselinecaps-v412-to-multiarch-f14
-  cron: 35 14 10,25 * *
-  steps:
-    cluster_profile: azure-qe
-    dependencies:
-      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
-    env:
-      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: v4.12
-      COMPUTE_NODE_TYPE: Standard_D4ps_v5
-      OCP_ARCH: arm64
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-    test:
-    - chain: openshift-upgrade-qe-test-heterogeneous
     workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-compact-f14
   cron: 31 23 3,18 * *
@@ -1405,7 +1383,6 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
       TEST_SCENARIOS: DR_Testing
     test:
-    - ref: cucushift-helper-service-build-info
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-azure-ipi-private
@@ -1524,6 +1501,25 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-sno
+- as: azure-ipi-to-multiarch-f14
+  cron: 31 12 11,26 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      OCP_ARCH: arm64
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.15 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.15 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-heterogeneous
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-ultrassd-disks-f28
   cron: 23 18 12 * *
   steps:
@@ -2003,7 +1999,6 @@ tests:
       TEST_FILTERS: ~ChkUpgrade&;~ConnectedOnly&;~MicroShiftOnly&
       TEST_SCENARIOS: DR_Testing
     test:
-    - ref: cucushift-helper-service-build-info
     - ref: idp-htpasswd
     - ref: openshift-extended-test-longduration
     workflow: cucushift-installer-rehearse-gcp-ipi-private

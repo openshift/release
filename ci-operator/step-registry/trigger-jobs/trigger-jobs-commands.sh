@@ -40,10 +40,10 @@ failed_jobs=""
 
 echo ""
 echo "# Loop through the trigger weekly jobs file using jq and issue a command for each job where 'active' is true"
-jq -r '.[] | select(.active == true) | .job_name' "$WEEKLY_JOBS" | while IFS= read -r job_name; do
-  echo "Issuing trigger for active job: $job_name"
+jq -r '.[] | select(.active == true) | .job_name' "$WEEKLY_JOBS" | while IFS= read -r job; do
+  echo "Issuing trigger for active job: $job"
   for ((retry_count=1; retry_count<=$max_retries; retry_count++)); do
-    response=$(curl -s -X POST -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/$job_name" -w "%{http_code}\n" -o /dev/null)
+    response=$(curl -s -X POST -d '{"job_execution_type": "1"}' -H "Authorization: Bearer ${GANGWAY_API_TOKEN}" "${URL}/v1/executions/$job" -w "%{http_code}\n" -o /dev/null)
     
     if [ "$response" -eq 200 ]; then
       echo "Trigger returned a 200 status code"
@@ -57,8 +57,8 @@ jq -r '.[] | select(.active == true) | .job_name' "$WEEKLY_JOBS" | while IFS= re
   done
 
   if [ "$response" -ne 200 ]; then
-    echo "Trigger for active job: $job_name FAILED, a manual re-run is needed for $job_name"
-    failed_jobs+="$job_name "  # Concatenate the job_name to the string of failed jobs
+    echo "Trigger for active job: $job FAILED, a manual re-run is needed for $job"
+    failed_jobs+="$job "  # Concatenate the job to the string of failed jobs
   fi
 
 done

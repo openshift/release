@@ -11,4 +11,4 @@ job-run-aggregator analyze-job-runs \
   --explicit-gcs-prefix=${EXPLICIT_GCS_PREFIX} \
   --job-start-time=${JOB_START_TIME} \
   --working-dir=${WORKING_DIR} \
-  --timeout=7h
+  --timeout=4h40m
