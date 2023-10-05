@@ -8,11 +8,13 @@ chain:
       export HYPERSHIFT_MANAGEMENT_CLUSTER_KUBECONFIG="${KUBECONFIG}"
       export HYPERSHIFT_MANAGEMENT_CLUSTER_NAMESPACE="$(oc get hcp -A -o=jsonpath="{.items[?(@.metadata.name==\"$CLUSTER_NAME\")].metadata.namespace}")"
       export AWS_SHARED_CREDENTIALS_FILE=/etc/hypershift-pool-aws-credentials/credentials
+      export PLATFORM_FAILURE_CONDITION=""
       [[ -n ${CLUSTER_PROFILE_DIR:-} ]] && export AZURE_AUTH_LOCATION=${CLUSTER_PROFILE_DIR}/osServicePrincipal.json
       export KUBECONFIG=${SHARED_DIR}/nested_kubeconfig
       if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
         source "${SHARED_DIR}/proxy-conf.sh"
       fi
+
 
       CLUSTER_TYPE="$(oc get infrastructure cluster -ojsonpath='{.status.platform}'|tr '[:upper:]' '[:lower:]')"
       case "${CLUSTER_TYPE}" in
@@ -56,28 +58,48 @@ chain:
           export IC_API_KEY
           ;;
       kubevirt)
+          # Standard parallel test suite env vars
           export TEST_PROVIDER='{"type":"kubevirt"}'
 
-          set +e
+          ###
+          # START KubeVirt CSI Conformance Test Execution
+          ###
+          # CSI driver env vars
           export TEST_CSI_DRIVER_MANIFEST="kubevirt-driver.yaml"
           curl -L -o ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST} https://raw.githubusercontent.com/openshift/kubevirt-csi-driver/master/hack/test-driver.yaml
           sed -i 's/FromExistingClassName: kubevirt/FromExistingClassName: kubevirt-csi-infra-default/' ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
-          cat ${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
           export TEST_CSI_DRIVER_FILES=${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}
+
           openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/csi | grep -e "External.Storage.*csi.kubevirt.io.*" | grep -v "CSI Ephemeral-volume*" > /tmp/tests_hs_kv_csi
           CSI_TEST_ARGS="${TEST_ARGS:-} --max-parallel-tests 1 --file /tmp/tests_hs_kv_csi"
-          echo "${ARTIFACT_DIR}/csi"
+
           # Make sure the csi artifacts can be stored
           mkdir -p "${ARTIFACT_DIR}/csi"
+          cp "${SHARED_DIR}/${TEST_CSI_DRIVER_MANIFEST}" "${ARTIFACT_DIR}/csi/kubevirt-driver.yaml"
+
           openshift-tests run openshift/csi ${CSI_TEST_ARGS:-} \
             --provider "${TEST_PROVIDER}" \
             -o "${ARTIFACT_DIR}/csi/e2e.log" \
-            --junit-dir "${ARTIFACT_DIR}/csi/junit"
-          if [ $? -ne 0 ]; then
-            TEST_SUITE_EXIT_CODE=$?
-            TEST_SUITE_FAILURE_MSG="KubeVirt CSI conformance tests returned failure(s)"
+            --junit-dir "${ARTIFACT_DIR}/csi/junit" 2>&1 | tee /tmp/openshift-csi-tests.log
+
+          csi_exit_code=${PIPESTATUS[0]}
+
+          # If this line is shown in the openshift-tests output, all of the conformance test cases passed,
+          # but the monitor test has failed. Currently we're ignoring MonitorTest failures until we resolve:
+          # https://issues.redhat.com/browse/CNV-33717
+          if [[ -n "${SKIP_MONITOR_TEST}" ]] && [[ $(grep "failed due to a MonitorTest failure" /tmp/openshift-csi-tests.log) ]];
+          then
+            echo "overriding Monitor Test Failure in CSI tests"
+            csi_exit_code=0
           fi
-          set -e
+
+          if [[ csi_exit_code -ne 0 ]]; then
+            echo "CSI conformance test exit code ${csi_exit_code}"
+            PLATFORM_FAILURE_CONDITION="KubeVirt CSI conformance tests returned failure(s)"
+          fi
+          ###
+          # END KubeVirt CSI Conformance Test Execution
+          ###
 
           # This looks counterintuitive. Here's an explanation.
           #
@@ -112,6 +134,7 @@ chain:
           echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
           TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
       fi
+
       openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
         --provider "${TEST_PROVIDER}" \
         -o "${ARTIFACT_DIR}/e2e.log" \
@@ -128,8 +151,8 @@ chain:
         exit_code=0
       fi
 
-      if [ -n "$TEST_SUITE_FAILURE_MSG" ]; then
-        echo "Cluster type $CLUSTER_TYPE encountered a failure condition: $TEST_SUITE_FAILURE_MSG, exit code: $TEST_SUITE_EXIT_CODE"
+      if [ -n "$PLATFORM_FAILURE_CONDITION" ]; then
+        echo "Cluster type $CLUSTER_TYPE encountered a failure condition: $PLATFORM_FAILURE_CONDITION"
         exit_code=1
       fi
 
