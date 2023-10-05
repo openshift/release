@@ -286,7 +286,13 @@ CONFIG = {
     },
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
-    }
+    },
+    'hypershift-powervs-quota-slice': {
+        'default': 3,
+    },
+    'hypershift-powervs-cb-quota-slice': {
+        'default': 5,
+    },
 }
 
 for i in range(3):
