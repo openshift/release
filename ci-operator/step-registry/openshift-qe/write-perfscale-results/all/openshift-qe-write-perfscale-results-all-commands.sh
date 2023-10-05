@@ -33,8 +33,6 @@ env
 git clone https://github.com/paigerube14/ocp-qe-perfscale-ci.git -b prow_write
 
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
-"${SHARED_DIR}/${OUTPUT_FILE}" --output sh
-
 
 pushd ocp-qe-perfscale-ci
 
