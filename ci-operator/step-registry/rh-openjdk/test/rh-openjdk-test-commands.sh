@@ -6,6 +6,8 @@ set -o pipefail
 
 status=0
 
+oc login --insecure-skip-tls-verify=true -u "kubeadmin" -p "$(cat ${KUBEADMIN_PASSWORD_FILE})" "$(oc whoami --show-server)"
+
 for JDK_VER in $OPENJDK_VERSION
 do
     status1=0
