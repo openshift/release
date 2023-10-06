@@ -90,33 +90,30 @@ tests:
       commands: |
         pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled
           --rp_name=Insights_operator_e2e_tests_periodic
-        ls $(SHARED_DIR)/var/run/
-        ls $(SHARED_DIR)/var/run/aws-bucket/
-        ls /var/run/
       credentials:
       - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
-      - mount_path: /var/run/aws-bucket
+      - mount_path: /secret/aws
         name: aws-bucket
         namespace: test-credentials
       - mount_path: /secret/aws
         name: aws-access-key-id
         namespace: test-credentials
-      - mount_path: /var/run/aws-region
+      - mount_path: /secret/aws
         name: aws-region
         namespace: test-credentials
-      - mount_path: /var/run/aws-secret-access-key
+      - mount_path: /secret/aws
         name: aws-secret-access-key
         namespace: test-credentials
       env:
       - default: /secret/aws/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
-      - default: ${SHARED_DIR}/var/run/aws-bucket/aws-bucket
+      - default: /secret/aws/aws-bucket
         name: AWS_BUCKET_PATH
-      - default: ${SHARED_DIR}/var/run/aws-region/aws-region
+      - default: /secret/aws/aws-region
         name: AWS_REGION_PATH
-      - default: ${SHARED_DIR}/var/run/aws-secret-access-key/aws-secret-access-key
+      - default: /secret/aws/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
       from: insights-operator-tests
       resources:
@@ -133,35 +130,33 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled
-        --rp_name=Insights_operator_e2e_tests_periodic ls ${SHARED_DIR}/var/run/ ls
-        ${SHARED_DIR}/var/run/aws-bucket
-      credentials:
-      - mount_path: /secrets
+      commands: |
+        pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled
+          --rp_name=Insights_operator_e2e_tests_periodic
+        credentials:
+        - mount_path: /secrets
         name: insights-qa
         namespace: test-credentials
-      - mount_path: /var/run/aws-bucket
+        - mount_path: /secret/aws
         name: aws-bucket
         namespace: test-credentials
-      - mount_path: /var/run/aws-access-key-id
+        - mount_path: /secret/aws
         name: aws-access-key-id
         namespace: test-credentials
-      - mount_path: /var/run/aws-region
+        - mount_path: /secret/aws
         name: aws-region
         namespace: test-credentials
-      - mount_path: /var/run/aws-secret-access-key
+        - mount_path: /secret/aws
         name: aws-secret-access-key
         namespace: test-credentials
-      env:
-      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
-        name: BREW_IMAGE_REGISTRY_USERNAME
-      - default: ${SHARED_DIR}/var/run/aws-access-key-id/aws-access-key-id
+        env:
+        - default: /secret/aws/aws-access-key-id
         name: AWS_ACCESS_KEY_ID_PATH
-      - default: ${SHARED_DIR}/var/run/aws-bucket/aws-bucket
+        - default: /secret/aws/aws-bucket
         name: AWS_BUCKET_PATH
-      - default: ${SHARED_DIR}/var/run/aws-region/aws-region
+        - default: /secret/aws/aws-region
         name: AWS_REGION_PATH
-      - default: ${SHARED_DIR}/var/run/aws-secret-access-key/aws-secret-access-key
+        - default: /secret/aws/aws-secret-access-key
         name: AWS_SECRET_ACCESS_KEY_PATH
       from: insights-operator-tests
       resources:
