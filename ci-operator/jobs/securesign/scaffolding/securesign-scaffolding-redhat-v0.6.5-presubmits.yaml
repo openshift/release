@@ -1,27 +1,27 @@
-postsubmits:
-  openshift/kuryr-kubernetes:
+presubmits:
+  securesign/scaffolding:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-4\.15$
-    cluster: build04
+    - ^redhat-v0\.6\.5$
+    - ^redhat-v0\.6\.5-
+    cluster: build03
+    context: ci/prow/test
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/is-promotion: "true"
       ci.openshift.io/generator: prowgen
-    max_concurrency: 1
-    name: branch-ci-openshift-kuryr-kubernetes-release-4.15-images
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-securesign-scaffolding-redhat-v0.6.5-test
+    rerun_command: /test test
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --image-mirror-push-secret=/etc/push-secret/.dockerconfigjson
-        - --promote
         - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
+        - --target=test
         command:
         - ci-operator
         image: ci-operator:latest
@@ -40,9 +40,6 @@ postsubmits:
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
-        - mountPath: /etc/push-secret
-          name: push-secret
-          readOnly: true
         - mountPath: /etc/report
           name: result-aggregator
           readOnly: true
@@ -54,9 +51,7 @@ postsubmits:
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
-      - name: push-secret
-        secret:
-          secretName: registry-push-credentials-ci-central
       - name: result-aggregator
         secret:
           secretName: result-aggregator
+    trigger: (?m)^/test( | .* )test,?($|\s.*)

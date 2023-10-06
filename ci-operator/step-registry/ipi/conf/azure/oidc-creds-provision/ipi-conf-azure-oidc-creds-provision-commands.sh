@@ -102,30 +102,6 @@ popd
 echo "CR manifest files:"
 ls "/tmp/credrequests"
 
-# Create manual credentials using client secret for openshift-cluster-api.
-# This is a temp workaround until cluster-api supports workload identity
-# authentication. This enables the openshift-e2e test to succeed when running
-# the cluster-api tests. Placing it here so ccoctl can override it with
-# generated credentials as work is done to support workload identity.
-# At the time of this comment, openshift-cluster-api appears to only be
-# enabled with the TechPreviewNoUpgrade FeatureSet.
-mkdir -p "/tmp/manifests"
-echo "Creating credentials for openshift-cluster-api..."
-cat > "/tmp/manifests/openshift-cluster-api-capz-manager-bootstrap-credentials-credentials.yaml" << EOF
-apiVersion: v1
-stringData:
-  azure_client_id: ${AZURE_CLIENT_ID}
-  azure_client_secret: ${AZURE_CLIENT_SECRET}
-  azure_region: ${REGION}
-  azure_resourcegroup: ${CLUSTER_NAME}
-  azure_subscription_id: ${AZURE_SUBSCRIPTION_ID}
-  azure_tenant_id: ${AZURE_TENANT_ID}
-kind: Secret
-metadata:
-  name: capz-manager-bootstrap-credentials
-  namespace: openshift-cluster-api
-EOF
-
 # create metadata so cluster resource group is deleted in ipi-deprovision-deprovision
 cat > ${SHARED_DIR}/metadata.json << EOF
 {"infraID":"${CLUSTER_NAME}","azure":{"region":"${REGION}","resourceGroupName":"${CLUSTER_NAME}"}}
