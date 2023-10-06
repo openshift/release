@@ -36,7 +36,9 @@ pushd ~/tempest/openshift
 TEMPEST_CONF_OVERRIDES=${TEMPEST_CONF_OVERRIDES:-}
 
 discover-tempest-config --os-cloud ${OS_CLOUD} --debug --create \
-identity.v3_endpoint_type public ${TEMPEST_CONF_OVERRIDES}
+identity.v3_endpoint_type public \
+identity.disable_ssl_certificate_validation true \
+dashboard.disable_ssl_certificate_validation true ${TEMPEST_CONF_OVERRIDES}
 
 # Generate skiplist and allow list
 ORG="openstack-k8s-operators"
