@@ -4,11 +4,121 @@ set -o nounset
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
+IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
+
 if [ "${ADDITIONAL_WORKERS}" == "0" ]
 then
     echo "No additional workers requested"
     exit 0
 fi
+
+function ic() {
+  HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
+}
+
+# Cleans up the failed prior jobs
+function cleanup_ibmcloud_powervs() {
+  local version="${1}"
+  local workspace_name="${2}"
+  local region="${3}"
+  local resource_group="${4}"
+  local api_key="${5}"
+  echo "Cleaning up prior runs - version: ${version} - workspace_name: ${workspace_name}"
+
+  echo "Cleaning up the Transit Gateways"
+  RESOURCE_GROUP_ID=$(ic resource groups --output json | jq -r '.[] | select(.name == "'${resource_group}'").id')
+  for GW in $(ic tg gateways --output json | jq -r '.[].id')
+  do
+    echo "Checking the resource_group and location for the transit gateways ${GW}"
+    VALID_GW=$(ic tg gw "${GW}" --output json | jq -r '. | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")')
+    if [ -n "${VALID_GW}" ]
+    then
+      TG_CRN=$(echo "${VALID_GW}" | jq -r '.crn')
+      TAGS=$(ic resource search "crn:\"${TG_CRN}\"" --output json | jq -r '.items[].tags[]' | grep "mac-cicd-${version}" || true )
+      if [ -n "${TAGS}" ]
+      then
+        for CS in $(ic tg connections "${GW}" --output json | jq -r '.[].id')
+        do 
+          ic tg connection-delete "${GW}" "${CS}" --force \
+            || sleep 120 \
+            && ic tg connection-delete "${GW}" "${CS}" --force || true
+          sleep 30
+        done
+        ic tg gwd "${GW}" --force \
+          || sleep 120 \
+          && ic tg gwd "${GW}" --force \
+          true
+        echo "waiting up a minute while the Transit Gateways are removed"
+        sleep 60
+      fi
+    fi
+  done
+
+  echo "reporting out the remaining TGs in the resource_group and region"
+  ic tg gws --output json | jq -r '.[] | select(.resource_group.id == "'$RESOURCE_GROUP_ID'" and .location == "'$region'")'
+
+  echo "Cleaning up workspaces for ${workspace_name}"
+  for CRN in $(ic pi sl 2> /dev/null | grep "${workspace_name}" | awk '{print $1}' || true)
+  do
+    echo "Targetting power cloud instance"
+    ic pi st "${CRN}"
+
+    echo "Deleting the PVM Instances"
+    for INSTANCE_ID in $(ic pi ins --json | jq -r '.pvmInstances[].pvmInstanceID')
+    do
+      echo "Deleting PVM Instance ${INSTANCE_ID}"
+      ic pi ind "${INSTANCE_ID}" --delete-data-volumes
+      sleep 60
+    done
+
+    echo "Deleting the Images"
+    for IMAGE_ID in $(ic pi imgs --json | jq -r '.images[].imageID')
+    do
+      echo "Deleting Images ${IMAGE_ID}"
+      ic pi image-delete "${IMAGE_ID}"
+      sleep 60
+    done
+
+    if [ -n "$(ic pi nets 2> /dev/null | grep DHCP || true)" ]
+    then
+       curl -L -o /tmp/pvsadm "https://github.com/ppc64le-cloud/pvsadm/releases/download/v0.1.12/pvsadm-linux-amd64"
+       chmod +x /tmp/pvsadm
+
+       POWERVS_SERVICE_INSTANCE_ID=$(echo "${CRN}" | sed 's|:| |g' | awk '{print $NF}')
+
+       NET_ID=$(IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver list --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --skip_headers --one_output | awk '{print $2}' | grep -v ID | grep -v '|' | sed '/^$/d' || true)
+       IC_API_KEY="${api_key}" /tmp/pvsadm dhcpserver delete --instance-id ${POWERVS_SERVICE_INSTANCE_ID} --id "${NET_ID}" || true
+       sleep 60
+    fi
+
+    echo "Deleting the Network"
+    for NETWORK_ID in $(ic pi nets 2> /dev/null | awk '{print $1}')
+    do
+      echo "Deleting network ${NETWORK_ID}"
+      ic pi network-delete "${NETWORK_ID}" || true
+      sleep 60
+    done
+
+    ic resource service-instance-update "${CRN}" --allow-cleanup true
+    sleep 30
+    ic resource service-instance-delete "${CRN}" --force --recursive
+    for COUNT in $(seq 0 5)
+    do
+      FIND=$(ibmcloud pi sl 2> /dev/null| grep "${CRN}" || true)
+      echo "FIND: ${FIND}"
+      if [ -z "${FIND}" ]
+      then
+        echo "service-instance is deprovisioned"
+        break
+      fi
+      echo "waiting on service instance to deprovision ${COUNT}"
+      sleep 60
+    done
+    echo "Done Deleting the ${CRN}"
+  done
+
+  echo "Done cleaning up prior runs"
+}
 
 function get_ready_nodes_count() {
   oc get nodes \
@@ -50,12 +160,19 @@ case "$CLUSTER_TYPE" in
   # Add code for ppc64le
   if [ "${ADDITIONAL_WORKER_ARCHITECTURE}" == "ppc64le" ]
   then
+      # Saving the OCP VERSION so we can use in a subsequent deprovision
+      echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
+
       echo "Adding additional ppc64le nodes"
       REGION="${LEASED_RESOURCE}"
       IBMCLOUD_HOME_FOLDER=/tmp/ibmcloud
       SERVICE_NAME=power-iaas
       SERVICE_PLAN_NAME=power-virtual-server-group
-      WORKSPACE_NAME=rdr-mac-${REGION}-n1
+
+      # Generates a workspace name like rdr-mac-4-14-au-syd-n1
+      # this keeps the workspace unique
+      CLEAN_VERSION=$(echo "${OCP_VERSION}" | tr '.' '-')
+      WORKSPACE_NAME=rdr-mac-${CLEAN_VERSION}-${REGION}-n1
 
       PATH=${PATH}:/tmp
       mkdir -p ${IBMCLOUD_HOME_FOLDER}
@@ -64,10 +181,6 @@ case "$CLUSTER_TYPE" in
         echo "ibmcloud CLI doesn't exist, installing"
         curl -fsSL https://clis.cloud.ibm.com/install/linux | sh
       fi
-      
-      function ic() {
-        HOME=${IBMCLOUD_HOME_FOLDER} ibmcloud "$@"
-      }
 
       # Check if jq,yq,git and openshift-install are installed
       if [ -z "$(command -v yq)" ]
@@ -90,24 +203,37 @@ case "$CLUSTER_TYPE" in
           -o /tmp/openshift-install && chmod +x /tmp/openshift-install
       fi
 
-      # upgrade go to GO_VERSION
-      if [ -z "$(command -v go)" ]
+      # short-circuit to download and install terraform
+      echo "Attempting to install terraform using gzip"
+      curl -L -o "${IBMCLOUD_HOME_FOLDER}"/terraform.gz -L https://releases.hashicorp.com/terraform/"${TERRAFORM_VERSION}"/terraform_"${TERRAFORM_VERSION}"_linux_amd64.zip \
+        && gunzip "${IBMCLOUD_HOME_FOLDER}"/terraform.gz \
+        && chmod +x "${IBMCLOUD_HOME_FOLDER}"/terraform \
+        || true
+
+      if [ ! -f "${IBMCLOUD_HOME_FOLDER}"/terraform ]
       then
-        echo "go is not installed, proceed to installing go"
-        cd /tmp && wget -q https://go.dev/dl/go"${GO_VERSION}".linux-amd64.tar.gz && tar -C /tmp -xzf go"${GO_VERSION}".linux-amd64.tar.gz \
-          && export PATH=$PATH:/tmp/go/bin && export GOCACHE=/tmp/go && export GOPATH=/tmp/go && export GOMODCACHE="/tmp/go/pkg/mod"
+        echo "Manually building the terraform code"
+        # upgrade go to GO_VERSION
         if [ -z "$(command -v go)" ]
         then
-          echo "Installed go successfully"
+          echo "go is not installed, proceed to installing go"
+          cd /tmp && wget -q https://go.dev/dl/go"${GO_VERSION}".linux-amd64.tar.gz && tar -C /tmp -xzf go"${GO_VERSION}".linux-amd64.tar.gz \
+            && export PATH=$PATH:/tmp/go/bin && export GOCACHE=/tmp/go && export GOPATH=/tmp/go && export GOMODCACHE="/tmp/go/pkg/mod"
+          if [ -z "$(command -v go)" ]
+          then
+            echo "Installed go successfully"
+          fi
         fi
+
+        # build terraform from source using TERRAFORM_VERSION
+        echo "terraform is not installed, proceed to installing terraform"
+        cd "${IBMCLOUD_HOME_FOLDER}" && curl -L https://github.com/hashicorp/terraform/archive/refs/tags/v"${TERRAFORM_VERSION}".tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz \
+          && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz && cd "${IBMCLOUD_HOME_FOLDER}"/terraform-"${TERRAFORM_VERSION}" \
+          && go build -ldflags "-w -s -X 'github.com/hashicorp/terraform/version.dev=no'" -o bin/ . && cp bin/terraform "${IBMCLOUD_HOME_FOLDER}"/terraform
       fi
 
-      # build terraform from source using TERRAFORM_VERSION
-      cd "${IBMCLOUD_HOME_FOLDER}" && curl -L https://github.com/hashicorp/terraform/archive/refs/tags/v"${TERRAFORM_VERSION}".tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz \
-        && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/terraform.tar.gz && cd "${IBMCLOUD_HOME_FOLDER}"/terraform-"${TERRAFORM_VERSION}" \
-        && go build -ldflags "-w -s -X 'github.com/hashicorp/terraform/version.dev=no'" -o bin/ . && cp bin/terraform /tmp/terraform
-      export PATH=$PATH:/tmp
-      t_ver1=$(/tmp/terraform -version)
+      export PATH=$PATH:/tmp:/"${IBMCLOUD_HOME_FOLDER}"
+      t_ver1=$(${IBMCLOUD_HOME_FOLDER}/terraform -version)
       echo "terraform version: ${t_ver1}"
 
       export PATH
@@ -116,13 +242,17 @@ case "$CLUSTER_TYPE" in
       RESOURCE_GROUP=$(yq -r '.platform.ibmcloud.resourceGroupName' "${SHARED_DIR}/install-config.yaml")
 
       ic login --apikey "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key" -r "${REGION}" -g "${RESOURCE_GROUP}"
-      ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage power-iaas is
+      ic plugin install -f cloud-internet-services vpc-infrastructure cloud-object-storage power-iaas is tg
+
+      # Run Cleanup
+      cleanup_ibmcloud_powervs "${CLEAN_VERSION}" "${WORKSPACE_NAME}" "${REGION}" "${RESOURCE_GROUP}" "@${CLUSTER_PROFILE_DIR}/ibmcloud-api-key"
 
       # Before the workspace is created, download the automation code
+      # release-4.14-per
       cd "${IBMCLOUD_HOME_FOLDER}" \
-        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}".tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
+        && curl -L https://github.com/IBM/ocp4-upi-compute-powervs/archive/refs/heads/release-"${OCP_VERSION}"-per.tar.gz -o "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
         && tar -xzf "${IBMCLOUD_HOME_FOLDER}"/ocp-"${OCP_VERSION}".tar.gz \
-        && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}" "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs
+        && mv "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs-release-${OCP_VERSION}-per" "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs
 
       # create workspace for powervs from cli
       echo "Display all the variable values:"
@@ -130,9 +260,9 @@ case "$CLUSTER_TYPE" in
       echo "VPC Region is ${REGION}"
       echo "PowerVS region is ${POWERVS_REGION}"
       echo "Resource Group is ${RESOURCE_GROUP}"
-      ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" 2>&1 \
+      ic resource service-instance-create "${WORKSPACE_NAME}" "${SERVICE_NAME}" "${SERVICE_PLAN_NAME}" "${POWERVS_REGION}" -g "${RESOURCE_GROUP}" --allow-cleanup 2>&1 \
         | tee /tmp/instance.id
-      
+
       # Process the CRN into a variable
       CRN=$(cat /tmp/instance.id | grep crn | awk '{print $NF}')
       export CRN
@@ -140,7 +270,7 @@ case "$CLUSTER_TYPE" in
       sleep 30
 
       # Tag the resource for easier deletion
-      ic resource tag-attach --tag-names "mac-power-worker" --resource-id "${CRN}" --tag-type user
+      ic resource tag-attach --tag-names "mac-power-worker-${CLEAN_VERSION}" --resource-id "${CRN}" --tag-type user
 
       # Waits for the created instance to become active... after 10 minutes it fails and exists
       # Example content for TEMP_STATE
@@ -174,7 +304,6 @@ case "$CLUSTER_TYPE" in
       echo "PowerVS Service CRN: ${CRN}"
 
       echo "${RESOURCE_GROUP}" > "${SHARED_DIR}"/RESOURCE_GROUP
-      echo "${OCP_VERSION}" > "${SHARED_DIR}"/OCP_VERSION
 
       # The CentOS-Stream-8 image is stock-image on PowerVS.
       # This image is available across all PowerVS workspaces.
@@ -199,64 +328,24 @@ case "$CLUSTER_TYPE" in
       # Invoke create-var-file.sh to generate var.tfvars file
       echo "Creating the var file"
       cd ${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs \
-        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}"
+        && bash scripts/create-var-file.sh /tmp/ibmcloud "${ADDITIONAL_WORKERS}" "${CLEAN_VERSION}"
 
       # TODO:MAC check if the var.tfvars file is populated
       VARFILE_OUTPUT=$(cat "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars)
       echo "varfile_output is ${VARFILE_OUTPUT}"
 
       # copy the var.tfvars file and the POWERVS_SERVICE_CRN to ${SHARED_DIR} so that it can be used to destroy the
-      # created resources. The FAILED_DEPLOY flag is only exported on a fail
-      FAILED_DEPLOY=""
+      # created resources.
       cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/data/var.tfvars "${SHARED_DIR}"/var.tfvars
+
       cd "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/ \
-        && /tmp/terraform init -upgrade -no-color \
-        && /tmp/terraform plan -var-file=data/var.tfvars -no-color \
-        && /tmp/terraform apply -var-file=data/var.tfvars -auto-approve -no-color \
-        || export FAILED_DEPLOY="true"
+        && "${IBMCLOUD_HOME_FOLDER}"/terraform init -upgrade -no-color \
+        && "${IBMCLOUD_HOME_FOLDER}"/terraform plan -var-file=data/var.tfvars -no-color \
+        && "${IBMCLOUD_HOME_FOLDER}"/terraform apply -var-file=data/var.tfvars -auto-approve -no-color \
+        || cp -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
 
       echo "Shared Directory: copy the terraform.tfstate"
-      cp "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
-
-      # If the deploy fails, hard exit
-      if [ -n "${FAILED_DEPLOY}" ]
-      then
-        echo "Failed to deploy... hard exit... deprovisioning now to more cleanly exit"
-        cd "${IBMCLOUD_HOME_FOLDER}/ocp4-upi-compute-powervs" \
-          && /tmp/terraform init -upgrade -no-color \
-          && /tmp/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
-          || sleep 120 \
-          || /tmp/terraform destroy -var-file=data/var.tfvars -auto-approve -no-color \
-          || true
-        echo "cleaning up workspace"
-        ic resource service-instance-delete "${POWERVS_SERVICE_INSTANCE_ID}" -g "${RESOURCE_GROUP}" --force --recursive \
-          || true
-        exit 1
-      else
-        echo "Worker Status is: "
-        oc get nodes -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}'
-        echo "Cluster Operator is: "
-        oc get co
-        IDX=0
-        while [ "$IDX" -lt "121" ]
-        do
-            FAL_COUNT=$(oc get co -o jsonpath='{range .items[*]}{.metadata.name}{","}{.status.conditions[?(@.type=="Available")].status}{"\n"}{end}' | grep False | wc -l)
-            if [ "${FAL_COUNT}" -eq "0" ]
-            then
-              break
-            fi
-            if [ "${IDX}" -eq "60" ]
-            then
-              echo "Exceeded the wait time of >120 minutes"
-              exit 3
-            fi
-            oc get co -o yaml
-            echo "waiting for the cluster operators to return to operation"
-            sleep 60
-            IDX=$(($IDX + 1))
-        done
-        
-      fi
+      cp -f "${IBMCLOUD_HOME_FOLDER}"/ocp4-upi-compute-powervs/terraform.tfstate "${SHARED_DIR}"/terraform.tfstate
   fi
 ;;
 *)
