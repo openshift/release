@@ -1,5 +1,15 @@
 ref:
   as: aap-tests-integration
+  env:
+  - name: ORG_NAME
+    default: openshift-ci-internal
+    documentation: "The organisation name for snyk to upload results to."
+  - name: SNYK_TOKEN_PATH
+    default: /snyk-credentials/api-token
+    documentation: "The file contains licencing token for snyk."
+  - name: ALL_PROJECTS
+    default: "false"
+    documentation: "Enable this to scan all projects in all sub-directories. Disable this to scan only the current directory."
   commands: aap-tests-integration-commands.sh
   resources:
     requests:
@@ -7,6 +17,9 @@ ref:
       memory: 100Mi
   from: cli
   credentials:
+    - mount_path: /snyk-credentials
+      name: snyk-credentials
+      namespace: test-credentials
     - namespace: test-credentials
       name: aap-secrets
       mount_path: /tmp/secrets/ci
