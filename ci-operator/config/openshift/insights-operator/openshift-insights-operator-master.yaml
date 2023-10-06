@@ -87,29 +87,12 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui and not tp_only" --junitxml=$(pwd)/test-report.xml
-        --rp_enabled
-      credentials:
-      - mount_path: /secrets
-        name: insights-qa
-        namespace: test-credentials
-      from: insights-operator-tests
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-gcp
-- as: insights-operator-e2e-tests-periodic
-  cron: 0 0 * * *
-  steps:
-    cluster_profile: gcp
-    pre:
-    - chain: ipi-gcp-pre
-    - ref: insights-live
-    test:
-    - as: test
-      cli: latest
-      commands: pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled
-        --rp_name=Insights_operator_e2e_tests_periodic
+      commands: |
+        pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled
+          --rp_name=Insights_operator_e2e_tests_periodic
+        ls $(SHARED_DIR)/var/run/
+        ls $(SHARED_DIR)/var/run/aws-bucket/
+        ls /var/run/
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -126,6 +109,60 @@ tests:
       - mount_path: /var/run/aws-secret-access-key
         name: aws-secret-access-key
         namespace: test-credentials
+      env:
+      - default: ${SHARED_DIR}/var/run/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: ${SHARED_DIR}/var/run/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: ${SHARED_DIR}/var/run/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: ${SHARED_DIR}/var/run/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
+      from: insights-operator-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: insights-operator-e2e-tests-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    pre:
+    - chain: ipi-gcp-pre
+    - ref: insights-live
+    test:
+    - as: test
+      cli: latest
+      commands: pytest.sh -k "not tp_only" --junitxml=$(pwd)/test-report.xml --rp_enabled
+        --rp_name=Insights_operator_e2e_tests_periodic ls ${SHARED_DIR}/var/run/ ls
+        ${SHARED_DIR}/var/run/aws-bucket
+      credentials:
+      - mount_path: /secrets
+        name: insights-qa
+        namespace: test-credentials
+      - mount_path: /var/run/aws-bucket
+        name: aws-bucket
+        namespace: test-credentials
+      - mount_path: /var/run/aws-access-key-id
+        name: aws-access-key-id
+        namespace: test-credentials
+      - mount_path: /var/run/aws-region
+        name: aws-region
+        namespace: test-credentials
+      - mount_path: /var/run/aws-secret-access-key
+        name: aws-secret-access-key
+        namespace: test-credentials
+      env:
+      - default: '|7820aea2-0d75-11e7-9259-28d244ea5a6d.hhav.f63e13'
+        name: BREW_IMAGE_REGISTRY_USERNAME
+      - default: ${SHARED_DIR}/var/run/aws-access-key-id/aws-access-key-id
+        name: AWS_ACCESS_KEY_ID_PATH
+      - default: ${SHARED_DIR}/var/run/aws-bucket/aws-bucket
+        name: AWS_BUCKET_PATH
+      - default: ${SHARED_DIR}/var/run/aws-region/aws-region
+        name: AWS_REGION_PATH
+      - default: ${SHARED_DIR}/var/run/aws-secret-access-key/aws-secret-access-key
+        name: AWS_SECRET_ACCESS_KEY_PATH
       from: insights-operator-tests
       resources:
         requests:
