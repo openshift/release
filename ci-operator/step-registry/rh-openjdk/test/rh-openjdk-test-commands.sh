@@ -1,11 +1,14 @@
 #!/bin/bash
 
+set -x
 set -u
 set -e
 set -o pipefail
 
 mkdir -p /tmp/openjdk
+
 cp $KUBECONFIG /tmp/openjdk/kubeconfig
+cp /usr/bin/oc /tmp/openjdk
 
 oc login --insecure-skip-tls-verify=true -u "kubeadmin" -p "$(cat ${KUBEADMIN_PASSWORD_FILE})" "$(oc whoami --show-server)"
 
@@ -73,10 +76,6 @@ spec:
       env:
         - name: KUBECONFIG
           value: /tmp/openjdk/kubeconfig
-      volumeMounts:
-        - mountPath: /tmp/openjdk
-          name: openjdk
-          readOnly: false
       command: ["sleep", "3600"]
       ports:
         - containerPort: 8080
@@ -85,42 +84,48 @@ spec:
         capabilities:
           drop:
             - ALL
-  volumes:
-    - name: openjdk
-      hostPath:
-        path: $KUBECONFIG
-        type: File
 EOF
+
+    # Wait for pod to start
+	POD_NAME=$(oc get pods -o jsonpath='{.items[0].metadata.name}')
+	count=30
+	while ! (oc get pod "$POD_NAME" | grep -q Running); do
+    	echo $count
+    	if [ "$count" -eq "0" ]
+    	then
+       		echo "Error: Timeout waiting for container to start"
+        	exit 1
+    	fi
+    	sleep 10
+    	count=$((count-1))
+	done
+
+    # Inject kubeconfgi and oc
+    oc rsync /tmp/openjdk $POD_NAME:/tmp
+
+    # Run tests on pod
+    CMD="export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/local/s2i:/tmp/openjdk;export KUBECONFIG=/tmp/openjdk/kubeconfig;cd /tmp/rhscl_openshift_dir/openjdk;./run.sh --jdk-version=$JDK_VER"
+
+    oc exec $POD_NAME -- bash -c "$CMD" 
 
     SOURCE_DIR="/tmp/rhscl_openshift_dir/openjdk"
     DEST_DIR="$ARTIFACT_DIR/test-run-results/openjdk-$JDK_VER"
 
-    POD_NAME=$(oc get pods -o jsonpath='{.items[0].metadata.name}')
-
-    while oc get pod "$POD_NAME" | grep -q Running; do
-        oc rsync --compress=true "$POD_NAME:$SOURCE_DIR/test-openjdk/log" "$DEST_DIR"
-        oc rsync --compress=true "$POD_NAME:$SOURCE_DIR/test-openjdk/target/surefire-reports" "$DEST_DIR"
-        sleep 5
-    done
+    # Get results and artifacts and save to $ARTIFACT_DIR
+    oc rsync --compress=true "$POD_NAME:$SOURCE_DIR/test-openjdk/log" "$DEST_DIR" || :
+    oc rsync --compress=true "$POD_NAME:$SOURCE_DIR/test-openjdk/target/surefire-reports" "$DEST_DIR" || :
 
     if [ "$status1" -ne "0" ]
     then
         status="$status1"
     fi
 
-    # Copy results and artifacts to $ARTIFACT_DIR
-    #echo "Archiving logs for Open JDK $JDK_VER..."
-    #mv /tmp/openjdk/kubeconfig/* $ARTIFACT_DIR/test-run-results/openjdk-$JDK_VER || :
-
-    #echo "Archiving results for Open JDK $JDK_VER..."
-    #cp -r ./test-openjdk/target/surefire-reports  $ARTIFACT_DIR/test-run-results/openjdk-$JDK_VER || :
-
     # Rename result xml files
     NAME=/junit_jdk${JDK_VER}_TEST- || :
     rename '/TEST-' $NAME ${ARTIFACT_DIR}/test-run-results/openjdk-$JDK_VER/surefire-reports/TEST-*.xml 2>/dev/null || :
-done
 
-sleep 3600
+    oc delete pod $POD_NAME
+done
 
 exit $status
 
