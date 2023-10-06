@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -o nounset
-set -o errexit
 set -o pipefail
 
 node_role=${APPLY_NODE_ROLE:=worker}
@@ -25,7 +24,7 @@ function gather_kdump_logs_from_node {
     fi
 
     # Get the debug pods name
-    debug_pod=$(oc get pods --namespace="default" 2>/dev/null | grep "$1-debug" | cut -d' ' -f1 || true)
+    debug_pod=$(oc get pods --namespace="default" 2>/dev/null | grep "$1-debug" | cut -d' ' -f1)
     sleep 2
   done
 
@@ -36,11 +35,11 @@ function gather_kdump_logs_from_node {
     echo "Pod name is: ${debug_pod}"
 
     # Wait for the debug pod to be ready
-    oc wait -n "default" --for=condition=Ready pod/"$debug_pod" --timeout=30s
+    oc wait -n "default" --for=condition=Ready pod/"$debug_pod" --timeout=60s
 
     # Copy kdump logs out of node and supress stdout
     echo "Copying kdump logs on node ""$1"""
-    oc cp --loglevel 1 -n "default" "${debug_pod}:/host${log_path}" "${output_path}/${1}_kdump_logs/"  > /dev/null 2>&1
+    oc cp --loglevel 1 -n "default" "${debug_pod}:/host${log_path}" "${output_path}/${1}_kdump_logs/" > /dev/null 2>&1
 
     # Cleanup the debug pod
     oc delete pod "$debug_pod" -n "default"
@@ -62,16 +61,19 @@ function package_kdump_logs {
   echo "INFO: Packaging the kdump logs"
 
   kdump_folders=""
+  num_kdump_folders=0
 
   # Check if we got kdump output from any of the nodes
-  if find ${output_path}/*/ -type d; then
+  if find ${output_path}/*/ -type d > /dev/null 2>&1; then
+    echo "INFO: Crash logs detected"
     kdump_folders="$(find ${output_path}/*/ -type d)"
-  fi
-  
-  # Only count the root directories
-  num_kdump_folders="$(echo -n "${kdump_folders}" | grep -c "\_kdump\_logs\/$" || true)"
 
-  echo "INFO: Found kdump folder(s) from ${num_kdump_folders} node(s)"
+      # Only count the root directories
+      num_kdump_folders="$(echo -n "${kdump_folders}" | grep -c "\_kdump\_logs\/$")"
+      echo "INFO: Found kdump folder(s) from ${num_kdump_folders} node(s)"
+  else
+    echo "INFO: No crash logs found"
+  fi
 
   if [ $num_kdump_folders -ne 0 ]; then
     # Package the whole folder together
@@ -84,12 +86,26 @@ function package_kdump_logs {
   rm -rf "${output_path}"
 }
 
+if test ! -f "${KUBECONFIG}"
+then
+	echo "No kubeconfig, so no point in gathering crash info."
+	exit 0
+fi
+
 node_label="node-role.kubernetes.io/${node_role}"
 NODES="${*:-$(oc get nodes -l ${node_label} -o jsonpath='{.items[?(@.status.nodeInfo.operatingSystem=="linux")].metadata.name}')}"
 
 echo $NODES
+if [[ -z "${NODES}" ]]; then
+  echo "Couldn't lookup node info from cluster API"
+  exit 0
+fi
 
 mkdir -p $output_path
+if [[ ! -d "${output_path}" ]]; then
+  echo "Output directory could not be created"
+  exit 0
+fi
 
 gather_kdump_logs
 
