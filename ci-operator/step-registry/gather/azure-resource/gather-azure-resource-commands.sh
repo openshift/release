@@ -59,7 +59,7 @@ function gatherLBs() {
         for ap in $aps; do
             echo "address-pool: $ap"
             if [[ "${CLUSTER_TYPE}" == "azurestack" ]]; then
-                run_command "az network lb address-pool show --lb-name $lb --name $ap --resource-group $RESOURCE_GROUP | jq -r .backendIpConfigurations[].id"
+                run_command "az network lb address-pool show --lb-name $lb --name $ap --resource-group $RESOURCE_GROUP | jq -r .backendIPConfigurations[].id"
             else
                 run_command "az network lb address-pool address list --lb-name $lb --pool-name $ap --resource-group $RESOURCE_GROUP -o table"
             fi
