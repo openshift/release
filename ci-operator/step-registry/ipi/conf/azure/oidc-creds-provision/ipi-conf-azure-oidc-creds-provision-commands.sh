@@ -110,6 +110,11 @@ if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ]; then
   ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
 fi
 
+if [[ -s "${SHARED_DIR}/customer_vnet_subnets.yaml" ]] && [[ -s "${SHARED_DIR}/resourcegroup" ]]; then
+  vnet_resource_group=$(cat "${SHARED_DIR}/resourcegroup")
+  ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --network-resource-group-name=${vnet_resource_group}"
+fi
+
 # create required credentials infrastructure and installer manifests
 ccoctl_ouptut="/tmp/ccoctl_output"
 ccoctl azure create-all \
