@@ -15,14 +15,11 @@ if [[ "${PLATFORM}" == "aws" ]]; then
     AWS_GUEST_INFRA_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
     DEFAULT_BASE_DOMAIN=origin-ci-int-aws.dev.rhcloud.com
   fi
-<<<<<<< HEAD
-=======
 elif [[ "${PLATFORM}" == "powervs" ]]; then
   export IBMCLOUD_CREDENTIALS="${CLUSTER_PROFILE_DIR}/credentials"
 else
   echo "Unsupported platform. Cluster deletion failed."
   exit 1
->>>>>>> origin/hypershift-hosted-powervs-test
 fi
 
 DOMAIN=${HYPERSHIFT_BASE_DOMAIN:-$DEFAULT_BASE_DOMAIN}
@@ -64,11 +61,7 @@ if [[ "${PLATFORM}" == "aws" ]]; then
      echo 'Failed to delete the cluster, retrying...'
    fi
   done
-<<<<<<< HEAD
-elif [[ "${PLATFORM}" == "powervs" ]]; then
-=======
 else
->>>>>>> origin/hypershift-hosted-powervs-test
   bin/hypershift destroy cluster powervs \
     --name ${CLUSTER_NAME} \
     --infra-id ${INFRA_ID} \
@@ -81,11 +74,5 @@ else
     --vpc ${VPC} \
     --cloud-connection ${CLOUD_CONNECTION} \
     --cluster-grace-period 40m
-<<<<<<< HEAD
-else
-  echo "Unsupported platform. Cluster deletion failed."
-  exit 1
-=======
->>>>>>> origin/hypershift-hosted-powervs-test
 fi
 echo "$(date) Finished deleting cluster"
