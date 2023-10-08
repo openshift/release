@@ -38,11 +38,11 @@ else
 fi
 
 createdAt=`oc -n clusters get hostedclusters $CLUSTER_NAME -o jsonpath='{.metadata.annotations.created-at}'`
-if [ -z $createdAt ]; then
-  echo Cluster is broken, skipping...
-  oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "broken=true"
-  exit 0
-fi
+#if [ -z $createdAt ]; then
+#  echo Cluster is broken, skipping...
+#  oc annotate -n clusters hostedcluster ${CLUSTER_NAME} "broken=true"
+#  exit 0
+#fi
 echo Cluster successfully created at $createdAt
 
 echo "$(date) Deleting HyperShift cluster ${CLUSTER_NAME}"
