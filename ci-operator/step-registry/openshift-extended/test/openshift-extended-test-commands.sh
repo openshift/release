@@ -43,7 +43,11 @@ which extended-platform-tests
 # setup proxy
 if test -f "${SHARED_DIR}/proxy-conf.sh"
 then
+    echo "[debug-yuewu] ${SHARED_DIR}/proxy-conf.sh exist"
     source "${SHARED_DIR}/proxy-conf.sh"
+    cat "${SHARED_DIR}/proxy-conf.sh"
+else
+    echo "[debug-yuewu] ${SHARED_DIR}/proxy-conf.sh does not exist"
 fi
 
 #setup bastion
@@ -250,7 +254,7 @@ function run {
 
     echo "final scenarios: ${test_scenarios}"
     extended-platform-tests run all --dry-run | \
-        grep -E "${test_scenarios}" | grep -E "${TEST_IMPORTANCE}" > ./case_selected
+        grep -E "CFE" > ./case_selected
 
     hardcoded_filters="~NonUnifyCI&;~Flaky&;~DEPRECATED&;~SUPPLEMENTARY&;~CPaasrunOnly&;~VMonly&;~ProdrunOnly&;~StagerunOnly&"
     if [[ "${test_scenarios}" == *"Stagerun"* ]] && [[ "${test_scenarios}" != *"~Stagerun"* ]]; then
@@ -282,6 +286,8 @@ function run {
 
     ret_value=0
     set -x
+    echo "[debug-yuewu] print env"
+    env | grep -o ".*="
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
         extended-platform-tests run --max-parallel-tests ${TEST_PARALLEL} \
         -o "${ARTIFACT_DIR}/extended.log" \
@@ -291,6 +297,7 @@ function run {
         --provider "${TEST_PROVIDER}" -o "${ARTIFACT_DIR}/extended.log" \
         --timeout "${TEST_TIMEOUT}m" --junit-dir="${ARTIFACT_DIR}/junit" -f ./case_selected || ret_value=$?
     fi
+    sleep 5h
     set +x
     set +e
     rm -fr ./case_selected
