@@ -1276,14 +1276,12 @@ periodics:
     - args:
       - --gcs-upload-secret=/secrets/gcs/service-account.json
       - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-      - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
+      - --lease-server-credentials-file=/etc/boskos/credentials
       - --secret-dir=/usr/local/launch-cluster-profile
-      - --input-hash=$(BUILD_ID)
-      - --input-hash=$(JOB_NAME)
-      - --namespace=$(NAMESPACE)
       - --target=hypershift-hostedcluster-powervs-e2e
+      - --variant=periodics
       command:
       - ci-operator
       env:
@@ -1293,43 +1291,6 @@ periodics:
         value: "4.14"
       - name: JOB_NAME_SAFE
         value: launch
-      - name: UNRESOLVED_CONFIG
-        value: |
-          releases:
-            multi-latest:
-              candidate:
-                architecture: multi
-                product: ocp
-                stream: nightly
-                version: "4.14"
-          resources:
-            '*':
-              limits:
-                memory: 4Gi
-              requests:
-                cpu: 100m
-                memory: 200Mi
-          tests:
-          - as: launch
-            steps:
-              cluster_profile: hypershift-powervs-cb
-              env:
-                PLATFORM: powervs
-                HYPERSHIFT_BASE_DOMAIN: hypershift-ppc64le.com
-                HYPERSHIFT_NODE_COUNT: 2
-                POWERVS_REGION: lon
-                POWERVS_ZONE: lon06
-                POWERVS_VPC_REGION: eu-gb
-                POWERVS_RESOURCE_GROUP: ibm-hypershift-dev
-                POWERVS_PROC_TYPE: shared
-                POWERVS_PROCESSORS: 0.5
-                POWERVS_SYS_TYPE: e980
-                POWERVS_GUID: 2313fc87-f7e9-4df6-969e-c0d37b8818a3
-                VPC: hypershift-clusterbot-ci-lon-vpc
-                CLOUD_CONNECTION: hypershift-clusterbot-ci-lon-cc
-              workflow: hypershift-hostedcluster-workflow
-              test:
-              - ref: clusterbot-wait
       image: ci-operator:latest
       imagePullPolicy: Always
       name: ""
