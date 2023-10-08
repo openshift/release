@@ -1018,6 +1018,20 @@ tests:
     test:
     - chain: openshift-e2e-test-hypershift-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+- as: aws-ipi-ovn-hypershift-guest-f28-longduration
+  cron: 43 9 25 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @network-ovnkubernetes and @hypershift-hosted
+        and not @fips'
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-longduration
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 - as: aws-ipi-ovn-hypershift-install-f7
   cron: 51 12 2,10,17,24 * *
   steps:
@@ -1054,6 +1068,18 @@ tests:
       TEST_TIMEOUT: "30"
     test:
     - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
+- as: aws-ipi-ovn-hypershift-mgmt-f28-longduration
+  cron: 58 13 24 * *
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_ADDITIONAL: Hypershift|Network_Observability
+      TEST_FILTERS: ~ChkUpgrade&;NonPreRelease&;~DisconnectedOnly&;HyperShiftMGMT&;~MicroShiftOnly&
+      TEST_TIMEOUT: "90"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt-longduration
     workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift
 - as: aws-ipi-ovn-ipsec-f7-obo
   cron: 28 7 1,9,17,24 * *
