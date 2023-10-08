@@ -4,7 +4,7 @@ postsubmits:
     always_run: true
     branches:
     - ^release-v1\.9$
-    cluster: build01
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
@@ -37,6 +37,9 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -48,6 +51,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -61,16 +67,16 @@ postsubmits:
     always_run: true
     branches:
     - ^release-v1\.9$
-    cluster: build01
+    cluster: build05
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/is-promotion: "true"
-      ci-operator.openshift.io/variant: "412"
+      ci-operator.openshift.io/variant: "413"
       ci.openshift.io/generator: prowgen
     max_concurrency: 1
-    name: branch-ci-openshift-knative-eventing-release-v1.9-412-images
+    name: branch-ci-openshift-knative-eventing-release-v1.9-413-images
     spec:
       containers:
       - args:
@@ -81,7 +87,7 @@ postsubmits:
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
         - --target=src
-        - --variant=412
+        - --variant=413
         command:
         - ci-operator
         image: ci-operator:latest
@@ -94,6 +100,9 @@ postsubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -105,6 +114,9 @@ postsubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

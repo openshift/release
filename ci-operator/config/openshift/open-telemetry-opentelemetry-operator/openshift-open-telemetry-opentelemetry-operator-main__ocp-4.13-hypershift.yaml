@@ -15,7 +15,7 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: upi-installer
-binary_build_commands: make build
+binary_build_commands: make manager
 build_root:
   image_stream_tag:
     name: builder
@@ -24,28 +24,30 @@ build_root:
 canonical_go_repository: github.com/open-telemetry/opentelemetry-operator
 images:
 - build_args:
+  - name: ARCH
+    value: amd64
   - name: VERSION_PKG
     value: github.com/open-telemetry/opentelemetry-operator/internal/version
   - name: VERSION
-    value: 0.79.0-20-g10fbf9f
+    value: 0.85.0-14-ga8109a6
   - name: VERSION_DATE
-    value: "2023-06-30T09:14:14Z"
+    value: "2023-09-28T14:15:14Z"
   - name: OTELCOL_VERSION
-    value: 0.80.0
+    value: 0.85.0
   - name: TARGETALLOCATOR_VERSION
-    value: 0.80.0
+    value: 0.85.0
   - name: OPERATOR_OPAMP_BRIDGE_VERSION
-    value: 0.80.0
+    value: 0.85.0
   - name: AUTO_INSTRUMENTATION_JAVA_VERSION
-    value: 1.26.0
+    value: 1.30.0
   - name: AUTO_INSTRUMENTATION_NODEJS_VERSION
-    value: 0.40.0
+    value: 0.41.1
   - name: AUTO_INSTRUMENTATION_PYTHON_VERSION
-    value: 0.39b0
+    value: 0.40b0
   - name: AUTO_INSTRUMENTATION_DOTNET_VERSION
-    value: 0.7.0
+    value: 1.0.0
   - name: AUTO_INSTRUMENTATION_GO_VERSION
-    value: v0.2.1-alpha
+    value: v0.3.0-alpha
   - name: AUTO_INSTRUMENTATION_APACHE_HTTPD_VERSION
     value: 1.0.3
   context_dir: .
@@ -62,7 +64,7 @@ operator:
     context_dir: .
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.80.0
+  - pullspec: ghcr.io/open-telemetry/opentelemetry-operator/opentelemetry-operator:0.85.0
     with: pipeline:opentelemetry-operator
 releases:
   latest:
@@ -84,9 +86,9 @@ tests:
       BASE_DOMAIN: qe.devcluster.openshift.com
       EO_SUB_CHANNEL: stable-5.7
       EO_SUB_SOURCE: redhat-operators
-      SKIP_TESTS: tests/e2e/instrumentation-sdk tests/e2e/instrumentation-go tests/e2e/instrumentation-apache-multicontainer
-        tests/e2e/instrumentation-apache-httpd tests/e2e/targetallocator-features
-        tests/e2e/prometheus-config-validation tests/e2e/smoke-targetallocator
+      SKIP_TESTS: tests/e2e/targetallocator-features tests/e2e/prometheus-config-validation
+        tests/e2e/smoke-targetallocator tests/e2e-instrumentation/instrumentation-apache-httpd
+        tests/e2e-openshift/otlp-metrics-traces
     test:
     - ref: cucushift-hypershift-extended-health-check
     - ref: cucushift-pre
@@ -97,8 +99,20 @@ tests:
     - as: install
       cli: latest
       commands: |
-        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-operators "$OO_BUNDLE"
-        oc wait --for condition=Available -n openshift-operators deployment opentelemetry-operator-controller-manager
+        oc create namespace opentelemetry-operator
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n opentelemetry-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
+
+        # Extract the CSV to a variable
+        csv_yaml=$(oc get csv opentelemetry-operator.v0.85.0 -n opentelemetry-operator -o yaml)
+
+        # Use sed to modify the feature gate flag
+        new_csv_yaml=$(echo "$csv_yaml" | sed 's/--feature-gates=+operator.autoinstrumentation.go/--feature-gates=+operator.autoinstrumentation.go,+operator.observability.prometheus/g')
+
+        # Reapply the modified CSV
+        echo "$new_csv_yaml" | oc apply -f -
+
+        oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
         name: opentelemetry-bundle

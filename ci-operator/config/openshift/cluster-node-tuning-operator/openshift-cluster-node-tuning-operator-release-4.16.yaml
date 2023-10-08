@@ -1,0 +1,150 @@
+base_images:
+  base:
+    name: "4.16"
+    namespace: ocp
+    tag: base-rhel9
+  hypershift-operator:
+    name: "4.16"
+    namespace: ocp
+    tag: hypershift-operator
+  hypershift-tests:
+    name: "4.16"
+    namespace: ocp
+    tag: hypershift-tests
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.14
+  openshift_release_golang-1.20:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+build_root:
+  from_repository: true
+images:
+- dockerfile_path: Dockerfile
+  from: base
+  inputs:
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+  to: cluster-node-tuning-operator-us-tuned
+- dockerfile_path: Dockerfile.rhel9
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
+  to: cluster-node-tuning-operator
+promotion:
+  excluded_images:
+  - cluster-node-tuning-operator-us-tuned
+  name: "4.16"
+  namespace: ocp
+releases:
+  initial:
+    integration:
+      name: "4.16"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.16"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: unit
+  commands: make test-unit
+  container:
+    from: src
+- as: verify
+  commands: make verify
+  container:
+    from: src
+- as: vet
+  commands: make vet
+  container:
+    from: src
+- as: e2e-hypershift
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-e2e-external
+- as: e2e-aws-ovn
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws
+- as: e2e-aws-operator
+  steps:
+    cluster_profile: aws
+    test:
+    - as: test
+      cli: latest
+      commands: make test-e2e
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-aws
+- as: e2e-gcp-pao
+  cluster: build03
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 2h0m0s
+    workflow: ipi-gcp
+- as: e2e-gcp-pao-updating-profile
+  cluster: build03
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-updating-profile
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+  timeout: 5h0m0s
+- as: e2e-gcp-pao-workloadhints
+  cluster: build03
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: CLUSTER=mcp-only make cluster-deploy-pao && make pao-functests-performance-workloadhints
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 4h0m0s
+    workflow: ipi-gcp
+  timeout: 4h0m0s
+- as: e2e-upgrade
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+- as: e2e-no-cluster
+  commands: make test-e2e-local
+  container:
+    from: src
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift
+  repo: cluster-node-tuning-operator

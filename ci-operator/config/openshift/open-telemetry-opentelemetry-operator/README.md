@@ -72,6 +72,9 @@ Following the test cluster being provisioned, the following steps are executed:
 - `EO_SUB_SOURCE`
   - **Definition**: The operator catalog source from which to install the Elasticsearch Operator.
   - **If left empty**: The [`operatorhub-subscribe-elasticsearch-operator`](../../../step-registry/operatorhub/subscribe/elasticsearch-operator/README.md) will use the `qe-app-registry` catalog source.
+- `DOWNSTREAM_TESTS_COMMIT`
+  - **Definition**: The OpenTelemetry operator commit to use downstream release compatible test cases.
+  - **If left empty**: The [`distributed-tracing-tests-tempo`](../../../step-registry/distributed-tracing/tests/opentelemetry/README.md) will use the latest commit.
 
 
 ### Custom Images

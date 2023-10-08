@@ -17,6 +17,7 @@ if [[ "${PLATFORM}" == "aws" ]]; then
   fi
   RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_LATEST}
 elif [[ "${PLATFORM}" == "powervs" ]]; then
+  export IBMCLOUD_CREDENTIALS="${CLUSTER_PROFILE_DIR}/credentials"
   RELEASE_IMAGE=${HYPERSHIFT_HC_RELEASE_IMAGE:-$RELEASE_IMAGE_MULTI_LATEST}
 else
   echo "Currently only AWS and PowerVS platforms are supported"

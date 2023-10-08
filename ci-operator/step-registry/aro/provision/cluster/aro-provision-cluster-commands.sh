@@ -17,6 +17,7 @@ AZURE_AUTH_TENANT_ID="$(<"${AZURE_AUTH_LOCATION}" jq -r .tenantId)"
 ARO_WORKER_COUNT=${ARO_WORKER_COUNT:=""}
 ARO_MASTER_VM_SIZE=${ARO_MASTER_VM_SIZE:=""}
 ARO_WORKER_VM_SIZE=${ARO_WORKER_VM_SIZE:=""}
+ARO_CLUSTER_VERSION=${ARO_CLUSTER_VERSION:=""}
 
 echo $CLUSTER > $SHARED_DIR/cluster-name
 echo $LOCATION > $SHARED_DIR/location
@@ -66,6 +67,14 @@ fi
 #change number of workers from default
 if [[ -n ${ARO_WORKER_COUNT} ]]; then
     CREATE_CMD="${CREATE_CMD} --worker-count ${ARO_WORKER_COUNT}"
+fi
+
+#select an OCP version for ARO cluster
+if [[ -n ${ARO_CLUSTER_VERSION} ]]; then
+    echo "Will attempt to install ARO cluster using Openshift ${ARO_CLUSTER_VERSION}"
+    echo "Available versions in ${LOCATION}:"
+    az aro get-versions -l ${LOCATION} -o table
+    CREATE_CMD="${CREATE_CMD} --version ${ARO_CLUSTER_VERSION}"
 fi
 
 echo "Running ARO create command:"

@@ -20,11 +20,12 @@ else
   echo "MCE version is greater than or equal to 2.4, need to extract HyperShift cli"
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
-  oc image extract "${HO_IMAGE}" --path /usr/bin/hypershift:/tmp --registry-config=/tmp/.dockerconfigjson
+  mkdir /tmp/hs-cli
+  oc image extract "${HO_IMAGE}" --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson
 fi
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
-/tmp/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
+/tmp/hs-cli/hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
 --namespace local-cluster \
 --dump-guest-cluster=true \
 --name="${CLUSTER_NAME}"

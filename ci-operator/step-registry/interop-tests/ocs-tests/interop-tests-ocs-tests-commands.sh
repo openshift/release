@@ -31,6 +31,9 @@ cat > "${LOGS_CONFIG}" << __EOF__
 ---
 RUN:
   log_dir: "${LOGS_FOLDER}"
+REPORTING:
+  default_ocs_must_gather_image: "quay.io/rhceph-dev/ocs-must-gather"
+  default_ocs_must_gather_latest_tag: "latest-${ODF_VERSION_MAJOR_MINOR}"
 __EOF__
 
 
@@ -39,6 +42,7 @@ START_TIME=$(date "+%s")
 
 run-ci --color=yes tests/ -m acceptance -k '' \
   --ocsci-conf "${LOGS_CONFIG}" \
+  --collect-logs \
   --ocs-version "${OCS_VERSION}" \
   --ocp-version "${OCP_VERSION}" \
   --cluster-path "${CLUSTER_PATH}" \
