@@ -48,7 +48,7 @@ if [ -f "${remove_resources_by_cli}" ]; then
     sh -x "${remove_resources_by_cli}"
 fi
 
-rg_files="${SHARED_DIR}/resourcegroup ${SHARED_DIR}/RESOURCE_GROUP_NAME"
+rg_files="${SHARED_DIR}/resourcegroup ${SHARED_DIR}/resourcegroup_cluster ${SHARED_DIR}/RESOURCE_GROUP_NAME"
 for rg_file in ${rg_files}; do
     if [ -f "${rg_file}" ]; then
         existing_rg=$(cat "${rg_file}")
