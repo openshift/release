@@ -1,3 +1,8 @@
+base_images:
+  base:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-base-openshift-4.14
 build_root:
   image_stream_tag:
     name: release
@@ -7,6 +12,30 @@ images:
 - context_dir: .
   dockerfile_path: Dockerfile
   to: main
+- dockerfile_literal: |-
+    FROM base as gitleaks-build
+    WORKDIR /go/src/github.com/zricethezav/gitleaks
+    RUN dnf install git golang -y && \
+        git clone https://github.com/gitleaks/gitleaks.git . && \
+        VERSION=$(git describe --tags --abbrev=0) \
+        CGO_ENABLED=0 \
+        go build -o /go/bin/gitleaks -ldflags "-X="github.com/zricethezav/gitleaks/v8/cmd.Version=${VERSION}
+  from: base
+  to: gitleaks-build
+- dockerfile_literal: |-
+    FROM main as with-gitleaks
+    RUN apt-get update -y && \
+    apt-get install git -y && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+    COPY --from=gitleaks-build /go/bin/gitleaks /usr/bin/gitleaks
+  from: main
+  inputs:
+    gitleaks-build:
+      as:
+      - gitleaks-build
+  to: with-gitleaks
 promotion:
   name: firewatch
   namespace: cspi-qe
@@ -15,6 +44,14 @@ resources:
     requests:
       cpu: 100m
       memory: 200Mi
+tests:
+- as: test-firewatch-with-gitleaks
+  commands: |-
+    firewatch --help
+    gitleaks --help
+  container:
+    clone: false
+    from: main
 zz_generated_metadata:
   branch: main
   org: CSPI-QE
