@@ -59,6 +59,9 @@ fi
 
 IFS=' ' read -r -a master_ips <<<"$(oc get machines -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-type=master -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
 IFS=' ' read -r -a worker_ips <<<"$(oc get machines -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-type=worker -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
+
+SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+
 declare API_VIP
 declare INGRESS_VIP
 # shellcheck source=/dev/null
