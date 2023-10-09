@@ -64,6 +64,8 @@ declare INGRESS_VIP
 # shellcheck source=/dev/null
 source "${SHARED_DIR}/nutanix_context.sh"
 
+SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
+
 worker_reboot=""
 worker_reboot_name=""
 # Check which worker is holding ingressVip
