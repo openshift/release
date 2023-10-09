@@ -13,7 +13,7 @@ else
   export KUBECONFIG=${SHARED_DIR}/kubeconfig
 fi
 
-RUN_COMMAND="poetry run python app/cli.py operators --kubeconfig ${KUBECONFIG} "
+RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py operators --kubeconfig ${KUBECONFIG} "
 
 OPERATORS_CMD=""
 for operator_value in $(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort  --version-sort); do
