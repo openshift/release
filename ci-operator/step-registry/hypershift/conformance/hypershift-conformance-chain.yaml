@@ -57,8 +57,29 @@ chain:
           ;;
       kubevirt)
           export TEST_PROVIDER='{"type":"kubevirt"}'
-          openshift-tests run --dry-run --provider "${TEST_PROVIDER}" openshift/conformance/parallel | grep "\[Suite:openshift/conformance/parallel/minimal\]" > /tmp/tests_hs_kv
-          TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests_hs_kv"
+
+          # This looks counterintuitive. Here's an explanation.
+          #
+          # There technically isn't a parallel minimal test suite. Some of the older KubeVirt
+          # platform versions need to be limited to just to tests marked as minimal.
+          #
+          # By using the "openshift/conformance/parallel" test suite, but filtering out
+          # everything that matches exactly to the "openshift/conformance/parallel" test suite,
+          # we are left with just the "openshift/conformance/parallel/minimal" test entries.
+          #
+          # This might not be the best long term solution, but these older KubeVirt platform
+          # tests won't be maintained for long and are not a part of any GA.
+          
+          PIPE="\|"
+          # if $TEST_SKIPS is empty then $PIPE should be empty too
+          if [[ -z "$TEST_SKIPS" ]]; then
+            PIPE=""          
+          fi
+          if [[ "${TEST_SUITE}" == "openshift/conformance/parallel/minimal" ]]; then
+              TEST_SKIPS=$TEST_SKIPS"${PIPE}\[Suite:openshift/conformance/parallel\]"
+              TEST_SUITE="openshift/conformance/parallel"
+          fi
+
           ;;
       *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
       esac

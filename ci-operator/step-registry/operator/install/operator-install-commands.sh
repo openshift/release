@@ -7,10 +7,10 @@ set -o verbose
 
 export KUBECONFIG=${SHARED_DIR}/kubeconfig
 
-RUN_COMMAND="poetry run python app/cli.py operators --kubeconfig ${KUBECONFIG} "
+RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py operators --kubeconfig ${KUBECONFIG} "
 
 OPERATORS_CMD=""
-for operator_value in $(env | grep -E '^OPERATOR[0-9]+_CONFIG'); do
+for operator_value in $(env | grep -E '^OPERATOR[0-9]+_CONFIG' | sort  --version-sort); do
     operator_value=$(echo "$operator_value" | sed -E  's/^OPERATOR[0-9]+_CONFIG=//')
     if  [ "${operator_value}" ]; then
       OPERATORS_CMD+=" --operator ${operator_value} "
@@ -19,7 +19,7 @@ done
 
 RUN_COMMAND="${RUN_COMMAND} ${OPERATORS_CMD}"
 
-if [ -n "${PARALLEL}" ]; then
+if [ "${ADDONS_OPERATORS_RUN_IN_PARALLEL}" = "true" ]; then
     RUN_COMMAND+=" --parallel"
 fi
 

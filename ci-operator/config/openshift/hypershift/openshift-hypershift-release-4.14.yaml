@@ -7,6 +7,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  hypershift-operator-initial:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
@@ -35,7 +39,6 @@ images:
 promotion:
   additional_images:
     hypershift-tests: test-bin
-  disabled: true
   name: "4.14"
   namespace: ocp
 releases:
@@ -65,7 +68,7 @@ releases:
     candidate:
       product: ocp
       stream: ci
-      version: "4.13"
+      version: "4.14"
   latest:
     integration:
       include_built_images: true
@@ -90,29 +93,33 @@ tests:
   commands: make verify
   container:
     from: src
-  skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
 - as: unit
   commands: make test
   container:
     from: src
-  skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
 - as: e2e-aws
-  skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-nested
 - as: e2e-kubevirt-aws-ovn
-  skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     cluster_profile: aws
     env:
       CNV_PRERELEASE_VERSION: "4.14"
       COMPUTE_NODE_REPLICAS: "1"
       COMPUTE_NODE_TYPE: c5n.metal
+      ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK: "true"
       ETCD_STORAGE_CLASS: gp3-csi
+      KUBEVIRT_CSI_INFRA: gp3-csi
     workflow: hypershift-kubevirt-e2e
 - as: e2e-aws-4-12
   optional: true
   steps:
+    cluster_profile: hypershift
     dependencies:
       OCP_IMAGE_LATEST: release:hosted-ocp-4-12-latest
       OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-12-previous
@@ -120,6 +127,7 @@ tests:
 - as: e2e-aws-4-13
   optional: true
   steps:
+    cluster_profile: hypershift
     dependencies:
       OCP_IMAGE_LATEST: release:hosted-ocp-4-13-latest
       OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-13-previous
@@ -127,10 +135,12 @@ tests:
 - as: e2e-aws-metrics
   optional: true
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-conformance
   optional: true
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: e2e-ibmcloud-iks
   optional: true

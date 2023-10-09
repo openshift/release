@@ -110,15 +110,52 @@ items:
                     - hook-apps
                 topologyKey: "kubernetes.io/hostname"
         serviceAccountName: hook
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --wait=30
+          - --root=/tmp/git-sync
+          - --max-sync-failures=3
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
         - name: hook
-          image: gcr.io/k8s-prow/hook:v20230628-f13bc80c8a
+          image: gcr.io/k8s-prow/hook:v20230927-4613add0a1
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
           - --hmac-secret-file=/etc/github/hmac
           - --dry-run=false
-          - --job-config-path=/etc/job-config
+          - --job-config-path=/var/repo/release/ci-operator/jobs
           - --github-app-id=$(GITHUB_APP_ID)
           - --github-app-private-key-path=/etc/github/cert
           - --github-endpoint=http://ghproxy
@@ -167,9 +204,8 @@ items:
             readOnly: true
           - name: tmp
             mountPath: /tmp
-          - name: job-config
-            mountPath: /etc/job-config
-            readOnly: true
+          - name: release
+            mountPath: /var/repo
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
@@ -211,61 +247,8 @@ items:
         - name: plugins
           configMap:
             name: plugins
-        - name: job-config
-          projected:
-            sources:
-            - configMap:
-                name: job-config-misc
-            - configMap:
-                name: job-config-master-periodics
-            - configMap:
-                name: job-config-main-periodics
-            - configMap:
-                name: job-config-master-postsubmits
-            - configMap:
-                name: job-config-main-postsubmits
-            - configMap:
-                name: job-config-master-presubmits
-            - configMap:
-                name: job-config-main-presubmits
-            - configMap:
-                name: job-config-1.x
-            - configMap:
-                name: job-config-2.x
-            - configMap:
-                name: job-config-3.x
-            - configMap:
-                name: job-config-4.0
-            - configMap:
-                name: job-config-4.1
-            - configMap:
-                name: job-config-4.2
-            - configMap:
-                name: job-config-4.3
-            - configMap:
-                name: job-config-4.4
-            - configMap:
-                name: job-config-4.5
-            - configMap:
-                name: job-config-4.6
-            - configMap:
-                name: job-config-4.7
-            - configMap:
-                name: job-config-4.8
-            - configMap:
-                name: job-config-4.9
-            - configMap:
-                name: job-config-4.10
-            - configMap:
-                name: job-config-4.11
-            - configMap:
-                name: job-config-4.12
-            - configMap:
-                name: job-config-4.13
-            - configMap:
-                name: job-config-4.14
-            - configMap:
-                name: job-config-4.15
+        - name: release
+          emptyDir: {}
         - name: build-farm-credentials
           secret:
             secretName: hook

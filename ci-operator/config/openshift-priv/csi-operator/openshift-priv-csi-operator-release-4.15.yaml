@@ -4,12 +4,10 @@ base_images:
     namespace: ocp-private
     tag: base
 build_root:
-  image_stream_tag:
-    name: release
-    namespace: openshift
-    tag: golang-1.10
+  from_repository: true
 canonical_go_repository: github.com/openshift/csi-operator
 promotion:
+  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:
@@ -36,18 +34,6 @@ tests:
   commands: make verify
   container:
     from: src
-- as: e2e-aws-operator
-  steps:
-    cluster_profile: aws
-    test:
-    - as: test
-      cli: latest
-      commands: make test-e2e
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-    workflow: ipi-aws
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

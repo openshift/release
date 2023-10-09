@@ -7,6 +7,10 @@ base_images:
     name: "4.13"
     namespace: ocp
     tag: cli
+  hypershift-operator-initial:
+    name: "4.13"
+    namespace: ocp
+    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.19-openshift-4.13:
     name: builder
     namespace: ocp
@@ -78,19 +82,21 @@ tests:
   commands: make verify
   container:
     from: src
-  skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
 - as: unit
   commands: make test
   container:
     from: src
-  skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
 - as: e2e-aws
-  skip_if_only_changed: (^(docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements|contrib)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-nested
 - as: e2e-aws-4-12
   optional: true
   steps:
+    cluster_profile: hypershift
     dependencies:
       OCP_IMAGE_LATEST: release:hosted-ocp-4-12-latest
       OCP_IMAGE_PREVIOUS: release:hosted-ocp-4-12-previous
@@ -98,14 +104,16 @@ tests:
 - as: e2e-aws-metrics
   optional: true
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-metrics
 - as: e2e-conformance
   optional: true
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: e2e-ibmcloud-iks
   optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     env:
       BOM_VERSION: 4.13.0_openshift
@@ -115,7 +123,7 @@ tests:
     workflow: hypershift-ibmcloud-e2e-release
 - as: e2e-ibmcloud-roks
   optional: true
-  skip_if_only_changed: (^(docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
+  skip_if_only_changed: (^(\.tekton|docs|examples|enhancements)/)|(^[A-Z]+\.md$)|((^|/)OWNERS$)
   steps:
     env:
       BOM_VERSION: 4.13.0_openshift

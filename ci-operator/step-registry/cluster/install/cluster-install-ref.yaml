@@ -1,0 +1,79 @@
+ref:
+  as: cluster-install
+  from: openshift-cli-installer
+  commands: cluster-install-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  env:
+    - name: CLUSTER1_CONFIG
+      documentation: >-
+        Cluster name and semi-comma-separated string with cluster parameters.
+        Example: 'name=cluster1;base_domain=aws.interop.com;platform=rosa;region=us-east-2;version=4.14.0-ec.2;channel-group=candidate;worker_flavor=m5.xlarge'
+        To set cluster installation timeout, add `timeout=<timeout>`, for example: 30m, 1h.
+        If not provided, the default timeout is 30 minutes.
+        Example: 'name=cluster1;base_domain=aws.interop.com;platform=aws;region=us-east-2;version=4.13.1;timeout=45m'
+    - name: CLUSTER2_CONFIG
+      default: ""
+      documentation: Refer to CLUSTER1_CONFIG documentation
+    - name: CLUSTER3_CONFIG
+      default: ""
+      documentation: Refer to CLUSTER1_CONFIG documentation
+    - name: CLUSTER4_CONFIG
+      default: ""
+      documentation: Refer to CLUSTER1_CONFIG documentation
+    - name: CLUSTERS_RUN_IN_PARALLEL
+      default: "true"
+      documentation: To run cluster install in parallel, set to "true" else set to "false"
+    - name: PULL_SECRET_NAME
+      default: ""
+      documentation: >-
+        Name of pull secret json secret; should be saved under cluster-profile.
+        Can be obtained from https://console.redhat.com/openshift/create/local.
+        Docker `config.json` file should be saved under cluster secrets with credentials to `registry.ci.openshift.org`.
+        Required only for AWS IPI installations.
+    - name: S3_BUCKET_NAME
+      default: ""
+      documentation: S3 bucket name to store install folder backups.
+    - name: S3_BUCKET_PATH
+      default: ""
+      documentation: S3 bucket path to store backups.
+    - name: CLUSTER_NAME_PREFIX
+      default: "ci"
+      documentation: >-
+        Prefix to be added to cluster name along with `RANDOMIZE_CLUSTER_NAME`.
+        Currently applicable for a single cluster.
+    - name: RANDOMIZE_CLUSTER_NAME
+      default: "true"
+      documentation: >-
+        To randomize cluster name, set to "true" else set to "false".
+        If set to "true", cluster name will be randomly generated prefixed with `CLUSTER_NAME_PREFIX`.
+        If set to "false", cluster name will be the same as CLUSTER1_CONFIG.
+    - name: GCP_SERVICE_ACCOUNT_NAME
+      default: ""
+      documentation: >-
+        Name of GCP service account json secret.  
+            To create the secret json, create a service account and download it:  
+            1. Go to https://console.cloud.google.com/iam-admin/serviceaccounts?project=<project>
+            2. Select the service account -> "Create Key"
+            3. Select the Key Type as `JSON` and click Create
+    - name: COLLECT_MUST_GATHER
+      default: "true"
+      documentation: >-
+        must-gather will try to collect data when cluster installation fails and cluster can be accessed.
+        Data will be saved under `ARTIFACT_DIR`
+  documentation: >-
+    This step installs cluster(s).
+    Currently supports up to 4 clusters. If needed, additional environment variables can be added here.
+    Currently supported installations: AWS IPI, AWS OSD, ROSA and Hypershift.
+    cluster-profile: 
+      - AWS credentials should be stored in `.awscred` as `aws_access_key_id` and `aws_secret_access_key`
+      - OCM token should be stored in `ocm-token`
+    Clusters authentication dir path: `/tmp/clusters-data/<cluster platform>/<cluster name>/<auth>
+    This dir is compressed and saved under $SHARED_DIR and should be extracted in the relevant step. Run:
+      tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
+    For example: 
+      For CLUSTER1_CONFIG="name=ci-hyper;platform=hypershift;region=us-west-2;version=4.13.4;timeout=1h"
+      kubeconfig file will be located under: /tmp/clusters-data/hypershift/ci-hyper/auth/kubeconfig
+    Refer to https://github.com/RedHatQE/openshift-cli-installer for more information.

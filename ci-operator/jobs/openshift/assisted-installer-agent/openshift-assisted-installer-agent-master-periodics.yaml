@@ -1,10 +1,8 @@
 periodics:
 - agent: kubernetes
-  cluster: build04
+  cluster: build05
   cron: 45 1 * * *
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -12,7 +10,7 @@ periodics:
   labels:
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.13"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-installer-agent-master-edge-mirror-nightly-image
   spec:
@@ -39,6 +37,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -50,6 +51,9 @@ periodics:
     - name: ci-pull-credentials
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials
@@ -57,11 +61,9 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: build04
+  cluster: build05
   cron: 00 00 */1 * 0-5
   decorate: true
-  decoration_config:
-    skip_cloning: true
   extra_refs:
   - base_ref: master
     org: openshift
@@ -71,7 +73,7 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: packet-assisted
     ci-operator.openshift.io/variant: edge
     ci.openshift.io/generator: prowgen
-    job-release: "4.13"
+    job-release: "4.14"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-openshift-assisted-installer-agent-master-edge-subsystem-test-periodic
   spec:
@@ -105,6 +107,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
         readOnly: true
@@ -125,6 +130,9 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-packet-assisted
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

@@ -41,9 +41,14 @@ tests:
 - always_run: false
   as: rosa-classic-e2e-presubmit
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-terraform-qe
     env:
       TF_FOLDER: ci/e2e/terraform_provider_rhcs_files
+      TF_VARS: |
+        url = "https://api.stage.openshift.com"
+        channel_group = "stable"
+        aws_region = "ap-northeast-1"
+        aws_availability_zones = ["ap-northeast-1a"]
     post:
     - ref: rosa-terraform-e2e-teardown
     pre:
@@ -51,9 +56,14 @@ tests:
 - as: managed-oidc-config-e2e-presubmit
   skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-terraform-qe
     env:
       TF_FOLDER: ci/e2e/oidc_configuration/cluster_with_managed_oidc_config
+      TF_VARS: |
+        url = "https://api.stage.openshift.com"
+        channel_group = "candidate"
+        aws_region = "ap-northeast-1"
+        aws_availability_zones = ["ap-northeast-1a"]
     post:
     - ref: rosa-terraform-e2e-teardown
     pre:
@@ -61,9 +71,14 @@ tests:
 - as: unmanaged-oidc-config-e2e-presubmit
   skip_if_only_changed: ^(LICENSE|OWNERS|README\.md|\.gitignore|\.goreleaser\.yaml)$|^docs/|^subsystem/|^examples/
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-terraform-qe
     env:
       TF_FOLDER: ci/e2e/oidc_configuration/cluster_with_unmanaged_oidc_config
+      TF_VARS: |
+        url = "https://api.stage.openshift.com"
+        channel_group = "stable"
+        aws_region = "ap-northeast-1"
+        aws_availability_zones = ["ap-northeast-1a"]
     post:
     - ref: rosa-terraform-e2e-teardown
     pre:
@@ -72,7 +87,7 @@ tests:
   cluster: build05
   cron: '@daily'
   steps:
-    cluster_profile: aws-qe
+    cluster_profile: aws-terraform-qe
     env:
       POLARION_PROPERTIES: |
         targets:
@@ -88,17 +103,25 @@ tests:
                 polarion-custom-version: '4.13'
                 polarion-custom-products: ocp
                 polarion-custom-plannedin: OCP_4_13_Z
-      POLARION_STEP_RESULTS: artifacts/managed-oidc-config-e2e-periodic/openshift-extended-test/artifacts/junit
+      POLARION_STEP_RESULTS: openshift-extended-test/artifacts/junit
       TEST_FILTERS: ~MicroShiftOnly&;~HyperShiftMGMT&;~CPaasrunOnly&;~NonPreRelease&;~VMonly&;~ProdrunOnly&;~StagerunOnly&;~DisconnectedOnly&;~Disruptive&;~Serial&;ROSA&
       TEST_SCENARIOS: OLM|Security_and_Compliance|Operator_SDK|Network_Edge|Workloads|Image_Registry|Container_Engine_Tools|MCO|ETCD|PSAP|SDN|Cluster_Infrastructure|API_Server|Authentication|Cluster_Observability|LOGGING
       TF_FOLDER: ci/e2e/oidc_configuration/cluster_with_managed_oidc_config
+      TF_VARS: |
+        provider_source  = "terraform.local/local/rhcs"
+        provider_version =  ">= 1.1.0"
+        ocm_environment = "production"
+        url = "https://api.openshift.com"
+        channel_group = "stable"
+        aws_region = "ap-northeast-1"
+        aws_availability_zones = ["ap-northeast-1a"]
     post:
-    - ref: rosa-terraform-e2e-tests-upload-polarion
     - ref: rosa-terraform-e2e-teardown
     pre:
     - ref: rosa-terraform-e2e-setup
     test:
     - ref: openshift-extended-test
+    - ref: rosa-terraform-e2e-tests-upload-polarion
 zz_generated_metadata:
   branch: main
   org: terraform-redhat

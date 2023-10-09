@@ -9,4 +9,4 @@ via the `workflow-launch` slack command. Each workflow item has 3 fields that ca
   The format is identical to the ci-operator config format for `base_images`.
 
 The struct definition for the above config file can be found in https://github.com/openshift/ci-chat-bot/blob/master/main.go.
-For any questions, plase contact #forum-crt on the coreos slack.
+For any questions, please contact #forum-ocp-crt on the Internal Red Hat Slack.

@@ -146,28 +146,29 @@ pushd ${ARTIFACT_DIR}/network/multus_logs/ || return
 oc get node -oname | xargs oc adm must-gather -- /usr/bin/gather_multus_logs
 popd || return
 
-# If the tcpdump-service step was used, grab the pcap files.
-echo "INFO: gathering quay tcpdump packet headers if present"
-output_dir="${ARTIFACT_DIR}/tcpdump/"
-mkdir -p "$output_dir"
+# If the tcpdump-service or conntrackdump-service step was used, grab the files.
+for capture_type in tcpdump conntrackdump; do
+  echo "INFO: gathering ${capture_type} information if present"
+  output_dir="${ARTIFACT_DIR}/${capture_type}/"
+  mkdir -p "$output_dir"
 
-# Skip downloading of .terminating and .lock files.
-oc adm node-logs --role=worker --path="/tcpdump" | \
-grep -v ".terminating" | \
-grep -v ".lock" | \
-tee "${output_dir}.tcpdump_listing"
+  # Skip downloading of .terminating and .lock files.
+  oc adm node-logs -l kubernetes.io/os=linux --path="/${capture_type}" | \
+  grep -v ".terminating" | \
+  grep -v ".lock" | \
+  tee "${output_dir}.${capture_type}_listing"
+  cat "${output_dir}.${capture_type}_listing"
 
-cat "${output_dir}.tcpdump_listing"
-
-# The ${output_dir}.tcpdump_listing file contains lines with the node and filename
-# separated by a space.
-while IFS= read -r item; do
-node=$(echo $item |cut -d ' ' -f 1)
-fname=$(echo $item |cut -d ' ' -f 2)
-echo "INFO: Queueing download/gzip of /tcpdump/${fname} from ${node}";
-echo "INFO:   gziping to ${output_dir}/${node}-${fname}.gz";
-FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/tcpdump/${fname}
-done < ${output_dir}.tcpdump_listing
+  # The ${output_dir}.${capture_type}_listing file contains lines with the node and filename
+  # separated by a space.
+  while IFS= read -r item; do
+    node=$(echo $item |cut -d ' ' -f 1)
+    fname=$(echo $item |cut -d ' ' -f 2)
+    echo "INFO: Queueing download/gzip of /${capture_type}/${fname} from ${node}";
+    echo "INFO: gziping to ${output_dir}/${node}-${fname}.gz";
+    FILTER=gzip queue ${output_dir}/${node}-${fname}.gz oc --insecure-skip-tls-verify adm node-logs ${node} --path=/${capture_type}/${fname}
+  done < ${output_dir}.${capture_type}_listing
+done
 
 # Gather etcd strace and pprof output if present:
 echo "INFO: Fetching debug info from etcd pods if present"
@@ -259,8 +260,13 @@ else
 fi
 
 echo "Adding debug tools link to sippy for intervals"
+if [[ "${JOB_TYPE}" == "presubmit" ]]; then
+  extra_args="${JOB_NAME}/${REPO_OWNER}_${REPO_NAME}/${PULL_NUMBER}"
+else
+  extra_args="${JOB_NAME}"
+fi
 cat >> ${SHARED_DIR}/custom-links.txt << EOF
-<a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
+<a target="_blank" href="https://sippy.dptools.openshift.org/sippy-ng/job_runs/${BUILD_ID}/${extra_args}/intervals" title="Intervals charts give insight into what was happening on the cluster at various points in time, including when tests failed or when operators were in certain states.">Intervals</a>
 EOF
 
 # Calculate metrics suitable for apples-to-apples comparison across CI runs.

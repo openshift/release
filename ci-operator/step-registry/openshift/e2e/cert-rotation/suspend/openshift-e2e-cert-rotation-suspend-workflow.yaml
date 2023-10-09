@@ -1,0 +1,22 @@
+workflow:
+  as: openshift-e2e-cert-rotation-suspend
+  steps:
+    allow_skip_on_success: true
+    allow_best_effort_post_steps: true
+    cluster_profile: packet-assisted
+    env:
+      PACKET_PLAN: "m3.large.x86"
+      PACKET_OS: "rocky_8"
+    pre:
+      - ref: baremetalds-packet-setup
+      - chain: assisted-common-pre
+    test:
+      - ref: openshift-e2e-cert-rotation-prepare-for-shutdown
+      - ref: openshift-e2e-cert-rotation-suspend
+    post:
+      - ref: gather-cert-rotation
+      - ref: assisted-common-gather
+      - ref: baremetalds-packet-gather-metadata
+      - ref: baremetalds-packet-teardown
+  documentation: |-
+    This workflow executes HA installation using live CD, rolls time forward for 90 days and verifies that the cluster correctly reconfigures itself

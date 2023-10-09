@@ -11,10 +11,18 @@ base_images:
     name: golangci-lint
     namespace: ci
     tag: v1.46.0
+  hypershift-operator:
+    name: 4.15-priv
+    namespace: ocp-private
+    tag: hypershift-operator
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
   tools:
     name: 4.15-priv
     namespace: ocp-private
@@ -30,6 +38,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: tests
 - dockerfile_path: images/hello-openshift/Dockerfile.rhel
   from: base
@@ -39,6 +50,7 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: hello-openshift
 promotion:
+  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:
@@ -310,21 +322,6 @@ tests:
       CONFIG_TYPE: minimal
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
-- as: e2e-openstack-kuryr
-  optional: true
-  steps:
-    cluster_profile: openstack-kuryr
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
-      TEST_SKIPS: NodePort \| session affinity \| Services should be able to change
-        the type from ExternalName to ClusterIP \| Pods should delete a collection
-        of pods \| Kubectl client Guestbook application should create and stop a working
-        application \| Services should serve multiport endpoints from pods \| Services
-        should serve a basic endpoint from pods
-      TEST_SUITE: kubernetes/conformance
-    workflow: openshift-e2e-openstack-ipi
 - as: e2e-openstack-serial
   optional: true
   steps:
@@ -372,6 +369,8 @@ tests:
   optional: true
   steps:
     cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-aws-etcd-recovery
 - always_run: false
   as: e2e-gcp-ovn-techpreview
@@ -389,6 +388,12 @@ tests:
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     workflow: openshift-e2e-gcp
+- as: e2e-aws-ovn-kubevirt
+  optional: true
+  run_if_changed: ^test/extended/kubevirt/.*
+  steps:
+    cluster_profile: aws
+    workflow: hypershift-kubevirt-conformance
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

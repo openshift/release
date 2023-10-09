@@ -26,7 +26,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-ingress-operator
 promotion:
-  disabled: true
   name: 4.14-priv
   namespace: ocp-private
 releases:
@@ -55,6 +54,7 @@ tests:
     from: src
 - as: e2e-hypershift
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
 - as: e2e-aws-ovn
   steps:
@@ -65,6 +65,12 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-e2e-azure
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-aws-operator
   steps:
     cluster_profile: aws

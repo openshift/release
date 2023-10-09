@@ -72,7 +72,7 @@ EOF
 chmod +x "${HOME}"/run-tests.sh
 
 # Get the bundle
-curl -L "https://storage.googleapis.com/crc-bundle-github-ci/${BUNDLE}" -o /tmp/${BUNDLE}
+curl -L "https://mirror.openshift.com/pub/openshift-v4/clients/crc/bundles/openshift/${BUNDLE_VERSION}/${BUNDLE}" -o /tmp/${BUNDLE}
 
 echo "${BUNDLE}" > "${HOME}"/bundle
 

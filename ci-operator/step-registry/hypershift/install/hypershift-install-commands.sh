@@ -2,9 +2,15 @@
 
 set -eux
 
+EXTRA_ARGS=""
+
 OPERATOR_IMAGE=$HYPERSHIFT_RELEASE_LATEST
 if [[ $OCP_ARCH == "arm64" ]]; then
   OPERATOR_IMAGE="quay.io/hypershift/hypershift-operator:latest-arm64"
+fi
+
+if [ "${ENABLE_HYPERSHIFT_OPERATOR_DEFAULTING_WEBHOOK}" = "true" ]; then
+  EXTRA_ARGS="${EXTRA_ARGS} --enable-defaulting-webhook=true"
 fi
 
 bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
@@ -19,4 +25,5 @@ bin/hypershift install --hypershift-image="${OPERATOR_IMAGE}" \
 --external-dns-provider=aws \
 --external-dns-credentials=/etc/hypershift-pool-aws-credentials/credentials \
 --external-dns-domain-filter=service.ci.hypershift.devcluster.openshift.com \
---wait-until-available
+--wait-until-available \
+${EXTRA_ARGS}

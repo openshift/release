@@ -69,17 +69,8 @@ fi
 
 export OS_CLIENT_CONFIG_FILE="${SHARED_DIR}/clouds.yaml"
 
-IPV6_NAMESPACE=$(
-    oc create -f - -o jsonpath='{.metadata.name}' <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ipv6-slaac
-  labels:
-    security.openshift.io/scc.podSecurityLabelSync: "false"
-    pod-security.kubernetes.io/enforce: "privileged"
-EOF
-)
+IPV6_NAMESPACE="ipv6-slaac"
+oc new-project "${IPV6_NAMESPACE}"
 echo "Created ${IPV6_NAMESPACE} Namespace"
 
 
@@ -116,10 +107,13 @@ metadata:
     k8s.v1.cni.cncf.io/networks: ${ADDITIONAL_NETWORK}
 spec:
   nodeName: ${WORKER_NAME}
+  securityContext:
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
   containers:
   - image: quay.io/kuryr/demo
     securityContext:
-      runAsUser: 1000
       allowPrivilegeEscalation: false
       capabilities:
         drop:

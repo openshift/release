@@ -1,6 +1,6 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: base
   dev-scripts:
@@ -11,31 +11,31 @@ base_images:
     name: insights-operator-tests
     namespace: ci
     tag: latest
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
 - from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: insights-operator
 promotion:
-  name: "4.14"
+  name: "4.15"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -87,7 +87,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui"
+      commands: pytest.sh -m "not ui and not tp_only"
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -107,7 +107,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh --junitxml=${ARTIFACT_DIR}/test-report.xml
+      commands: pytest.sh -k "not tp_only" --junitxml=${ARTIFACT_DIR}/test-report.xml
       credentials:
       - mount_path: /secrets
         name: insights-qa
@@ -134,7 +134,6 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-gcp-ovn-techpreview
-  optional: true
   steps:
     cluster_profile: gcp
     env:
@@ -145,7 +144,7 @@ tests:
     test:
     - as: test
       cli: latest
-      commands: pytest.sh -m "not ui"
+      commands: pytest.sh -m "not ui and techpreview"
       credentials:
       - mount_path: /secrets
         name: insights-qa

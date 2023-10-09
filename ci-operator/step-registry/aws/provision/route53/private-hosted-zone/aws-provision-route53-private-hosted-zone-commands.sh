@@ -18,7 +18,10 @@ CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 ROUTE53_HOSTED_ZONE_NAME="${CLUSTER_NAME}.${BASE_DOMAIN}"
 VPC_ID=$(cat "${SHARED_DIR}/vpc_id")
-CALLER_REFERENCE_STR=$ROUTE53_HOSTED_ZONE_NAME
+# Use a timestamp to ensure the caller reference is unique, as we've found
+# cluster name can get reused in specific situations.
+TIMESTAMP=$(date +%s)
+CALLER_REFERENCE_STR="${ROUTE53_HOSTED_ZONE_NAME}-${TIMESTAMP}"
 
 echo -e "creating route53 hosted zone: ${ROUTE53_HOSTED_ZONE_NAME}"
 HOSTED_ZONE_CREATION=$(aws --region "$REGION" route53 create-hosted-zone --name "${ROUTE53_HOSTED_ZONE_NAME}" --vpc VPCRegion="${REGION}",VPCId="${VPC_ID}" --caller-reference "${CALLER_REFERENCE_STR}")

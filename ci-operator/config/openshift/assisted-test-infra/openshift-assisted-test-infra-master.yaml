@@ -1,22 +1,22 @@
 base_images:
   assisted-image-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-image-service
   assisted-installer:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer
   assisted-installer-agent:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-agent
   assisted-installer-controller:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-installer-controller
   assisted-service:
-    name: ocm-2.9
+    name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-service
   dev-scripts:
@@ -45,7 +45,7 @@ images:
       - quay.io/ocp-splat/govc:v0.29.0
   to: assisted-test-infra-internal
 promotion:
-  name: ocm-2.9
+  name: ocm-2.10
   namespace: edge-infrastructure
 releases:
   latest:
@@ -236,7 +236,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.13
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-periodic
   cron: 15 02 */1 * 0-5
@@ -245,7 +245,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.13
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
@@ -278,7 +278,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.13
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-mce
@@ -318,7 +318,7 @@ tests:
     env:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=odf
-        OPENSHIFT_VERSION=4.12
+        OPENSHIFT_VERSION=4.13
       PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
     workflow: assisted-baremetal
@@ -565,6 +565,7 @@ tests:
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-single-node-live-iso
+  optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|OWNERS_ALIASES|PROJECT|LICENSE)$
   steps:
     cluster_profile: packet-sno
@@ -748,6 +749,20 @@ tests:
         ISO_IMAGE_TYPE=minimal-iso
       PLATFORM: nutanix
     workflow: assisted-nutanix
+- as: e2e-nutanix-assisted-4-13
+  cluster: build01
+  optional: true
+  steps:
+    cluster_profile: nutanix
+    env:
+      ASSISTED_CONFIG: |
+        NUM_WORKERS=0
+        MAKEFILE_TARGET=test
+        DISABLED_HOST_VALIDATIONS=belongs-to-majority-group
+        ISO_IMAGE_TYPE=minimal-iso
+        OPENSHIFT_VERSION=4.13
+      PLATFORM: nutanix
+    workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-periodic
   cluster: build01
   interval: 24h
@@ -785,9 +800,9 @@ tests:
       ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
-        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
-        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        AGENT_DOCKER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-agent-rhel8:latest
+        CONTROLLER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-reporter-rhel8:latest
+        INSTALLER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-rhel8:latest
     workflow: assisted-equinix
 - as: e2e-metal-assisted-day2-arm-workers-periodic
   cron: 15 15 */1 * 0,3
@@ -799,9 +814,9 @@ tests:
       ANSIBLE_PLAYBOOK_CREATE_INFRA: equinix_heterogeneous_create_infra_playbook.yml
       ASSISTED_CONFIG: |
         TEST_FUNC=test_deploy_day2_nodes_cloud
-        AGENT_DOCKER_IMAGE=quay.io/edge-infrastructure/assisted-installer-agent-multi:latest
-        CONTROLLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-controller-multi:latest
-        INSTALLER_IMAGE=quay.io/edge-infrastructure/assisted-installer-multi:latest
+        AGENT_DOCKER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-agent-rhel8:latest
+        CONTROLLER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-reporter-rhel8:latest
+        INSTALLER_IMAGE=brew.registry.redhat.io/rh-osbs/openshift4-assisted-installer-rhel8:latest
     workflow: assisted-equinix
 - as: e2e-oci-assisted
   optional: true

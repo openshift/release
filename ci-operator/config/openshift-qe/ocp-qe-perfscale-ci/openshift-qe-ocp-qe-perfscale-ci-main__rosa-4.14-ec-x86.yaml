@@ -1,0 +1,93 @@
+build_root:
+  image_stream_tag:
+    name: ci-tools-build-root
+    namespace: ci
+    tag: latest
+images:
+- dockerfile_path: prow/Dockerfile
+  to: ocp-qe-perfscale-ci-rosa-4.14-ec
+promotion:
+  namespace: ci
+  tag: latest
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: perfscale-rosa-multiaz-ec-data-path-9nodes-periodic
+  cron: 0 3 */21 * *
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: candidate
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      CONFIG: config/standard-classic-rosa.yml
+      EC_BUILD: "true"
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.14"
+      REPLICAS: "9"
+    test:
+    - chain: openshift-qe-data-path-tests
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
+- as: perfscale-rosa-singleaz-ec-data-path-2nodes-periodic
+  cron: 0 9 */21 * *
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: candidate
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      EC_BUILD: "true"
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "false"
+      OPENSHIFT_VERSION: "4.14"
+      REPLICAS: "2"
+    test:
+    - chain: openshift-qe-data-path-tests
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
+- as: perfscale-rosa-multiaz-ec-control-plane-24nodes-periodic
+  cron: 0 12 */21 * *
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: candidate
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      EC_BUILD: "true"
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.14"
+      REPLICAS: "24"
+    test:
+    - chain: openshift-qe-control-plane
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
+- as: perfscale-rosa-multiaz-ec-node-density-heavy-24nodes-periodic
+  cron: 0 18 */21 * *
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: candidate
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.14"
+      PODS_PER_NODE: "100"
+      REPLICAS: "24"
+    test:
+    - chain: openshift-qe-node-density-heavy
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift-qe
+  repo: ocp-qe-perfscale-ci
+  variant: rosa-4.14-ec-x86

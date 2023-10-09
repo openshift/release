@@ -1,34 +1,30 @@
 base_images:
   base:
-    name: "4.13"
+    name: "4.14"
     namespace: origin
     tag: base-rhel9
   cli:
-    name: "4.13"
+    name: "4.14"
     namespace: origin
     tag: cli
   cli-operator-sdk:
     name: cli-operator-sdk
     namespace: ocp
-    tag: v1.29.0
-  hco-index:
-    name: hyperconverged-cluster-index
+    tag: v1.31.0
+  hco-bundle-reg:
+    name: hyperconverged-cluster-bundle
     namespace: ci
-    tag: 1.10.0-unstable
-  hco-index-prev:
-    name: hyperconverged-cluster-index
-    namespace: ci
-    tag: 1.9.0-unstable
-  ocp_builder_rhel-9-golang-1.19-openshift-4.13:
+    tag: 1.11.0-unstable
+  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.13
+    tag: rhel-9-golang-1.20-openshift-4.14
 binary_build_commands: make install
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.13
+    tag: rhel-9-golang-1.20-openshift-4.14
 images:
 - dockerfile_path: build/Dockerfile.okd
   from: base
@@ -51,9 +47,9 @@ images:
   to: virt-artifacts-server
 - dockerfile_path: build/Dockerfile.functest.ci
   inputs:
-    ocp_builder_rhel-9-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: hyperconverged-cluster-functest
 - dockerfile_literal: |
     FROM src
@@ -67,21 +63,31 @@ images:
       - destination_dir: .
         source_path: /usr/bin/oc
   to: hco-oc-bin-image
+- dockerfile_literal: |
+    FROM src
+    COPY oc /usr/bin/oc
+    COPY operator-sdk /usr/local/bin/operator-sdk
+    RUN ln -s /usr/bin/oc /usr/bin/kubectl
+    RUN dnf install -y jq && dnf clean all
+  from: src
+  inputs:
+    cli:
+      paths:
+      - destination_dir: .
+        source_path: /usr/bin/oc
+    cli-operator-sdk:
+      paths:
+      - destination_dir: .
+        source_path: /usr/local/bin/operator-sdk
+  to: hco-oc-bin-operator-sdk-image
 operator:
   bundles:
   - as: hco-bundle
     context_dir: deploy/index-image
     dockerfile_path: bundle.Dockerfile
-  - as: hco-upgrade-bundle
-    base_index: hco-index
+  - as: hco-upgrade-operator-sdk-bundle
     context_dir: deploy/index-image
     dockerfile_path: Dockerfile.bundle.ci-index-image-upgrade
-    update_graph: semver
-  - as: hco-upgrade-prev-bundle
-    base_index: hco-index-prev
-    context_dir: deploy/index-image
-    dockerfile_path: Dockerfile.bundle.ci-index-image-upgrade
-    update_graph: semver
   substitutions:
   - pullspec: +IMAGE_TO_REPLACE+
     with: hyperconverged-cluster-operator
@@ -92,12 +98,12 @@ operator:
 releases:
   initial:
     integration:
-      name: "4.13"
+      name: "4.14"
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: "4.13"
+      name: "4.14"
       namespace: origin
 resources:
   '*':
@@ -106,6 +112,7 @@ resources:
       memory: 1Gi
 tests:
 - as: hco-e2e-operator-sdk-gcp
+  run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp-virtualization
     dependencies:
@@ -168,48 +175,112 @@ tests:
           cpu: 500m
           memory: 1Gi
     workflow: optional-operators-ci-operator-sdk-aws
-- as: hco-e2e-upgrade-index-aws
+- as: hco-e2e-upgrade-operator-sdk-aws
   run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: aws-virtualization
     dependencies:
-      OO_INDEX: ci-index-hco-upgrade-bundle
+      OO_BUNDLE: hco-bundle-reg
     env:
       BASE_DOMAIN: cnv-ci.syseng.devcluster.openshift.com
-      OO_CHANNEL: 1.10.0
+      INITIAL_VERSION: 1.11.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e-index-image-upgrade-aws
-      commands: RELEASE_DELTA=1 KVM_EMULATION=true make upgrade-test-index-image
+    - as: deploy-cr
+      commands: |
+        export OUTPUT_DIR=${SHARED_DIR}
+        export CMD=oc
+        source ./hack/compare_scc.sh
+        dump_sccs_before
+        # compressing the SCC files into one tar file, as the CI does not support sub-directories in the  SHARED_DIR
+        tar -C "${SHARED_DIR}" -czvf "${SHARED_DIR}/scc.tar.gz" scc/
+        KVM_EMULATION=true make deploy_cr
+      from: hco-oc-bin-operator-sdk-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: upgrade-bundle
+      commands: |
+        # un-compressing to get all the original SCC files from the previous phase
+        tar -C "${SHARED_DIR}" -xzvf "${SHARED_DIR}/scc.tar.gz"
+        OUTPUT_DIR=${SHARED_DIR} make upgrade-test-operator-sdk
+      dependencies:
+      - env: OO_NEXT_BUNDLE
+        name: hco-upgrade-operator-sdk-bundle
+      env:
+      - name: INITIAL_VERSION
+      from: hco-oc-bin-operator-sdk-image
+      grace_period: 45m0s
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
+        make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
       from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-aws
-- as: hco-e2e-upgrade-index-gcp
+    workflow: optional-operators-ci-operator-sdk-aws
+- as: hco-e2e-upgrade-operator-sdk-gcp
   run_if_changed: ^(api/.*|assets/.*|build/.*|ci-test-files/.*|config/.*|controllers/.*|cmd/.*|deploy/crds/.*|deploy/index-image/.*|hack/.*|pkg/.*|tests/.*|Makefile|go\.mod|go\.sum)$
   steps:
     cluster_profile: gcp-virtualization
     dependencies:
-      OO_INDEX: ci-index-hco-upgrade-bundle
+      OO_BUNDLE: hco-bundle-reg
     env:
       COMPUTE_NODE_TYPE: n2-standard-4
-      OO_CHANNEL: 1.10.0
+      INITIAL_VERSION: 1.11.0
       OO_INSTALL_NAMESPACE: kubevirt-hyperconverged
-      OO_PACKAGE: community-kubevirt-hyperconverged
-      OO_TARGET_NAMESPACES: '!all'
     test:
-    - as: e2e-index-image-upgrade-gcp
-      commands: RELEASE_DELTA=1 make upgrade-test-index-image
+    - as: deploy-cr
+      commands: |
+        export OUTPUT_DIR=${SHARED_DIR}
+        export CMD=oc
+        source ./hack/compare_scc.sh
+        dump_sccs_before
+        # compressing the SCC files into one tar file, as the CI does not support sub-directories in the  SHARED_DIR
+        tar -C "${SHARED_DIR}" -czvf "${SHARED_DIR}/scc.tar.gz" scc/
+        make deploy_cr
+      from: hco-oc-bin-operator-sdk-image
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: upgrade-bundle
+      commands: |
+        # un-compressing to get all the original SCC files from the previous phase
+        tar -C "${SHARED_DIR}" -xzvf "${SHARED_DIR}/scc.tar.gz"
+        OUTPUT_DIR=${SHARED_DIR} make upgrade-test-operator-sdk
+      dependencies:
+      - env: OO_NEXT_BUNDLE
+        name: hco-upgrade-operator-sdk-bundle
+      env:
+      - name: INITIAL_VERSION
+      from: hco-oc-bin-operator-sdk-image
+      grace_period: 45m0s
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+    - as: e2e-test
+      commands: |
+        make functest
+      dependencies:
+      - env: FUNCTEST_IMAGE
+        name: hyperconverged-cluster-functest
       from: hco-oc-bin-image
       resources:
         requests:
           cpu: 500m
           memory: 1Gi
-    workflow: optional-operators-ci-gcp
+    workflow: optional-operators-ci-operator-sdk-gcp
 zz_generated_metadata:
   branch: main
   org: kubevirt

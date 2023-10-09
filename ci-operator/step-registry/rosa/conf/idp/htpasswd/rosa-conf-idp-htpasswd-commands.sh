@@ -8,6 +8,17 @@ trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wa
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 
+function set_proxy () {
+    if test -s "${SHARED_DIR}/proxy-conf.sh" ; then
+        echo "setting the proxy"
+        # cat "${SHARED_DIR}/proxy-conf.sh"
+        echo "source ${SHARED_DIR}/proxy-conf.sh"
+        source "${SHARED_DIR}/proxy-conf.sh"
+    else
+        echo "no proxy setting."
+    fi
+}
+
 # Configure aws
 CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
 AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
@@ -34,9 +45,23 @@ else
   exit 1
 fi
 
+# The API_URL is not registered ASAP, we need to wait for a while.
+API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
+# if [[ "${API_URL}" == "null" ]]; then
+#   port="6443"
+#   if [[ "$HOSTED_CP" == "true" ]]; then
+#     port="443"
+#   fi
+#   echo "warning: API URL was null, attempting to build API URL"
+#   base_domain=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.dns.base_domain')
+#   CLUSTER_NAME=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.name')
+#   echo "info: Using baseDomain : ${base_domain} and clusterName : ${CLUSTER_NAME}"
+#   API_URL="https://api.${CLUSTER_NAME}.${base_domain}:${port}"
+# fi
+
 # Config htpasswd idp
 # The expected time for the htpasswd idp configuaration is in 1 minute. But actually, we met the waiting time
-# is over 10 minutes, so we give a loop to wait for the configuration to be active before timeout. 
+# is over 10 minutes, so we give a loop to wait for the configuration to be active before timeout.
 echo "Config htpasswd idp ..."
 IDP_USER="rosa-admin"
 IDP_PASSWD="HTPasswd_$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 6)"
@@ -46,15 +71,13 @@ rosa create idp -c ${CLUSTER_ID} \
                 --name rosa-htpasswd \
                 --username ${IDP_USER} \
                 --password ${IDP_PASSWD}
-
-API_URL=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.api.url')
 echo "oc login ${API_URL} -u ${IDP_USER} -p ${IDP_PASSWD} --insecure-skip-tls-verify=true" > "${SHARED_DIR}/api.login"
-cat "${SHARED_DIR}/api.login" > "${ARTIFACT_DIR}/api.login"
 
 # Grant cluster-admin access to the cluster
 rosa grant user cluster-admin --user=${IDP_USER} --cluster=${CLUSTER_ID}
 
 echo "Waiting for idp ready..."
+set_proxy
 IDP_LOGIN_LOG="${ARTIFACT_DIR}/htpasswd_login.log"
 start_time=$(date +"%s")
 while true; do

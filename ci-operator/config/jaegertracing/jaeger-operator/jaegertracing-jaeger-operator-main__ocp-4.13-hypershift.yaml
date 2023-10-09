@@ -1,0 +1,100 @@
+base_images:
+  cli:
+    name: "4.13"
+    namespace: ocp
+    tag: cli
+  hypershift-operator:
+    name: "4.13"
+    namespace: ocp
+    tag: hypershift-operator
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
+  upi-installer:
+    name: "4.13"
+    namespace: ocp
+    tag: upi-installer
+binary_build_commands: LD_FLAGS="-X github.com/jaegertracing/jaeger-operator/pkg/version".version=1.49.0
+  -X github.com/jaegertracing/jaeger-operator/pkg/version".buildDate=2023-09-29T02:01:34Z
+  -X github.com/jaegertracing/jaeger-operator/pkg/version".defaultJaeger="1.49.0"
+  make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- build_args:
+  - name: VERSION
+    value: 1.49.0
+  - name: JAEGER_VERSION
+    value: 1.49.0
+  - name: VERSION_DATE
+    value: "2023-09-29T02:01:34Z"
+  - name: VERSION_PKG
+    value: github.com/jaegertracing/jaeger-operator/pkg/version
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: jaeger-operator
+- context_dir: .
+  dockerfile_path: Dockerfile.asserts
+  to: jaeger-tests-asserts-e2e
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: jaeger-tests-runner
+operator:
+  bundles:
+  - as: jaeger-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/jaegertracing/jaeger-operator:1.49.0
+    with: pipeline:jaeger-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: jaeger-e2e-tests
+  cron: 0 6 * * 3
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      EO_SUB_CHANNEL: stable-5.7
+      EO_SUB_SOURCE: redhat-operators
+    test:
+    - ref: cucushift-hypershift-extended-health-check
+    - ref: cucushift-pre
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: distributed-tracing-install-tempo-product
+    - as: install
+      cli: latest
+      commands: |
+        operator-sdk run bundle --timeout=5m --security-context-config restricted -n openshift-operators "$OO_BUNDLE"
+        oc wait --for condition=Available -n openshift-operators deployment jaeger-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: jaeger-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: distributed-tracing-tests-jaeger
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
+zz_generated_metadata:
+  branch: main
+  org: jaegertracing
+  repo: jaeger-operator
+  variant: ocp-4.13-hypershift

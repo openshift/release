@@ -1,7 +1,23 @@
+base_images:
+  metrics-linter:
+    name: prom-metrics-linter
+    namespace: ci
+    tag: v0.0.2
 build_root:
   project_image:
     dockerfile_path: ci-builder/Dockerfile
 images:
+- dockerfile_literal: |
+    FROM src
+    COPY prom-metrics-linter /usr/bin/prom-metrics-linter
+    RUN dnf install -y jq && dnf clean all
+  from: src
+  inputs:
+    metrics-linter:
+      paths:
+      - destination_dir: .
+        source_path: /prom-metrics-linter
+  to: ssp-metrics-linter
 - dockerfile_path: Dockerfile
   to: ssp-operator-container
 - dockerfile_path: validator.Dockerfile
@@ -9,12 +25,12 @@ images:
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -31,6 +47,13 @@ tests:
     - as: unittests
       commands: export GOFLAGS= && make unittest
       from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    - as: metrics-linter
+      commands: export GOFLAGS= && make lint-metrics
+      from: ssp-metrics-linter
       resources:
         requests:
           cpu: 100m

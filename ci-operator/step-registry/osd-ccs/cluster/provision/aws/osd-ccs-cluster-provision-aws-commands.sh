@@ -87,6 +87,7 @@ echo "  Openshift version: ${OPENSHIFT_VERSION}"
 echo "  Channel group: ${CHANNEL_GROUP}"
 echo "  Etcd encryption: ${ETCD_ENCRYPTION}"
 echo "  Disable workload monitoring: ${DISABLE_WORKLOAD_MONITORING}"
+echo "  Fips: ${FIPS}"
 
 # Cluster payload
 # Using the default aws credentials but not the user osdCcsAdmin's credentials to provision cluster
@@ -129,6 +130,10 @@ CLUSTER_PAYLOAD=$(echo -e '{
   }
 }')
 
+if [[ "$FIPS" == "true" ]]; then
+  CLUSTER_PAYLOAD=$(echo "${CLUSTER_PAYLOAD}" | jq '. +={"fips":true}')
+fi
+
 echo "${CLUSTER_PAYLOAD}" | jq -c | ocm post /api/clusters_mgmt/v1/clusters > "${ARTIFACT_DIR}/cluster.txt"
 
 # Store the cluster ID for the post steps and the cluster deprovision
@@ -136,6 +141,7 @@ mkdir -p "${SHARED_DIR}"
 CLUSTER_ID=$(cat "${ARTIFACT_DIR}/cluster.txt" | jq '.id' | tr -d '"')
 echo "Cluster ${CLUSTER_NAME} is being created with cluster-id: ${CLUSTER_ID}"
 echo -n "${CLUSTER_ID}" > "${SHARED_DIR}/cluster-id"
+echo "${CLUSTER_NAME}" > "${SHARED_DIR}/cluster-name"
 
 echo "Waiting for cluster ready..."
 start_time=$(date +"%s")
@@ -167,3 +173,6 @@ echo "${CONSOLE_URL}" > "${SHARED_DIR}/console.url"
 
 PRODUCT_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.product.id')
 echo "${PRODUCT_ID}" > "${SHARED_DIR}/cluster-type"
+
+INFRA_ID=$(ocm get /api/clusters_mgmt/v1/clusters/${CLUSTER_ID} | jq -r '.infra_id')
+echo "${INFRA_ID}" > "${SHARED_DIR}/infra_id"

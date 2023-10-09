@@ -1,16 +1,16 @@
 base_images:
   base:
-    name: 4.14-priv
+    name: 4.15-priv
     namespace: ocp-private
     tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 binary_build_commands: NO_DOCKER=1 make build
 build_root:
   from_repository: true
@@ -19,22 +19,22 @@ images:
 - dockerfile_path: Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: machine-api-operator
 promotion:
-  name: 4.14-priv
+  name: 4.15-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
 resources:
   '*':
@@ -105,6 +105,12 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-gcp-ovn
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$|vsphere
@@ -222,7 +228,7 @@ tests:
 - as: e2e-vsphere-static-ovn
   optional: true
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere
     workflow: openshift-e2e-vsphere-staticip
   timeout: 6h0m0s
 - as: e2e-openstack

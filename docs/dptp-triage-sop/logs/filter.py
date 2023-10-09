@@ -132,6 +132,8 @@ elif mode == "errors":
 
         # Looks temporary
         lambda message: matches(message, "pod-scaler", error="server_error: server error: 504"),
+        # Expected
+        lambda message: matches(message, "pod-scaler", msg="Kubeconfig changed, exiting to get restarted by Kubelet and pick up the changes"),
 
         # This is due to rate limiting: DPTP-2449
         lambda message: "hook" in message.get("component", "") and
@@ -147,6 +149,7 @@ elif mode == "errors":
         lambda message: matches(message, "prow-controller-manager", msg='error executing URL template: template: JobURL:1:287: executing "JobURL" at <.Spec.Refs.Repo>: nil pointer evaluating *v1.Refs.Repo'),
 
         lambda message: matches(message, "pj-rehearse", msg="couldn't prepare candidate"),
+        lambda message: matches(message, "pj-rehearse", error="failed waiting for prowjobs to finish: timed out waiting for the condition"),
         ]
 
 else:

@@ -1,0 +1,58 @@
+ref:
+  as: redhat-chaos-pod-scenarios-prometheus-disruption
+  from_image:
+    namespace: chaos
+    name: krkn
+    tag: latest
+  commands: redhat-chaos-pod-scenarios-prometheus-disruption-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aws-chaos
+    mount_path: /secret/telemetry
+  env:
+  - name: TARGET_NAMESPACE
+    default: "openshift-monitoring"
+  - name: POD_LABEL
+    default: "statefulset.kubernetes.io/pod-name=prometheus-k8s-0"
+  - name: DISRUPTION_COUNT
+    default: "1"
+  - name: EXPECTED_POD_COUNT
+    default: "1"
+  - name: KILL_TIMEOUT
+    default: "180"
+  - name: WAIT_TIMEOUT
+    default: "90"
+  - name: ENABLE_ALERTS
+    default: "True"
+  - name: ALERTS_PATH
+    default: "/root/kraken/config/alerts"
+  - name: CHECK_CRITICAL_ALERTS
+    default: "True"
+  - name: WAIT_DURATION
+    default: "300"
+  - name: TELEMETRY_ENABLED
+    default: "True"
+  - name: TELEMETRY_API_URL
+    default: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
+  - name: TELEMETRY_USERNAME
+    default: "redhat-chaos"
+  - name: TELEMETRY_RUN_TAG
+    default: "prow-prometheus-pod-disruption"
+  - name: TELEMETRY_PROMETHEUS_BACKUP
+    default: "True"
+  - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+    default: "True"
+  - name: TELEMTRY_BACKUP_THREADS
+    default: "5"
+  - name: TELEMETRY_ARCHIVE_PATH
+    default: "/tmp"
+  - name: TELEMETRY_MAX_RETRIES
+    default: "0"
+  - name: TELEMETRY_ARCHIVE_SIZE
+    default: "1000000"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This step runs the krkn-hub config workload to disrupt prometheus pod(s) and checks its recovery/health.

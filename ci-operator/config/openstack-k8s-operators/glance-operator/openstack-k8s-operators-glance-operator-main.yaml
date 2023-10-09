@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.12"
     namespace: ocp
     tag: cli
   openstack-operator-ci-tempest:
@@ -57,6 +57,8 @@ resources:
 tests:
 - as: functional
   commands: |
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
     export GOFLAGS=
     make test GINKGO_ARGS='--no-color'
   container:
@@ -68,9 +70,11 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.12"
   optional: true
   steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy
 - as: precommit-check
   commands: |
@@ -93,9 +97,10 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h20m0s
-    version: "4.10"
+    version: "4.12"
   steps:
     env:
+      CEPH_HOSTNETWORK: "false"
       TEMPEST_REGEX: tempest.api.image.v2
     workflow: openstack-k8s-operators-test-build-deploy-tempest
 - as: glance-operator-build-deploy-kuttl
@@ -105,9 +110,10 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
-  optional: true
+    version: "4.12"
   steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy-kuttl
 zz_generated_metadata:
   branch: main

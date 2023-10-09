@@ -1,0 +1,44 @@
+ref:
+  as: osde2e-test
+  from_image:
+    namespace: ci
+    name: osde2e
+    tag: latest
+  commands: osde2e-test-commands.sh
+  resources:
+    requests:
+      cpu: 100m
+      memory: 200Mi
+  timeout: 3h0m0s
+  env:
+    - name: CONFIGS
+      default: ""
+      documentation: "Comma separated list of pre-canned configs provided out of the box by osde2e."
+    - name: SKIP_MUST_GATHER
+      default: "false"
+      documentation: "Toggles on/off collecting OpenShift must gather logs."
+    - name: SKIP_DESTROY_CLUSTER
+      default: "false"
+      documentation: "Toggles on/off whether the cluster should be destroyed at the very end of test execution."
+    - name: SECRET_LOCATIONS
+      default: ""
+      documentation: "Comma separated list of directory paths within the container to have osde2e load credentials."
+    - name: INSTALL_LATEST_NIGHTLY
+      default: ""
+      documentation: "Defines the version (major.minor) to install latest nightly image."
+  documentation: |-
+    Calls the service delivery osde2e framework to test all aspects of Managed OpenShift
+    Clusters (OSD, ROSA, ROSA HCP).
+  dependencies:
+    - name: "release:latest"
+      env: "RELEASE_IMAGE_LATEST"
+  credentials:
+    - mount_path: /usr/local/osde2e-common
+      name: osde2e-common
+      namespace: test-credentials
+    - mount_path: /usr/local/osde2e-hypershift-credentials
+      name: osde2e-hypershift-credentials
+      namespace: test-credentials
+    - mount_path: /usr/local/osde2e-trt-credentials
+      name: osde2e-trt-credentials
+      namespace: test-credentials

@@ -19,7 +19,6 @@ images:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
   to: cluster-cloud-controller-manager-operator
 promotion:
-  disabled: true
   name: "4.14"
   namespace: ocp
 releases:
@@ -57,12 +56,22 @@ tests:
   container:
     from: src
 - as: unit
-  commands: |
-    make verify-generate
-    make verify-manifests
-    make unit
-  container:
-    from: src
+  steps:
+    test:
+    - as: unit
+      commands: |
+        make verify-generate
+        make verify-manifests
+        make unit
+      from: src
+      resources:
+        requests:
+          cpu: 200m
+- as: e2e-alibaba-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
+  steps:
+    cluster_profile: alibabacloud
+    workflow: openshift-e2e-alibabacloud
 - as: e2e-aws-ovn
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
   steps:
@@ -73,6 +82,12 @@ tests:
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-ovn
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
@@ -85,20 +100,6 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
-- as: e2e-azure-ovn-ccm
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    workflow: openshift-e2e-azure-ccm
-- as: e2e-azure-ovn-techpreview
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: azure4
-    env:
-      FEATURE_SET: TechPreviewNoUpgrade
-    workflow: openshift-e2e-azure
 - as: e2e-gcp-ovn-ccm
   optional: true
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$

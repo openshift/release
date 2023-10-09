@@ -11,10 +11,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: base-rhel9
-  ocp_builder_rhel-9-golang-1.19-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.19-openshift-4.14
   ocp_builder_rhel-9-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
@@ -34,6 +34,9 @@ images:
 - dockerfile_path: Dockerfile
   from: ovn-kubernetes-base
   inputs:
+    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
     ocp_builder_rhel-9-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
@@ -41,15 +44,11 @@ images:
 - dockerfile_path: Dockerfile.microshift
   from: ovn-kubernetes-base
   inputs:
-    ocp_builder_rhel-9-golang-1.19-openshift-4.14:
-      as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.19-openshift-4.14
     ocp_builder_rhel-9-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
   to: ovn-kubernetes-microshift
 promotion:
-  disabled: true
   name: "4.14"
   namespace: ocp
 releases:
@@ -151,7 +150,17 @@ tests:
       NETWORK_TYPE: OVNKubernetes
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-openstack-ipi
+- as: e2e-ibmcloud-ipi-ovn-periodic
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: ibmcloud
+    workflow: openshift-e2e-ibmcloud-ovn
 - as: e2e-aws-ovn-shared-to-local-gateway-mode-migration
+  steps:
+    cluster_profile: aws
+    workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
+- as: e2e-aws-ovn-shared-to-local-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
   steps:
     cluster_profile: aws
     workflow: openshift-e2e-aws-ovn-shared-to-local-gateway-mode-migration
@@ -161,9 +170,16 @@ tests:
     env:
       GATEWAY_MODE: local
     workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
-- as: e2e-aws-ovn-hypershift
-  optional: true
+- as: e2e-aws-ovn-local-to-shared-gateway-mode-migration-periodic
+  cron: 0 0 */2 * *
   steps:
+    cluster_profile: aws
+    env:
+      GATEWAY_MODE: local
+    workflow: openshift-e2e-aws-ovn-local-to-shared-gateway-mode-migration
+- as: e2e-aws-ovn-hypershift
+  steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-conformance
 - as: unit
   commands: |
@@ -196,6 +212,72 @@ tests:
   steps:
     cluster_profile: aws
     workflow: hypershift-kubevirt-conformance
+- always_run: false
+  as: qe-perfscale-aws-ovn-medium-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-cluster-density
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-medium-node-density-cni
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "120"
+      COMPUTE_NODE_TYPE: m5.xlarge
+      SIZE_VARIANT: large
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-cluster-density-v2
+  timeout: 5h0m0s
+- always_run: false
+  as: qe-perfscale-aws-ovn-small-node-density-cni
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "24"
+      COMPUTE_NODE_TYPE: m5.xlarge
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    workflow: openshift-qe-node-density-cni
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: release-4.14
   org: openshift

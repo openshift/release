@@ -3,23 +3,23 @@ base_images:
     name: ubi-minimal
     namespace: ocp
     tag: "8"
-  stolostron_builder_go1.19-linux:
+  stolostron_builder_go1.20-linux:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.20-linux
 binary_build_commands: go build ./cmd/manager
 build_root:
   image_stream_tag:
     name: builder
     namespace: stolostron
-    tag: go1.19-linux
+    tag: go1.20-linux
 images:
 - dockerfile_path: build/Dockerfile
   from: base
   inputs:
-    stolostron_builder_go1.19-linux:
+    stolostron_builder_go1.20-linux:
       as:
-      - registry.ci.openshift.org/stolostron/builder:go1.19-linux
+      - registry.ci.openshift.org/stolostron/builder:go1.20-linux
   to: managedcluster-import-controller
 promotion:
   disabled: true
@@ -73,6 +73,33 @@ tests:
   commands: make test
   container:
     from: src
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    as: custom
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h30m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: e2e
+      cli: latest
+      commands: |
+        KUBECTL=oc
+        OCM_VERSION=main
+        export KUBECTL OCM_VERSION
+        make e2e-test-prow
+      dependencies:
+      - env: IMPORT_CONTROLLER_IMAGE_NAME
+        name: managedcluster-import-controller
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: generic-claim
 - as: pr-image-mirror
   steps:
     dependencies:

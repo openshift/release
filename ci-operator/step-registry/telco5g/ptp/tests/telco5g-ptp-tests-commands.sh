@@ -8,6 +8,8 @@ set -o pipefail
 build_images(){
 oc delete namespace openshift-ptp || true
 oc create namespace openshift-ptp -o yaml | oc label -f - pod-security.kubernetes.io/enforce=privileged pod-security.kubernetes.io/audit=privileged pod-security.kubernetes.io/warn=privileged || true
+# copy pull secrets in openshift-ptp namespace
+oc get secret pull-secret --namespace=openshift-config -oyaml | grep -v '^\s*namespace:\s' | oc apply --namespace=openshift-ptp -f -
 echo $KUBECONFIG
 jobdefinition='---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -64,12 +66,12 @@ spec:
           go version
           pass=$( jq .\"image-registry.openshift-image-registry.svc:5000\".password /var/run/secrets/openshift.io/push/.dockercfg )
           podman login -u serviceaccount -p ${pass:1:-1} image-registry.openshift-image-registry.svc:5000 --tls-verify=false
+
           set -x
 
           git clone --single-branch --branch OPERATOR_VERSION https://github.com/openshift/ptp-operator.git
           cd ptp-operator
           export IMG=PTP_IMAGE
-          sed -i "s@golang:1.19@docker.io/library/golang:1.19@g" Dockerfile
           sed -i "/ENV GO111MODULE=off/ a\ENV GOMAXPROCS=20" Dockerfile
           make docker-build
           podman push ${IMG} --tls-verify=false
@@ -80,7 +82,17 @@ spec:
         - mountPath: /var/run/secrets/openshift.io/push
           name: dockercfg
           readOnly: true
+        - name: secret-volume
+          mountPath: /root/.docker
+
   volumes:
+    - name: secret-volume
+      secret:
+        secretName: pull-secret
+        items:
+        - key: .dockerconfigjson
+          path: config.json
+
     - name: dockercfg
       defaultMode: 384
       secret:

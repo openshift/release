@@ -46,15 +46,53 @@ items:
           component: tide
       spec:
         serviceAccountName: tide
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --wait=30
+          - --root=/tmp/git-sync
+          - --max-sync-failures=3
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
         - name: tide
-          image: gcr.io/k8s-prow/tide:v20230628-f13bc80c8a
+          image: gcr.io/k8s-prow/tide:v20230927-4613add0a1
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
           - --dry-run=false
-          - --github-token-path=/etc/github/oauth
-          - --job-config-path=/etc/job-config
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
+          - --job-config-path=/var/repo/release/ci-operator/jobs
           - --github-endpoint=http://ghproxy
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
@@ -64,6 +102,12 @@ items:
           - --projected-token-file=/var/sa-token/token
           - --sync-hourly-tokens=-1
           - --status-hourly-tokens=-1
+          env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-prow-github-app
+                key: appid
           ports:
           - name: main
             containerPort: 8888
@@ -72,15 +116,14 @@ items:
           volumeMounts:
           - name: service-account-token
             mountPath: /var/sa-token
-          - name: oauth
+          - name: github-app-credentials
             mountPath: /etc/github
             readOnly: true
           - name: config
             mountPath: /etc/config
             readOnly: true
-          - name: job-config
-            mountPath: /etc/job-config
-            readOnly: true
+          - name: release
+            mountPath: /var/repo
           - name: tmp
             mountPath: /tmp
           - name: service-account
@@ -96,67 +139,14 @@ items:
             sources:
             - serviceAccountToken:
                 path: token
-        - name: oauth
+        - name: github-app-credentials
           secret:
-            secretName: github-credentials-openshift-merge-robot
+            secretName: openshift-prow-github-app
         - name: config
           configMap:
             name: config
-        - name: job-config
-          projected:
-            sources:
-            - configMap:
-                name: job-config-misc
-            - configMap:
-                name: job-config-master-periodics
-            - configMap:
-                name: job-config-main-periodics
-            - configMap:
-                name: job-config-master-postsubmits
-            - configMap:
-                name: job-config-main-postsubmits
-            - configMap:
-                name: job-config-master-presubmits
-            - configMap:
-                name: job-config-main-presubmits
-            - configMap:
-                name: job-config-1.x
-            - configMap:
-                name: job-config-2.x
-            - configMap:
-                name: job-config-3.x
-            - configMap:
-                name: job-config-4.0
-            - configMap:
-                name: job-config-4.1
-            - configMap:
-                name: job-config-4.2
-            - configMap:
-                name: job-config-4.3
-            - configMap:
-                name: job-config-4.4
-            - configMap:
-                name: job-config-4.5
-            - configMap:
-                name: job-config-4.6
-            - configMap:
-                name: job-config-4.7
-            - configMap:
-                name: job-config-4.8
-            - configMap:
-                name: job-config-4.9
-            - configMap:
-                name: job-config-4.10
-            - configMap:
-                name: job-config-4.11
-            - configMap:
-                name: job-config-4.12
-            - configMap:
-                name: job-config-4.13
-            - configMap:
-                name: job-config-4.14
-            - configMap:
-                name: job-config-4.15
+        - name: release
+          emptyDir: {}
         - name: tmp
           emptyDir: {}
         - name: service-account

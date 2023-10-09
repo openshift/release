@@ -1,0 +1,29 @@
+ref:
+  as: ipi-conf-capability-additonalcaps
+  from_image:
+   namespace: ocp
+   name: "4.12"
+   tag: upi-installer
+  commands: ipi-conf-capability-additonalcaps-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+    - name: BASELINE_CAPABILITY_SET
+      default: ""
+      documentation: |-
+        Baseline capabilities to install in the cluster.
+        * "" (default) - leave the property unset
+        * "None" - install no capabilities
+        * "vCurrent" - install the recommended set of optional capabilities for the cluster's current version of OpenShift.
+        * Others as defined in https://github.com/openshift/api/blob/master/config/v1/types_cluster_version.go
+    - name: ADDITIONAL_ENABLED_CAPABILITIES
+      default: ""
+      documentation: |-
+        Extends the set of optional capabilities beyond what is specified in `baselineCapabilitySet`.
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM
+  documentation: |-
+    The IPI configure step enable baselinCapabilitySet to None and enable new added capability on testing ocp version.

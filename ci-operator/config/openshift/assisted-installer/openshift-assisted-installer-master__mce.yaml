@@ -1,32 +1,35 @@
 base_images:
-  coreos-centos-stream8:
-    name: stream8
+  coreos-centos-stream9:
+    name: stream9
     namespace: coreos
-    tag: "8"
+    tag: "9"
   openshift_release_golang-1.19:
     name: release
     namespace: openshift
     tag: golang-1.19
 build_root:
-  project_image:
-    dockerfile_path: Dockerfile.assisted-installer-build
+  from_repository: true
 images:
 - dockerfile_path: Dockerfile.assisted-installer
-  from: coreos-centos-stream8
   inputs:
+    coreos-centos-stream9:
+      as:
+      - quay.io/centos/centos:stream9
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer
 - dockerfile_path: Dockerfile.assisted-installer-controller
-  from: coreos-centos-stream8
   inputs:
+    coreos-centos-stream9:
+      as:
+      - quay.io/centos/centos:stream9
     openshift_release_golang-1.19:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.19
   to: assisted-installer-controller
 promotion:
-  name: "2.4"
+  name: "2.5"
   namespace: stolostron
 releases:
   latest:
@@ -50,8 +53,8 @@ tests:
         OSCI_PUBLISH_DELAY=0
         OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         OSCI_PIPELINE_REPO=backplane-pipeline
-        OSCI_RELEASE_BRANCH=backplane-2.4
-      RELEASE_REF: backplane-2.4
+        OSCI_RELEASE_BRANCH=backplane-2.5
+      RELEASE_REF: backplane-2.5
     workflow: ocm-ci-manifest-update
 - as: publish-controller
   postsubmit: true
@@ -65,8 +68,8 @@ tests:
         OSCI_PUBLISH_DELAY=0
         OSCI_PIPELINE_PRODUCT_PREFIX=backplane
         OSCI_PIPELINE_REPO=backplane-pipeline
-        OSCI_RELEASE_BRANCH=backplane-2.4
-      RELEASE_REF: backplane-2.4
+        OSCI_RELEASE_BRANCH=backplane-2.5
+      RELEASE_REF: backplane-2.5
     workflow: ocm-ci-manifest-update
 zz_generated_metadata:
   branch: master

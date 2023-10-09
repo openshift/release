@@ -6,6 +6,9 @@ DEFAULT_REGISTRY="quay.io"
 OPENSTACK_OPERATOR="openstack-operator"
 BASE_DIR=${HOME:-"/alabama"}
 NS_SERVICES=${NS_SERVICES:-"openstack"}
+export CEPH_HOSTNETWORK=${CEPH_HOSTNETWORK:-"true"}
+export CEPH_DATASIZE=${CEPH_DATASIZE:="2Gi"}
+export CEPH_TIMEOUT=${CEPH_TIMEOUT:="90"}
 
 # We don't want to use OpenShift-CI build cluster namespace
 unset NAMESPACE
@@ -34,6 +37,12 @@ SERVICE_NAME=$(echo "${BASE_OP^^}" | sed 's/\(.*\)-OPERATOR/\1/'| sed 's/-/\_/g'
 
 # Copy base operator code to home directory
 cp -r /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/ ${BASE_DIR}
+
+# custom per project ENV variables
+# shellcheck source=/dev/null
+if [ -f /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/.prow_ci.env ]; then
+  source /go/src/github.com/${DEFAULT_ORG}/${BASE_OP}/.prow_ci.env
+fi
 
 if [[ "$SERVICE_NAME" == "INSTALL_YAMLS" ]]; then
   # when testing install_yamls patch, we can skip build process and
@@ -97,7 +106,7 @@ if [[ "$SERVICE_NAME" == "OPENSTACK" ]]; then
   export ${SERVICE_NAME}_CR=/go/src/github.com/${DEFAULT_ORG}/${OPENSTACK_OPERATOR}/${OPENSTACK_CTLPLANE}
 fi
 
-make ceph DATA_SIZE=2Gi TIMEOUT=90
+make ceph
 sleep 30
 
 # Deploy openstack services with the sample from the PR under test
@@ -222,9 +231,8 @@ make input
 oc kustomize ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/ | oc apply -f -
 sleep 60
 
-# Waiting for all services to be ready
-oc get OpenStackControlPlane openstack -o json | jq -r '.status.conditions[].type' | \
-timeout ${TIMEOUT_SERVICES_READY} xargs -d '\n' -I {} sh -c 'echo testing condition={}; oc wait openstackcontrolplane.core.openstack.org/openstack --for=condition={} --timeout=-1s'
+# Waiting for Openstack CR to be ready
+oc kustomize ${BASE_DIR}/install_yamls/out/openstack/openstack/cr/ | oc wait --for condition=Ready --timeout="${TIMEOUT_SERVICES_READY}s" -f -
 
 # Basic validations after deploying
 oc project "${NS_SERVICES}"
@@ -235,14 +243,14 @@ cat > ~/.config/openstack/clouds.yaml << EOF
 $(oc get cm openstack-config -o json | jq -r '.data["clouds.yaml"]')
 EOF
 export OS_CLOUD=default
-KEYSTONE_SECRET_NAME=$(oc get keystoneapi keystone -o json | jq -r .spec.secret)
-KEYSTONE_PASSWD_SELECT=$(oc get keystoneapi keystone -o json | jq -r .spec.passwordSelectors.admin)
+KEYSTONE_SECRET_NAME=$(oc get keystoneapi -o json | jq -r '.items[0].spec.secret')
+KEYSTONE_PASSWD_SELECT=$(oc get keystoneapi -o json | jq -r '.items[0].spec.passwordSelectors.admin')
 OS_PASSWORD=$(oc get secret "${KEYSTONE_SECRET_NAME}" -o json | jq -r .data.${KEYSTONE_PASSWD_SELECT} | base64 -d)
 export OS_PASSWORD
 
 # Post tests for mariadb-operator
 # Check to confirm they we can login into mariadb container and show databases.
-MARIADB_SECRET_NAME=$(oc get ${DBSERVICE} openstack -o json | jq -r .spec.secret)
+MARIADB_SECRET_NAME=$(oc get ${DBSERVICE} -o json | jq -r '.items[0].spec.secret')
 MARIADB_PASSWD=$(oc get secret ${MARIADB_SECRET_NAME} -o json | jq -r .data.DbRootPassword | base64 -d)
 oc exec -it  pod/${DBSERVICE_CONTAINER} -- mysql -uroot -p${MARIADB_PASSWD} -e "show databases;"
 

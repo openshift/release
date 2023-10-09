@@ -11,7 +11,6 @@ function send_slack(){
     set +x
     SLACK_AUTH_TOKEN="T027F3GAJ/B011TAG710V/$(cat $CLUSTER_PROFILE_DIR/slackhook)"
 
-    sleep infinity
     curl -X POST --data "payload={\"text\":\"<https://prow.ci.openshift.org/view/gs/origin-ci-test/logs/$JOB_NAME/$BUILD_ID|Ofcir setup failed> $1\n\"}" \
         "https://hooks.slack.com/services/${SLACK_AUTH_TOKEN}"
     set -x
@@ -101,8 +100,8 @@ function getCIR(){
 #CLUSTERTYPE can be one of "virt", "virt-arm64" or "baremetal"
 CIRTYPE=host
 [ "$CLUSTERTYPE" == "baremetal" ] && CIRTYPE=cluster
-[ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host-arm
-
+[ "$CLUSTERTYPE" == "virt-arm64" ] && CIRTYPE=host_arm
+[ "$CLUSTERTYPE" == "lab-small" ] && CIRTYPE=host_lab_small
 
 if [[ ! "$RELEASE_IMAGE_LATEST" =~ build05 ]] ; then
     echo "WARNING: Attempting to contact lab ofcir API from the wrong cluster, must be build05 to succeed"

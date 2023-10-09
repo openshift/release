@@ -3,21 +3,26 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: base
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  commitchecker:
+    name: commitchecker
+    namespace: ci
+    tag: "4.14"
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
 - dockerfile_path: openshift/operator-controller.Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: olm-operator-controller
 promotion:
+  disabled: true
   name: "4.15"
   namespace: ocp
 releases:
@@ -62,6 +67,21 @@ tests:
   commands: make -f openshift/Makefile verify-manifests
   container:
     from: src
+- as: verify-commits
+  commands: make -f openshift/Makefile verify-commits
+  container:
+    from: src
+- as: verify-commits-shared
+  commands: commitchecker --start ${PULL_BASE_SHA:-main}
+  container:
+    from: commitchecker
+- as: openshift-e2e-aws
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO|CODEOWNERS|PROJECT)|\.golangci\.yaml|\.goreleaser\.yml|\.markdownlint.yaml|^\.github|Tiltfile$
+  steps:
+    cluster_profile: aws
+    env:
+      FEATURE_SET: TechPreviewNoUpgrade
+    workflow: openshift-e2e-aws
 zz_generated_metadata:
   branch: release-4.15
   org: openshift

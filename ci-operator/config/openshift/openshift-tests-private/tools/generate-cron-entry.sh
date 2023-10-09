@@ -5,7 +5,7 @@ DEBUG='false'
 function display_usage() {
 	echo "This script generates a cron entry, based on provided test_name and yaml_file_name."
 	echo "Usage: $0 <test_name> <yaml_file_name> [--force]"
-	echo "  e.g, $0 aws-c2s-ipi-disconnected-private-p2-f7 openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml"
+	echo "  e.g, $0 aws-c2s-ipi-disconnected-private-f7 openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml"
 }
 
 if [[ $# -lt 2 ]] ; then
@@ -18,10 +18,10 @@ if [[ ($@ == "--help") || ($@ == "-h") ]] ; then
 fi
 
 
-TEST_NAME="$1"    # aws-c2s-ipi-disconnected-private-p2-f7
+TEST_NAME="$1"    # aws-c2s-ipi-disconnected-private-f7
 YAML_FILE="$2"    # openshift-openshift-tests-private-release-4.13__amd64-nightly.yaml
 
-if [[ "${TEST_NAME}" == *baremetal-* ]] && [[ "$@" != *\ --force* ]]; then
+if [[ "${TEST_NAME}" =~ (baremetal-|-disabled|powervs-) ]] && [[ "$@" != *\ --force* ]]; then
     echo "The test config ${TEST_NAME} should not get changes in the cron entry as
       the schedule rotation scheme is different than the other tests.
       Use --force to skip this check."

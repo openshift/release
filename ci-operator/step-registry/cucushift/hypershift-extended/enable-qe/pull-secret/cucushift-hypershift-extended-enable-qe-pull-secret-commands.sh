@@ -67,6 +67,10 @@ function check_update_pullsecret() {
     fi
 }
 
+if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
+  source "${SHARED_DIR}/proxy-conf.sh"
+fi
+
 if [[ $SKIP_HYPERSHIFT_PULL_SECRET_UPDATE == "true" ]]; then
   echo "SKIP ....."
   exit 0

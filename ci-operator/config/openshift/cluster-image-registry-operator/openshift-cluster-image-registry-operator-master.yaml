@@ -1,42 +1,42 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: base
   hypershift-operator:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: hypershift-operator
   hypershift-tests:
-    name: "4.14"
+    name: "4.15"
     namespace: ocp
     tag: hypershift-tests
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
 - dockerfile_path: Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: cluster-image-registry-operator
 promotion:
-  name: "4.14"
+  name: "4.15"
   namespace: ocp
 releases:
   initial:
     integration:
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.14"
+      name: "4.15"
       namespace: ocp
 resources:
   '*':
@@ -97,6 +97,12 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-gcp
+- always_run: false
+  as: e2e-azure-manual-oidc
+  optional: true
+  steps:
+    cluster_profile: azure4
+    workflow: openshift-e2e-azure-manual-oidc-workload-identity
 - as: e2e-azure-ovn
   optional: true
   run_if_changed: ^(.*azure.*|vendor/github\.com/Azure/.*)\.go$
@@ -141,12 +147,6 @@ tests:
   container:
     from: src
   skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-- as: e2e-ovirt-sdn
-  optional: true
-  skip_if_only_changed: ^docs/|\.md$|^(?:.*/)?(?:\.gitignore|OWNERS|PROJECT|LICENSE)$
-  steps:
-    cluster_profile: ovirt
-    workflow: openshift-e2e-ovirt-minimal
 - as: e2e-openstack
   optional: true
   run_if_changed: (^(.*swift.*|vendor/github\.com/gophercloud/.*)\.go$|.*openstack.*)
@@ -159,7 +159,12 @@ tests:
     workflow: openshift-e2e-openstack-ipi
 - as: e2e-hypershift
   steps:
+    cluster_profile: hypershift
     workflow: hypershift-aws-e2e-external
+- as: e2e-hypershift-conformance
+  steps:
+    cluster_profile: hypershift
+    workflow: hypershift-aws-conformance
 zz_generated_metadata:
   branch: master
   org: openshift

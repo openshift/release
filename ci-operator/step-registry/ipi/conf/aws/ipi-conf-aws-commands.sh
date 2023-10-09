@@ -137,9 +137,8 @@ BOOTSTRAP_NODE_TYPE=${arch_instance_type}.large
 workers=${COMPUTE_NODE_REPLICAS:-3}
 if [[ "${COMPUTE_NODE_REPLICAS}" -le 0 ]]; then
     workers=0
-elif [[ "${COMPUTE_NODE_REPLICAS}" -gt 5 ]]; then
-    workers=5
 fi
+
 if [[ "${SIZE_VARIANT}" == "compact" ]]; then
   workers=0
 fi
@@ -276,8 +275,16 @@ fi
 
 if [[ "${CLUSTER_TYPE}" =~ ^aws-s?c2s$ ]]; then
   jq --version
-  openshift-install version
-  RHCOS_AMI=$(openshift-install coreos print-stream-json | jq -r ".architectures.x86_64.images.aws.regions.\"${aws_source_region}\".image")
+  if (( ocp_minor_version <= 9 && ocp_major_version == 4 )); then
+    # 4.9 and below
+    curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/rhcos.json -o /tmp/ami.json
+    RHCOS_AMI=$(jq --arg r $aws_source_region -r '.amis[$r].hvm' /tmp/ami.json)
+  else
+    # 4.10 and above
+    curl -sL https://raw.githubusercontent.com/openshift/installer/release-${ocp_major_version}.${ocp_minor_version}/data/data/coreos/rhcos.json -o /tmp/ami.json
+    RHCOS_AMI=$(jq --arg r $aws_source_region -r '.architectures.x86_64.images.aws.regions[$r].image' /tmp/ami.json)
+  fi
+  echo "RHCOS for C2S: ${RHCOS_AMI}"
 fi
 
 if [ ! -z ${RHCOS_AMI} ]; then
@@ -315,7 +322,7 @@ EOF
 fi
 
 if [[ -n "${AWS_EDGE_POOL_ENABLED-}" ]]; then
-  local_zone=$(aws --region "${aws_source_region}" ec2 describe-availability-zones --all-availability-zones --filter Name=state,Values=available Name=zone-type,Values=local-zone | jq -r '.AvailabilityZones[].ZoneName' | shuf | tail -n 1)
+  local_zone=$(< "${SHARED_DIR}"/local-zone-name.txt)
   local_zones_str="[ $local_zone ]"
   patch_edge="${SHARED_DIR}/install-config-edge.yaml.patch"
   cat > "${patch_edge}" << EOF
@@ -327,4 +334,14 @@ compute:
       zones: ${local_zones_str}
 EOF
   yq-go m -a -x -i "${CONFIG}" "${patch_edge}"
+fi
+
+if [[ "${PRESERVE_BOOTSTRAP_IGNITION}" == "yes" ]]; then
+  patch_bootstrap_ignition="${SHARED_DIR}/install-config-bootstrap_ignition.yaml.patch"
+  cat > "${patch_bootstrap_ignition}" << EOF
+platform:
+  aws:
+    preserveBootstrapIgnition: true
+EOF
+  yq-go m -a -x -i "${CONFIG}" "${patch_bootstrap_ignition}"
 fi

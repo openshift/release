@@ -6,6 +6,10 @@ workflow:
     env:
       COMPUTE_NODE_REPLICAS: "2"
       COMPUTE_NODE_TYPE: c5n.metal
+      ZONES_COUNT: "3"
+    leases:
+      - env: LEASED_RESOURCE
+        resource_type: aws-3-quota-slice
     post:
     - ref: hypershift-mce-dump
     - chain: gather-core-dump
@@ -13,7 +17,6 @@ workflow:
     - chain: ipi-aws-post
     test:
     - chain: hypershift-conformance
-    - chain: hypershift-kubevirt-run-csi-e2e
     pre:
     - chain: ipi-aws-ovn-pre
     - chain: ipi-install

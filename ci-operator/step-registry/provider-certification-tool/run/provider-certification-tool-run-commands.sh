@@ -8,7 +8,10 @@ set -o pipefail
 source "${SHARED_DIR}/install-env"
 extract_opct
 
-if [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
+if [ -n "${OPCT_DEV_EXTRA_CMD:-}" ]; then
+    echo "Running OPCT with regular mode with custom image"
+    ${OPCT_EXEC} run --watch ${OPCT_DEV_EXTRA_CMD:-}
+elif [ "${OPCT_RUN_MODE:-}" == "upgrade" ]; then
     echo "Running OPCT with upgrade mode"
     ${OPCT_EXEC} run --watch --mode=upgrade --upgrade-to-image="${TARGET_RELEASE_IMAGE}"
 else

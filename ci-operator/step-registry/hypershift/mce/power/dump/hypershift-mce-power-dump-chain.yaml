@@ -1,0 +1,39 @@
+chain:
+  as: hypershift-mce-power-dump
+  steps:
+    - as: dump-hostedcluster
+      cli: latest
+      commands: |-
+        set -x
+        
+        CLUSTERS_NAMESPACE="clusters"
+        HOSTED_CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+        
+        # Installing required tools
+        mkdir /tmp/bin
+        curl -L https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 -o /tmp/bin/jq && chmod +x /tmp/bin/jq
+        curl -L https://github.com/mikefarah/yq/releases/download/v4.31.2/yq_linux_amd64 -o /tmp/bin/yq && chmod +x /tmp/bin/yq
+        export PATH=$PATH:/tmp/bin
+        
+        # Installing hypershift cli
+        mkdir /tmp/hypershift_cli
+        downURL=$(oc get ConsoleCLIDownload hypershift-cli-download -o json | jq -r '.spec.links[] | select(.text | test("Linux for x86_64")).href')
+        curl -k --output /tmp/hypershift.tar.gz ${downURL}
+        tar -xvf /tmp/hypershift.tar.gz -C /tmp/hypershift_cli
+        chmod +x /tmp/hypershift_cli/hypershift
+        export PATH=$PATH:/tmp/hypershift_cli
+        
+        
+        # Dump hosted cluster for debug purpose
+        hypershift dump cluster --artifact-dir=$ARTIFACT_DIR \
+        --namespace ${CLUSTERS_NAMESPACE} \
+        --dump-guest-cluster=true \
+        --name="${HOSTED_CLUSTER_NAME}"
+
+      from: dev-scripts
+      grace_period: 15m0s
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 15m0s

@@ -101,15 +101,13 @@ tests:
   steps:
     cluster_profile: equinix-ocp-metal
     workflow: baremetalds-e2e-virtualmedia
-- as: e2e-agent-compact
+- as: e2e-agent-compact-ipv4
   cluster: build05
   skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
   steps:
     cluster_profile: equinix-ocp-metal
-    env:
-      DEVSCRIPTS_CONFIG: |
-        AGENT_E2E_TEST_SCENARIO=HA_IPV4
     workflow: agent-e2e-compact-ipv4
+  timeout: 6h0m0s
 - as: e2e-agent-sno-ipv6
   cluster: build05
   optional: true
@@ -121,6 +119,18 @@ tests:
         AGENT_E2E_TEST_SCENARIO=SNO_IPV6
         AGENT_USE_ZTP_MANIFESTS=true
     workflow: agent-e2e-generic
+- as: e2e-agent-ha-dualstack
+  cluster: build05
+  optional: true
+  skip_if_only_changed: (^docs|.github/)|^config_example.sh$|\.md$|^(DCO|LICENSE)$|((^|/)OWNERS$)
+  steps:
+    cluster_profile: equinix-ocp-metal
+    env:
+      DEVSCRIPTS_CONFIG: |
+        AGENT_E2E_TEST_SCENARIO=HA_IPV4V6_DHCP
+        MIRROR_IMAGES=true
+    workflow: agent-e2e-generic
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift-metal3

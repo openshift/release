@@ -1,9 +1,8 @@
 #!/bin/bash
 
 #
-# This step change replaces the default CSI from
-# gp2-csi to gp3-csi.
-# Some tests is failing when trying to provision gp3 volumes
+# Replacing the default CSI from gp3-csi to gp2-csi.
+# Some tests are failing when trying to provision gp3 volumes
 # in AWS Local Zones that does not support that EBS type.
 # AWS does not provide API to query it.
 # See also the TEST_SKIPS related to gp3 volumes failing for

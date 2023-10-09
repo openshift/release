@@ -1,8 +1,6 @@
 #!/bin/bash
 set -xeuo pipefail
 
-trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
-
 IP_ADDRESS="$(cat ${SHARED_DIR}/public_address)"
 HOST_USER="$(cat ${SHARED_DIR}/ssh_user)"
 INSTANCE_PREFIX="${HOST_USER}@${IP_ADDRESS}"
@@ -31,9 +29,7 @@ if ! sudo subscription-manager status >&/dev/null; then
 fi
 
 chmod 0755 ~
-mkdir ~/rpms
-tar -xf /tmp/rpms.tar -C ~/rpms
-tar -xf /tmp/microshift.tgz -C ~
+tar -xf /tmp/microshift.tgz -C ~ --strip-components 4
 
 cp /tmp/ssh-publickey ~/.ssh/id_rsa.pub
 cp /tmp/ssh-privatekey ~/.ssh/id_rsa
@@ -46,15 +42,13 @@ cp /tmp/pull-secret "\${PULL_SECRET}"
 cd ~/microshift
 
 ./test/bin/ci_phase_iso_build.sh
-
-./scripts/image-builder/build.sh -pull_secret_file "\${PULL_SECRET}" -microshift_rpms ~/rpms -authorized_keys_file ~/.ssh/id_rsa.pub -open_firewall_ports 6443:tcp
+sudo dnf install -y pcp-zeroconf; sudo systemctl start pmcd; sudo systemctl start pmlogger
 EOF
 chmod +x /tmp/iso.sh
 
-tar czf /tmp/microshift.tgz /microshift
+tar czf /tmp/microshift.tgz /go/src/github.com/openshift/microshift
 
 scp \
-    /rpms.tar \
     /tmp/iso.sh \
     /var/run/rhsm/subscription-manager-org \
     /var/run/rhsm/subscription-manager-act-key \
@@ -64,4 +58,15 @@ scp \
     /tmp/microshift.tgz \
     "${INSTANCE_PREFIX}:/tmp"
 
-ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh"
+trap 'scp -r ${INSTANCE_PREFIX}:/home/${HOST_USER}/microshift/_output/test-images/build-logs ${ARTIFACT_DIR}' EXIT
+# Call wait regardless of the outcome of the kill command, in case some of the children are finished
+# by the time we try to kill them. There is only 1 child now, but this is generic enough to allow N.
+trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} || true; wait; fi' TERM
+
+# Run in background to allow trapping signals before the command ends. If running in foreground
+# then TERM is queued until the ssh completes. This might be too long to fit in the grace period
+# and get abruptly killed, which prevents gathering logs.
+ssh "${INSTANCE_PREFIX}" "/tmp/iso.sh" &
+# Run wait -n since we only have one background command. Should this change, please update the exit
+# status handling.
+wait -n

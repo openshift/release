@@ -62,7 +62,10 @@ echo "[INFO] Extracting the baremetal-installer from ${MULTI_RELEASE_IMAGE}..."
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
   --command=openshift-baremetal-install --to=/tmp
 
-if [ "${DISCONNECTED}" == "true" ]; then
+# We change the payload image to the one in the mirror registry only when the mirroring happens.
+# For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
+# To avoid additional params in the workflows definition, we check the existence of the ICSP patch file.
+if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-icsp.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 file /tmp/openshift-baremetal-install

@@ -155,6 +155,26 @@ spec:
     spec:
       containers:
       - args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --wait=30
+        - --root=/tmp/git-sync
+        - --max-sync-failures=3
+        command:
+        - /git-sync
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        name: git-sync
+        resources:
+          requests:
+            cpu: '0.5'
+            memory: 1Gi
+        volumeMounts:
+        - mountPath: /tmp/git-sync
+          name: release
+      - args:
         - -provider=openshift
         - -https-address=:8443
         - -http-address=
@@ -186,11 +206,11 @@ spec:
       - command:
         - /usr/bin/release-controller
         - --release-namespace=ocp-priv
-        - --cluster-group=build01,build02,build03,build04
+        - --cluster-group=build02,build03,build04,build05
         - --cluster-group=vsphere
         - --prow-config=/etc/config/config.yaml
         - --supplemental-prow-config-dir=/etc/config
-        - --job-config=/etc/job-config
+        - --job-config=/var/repo/release/ci-operator/jobs
         - --listen=127.0.0.1:8080
         - --prow-namespace=ci
         - --job-namespace=ci-release-priv
@@ -231,9 +251,8 @@ spec:
         - mountPath: /etc/config
           name: config
           readOnly: true
-        - mountPath: /etc/job-config
-          name: job-config
-          readOnly: true
+        - mountPath: /var/repo
+          name: release
         - mountPath: /etc/github
           name: oauth
           readOnly: true
@@ -246,65 +265,31 @@ spec:
         - mountPath: /etc/kubeconfigs
           name: release-controller-kubeconfigs
           readOnly: true
+      initContainers:
+      - args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        command:
+        - /git-sync
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        name: git-sync-init
+        volumeMounts:
+        - mountPath: /tmp/git-sync
+          name: release
       serviceAccountName: release-controller-ocp-priv
       volumes:
       - configMap:
           defaultMode: 420
           name: config
         name: config
-      - name: job-config
-        projected:
-          sources:
-          - configMap:
-              name: job-config-misc
-          - configMap:
-              name: job-config-master-periodics
-          - configMap:
-              name: job-config-main-periodics
-          - configMap:
-              name: job-config-master-postsubmits
-          - configMap:
-              name: job-config-main-postsubmits
-          - configMap:
-              name: job-config-master-presubmits
-          - configMap:
-              name: job-config-main-presubmits
-          - configMap:
-              name: job-config-1.x
-          - configMap:
-              name: job-config-2.x
-          - configMap:
-              name: job-config-3.x
-          - configMap:
-              name: job-config-4.0
-          - configMap:
-              name: job-config-4.1
-          - configMap:
-              name: job-config-4.10
-          - configMap:
-              name: job-config-4.11
-          - configMap:
-              name: job-config-4.12
-          - configMap:
-              name: job-config-4.13
-          - configMap:
-              name: job-config-4.14
-          - configMap:
-              name: job-config-4.2
-          - configMap:
-              name: job-config-4.3
-          - configMap:
-              name: job-config-4.4
-          - configMap:
-              name: job-config-4.5
-          - configMap:
-              name: job-config-4.6
-          - configMap:
-              name: job-config-4.7
-          - configMap:
-              name: job-config-4.8
-          - configMap:
-              name: job-config-4.9
+      - emptyDir: {}
+        name: release
       - name: oauth
         secret:
           defaultMode: 420

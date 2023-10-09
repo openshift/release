@@ -1,31 +1,36 @@
 apiVersion: image.openshift.io/v1
 kind: ImageStream
 metadata:
-  name: envoyproxy
+  name: tp-envoyproxy
   namespace: ci
 spec:
   tags:
-  - name: "1.25.3"
+  - name: "1.26.4"
 ---
 kind: BuildConfig
 apiVersion: build.openshift.io/v1
 metadata:
   namespace: ci
-  name: envoyproxy
+  name: tp-envoyproxy
 spec:
   successfulBuildsHistoryLimit: 1
   failedBuildsHistoryLimit: 2
   output:
     to:
       kind: ImageStreamTag
-      name: envoyproxy:tp-1.25.3
+      name: tp-envoyproxy:1.26.4
   source:
     dockerfile: |
-      FROM registry.ci.openshift.org/openshift/centos:stream9
-      LABEL maintainer="jguzik@redhat.com"
-      RUN curl -L -o /bin/envoy https://github.com/envoyproxy/envoy/releases/download/v1.25.3/envoy-1.25.3-linux-x86_64 && chmod +x /bin/envoy
-      RUN curl -L -o /tmp/api_descriptor.pb https://github.com/kubernetes/test-infra/raw/master/prow/gangway/api_descriptor.pb
-      RUN echo $'static_resources: \n\
+      FROM registry.ci.openshift.org/ci/ubuntu:20.04
+      LABEL org.opencontainers.image.ref.name=ubuntu
+      LABEL org.opencontainers.image.version=20.04
+      ARG DEBIAN_FRONTEND=noninteractive
+      ENV TZ=Etc/UTC
+      RUN apt-get -qq update && apt-get -qq upgrade -y && apt-get -qq install --no-install-recommends -y ca-certificates && apt-get install -y luarocks curl && apt-get -qq autoremove -y && apt-get -y clean
+      RUN luarocks install lua-cjson
+      RUN curl -L -o /usr/local/bin/envoy https://github.com/envoyproxy/envoy/releases/download/v1.26.4/envoy-1.26.4-linux-x86_64 && chmod +x /usr/local/bin/envoy
+      RUN curl -L https://github.com/kubernetes/test-infra/raw/master/prow/gangway/api_descriptor.pb -o /tmp/api_descriptor.pb
+      RUN echo 'static_resources: \n\
         listeners: \n\
         - name: listener1 \n\
           address: \n\
@@ -50,9 +55,19 @@ spec:
                   typed_config: \n\
                     "@type": type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua \n\
                     inline_code: | \n\
+                      local json = require("cjson") \n\
                       function envoy_on_request(request_handle) \n\
                           request_handle:headers():add("x-endpoint-api-consumer-type", "PROJECT") \n\
                           request_handle:headers():add("x-endpoint-api-consumer-number", "1") \n\
+                          local body = request_handle:body() \n\
+                          local jsonString = tostring(body:getBytes(0, body:length())) \n\
+                          local bodyTable = json.decode(jsonString) \n\
+                          local podSpecOptions = bodyTable.pod_spec_options or {} \n\
+                          podSpecOptions.annotations = podSpecOptions.annotations or {} \n\
+                          podSpecOptions.annotations.executor = "gangway" \n\
+                          bodyTable.pod_spec_options = podSpecOptions \n\
+                          local newBody = json.encode(bodyTable) \n\
+                          request_handle:body():setBytes(newBody) \n\
                       end \n\
                 - name: envoy.filters.http.grpc_json_transcoder \n\
                   typed_config: \n\
@@ -85,13 +100,13 @@ spec:
                             port_value: 32000' >> /tmp/config.yml
       EXPOSE 32001
       EXPOSE 32000
-      ENTRYPOINT ["/bin/envoy", "-c", "/tmp/config.yml"]
+      CMD envoy -c /tmp/config.yml
     type: Dockerfile
   strategy:
     dockerStrategy:
       from:
         kind: ImageStreamTag
-        name: centos:stream9
-        namespace: openshift
+        name: ubuntu:20.04
+        namespace: ci
       imageOptimizationPolicy: SkipLayers
     type: Docker

@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.12"
     namespace: ocp
     tag: cli
   opm-builder:
@@ -53,6 +53,8 @@ resources:
 tests:
 - as: functional
   commands: |
+    mkdir -p ../operator && cp -r . ../operator
+    cd ../operator
     export GOFLAGS=
     make test GINKGO_ARGS='--no-color'
   container:
@@ -64,9 +66,11 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.12"
   optional: true
   steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy
 - as: ovn-operator-build-deploy-kuttl
   cluster_claim:
@@ -75,9 +79,10 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
-  optional: true
+    version: "4.12"
   steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy-kuttl
 - as: precommit-check
   commands: |

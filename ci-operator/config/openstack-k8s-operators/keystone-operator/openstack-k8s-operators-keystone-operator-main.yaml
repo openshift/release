@@ -1,6 +1,6 @@
 base_images:
   cli:
-    name: "4.10"
+    name: "4.12"
     namespace: ocp
     tag: cli
   openstack-operator-ci-tempest:
@@ -70,9 +70,11 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
+    version: "4.12"
   optional: true
   steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy
 - as: precommit-check
   commands: |
@@ -85,7 +87,6 @@ tests:
     pre-commit run -a --show-diff-on-failure
   container:
     from: openstack-operator-ci-pre-commit
-  optional: true
 - as: keystone-operator-build-deploy-tempest
   cluster_claim:
     architecture: amd64
@@ -93,9 +94,11 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h20m0s
-    version: "4.10"
+    version: "4.12"
   optional: true
   steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy-tempest
 - as: keystone-operator-build-deploy-kuttl
   cluster_claim:
@@ -104,9 +107,10 @@ tests:
     owner: openstack-k8s-operators
     product: ocp
     timeout: 1h0m0s
-    version: "4.10"
-  optional: true
+    version: "4.12"
   steps:
+    env:
+      CEPH_HOSTNETWORK: "false"
     workflow: openstack-k8s-operators-test-build-deploy-kuttl
 zz_generated_metadata:
   branch: main

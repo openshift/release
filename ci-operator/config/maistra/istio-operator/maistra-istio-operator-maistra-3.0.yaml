@@ -7,8 +7,20 @@ build_root:
   image_stream_tag:
     name: maistra-builder
     namespace: ci
-    tag: "3.0"
+    tag: upstream-master
   use_build_cache: true
+images:
+- dockerfile_literal: |
+    FROM registry.ci.openshift.org/ci/maistra-builder:upstream-master
+    # Git checks if the user that owns the files on the filesystem match the
+    # current user.  We need to disable this check because tests in Prow are
+    # running with a random user.
+    RUN git config --system --add safe.directory '*'
+  inputs:
+    src:
+      as:
+      - registry.ci.openshift.org/ci/maistra-builder:upstream-master
+  to: src-test
 releases:
   latest:
     release:
@@ -22,7 +34,7 @@ resources:
       cpu: "2"
       memory: 2Gi
 tests:
-- as: maistra-istio-operator-unit-3-0
+- as: unit
   commands: |
     make test \
     GOBIN="/gobin" \
@@ -31,9 +43,9 @@ tests:
     XDG_CACHE_HOME="/tmp/cache" \
     TEST_FLAGS="-v"
   container:
-    from: src
+    from: src-test
   timeout: 1h0m0s
-- as: maistra-istio-operator-gencheck-3-0
+- as: gencheck
   commands: |
     make gen-check \
     GOBIN="/gobin" \
@@ -41,9 +53,9 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
   timeout: 30m0s
-- as: maistra-istio-operator-lint-3-0
+- as: lint
   commands: |
     make lint \
     GOBIN="/gobin" \
@@ -51,22 +63,23 @@ tests:
     GOMODCACHE="/tmp/cache" \
     XDG_CACHE_HOME="/tmp/cache"
   container:
-    from: src
+    from: src-test
   timeout: 20m0s
-- as: istio-operator-push-image-3-0
+- as: push-images
   steps:
-    cluster_profile: aws-2
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
     env:
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
       XDG_CACHE_HOME: /tmp/cache
     test:
-    - as: istio-operator-copy-src
+    - as: copy-src
       cli: latest
       commands: |
         # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
@@ -80,7 +93,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 10m0s
-    - as: istio-operator-push-image-3-0
+    - as: push-images
       cli: latest
       commands: |
         export QUAY_PASS=$(cat /maistra-secrets/password)
@@ -89,6 +102,7 @@ tests:
           sh -c \
           "docker login -u='maistra-dev+prow' \
           -p=${QUAY_PASS} quay.io; \
+          cd /work && \
           make docker-build docker-push \
           IMAGE=quay.io/maistra-dev/istio-ubi9-operator:PR-${PULL_NUMBER}"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
@@ -103,6 +117,114 @@ tests:
       - name: GOCACHE
       - name: GOBIN
       - name: GOMODCACHE
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: integration-ocp
+  steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: integration-ocp
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          sh -c \
+          "export KUBECONFIG=/work/ci-kubeconfig && \
+          export TAG=PR-${PULL_NUMBER} && \
+          docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+          cd /work && \
+          make test.integration.ocp"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src-test
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
+- as: integration-kind
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: integration-kind
+      cli: latest
+      commands: |
+        export QUAY_PASS=$(cat /maistra-secrets/password)
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          sh -c \
+          "export TAG=PR-${PULL_NUMBER} && \
+          docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
+          cd /work && \
+          make test.integration.kind"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
       from: src
       resources:
         requests:
@@ -110,13 +232,61 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
-- as: nightly-images-3-0
-  cron: 00 03 * * *
+- as: scorecard
   steps:
     cluster_profile: aws-2
     env:
-      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.12.9-multi
-      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:3.0
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: copy-src
+      cli: latest
+      commands: |
+        # SRC_PATH does end with /. : the content of the source directory is copied into dest directory
+        oc cp ./. "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":/work/
+        oc cp ${KUBECONFIG} ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/work/ci-kubeconfig
+        oc cp `which oc` ${MAISTRA_NAMESPACE}/${MAISTRA_SC_POD}:/bin
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 10m0s
+    - as: scorecard
+      cli: latest
+      commands: |
+        oc rsh -n "${MAISTRA_NAMESPACE}" "${MAISTRA_SC_POD}" \
+          entrypoint \
+          sh -c \
+          "export KUBECONFIG=/work/ci-kubeconfig && \
+          cd /work && \
+          make test.scorecard"
+        oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-hypershift
+- as: nightly-images
+  cron: 00 03 * * *
+  steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-nightly-images
       MAISTRA_SC_POD: maistra-nightly-images-pod
     test:
@@ -150,6 +320,7 @@ tests:
           sh -c \
           "git config --global user.email 'dgrimm@redhat.com'; \
            git config --global user.name 'Daniel Grimm'; \
+           cd /work && \
            make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
@@ -162,7 +333,7 @@ tests:
       env:
       - name: MAISTRA_NAMESPACE
       - name: MAISTRA_SC_POD
-      from: src
+      from: src-test
       resources:
         requests:
           cpu: 100m

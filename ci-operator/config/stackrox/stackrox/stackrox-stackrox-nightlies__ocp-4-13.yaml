@@ -21,20 +21,43 @@ resources:
 test_binary_build_commands: .openshift-ci/dispatch.sh test-binary-build-commands
 tests:
 - as: qa-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
   postsubmit: true
   steps:
-    cluster_profile: gcp
     env:
+      COLLECTION_METHOD: core_bpf
       TEST_SUITE: ocp-qa-e2e-tests
     test:
     - ref: stackrox-e2e
-    workflow: ipi-gcp
+  timeout: 5h0m0s
+- as: qa-ebpf-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: ebpf
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
   timeout: 5h0m0s
 - as: fips-qa-e2e-tests
   postsubmit: true
   steps:
     cluster_profile: gcp
     env:
+      COLLECTION_METHOD: core_bpf
       FIPS_ENABLED: "true"
       TEST_SUITE: ocp-qa-e2e-tests
     pre:
@@ -44,45 +67,52 @@ tests:
     - ref: stackrox-e2e
     workflow: ipi-gcp
   timeout: 5h0m0s
-- as: core-bpf-qa-e2e-tests
-  postsubmit: true
-  steps:
-    cluster_profile: gcp
-    env:
-      TEST_SUITE: ocp-core-bpf-qa-e2e-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-gcp
-  timeout: 5h0m0s
 - as: operator-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
   postsubmit: true
   steps:
-    cluster_profile: gcp
     env:
       TEST_SUITE: ocp-operator-e2e-tests
     test:
     - ref: stackrox-e2e
-    workflow: ipi-gcp
-  timeout: 5h0m0s
-- as: sensor-integration-tests
-  optional: true
-  steps:
-    cluster_profile: aws
-    env:
-      TEST_SUITE: ocp-sensor-integration-tests
-    test:
-    - ref: stackrox-e2e
-    workflow: ipi-aws
   timeout: 5h0m0s
 - as: ui-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
   postsubmit: true
   steps:
-    cluster_profile: gcp
     env:
+      COLLECTION_METHOD: core_bpf
       TEST_SUITE: ocp-ui-e2e-tests
     test:
     - ref: stackrox-e2e
-    workflow: ipi-gcp
+  timeout: 5h0m0s
+- as: compliance-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: stackrox
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  postsubmit: true
+  steps:
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-compliance-e2e-tests
+    test:
+    - ref: stackrox-e2e
   timeout: 5h0m0s
 zz_generated_metadata:
   branch: nightlies

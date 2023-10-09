@@ -12,6 +12,7 @@ images:
 promotion:
   additional_images:
     openstack-tests: bin
+  disabled: true
   name: 4.15-priv
   namespace: ocp-private
 releases:
@@ -44,16 +45,47 @@ tests:
     test:
     - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
-- as: test-kuryr
+- always_run: false
+  as: e2e-openstack-ccpmso
+  optional: true
   steps:
-    cluster_profile: openstack-kuryr
-    env:
-      BASE_DOMAIN: shiftstack.devcluster.openshift.com
-      CONFIG_TYPE: minimal
-      NETWORK_TYPE: Kuryr
+    cluster_profile: openstack-vexxhost
     test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
     - ref: openstack-test-openstack
     workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
+- always_run: false
+  as: e2e-openstack-ccpmso-zone
+  optional: true
+  steps:
+    cluster_profile: openstack-vh-mecha-az0
+    test:
+    - as: openstack-test-cpms
+      commands: |
+        dir=$GOPATH/src/github.com/openshift/cluster-control-plane-machine-set-operator
+        git clone https://github.com/openshift/cluster-control-plane-machine-set-operator --branch main --depth=1 $dir
+        export OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE="$(<"${SHARED_DIR}/OPENSTACK_CONTROLPLANE_FLAVOR_ALTERNATE")"
+        cd $dir
+        test -f "${SHARED_DIR}/proxy-conf.sh" && source "${SHARED_DIR}/proxy-conf.sh"
+        make e2e-presubmit
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    - ref: openstack-test-openstack
+    workflow: openshift-e2e-openstack-ipi
+  timeout: 6h0m0s
 zz_generated_metadata:
   branch: release-4.15
   org: openshift-priv

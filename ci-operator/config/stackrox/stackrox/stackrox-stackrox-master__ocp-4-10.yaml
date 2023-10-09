@@ -26,6 +26,19 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: ebpf-qa-e2e-tests
+  optional: true
+  run_if_changed: ^((generated|image|operator|pkg|make|deploy|scripts)/.*|Makefile|status\.sh|COLLECTOR_VERSION|EXPECTED_GO_VERSION)
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: ebpf
       TEST_SUITE: ocp-qa-e2e-tests
     test:
     - ref: stackrox-e2e
@@ -47,6 +60,7 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      COLLECTION_METHOD: core_bpf
       TEST_SUITE: ocp-sensor-integration-tests
     test:
     - ref: stackrox-e2e
@@ -58,16 +72,53 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      COLLECTION_METHOD: core_bpf
       TEST_SUITE: ocp-ui-e2e-tests
     test:
     - ref: stackrox-e2e
     workflow: ipi-aws
   timeout: 5h0m0s
+- as: compliance-e2e-tests
+  optional: true
+  run_if_changed: ^(compliance|central\/compliance.*)
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-compliance-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- always_run: false
+  as: sensor-profiling
+  optional: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-sensor-profiling
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 2h0m0s
 - as: merge-qa-e2e-tests
   postsubmit: true
   steps:
     cluster_profile: aws
     env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-qa-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: merge-ebpf-qa-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: ebpf
       TEST_SUITE: ocp-qa-e2e-tests
     test:
     - ref: stackrox-e2e
@@ -88,7 +139,19 @@ tests:
   steps:
     cluster_profile: aws
     env:
+      COLLECTION_METHOD: core_bpf
       TEST_SUITE: ocp-ui-e2e-tests
+    test:
+    - ref: stackrox-e2e
+    workflow: ipi-aws
+  timeout: 5h0m0s
+- as: merge-compliance-e2e-tests
+  postsubmit: true
+  steps:
+    cluster_profile: aws
+    env:
+      COLLECTION_METHOD: core_bpf
+      TEST_SUITE: ocp-compliance-e2e-tests
     test:
     - ref: stackrox-e2e
     workflow: ipi-aws

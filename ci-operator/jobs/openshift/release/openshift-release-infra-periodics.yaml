@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -58,6 +58,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: pull-secret
@@ -69,6 +72,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build01
   cron: '@yearly'
@@ -185,6 +191,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -207,8 +216,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -299,6 +311,7 @@ periodics:
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 BASELINE_CAPABILITY_SET: None
+                ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
                 PERSISTENT_MONITORING: "false"
               test:
               - ref: clusterbot-wait
@@ -382,6 +395,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -404,8 +420,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -487,6 +506,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -507,8 +529,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -593,6 +618,7 @@ periodics:
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 BASELINE_CAPABILITY_SET: None
+                ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
                 PERSISTENT_MONITORING: "false"
               test:
               - ref: clusterbot-wait
@@ -660,6 +686,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -682,6 +711,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
   cron: '@yearly'
@@ -782,6 +814,7 @@ periodics:
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 BASELINE_CAPABILITY_SET: None
+                ADDITIONAL_ENABLED_CAPABILITIES: MachineAPI
                 PERSISTENT_MONITORING: "false"
               test:
               - ref: clusterbot-wait
@@ -858,6 +891,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -882,6 +918,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build05
   cron: '@yearly'
@@ -961,10 +1000,10 @@ periodics:
                   IP_STACK=v4
                   NETWORK_TYPE=OpenShiftSDN
               post:
-                - chain: baremetalds-ipi-post
+                - chain: baremetalds-ofcir-post
               pre:
                 - ref: openshift-cluster-bot-rbac
-                - chain: baremetalds-ipi-pre
+                - chain: baremetalds-ofcir-pre
               test:
                 - as: wait
                   commands: sleep $(CLUSTER_DURATION) & wait
@@ -978,10 +1017,10 @@ periodics:
                   IP_STACK=v4
                   NETWORK_TYPE=OVNKubernetes
               post:
-                - chain: baremetalds-ipi-post
+                - chain: baremetalds-ofcir-post
               pre:
                 - ref: openshift-cluster-bot-rbac
-                - chain: baremetalds-ipi-pre
+                - chain: baremetalds-ofcir-pre
               test:
                 - as: wait
                   commands: sleep $(CLUSTER_DURATION) & wait
@@ -995,10 +1034,10 @@ periodics:
                   IP_STACK=v4
                   NETWORK_TYPE=OVNKubernetes
               post:
-                - chain: baremetalds-ipi-post
+                - chain: baremetalds-ofcir-post
               pre:
                 - ref: openshift-cluster-bot-rbac
-                - chain: baremetalds-ipi-pre
+                - chain: baremetalds-ofcir-pre
               test:
                 - as: wait
                   commands: sleep $(CLUSTER_DURATION) & wait
@@ -1012,10 +1051,10 @@ periodics:
                   IP_STACK=v6
                   NETWORK_TYPE=OVNKubernetes
               post:
-                - chain: baremetalds-ipi-post
+                - chain: baremetalds-ofcir-post
               pre:
                 - ref: openshift-cluster-bot-rbac
-                - chain: baremetalds-ipi-pre
+                - chain: baremetalds-ofcir-pre
               test:
                 - as: wait
                   commands: sleep $(CLUSTER_DURATION) & wait
@@ -1029,10 +1068,10 @@ periodics:
                   IP_STACK=v6
                   NETWORK_TYPE=OVNKubernetes
               post:
-                - chain: baremetalds-ipi-post
+                - chain: baremetalds-ofcir-post
               pre:
                 - ref: openshift-cluster-bot-rbac
-                - chain: baremetalds-ipi-pre
+                - chain: baremetalds-ofcir-pre
               test:
                 - as: wait
                   commands: sleep $(CLUSTER_DURATION) & wait
@@ -1046,10 +1085,10 @@ periodics:
                   IP_STACK=v4v6
                   NETWORK_TYPE=OVNKubernetes
               post:
-                - chain: baremetalds-ipi-post
+                - chain: baremetalds-ofcir-post
               pre:
                 - ref: openshift-cluster-bot-rbac
-                - chain: baremetalds-ipi-pre
+                - chain: baremetalds-ofcir-pre
               test:
                 - as: wait
                   commands: sleep $(CLUSTER_DURATION) & wait
@@ -1063,10 +1102,10 @@ periodics:
                   IP_STACK=v4v6
                   NETWORK_TYPE=OVNKubernetes
               post:
-                - chain: baremetalds-ipi-post
+                - chain: baremetalds-ofcir-post
               pre:
                 - ref: openshift-cluster-bot-rbac
-                - chain: baremetalds-ipi-pre
+                - chain: baremetalds-ofcir-pre
               test:
                 - as: wait
                   commands: sleep $(CLUSTER_DURATION) & wait
@@ -1095,6 +1134,9 @@ periodics:
       - mountPath: /secrets/gcs
         name: gcs-credentials
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1117,6 +1159,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: vsphere
   cron: '@yearly'
@@ -1202,6 +1247,15 @@ periodics:
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
+          - as: launch-multi-zone-techpreview
+            steps:
+              cluster_profile: vsphere-multizone
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                FEATURE_SET: TechPreviewNoUpgrade
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-zones
           - as: launch-ovn-hybrid
             steps:
               cluster_profile: $(CLUSTER_PROFILE)
@@ -1232,6 +1286,15 @@ periodics:
               cluster_profile: vsphere
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
+          - as: launch-dualstack-primaryv6
+            steps:
+              cluster_profile: vsphere
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+                IP_FAMILIES: DualStackIPv6Primary
               test:
               - ref: clusterbot-wait
               workflow: openshift-e2e-$(CLUSTER_TYPE)-ovn-dualstack
@@ -1269,6 +1332,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1291,8 +1357,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1368,6 +1437,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1390,8 +1462,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -1473,6 +1548,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1492,8 +1570,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -1501,8 +1582,7 @@ periodics:
     job-env: aws
     job-test: e2e
     job-type: upgrade
-    tag: "1"
-  name: release-openshift-okd-installer-e2e-aws-upgrade
+  name: release-openshift-okd-fcos-installer-e2e-aws-upgrade-from-fcos-stable
   spec:
     containers:
     - args:
@@ -1518,15 +1598,18 @@ periodics:
       command:
       - ci-operator
       env:
-      - name: RELEASE_IMAGE_INITIAL
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: BRANCH
-        value: "4.10"
       - name: CLUSTER_TYPE
         value: aws
       - name: UNRESOLVED_CONFIG
         value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-stable
+                  upper: 4.999.0-0
           resources:
             '*':
               limits:
@@ -1534,9 +1617,6 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: origin
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1574,6 +1654,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1593,16 +1676,19 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
     job-architecture: amd64
-    job-env: gcp
+    job-env: aws
     job-test: e2e
     job-type: upgrade
-  name: release-openshift-okd-installer-e2e-gcp-upgrade
+  name: release-openshift-okd-scos-installer-e2e-aws-upgrade-from-scos-stable
   spec:
     containers:
     - args:
@@ -1618,15 +1704,18 @@ periodics:
       command:
       - ci-operator
       env:
-      - name: RELEASE_IMAGE_INITIAL
-      - name: RELEASE_IMAGE_LATEST
-      - name: CLUSTER_VARIANT
-      - name: BRANCH
-        value: "4.10"
       - name: CLUSTER_TYPE
-        value: gcp
+        value: aws
       - name: UNRESOLVED_CONFIG
         value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-stable
+                  upper: 4.999.0-0
           resources:
             '*':
               limits:
@@ -1634,9 +1723,218 @@ periodics:
               requests:
                 cpu: 100m
                 memory: 200Mi
-          tag_specification:
-            name: "$(BRANCH)"
-            namespace: origin
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build05
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: aws
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-scos-installer-e2e-aws-upgrade-from-scos-next
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: aws
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-next
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            steps:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              workflow: openshift-upgrade-$(CLUSTER_TYPE)
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-aws
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build02
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: gcp
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-fcos-installer-e2e-gcp-upgrade-from-fcos-stable
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-stable
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
           tests:
           - as: e2e-$(CLUSTER_TYPE)
             commands: TEST_SUITE=openshift/conformance/parallel run-tests
@@ -1674,6 +1972,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1695,8 +1996,229 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: gcp
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-scos-installer-e2e-gcp-upgrade-from-scos-stable
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-stable
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build02
+  cron: '@yearly'
+  decorate: true
+  labels:
+    job-architecture: amd64
+    job-env: gcp
+    job-test: e2e
+    job-type: upgrade
+  name: release-openshift-okd-scos-installer-e2e-gcp-upgrade-from-scos-next
+  spec:
+    containers:
+    - args:
+      - --give-pr-author-access-to-namespace=true
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --input-hash=$(BUILD_ID)
+      - --input-hash=$(JOB_NAME)
+      - --secret-dir=/usr/local/e2e-$(CLUSTER_TYPE)-upgrade-cluster-profile
+      - --secret-dir=/usr/local/pull-secret
+      - --target=e2e-$(CLUSTER_TYPE)-upgrade
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      command:
+      - ci-operator
+      env:
+      - name: CLUSTER_TYPE
+        value: gcp
+      - name: UNRESOLVED_CONFIG
+        value: |
+          releases:
+            initial:
+              prerelease:
+                product: okd
+                version_bounds:
+                  lower: 4.13.0-0
+                  stream: 4-scos-next
+                  upper: 4.999.0-0
+          resources:
+            '*':
+              limits:
+                memory: 6Gi
+              requests:
+                cpu: 100m
+                memory: 200Mi
+          tests:
+          - as: e2e-$(CLUSTER_TYPE)
+            commands: TEST_SUITE=openshift/conformance/parallel run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-serial
+            commands: TEST_SUITE=openshift/conformance/serial run-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+          - as: e2e-$(CLUSTER_TYPE)-upgrade
+            commands: TEST_SUITE=all run-upgrade-tests
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+              upgrade: true
+          - as: launch-$(CLUSTER_TYPE)
+            commands: sleep 9000 & wait
+            openshift_installer:
+              cluster_profile: "$(CLUSTER_TYPE)"
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /usr/local/pull-secret
+        name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp
+        - configMap:
+            name: cluster-profile-gcp
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: release-pull-secret
+      secret:
+        secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+- agent: kubernetes
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1765,6 +2287,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1784,6 +2309,9 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
   cluster: build02
   cron: '@yearly'
@@ -1866,6 +2394,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -1887,8 +2418,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -1978,6 +2512,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2000,8 +2537,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -2068,6 +2608,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2087,8 +2630,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build02
+  cluster: build01
   cron: '@yearly'
   decorate: true
   labels:
@@ -2160,7 +2706,7 @@ periodics:
               workflow: openshift-e2e-$(CLUSTER_TYPE)-nfv
           - as: launch-kuryr
             steps:
-              cluster_profile: openstack-kuryr
+              cluster_profile: openstack-vh-mecha-az0
               env:
                 CLUSTER_DURATION: $(CLUSTER_DURATION)
                 CONFIG_TYPE: minimal
@@ -2225,6 +2771,9 @@ periodics:
         readOnly: true
       - mountPath: /usr/local/pull-secret
         name: release-pull-secret
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2247,8 +2796,11 @@ periodics:
     - name: release-pull-secret
       secret:
         secretName: ci-pull-credentials
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -2337,6 +2889,9 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2360,8 +2915,11 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
 - agent: kubernetes
-  cluster: build01
+  cluster: build05
   cron: '@yearly'
   decorate: true
   labels:
@@ -2440,6 +2998,9 @@ periodics:
       - mountPath: /etc/report
         name: result-aggregator
         readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
     serviceAccountName: ci-operator
     volumes:
     - name: boskos
@@ -2460,3 +3021,6 @@ periodics:
     - name: result-aggregator
       secret:
         secretName: result-aggregator
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher

@@ -1,16 +1,21 @@
 base_images:
   base:
-    name: 4.14-priv
+    name: 4.15-priv
     namespace: ocp-private
     tag: base
-  ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.13
-  ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+    tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.19-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: cd ./scripts/bumper && go install -mod=mod ./...
 build_root:
   from_repository: true
 canonical_go_repository: github.com/openshift/operator-framework-olm
@@ -18,37 +23,52 @@ images:
 - dockerfile_path: operator-lifecycle-manager.Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: operator-lifecycle-manager
 - dockerfile_path: operator-registry.Dockerfile
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.19-openshift-4.13:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13
-    ocp_builder_rhel-8-golang-1.19-openshift-4.14:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: operator-registry
 - dockerfile_path: base.Dockerfile
   from: src
   to: ci-image
+- context_dir: scripts/bumper
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/bumper
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: olm-bumper
 promotion:
   excluded_images:
   - ci-image
-  name: 4.14-priv
+  - olm-bumper
+  name: 4.15-priv
   namespace: ocp-private
 releases:
   initial:
     integration:
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
   latest:
     integration:
       include_built_images: true
-      name: 4.14-priv
+      name: 4.15-priv
       namespace: ocp-private
 resources:
   '*':
@@ -61,6 +81,7 @@ tests:
   container:
     from: ci-image
 - as: e2e-gcp-ovn
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp
@@ -87,6 +108,7 @@ tests:
   container:
     from: ci-image
 - as: e2e-gcp-olm
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: gcp
     test:
@@ -106,6 +128,7 @@ tests:
     workflow: ipi-gcp
 - as: e2e-gcp-olm-flaky
   optional: true
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: gcp
     test:
@@ -118,6 +141,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-gcp-console-olm
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: gcp
     test:
@@ -130,6 +154,7 @@ tests:
           cpu: 100m
     workflow: ipi-gcp
 - as: e2e-upgrade
+  skip_if_only_changed: ^docs/|\.md$|^(?:.*\/)?(?:\.gitignore|DOWNSTREAM_OWNERS|DOWNSTREAM_OWNERS_ALIASES|LICENSE|DCO)|\.golangci\.yaml|Tiltfile$
   steps:
     cluster_profile: aws
     workflow: openshift-upgrade-aws

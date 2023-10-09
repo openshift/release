@@ -88,6 +88,29 @@ EOF
     echo "The bootstrap node didn't power off and it will not be released to retry in the deprovisioning steps..."
     return 0
   fi
+
+  if [ -z "${pdu_uri}" ]; then
+    echo "pdu_uri is empty... skipping pdu reset"
+  else
+    pdu_host=${pdu_uri%%/*}
+    pdu_socket=${pdu_uri##*/}
+    pdu_creds=${pdu_host%%@*}
+    pdu_host=${pdu_host##*@}
+    pdu_user=${pdu_creds%%:*}
+    pdu_pass=${pdu_creds##*:}
+    # pub-priv key auth is not supported by the PDUs
+    echo "${pdu_pass}" > /tmp/ssh-pass
+
+    timeout -s 9 10m sshpass -f /tmp/ssh-pass ssh "${SSHOPTS[@]}" "${pdu_user}@${pdu_host}" <<EOF || true
+olReboot $pdu_socket
+quit
+EOF
+    if ! wait_for_power_down "${bmc_address}" "${bmc_user}" "${bmc_pass}"; then
+      echo "The bootstrap node PDU reset was not successful... it will not be released to retry in the deprovisioning steps..."
+      return 0
+    fi
+  fi
+
   echo "Releasing the bootstrap node..."
   timeout -s 9 10m ssh "${SSHOPTS[@]}" "root@${AUX_HOST}" bash -s -- \
         "${CLUSTER_NAME}" << 'EOF'
@@ -210,7 +233,10 @@ echo "Installing from initial release ${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE
 oc adm release extract -a "$PULL_SECRET_PATH" "${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE}" \
    --command=openshift-install --to=/tmp
 
-if [ "${DISCONNECTED}" == "true" ]; then
+# We change the payload image to the one in the mirror registry only when the mirroring happens.
+# For example, in the case of clusters using cluster-wide proxy, the mirroring is not required.
+# To avoid additional params in the workflows definition, we check the existence of the ICSP patch file.
+if [ "${DISCONNECTED}" == "true" ] && [ -f "${SHARED_DIR}/install-config-icsp.yaml.patch" ]; then
   OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE="$(<"${CLUSTER_PROFILE_DIR}/mirror_registry_url")/${OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE#*/}"
 fi
 

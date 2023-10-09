@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build05
     context: ci/prow/cinder-operator-build-deploy
     decorate: true
     labels:
@@ -41,6 +41,9 @@ presubmits:
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -55,6 +58,9 @@ presubmits:
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -63,19 +69,19 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )cinder-operator-build-deploy,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build05
     context: ci/prow/cinder-operator-build-deploy-kuttl
     decorate: true
     labels:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-cinder-operator-main-cinder-operator-build-deploy-kuttl
-    optional: true
     rerun_command: /test cinder-operator-build-deploy-kuttl
+    skip_if_only_changed: ^(renovate.json|.*\.md|tests/functional/.*|OWNERS.*|LICENSE.*)$
     spec:
       containers:
       - args:
@@ -103,6 +109,9 @@ presubmits:
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -117,6 +126,9 @@ presubmits:
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -125,11 +137,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )cinder-operator-build-deploy-kuttl,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build05
     context: ci/prow/cinder-operator-build-deploy-tempest
     decorate: true
     labels:
@@ -138,6 +150,7 @@ presubmits:
     name: pull-ci-openstack-k8s-operators-cinder-operator-main-cinder-operator-build-deploy-tempest
     optional: true
     rerun_command: /test cinder-operator-build-deploy-tempest
+    skip_if_only_changed: ^(renovate.json|.*\.md|tests/.*|OWNERS.*|LICENSE.*)$
     spec:
       containers:
       - args:
@@ -165,6 +178,9 @@ presubmits:
         - mountPath: /secrets/hive-hive-credentials
           name: hive-hive-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -179,6 +195,9 @@ presubmits:
       - name: hive-hive-credentials
         secret:
           secretName: hive-hive-credentials
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -187,11 +206,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )cinder-operator-build-deploy-tempest,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build05
     context: ci/prow/images
     decorate: true
     labels:
@@ -199,6 +218,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-cinder-operator-main-images
     rerun_command: /test images
+    skip_if_only_changed: ^renovate.json|^README.md
     spec:
       containers:
       - args:
@@ -218,6 +238,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -226,6 +249,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -234,11 +260,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )images,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build05
     context: ci/prow/precommit-check
     decorate: true
     labels:
@@ -246,6 +272,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-cinder-operator-main-precommit-check
     rerun_command: /test precommit-check
+    skip_if_only_changed: ^renovate.json|^README.md
     spec:
       containers:
       - args:
@@ -265,6 +292,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -273,6 +303,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -281,11 +314,11 @@ presubmits:
           secretName: result-aggregator
     trigger: (?m)^/test( | .* )precommit-check,?($|\s.*)
   - agent: kubernetes
-    always_run: true
+    always_run: false
     branches:
     - ^main$
     - ^main-
-    cluster: build02
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     labels:
@@ -293,6 +326,7 @@ presubmits:
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openstack-k8s-operators-cinder-operator-main-unit
     rerun_command: /test unit
+    skip_if_only_changed: ^(renovate.json|.*\.md|tests/kuttl/.*|OWNERS.*|LICENSE.*)$
     spec:
       containers:
       - args:
@@ -312,6 +346,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -320,6 +357,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

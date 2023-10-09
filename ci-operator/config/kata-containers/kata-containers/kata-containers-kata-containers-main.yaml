@@ -1,12 +1,3 @@
-base_images:
-  base:
-    name: "4.10"
-    namespace: ocp
-    tag: base
-  qemu-builder:
-    name: ubuntu
-    namespace: ci
-    tag: "20.04"
 binary_build_commands: |
   # The CentOS 8 build root does not have golang package installed so that we
   # use the golang installed by Kata Containers setup script. Here it is
@@ -14,56 +5,25 @@ binary_build_commands: |
   export GOPATH=/go
   export PATH="${GOPATH}/bin:/usr/local/go/bin/:$PATH"
   source ci/lib.sh
-  destdir="$(pwd)/_out/build_install"
-  mkdir -p "$destdir"
   clone_tests_repo
-  pushd "${tests_repo_dir}"
-  # This builds Kata Containers and install on $destdir.
-  # Only QEMU is not built.
-  .ci/openshift-ci/build_install.sh "$destdir"
-
-  # This generates the Dockerfile used later in the pipeline to build QEMU.
-  .ci/openshift-ci/qemu-build-pre.sh
-  popd
 build_root:
   project_image:
     dockerfile_path: ci/openshift-ci/images/Dockerfile.buildroot
 images:
-- context_dir: tools/packaging
-  dockerfile_path: ./static-build/qemu/Dockerfile.ci
-  from: qemu-builder
-  inputs:
-    bin:
-      paths:
-      - destination_dir: ./static-build/qemu
-        source_path: /go/src/github.com/kata-containers/kata-containers/tools/packaging/static-build/qemu/Dockerfile.ci
-  to: kata-qemu
-- context_dir: .
-  dockerfile_path: ./Dockerfile.installer
-  from: base
-  inputs:
-    bin:
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/kata-containers/kata-containers/_out
-      - destination_dir: .
-        source_path: /go/src/github.com/kata-containers/tests/.ci/openshift-ci/images/Dockerfile.installer
-      - destination_dir: .
-        source_path: /go/src/github.com/kata-containers/tests/.ci/openshift-ci/images/entrypoint.sh
-    kata-qemu:
-      paths:
-      - destination_dir: .
-        source_path: /tmp/qemu-static/kata-static-qemu.tar.gz
-  to: kata-installer
+- dockerfile_literal: |
+    FROM bin
+    RUN dnf install -y --nobest gettext
+  from: bin
+  to: with-deps
 releases:
   initial:
     integration:
-      name: "4.10"
+      name: "4.13"
       namespace: ocp
   latest:
     integration:
       include_built_images: true
-      name: "4.10"
+      name: "4.13"
       namespace: ocp
 resources:
   '*':
@@ -78,24 +38,26 @@ tests:
     allow_skip_on_success: true
     cluster_profile: azure4
     env:
-      TEST_SKIPS: 'EmptyDir volumes when FSGroup is specified \[LinuxOnly\] \[NodeFeature:FSGroup\]
-        nonexistent volume subPath should have the correct mode and owner using FSGroup\|
-        In-tree Volumes \[Driver: local\]\[LocalVolumeType: block\] \[Testpattern:
-        Pre-provisioned PV (ext4)\] volumes should store data\| In-tree Volumes \[Driver:
-        azure-disk\] \[Testpattern: Dynamic PV (ext4)\] volumes should store data\|
-        In-tree Volumes \[Driver: azure-disk\] \[Testpattern: Pre-provisioned PV (ext4)\]
-        volumes should store data\| In-tree Volumes \[Driver: azure-disk\] \[Testpattern:
-        Inline-volume (ext4)\] volumes should store data\|\[sig-node\] Security Context
-        should support seccomp runtime/default\|\[sig-node\] Variable Expansion should
-        allow substituting values in a volume subpath\|\[sig-node\] Container Runtime
-        blackbox test on terminated container should report termination message\|\[k8s.io\]
-        Probing container should be restarted with a docker exec liveness probe with
-        timeout\|\[sig-autoscaling\] \[Feature:HPA\] Horizontal pod autoscaling (scale
-        resource: CPU) ReplicationController light Should scale from 1 pod to 2 pods\|\[sig-node\]
-        Probing container should be restarted with a failing exec liveness probe that
-        took longer than the timeout\|\[sig-node\] Probing container should be restarted
-        with an exec liveness probe with timeout \[MinimumKubeletVersion:1.20\]\|docker
-        strategy builds\|Services should create endpoints for unready pods\|\[sig-api-machinery\]\|\[sig-apps\]\|\[sig-arch\]\|\[sig-auth\]\|\[sig-autoscaling\]\|\[sig-builds\]\|\[sig-cli\]\|\[sig-cluster-lifecycle\]\|\[sig-coreos\]\|\[sig-devex\]\|\[sig-etcd\]\|\[sig-imageregistry\]\|\[sig-installer\]\|\[sig-instrumentation\]\|\[sig-network\]\|\[sig-network-edge\]\|\[sig-operator\]\|\[sig-scheduling\]\|\[sig-storage\]'
+      TEST_ARGS: ' --max-parallel-tests 5 '
+      TEST_SKIPS: \[sig-api-machinery\]\|\[sig-apps\]\|\[sig-arch\]\|\[sig-auth\]\|\[sig-autoscaling\]\|\[sig-builds\]\|\[sig-ci\]\|\[sig-cli\]\|\[sig-cloud-provider\]\|\[sig-cluster-lifecycle\]\|\[sig-coreos\]\|\[sig-devex\]\|\[sig-etcd\]\|\[sig-imageregistry\]\|\[sig-installer\]\|\[sig-instrumentation\]\|\[sig-kubevirt\]\|\[sig-network-edge\]\|\[sig-operator\]\|\[sig-scheduling\]\|\[sig-storage\]\|\[sig-node\]
+        Security Context should support seccomp runtime/default\|\[sig-node\] Variable
+        Expansion should allow substituting values in a volume subpath\|\[sig-node\]
+        Container Runtime blackbox test on terminated container should report termination
+        message\|\[k8s.io\] Probing container should be restarted with a docker exec
+        liveness probe with timeout\|\[sig-node\] Probing container should be restarted
+        with a failing exec liveness probe that took longer than the timeout\|\[sig-node\]
+        Probing container should be restarted with an exec liveness probe with timeout
+        \[MinimumKubeletVersion:1.20\]\|\[sig-node\] Pods Extended Pod Container Status
+        should never report success for a pending container\|\[sig-node\] Probing
+        container should \*not\* be restarted with a GRPC liveness probe\|\[sig-node\]
+        Pods Extended Pod Container lifecycle evicted pods should be terminal\|\[sig-node\]
+        PodOSRejection \[NodeConformance\] Kubelet should reject pod when the node
+        OS doesn't match pod's OS\|\[sig-node\] Probing container should be restarted
+        with a GRPC liveness probe\|\[sig-network\].*for evicted pods\|\[sig-network\].*HAProxy\|\[sig-network\].*bond\|\[sig-network\].*all
+        sysctl on whitelist\|\[sig-network\].*sysctls should not affect\|\[sig-network\]
+        pods should successfully create sandboxes by adding pod to network\|\[sig-network\]
+        HostPort validates that there is no conflict between pods with same hostPort
+        but different hostIP and protocol.*
     pre:
     - chain: ipi-azure-pre
     - as: kata-containers-e2e-pre
@@ -109,23 +71,22 @@ tests:
             ln -s oc kubectl
         fi
         popd
-
         # TODO: The ipi-azure test step does not export AZURE_AUTH_LOCATION
         # which causes openshift-tests to fail.
         export AZURE_AUTH_LOCATION=${SHARED_DIR}/metadata.json
 
         KATA_WORKDIR=/go/src/github.com/kata-containers/tests
         cd $KATA_WORKDIR
+
+        # Set environment variables for the ci test.sh script
+        export KATA_RUNTIME="kata-qemu"
         # Install Kata Containers and run a smoke test.
         .ci/openshift-ci/test.sh
 
         # Deploy the kata-webhook so that the tests ran on next step of the
         # workflow will use the kata runtime.
         .ci/openshift-ci/cluster/deploy_webhook.sh
-      dependencies:
-      - env: KATA_INSTALLER_IMG
-        name: kata-installer
-      from: pipeline:bin
+      from: with-deps
       resources:
         requests:
           cpu: 100m

@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 PARALLEL_CUCUMBER_OPTIONS='--verbose-process-command --first-is-1 --type cucumber --serialize-stdout --combine-stderr --prefix-output-with-test-env-number'
+FORCE_SKIP_TAGS="customer security"
 
 function show_time_used() {
     local time_start test_type time_used
@@ -33,11 +34,11 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
-if [ -z "${E2E_SKIP_TAGS}" ] ; then
-    export E2E_SKIP_TAGS="not @customer and not @security"
-else
-    export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not @customer and not @security"
-fi
+for tag in ${FORCE_SKIP_TAGS} ; do
+    if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
+        export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not $tag"
+    fi
+done
 echo "E2E_RUN_TAGS is '${E2E_RUN_TAGS}'"
 echo "E2E_SKIP_TAGS is '${E2E_SKIP_TAGS}'"
 
@@ -65,9 +66,9 @@ export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/serial"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
 timestamp_start="$(date +%s)"
 set -x
-cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and (@console or @serial)" -p junit || true
+cucumber --tags "${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and ((@console and @smoke) or @serial)" -p junit || true
 set +x
-show_time_used "$timestamp_start" 'console or serial'
+show_time_used "$timestamp_start" 'smoke console or serial'
 
 # summarize test results
 echo "Summarizing test result..."
@@ -80,5 +81,5 @@ done
 if [ $((failures)) == 0 ]; then
     echo "All tests have passed"
 else
-    echo "${failures} failures in cucushift-e2e" | tee -a "${SHARED_DIR}/cucushift-e2e-failures"
+    echo "${failures} failures in cucushift-e2e" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report-cucushift-failures"
 fi

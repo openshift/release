@@ -1,0 +1,94 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
+binary_build_commands: LD_FLAGS="-X github.com/jaegertracing/jaeger-operator/pkg/version".version=1.49.0
+  -X github.com/jaegertracing/jaeger-operator/pkg/version".buildDate=2023-09-29T02:01:34Z
+  -X github.com/jaegertracing/jaeger-operator/pkg/version".defaultJaeger="1.49.0"
+  make build
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- build_args:
+  - name: VERSION
+    value: 1.49.0
+  - name: JAEGER_VERSION
+    value: 1.49.0
+  - name: VERSION_DATE
+    value: "2023-09-29T02:01:34Z"
+  - name: VERSION_PKG
+    value: github.com/jaegertracing/jaeger-operator/pkg/version
+  context_dir: .
+  dockerfile_path: Dockerfile
+  to: jaeger-operator
+- context_dir: .
+  dockerfile_path: Dockerfile.asserts
+  to: jaeger-tests-asserts-e2e
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: jaeger-tests-runner
+operator:
+  bundles:
+  - as: jaeger-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: quay.io/jaegertracing/jaeger-operator:1.49.0
+    with: pipeline:jaeger-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: jaeger-e2e-tests
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 3h0m0s
+    version: "4.13"
+  steps:
+    env:
+      EO_SUB_CHANNEL: stable-5.7
+      EO_SUB_SOURCE: redhat-operators
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace jaeger-operator
+        operator-sdk run bundle -n jaeger-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n jaeger-operator deployment jaeger-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: jaeger-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 400Mi
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: distributed-tracing-install-tempo-product
+    - ref: distributed-tracing-tests-jaeger
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: jaegertracing
+  repo: jaeger-operator

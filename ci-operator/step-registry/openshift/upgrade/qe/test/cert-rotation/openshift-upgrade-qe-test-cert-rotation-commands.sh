@@ -1,6 +1,16 @@
 #!/bin/bash
 set -xeuo pipefail
 
+function download_oc(){
+    local tmp_bin_path='/tmp/oc-bin/'
+
+    mkdir -p "$tmp_bin_path"
+    curl -sSL --retry 3 --retry-delay 5 https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest-4.10/openshift-client-linux.tar.gz | tar xvzf - -C "${tmp_bin_path}" oc
+    export PATH=${tmp_bin_path}:$PATH
+    which oc
+    oc version --client
+}
+
 function extract_oc(){
     mkdir -p /tmp/client
     export OC_DIR="/tmp/client"
@@ -23,9 +33,22 @@ function extract_oc(){
 }
 
 # This step is executed after upgrade to target, oc client of target release should use as many new versions as possible, make sure new feature cert-rotation of oc amd is supported
-extract_oc
+ocp_version=$(oc get -o jsonpath='{.status.desired.version}' clusterversion version)
+major_version=$(echo ${ocp_version} | cut -d '.' -f1)
+minor_version=$(echo ${ocp_version} | cut -d '.' -f2)
+if [[ -n "$minor_version" && "$minor_version" -lt 10 ]] ; then
+    echo "Y version is less than 10, using oc 4.10 directly"
+    download_oc
+else
+    extract_oc
+fi
 
 start_date=$(date +"%Y-%m-%dT%H:%M:%S%:z")
+
+if test -f "${SHARED_DIR}/proxy-conf.sh" ;then
+    # shellcheck disable=SC1091
+    source "${SHARED_DIR}/proxy-conf.sh"
+fi
 
 # ensure we're stable to start
 oc adm wait-for-stable-cluster --minimum-stable-period=5s
@@ -85,8 +108,13 @@ then
     echo "new secret router-ca is not created or old secret router-ca is not deleted" && exit 1
 fi
 
-# Let's start with the MCO cert rotation
-oc adm ocp-certificates regenerate-machine-config-server-serving-cert
+# WARNING: On some platforms this step may prevent new nodes from joining the cluster.
+workerUserData="$(oc -n openshift-machine-api get secret/worker-user-data -o=jsonpath='{.data.userData}' | base64 -d)" || true
+workerUserDataManaged="$(oc -n openshift-machine-api get secret/worker-user-data-managed -o=jsonpath='{.data.userData}' | base64 -d)" || true
+if ( echo "$workerUserData" "$workerUserDataManaged" | grep 'api-int' ) ; then
+  # Let's start with the MCO cert rotation
+  oc adm ocp-certificates regenerate-machine-config-server-serving-cert
+fi
 
 # A few preparatory rotations, these give us 30 days to complete the rotation after generating new roots of trust
 oc adm ocp-certificates regenerate-leaf -n openshift-config-managed secrets kube-controller-manager-client-cert-key kube-scheduler-client-cert-key
@@ -104,10 +132,18 @@ oc adm wait-for-stable-cluster
 
 # generate new client certs for kcm and ks
 oc adm ocp-certificates regenerate-leaf -n openshift-config-managed secrets kube-controller-manager-client-cert-key kube-scheduler-client-cert-key
+# certs change may cause some worker nodes to become not ready, waiting again will reduce the error rate of the following step
+oc adm wait-for-stable-cluster
 
 # distribute trust across all known clients
 # update our local CA bundle so that when new serving certs are used for kube-apiserver we will trust them
-oc config refresh-ca-bundle
+# If hits 'error: failed to update CA bundle: using system CA bundle to verify server, not allowing refresh to overwrite', retry
+if oc config refresh-ca-bundle ;then
+    :
+else
+    sleep 3
+    oc config refresh-ca-bundle
+fi
 # produce a new kubelet bootstrap kubeconfig (used to create the first CSR and establishes ca bundle)
 oc config new-kubelet-bootstrap-kubeconfig > /tmp/bootstrap.kubeconfig
 oc whoami --kubeconfig=/tmp/bootstrap.kubeconfig --server="$(oc get infrastructure/cluster -ojsonpath='{ .status.apiServerURL }')"
@@ -126,7 +162,17 @@ oc adm wait-for-stable-cluster
 
 # create new admin.kubeconfig
 oc config new-admin-kubeconfig > "${SHARED_DIR}/admin.kubeconfig"
-oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
+# If hits the 'error: You must be logged in to the server (Unauthorized)', retry
+# Detail see https://issues.redhat.com/browse/OCPBUGS-15793
+if oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
+    :
+elif sleep 10;oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami ;then
+    :
+else 
+    # 4.6 - 4.9 need to wait for more time
+    [[ ${major_version} -eq 4 && ${minor_version} -lt 10 ]] && sleep 60 || sleep 10
+    oc --kubeconfig="${SHARED_DIR}/admin.kubeconfig" whoami
+fi
 
 # revoke old trust for the signers we have regenerated
 oc adm ocp-certificates remove-old-trust -n openshift-kube-apiserver-operator configmaps kube-apiserver-to-kubelet-client-ca kube-control-plane-signer-ca loadbalancer-serving-ca localhost-serving-ca service-network-serving-ca  --created-before=${start_date}

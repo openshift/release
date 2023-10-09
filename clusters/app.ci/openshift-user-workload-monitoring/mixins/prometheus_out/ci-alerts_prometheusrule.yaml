@@ -431,6 +431,13 @@ spec:
       for: 10m
       labels:
         severity: critical
+    - alert: ImagePullBackOff
+      annotations:
+        message: Many pods have been failing on pulling images. Please check the relevant events on the cluster.
+      expr: sum(sum_over_time(kube_pod_container_status_waiting_reason{reason="ImagePullBackOff"}[5m])) > 30
+      for: 10m
+      labels:
+        severity: critical
     - alert: prow-job-backlog-growing
       annotations:
         message: The number of the triggered Prow jobs that have not yet been running has been increasing for the past hour.

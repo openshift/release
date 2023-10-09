@@ -84,9 +84,46 @@ objects:
           component: deck
       spec:
         serviceAccountName: deck
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --wait=30
+          - --root=/tmp/git-sync
+          - --max-sync-failures=3
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20230628-f13bc80c8a
+          image: gcr.io/k8s-prow/deck:v20230927-4613add0a1
           args:
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
@@ -98,9 +135,9 @@ objects:
           - --github-endpoint=https://api.github.com
           - --github-graphql-endpoint=http://ghproxy/graphql
           - --tide-url=http://tide/
-          - --hook-url=http://hook:8888/plugin-help
+          - --hook-url=http://hook-apps:8888/plugin-help
           - --oauth-url=/github-login
-          - --job-config-path=/etc/job-config
+          - --job-config-path=/var/repo/release/ci-operator/jobs
           - --spyglass=true
           - --projected-token-file=/var/sa-token/token
           - --rerun-creates-job=true
@@ -155,9 +192,8 @@ objects:
           - name: cookie-secret
             mountPath: /etc/cookie
             readOnly: true
-          - name: job-config
-            mountPath: /etc/job-config
-            readOnly: true
+          - name: release
+            mountPath: /var/repo
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
@@ -189,61 +225,8 @@ objects:
         - name: cookie-secret
           secret:
             secretName: cookie
-        - name: job-config
-          projected:
-            sources:
-            - configMap:
-                name: job-config-misc
-            - configMap:
-                name: job-config-master-periodics
-            - configMap:
-                name: job-config-main-periodics
-            - configMap:
-                name: job-config-master-postsubmits
-            - configMap:
-                name: job-config-main-postsubmits
-            - configMap:
-                name: job-config-master-presubmits
-            - configMap:
-                name: job-config-main-presubmits
-            - configMap:
-                name: job-config-1.x
-            - configMap:
-                name: job-config-2.x
-            - configMap:
-                name: job-config-3.x
-            - configMap:
-                name: job-config-4.0
-            - configMap:
-                name: job-config-4.1
-            - configMap:
-                name: job-config-4.2
-            - configMap:
-                name: job-config-4.3
-            - configMap:
-                name: job-config-4.4
-            - configMap:
-                name: job-config-4.5
-            - configMap:
-                name: job-config-4.6
-            - configMap:
-                name: job-config-4.7
-            - configMap:
-                name: job-config-4.8
-            - configMap:
-                name: job-config-4.9
-            - configMap:
-                name: job-config-4.10
-            - configMap:
-                name: job-config-4.11
-            - configMap:
-                name: job-config-4.12
-            - configMap:
-                name: job-config-4.13
-            - configMap:
-                name: job-config-4.14
-            - configMap:
-                name: job-config-4.15
+        - name: release
+          emptyDir: {}
         - name: build-farm-credentials
           secret:
             secretName: deck
@@ -306,7 +289,44 @@ objects:
           component: deck-internal
       spec:
         serviceAccountName: deck
+        initContainers:
+        - name: git-sync-init
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --root=/tmp/git-sync
+          - --one-time=true
+          - --depth=1
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
         containers:
+        - name: git-sync
+          command:
+          - /git-sync
+          args:
+          - --repo=https://github.com/openshift/release.git
+          - --branch=master
+          - --wait=30
+          - --root=/tmp/git-sync
+          - --max-sync-failures=3
+          env:
+          - name: GIT_SYNC_DEST
+            value: release
+          image: registry.k8s.io/git-sync/git-sync:v3.6.2
+          volumeMounts:
+          - name: release
+            mountPath: /tmp/git-sync
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "0.5"
         - name: oauth-proxy
           image: quay.io/openshift/origin-oauth-proxy:4.9
           imagePullPolicy: IfNotPresent
@@ -335,7 +355,7 @@ objects:
           - mountPath: /etc/proxy/secrets
             name: session-secret
         - name: deck
-          image: gcr.io/k8s-prow/deck:v20230628-f13bc80c8a
+          image: gcr.io/k8s-prow/deck:v20230927-4613add0a1
           args:
           - --github-oauth-config-file=/etc/oauth/config.json
           - --github-app-id=$(GITHUB_APP_ID)
@@ -346,9 +366,9 @@ objects:
           - --oauth-url=/github-login
           - --config-path=/etc/config/config.yaml
           - --supplemental-prow-config-dir=/etc/config
-          - --job-config-path=/etc/job-config
+          - --job-config-path=/var/repo/release/ci-operator/jobs
           - --tide-url=http://tide/
-          - --hook-url=http://hook:8888/plugin-help
+          - --hook-url=http://hook-apps:8888/plugin-help
           - --hidden-only=true
           - --spyglass=true
           - --cookie-secret=/etc/proxy/secrets/session_secret
@@ -406,9 +426,8 @@ objects:
           - name: oauth-config
             mountPath: /etc/oauth
             readOnly: true
-          - name: job-config
-            mountPath: /etc/job-config
-            readOnly: true
+          - name: release
+            mountPath: /var/repo
           - mountPath: /etc/build-farm-credentials
             name: build-farm-credentials
             readOnly: true
@@ -446,59 +465,8 @@ objects:
         - name: deck-internal-tls
           secret:
             secretName: deck-internal-tls
-        - name: job-config
-          projected:
-            sources:
-            - configMap:
-                name: job-config-misc
-            - configMap:
-                name: job-config-master-periodics
-            - configMap:
-                name: job-config-main-periodics
-            - configMap:
-                name: job-config-master-postsubmits
-            - configMap:
-                name: job-config-main-postsubmits
-            - configMap:
-                name: job-config-master-presubmits
-            - configMap:
-                name: job-config-main-presubmits
-            - configMap:
-                name: job-config-1.x
-            - configMap:
-                name: job-config-2.x
-            - configMap:
-                name: job-config-3.x
-            - configMap:
-                name: job-config-4.1
-            - configMap:
-                name: job-config-4.2
-            - configMap:
-                name: job-config-4.3
-            - configMap:
-                name: job-config-4.4
-            - configMap:
-                name: job-config-4.5
-            - configMap:
-                name: job-config-4.6
-            - configMap:
-                name: job-config-4.7
-            - configMap:
-                name: job-config-4.8
-            - configMap:
-                name: job-config-4.9
-            - configMap:
-                name: job-config-4.10
-            - configMap:
-                name: job-config-4.11
-            - configMap:
-                name: job-config-4.12
-            - configMap:
-                name: job-config-4.13
-            - configMap:
-                name: job-config-4.14
-            - configMap:
-                name: job-config-4.15
+        - name: release
+          emptyDir: {}
         - name: build-farm-credentials
           secret:
             secretName: deck

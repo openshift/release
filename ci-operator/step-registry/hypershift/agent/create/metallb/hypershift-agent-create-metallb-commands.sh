@@ -42,7 +42,7 @@ spec:
   channel: stable
   installPlanApproval: Automatic
   name: metallb-operator
-  source: redhat-operators
+  source: "${METALLB_OPERATOR_SUB_SOURCE}"
   sourceNamespace: openshift-marketplace
 EOF
 
@@ -137,3 +137,18 @@ until \
     oc get clusterversion 2>/dev/null || true
     sleep 1s
 done
+
+export KUBECONFIG=${SHARED_DIR}/kubeconfig
+HOSTED_CLUSTER_NS=$(oc get hostedcluster -A -ojsonpath='{.items[0].metadata.namespace}')
+if [[ $HOSTED_CLUSTER_NS == "local-cluster" ]]; then
+  echo "Waiting for ManagedCluster to be ready"
+  export KUBECONFIG=${SHARED_DIR}/kubeconfig
+  CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"
+  until \
+  oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterJoined' >/dev/null && \
+  oc wait managedcluster ${CLUSTER_NAME} --for='condition=ManagedClusterConditionAvailable' >/dev/null && \
+  oc wait managedcluster ${CLUSTER_NAME} --for='condition=HubAcceptedManagedCluster' >/dev/null;  do
+  echo "$(date --rfc-3339=seconds) ManagedCluster not yet ready"
+  sleep 10s
+  done
+fi

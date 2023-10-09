@@ -1,9 +1,13 @@
 base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
   operator-sdk:
     name: "4.14"
     namespace: origin
     tag: operator-sdk
-binary_build_commands: go install ./
+binary_build_commands: make build
 build_root:
   image_stream_tag:
     name: builder
@@ -23,16 +27,19 @@ operator:
     context_dir: ./bundle/openshift
     dockerfile_path: bundle.Dockerfile
   substitutions:
-  - pullspec: ghcr.io/grafana/tempo-operator/tempo-operator:v0.2.0
+  - pullspec: ghcr.io/grafana/tempo-operator/tempo-operator:v0.4.0
     with: pipeline:tempo-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
 resources:
   '*':
-    limits:
-      memory: 4Gi
     requests:
       cpu: 100m
       memory: 200Mi
-test_binary_build_commands: go build ./main.go
 tests:
 - as: test
   steps:
@@ -44,103 +51,39 @@ tests:
         requests:
           cpu: 100m
           memory: 200Mi
-- as: e2e-in-cluster-build
+- as: tempo-e2e-tests
   cluster_claim:
     architecture: amd64
     cloud: aws
     owner: openshift-ci
     product: ocp
-    timeout: 1h0m0s
+    timeout: 2h0m0s
     version: "4.13"
   steps:
+    env:
+      EO_SUB_CHANNEL: stable-5.7
+      EO_SUB_SOURCE: redhat-operators
+      SKIP_TESTS: tests/e2e-openshift/red-metrics tests/e2e/custom-ca
     test:
     - as: install
       cli: latest
       commands: |
-        oc create namespace openshift-operators-tempo
-        operator-sdk run bundle -n openshift-operators-tempo "$OO_BUNDLE" # install operator
-        oc wait --for condition=Available -n openshift-operators-tempo deployment tempo-operator-controller # wait until operator is ready
+        oc create namespace tempo-operator
+        operator-sdk run bundle -n tempo-operator "$OO_BUNDLE"
+        oc wait --for condition=Available -n tempo-operator deployment tempo-operator-controller
       dependencies:
       - env: OO_BUNDLE
         name: tempo-bundle
       from: operator-sdk
       resources:
         requests:
-          cpu: 500m
-          memory: 500Mi
-    - as: run-test
-      cli: latest
-      commands: |
-        cat <<EOF | oc apply -f -
-        apiVersion: operators.coreos.com/v1alpha1
-        kind: Subscription
-        metadata:
-          name: opentelemetry-product
-          namespace: openshift-operators
-        spec:
-          channel: stable
-          installPlanApproval: Automatic
-          name: opentelemetry-product
-          source: redhat-operators
-          sourceNamespace: openshift-marketplace
-        EOF
-
-        # can't wait before the resource exists. Need to sleep a bit before start watching
-        sleep 60
-
-        RETRIES=30
-        CSV=
-        for i in $(seq "${RETRIES}"); do
-          if [[ -z "${CSV}" ]]; then
-            CSV=$(oc get subscription -n openshift-operators opentelemetry-product -o jsonpath='{.status.installedCSV}')
-          fi
-
-          if [[ -z "${CSV}" ]]; then
-            echo "Try ${i}/${RETRIES}: can't get the opentelemetry-product yet. Checking again in 30 seconds"
-            sleep 30
-          fi
-
-          if [[ $(oc get csv -n openshift-operators ${CSV} -o jsonpath='{.status.phase}') == "Succeeded" ]]; then
-            echo "opentelemetry-product is deployed"
-            break
-          else
-            echo "Try ${i}/${RETRIES}: opentelemetry-product is not deployed yet. Checking again in 30 seconds"
-            sleep 30
-          fi
-        done
-
-        if [[ $(oc get csv -n openshift-operators "${CSV}" -o jsonpath='{.status.phase}') != "Succeeded" ]]; then
-          echo "Error: Failed to deploy opentelemetry-product"
-          echo "csv ${CSV} YAML"
-          oc get csv "${CSV}" -n openshift-operators -o yaml
-          echo
-          echo "csv ${CSV} Describe"
-          oc describe csv "${CSV}" -n openshift-operators
-          exit 1
-        fi
-
-        #Add manifest directory for kuttl
-        mkdir /tmp/kuttl-manifests && cp /tmp/tempo-operator/minio.yaml /tmp/kuttl-manifests
-
-        #Copy the tempo-operator repo files to a writable directory by kuttl
-        cp -R /tmp/tempo-operator /tmp/tempo-tests && cd /tmp/tempo-tests
-
-        # Execute Tempo e2e tests
-        kuttl test \
-          --report=xml \
-          --artifacts-dir="$ARTIFACT_DIR" \
-          --parallel="5" \
-          --report-name="junit_tempo_test_results.xml" \
-          --start-kind=false \
-          --timeout="150" \
-          --manifest-dir="/tmp/kuttl-manifests" \
-          tests/e2e \
-          tests/e2e-openshift
-      from: tempo-tests-runner
-      resources:
-        requests:
-          cpu: 500m
-          memory: 500Mi
+          cpu: 1000m
+          memory: 400Mi
+    - ref: operatorhub-subscribe-elasticsearch-operator
+    - ref: operatorhub-subscribe-amq-streams
+    - ref: distributed-tracing-install-jaeger-product
+    - ref: distributed-tracing-install-opentelemetry-product
+    - ref: distributed-tracing-tests-tempo
     workflow: generic-claim
 zz_generated_metadata:
   branch: main
