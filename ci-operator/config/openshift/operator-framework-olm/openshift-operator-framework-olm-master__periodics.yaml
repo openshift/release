@@ -1,0 +1,84 @@
+base_images:
+  ci-image:
+    name: ci-image
+    namespace: operator-lifecycle-manager
+    tag: latest
+  operator-lifecycle-manager:
+    name: "4.15"
+    namespace: ocp
+    tag: operator-lifecycle-manager
+releases:
+  initial:
+    integration:
+      name: "4.15"
+      namespace: ocp
+  latest:
+    integration:
+      name: "4.15"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: e2e-gcp-ovn
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    workflow: openshift-e2e-gcp
+- as: e2e-gcp-olm
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: |
+        export JUNIT_DIRECTORY=${ARTIFACT_DIR}
+        # Skip the flake tests, which are ran in a separate job
+        export SKIP='\[FLAKE\]'
+        # Skip an upstream test that requires OLM to be built with an e2e-only go build tag
+        export SKIP="$SKIP|an InstallPlan step contains a deprecated resource version"
+        make e2e/olm
+      from: ci-image
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-olm-flaky
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: JUNIT_DIRECTORY=${ARTIFACT_DIR} make e2e/olm TEST='\[FLAKE\]'
+      from: ci-image
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-gcp-console-olm
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: gcp
+    test:
+    - as: test
+      cli: latest
+      commands: ./test-prow-e2e.sh olmFull
+      from: stable:console-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-gcp
+- as: e2e-upgrade
+  cron: 0 0 * * *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-upgrade-aws
+zz_generated_metadata:
+  branch: master
+  org: openshift
+  repo: operator-framework-olm
+  variant: periodics

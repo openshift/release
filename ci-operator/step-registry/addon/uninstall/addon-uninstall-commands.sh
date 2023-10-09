@@ -7,7 +7,7 @@ set -o verbose
 
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
-RUN_COMMAND="poetry run python app/cli.py addons --cluster ${CLUSTER_NAME} --token ${OCM_TOKEN} --api-host ${API_HOST} "
+RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py addons --cluster ${CLUSTER_NAME} --token ${OCM_TOKEN} --api-host ${API_HOST} "
 export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export OCM_TOKEN
 
@@ -21,7 +21,7 @@ done
 
 RUN_COMMAND="${RUN_COMMAND} ${ADDONS_CMD}"
 
-if [ "${PARALLEL}" = "true" ]; then
+if [ "${ADDONS_OPERATORS_RUN_IN_PARALLEL}" = "true" ]; then
     RUN_COMMAND+=" --parallel"
 fi
 

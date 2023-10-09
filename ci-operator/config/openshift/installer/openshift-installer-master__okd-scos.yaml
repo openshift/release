@@ -1,16 +1,28 @@
 base_images:
   base:
-    name: "4.14"
+    name: "4.15"
     namespace: origin
     tag: base
   dev-scripts:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
+  ocp_4.10_cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
+  ocp_4.14_cli:
+    name: "4.15"
+    namespace: ocp
+    tag: cli
   ocp_builder_rhel-8-golang-1.20-openshift-4.14:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
@@ -23,6 +35,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: installer
 - build_args:
   - name: TAGS
@@ -33,7 +48,36 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: installer-artifacts
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/installer/Dockerfile.upi.ci.rhel8
+  from: base
+  inputs:
+    ocp_4.10_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.10:cli
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: upi-installer
+- build_args:
+  - name: TAGS
+    value: scos
+  dockerfile_path: images/openstack/Dockerfile.ci
+  from: base
+  inputs:
+    ocp_4.14_cli:
+      as:
+      - registry.ci.openshift.org/ocp/4.14:cli
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: openstack-installer
 - build_args:
   - name: TAGS
     value: baremetal libvirt scos
@@ -43,19 +87,22 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: baremetal-installer
 promotion:
-  name: scos-4.14
+  name: scos-4.15
   namespace: origin
 releases:
   initial:
     integration:
-      name: scos-4.14
+      name: scos-4.15
       namespace: origin
   latest:
     integration:
       include_built_images: true
-      name: scos-4.14
+      name: scos-4.15
       namespace: origin
 resources:
   '*':

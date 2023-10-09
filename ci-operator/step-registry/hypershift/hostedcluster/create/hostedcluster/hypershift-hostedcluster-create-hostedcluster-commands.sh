@@ -60,6 +60,7 @@ echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
   --aws-creds=${AWS_GUEST_INFRA_CREDENTIALS_FILE} \
   --release-image ${RELEASE_IMAGE} \
   --control-plane-operator-image=${CONTROLPLANE_OPERATOR_IMAGE:-} \
+  --node-selector "hypershift.openshift.io/control-plane=true" \
   --additional-tags="expirationDate=$(date -d '4 hours' --iso=minutes --utc)" \
   --annotations "prow.k8s.io/job=${JOB_NAME}" \
   --annotations "prow.k8s.io/build-id=${BUILD_ID}" \
@@ -93,9 +94,15 @@ oc wait --timeout=120m --for=condition=Available --namespace=clusters hostedclus
   exit 1
 }
 echo "Cluster became available, creating kubeconfig"
-bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} >${SHARED_DIR}/nested_kubeconfig || {
+KUBECONFIG_NAME=""
+while [[ -z "${KUBECONFIG_NAME}" ]]; do
+  echo "Still waiting for kubeconfig to be available"
+  sleep 10
+  KUBECONFIG_NAME=$(oc get hc/${CLUSTER_NAME} -n clusters -o jsonpath='{ .status.kubeconfig.name }')
+done
+
+bin/hypershift create kubeconfig --namespace=clusters --name=${CLUSTER_NAME} > ${SHARED_DIR}/nested_kubeconfig || {
   echo "Failed to create kubeconfig"
-  exit 1
 }
 
 # Data for cluster bot.

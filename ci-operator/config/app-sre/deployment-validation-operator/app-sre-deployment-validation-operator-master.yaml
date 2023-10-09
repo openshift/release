@@ -94,6 +94,37 @@ tests:
         requests:
           cpu: 100m
     workflow: generic-claim
+- as: dvo-e2e-tests-periodic
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 2h0m0s
+    version: "4.12"
+  cron: 0 0 * * *
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        operator-sdk run bundle -n openshift-operators "$OO_BUNDLE" --timeout 10m0s
+      dependencies:
+      - env: OO_BUNDLE
+        name: dvo-operator-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+    - as: test
+      cli: latest
+      commands: |
+        pytest.sh -m "not ui" --junitxml=${ARTIFACT_DIR}/test-report.xml
+      from: dvo-tests
+      resources:
+        requests:
+          cpu: 100m
+    workflow: generic-claim
 zz_generated_metadata:
   branch: master
   org: app-sre

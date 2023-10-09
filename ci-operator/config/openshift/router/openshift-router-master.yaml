@@ -7,19 +7,19 @@ base_images:
     name: test
     namespace: ocp-kni
     tag: dev-scripts
-  ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-8-golang-1.20-openshift-4.14
+    tag: rhel-8-golang-1.20-openshift-4.15
 build_root:
   from_repository: true
 images:
 - dockerfile_path: images/router/base/Dockerfile.rhel
   from: base
   inputs:
-    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   optional: true
   to: haproxy-router-base
 - dockerfile_path: images/router/haproxy/Dockerfile.rhel8
@@ -140,6 +140,26 @@ tests:
   steps:
     cluster_profile: azure4
     workflow: openshift-upgrade-azure
+- always_run: false
+  as: perfscale-aws-ingress-perf
+  optional: true
+  steps:
+    cluster_profile: aws-perfscale
+    env:
+      BASE_DOMAIN: perfscale.devcluster.openshift.com
+      COMPUTE_NODE_REPLICAS: "9"
+      COMPUTE_NODE_TYPE: m5.2xlarge
+      LOKI_USE_SERVICEMONITOR: "false"
+      OPENSHIFT_INFRA_NODE_INSTANCE_TYPE: c5.4xlarge
+      SET_ENV_BY_PLATFORM: custom
+    post:
+    - chain: ipi-aws-post
+    pre:
+    - chain: ipi-aws-pre
+    - chain: create-infra-move-ingress-monitoring-registry
+    test:
+    - chain: openshift-qe-ingress-perf
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: master
   org: openshift

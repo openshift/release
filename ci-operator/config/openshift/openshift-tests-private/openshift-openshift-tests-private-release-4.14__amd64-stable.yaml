@@ -83,7 +83,7 @@ tests:
     cluster_profile: aws-c2s-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
@@ -94,7 +94,7 @@ tests:
     cluster_profile: aws-1-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
@@ -105,7 +105,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private-sno
@@ -115,7 +115,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
@@ -173,7 +173,7 @@ tests:
     cluster_profile: aws-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
@@ -217,31 +217,34 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: rosa-aws-sts
+- as: aws-rosa-sts-hypershift-sector-guest-prod-critical-f2
+  cron: 33 7 1,3,5,7,9,11,13,15,17,19,20,23,25,27,29 * *
+  steps:
+    cluster_profile: aws-sd-qe
+    env:
+      CLUSTER_SECTOR: canary
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
+        @hypershift-hosted and @critical and not @fips'
+      OCM_LOGIN_ENV: production
+      OPENSHIFT_VERSION: "4.14"
+      REGION: us-east-1
+      ROSA_LOGIN_ENV: production
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+      TEST_IMPORTANCE: Critical
+    test:
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: rosa-aws-sts-hypershift-sector
 - as: aws-usgov-ipi-private-sts-f14
   cron: 58 14 14,29 * *
   steps:
     cluster_profile: aws-usgov-qe
     env:
       BASE_DOMAIN: qe.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-usgov-ipi-private-cco-manual-security-token-service
-- as: azure-ipi-baselinecaps-v412-to-multiarch-f14
-  cron: 54 19 10,25 * *
-  steps:
-    cluster_profile: azure-qe
-    env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
-      BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      BASELINE_CAPABILITY_SET: v4.12
-      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @azure-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @azure-ipi and @heterogeneous
-        and @network-ovnkubernetes and not @fips'
-    test:
-    - chain: openshift-upgrade-qe-test-heterogeneous
-    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-disconnected-fullyprivate-f14
   cron: 36 13 4,19 * *
   steps:
@@ -260,6 +263,20 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-azure-ipi-fullyprivate-proxy
+- as: azure-ipi-to-multiarch-f14
+  cron: 55 22 2,17 * *
+  steps:
+    cluster_profile: azure-qe
+    env:
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.14 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.14 and @azure-ipi and @heterogeneous
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-heterogeneous
+    workflow: cucushift-installer-rehearse-azure-ipi
 - as: azure-ipi-usertags-f14
   cron: 56 3 4,19 * *
   steps:
@@ -286,7 +303,7 @@ tests:
     cluster_profile: azurestack-qe
     env:
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
@@ -355,7 +372,7 @@ tests:
   steps:
     cluster_profile: gcp-qe
     env:
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-gcp-ipi-disconnected-private-cco-manual-workload-identity
@@ -388,7 +405,7 @@ tests:
   steps:
     cluster_profile: nutanix-qe
     env:
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
       SIZE_VARIANT: compact
     test:
     - chain: cucushift-installer-check-cluster-health
@@ -399,7 +416,7 @@ tests:
   steps:
     cluster_profile: nutanix-qe-dis
     env:
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-disconnected
@@ -409,7 +426,7 @@ tests:
   steps:
     cluster_profile: nutanix-qe-dis
     env:
-      EXTRACT_MANIFEST_INCLUDED: "false"
+      EXTRACT_MANIFEST_INCLUDED: "true"
       FIPS_ENABLED: "true"
     test:
     - chain: cucushift-installer-check-cluster-health

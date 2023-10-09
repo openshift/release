@@ -30,6 +30,6 @@ cp /tmp/windup-ui-tests/cypress/reports/junitreport.xml $ARTIFACT_DIR/junit_wind
 # Copy screenshots into $ARTIFACT_DIR/screenshots
 if [ -d "/tmp/windup-ui-tests/cypress/screenshots/" ]; then
     echo "Archiving  /tmp/windup-ui-tests/cypress/screenshots/* to ARTIFACT_DIR/screenshots"
-    mkdir -p $ARTIFACT_DIR/screenshots
-    cp  /tmp/windup-ui-tests/cypress/screenshots/* $ARTIFACT_DIR/screenshots/
+    mkdir -p $ARTIFACT_DIR
+    cp -r /tmp/windup-ui-tests/cypress/screenshots $ARTIFACT_DIR
 fi

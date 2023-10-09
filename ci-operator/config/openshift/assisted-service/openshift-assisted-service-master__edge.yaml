@@ -221,9 +221,9 @@ tests:
     make lint
   container:
     from: assisted-service-lint
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: verify-generated-code
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
   steps:
     test:
     - ref: assisted-verify-generated-code
@@ -238,7 +238,7 @@ tests:
   secret:
     mount_path: /tmp/secret
     name: assisted-service-codecov-token
-  skip_if_only_changed: ^dashboards/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
+  skip_if_only_changed: ^dashboards/|^\.tekton/|^openshift/|^docs/|^sites/|\.md$|^(LICENSE|OWNERS|OWNERS_ALIASES)$
 - as: unit-test-postsubmit
   commands: |
     export REPORTS=/tmp/reports
@@ -610,6 +610,9 @@ tests:
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: cluster-api-provider-agent
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-capi-periodic
   cron: 25 00 */1 * 0-5
@@ -620,6 +623,9 @@ tests:
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       PROVIDER_IMAGE: cluster-api-provider-agent
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-capi
 - as: e2e-ai-operator-ztp-multiarch-3masters-ocp-411
   optional: true
@@ -647,24 +653,18 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes
+- always_run: false
+  as: e2e-ai-operator-ztp-hypershift-zero-nodes
   optional: true
-  run_if_changed: ^(deploy/operator/hypershift/.*|api/.*|internal/controller/controllers/.*agentserviceconfig.*)$
   steps:
     cluster_profile: packet-assisted
     dependencies:
       ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
       HYPERSHIFT_IMAGE: hypershift-operator
       OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    workflow: assisted-baremetal-operator-hypershift
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes-periodic
-  cron: 00 02 */1 * 1-4
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
+    env:
+      ASSISTED_ZTP_CONFIG: |
+        EXTRA_HYPERSHIFT_INSTALL_FLAGS="--enable-defaulting-webhook true"
     workflow: assisted-baremetal-operator-hypershift
 - as: e2e-metal-assisted-tpmv2
   optional: true
@@ -1029,6 +1029,7 @@ tests:
       PLATFORM: vsphere
     workflow: assisted-vsphere
 - as: e2e-nutanix-assisted
+  cluster: build01
   optional: true
   run_if_changed: ^(internal/provider/.*\.go|internal/provider/nutanix/.*|internal/provider/registry/.*)$
   steps:
@@ -1042,6 +1043,7 @@ tests:
       PLATFORM: nutanix
     workflow: assisted-nutanix
 - as: e2e-nutanix-assisted-2workers
+  cluster: build01
   optional: true
   steps:
     cluster_profile: nutanix

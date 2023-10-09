@@ -4,6 +4,7 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
+FORCE_SKIP_TAGS="customer security"
 
 if [ -f "${SHARED_DIR}/kubeconfig" ] ; then
     export KUBECONFIG=${SHARED_DIR}/kubeconfig
@@ -23,11 +24,11 @@ if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
 fi
 
 export E2E_RUN_TAGS="${E2E_RUN_TAGS} and ${TAG_VERSION}"
-if [ -z "${E2E_SKIP_TAGS}" ] ; then
-    export E2E_SKIP_TAGS="not @customer and not @security"
-else
-    export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not @customer and not @security"
-fi
+for tag in ${FORCE_SKIP_TAGS} ; do
+    if ! [[ "${E2E_SKIP_TAGS}" =~ $tag ]] ; then
+        export E2E_SKIP_TAGS="${E2E_SKIP_TAGS} and not $tag"
+    fi
+done
 echo "E2E_RUN_TAGS is '${E2E_RUN_TAGS}'"
 echo "E2E_SKIP_TAGS is '${E2E_SKIP_TAGS}'"
 

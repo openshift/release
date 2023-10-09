@@ -73,23 +73,23 @@ branch="${PULL_BASE_REF}"
 echo "INFO The base branch is $branch"
 
 if [[ -n "$RELEASE_REF" ]]; then
-    echo "INFO RELEASE_REF variable is set. Using $RELEASE_REF for OSCI_COMPONENT_BRANCH."
-    export OSCI_COMPONENT_BRANCH=${RELEASE_REF}
+    if [ -z "$OSCI_RELEASE_BRANCH" ]; then
+        echo "INFO OSCI_RELEASE_BRANCH variable is not set. Using $RELEASE_REF for OSCI_COMPONENT_BRANCH."
+        export OSCI_COMPONENT_BRANCH=${RELEASE_REF}
+    fi
     echo "INFO RELEASE_REF variable is set. Using $RELEASE_REF as branch."
     branch="${RELEASE_REF}"
 fi
 
-if [[ -z "$OSCI_COMPONENT_VERSION" ]]; then
-    # Get current Z-stream version and set to OSCI_COMPONENT_VERSION if this is not set
-    cd "$release_dir" || exit 1
-    git checkout "$branch" || {
-        echo "ERROR Could not checkout branch $branch in OCM release repo"
-        exit 1
-    }
-    release=$(cat "$release_dir/Z_RELEASE_VERSION")
-    echo "INFO Z-stream version is $release"
-    export OSCI_COMPONENT_VERSION=$release
-fi
+# Get current Z-stream version and set to OSCI_COMPONENT_VERSION if this is not set
+cd "$release_dir" || exit 1
+git checkout "$branch" || {
+    echo "ERROR Could not checkout branch $branch in OCM release repo"
+    exit 1
+}
+release=$(cat "$release_dir/Z_RELEASE_VERSION")
+echo "INFO Z-stream version is $release"
+export OSCI_COMPONENT_VERSION=${OSCI_COMPONENT_VERSION:-$release}
 
 echo "INFO OSCI_COMPONENT_VERSION is ${OSCI_COMPONENT_VERSION}"
 

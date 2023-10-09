@@ -85,7 +85,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/clusterimageset-validate
     decorate: true
     labels:
@@ -219,7 +219,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/boskos-config
     decorate: true
     labels:
@@ -234,7 +234,7 @@ presubmits:
         - core-services/prow/02_config/_boskos.yaml
         command:
         - /app
-        image: gcr.io/k8s-staging-boskos/checkconfig:v20230824-0ad4732
+        image: gcr.io/k8s-staging-boskos/checkconfig:v20230908-da54d76
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -246,7 +246,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/boskos-config-generation
     decorate: true
     labels:
@@ -265,32 +265,6 @@ presubmits:
           requests:
             cpu: 10m
     trigger: (?m)^/test( | .* )boskos-config-generation,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build04
-    context: ci/prow/build-clusters
-    decorate: true
-    labels:
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build-clusters
-    optional: true
-    rerun_command: /test build-clusters
-    spec:
-      containers:
-      - args:
-        - ./
-        command:
-        - hack/validate-ci-build-clusters.sh
-        image: registry.ci.openshift.org/ci/cluster-init:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-    trigger: ((?m)^/test build-clusters,?(\s+|$))
   - agent: kubernetes
     always_run: false
     branches:
@@ -562,19 +536,19 @@ presubmits:
     - ^master$
     - ^master-
     cluster: app.ci
-    context: ci/build-farm/build08-dry
+    context: ci/build-farm/build09-dry
     decorate: true
     labels:
-      ci.openshift.io/build-farm: build08
+      ci.openshift.io/build-farm: build09
       ci.openshift.io/generator: cluster-init
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-release-master-build08-dry
-    rerun_command: /test build08-dry
+    name: pull-ci-openshift-release-master-build09-dry
+    rerun_command: /test build09-dry
     run_if_changed: ^clusters/.*
     spec:
       containers:
       - args:
-        - --config-dir=clusters/build-clusters/build08
+        - --config-dir=clusters/build-clusters/build09
         - --as=
         - --kubeconfig=/etc/build-farm-credentials/kubeconfig
         command:
@@ -582,6 +556,11 @@ presubmits:
         env:
         - name: HOME
           value: /tmp
+        - name: build09_id
+          valueFrom:
+            secretKeyRef:
+              key: build09-id
+              name: build09-dex-oidc
         image: registry.ci.openshift.org/ci/applyconfig:latest
         imagePullPolicy: Always
         name: ""
@@ -599,18 +578,18 @@ presubmits:
       - name: build-farm-credentials
         secret:
           items:
-          - key: sa.config-updater.build08.config
+          - key: sa.config-updater.build09.config
             path: kubeconfig
           secretName: config-updater
       - emptyDir: {}
         name: tmp
-    trigger: (?m)^/test( | .* )build08-dry,?($|\s.*)
+    trigger: (?m)^/test( | .* )build09-dry,?($|\s.*)
   - agent: kubernetes
     always_run: false
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/ci-operator-config
     decorate: true
     labels:
@@ -639,7 +618,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/ci-operator-config-metadata
     decorate: true
     labels:
@@ -665,7 +644,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/ci-operator-registry
     decorate: true
     labels:
@@ -695,7 +674,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/ci-testgrid-allow-list
     decorate: true
     labels:
@@ -764,7 +743,7 @@ presubmits:
             secretKeyRef:
               key: appid
               name: openshift-prow-github-app
-        image: gcr.io/k8s-prow/checkconfig:v20230901-e9e5d470a5
+        image: gcr.io/k8s-prow/checkconfig:v20230927-4613add0a1
         imagePullPolicy: IfNotPresent
         name: ""
         resources:
@@ -784,7 +763,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/core-valid
     decorate: true
     decoration_config:
@@ -813,6 +792,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -821,6 +803,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -833,7 +818,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/deprecate-templates
     decorate: true
     labels:
@@ -858,7 +843,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/generated-config
     decorate: true
     labels:
@@ -884,7 +869,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/generated-dashboards
     decorate: true
     labels:
@@ -959,7 +944,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/jira-lifecycle-config
     decorate: true
     labels:
@@ -1034,7 +1019,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/ordered-prow-config
     decorate: true
     labels:
@@ -1060,7 +1045,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/owners
     decorate: true
     labels:
@@ -1086,7 +1071,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/prow-config
     decorate: true
     labels:
@@ -1112,7 +1097,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/prow-config-filenames
     decorate: true
     labels:
@@ -1139,7 +1124,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/prow-config-semantics
     decorate: true
     labels:
@@ -1165,7 +1150,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/release-config
     decorate: true
     labels:
@@ -1191,7 +1176,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/release-controller-config
     decorate: true
     labels:
@@ -1216,7 +1201,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/secret-generator-config-valid
     decorate: true
     labels:
@@ -1244,7 +1229,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/services-valid
     decorate: true
     decoration_config:
@@ -1274,6 +1259,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1282,6 +1270,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1294,7 +1285,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/step-registry-metadata
     decorate: true
     labels:
@@ -1320,7 +1311,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/step-registry-shellcheck
     decorate: true
     labels:
@@ -1346,7 +1337,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/supplemental-ci-images-mapping-files
     decorate: true
     labels:
@@ -1469,7 +1460,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/openshift-image-mirror-mappings
     decorate: true
     labels:
@@ -1551,7 +1542,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/pylint
     decorate: true
     labels:
@@ -1580,7 +1571,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/sync-rover-groups
     decorate: true
     labels:
@@ -1612,7 +1603,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build04
+    cluster: build02
     context: ci/prow/yamllint
     decorate: true
     labels:

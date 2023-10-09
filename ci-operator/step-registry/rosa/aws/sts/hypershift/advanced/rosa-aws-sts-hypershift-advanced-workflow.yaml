@@ -8,8 +8,8 @@ workflow:
       ENABLE_AUTOSCALING: "true"
       MIN_REPLICAS: "3"
       MAX_REPLICAS: "6"
-      MULTI_AZ: "true"
       ENABLE_BYOVPC: "true"
+      ENABLE_AUDIT_LOG: "true"
       # ENABLE_PROXY: "true"
       ETCD_ENCRYPTION: "true"
       STORAGE_ENCRYPTION: "true"
@@ -17,19 +17,20 @@ workflow:
       OIDC_CONFIG_MANAGED: "true"
       DISABLE_WORKLOAD_MONITORING: "true"
       DISABLE_SCP_CHECKS: "false"
-      EC2_METADATA_HTTP_TOKENS: "optional"      
     pre:
     - ref: aws-provision-vpc-shared
     - ref: aws-provision-tags-for-byo-vpc-ocm-pre
     # - chain: aws-provision-bastionhost
     - chain: rosa-sts-oidc-config-create
     - ref: rosa-sts-kms-key-create
+    - ref: rosa-sts-audit-log-create
     - chain: rosa-cluster-provision
     - ref: aws-provision-tags-for-byo-vpc
     - ref: osd-ccs-conf-idp-htpasswd-multi-users
     - ref: rosa-cluster-wait-ready-nodes
     post:
     - chain: rosa-cluster-deprovision
+    - ref: rosa-sts-audit-log-delete
     - ref: rosa-sts-kms-key-delete
     - chain: rosa-sts-oidc-config-delete
     # - ref: aws-deprovision-s3buckets

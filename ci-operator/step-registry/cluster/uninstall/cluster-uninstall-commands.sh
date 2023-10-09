@@ -21,7 +21,6 @@ export DOCKER_CONFIG=${CLUSTER_PROFILE_DIR}
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=$CLUSTER_DATA_DIR
 
 RUN_COMMAND="poetry run python openshift_cli_installer/cli.py \
-            --clusters-install-data-directory $CLUSTER_DATA_DIR \
             --ocm-token=$OCM_TOKEN \
             --s3-bucket-name=$S3_BUCKET_NAME "
 
@@ -31,15 +30,17 @@ if [ -z "${CLUSTER_DATA_FILES}" ] ; then
   exit 1
 fi
 
-CLUSTER_DATA_CMD="--destroy-clusters-from-config-files "
+NUM_CLUSTERS=0
+CLUSTER_DATA_CMD="--destroy-clusters-from-s3-config-files "
 for data_file in $CLUSTER_DATA_FILES; do
-  CLUSTER_DATA_CMD+="${data_file},"
+  CLUSTER_DATA_CMD+="$(dirname "${data_file}"),"
+  NUM_CLUSTERS=$(( NUM_CLUSTERS + 1))
 done
 
 RUN_COMMAND+=$(echo "${CLUSTER_DATA_CMD}" | sed 's/,$//g')
 
-if [[ -n "${OCM_ENVIRONMENT}" ]]; then
-    RUN_COMMAND+=" --ocm-env=${OCM_ENVIRONMENT} "
+if [ "${CLUSTERS_RUN_IN_PARALLEL}" = "true" ] && [ $NUM_CLUSTERS -gt 1 ]; then
+    RUN_COMMAND+=" --parallel"
 fi
 
 if [[ -n "${S3_BUCKET_PATH}" ]]; then
@@ -51,5 +52,4 @@ if [[ -n "${PULL_SECRET_NAME}" ]]; then
 fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
-
 ${RUN_COMMAND}

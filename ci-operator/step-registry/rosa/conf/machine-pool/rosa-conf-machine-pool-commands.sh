@@ -107,7 +107,7 @@ function createMachinepool() {
     AUTO_REPAIR_SWITCH="--autorepair"
   fi
 
-  echo -e " Create machine pool ${MP_NAME} on the cluster ${CLUSTER_ID} ...
+  echo -e "Create machine pool ${MP_NAME} on the cluster ${CLUSTER_ID} ...
 rosa create machinepool -y \
 -c ${CLUSTER_ID}
 --name ${MP_NAME} \

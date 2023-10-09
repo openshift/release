@@ -15,10 +15,6 @@ base_images:
     name: ocm-2.8
     namespace: edge-infrastructure
     tag: assisted-installer-controller
-  assisted-test-infra:
-    name: ocm-2.8
-    namespace: edge-infrastructure
-    tag: assisted-test-infra
   cli:
     name: "4.11"
     namespace: ocp
@@ -612,18 +608,9 @@ tests:
         SPOKE_CONTROLPLANE_AGENTS=1
       NUM_EXTRA_WORKERS: "1"
     workflow: assisted-baremetal-operator-ztp
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes
+- always_run: false
+  as: e2e-ai-operator-ztp-hypershift-zero-nodes
   optional: true
-  run_if_changed: ^(deploy/operator/hypershift/.*|api/.*|internal/controller/controllers/.*agentserviceconfig.*)$
-  steps:
-    cluster_profile: packet-assisted
-    dependencies:
-      ASSISTED_OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-      HYPERSHIFT_IMAGE: hypershift-operator
-      OPENSHIFT_INSTALL_RELEASE_IMAGE: release:latest
-    workflow: assisted-baremetal-operator-hypershift
-- as: e2e-ai-operator-ztp-hypershift-zero-nodes-periodic
-  cron: 00 02 */1 * 1-4
   steps:
     cluster_profile: packet-assisted
     dependencies:
