@@ -46,6 +46,7 @@ if [[ "${COMPUTE_NODE_TYPE}" == "" ]]; then
 fi
 
 echo "$(date) Creating HyperShift cluster ${CLUSTER_NAME}"
+if echo error | grep error; then echo "ERROR during cluster creation: fake error for test purposes"; exit 1; fi
 /usr/bin/hypershift create cluster aws \
   ${EXTRA_ARGS} \
   --name ${CLUSTER_NAME} \
