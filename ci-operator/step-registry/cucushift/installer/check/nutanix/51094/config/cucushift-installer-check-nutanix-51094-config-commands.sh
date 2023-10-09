@@ -24,7 +24,7 @@ compute:
       memoryMiB: 20000
       osDisk:
         diskSizeGiB: 100
-  replicas: 3
+  replicas: 2
 controlPlane:
   architecture: amd64
   hyperthreading: Enabled
@@ -36,7 +36,7 @@ controlPlane:
       memoryMiB: 20000
       osDisk:
         diskSizeGiB: 100
-  replicas: 3"
+  replicas: 3
 EOF
 
 cat "${CONFIG}"
