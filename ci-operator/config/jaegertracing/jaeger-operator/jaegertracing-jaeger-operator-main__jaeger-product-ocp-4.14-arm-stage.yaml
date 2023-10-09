@@ -1,26 +1,78 @@
 base_images:
+  ansible:
+    name: "4.14"
+    namespace: ocp
+    tag: ansible
+  aws-efs-csi-operator-create-efs:
+    name: "4.14"
+    namespace: ocp
+    tag: aws-efs-csi-operator-create-efs
   cli:
-    name: "4.15"
+    name: "4.14"
     namespace: ocp
     tag: cli
+  dev-scripts:
+    name: test
+    namespace: ocp-kni
+    tag: dev-scripts
+  hypershift-operator:
+    name: "4.14"
+    namespace: ocp
+    tag: hypershift-operator
+  openstack-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: openstack-installer
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
+  tools:
+    name: "4.14"
+    namespace: ocp
+    tag: tools
+  upi-installer:
+    name: "4.14"
+    namespace: ocp
+    tag: upi-installer
 build_root:
   image_stream_tag:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
 images:
-- context_dir: .
+- build_args:
+  - name: BUILDPLATFORM
+    value: linux/arm64
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: arm64
+  context_dir: .
   dockerfile_path: Dockerfile.asserts
   to: jaeger-tests-asserts-e2e
 - context_dir: .
   dockerfile_path: tests/Dockerfile
   to: jaeger-tests-runner
 releases:
-  latest:
+  arm64-latest:
     candidate:
+      architecture: arm64
       product: ocp
       stream: nightly
-      version: "4.15"
+      version: "4.14"
+  latest:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
+  target:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -31,12 +83,17 @@ tests:
   cron: 0 6 1 10 1
   steps:
     cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:arm64-latest
     env:
       AMQ_SOURCE: dt-catalogsource
       BASE_DOMAIN: qe.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: m6g.xlarge
+      CONTROL_PLANE_INSTANCE_TYPE: m6g.xlarge
       EO_SUB_CHANNEL: stable-5.7
       EO_SUB_SOURCE: dt-catalogsource
       JAEGER_SOURCE: dt-catalogsource
+      OCP_ARCH: arm64
       OTEL_SOURCE: dt-catalogsource
       TEMPO_SOURCE: dt-catalogsource
     test:
@@ -52,4 +109,4 @@ zz_generated_metadata:
   branch: main
   org: jaegertracing
   repo: jaeger-operator
-  variant: jaeger-product-ocp-4.15-stage
+  variant: jaeger-product-ocp-4.14-arm-stage
