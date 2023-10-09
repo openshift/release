@@ -41,12 +41,29 @@ EOF
     fi
 }
 
-function update_cloud_credentials(){
-    platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
-    cco_mode=$(oc get cloudcredential cluster -o jsonpath='{.spec.credentialsMode}')
-    if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )) || [[ "${cco_mode}" != "Manual" ]]; then
-        echo "No need update cloud credentials" && return
+function extract_ccoctl(){
+    echo -e "Extracting ccoctl\n"
+    local retry=5 
+    tmp_ccoctl="/tmp/upgtool"
+    mkdir -p ${tmp_ccoctl}
+    cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${TARGET} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc image extract $cco_image --path="/usr/bin/ccoctl:${tmp_ccoctl}" -a "${CLUSTER_PROFILE_DIR}/pull-secret");
+    do
+        echo >&2 "Failed to extract ccoctl binary, retry..."
+        (( retry -= 1 ))
+        if (( retry < 0 )); then return 1; fi
+        sleep 60
+    done
+    mv ${tmp_ccoctl}/ccoctl /tmp -f
+    if [[ ! -e /tmp/ccoctl ]]; then
+        echo "No ccoctl tool found!" && return 1
+    else
+        chmod 775 /tmp/ccoctl
     fi
+}
+
+function update_cloud_credentials_oidc(){
+    platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
     preCredsDir="/tmp/pre-include-creds"
     tobeCredsDir="/tmp/tobe-include-creds"
     mkdir "${preCredsDir}" "${tobeCredsDir}"
@@ -54,26 +71,39 @@ function update_cloud_credentials(){
     if ! oc adm release extract --to "${preCredsDir}" --included --credentials-requests; then
         echo "Failed to extract CRs from live cluster!" && exit 1
     fi
-    if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE}"; then
+    if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
         echo "Failed to extract CRs from tobe upgrade release payload!" && exit 1
     fi
 
     # TODO: add gcp and azure
     # Update iam role with ccoctl based on tobeCredsDir
-    if [[ "${platform}" == "AWS" ]]; then
-        if [[ ! -e ${SHARED_DIR}/aws_oidc_provider_arn ]]; then
-            echo "No aws_oidc_provider_arn file in SHARED_DIR" && exit 1
-        else
-            oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
-        fi
-    fi
     if ! diff -r "${preCredsDir}" "${tobeCredsDir}" &> /dev/null; then
-        infra_name=${NAMESPACE}-${UNIQUE_HASH}
-        if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}"; then
-            echo "Failed to update iam role!" && exit 1
-        fi
+        toManifests="/tmp/to-manifests"
+        mkdir "${toManifests}"
+        case "${platform}" in
+        "AWS")
+            if [[ ! -e ${SHARED_DIR}/aws_oidc_provider_arn ]]; then
+                echo "No aws_oidc_provider_arn file in SHARED_DIR" && exit 1
+            else
+                export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+                infra_name=${NAMESPACE}-${UNIQUE_HASH}
+                oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
+                export PATH=/tmp:${PATH}
+                extract_ccoctl
+                if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}" --output-dir="${toManifests}"; then
+                    echo "Failed to update iam role!" && exit 1
+                fi
+                if [[ "$(ls -A ${toManifests}/manifests)" ]]; then
+                    echo "Apply the new credential secrets."
+                    oc apply -f "${toManifests}/manifests"
+                fi
+            fi
+            ;;
+        *)
+           echo "to be supported platform: ${platform}" 
+           ;;
+        esac
     fi
-
 }
 
 # Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual
@@ -556,7 +586,6 @@ export OC="run_command_oc"
 mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
 export PATH=${OC_DIR}:$PATH
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 
 for target in "${TARGET_RELEASES[@]}"
 do
@@ -584,7 +613,9 @@ do
         admin_ack
         cco_annotation
     fi
-    update_cloud_credentials
+    if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
+        update_cloud_credentials_oidc
+    fi
     upgrade
     check_upgrade_status
     check_history

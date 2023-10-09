@@ -22,7 +22,7 @@ function extract_oc(){
 
 # Define the checkpoints/steps needed for the specific case
 function pre-ocp-66839(){
-    if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "CSISnapshot" ]] || [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
+    if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
         echo "Test Skipped: ${FUNCNAME[0]}"
         return 0
     fi
@@ -35,10 +35,10 @@ function pre-ocp-66839(){
         echo "Failed to extract manifests!"
         return 1
     fi
-    # Only enabled cap annotation in all extracted manifests 
+    # There should not be any cap annotation in all extracted manifests 
     curCap=$(grep -rh "capability.openshift.io/name:" "${manifestsDir}"|awk -F": " '{print $NF}'|sort -u)
-    if [[ "${curCap}" != "${ADDITIONAL_ENABLED_CAPABILITIES}" ]]; then
-        echo "Caps in extracted manifests: ${curCap}, but expected: ${ADDITIONAL_ENABLED_CAPABILITIES}"
+    if [[ "${curCap}" != "" ]]; then
+        echo "Caps in extracted manifests found: ${curCap}, but expected nothing"
         return 1
     fi
     # No featureset or only Default featureset annotation in all extarcted manifests
@@ -82,9 +82,9 @@ function pre-ocp-66839(){
     return 0
 }
 
-# This func run all test cases with with checkpoints which will not break other cases, 
+# This func run all test cases with checkpoints which will not break other cases, 
 # which means the case func called in this fun can be executed in the same cluster
-# Define if the specified case should be ran or not
+# Define if the specified case should be run or not
 function run_ota_multi_test(){
     echo "placeholder"
 }

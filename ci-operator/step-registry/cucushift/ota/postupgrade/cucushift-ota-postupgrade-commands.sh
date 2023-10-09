@@ -22,7 +22,7 @@ function extract_oc(){
 
 # Define the checkpoints/steps needed for the specific case
 function post-ocp-66839(){
-    if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "CSISnapshot" ]] || [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
+    if [[ "${BASELINE_CAPABILITY_SET}" != "None" ]]; then
         echo "Test Skipped: ${FUNCNAME[0]}"
         return 0
     fi
