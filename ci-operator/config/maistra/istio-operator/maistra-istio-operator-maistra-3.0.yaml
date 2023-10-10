@@ -238,6 +238,38 @@ tests:
           memory: 100Mi
       timeout: 2h0m0s
     workflow: servicemesh-istio-e2e-profile
+- as: registry-dummy-test
+  optional: true
+  steps:
+    cluster_profile: aws
+    dependencies:
+      RELEASE_IMAGE_LATEST: release:latest
+    env:
+      MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
+      MAISTRA_NAMESPACE: maistra-e2e-test
+      MAISTRA_SC_POD: maistra-e2e-test-sc-pod
+      XDG_CACHE_HOME: /tmp/cache
+    test:
+    - as: registry-dummy-test
+      cli: latest
+      commands: |
+        output=$(oc get pods -n openshift-image-registry)
+        echo "${output}"
+      credentials:
+      - mount_path: /maistra-secrets
+        name: maistra-dev-prow
+        namespace: test-credentials
+      env:
+      - name: MAISTRA_NAMESPACE
+      - name: MAISTRA_SC_POD
+      - name: XDG_CACHE_HOME
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 100Mi
+      timeout: 2h0m0s
+    workflow: servicemesh-istio-e2e-profile
 - as: scorecard
   steps:
     cluster_profile: aws-2
