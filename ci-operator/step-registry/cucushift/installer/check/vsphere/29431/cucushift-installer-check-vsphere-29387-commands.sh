@@ -4,10 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-echo "Start Running Case https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-29387"
-
-sleep 3600
-
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
 if ! whoami &> /dev/null; then
@@ -19,6 +15,7 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
+echo "Start Running Case https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-29387"
 oc new-project vip-test
 oc new-app httpd -n vip-test
 oc expose svc/httpd
