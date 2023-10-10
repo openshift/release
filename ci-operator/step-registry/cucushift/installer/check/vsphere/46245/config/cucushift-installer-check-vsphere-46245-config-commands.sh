@@ -9,7 +9,7 @@ echo "Start Running Case https://polarion.engineering.redhat.com/polarion/#/proj
 CONFIG="${SHARED_DIR}/install-config.yaml"
 
 # Set field platform.vsphere.diskType thin
-sed -i "s#platform:\n  vsphere:#platform:\n  vsphere:\n    diskType: thin#g" "${CONFIG}"
+sed -i "/vsphere:/a \ \ \ \ diskType: thin" "${CONFIG}"
 cat "${CONFIG}"
 
 # Restore

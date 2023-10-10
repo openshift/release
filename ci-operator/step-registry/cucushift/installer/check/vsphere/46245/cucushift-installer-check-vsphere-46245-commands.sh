@@ -8,7 +8,7 @@ echo "Start Running Case https://polarion.engineering.redhat.com/polarion/#/proj
 
 sleep 3600
 
-# Check 2 worker nodes are joined in without error
+# Check all virtual machines of cluster are thin
 if [ "$(oc get node -l node-role.kubernetes.io/worker= --no-headers | wc -l)" != "2" ]; then
     echo "Fail: check worker number"
     exit 1
