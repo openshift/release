@@ -1,0 +1,49 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+images:
+- dockerfile_literal: |-
+    FROM src
+    SHELL ["/bin/bash", "-c"]
+
+    # Install jq, yq, kubectl, help and vcluster
+    RUN curl -Lso /usr/local/bin/jq https://github.com/stedolan/jq/releases/download/jq-1.6/jq-linux64 && chmod +x /usr/local/bin/jq
+    RUN curl -Lso /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.25.2/yq_linux_amd64 && chmod +x /usr/local/bin/yq
+    RUN curl -Lso /usr/local/bin/kubectl https://storage.googleapis.com/kubernetes-release/release/$(curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && chmod +x /usr/local/bin/kubectl
+    RUN yum install -y httpd-tools parallel
+    RUN curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 && chmod 700 get_helm.sh && ./get_helm.sh && helm version
+    RUN curl -L -o vcluster "https://github.com/loft-sh/vcluster/releases/download/v0.15.0/vcluster-linux-amd64" && install -c -m 0755 vcluster /usr/local/bin && rm -f vcluster && vcluster --version
+  from: src
+  to: openshift-pipelines-performance-runner
+releases:
+  latest:
+    release:
+      architecture: amd64
+      channel: fast
+      version: "4.12"
+resources:
+  '*':
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+tests:
+- as: scaling-pipelines-daily
+  cron: 0 2,14 * * *
+  steps:
+    cluster_profile: aws
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
+- as: scaling-pipelines
+  steps:
+    cluster_profile: aws
+    workflow: openshift-pipelines-scaling-pipelines
+  timeout: 8h0m0s
+zz_generated_metadata:
+  branch: master
+  org: openshift-pipelines
+  repo: performance
