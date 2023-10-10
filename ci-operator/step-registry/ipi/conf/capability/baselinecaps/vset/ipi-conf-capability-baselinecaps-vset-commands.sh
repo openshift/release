@@ -4,17 +4,6 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-baselinecaps_from_config=$(yq-go r "${SHARED_DIR}/install-config.yaml" "capabilities.baselineCapabilitySet")
-if [[ "${baselinecaps_from_config}" == "" ]]; then
-    echo "This step requires field capabilities.baselineCapabilitySet in install-config to be set!"
-    exit 1
-fi
-
-if [[ "${ADDITIONAL_ENABLED_CAPABILITIES}" != "" ]]; then
-   echo "ENV 'ADDITIONAL_ENABLED_CAPABILITIES' is set, this step is not required!"
-   exit 0
-fi
-
 # release-controller always expose RELEASE_IMAGE_LATEST when job configuraiton defines release:latest image
 echo "RELEASE_IMAGE_LATEST: ${RELEASE_IMAGE_LATEST:-}"
 # RELEASE_IMAGE_LATEST_FROM_BUILD_FARM is pointed to the same image as RELEASE_IMAGE_LATEST,
@@ -57,57 +46,41 @@ echo "OCP Version: $ocp_version"
 ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
 ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
 
-v411="baremetal marketplace openshift-samples"
-v412=" ${v411} Console Insights Storage CSISnapshot"
-v413=" ${v412} NodeTuning"
+# define baselineCapabilitySet valid value on each version
+v411_set="vCurrent v4.11"
+v412_set="${v411_set} v4.12"
+v413_set="${v412_set} v4.13"
 # shellcheck disable=SC2034
-v414=" ${v413} MachineAPI Build DeploymentConfig ImageRegistry"
-latest_version="v414"
+v414_set="${v413_set} v4.14"
+latest_version_set="v414_set"
 
-declare "v${ocp_major_version}${ocp_minor_version}"
-v_current_version="v${ocp_major_version}${ocp_minor_version}"
+declare "v${ocp_major_version}${ocp_minor_version}_set"
+v_current_version="v${ocp_major_version}${ocp_minor_version}_set"
 
 if [[ ${!v_current_version:-} == "" ]]; then
-  echo "vCurrent: No default value for ${v_current_version}, use default value from ${latest_version}"
-  vcurrent_capabilities=${!latest_version}
+  echo "vCurrent: No default value for ${v_current_version}, use default value from ${latest_version_set}"
+  v_current_set=${!latest_version_set}
 else
   echo "vCurrent: Use exsting value from ${v_current_version}: ${!v_current_version}"
-  vcurrent_capabilities=${!v_current_version}
+  v_current_set=${!v_current_version}
 fi
 
-#Randomly select one capability to be disabled
 # shellcheck disable=SC2206
-vcurrent_capabilities_array=(${vcurrent_capabilities})
-echo "vcurrent_capabilities: ${vcurrent_capabilities_array[*]}"
-selected_capability_index=$((RANDOM % ${#vcurrent_capabilities_array[@]}))
-selected_capability="${vcurrent_capabilities_array[$selected_capability_index]}"
-echo "Selected capability to be disabled: ${selected_capability}"
+baseline_caps_set_array=(${v_current_set})
 
-enabled_capabilities=${vcurrent_capabilities}
-if [[ ! "${selected_capability}" == "MachineAPI" ]]; then
-    enabled_capabilities=${enabled_capabilities/${selected_capability}}
-else
-    echo "WARNING: MachineAPI is selected, but it requires on IPI, so no capability to be disabled!"
-fi
-
-# Disable Build if ImageRegistry is selected to bo disabled
-if [[ "${selected_capability}" == "ImageRegistry" ]]; then
-    echo "Capability 'Build' depends on Capability 'ImageRegistry', so disable Build along with ImageRegistry"
-    enabled_capabilities=${enabled_capabilities/"Build"}
-fi
+#select one cap set randomly
+echo "baselineCapabilitySet: ${baseline_caps_set_array[*]}"
+selected_cap_set_index=$((RANDOM % ${#baseline_caps_set_array[@]}))
+selected_cap_set="${baseline_caps_set_array[$selected_cap_set_index]}"
+echo "Selected baseline capability set: ${selected_cap_set}"
 
 # apply patch to install-config
 CONFIG="${SHARED_DIR}/install-config.yaml"
-PATCH="/tmp/install-config-capability.yaml.path"
+PATCH="/tmp/install-config-capability-baseline.yaml.path"
 cat > "${PATCH}" << EOF
 capabilities:
-  additionalEnabledCapabilities:
+  baselineCapabilitySet: ${selected_cap_set}
 EOF
-for item in ${enabled_capabilities}; do
-    cat >> "${PATCH}" << EOF
-  - ${item}
-EOF
-done
 
 yq-go m -x -i "${CONFIG}" "${PATCH}"
 cat ${PATCH}
