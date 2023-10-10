@@ -5,7 +5,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/ci-index-jaeger-bundle
     decorate: true
     decoration_config:
@@ -61,7 +61,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -117,7 +117,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/jaeger-e2e-tests
     decorate: true
     decoration_config:
@@ -187,7 +187,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/jaeger-product-ocp-4.11-stage-images
     decorate: true
     decoration_config:
@@ -245,7 +245,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/jaeger-product-ocp-4.12-stage-images
     decorate: true
     decoration_config:
@@ -303,7 +303,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/jaeger-product-ocp-4.13-stage-images
     decorate: true
     decoration_config:
@@ -361,7 +361,65 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
+    context: ci/prow/jaeger-product-ocp-4.14-arm-stage-images
+    decorate: true
+    decoration_config:
+      skip_cloning: true
+    labels:
+      ci-operator.openshift.io/variant: jaeger-product-ocp-4.14-arm-stage
+      ci.openshift.io/generator: prowgen
+      job-release: "4.14"
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-jaegertracing-jaeger-operator-main-jaeger-product-ocp-4.14-arm-stage-images
+    rerun_command: /test jaeger-product-ocp-4.14-arm-stage-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=jaeger-product-ocp-4.14-arm-stage
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )jaeger-product-ocp-4.14-arm-stage-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^main$
+    - ^main-
+    cluster: build01
     context: ci/prow/jaeger-product-ocp-4.14-lp-interop-images
     decorate: true
     decoration_config:
@@ -419,7 +477,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/jaeger-product-ocp-4.14-stage-images
     decorate: true
     decoration_config:
@@ -477,7 +535,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/jaeger-product-ocp-4.15-stage-images
     decorate: true
     decoration_config:
@@ -535,7 +593,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/ocp-4.13-hypershift-ci-index-jaeger-bundle
     decorate: true
     decoration_config:
@@ -593,7 +651,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/ocp-4.13-hypershift-images
     decorate: true
     decoration_config:
@@ -651,7 +709,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/ocp-4.14-amd64-ci-index-jaeger-bundle
     decorate: true
     decoration_config:
@@ -709,7 +767,7 @@ presubmits:
     branches:
     - ^main$
     - ^main-
-    cluster: build05
+    cluster: build01
     context: ci/prow/ocp-4.14-amd64-images
     decorate: true
     decoration_config:

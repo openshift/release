@@ -37,6 +37,7 @@ tests:
 - as: unit
   commands: |
     make test \
+    BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
@@ -48,6 +49,7 @@ tests:
 - as: gencheck
   commands: |
     make gen-check \
+    BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
@@ -58,6 +60,7 @@ tests:
 - as: lint
   commands: |
     make lint \
+    BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
@@ -103,6 +106,7 @@ tests:
           "docker login -u='maistra-dev+prow' \
           -p=${QUAY_PASS} quay.io; \
           cd /work && \
+          export BUILD_WITH_CONTAINER="0" && \
           make docker-build docker-push \
           IMAGE=quay.io/maistra-dev/istio-ubi9-operator:PR-${PULL_NUMBER}"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
@@ -162,6 +166,7 @@ tests:
           export TAG=PR-${PULL_NUMBER} && \
           docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
           cd /work && \
+          export BUILD_WITH_CONTAINER="0" && \
           make test.integration.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
@@ -215,6 +220,7 @@ tests:
           "export TAG=PR-${PULL_NUMBER} && \
           docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
           cd /work && \
+          export BUILD_WITH_CONTAINER="0" && \
           make test.integration.kind"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
@@ -266,6 +272,7 @@ tests:
           sh -c \
           "export KUBECONFIG=/work/ci-kubeconfig && \
           cd /work && \
+          export BUILD_WITH_CONTAINER="0" && \
           make test.scorecard"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
@@ -321,6 +328,7 @@ tests:
           "git config --global user.email 'dgrimm@redhat.com'; \
            git config --global user.name 'Daniel Grimm'; \
            cd /work && \
+           export BUILD_WITH_CONTAINER="0" && \
            make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:

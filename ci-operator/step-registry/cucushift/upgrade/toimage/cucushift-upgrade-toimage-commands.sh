@@ -41,6 +41,71 @@ EOF
     fi
 }
 
+function extract_ccoctl(){
+    echo -e "Extracting ccoctl\n"
+    local retry=5 
+    tmp_ccoctl="/tmp/upgtool"
+    mkdir -p ${tmp_ccoctl}
+    export PATH=/tmp:${PATH}
+    cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${TARGET} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
+    while ! (env "NO_PROXY=*" "no_proxy=*" oc image extract $cco_image --path="/usr/bin/ccoctl:${tmp_ccoctl}" -a "${CLUSTER_PROFILE_DIR}/pull-secret");
+    do
+        echo >&2 "Failed to extract ccoctl binary, retry..."
+        (( retry -= 1 ))
+        if (( retry < 0 )); then return 1; fi
+        sleep 60
+    done
+    mv ${tmp_ccoctl}/ccoctl /tmp -f
+    if [[ ! -e /tmp/ccoctl ]]; then
+        echo "No ccoctl tool found!" && return 1
+    else
+        chmod 775 /tmp/ccoctl
+    fi
+}
+
+function update_cloud_credentials_oidc(){
+    platform=$(oc get infrastructure cluster -o jsonpath='{.status.platformStatus.type}')
+    preCredsDir="/tmp/pre-include-creds"
+    tobeCredsDir="/tmp/tobe-include-creds"
+    mkdir "${preCredsDir}" "${tobeCredsDir}"
+    # Extract all CRs from live cluster with --included
+    if ! oc adm release extract --to "${preCredsDir}" --included --credentials-requests; then
+        echo "Failed to extract CRs from live cluster!" && exit 1
+    fi
+    if ! oc adm release extract --to "${tobeCredsDir}" --included --credentials-requests "${TARGET}"; then
+        echo "Failed to extract CRs from tobe upgrade release payload!" && exit 1
+    fi
+
+    # TODO: add gcp and azure
+    # Update iam role with ccoctl based on tobeCredsDir
+    if ! diff -r "${preCredsDir}" "${tobeCredsDir}" &> /dev/null; then
+        toManifests="/tmp/to-manifests"
+        mkdir "${toManifests}"
+        case "${platform}" in
+        "AWS")
+            if [[ ! -e ${SHARED_DIR}/aws_oidc_provider_arn ]]; then
+                echo "No aws_oidc_provider_arn file in SHARED_DIR" && exit 1
+            else
+                export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+                infra_name=${NAMESPACE}-${UNIQUE_HASH}
+                oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
+                extract_ccoctl
+                if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}" --output-dir="${toManifests}"; then
+                    echo "Failed to update iam role!" && exit 1
+                fi
+                if [[ "$(ls -A ${toManifests}/manifests)" ]]; then
+                    echo "Apply the new credential secrets."
+                    oc apply -f "${toManifests}/manifests"
+                fi
+            fi
+            ;;
+        *)
+           echo "to be supported platform: ${platform}" 
+           ;;
+        esac
+    fi
+}
+
 # Add cloudcredential.openshift.io/upgradeable-to: <version_number> to cloudcredential cluster when cco mode is manual
 function cco_annotation(){
     if (( SOURCE_MINOR_VERSION == TARGET_MINOR_VERSION )) || (( SOURCE_MINOR_VERSION < 8 )); then
@@ -214,7 +279,7 @@ function run_command_oc() {
 }
 
 function check_clusteroperators() {
-    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc null_version unavailable_operator degraded_operator skip_operator
+    local tmp_ret=0 tmp_clusteroperator input column last_column_name tmp_clusteroperator_1 rc unavailable_operator degraded_operator skip_operator
 
     skip_operator="aro" # ARO operator versioned but based on RP git commit ID not cluster version
     echo "Make sure every operator do not report empty column"
@@ -241,12 +306,6 @@ function check_clusteroperators() {
     done < "${input}"
     rm -f "${tmp_clusteroperator}"
 
-    echo "Make sure every operator column reports version"
-    if null_version=$(${OC} get clusteroperator -o json | jq '.items[] | select(.status.versions == null) | .metadata.name') && [[ ${null_version} != "" ]]; then
-      echo >&2 "Null Version: ${null_version}"
-      (( tmp_ret += 1 ))
-    fi
-
     echo "Make sure every operator reports correct version"
     if incorrect_version=$(${OC} get clusteroperator --no-headers | grep -v ${skip_operator} | awk -v var="${TARGET_VERSION}" '$2 != var') && [[ ${incorrect_version} != "" ]]; then
         echo >&2 "Incorrect CO Version: ${incorrect_version}"
@@ -260,7 +319,7 @@ function check_clusteroperators() {
         echo >&2 "$unavailable_operator"
         (( tmp_ret += 1 ))
     fi
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Available") | .status' | grep -iv "True"; then
+    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Available")].status}'| grep -iv "True"; then
         echo >&2 "Some operators are unavailable, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
@@ -273,7 +332,7 @@ function check_clusteroperators() {
         (( tmp_ret += 1 ))
     fi
     #co_check=$(${OC} get clusteroperator -o json | jq '.items[] | select(.metadata.name != "openshift-samples") | .status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False')
-    if ${OC} get clusteroperator -o json | jq '.items[].status.conditions[] | select(.type == "Degraded") | .status'  | grep -iv 'False'; then
+    if ${OC} get clusteroperator -o jsonpath='{.items[].status.conditions[?(@.type=="Degraded")].status}'| grep -iv 'False'; then
         echo >&2 "Some operators are Degraded, pls run 'oc get clusteroperator -o json' to check"
         (( tmp_ret += 1 ))
     fi
@@ -307,14 +366,14 @@ function wait_clusteroperators_continous_success() {
 }
 
 function check_latest_machineconfig_applied() {
-    local role="$1" cmd latest_machineconfig applied_machineconfig_machines ready_machines
+    local role="$1" cmd latest_machineconfig
 
     cmd="oc get machineconfig"
     echo "Command: $cmd"
     eval "$cmd"
 
     echo "Checking $role machines are applied with latest $role machineconfig..."
-    latest_machineconfig=$(oc get mcp/$role -o json | jq -r '.spec.configuration.name')
+    latest_machineconfig=$(oc get mcp/$role -o jsonpath='{.spec.configuration.name}')
     if [[ ${latest_machineconfig} == "" ]]; then
         echo >&2 "Did not found ${role} render machineconfig"
         return 1
@@ -322,15 +381,18 @@ function check_latest_machineconfig_applied() {
         echo "latest ${role} machineconfig: ${latest_machineconfig}"
     fi
 
-    applied_machineconfig_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r --arg mc_name "${latest_machineconfig}" '.items[] | select(.metadata.annotations."machineconfiguration.openshift.io/state" == "Done" and .metadata.annotations."machineconfiguration.openshift.io/currentConfig" == $mc_name) | .metadata.name' | sort)
-    ready_machines=$(oc get node -l "node-role.kubernetes.io/${role}" -o json | jq -r '.items[].metadata.name' | sort)
-    if [[ ${applied_machineconfig_machines} == "${ready_machines}" ]]; then
-        echo "latest machineconfig - ${latest_machineconfig} is already applied to ${ready_machines}"
-        return 0
-    else
-        echo "latest machineconfig - ${latest_machineconfig} is applied to ${applied_machineconfig_machines}, but expected ready node lists: ${ready_machines}"
-        return 1
-    fi
+    for NODE in $(oc get -l node-role.kubernetes.io/$role -o jsonpath='{.items[*].metadata.name}' nodes); do
+        node_state=$(oc get node $NODE -o jsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io\/state}')
+        cur_config=$(oc get node $NODE -o jsonpath='{.metadata.annotations.machineconfiguration\.openshift\.io\/currentConfig}')
+        if [[ "${node_state}" == "Done" && "${cur_config}" == "${latest_machineconfig}" ]];then
+            echo "latest machineconfig - ${latest_machineconfig} is already applied to ${NODE}"
+            continue
+        else
+            echo "${NODE}'s status: ${node_state}, ${NODE}'s config: ${cur_config}"
+            echo "latest machineconfig - ${latest_machineconfig} is not applied to ${NODE}"
+            return 1
+        fi
+    done
 }
 
 function wait_machineconfig_applied() {
@@ -344,7 +406,7 @@ function wait_machineconfig_applied() {
     do
         sleep ${interval}
         echo "Checking MCP #${try}"
-        mcp_status=$(oc get mcp/$role -o json | jq -r '.status.conditions[] | select(.type == "Updated") | .status')
+        mcp_status=$(oc get mcp/$role -o jsonpath='{.status.conditions[?(@.type=="Updated")].status}')
         if [[ X"$mcp_status" != X"True" ]]; then
             mcp_try=0
         fi
@@ -428,7 +490,7 @@ function admin_ack() {
         echo "Admin ack is not required in either z-stream upgrade or 4.7 and earlier" && return
     fi
 
-    local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o json | jq -r ".data")"
+    local out; out="$(oc -n openshift-config-managed get configmap admin-gates -o jsonpath='{.data}')"
     if [[ ${out} != *"ack-4.${SOURCE_MINOR_VERSION}"* ]]; then
         echo "Admin ack not required" && return
     fi
@@ -487,10 +549,9 @@ function check_upgrade_status() {
 
 # Check version, state in history
 function check_history() {
-    local cv version state
-    cv=$(oc get clusterversion/version -o json)
-    version=$(echo "${cv}" | jq -r '.status.history[0].version')
-    state=$(echo "${cv}" | jq -r '.status.history[0].state')
+    local version state
+    version=$(oc get clusterversion/version -o jsonpath='{.status.history[0].version}')
+    state=$(oc get clusterversion/version -o jsonpath='{.status.history[0].state}')
     if [[ ${version} == "${TARGET_VERSION}" && ${state} == "Completed" ]]; then
         echo "History check PASSED, cluster is now upgraded to ${TARGET_VERSION}" && return 0
     else
@@ -526,11 +587,10 @@ mkdir -p /tmp/client
 export OC_DIR="/tmp/client"
 export PATH=${OC_DIR}:$PATH
 
-
 for target in "${TARGET_RELEASES[@]}"
 do
     export TARGET="${target}"
-    TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" --output=json | jq -r '.metadata.version')"
+    TARGET_VERSION="$(env "NO_PROXY=*" "no_proxy=*" oc adm release info "${TARGET}" -o jsonpath='{.metadata.version}')"
     extract_oc
 
     SOURCE_VERSION="$(oc get clusterversion --no-headers | awk '{print $2}')"
@@ -553,7 +613,9 @@ do
         admin_ack
         cco_annotation
     fi
-
+    if [[ "${UPGRADE_CCO_MANUAL_MODE}" == "oidc" ]]; then
+        update_cloud_credentials_oidc
+    fi
     upgrade
     check_upgrade_status
     check_history

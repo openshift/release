@@ -16,6 +16,11 @@ finished()
   # Remember dev-scripts setup exit code
   retval=$?
 
+  # Make sure we always execute all of this, so we gather logs and installer status, even when
+  # install fails.
+  set +o pipefail
+  set +o errexit
+
   echo "Fetching kubeconfig, other credentials..."
   scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeconfig" "${SHARED_DIR}/"
   scp "${SSHOPTS[@]}" "root@${IP}:/root/dev-scripts/ocp/*/auth/kubeadmin-password" "${SHARED_DIR}/"
