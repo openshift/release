@@ -6,7 +6,31 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
+# Log in
+ROSA_VERSION=$(rosa version)
+ROSA_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
+if [[ ! -z "${ROSA_TOKEN}" ]]; then
+  echo "Logging into ${ROSA_LOGIN_ENV} with offline token using rosa cli ${ROSA_VERSION}"
+  rosa login --env "${ROSA_LOGIN_ENV}" --token "${ROSA_TOKEN}"
+  if [ $? -ne 0 ]; then
+    echo "Login failed"
+    exit 1
+  fi
+else
+  echo "Cannot login! You need to specify the offline token ROSA_TOKEN!"
+  exit 1
+fi
+
+# Configure aws
+CLOUD_PROVIDER_REGION=${LEASED_RESOURCE}
+AWSCRED="${CLUSTER_PROFILE_DIR}/.awscred"
+if [[ -f "${AWSCRED}" ]]; then
+  export AWS_SHARED_CREDENTIALS_FILE="${AWSCRED}"
+  export AWS_DEFAULT_REGION="${CLOUD_PROVIDER_REGION}"
+else
+  echo "Did not find compatible cloud provider cluster_profile"
+  exit 1
+fi
 
 CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
 CLUSTER_NAME=$(rosa describe cluster -c "${CLUSTER_ID}" -o json | jq -r '.name')
