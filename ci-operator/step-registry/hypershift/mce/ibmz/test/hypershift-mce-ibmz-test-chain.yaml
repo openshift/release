@@ -1,13 +1,15 @@
 chain:
   as: hypershift-mce-ibmz-test
+  env:
+  - name: HC_NAME
+    documentation: "Hosted Cluster name"
   steps:
     - as: test-ibmz-hostedcluster
       cli: latest
       commands: |-
         set -x
-        hc_name="agent-ibmz"
         echo "$(date) Checking for the cluster-operators status to be ready"
-        export KUBECONFIG=${SHARED_DIR}/${hc_name}_kubeconfig
+        export KUBECONFIG=${SHARED_DIR}/${HC_NAME}_kubeconfig
         while true; do
             count=$(oc get co --no-headers| awk '$3 != "True" {print $1}' | wc -l)
             if [ "$count" -eq 0 ]
@@ -26,4 +28,4 @@ chain:
         requests:
           cpu: 100m
           memory: 100Mi
-      timeout: 120m0s
+      timeout: 30m0s
