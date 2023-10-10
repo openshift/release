@@ -3,21 +3,24 @@ chain:
   steps:
     - as: test-ibmz-hostedcluster
       cli: latest
+      env:
+      - name: HC_NAME
+        documentation: "Hosted Cluster name"
       commands: |-
         set -x
-        hc_name="agent-ibmz"
         echo "$(date) Checking for the cluster-operators status to be ready"
-        export KUBECONFIG=${SHARED_DIR}/${hc_name}_kubeconfig
+        export KUBECONFIG=${SHARED_DIR}/${HC_NAME}_kubeconfig
         while true; do
             count=$(oc get co --no-headers| awk '$3 != "True" {print $1}' | wc -l)
             if [ "$count" -eq 0 ]
             then
                 echo "$(date) All the cluster operators are ready"
-                oc get co
                 break
             else
                 echo "All the cluster operators are not ready yet"
+                sleep 5
             fi
+            oc get co
         done
       from: tests
       grace_period: 15m0s
