@@ -69,9 +69,7 @@ if [[ ${ENABLE_SHARED_PHZ} == "yes" ]]; then
                 "tag:GetResources",
                 "tag:UntagResources"
             ],
-            "Resource": [
-                "arn:aws:route53:::hostedzone/${HOSTED_ZONE_ID}"
-            ]
+            "Resource": "*"
         }
     ]
 }
