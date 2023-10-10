@@ -208,6 +208,7 @@ data:
         regex: __meta_kubernetes_pod_label_(.+)
     - job_name: journal
       journal:
+        json: true
         path: /var/log/journal
         labels:
           job: systemd-journal
