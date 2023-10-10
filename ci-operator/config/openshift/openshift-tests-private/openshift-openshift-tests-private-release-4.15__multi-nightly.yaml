@@ -187,8 +187,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
     workflow: cucushift-installer-rehearse-azure-ipi
-- as: azure-ipi-arm-mixarch-f14
-  cron: 11 3 5,20 * *
+- as: azure-ipi-arm-mixarch-f28
+  cron: 22 0 9 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
@@ -299,21 +299,43 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-disconnected-fullyprivate
-- as: azure-ipi-ingress-custom-controller-amd-mixarch-f28
-  cron: 29 9 15 * *
+- as: azure-ipi-ingress-controller-arm-mixarch-f28
+  cron: 11 3 28 * *
   steps:
     cluster_profile: azure-qe
     dependencies:
       OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
     env:
-      ADDITIONAL_WORKER_VM_TYPE: Standard_D4ps_v5
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
       BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
       E2E_RUN_TAGS: '@heterogeneous and @azure-ipi and @network-ovnkubernetes and
         not @fips'
+      OCP_ARCH: arm64
       TAG_VERSION: '@4.15'
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
+- as: azure-ipi-ingress-controller-arm-mixarch-f28-destructive
+  cron: 25 2 9 * *
+  steps:
+    cluster_profile: azure-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: x86_64
+      ADDITIONAL_WORKER_VM_TYPE: Standard_D4s_v3
+      BASE_DOMAIN: qe.azure.devcluster.openshift.com
+      COMPUTE_NODE_TYPE: Standard_D4ps_v5
+      E2E_RUN_TAGS: '@heterogeneous and @azure-ipi and @network-ovnkubernetes and
+        not @fips'
+      OCP_ARCH: arm64
+      TAG_VERSION: '@4.15'
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-ipi-ingress-custom-controller
 - as: azure-ipi-oidc-amd-f28-destructive
   cron: 49 20 6 * *
