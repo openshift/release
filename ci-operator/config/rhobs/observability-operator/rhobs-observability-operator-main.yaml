@@ -1,0 +1,71 @@
+base_images:
+  cli:
+    name: "4.14"
+    namespace: ocp
+    tag: cli
+  operator-sdk:
+    name: "4.14"
+    namespace: origin
+    tag: operator-sdk
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- context_dir: .
+  dockerfile_path: build/Dockerfile
+  to: observability-operator
+- context_dir: .
+  dockerfile_path: test/Dockerfile
+  to: observability-operator-test-harness
+operator:
+  bundles:
+  - as: observability-bundle
+    context_dir: .
+    dockerfile_path: bundle.Dockerfile
+  substitutions:
+  - pullspec: observability-operator:0.0.25
+    with: pipeline:observability-operator
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.13"
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: observability-operator-e2e
+  cluster_claim:
+    architecture: amd64
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.13"
+  steps:
+    test:
+    - as: install
+      cli: latest
+      commands: |
+        oc create namespace obo
+        operator-sdk run bundle -n obo "$OO_BUNDLE"
+        oc wait --for condition=Available -n obo deployment observability-operator
+      dependencies:
+      - env: OO_BUNDLE
+        name: observability-bundle
+      from: operator-sdk
+      resources:
+        requests:
+          cpu: 100m
+          memory: 400Mi
+    - ref: rhobs-obo-test-harness
+    workflow: generic-claim
+zz_generated_metadata:
+  branch: main
+  org: rhobs
+  repo: observability-operator

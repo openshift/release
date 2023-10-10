@@ -1,0 +1,26 @@
+chain:
+  as: cucushift-installer-rehearse-azure-ipi-disconnected-cco-manual-workload-identity-provision
+  steps:
+    - ref: azure-provision-resourcegroup
+    - ref: azure-provision-vnet
+    - chain: azure-provision-bastionhost
+    - ref: openshift-cluster-bot-rbac
+    - chain: mirror-images-by-oc-adm
+    - chain: ipi-conf-azure
+    - ref: ipi-conf-manual-creds
+    - ref: ipi-conf-azure-oidc-creds-provision
+    - ref: ipi-conf-azure-provisioned-resourcegroup
+    - ref: ipi-conf-mirror
+    - ref: ipi-conf-azure-provisionednetwork
+    - ref: ipi-install-install
+    - ref: ipi-install-times-collection
+    - ref: enable-qe-catalogsource-disconnected
+    - ref: set-sample-operator-disconnected
+    - chain: cucushift-installer-check
+  env:
+    - name: RESTRICTED_NETWORK
+      default:  "yes"
+    - name: REGISTER_MIRROR_REGISTRY_DNS
+      default: "yes"
+  documentation: |-
+    Create an IPI cluster via image mirroring in a restricted network on Azure Workload Identity cluster for QE e2e tests.

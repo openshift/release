@@ -102,17 +102,17 @@ popd
 echo "CR manifest files:"
 ls "/tmp/credrequests"
 
-# create metadata so cluster resource group is deleted in ipi-deprovision-deprovision
-cat > ${SHARED_DIR}/metadata.json << EOF
-{"infraID":"${CLUSTER_NAME}","azure":{"region":"${REGION}","resourceGroupName":"${CLUSTER_NAME}"}}
-EOF
-
 ADDITIONAL_CCOCTL_ARGS=""
 # ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS enables the relevant job for each operator to decide
 # independantly if it needs the --enable-tech-preview added to the ccoctl command. It is very
 # different from the TechPreviewNoUpgrade FEATURE_SET, which toggles cluster wide.
 if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ]; then
   ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
+fi
+
+if [[ -s "${SHARED_DIR}/customer_vnet_subnets.yaml" ]] && [[ -s "${SHARED_DIR}/resourcegroup" ]]; then
+  vnet_resource_group=$(cat "${SHARED_DIR}/resourcegroup")
+  ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --network-resource-group-name=${vnet_resource_group}"
 fi
 
 # create required credentials infrastructure and installer manifests
@@ -143,7 +143,7 @@ cat "/tmp/manifests/cluster-authentication-02-config.yaml"
 echo -e "\n"
 
 # save the resource_group name for use by ipi-conf-azure-provisioned-resourcegroup
-echo $CLUSTER_NAME > ${SHARED_DIR}/resourcegroup
+echo $CLUSTER_NAME > ${SHARED_DIR}/resourcegroup_cluster
 
 # copy generated service account signing from ccoctl target directory into shared directory
 cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"
