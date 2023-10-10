@@ -63,10 +63,12 @@ IFS=' ' read -r -a worker_ips <<<"$(oc get machines -n openshift-machine-api -l 
 
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
-declare API_VIP
-declare INGRESS_VIP
-# shellcheck source=/dev/null
-source "${SHARED_DIR}/vsphere_context.sh"
+declare -a vips
+mapfile -t vips <"${SHARED_DIR}/vips.txt"
+apiVIP: "${vips[0]}"
+ingressVIP: "${vips[1]}"
+API_VIP=${vips[0]}
+INGRESS_VIP=${vips[1]}
 
 worker_reboot=""
 worker_reboot_name=""
