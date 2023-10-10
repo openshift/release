@@ -65,8 +65,6 @@ SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
 declare -a vips
 mapfile -t vips <"${SHARED_DIR}/vips.txt"
-apiVIP: "${vips[0]}"
-ingressVIP: "${vips[1]}"
 API_VIP=${vips[0]}
 INGRESS_VIP=${vips[1]}
 
