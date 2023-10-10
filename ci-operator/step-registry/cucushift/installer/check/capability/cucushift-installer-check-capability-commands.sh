@@ -4,10 +4,12 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-if [[ "${BASELINE_CAPABILITY_SET}" == "" ]]; then
-  echo "This step is not required when BASELINE_CAPABILITY_SET is not set"
-  exit 0
+baselinecaps_from_config=$(yq-go r "${SHARED_DIR}/install-config.yaml" "capabilities.baselineCapabilitySet")
+if [[ "${baselinecaps_from_config}" == "" ]]; then
+    echo "Field capabilities.baselineCapabilitySet in install-config is not set, skip the check!"
+    exit 0
 fi
+echo "baselinecaps_from_config: ${baselinecaps_from_config}"
 
 function cvoCapabilityCheck() {
 
@@ -84,9 +86,11 @@ caps_operator[MachineAPI]="machine-api control-plane-machine-set cluster-autosca
 caps_operator[ImageRegistry]="image-registry"
 
 # Mapping between optional capability and resources
+# Need to be updated when new resource marks as optional
+caps_resource_list="Build DeploymentConfig"
 declare -A caps_resource
-caps_resource[Build]="build.build.openshift.io"
-caps_resource[DeploymentConfig]="dc"
+caps_resource[Build]="build"
+caps_resource[DeploymentConfig]="deploymentconfig"
 
 v411="baremetal marketplace openshift-samples"
 # shellcheck disable=SC2034
@@ -110,7 +114,7 @@ fi
 echo "vCurrent set: $vCurrent"
 
 enabled_capability_set=""
-case ${BASELINE_CAPABILITY_SET} in
+case ${baselinecaps_from_config} in
 "None")
   ;;
 "v4.11")
@@ -144,6 +148,7 @@ else
     [[ ${#additional_caps_from_config_array[@]} -gt 0 ]] && enabled_capability_set="${enabled_capability_set} ${additional_caps_from_config_array[*]}"
 fi
 
+enabled_capability_set=$(echo ${enabled_capability_set} | xargs -n1 | sort -u | xargs)
 disabled_capability_set="${vCurrent}"
 for cap in $enabled_capability_set; do
     disabled_capability_set=${disabled_capability_set/$cap}
@@ -158,9 +163,13 @@ check_result=0
 echo "------check enabled capabilities-----"
 echo "enabled capability set: ${enabled_capability_set}"
 for cap in $enabled_capability_set; do
-    if [[ "${cap}" == "Build" ]] || [[ "${cap}" == "DeploymentConfig" ]]; then
+    echo "check capability ${cap}"
+    #shellcheck disable=SC2076
+    if [[ " ${caps_resource_list} " =~ " ${cap} " ]]; then
         resource="${caps_resource[$cap]}"
-        if ! oc get ${resource} -A &>/dev/null; then
+        res_ret=0
+        oc api-resources | grep ${resource} || res_ret=1
+        if [[ ${res_ret} -eq 1 ]] ; then
             echo "ERROR: capability ${cap}: resources ${resource} -- not found!"
             check_result=1
         fi
@@ -178,9 +187,13 @@ done
 echo "------check disabled capabilities-----"
 echo "disabled capability set: ${disabled_capability_set}"
 for cap in $disabled_capability_set; do
-    if [[ "${cap}" == "Build" ]] || [[ "${cap}" == "DeploymentConfig" ]]; then
+    echo "check capability ${cap}"
+    #shellcheck disable=SC2076
+    if [[ " ${caps_resource_list} " =~ " ${cap} " ]]; then
         resource="${caps_resource[$cap]}"
-        if oc get ${resource} -A &>/dev/null; then
+        res_ret=0
+        oc api-resources | grep ${resource} || res_ret=1
+        if [[ ${res_ret} -eq 0 ]]; then
             echo "ERROR: capability ${cap}: resources ${resource} -- found!"
             check_result=1
         fi
@@ -197,7 +210,6 @@ done
 # cvo status capability check
 echo "------check cvo status capabilities check-----"
 echo "===check .status.capabilities.enabledCapabilities"
-enabled_capability_set=$(echo ${enabled_capability_set} | xargs -n1 | sort -u | xargs)
 cvoCapabilityCheck "${enabled_capability_set}" "enabled" ".status.capabilities.enabledCapabilities" || check_result=1
 
 echo "===check .status.capabilities.knownCapabilities"

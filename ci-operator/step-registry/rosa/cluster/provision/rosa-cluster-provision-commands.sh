@@ -237,7 +237,7 @@ if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
   if [[ "$HOSTED_CP" == "true" ]]; then
     kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
     ETCD_ENCRYPTION_SWITCH="${ETCD_ENCRYPTION_SWITCH} --etcd-encryption-kms-arn $kms_key_arn"
-    record_cluster "encrption" "etcd_encryption_kms_arn" $kms_key_arn
+    record_cluster "encryption" "etcd_encryption_kms_arn" $kms_key_arn
   fi
 fi
 
@@ -245,7 +245,7 @@ STORAGE_ENCRYPTION_SWITCH=""
 if [[ "$STORAGE_ENCRYPTION" == "true" ]]; then
   kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
   STORAGE_ENCRYPTION_SWITCH="--enable-customer-managed-key --kms-key-arn $kms_key_arn"
-  record_cluster "encrption" "kms_key_arn" $kms_key_arn
+  record_cluster "encryption" "kms_key_arn" $kms_key_arn
 fi
 
 HYPERSHIFT_SWITCH=""
@@ -263,7 +263,7 @@ if [[ "$HOSTED_CP" == "true" ]]; then
   fi
 
   ENABLE_BYOVPC="true"
-  # BYO_OIDC="true"
+  BYO_OIDC="true"
 fi
 
 FIPS_SWITCH=""
@@ -370,11 +370,6 @@ if [[ "$STS" == "true" ]]; then
     BYO_OIDC_SWITCH="--oidc-config-id ${oidc_config_id} --operator-roles-prefix ${operator_roles_prefix}"
     record_cluster "aws.sts" "oidc_config_id" $oidc_config_id
     record_cluster "aws.sts" "operator_roles_prefix" $operator_roles_prefix
-  else
-    # For the hypershift cluster, as default, BYO OIDC is required. If we do not set BYO OIDC, the option --classic-oidc-config must be set.
-    if [[ "$HOSTED_CP" == "true" ]] ; then
-      BYO_OIDC_SWITCH="--classic-oidc-config"
-    fi
   fi
 fi
 

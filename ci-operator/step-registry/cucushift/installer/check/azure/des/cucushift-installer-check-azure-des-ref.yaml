@@ -1,0 +1,23 @@
+ref:
+  as: cucushift-installer-check-azure-des
+  from_image:
+   namespace: ocp
+   name: "4.14"
+   tag: upi-installer
+  commands: cucushift-installer-check-azure-des-commands.sh
+  resources:
+    requests:
+      cpu: 10m
+      memory: 100Mi
+  env:
+  - name: ENABLE_DES_DEFAULT_MACHINE
+    default: ""
+    documentation: |-
+      Adds provisioned disk encryption set section under DefaultMachinePlatform in the install-config.yaml
+      * "false" (default) - Adds provisioned disk encryption set section under compute/controlPlane
+      * "true" - Adds provisioned disk encryption set section under DefaultMachinePlatform, which also encrypts the default storage class from 4.13
+  dependencies:
+  - name: "release:latest"
+    env: RELEASE_IMAGE_LATEST_FROM_BUILD_FARM
+  documentation: |-
+    Check that disk encryption set is configured well on nodes
