@@ -39,15 +39,14 @@ function cleanup_ibmcloud_powervs() {
       then
         for CS in $(ic tg connections "${GW}" --output json | jq -r '.[].id')
         do 
-          ic tg connection-delete "${GW}" "${CS}" --force \
-            || sleep 120 \
-            && ic tg connection-delete "${GW}" "${CS}" --force || true
+          ic tg connection-delete "${GW}" "${CS}" --force || true
+          sleep 120
+          ic tg connection-delete "${GW}" "${CS}" --force || true
           sleep 30
         done
-        ic tg gwd "${GW}" --force \
-          || sleep 120 \
-          && ic tg gwd "${GW}" --force \
-          true
+        ic tg gwd "${GW}" --force || sleep 120s || true
+        ic tg gateway "${GW}" || true
+        ic tg gwd "${GW}" --force || sleep 120s || true
         echo "waiting up a minute while the Transit Gateways are removed"
         sleep 60
       fi
