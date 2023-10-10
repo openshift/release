@@ -3,11 +3,9 @@
 set -x
 
 # Session variables
-infra_name="hcp-ci-$(echo -n $PROW_JOB_ID|cut -c-8)"
+infra_name="$HC_NAME-$(echo -n $PROW_JOB_ID|cut -c-8)"
 plugins_list=("vpc-infrastructure" "cloud-dns-services")
-hc_ns="hcp-ci"
-hc_name="agent-ibmz"
-hcp_ns=$hc_ns-$hc_name
+hcp_ns=$HC_NS-$HC_NAME
 export hcp_ns
 IC_API_KEY=$(cat "${AGENT_IBMZ_CREDENTIALS}/ibmcloud-apikey")
 export IC_API_KEY
@@ -155,30 +153,30 @@ else
   exit 1
 fi
 
-echo "Creating the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN in the instance $infra_name-dns."
-dns_zone_id=$(ibmcloud dns zone-create "$hc_name.$HYPERSHIFT_BASEDOMAIN" -i $infra_name-dns --output JSON | jq -r '.id')
+echo "Creating the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN in the instance $infra_name-dns."
+dns_zone_id=$(ibmcloud dns zone-create "$HC_NAME.$HYPERSHIFT_BASEDOMAIN" -i $infra_name-dns --output JSON | jq -r '.id')
 if [ -z $dns_zone_id ]; then
-  echo "DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN is not created properly as it is not possesing any ID."
+  echo "DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN is not created properly as it is not possesing any ID."
   exit 1
 else 
-  echo "DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN is created successfully in the instance $infra_name-dns."
+  echo "DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN is created successfully in the instance $infra_name-dns."
 fi
 
-echo "Adding VPC network $infra_name-vpc to the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN"
+echo "Adding VPC network $infra_name-vpc to the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN"
 dns_network_state=$(ibmcloud dns permitted-network-add $dns_zone_id --type vpc --vpc-crn $vpc_crn -i $infra_name-dns --output JSON | jq -r '.state')
 if [ "$dns_network_state" != "ACTIVE" ]; then
-  echo "VPC network $infra_name-vpc which is added to the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN is not in ACTIVE state."
+  echo "VPC network $infra_name-vpc which is added to the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN is not in ACTIVE state."
   exit 1
 else 
-  echo "VPC network $infra_name-vpc is successfully added to the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN."
-  echo "DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN is in the ACTIVE state."
+  echo "VPC network $infra_name-vpc is successfully added to the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN."
+  echo "DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN is in the ACTIVE state."
 fi
 
 echo "Fetching the hosted cluster IP address for resolution"
-hc_url=$(cat ${SHARED_DIR}/${hc_name}_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1)
+hc_url=$(cat ${SHARED_DIR}/${HC_NAME}_kubeconfig | awk '/server/{print $2}' | cut -c 9- | cut -d ':' -f 1)
 hc_ip=$(dig +short $hc_url | head -1)
 
-echo "Adding A records in the DNS zone $hc_name.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
+echo "Adding A records in the DNS zone $HC_NAME.$HYPERSHIFT_BASEDOMAIN to resolve the api URLs of hosted cluster to the hosted cluster IP."
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api" --ipv4 $hc_ip -i $infra_name-dns
 ibmcloud dns resource-record-create $dns_zone_id --type A --name "api-int" --ipv4 $hc_ip -i $infra_name-dns
 if [ $? -eq 0 ]; then
@@ -208,11 +206,11 @@ else
 fi
 
 # Generating script for agent bootup execution on zVSI
-initrd_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.initrd')
+initrd_url=$(oc get infraenv/${HC_NAME} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.initrd')
 export initrd_url
-kernel_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.kernel')
+kernel_url=$(oc get infraenv/${HC_NAME} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.kernel')
 export kernel_url
-rootfs_url=$(oc get infraenv/${hc_name} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
+rootfs_url=$(oc get infraenv/${HC_NAME} -n $hcp_ns -o json | jq -r '.status.bootArtifacts.rootfs')
 export rootfs_url
 ssh_key_string=$(cat "${AGENT_IBMZ_CREDENTIALS}/httpd-vsi-key")
 export ssh_key_string
@@ -278,7 +276,7 @@ for ((i=0; i<$HYPERSHIFT_NODE_COUNT; i++)); do
 done
 
 # Scaling up nodepool
-oc -n $hc_ns scale nodepool $hc_name --replicas $HYPERSHIFT_NODE_COUNT
+oc -n $HC_NS scale nodepool $HC_NAME --replicas $HYPERSHIFT_NODE_COUNT
 
 # Waiting for compute nodes to get ready
 echo "$(date) Patched the agents, waiting for the installation to get completed on them"
@@ -287,5 +285,5 @@ echo "$(date) All the agents are attached as compute nodes to the hosted control
 
 # Verifying the compute nodes status
 echo "$(date) Checking the compute nodes in the hosted control plane"
-oc get no --kubeconfig="${SHARED_DIR}/${hc_name}_kubeconfig"
+oc get no --kubeconfig="${SHARED_DIR}/${HC_NAME}_kubeconfig"
 echo "$(date) Successfully completed the e2e creation chain"

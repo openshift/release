@@ -54,6 +54,8 @@ else
 
 fi
 
+echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
+
 pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
 build01_secrets="/var/run/vault/secrets/.dockerconfigjson"
 extract_build01_auth=$(jq -c '.auths."registry.apps.build01-us-west-2.vmc.ci.openshift.org"' ${build01_secrets})

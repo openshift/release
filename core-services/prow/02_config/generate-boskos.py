@@ -139,10 +139,10 @@ CONFIG = {
         'us-central1': 30,
     },
     'gcp-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 80,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 80,
     },
     'gcp-arm64-quota-slice': {
         'us-central1': 30,
@@ -168,9 +168,6 @@ CONFIG = {
     },
     'openstack-hwoffload-quota-slice': {
         'default': 5,
-    },
-    'openstack-kuryr-quota-slice': {
-        'default': 2,
     },
     'openstack-nfv-quota-slice': {
         'default': 5,
@@ -289,7 +286,13 @@ CONFIG = {
     },
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
-    }
+    },
+    'hypershift-powervs-quota-slice': {
+        'default': 3,
+    },
+    'hypershift-powervs-cb-quota-slice': {
+        'default': 5,
+    },
 }
 
 for i in range(3):

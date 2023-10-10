@@ -15,4 +15,4 @@ TEAM=$1
 OUTPUT_DIR="clusters/hive/pools/$TEAM"
 mkdir -p "${OUTPUT_DIR}"
 OUTPUT_FILE="${OUTPUT_DIR}/admins_${TEAM}-cluster-pool_rbac.yaml"
-oc process -f clusters/hive/pools/_pool-admin-rbac_template.yaml -p TEAM=${TEAM} -p POOL_NAMESPACE=${TEAM}-cluster-pool -o yaml > "${OUTPUT_FILE}"
+oc process --local -f clusters/hive/pools/_pool-admin-rbac_template.yaml -p TEAM=${TEAM} -p POOL_NAMESPACE=${TEAM}-cluster-pool -o yaml > "${OUTPUT_FILE}"

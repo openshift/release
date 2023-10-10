@@ -238,12 +238,11 @@ networking:
 EOF
 fi
 
-
 echo "$(date -u --rfc-3339=seconds) - ***** DEBUG ***** DNS: ${dns_server}"
 
 echo "$(date -u --rfc-3339=seconds) - Create terraform.tfvars ..."
 cat >"${SHARED_DIR}/terraform.tfvars" <<-EOF
-machine_cidr = "192.168.${third_octet}.0/25"
+machine_cidr = "${machine_cidr}"
 vm_template = "${vm_template}"
 vsphere_server = "${vsphere_url}"
 ipam = "ipam.vmc.ci.openshift.org"
@@ -267,21 +266,21 @@ failure_domains = [
         cluster = "vcs-mdcnc-workload-1"
         datastore = "mdcnc-ds-1"
         network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 1b 07 19 2b 0b 0a-eb 90 98 54 1d c5 b5 19"
+        distributed_virtual_switch_uuid = "50 05 37 56 0d b0 eb 3a-e4 4c 68 33 1b 64 9e a2"
     },
     {
         datacenter = "IBMCloud"
         cluster = "vcs-mdcnc-workload-2"
         datastore = "mdcnc-ds-2"
         network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 df b2 de b8 24 7b-db a6 e2 9b eb be 85 30"
+        distributed_virtual_switch_uuid = "50 05 37 56 0d b0 eb 3a-e4 4c 68 33 1b 64 9e a2"
     },
     {
         datacenter = "IBMCloud"
         cluster = "vcs-mdcnc-workload-3"
         datastore = "mdcnc-ds-3"
         network = "${vsphere_portgroup}"
-        distributed_virtual_switch_uuid = "50 05 f2 28 9e 27 86 0c-da 17 16 22 e9 47 20 e3"
+        distributed_virtual_switch_uuid = "50 05 37 56 0d b0 eb 3a-e4 4c 68 33 1b 64 9e a2"
     },
     {
         datacenter = "datacenter-2"
