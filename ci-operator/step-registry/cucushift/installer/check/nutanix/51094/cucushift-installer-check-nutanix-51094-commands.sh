@@ -17,6 +17,10 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
+sleep 3600
+
+oc get node -l node-role.kubernetes.io/worker= --no-headers | wc -l
+
 SSH_PRIV_KEY_PATH=${CLUSTER_PROFILE_DIR}/ssh-privatekey
 
 # Check MachineConfig have kerneltype applied
