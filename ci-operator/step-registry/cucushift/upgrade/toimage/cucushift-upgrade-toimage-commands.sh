@@ -46,6 +46,7 @@ function extract_ccoctl(){
     local retry=5 
     tmp_ccoctl="/tmp/upgtool"
     mkdir -p ${tmp_ccoctl}
+    export PATH=/tmp:${PATH}
     cco_image=$(oc adm release info --image-for='cloud-credential-operator' ${TARGET} -a "${CLUSTER_PROFILE_DIR}/pull-secret") || return 1
     while ! (env "NO_PROXY=*" "no_proxy=*" oc image extract $cco_image --path="/usr/bin/ccoctl:${tmp_ccoctl}" -a "${CLUSTER_PROFILE_DIR}/pull-secret");
     do
@@ -88,7 +89,6 @@ function update_cloud_credentials_oidc(){
                 export AWS_SHARED_CREDENTIALS_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
                 infra_name=${NAMESPACE}-${UNIQUE_HASH}
                 oidc_provider=$(head -n1 ${SHARED_DIR}/aws_oidc_provider_arn)
-                export PATH=/tmp:${PATH}
                 extract_ccoctl
                 if ! ccoctl aws create-iam-roles --name="${infra_name}" --region="${LEASED_RESOURCE}" --credentials-requests-dir="${tobeCredsDir}" --identity-provider-arn="${oidc_provider}" --output-dir="${toManifests}"; then
                     echo "Failed to update iam role!" && exit 1
