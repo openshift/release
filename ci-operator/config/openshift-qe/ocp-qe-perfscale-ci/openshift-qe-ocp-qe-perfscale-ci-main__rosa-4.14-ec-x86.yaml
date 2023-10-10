@@ -21,8 +21,8 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
-- always_run: false
-  as: perfscale-rosa-multiaz-ec-data-path-9nodes-periodic
+- as: perfscale-rosa-multiaz-data-path-9nodes-periodic
+  cron: 0 3 */21 * *
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -39,7 +39,7 @@ tests:
     - chain: openshift-qe-data-path-tests
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: perfscale-rosa-singleaz-ec-data-path-2nodes-periodic
+- as: perfscale-rosa-1zone-data-path-2nodes-periodic
   cron: 0 9 */21 * *
   steps:
     cluster_profile: aws-perfscale-qe
@@ -56,7 +56,7 @@ tests:
     - chain: openshift-qe-data-path-tests
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: perfscale-rosa-multiaz-ec-control-plane-24nodes-periodic
+- as: perfscale-rosa-multiaz-control-plane-24nodes-periodic
   cron: 0 12 */21 * *
   steps:
     cluster_profile: aws-perfscale-qe
@@ -72,13 +72,14 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 5h0m0s
-- as: perfscale-rosa-multiaz-ec-node-density-heavy-24nodes-periodic
+- as: perfscale-rosa-multiaz-node-density-heavy-24nodes-periodic
   cron: 0 18 */21 * *
   steps:
     cluster_profile: aws-perfscale-qe
     env:
       CHANNEL_GROUP: candidate
       COMPUTE_MACHINE_TYPE: m5.xlarge
+      EC_BUILD: "true"
       ENABLE_AUTOSCALING: "false"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.14"
@@ -86,6 +87,26 @@ tests:
       REPLICAS: "24"
     test:
     - chain: openshift-qe-node-density-heavy
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
+- as: perfscale-rosa-multiaz-node-density-cni-24nodes-periodic
+  cron: 0 15 * * 4
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: candidate
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      DISABLE_WORKLOAD_MONITORING: "false"
+      EC_BUILD: "true"
+      ENABLE_AUTOSCALING: "false"
+      HOSTED_CP: "true"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.14"
+      PODS_PER_NODE: "100"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "24"
+    test:
+    - chain: openshift-qe-node-density-cni
     workflow: rosa-aws-sts
   timeout: 5h0m0s
 zz_generated_metadata:
