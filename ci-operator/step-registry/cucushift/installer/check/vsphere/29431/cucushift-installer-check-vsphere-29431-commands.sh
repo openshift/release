@@ -15,7 +15,7 @@ if ! whoami &> /dev/null; then
     fi
 fi
 
-echo "Start Running Case https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-29387"
+echo "Start Running Case https://polarion.engineering.redhat.com/polarion/#/project/OSE/workitem?id=OCP-29431"
 oc new-project vip-test
 oc new-app httpd -n vip-test
 oc expose svc/httpd
