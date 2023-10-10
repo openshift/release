@@ -1,28 +1,28 @@
 presubmits:
-  kubevirt/node-maintenance-operator:
+  rhobs/observability-operator:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.9$
-    - ^release-0\.9-
-    cluster: build01
-    context: ci/prow/ci-index
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/ci-index-observability-bundle
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.8"
+      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-node-maintenance-operator-release-0.9-ci-index
-    rerun_command: /test ci-index
+    name: pull-ci-rhobs-observability-operator-main-ci-index-observability-bundle
+    rerun_command: /test ci-index-observability-bundle
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
-        - --target=ci-index
+        - --target=ci-index-observability-bundle
         command:
         - ci-operator
         image: ci-operator:latest
@@ -55,22 +55,22 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )ci-index,?($|\s.*)
+    trigger: (?m)^/test( | .* )ci-index-observability-bundle,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.9$
-    - ^release-0\.9-
-    cluster: build01
+    - ^main$
+    - ^main-
+    cluster: build03
     context: ci/prow/images
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci.openshift.io/generator: prowgen
-      job-release: "4.8"
+      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-node-maintenance-operator-release-0.9-images
+    name: pull-ci-rhobs-observability-operator-main-images
     rerun_command: /test images
     spec:
       containers:
@@ -115,31 +115,28 @@ presubmits:
   - agent: kubernetes
     always_run: true
     branches:
-    - ^release-0\.9$
-    - ^release-0\.9-
-    cluster: build05
-    context: ci/prow/openshift-e2e
+    - ^main$
+    - ^main-
+    cluster: build03
+    context: ci/prow/observability-operator-e2e
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
-      ci-operator.openshift.io/cloud: aws
-      ci-operator.openshift.io/cloud-cluster-profile: aws
       ci.openshift.io/generator: prowgen
-      job-release: "4.8"
+      job-release: "4.13"
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-kubevirt-node-maintenance-operator-release-0.9-openshift-e2e
-    rerun_command: /test openshift-e2e
+    name: pull-ci-rhobs-observability-operator-main-observability-operator-e2e
+    rerun_command: /test observability-operator-e2e
     spec:
       containers:
       - args:
         - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --hive-kubeconfig=/secrets/hive-hive-credentials/kubeconfig
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --lease-server-credentials-file=/etc/boskos/credentials
         - --report-credentials-file=/etc/report/credentials
         - --secret-dir=/secrets/ci-pull-credentials
-        - --secret-dir=/usr/local/openshift-e2e-cluster-profile
-        - --target=openshift-e2e
+        - --target=observability-operator-e2e
         command:
         - ci-operator
         image: ci-operator:latest
@@ -149,16 +146,14 @@ presubmits:
           requests:
             cpu: 10m
         volumeMounts:
-        - mountPath: /etc/boskos
-          name: boskos
-          readOnly: true
         - mountPath: /secrets/ci-pull-credentials
           name: ci-pull-credentials
           readOnly: true
-        - mountPath: /usr/local/openshift-e2e-cluster-profile
-          name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/hive-hive-credentials
+          name: hive-hive-credentials
           readOnly: true
         - mountPath: /secrets/manifest-tool
           name: manifest-tool-local-pusher
@@ -171,18 +166,12 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
-      - name: boskos
-        secret:
-          items:
-          - key: credentials
-            path: credentials
-          secretName: boskos-credentials
       - name: ci-pull-credentials
         secret:
           secretName: ci-pull-credentials
-      - name: cluster-profile
+      - name: hive-hive-credentials
         secret:
-          secretName: cluster-secrets-aws
+          secretName: hive-hive-credentials
       - name: manifest-tool-local-pusher
         secret:
           secretName: manifest-tool-local-pusher
@@ -192,4 +181,4 @@ presubmits:
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )openshift-e2e,?($|\s.*)
+    trigger: (?m)^/test( | .* )observability-operator-e2e,?($|\s.*)
