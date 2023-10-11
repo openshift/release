@@ -19,6 +19,10 @@ base_images:
     name: centos
     namespace: origin
     tag: stream8
+  snyk-cli:
+    name: snyk-cli
+    namespace: ci
+    tag: go1.19
 binary_build_commands: make production-install
 build_root:
   from_repository: true
@@ -866,6 +870,11 @@ tests:
   commands: make lint
   container:
     from: golangci-lint
+- as: security
+  steps:
+    env:
+      PROJECT_NAME: ci-tools
+    workflow: openshift-ci-security
 zz_generated_metadata:
   branch: master
   org: openshift
