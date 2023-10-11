@@ -45,6 +45,8 @@ spec:
         contents: |
           [Unit]
           Description=Setup for C2S Instance Metadata Emulator
+          Before=aws-kubelet-nodename.service aws-kubelet-providerid.service
+          RequiredBy=aws-kubelet-nodename.service aws-kubelet-providerid.service
           [Service]
           Type=oneshot
           RemainAfterExit=true
@@ -59,6 +61,8 @@ spec:
           Description=C2S Instance Metadata Emulator
           Wants=c2s-instance-metadata-setup.service
           After=c2s-instance-metadata-setup.service
+          Before=aws-kubelet-nodename.service aws-kubelet-providerid.service
+          RequiredBy=aws-kubelet-nodename.service aws-kubelet-providerid.service
           [Service]
           User=metadata
           ExecStart=podman run --userns keep-id  --net host ${instance_metadata_repo} --emulatedRegion ${REGION}
