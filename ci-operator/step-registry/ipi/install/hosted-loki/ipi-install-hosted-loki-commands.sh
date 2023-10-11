@@ -243,6 +243,9 @@ data:
       relabel_configs:
       - action: labelmap
         regex: __journal__(.+)
+      - source_labels:
+        - __journal__hostname
+        target_label: host
     server:
       http_listen_port: 3101
       log_level: warn
