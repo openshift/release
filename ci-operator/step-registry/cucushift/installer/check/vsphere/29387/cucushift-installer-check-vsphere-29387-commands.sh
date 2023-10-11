@@ -8,9 +8,9 @@ echo "Start Running Case https://polarion.engineering.redhat.com/polarion/#/proj
 
 # Ensure our UID, which is randomly generated, is in /etc/passwd. This is required
 # to be able to SSH.
-if ! whoami &> /dev/null; then
+if ! whoami &>/dev/null; then
     if [[ -w /etc/passwd ]]; then
-        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >> /etc/passwd
+        echo "${USER_NAME:-default}:x:$(id -u):0:${USER_NAME:-default} user:${HOME}:/sbin/nologin" >>/etc/passwd
     else
         echo "/etc/passwd is not writeable, and user matching this uid is not found."
         exit 1
@@ -73,7 +73,7 @@ worker_reboot_name=""
 # Check which worker is holding ingressVip
 for worker_ip in "${worker_ips[@]}"; do
     net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$worker_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$INGRESS_VIP"; then
+    if echo "$net_show" | grep "$INGRESS_VIP/"; then
         echo "Pass: worker: $worker_ip is holding ingressVip: $INGRESS_VIP"
         worker_reboot=$worker_ip
         worker_reboot_name="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$worker_ip" hostname)"
@@ -105,7 +105,7 @@ done
 # Check left workers get ingressVip
 for worker_ip in "${worker_ips[@]}"; do
     net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$worker_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$INGRESS_VIP"; then
+    if echo "$net_show" | grep "$INGRESS_VIP/"; then
         if [ "$worker_ip" != "$worker_reboot" ]; then
             echo "Pass: worker: $worker_ip is holding ingressVip: $INGRESS_VIP"
             break
@@ -145,7 +145,7 @@ master_reboot_name=""
 # Check which worker is holding APIVip
 for master_ip in "${master_ips[@]}"; do
     net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$master_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$API_VIP"; then
+    if echo "$net_show" | grep "$API_VIP/"; then
         echo "Pass: master: $master_ip is holding APIVip: $API_VIP"
         master_reboot=$master_ip
         master_reboot_name="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$master_ip" hostname)"
@@ -177,9 +177,9 @@ done
 # Check left masters get APIVip
 for master_ip in "${master_ips[@]}"; do
     net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$master_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$API_VIP"; then
+    if echo "$net_show" | grep "$API_VIP/"; then
         if [ "$master_ip" != "$master_reboot" ]; then
-            echo "Pass: worker: $master_ip is holding ingressVip: $API_VIP"
+            echo "Pass: worker: $master_ip is holding APIVip: $API_VIP"
             break
         fi
     fi

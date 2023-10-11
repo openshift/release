@@ -71,7 +71,7 @@ worker_reboot_name=""
 # Check which worker is holding ingressVip
 for worker_ip in "${worker_ips[@]}"; do
     net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$worker_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$INGRESS_VIP"; then
+    if echo "$net_show" | grep "$INGRESS_VIP/"; then
         echo "Pass: worker: $worker_ip is holding ingressVip: $INGRESS_VIP"
         worker_reboot=$worker_ip
         worker_reboot_name="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$worker_ip" hostname)"
@@ -103,7 +103,7 @@ done
 # Check left workers get ingressVip
 for worker_ip in "${worker_ips[@]}"; do
     net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$worker_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$INGRESS_VIP"; then
+    if echo "$net_show" | grep "$INGRESS_VIP/"; then
         if [ "$worker_ip" != "$worker_reboot" ]; then
             echo "Pass: worker: $worker_ip is holding ingressVip: $INGRESS_VIP"
             break
@@ -143,7 +143,7 @@ master_reboot_name=""
 # Check which worker is holding APIVip
 for master_ip in "${master_ips[@]}"; do
     net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$master_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$API_VIP"; then
+    if echo "$net_show" | grep "$API_VIP/"; then
         echo "Pass: master: $master_ip is holding APIVip: $API_VIP"
         master_reboot=$master_ip
         master_reboot_name="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$master_ip" hostname)"
@@ -175,9 +175,9 @@ done
 # Check left masters get APIVip
 for master_ip in "${master_ips[@]}"; do
     net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$master_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$API_VIP"; then
+    if echo "$net_show" | grep "$API_VIP/"; then
         if [ "$master_ip" != "$master_reboot" ]; then
-            echo "Pass: worker: $master_ip is holding ingressVip: $API_VIP"
+            echo "Pass: worker: $master_ip is holding APIVip: $API_VIP"
             break
         fi
     fi
