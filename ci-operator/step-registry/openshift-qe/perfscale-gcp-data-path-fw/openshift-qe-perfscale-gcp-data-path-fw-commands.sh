@@ -6,19 +6,6 @@ set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
 
-# Log in
-OCM_TOKEN=$(cat "${CLUSTER_PROFILE_DIR}/ocm-token")
-if [[ ! -z "${OCM_TOKEN}" ]]; then
-  echo "Logging into ${OCM_LOGIN_URL} with offline token using ocm cli ${OCM_VERSION}"
-  ocm login --url "${OCM_LOGIN_URL}" --token "${OCM_TOKEN}"
-  if [ $? -ne 0 ]; then
-    echo "Login failed"
-    exit 1
-  fi
-else
-  echo "Cannot login! You need to specify the offline token OCM_TOKEN!"
-  exit 1
-fi
 
 # Configure gcloud
 GOOGLE_PROJECT_ID="$(< ${CLUSTER_PROFILE_DIR}/openshift_gcp_project)"
@@ -33,8 +20,7 @@ fi
 REGION="${LEASED_RESOURCE}"
 echo "Using region: ${REGION}"
 
-CLUSTER_ID=$(cat "${SHARED_DIR}/cluster-id")
-CLUSTER_NAME=$(ocm describe cluster $CLUSTER_ID --json | jq -r '.name')
+CLUSTER_NAME=$(oc get infrastructure cluster -o json | jq -r '.status.apiServerURL' | awk -F.  '{print$2}')
 echo "Updating firewall rules for data-path test on cluster $CLUSTER_NAME"
 
 NETWORK_NAME=$(gcloud compute networks list --format="value(name)" | grep ^${CLUSTER_NAME})
