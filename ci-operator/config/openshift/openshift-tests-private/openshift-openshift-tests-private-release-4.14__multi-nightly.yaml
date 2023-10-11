@@ -83,8 +83,8 @@ tests:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
-- as: aws-ipi-disc-tp-amd-mixarch-f28
-  cron: 6 18 27 * *
+- as: aws-ipi-disc-tp-amd-mixarch-f14
+  cron: 4 16 3,18 * *
   steps:
     cluster_profile: aws-qe
     dependencies:
@@ -100,6 +100,24 @@ tests:
     test:
     - ref: ipi-install-heterogeneous
     - chain: openshift-e2e-test-qe
+    workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
+- as: aws-ipi-disc-tp-amd-mixarch-f28-destructive
+  cron: 13 12 22 * *
+  steps:
+    cluster_profile: aws-qe
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      E2E_RUN_TAGS: '@heterogeneous and @aws-ipi and @disconnected and @network-ovnkubernetes
+        and not @fips'
+      EXTRACT_MANIFEST_INCLUDED: "true"
+      FEATURE_SET: TechPreviewNoUpgrade
+      TAG_VERSION: '@4.14'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~ConnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&
+    test:
+    - ref: ipi-install-heterogeneous
+    - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-aws-ipi-disconnected-private
 - as: aws-ipi-ovn-ipsec-amd-mixarch-f14
   cron: 12 18 2,17 * *
