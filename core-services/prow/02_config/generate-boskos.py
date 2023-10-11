@@ -84,6 +84,9 @@ CONFIG = {
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
+    'aws-perfscale-psap-quota-slice': {
+        'us-west-2': 5,
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
