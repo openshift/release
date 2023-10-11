@@ -5,18 +5,18 @@ base_images:
     tag: "8"
 build_root:
   from_repository: true
+images:
+- context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: python-test-runner
 releases:
   latest:
     candidate:
       product: ocp
       stream: nightly
       version: "4.14"
-images:
-  - context_dir: .
-    dockerfile_path: tests/Dockerfile
-    to: python-test-runner
 resources:
-  "*":
+  '*':
     limits:
       cpu: 256m
       memory: 2Gi
@@ -24,22 +24,22 @@ resources:
       cpu: 128m
       memory: 256Mi
 tests:
-  - as: unittest
-    commands: pipenv run pytest --cov=src --cov-fail-under=90 -vv --cov-report term-missing
-    container:
-      from: python-test-runner
-  - as: lint
-    commands: pipenv run pylint src tests
-    container:
-      from: python-test-runner
-  - as: code-style
-    commands: pipenv run pycodestyle
-    container:
-      from: python-test-runner
-  - as: doc-style
-    commands: pipenv run pydocstyle
-    container:
-      from: python-test-runner
+- as: unittest
+  commands: pipenv run pytest --cov=src --cov-fail-under=90 -vv --cov-report term-missing
+  container:
+    from: python-test-runner
+- as: lint
+  commands: pipenv run pylint src tests
+  container:
+    from: python-test-runner
+- as: code-style
+  commands: pipenv run pycodestyle
+  container:
+    from: python-test-runner
+- as: doc-style
+  commands: pipenv run pydocstyle
+  container:
+    from: python-test-runner
 zz_generated_metadata:
   branch: main
   org: openshift
