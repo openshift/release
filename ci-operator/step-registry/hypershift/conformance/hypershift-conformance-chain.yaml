@@ -15,7 +15,6 @@ chain:
         source "${SHARED_DIR}/proxy-conf.sh"
       fi
 
-
       CLUSTER_TYPE="$(oc get infrastructure cluster -ojsonpath='{.status.platform}'|tr '[:upper:]' '[:lower:]')"
       case "${CLUSTER_TYPE}" in
       gcp)
@@ -58,9 +57,67 @@ chain:
           export IC_API_KEY
           ;;
       kubevirt)
-          # Standard parallel test suite env vars
           export TEST_PROVIDER='{"type":"kubevirt"}'
 
+          # This looks counterintuitive. Here's an explanation.
+          #
+          # There technically isn't a parallel minimal test suite. Some of the older KubeVirt
+          # platform versions need to be limited to just to tests marked as minimal.
+          #
+          # By using the "openshift/conformance/parallel" test suite, but filtering out
+          # everything that matches exactly to the "openshift/conformance/parallel" test suite,
+          # we are left with just the "openshift/conformance/parallel/minimal" test entries.
+          #
+          # This might not be the best long term solution, but these older KubeVirt platform
+          # tests won't be maintained for long and are not a part of any GA.
+
+          PIPE="\|"
+          # if $TEST_SKIPS is empty then $PIPE should be empty too
+          if [[ -z "$TEST_SKIPS" ]]; then
+            PIPE=""          
+          fi
+          if [[ "${TEST_SUITE}" == "openshift/conformance/parallel/minimal" ]]; then
+              TEST_SKIPS=$TEST_SKIPS"${PIPE}\[Suite:openshift/conformance/parallel\]"
+              TEST_SUITE="openshift/conformance/parallel"
+          fi
+
+          ;;
+      *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
+      esac
+
+      if [[ -n "${TEST_SKIPS}" ]]; then
+          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
+          echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
+          echo "Skipping tests:"
+          echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
+          TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
+      fi
+
+      openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
+        --provider "${TEST_PROVIDER}" \
+        -o "${ARTIFACT_DIR}/e2e.log" \
+        --junit-dir "${ARTIFACT_DIR}/junit" 2>&1 | tee /tmp/openshift-tests.log
+      
+      exit_code=${PIPESTATUS[0]}
+                
+      # If this line is shown in the openshift-tests output, all of the conformance test cases passed,
+      # but the monitor test has failed. Currently we're ignoring MonitorTest failures until we resolve:
+      # https://issues.redhat.com/browse/CNV-33717
+      if [[ -n "${SKIP_MONITOR_TEST}" ]] && [[ $(grep "failed due to a MonitorTest failure" /tmp/openshift-tests.log) ]];
+      then
+        echo "overriding Monitor Test Failure"
+        exit_code=0
+      fi
+
+      # Platform specific additional testing
+      #
+      # If a platform needs to run additional conformance testing that encompasses
+      # additional test suites, that can be executed per platform in the switch case
+      # below. If a failure is detected, set the PLATFORM_FAILURE_CONDITION env var
+      # with a human readable msg discribing the failure. Ensure test artifacts
+      # are placed in a separat $ARTIFACTS sub directory.
+      case "${CLUSTER_TYPE}" in
+      kubevirt)
           ###
           # START KubeVirt CSI Conformance Test Execution
           ###
@@ -100,56 +157,8 @@ chain:
           ###
           # END KubeVirt CSI Conformance Test Execution
           ###
-
-          # This looks counterintuitive. Here's an explanation.
-          #
-          # There technically isn't a parallel minimal test suite. Some of the older KubeVirt
-          # platform versions need to be limited to just to tests marked as minimal.
-          #
-          # By using the "openshift/conformance/parallel" test suite, but filtering out
-          # everything that matches exactly to the "openshift/conformance/parallel" test suite,
-          # we are left with just the "openshift/conformance/parallel/minimal" test entries.
-          #
-          # This might not be the best long term solution, but these older KubeVirt platform
-          # tests won't be maintained for long and are not a part of any GA.
-          
-          PIPE="\|"
-          # if $TEST_SKIPS is empty then $PIPE should be empty too
-          if [[ -z "$TEST_SKIPS" ]]; then
-            PIPE=""          
-          fi
-          if [[ "${TEST_SUITE}" == "openshift/conformance/parallel/minimal" ]]; then
-              TEST_SKIPS=$TEST_SKIPS"${PIPE}\[Suite:openshift/conformance/parallel\]"
-              TEST_SUITE="openshift/conformance/parallel"
-          fi
-
           ;;
-      *) echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"; exit 1;;
       esac
-
-      if [[ -n "${TEST_SKIPS}" ]]; then
-          TESTS="$(openshift-tests run --dry-run --provider "${TEST_PROVIDER}" "${TEST_SUITE}")"
-          echo "${TESTS}" | grep -v "${TEST_SKIPS}" >/tmp/tests
-          echo "Skipping tests:"
-          echo "${TESTS}" | grep "${TEST_SKIPS}" || { exit_code=$?; echo 'Error: no tests were found matching the TEST_SKIPS regex:'; echo "$TEST_SKIPS"; return $exit_code; }
-          TEST_ARGS="${TEST_ARGS:-} --file /tmp/tests"
-      fi
-
-      openshift-tests run ${TEST_SUITE} ${TEST_ARGS:-} \
-        --provider "${TEST_PROVIDER}" \
-        -o "${ARTIFACT_DIR}/e2e.log" \
-        --junit-dir "${ARTIFACT_DIR}/junit" 2>&1 | tee /tmp/openshift-tests.log
-      
-      exit_code=${PIPESTATUS[0]}
-                
-      # If this line is shown in the openshift-tests output, all of the conformance test cases passed,
-      # but the monitor test has failed. Currently we're ignoring MonitorTest failures until we resolve:
-      # https://issues.redhat.com/browse/CNV-33717
-      if [[ -n "${SKIP_MONITOR_TEST}" ]] && [[ $(grep "failed due to a MonitorTest failure" /tmp/openshift-tests.log) ]];
-      then
-        echo "overriding Monitor Test Failure"
-        exit_code=0
-      fi
 
       if [ -n "$PLATFORM_FAILURE_CONDITION" ]; then
         echo "Cluster type $CLUSTER_TYPE encountered a failure condition: $PLATFORM_FAILURE_CONDITION"
@@ -161,7 +170,7 @@ chain:
     - mount_path: /etc/hypershift-pool-aws-credentials
       name: hypershift-pool-aws-credentials
       namespace: test-credentials
-    timeout: 14400s
+    timeout: 6h
     env:
     - name: TEST_ARGS
       default: ""
