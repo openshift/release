@@ -1,0 +1,31 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_literal: |
+    FROM registry.redhat.io/ubi9/ubi as src
+    RUN dnf install git -y
+    RUN git clone https://gitlab.corp.redhat.com/infosec-public/developer-workbench/tools.git /tmp/src
+    FROM registry.redhat.io/ubi9/python-311 as build
+    COPY --from=src /tmp/src/rh-gitleaks /opt/app-root/src
+    WORKDIR /opt/app-root/src/rh-gitleaks
+    RUN pip install --upgrade pip && \
+        make install
+    RUN rh-gitleaks pre-cache && \
+        rh-gitleaks | true
+  to: rh-gitleaks
+promotion:
+  name: rh-gitleaks
+  namespace: cspi-qe
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+zz_generated_metadata:
+  branch: main
+  org: CSPI-QE
+  repo: firewatch
+  variant: rh-gitleaks-image
