@@ -3,11 +3,7 @@
 set -x
 
 # Hosted Control Plane parameters
-hc_ns="hcp-ci"
-export hc_ns
-hc_name="agent-ibmz"
-export hc_name
-hcp_ns="$hc_ns-$hc_name"
+hcp_ns="$HC_NS-$HC_NAME"
 export hcp_ns
 
 # InfraEnv configs
@@ -148,15 +144,15 @@ oc create ns ${hcp_ns}
 mkdir /tmp/hc-manifests
 
 ${HYPERSHIFT_CLI_NAME} create cluster agent \
-    --name=${hc_name} \
+    --name=${HC_NAME} \
     --pull-secret="${PULL_SECRET_FILE}" \
     --agent-namespace=${hcp_ns} \
     --base-domain=${HYPERSHIFT_BASEDOMAIN} \
-    --api-server-address=api.${hc_name}.${HYPERSHIFT_BASEDOMAIN} \
+    --api-server-address=api.${HC_NAME}.${HYPERSHIFT_BASEDOMAIN} \
     --ssh-key=${ssh_key_file} \
     --control-plane-availability-policy "SingleReplica" \
     --infra-availability-policy "SingleReplica" \
-    --namespace $hc_ns \
+    --namespace $HC_NS \
     --release-image=${OCP_IMAGE_MULTI} --render > /tmp/hc-manifests/cluster-agent.yaml
 
 # Split the manifest to replace routing strategy of various services
@@ -195,7 +191,7 @@ done
 echo "$(date) Applying agent cluster manifests"
 ls /tmp/hc-manifests/manifest_* | awk ' { print " -f " $1 } ' | xargs oc apply
 
-oc wait --timeout=15m --for=condition=Available --namespace=${hc_ns} hostedcluster/${hc_name}
+oc wait --timeout=15m --for=condition=Available --namespace=${HC_NS} hostedcluster/${HC_NAME}
 echo "$(date) Agent cluster is available"
 
 # Applying InfraEnv
@@ -204,7 +200,7 @@ envsubst <<"EOF" | oc apply -f -
 apiVersion: agent-install.openshift.io/v1beta1
 kind: InfraEnv
 metadata:
-  name: ${hc_name}
+  name: ${HC_NAME}
   namespace: ${hcp_ns}
 spec:
   cpuArchitecture: s390x
@@ -214,9 +210,9 @@ spec:
 EOF
 
 # Waiting for discovery iso file to ready
-oc wait --timeout=10m --for=condition=ImageCreated --namespace=${hcp_ns} infraenv/${hc_name}
+oc wait --timeout=10m --for=condition=ImageCreated --namespace=${hcp_ns} infraenv/${HC_NAME}
 echo "$(date) ISO Download url is ready"
 
 # Download hosted cluster kubeconfig
 echo "$(date) Create hosted cluster kubeconfig"
-${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${hc_ns} --name=${hc_name} >${SHARED_DIR}/${hc_name}_kubeconfig
+${HYPERSHIFT_CLI_NAME} create kubeconfig --namespace=${HC_NS} --name=${HC_NAME} >${SHARED_DIR}/${HC_NAME}_kubeconfig

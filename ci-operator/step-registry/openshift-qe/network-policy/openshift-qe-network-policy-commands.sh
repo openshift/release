@@ -20,10 +20,6 @@ pushd e2e-benchmarking/workloads/kube-burner
 
 export JOB_TIMEOUT=${JOB_TIMEOUT:=21600}
 
-# UUID Generation
-UUID="perfscale-cpt-$(uuidgen)"
-export UUID
-
 current_worker_count=$(oc get nodes --no-headers -l node-role.kubernetes.io/worker=,node-role.kubernetes.io/infra!=,node-role.kubernetes.io/workload!= --output jsonpath="{.items[?(@.status.conditions[-1].type=='Ready')].status.conditions[-1].type}" | wc -w | xargs)
 
 export WORKLOAD=${WORKLOAD:=networkpolicy-case1}
@@ -47,8 +43,7 @@ echo $JOB_ITERATIONS is JOB_ITERATIONS
 export JOB_ITERATIONS
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-OUTPUT_FILE="index_data.json"
-rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
+rm -f ${SHARED_DIR}/index.json
 
 ./run.sh
 

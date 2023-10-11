@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -exuo pipefail
+set -euo pipefail
 
 if [ -f "${SHARED_DIR}/proxy-conf.sh" ] ; then
   source "${SHARED_DIR}/proxy-conf.sh"
@@ -21,7 +21,10 @@ else
   oc extract secret/pull-secret -n openshift-config --to=/tmp --confirm
   HO_IMAGE=$(oc get deployment -n hypershift operator -ojsonpath='{.spec.template.spec.containers[*].image}')
   mkdir /tmp/hs-cli
-  oc image extract "${HO_IMAGE}" --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/.dockerconfigjson
+  brew_registry_auth=$(echo -n "${BREW_IMAGE_REGISTRY_USERNAME}:$(<$BREW_IMAGE_REGISTRY_TOKEN_PATH)" | base64 -w 0)
+  echo '{}' | jq --arg auth "$brew_registry_auth" '.auths += {"brew.registry.redhat.io": {"auth": $auth}}' > /tmp/brew_configjson
+  oc image extract "brew.${HO_IMAGE}" --path /usr/bin/hypershift:/tmp/hs-cli --registry-config=/tmp/brew_configjson
+  chmod +x /tmp/hs-cli/hypershift
 fi
 
 CLUSTER_NAME="$(echo -n $PROW_JOB_ID|sha256sum|cut -c-20)"

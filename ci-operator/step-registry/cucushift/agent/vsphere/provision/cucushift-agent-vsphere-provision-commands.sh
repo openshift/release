@@ -5,6 +5,7 @@ set -o errexit
 set -o pipefail
 
 trap 'CHILDREN=$(jobs -p); if test -n "${CHILDREN}"; then kill ${CHILDREN} && wait; fi' TERM
+trap 'echo "$?" > "${SHARED_DIR}/install-status.txt"' EXIT TERM
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "$(date -u --rfc-3339=seconds) - failed to acquire lease"
@@ -91,7 +92,6 @@ openshift-install --dir="${installer_dir}" agent wait-for bootstrap-complete &
 
 if ! wait $!; then
   echo "ERROR: Bootstrap failed. Aborting execution."
-  # TODO: gather logs??
   exit 1
 fi
 
@@ -104,6 +104,5 @@ openshift-install --dir="${installer_dir}" agent wait-for install-complete 2>&1 
 
 if ! wait "$!"; then
   echo "ERROR: Installation failed. Aborting execution."
-  # TODO: gather logs??
   exit 1
 fi

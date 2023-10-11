@@ -56,7 +56,8 @@ else
   cp -R /tmp/opentelemetry-operator /tmp/opentelemetry-tests && cd /tmp/opentelemetry-tests
 
   #Set parameters for running the test cases on OpenShift
-  TARGETALLOCATOR_IMG=$TARGETALLOCATOR_IMG SED_BIN="$(which sed)" ./hack/modify-test-images.sh
+  #Skip setting the built Target Allocator image due to bug https://issues.redhat.com/browse/TRACING-3615 and use the pre-built upstream image.
+  TARGETALLOCATOR_IMG="" SED_BIN="$(which sed)" ./hack/modify-test-images.sh
   sed -i 's/- -duration=1m/- -duration=6m/' tests/e2e-autoscale/autoscale/03-install.yaml
 
   # Remove test cases to be skipped from the test run

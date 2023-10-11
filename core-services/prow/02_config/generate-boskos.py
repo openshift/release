@@ -84,6 +84,9 @@ CONFIG = {
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
+    'aws-rhtap-qe-quota-slice': {
+        'us-west-2': 10
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
@@ -139,10 +142,10 @@ CONFIG = {
         'us-central1': 30,
     },
     'gcp-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 80,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 80,
     },
     'gcp-arm64-quota-slice': {
         'us-central1': 30,
@@ -168,9 +171,6 @@ CONFIG = {
     },
     'openstack-hwoffload-quota-slice': {
         'default': 5,
-    },
-    'openstack-kuryr-quota-slice': {
-        'default': 2,
     },
     'openstack-nfv-quota-slice': {
         'default': 5,
@@ -249,7 +249,7 @@ CONFIG = {
         'jp-tok': 10,
     },
     'ibmcloud-multi-ppc64le-quota-slice': {
-        'au-syd': 3,
+        'us-south': 3,
     },
     'ibmcloud-multi-s390x-quota-slice': {
         'ca-tor': 3,
@@ -289,7 +289,13 @@ CONFIG = {
     },
     'aws-chaos-quota-slice': {
         'us-west-2': 10,
-    }
+    },
+    'hypershift-powervs-quota-slice': {
+        'default': 3,
+    },
+    'hypershift-powervs-cb-quota-slice': {
+        'default': 5,
+    },
 }
 
 for i in range(3):
