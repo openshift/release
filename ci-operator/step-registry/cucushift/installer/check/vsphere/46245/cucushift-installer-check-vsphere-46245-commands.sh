@@ -8,6 +8,26 @@ echo "Start Running Case https://polarion.engineering.redhat.com/polarion/#/proj
 
 sleep 3600
 
+
+# sh-4.4$ govc vm.info -json ci-op-1gql3glg-32a2e-9gkf9-master-2 | grep -i thin
+#                 "ThinProvisioned": true,
+
+# govc vm.info -json ci-op-1gql3glg-32a2e-9gkf9-master-2 | jq -r .VirtualMachines[].Layout.Disk[].DiskFile[]
+
+# sh-4.4$ govc vm.info -json ci-op-1gql3glg-32a2e-9gkf9-master-2 | jq -r .VirtualMachines[].Layout.Disk[].DiskFile[]
+# govc: mkdir /output/.govmomi: permission denied
+# sh-4.4$ export  HOME=/tmp
+# sh-4.4$ govc vm.info -json ci-op-1gql3glg-32a2e-9gkf9-master-2 | jq -r .VirtualMachines[].Layout.Disk[].DiskFile[]
+# [vsanDatastore] e21c2665-da32-a56b-9303-3cecef1c81aa/ci-op-1gql3glg-32a2e-9gkf9-master-2.vmdk
+# sh-4.4$ govc datastore.disk.info ci-op-1gql3glg-32a2e-9gkf9-master-2.vmdk
+# govc: File [vsanDatastore] ci-op-1gql3glg-32a2e-9gkf9-master-2.vmdk was not found
+# sh-4.4$ govc datastore.disk.info e21c2665-da32-a56b-9303-3cecef1c81aa/ci-op-1gql3glg-32a2e-9gkf9-master-2.vmdk
+# Name:      e21c2665-da32-a56b-9303-3cecef1c81aa/ci-op-1gql3glg-32a2e-9gkf9-master-2.vmdk
+#   Type:    thin
+#   Parent:
+
+# Hardware
+
 # Check all virtual machines of cluster are thin
 if [ "$(oc get node -l node-role.kubernetes.io/worker= --no-headers | wc -l)" != "2" ]; then
     echo "Fail: check worker number"

@@ -58,8 +58,6 @@ else
     exit 1
 fi
 
-sleep 7200
-
 IFS=' ' read -r -a master_ips <<<"$(oc get machines -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-type=master -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
 IFS=' ' read -r -a worker_ips <<<"$(oc get machines -n openshift-machine-api -l machine.openshift.io/cluster-api-machine-type=worker -o jsonpath='{.items[*].status.addresses[?(@.type=="InternalIP")].address}')"
 
