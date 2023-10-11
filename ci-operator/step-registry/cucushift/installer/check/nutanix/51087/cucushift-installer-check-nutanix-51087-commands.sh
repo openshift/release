@@ -120,6 +120,8 @@ else
     exit 1
 fi
 
+sleep 3600
+
 # Wait node Ready, maxmium 600 seconds
 loop=60
 while [ ${loop} -gt 0 ]; do
