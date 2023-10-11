@@ -5,10 +5,12 @@ set -o errexit
 set -o pipefail
 set -x
 
-oc label node worker-0 cluster.ocs.openshift.io/openshift-storage=''
-oc label node worker-1 cluster.ocs.openshift.io/openshift-storage=''
-oc label node worker-2 cluster.ocs.openshift.io/openshift-storage=''
-oc label node worker-3 cluster.ocs.openshift.io/openshift-storage=''
+# Make the masters schedulable so we have more capacity to run ODF and VMs
+oc patch scheduler cluster --type=json -p '[{ "op": "replace", "path": "/spec/mastersSchedulable", "value": true }]'
+
+echo "Preparing nodes"
+oc label nodes node-role.kubernetes.io/worker='' --selector='node-role.kubernetes.io/control-plane' --overwrite
+oc label nodes cluster.ocs.openshift.io/openshift-storage='' --selector='node-role.kubernetes.io/worker' --overwrite
 
 oc apply -f - <<EOF
 apiVersion: local.storage.openshift.io/v1

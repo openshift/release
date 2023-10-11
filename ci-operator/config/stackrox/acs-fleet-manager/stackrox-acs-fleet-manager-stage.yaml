@@ -1,0 +1,117 @@
+base_images:
+  base:
+    name: ubi-minimal
+    namespace: ocp
+    tag: "8"
+  openshift_release_golang-1.20:
+    name: release
+    namespace: openshift
+    tag: golang-1.20
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.18
+  use_build_cache: true
+images:
+- dockerfile_path: Dockerfile
+  inputs:
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+    src:
+      paths:
+      - destination_dir: ./
+        source_path: /go/src/github.com/stackrox/acs-fleet-manager/.
+  to: acs-fleet-manager
+- dockerfile_path: .openshift-ci/e2e-runtime/Dockerfile
+  inputs:
+    openshift_release_golang-1.20:
+      as:
+      - registry.ci.openshift.org/openshift/release:golang-1.20
+    src:
+      paths:
+      - destination_dir: ./
+        source_path: /go/src/github.com/stackrox/acs-fleet-manager/.
+  to: e2e-runtime
+releases:
+  initial:
+    integration:
+      name: "4.11"
+      namespace: ocp
+  latest:
+    integration:
+      include_built_images: true
+      name: "4.11"
+      namespace: ocp
+resources:
+  '*':
+    requests:
+      cpu: 2000m
+      memory: 6000Mi
+tests:
+- as: e2e
+  cluster_claim:
+    architecture: amd64
+    as: custom
+    cloud: aws
+    owner: openshift-ci
+    product: ocp
+    timeout: 1h0m0s
+    version: "4.12"
+  steps:
+    test:
+    - as: claim
+      cli: custom
+      commands: |
+        if [ -x ".openshift-ci/tests/e2e.sh" ]; then
+          ./.openshift-ci/tests/e2e.sh
+        else
+          echo "No e2e configured, skipping."
+        fi
+      credentials:
+      - mount_path: /var/run/rhacs-ms-e2e-tests
+        name: rhacs-ms-e2e-tests
+        namespace: test-credentials
+      dependencies:
+      - env: FLEET_MANAGER_IMAGE
+        name: acs-fleet-manager
+      from: e2e-runtime
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 6000Mi
+    workflow: generic-claim
+- as: image-push
+  steps:
+    allow_best_effort_post_steps: true
+    test:
+    - as: to-quay
+      best_effort: true
+      cli: latest
+      commands: |
+        entrypoint=".openshift-ci/image-push/entrypoint.sh"
+        if [ -x "$entrypoint" ]; then
+          echo "Executing image-push entrypoint."
+          $entrypoint
+        else
+          echo "No image-push entrypoint ($entrypoint) found."
+          exit 1
+        fi
+      credentials:
+      - mount_path: /var/run/rhacs-ms-push
+        name: rhacs-ms-push
+        namespace: test-credentials
+      dependencies:
+      - env: FLEET_MANAGER_IMAGE
+        name: acs-fleet-manager
+      from: base
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+      timeout: 15m0s
+zz_generated_metadata:
+  branch: stage
+  org: stackrox
+  repo: acs-fleet-manager

@@ -237,7 +237,7 @@ if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
   if [[ "$HOSTED_CP" == "true" ]]; then
     kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
     ETCD_ENCRYPTION_SWITCH="${ETCD_ENCRYPTION_SWITCH} --etcd-encryption-kms-arn $kms_key_arn"
-    record_cluster "encrption" "etcd_encryption_kms_arn" $kms_key_arn
+    record_cluster "encryption" "etcd_encryption_kms_arn" $kms_key_arn
   fi
 fi
 
@@ -245,7 +245,7 @@ STORAGE_ENCRYPTION_SWITCH=""
 if [[ "$STORAGE_ENCRYPTION" == "true" ]]; then
   kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
   STORAGE_ENCRYPTION_SWITCH="--enable-customer-managed-key --kms-key-arn $kms_key_arn"
-  record_cluster "encrption" "kms_key_arn" $kms_key_arn
+  record_cluster "encryption" "kms_key_arn" $kms_key_arn
 fi
 
 HYPERSHIFT_SWITCH=""

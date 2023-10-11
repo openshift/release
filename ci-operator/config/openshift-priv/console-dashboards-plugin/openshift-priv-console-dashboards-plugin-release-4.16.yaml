@@ -1,0 +1,40 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.13
+canonical_go_repository: github.com/openshift/console-dashboards-plugin
+images:
+- dockerfile_path: Dockerfile.test
+  to: console-dashboards-plugin-test
+promotion:
+  excluded_images:
+  - console-dashboards-plugin-test
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: lint
+  commands: yarn lint
+  container:
+    from: console-dashboards-plugin-test
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-priv
+  repo: console-dashboards-plugin

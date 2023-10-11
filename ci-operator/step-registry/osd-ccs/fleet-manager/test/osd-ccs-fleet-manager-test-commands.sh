@@ -397,6 +397,233 @@ function test_labels()
 
 ###### end of Sector predicates to support multiple sectors by labels tests (OCP-63998) ######
 
+##################################################################
+
+###### endpoints tests (OCPQE-16843) ######
+
+function test_endpoints () {
+  TEST_PASSED=true
+  echo "Querying '/errors' endpoint"
+  ERRORS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/errors)
+  ERRORS_LIST_KIND=$(jq -n "$ERRORS_OUTPUT" | jq -r .kind)
+  EXPECTED_ERRORS_LIST_KIND="ErrorList"
+  echo "Confirming that '/errors' output returns correct kind: '$EXPECTED_ERRORS_LIST_KIND'"
+  if [ "$ERRORS_LIST_KIND" != "$EXPECTED_ERRORS_LIST_KIND" ]; then
+    echo "ERROR. Incorrect kind returned: '$ERRORS_LIST_KIND'. Expected: '$EXPECTED_ERRORS_LIST_KIND'"
+    TEST_PASSED=false
+  fi
+
+  ERRORS_SIZE=$(jq -n "$ERRORS_OUTPUT" | jq -r .size)
+  echo "Confirming that '/errors' output returns at least one error"
+  if [ "$ERRORS_SIZE" -lt 1 ]; then
+    echo "ERROR. There should be some errors returned from the /errors endpoint"
+    TEST_PASSED=false
+  else
+    RETURNED_RECORDS_COUNT=$(jq -n "$ERRORS_OUTPUT" | jq -r '.items | length')
+    ## Confirm that number of records returned matches .size value
+    echo "Checking number of errors returned against declared size"
+    if [ "$RETURNED_RECORDS_COUNT" -ne "$ERRORS_SIZE" ]; then
+      echo "ERROR. Mismatch in expected size: $ERRORS_SIZE and number of returned errors: $RETURNED_RECORDS_COUNT"
+      TEST_PASSED=false
+    else 
+      ERROR_ID=$(jq -n "$ERRORS_OUTPUT" | jq -r .items[0].id)
+      ERROR_HREF=$(jq -n "$ERRORS_OUTPUT" | jq -r .items[0].href)
+      echo "Querying '/errors/{id}' endpoint"
+      ERROR_OUTPUT=$(ocm get "$ERROR_HREF")
+      SINGLE_ERROR_OUTPUT_ID=$(jq -n "$ERROR_OUTPUT" | jq -r .id)
+      SINGLE_ERROR_OUTPUT_HREF=$(jq -n "$ERROR_OUTPUT" | jq -r .href)
+      SINGLE_ERROR_OUTPUT_KIND=$(jq -n "$ERRORS_OUTPUT" | jq -r .items[0].kind)
+      EXPECTED_ERROR_KIND="Error"
+      echo "Confirming that '.items[0]' output from /errors output matches error output corresponding to this particular error in '/errors/{id}' output"
+      if [ "$ERROR_ID" != "$SINGLE_ERROR_OUTPUT_ID" ] || [ "$ERROR_HREF" != "$SINGLE_ERROR_OUTPUT_HREF" ] || [ "$SINGLE_ERROR_OUTPUT_KIND" != "$EXPECTED_ERROR_KIND" ]; then
+        echo "ERROR. Output of first item in errors array should match /errors/id values"
+        echo ".items[0] output:"
+        echo "$ERRORS_OUTPUT" | jq -r .items[0]
+        echo "/errors/id output:"
+        echo "$ERROR_OUTPUT"
+        TEST_PASSED=false
+      fi
+    fi
+  fi
+  
+  ## confirming metadata (/api/osd_fleet_mgmt/v1) endpoint works
+  echo "Querying metadata endpoint"
+  METADATA_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1)
+  COLLECTIONS_LENGTH=$(jq -n "$METADATA_OUTPUT" | jq -r '.collections | length')
+  echo "Confirming that metadata contains two collections"
+  if [ "$COLLECTIONS_LENGTH" -ne 2 ]; then
+    echo "ERROR. There should be two collections returned in the metadata endpoint ('/api/osd_fleet_mgmt/v1')"
+    TEST_PASSED=false
+  else 
+    echo "Confirming that endpoints referenced in the metadata output return correct collections"
+    for ((i=0; i<"$COLLECTIONS_LENGTH"; i++)); do
+      COLLECTION_HREF=$(jq -n "$METADATA_OUTPUT" | jq -r .collections[$i].href)
+      COLLECTION_KIND=$(jq -n "$METADATA_OUTPUT" | jq -r .collections[$i].kind)
+      echo "Querying $COLLECTION_HREF"
+      COLLECTION_OUTPUT=$(ocm get "$COLLECTION_HREF")
+      COLLECTION_OUTPUT_KIND=$(jq -n "$COLLECTION_OUTPUT" | jq -r .kind)
+      echo "Confirming that returned collection is of correct kind: $COLLECTION_OUTPUT_KIND"
+      if [ "$COLLECTION_KIND" != "$COLLECTION_OUTPUT_KIND" ]; then
+        echo "ERROR. Expected kind: '$COLLECTION_OUTPUT' didn't match. Got: '$COLLECTION_OUTPUT_KIND' when querying endpoint from metadata.collections[].href"
+        TEST_PASSED=false
+      fi
+    done
+  fi
+
+  ## confirming /keys endpoints work
+  echo "Getting first available management cluster (if any created)"
+  MC_CLUSTERS_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/management_clusters)
+  MC_CLUSTERS_COUNT=$(jq -n "$MC_CLUSTERS_OUTPUT" | jq -r .size)
+  if [ "$MC_CLUSTERS_COUNT" -gt 0 ]; then
+    MC_CLUSTER_ID=$(jq -n "$MC_CLUSTERS_OUTPUT" | jq -r .items[0].id)
+    MC_CLUSTER_HREF=$(jq -n "$MC_CLUSTERS_OUTPUT" | jq -r .items[0].href)
+    echo "Getting keys for MC with ID: $MC_CLUSTER_ID"
+    MC_CLUSTER_KEYS_OUTPUT=$(ocm get "$MC_CLUSTER_HREF"/keys)
+    EXPECTED_KEYS_LIST_KIND="AccessKeyList"
+    MC_KEYS_OUTPUT_KIND=$(jq -n "$MC_CLUSTER_KEYS_OUTPUT" | jq -r .kind)
+    echo "Confirming that returned collection is of correct kind: $EXPECTED_KEYS_LIST_KIND"
+    if [ "$MC_KEYS_OUTPUT_KIND" != "$EXPECTED_KEYS_LIST_KIND" ]; then
+      echo "ERROR. Expected kind: '$EXPECTED_KEYS_LIST_KIND' didn't match. Go:t '$MC_KEYS_OUTPUT_KIND' when querying management_clusters/{id}/keys endpoint"
+      TEST_PASSED=false
+    fi
+  else 
+    echo "No management_clusters found"
+  fi
+  update_results "OCPQE-16843" $TEST_PASSED
+}
+
+###### end of endpoints tests (OCPQE-16843) ######
+
+##################################################################
+
+###### /audit endpoint tests (OCPQE-17072) ######
+
+function test_audit_endpooint () {
+TEST_PASSED=true
+  ## confirm /audit endpoints works
+  echo "Querying '/audit' endpoint"
+  AUDIT_ENDPOINT_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/audit)
+  AUDIT_ENDPOINT_KIND=$(jq -n "$AUDIT_ENDPOINT_OUTPUT" | jq -r .kind)
+  EXPECTED_AUDIT_LIST_KIND="AuditRecordList"
+  if [ "$AUDIT_ENDPOINT_KIND" != "$EXPECTED_AUDIT_LIST_KIND" ]; then
+    echo "ERROR. Incorrect kind returned: '$AUDIT_ENDPOINT_KIND'. Expected: '$EXPECTED_AUDIT_LIST_KIND'"
+    TEST_PASSED=false
+  fi
+  AUDIT_RESULTS_COUNT=$(jq -n "$AUDIT_ENDPOINT_OUTPUT" | jq -r .size)
+  echo "Checking if any audit results were returned"
+  ALLOWED_HTTP_METHODS=("POST" "PATCH" "DELETE")
+  if [ "$AUDIT_RESULTS_COUNT" -gt 0 ]; then
+    RETURNED_AUDIT_RECORD_COUNT=$(jq -n "$AUDIT_ENDPOINT_OUTPUT" | jq -r '.items | length')
+    ## Confirm that number of records returned matches .size value
+    echo "Checking number of audit records returned against declared size"
+    if [ "$RETURNED_AUDIT_RECORD_COUNT" -ne "$AUDIT_RESULTS_COUNT" ]; then
+      echo "ERROR. Mismatch in expected size: $AUDIT_RESULTS_COUNT and number of returned audit records: $RETURNED_AUDIT_RECORD_COUNT"
+      TEST_PASSED=false
+    else
+      AUDIT_RECORD_USERNAME="" # to be re-assigned and reused later
+      ## Confirm that each of ther returned errors is representing POST/PATCH/DELETE operation and username + endpoint URI are not empty
+      echo "Checking fields validity of each audit record from the first returned page (correct method and kind, and populated username and uri)"
+      EXPECTED_AUDIT_RECORD_KIND="AuditRecord"
+      for ((i=0; i<"$AUDIT_RESULTS_COUNT"; i++)); do
+        ## check kind
+        AUDIT_RECORD_KIND=$(jq -n "$AUDIT_ENDPOINT_OUTPUT" | jq -r .items[$i].kind)
+        if [ "$AUDIT_RECORD_KIND" != "$EXPECTED_AUDIT_RECORD_KIND" ]; then
+          echo "ERROR. Expected kind '$EXPECTED_AUDIT_RECORD_KIND' didn't match. Got: '$AUDIT_RECORD_KIND' in the /audit endpoint returned items"
+          TEST_PASSED=false
+          break
+        fi
+        ## check http method
+        AUDIT_RECORD_METHOD=$(jq -n "$AUDIT_ENDPOINT_OUTPUT" | jq -r .items[$i].method)
+        # shellcheck disable=SC2076 # ignore the warning - this code works as expected
+        if ! [[ ${ALLOWED_HTTP_METHODS[*]} =~ "$AUDIT_RECORD_METHOD" ]]; then
+          echo "ERROR. Not allowed HTTP method: $AUDIT_RECORD_METHOD in audit records detected"
+          TEST_PASSED=false
+          break
+        fi
+        AUDIT_RECORD_URL=$(jq -n "$AUDIT_ENDPOINT_OUTPUT" | jq -r .items[$i].request_uri)
+        if [ "$AUDIT_RECORD_URL" == "" ]; then
+          echo "ERROR. Expected audit record uri not to be empty"
+          TEST_PASSED=false
+          break
+        fi
+        AUDIT_RECORD_USERNAME=$(jq -n "$AUDIT_ENDPOINT_OUTPUT" | jq -r .items[$i].username)
+        if [ "$AUDIT_RECORD_USERNAME" == "" ]; then
+          echo "ERROR. Expected audit record username not to be empty"
+          TEST_PASSED=false
+          break
+        fi
+      done
+      ## check query parameters
+      ### page parameter
+      EXPECTED_SIZE_FOR_PAGE_PARAM_CHECK=0
+      VERY_LARGE_PAGE_NUMBER=999999
+      echo "Checking /audit endpoint query parameters"
+      echo "Checking /audit endpoint 'page' parameter"
+      PAGE_PARAMETER_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/audit --parameter="page=$VERY_LARGE_PAGE_NUMBER")
+      PAGE_NUMBER=$(jq -n "$PAGE_PARAMETER_OUTPUT" | jq -r .page)
+      SIZE_NUMBER=$(jq -n "$PAGE_PARAMETER_OUTPUT" | jq -r .size)
+      ITEMS_LENGTH=$(jq -n "$PAGE_PARAMETER_OUTPUT" | jq -r '.items | length')
+      if [ "$PAGE_NUMBER" -ne "$VERY_LARGE_PAGE_NUMBER" ] || [ "$SIZE_NUMBER" -ne "$EXPECTED_SIZE_FOR_PAGE_PARAM_CHECK" ] || [ "$ITEMS_LENGTH" != "$EXPECTED_SIZE_FOR_PAGE_PARAM_CHECK" ]; then
+        echo "ERROR. When testing page param in /audit endpoint and providing very large page outside of range, returned items length and size should be 0, and page number output should match the page param. Got: "
+        echo "$PAGE_PARAMETER_OUTPUT"
+        TEST_PASSED=false
+      fi
+      ### search parameter
+      echo "Checking /audit endpoint 'search' parameter"
+      SEARCH_PARAM_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/audit --parameter="search=username='$AUDIT_RECORD_USERNAME'")
+      SEARCH_PARAM_SIZE=$(jq -n "$SEARCH_PARAM_OUTPUT" | jq -r .size)
+      SEARCH_PARAM_USERNAME=$(jq -n "$SEARCH_PARAM_OUTPUT" | jq -r .items[0].username)
+      if [ "$SEARCH_PARAM_SIZE" -lt 1 ] || [ "$SEARCH_PARAM_USERNAME" != "$AUDIT_RECORD_USERNAME" ]; then
+        echo "ERROR. When searching for an audit record with existing username: $AUDIT_RECORD_USERNAME, the first item should include the username and items length should be greater than 0. Got:"
+        echo "$SEARCH_PARAM_OUTPUT"
+        TEST_PASSED=false
+      fi
+      ### size parameter
+      echo "Checking /audit endpoint 'size' parameter"
+      SIZE_PARAM_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/audit --parameter="size=$SEARCH_PARAM_SIZE")
+      SIZE_OUTPUT_SIZE=$(jq -n "$SIZE_PARAM_OUTPUT" | jq -r .size)
+      if [ "$SIZE_OUTPUT_SIZE" -ne "$SEARCH_PARAM_SIZE" ]; then
+        echo "ERROR. When providing size parameter for /audit endpoint, returned size should match with $SEARCH_PARAM_SIZE. Got: $SIZE_OUTPUT_SIZE"
+        TEST_PASSED=false
+      fi
+      ### order parameter
+      echo "Checking /audit endpoint 'order' (asc) parameter"
+      ORDER_PARAMETER_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/audit --parameter="order=cluster_id asc")
+      ORDER_OUTPUT_ITEMS_COUNT=$(jq -n "$ORDER_PARAMETER_OUTPUT" | jq -r .size)
+      echo "Checking that the output of /audit endpoint query is sorted by cluster_id in ascending order"
+      for ((i=1; i<"$ORDER_OUTPUT_ITEMS_COUNT"; i++)); do
+        PREVIOUS_INDEX=$((i-1))
+        CLUSTER_ID=$(jq -n "$ORDER_PARAMETER_OUTPUT" | jq -r .items["$i"].cluster_id)
+        PREVIOUS_ITEM_CLUSTER_ID=$(jq -n "$ORDER_PARAMETER_OUTPUT" | jq -r .items["$PREVIOUS_INDEX"].cluster_id)
+        if [[ "$PREVIOUS_ITEM_CLUSTER_ID" > "$CLUSTER_ID" ]]; then
+          echo "ERROR. Sorting by cluster_id in ascending didn't work. $PREVIOUS_ITEM_CLUSTER_ID should be lexicographically smaller than or equal to $CLUSTER_ID"
+          TEST_PASSED=false
+          break
+        fi
+      done
+      echo "Checking /audit endpoint 'order' (desc) parameter"
+      ORDER_PARAMETER_OUTPUT=$(ocm get /api/osd_fleet_mgmt/v1/audit --parameter="order=cluster_id desc")
+      ORDER_OUTPUT_ITEMS_COUNT=$(jq -n "$ORDER_PARAMETER_OUTPUT" | jq -r .size)
+      echo "Checking that the output of /audit endpoint query is sorted by cluster_id in descending order"
+      for ((i=1; i<"$ORDER_OUTPUT_ITEMS_COUNT"; i++)); do
+        PREVIOUS_INDEX=$((i-1))
+        CLUSTER_ID=$(jq -n "$ORDER_PARAMETER_OUTPUT" | jq -r .items["$i"].cluster_id)
+        PREVIOUS_ITEM_CLUSTER_ID=$(jq -n "$ORDER_PARAMETER_OUTPUT" | jq -r .items["$PREVIOUS_INDEX"].cluster_id)
+        if [[ "$PREVIOUS_ITEM_CLUSTER_ID" < "$CLUSTER_ID" ]]; then
+          echo "ERROR. Sorting by cluster_id in descending oorder didn't work. $PREVIOUS_ITEM_CLUSTER_ID should be lexicographically greater than or equal to $CLUSTER_ID"
+          TEST_PASSED=false
+          break
+        fi
+      done
+    fi
+  else 
+    echo "No audit results returned"
+  fi
+  update_results "OCPQE-17072" $TEST_PASSED
+}
+
+###### end of /audit endpoints tests (OCPQE-17072) ######
+
 # Test all cases and print results
 
 test_monitoring_disabled
@@ -404,6 +631,10 @@ test_monitoring_disabled
 test_autoscaler
 
 test_labels
+
+test_endpoints
+
+test_audit_endpooint
 
 printf "\nPassed tests:\n"
 for p in "${PASSED[@]}"; do

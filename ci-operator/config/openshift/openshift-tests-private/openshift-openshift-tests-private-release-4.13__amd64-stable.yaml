@@ -128,6 +128,21 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-aws-ipi-proxy-cco-manual-security-token-service
+- as: aws-ocm-osd-ccs-fleet-manager-f7
+  cron: 9 20 4,12,20,27 * *
+  steps:
+    cluster_profile: fleet-manager-qe
+    env:
+      CHANNEL_GROUP: candidate
+      E2E_RUN_TAGS: '@amd64 and @aws-ipi and @rosa and @network-ovnkubernetes and
+        @hypershift-hosted and not @fips'
+      OPENSHIFT_VERSION: "4.13"
+      TAG_VERSION: '@4.13'
+      TEST_FILTERS: ~ChkUpgrade&;~NonPreRelease&;~Serial&;~Disruptive&;~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&;ROSA&
+    test:
+    - ref: osd-ccs-fleet-manager-test
+    - chain: openshift-e2e-test-hypershift-qe
+    workflow: osd-ccs-fleet-manager
 - as: aws-ipi-shared-vpc-phz-sts-fips-f14
   cron: 13 0 12,27 * *
   steps:
@@ -376,13 +391,13 @@ tests:
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-nutanix-ipi-proxy
-- as: vsphere-ipi-disconnected-registry-pvc-f14
+- as: vsphere-ipi-disconnected-f14
   cron: 33 1 14,29 * *
   steps:
     cluster_profile: vsphere-dis
     test:
     - chain: cucushift-installer-check-cluster-health
-    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected-image-registry-pvc
+    workflow: cucushift-installer-rehearse-vsphere-ipi-disconnected
 - as: vsphere-ipi-ovn-dualstack-f14
   cron: 47 17 8,23 * *
   steps:
@@ -402,7 +417,7 @@ tests:
 - as: vsphere-ipi-zones-f14
   cron: 38 1 3,18 * *
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     test:
     - chain: cucushift-installer-check-cluster-health
     workflow: cucushift-installer-rehearse-vsphere-ipi-zones
