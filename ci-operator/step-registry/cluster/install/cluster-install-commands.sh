@@ -71,7 +71,7 @@ if [ "${COLLECT_MUST_GATHER}" = "true" ]; then
 fi
 
 echo "$RUN_COMMAND" | sed -r "s/ocm-token=[A-Za-z0-9\.\-]+/ocm-token=hashed-token /g"
-
+sleep 50000000000
 set +e
 ${RUN_COMMAND}
 return_code=$?
