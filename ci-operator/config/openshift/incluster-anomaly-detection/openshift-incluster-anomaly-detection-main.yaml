@@ -1,0 +1,58 @@
+base_images:
+  ubi:
+    name: ubi
+    namespace: ocp
+    tag: "8"
+build_root:
+  image_stream_tag:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.14
+images:
+- build_args:
+  - name: TARGETOS
+    value: linux
+  - name: TARGETARCH
+    value: amd64
+  context_dir: .
+  dockerfile_path: tests/Dockerfile
+  to: python-test-runner
+releases:
+  latest:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.14"
+resources:
+  '*':
+    limits:
+      cpu: 512m
+      memory: 2Gi
+    requests:
+      cpu: 256m
+      memory: 512Mi
+tests:
+- as: unittest
+  commands: pipenv run pytest --cov=src --cov-fail-under=90 -vv --cov-report term-missing
+  container:
+    from: python-test-runner
+  timeout: 2h0m0s
+- as: lint
+  commands: pipenv run pylint src tests
+  container:
+    from: python-test-runner
+  timeout: 2h0m0s
+- as: code-style
+  commands: pipenv run pycodestyle src tests
+  container:
+    from: python-test-runner
+  timeout: 2h0m0s
+- as: doc-style
+  commands: pipenv run pydocstyle src tests
+  container:
+    from: python-test-runner
+  timeout: 2h0m0s
+zz_generated_metadata:
+  branch: main
+  org: openshift
+  repo: incluster-anomaly-detection

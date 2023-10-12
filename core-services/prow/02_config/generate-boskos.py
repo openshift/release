@@ -242,6 +242,9 @@ CONFIG = {
         'syd04': 1,
         'syd05': 1,
     },
+    'powervs-3-quota-slice': {
+        'dal10': 1,
+    },
     'ibmcloud-quota-slice': {
         'us-east': 7,
     },

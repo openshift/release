@@ -47,6 +47,9 @@ mapfile -t mac_addresses <"${SHARED_DIR}"/mac-addresses.txt
 declare -a hostnames
 mapfile -t hostnames <"${SHARED_DIR}"/hostnames.txt
 
+folder_name=$(<"${SHARED_DIR}"/cluster-name.txt)
+govc folder.create "/${vsphere_datacenter}/vm/${folder_name}"
+
 [[ ${MASTERS} -eq 1 ]] && cpu="8" || cpu="4"
 
 for ((i = 0; i < total_host; i++)); do
@@ -61,30 +64,30 @@ for ((i = 0; i < total_host; i++)); do
     -firmware=efi \
     -on=false \
     -version vmx-"${target_hw_version}" \
-    -folder=/"${vsphere_datacenter}"/vm/ \
+    -folder="/${vsphere_datacenter}/vm/${folder_name}" \
     -iso-datastore="${vsphere_datastore}" \
     -iso=agent-installer-isos/"${agent_iso}" \
     "$vm_name"
 
   govc vm.change \
     -e="disk.EnableUUID=1" \
-    -vm="/${vsphere_datacenter}/vm/${vm_name}"
+    -vm="/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 
   govc vm.change \
     -nested-hv-enabled=true \
-    -vm="/${vsphere_datacenter}/vm/${vm_name}"
+    -vm="/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 
   govc device.boot \
     -secure \
-    -vm="/${vsphere_datacenter}/vm/${vm_name}"
+    -vm="/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 
   govc vm.network.change \
-    -vm="/${vsphere_datacenter}/vm/${vm_name}" \
+    -vm="/${vsphere_datacenter}/vm/${folder_name}/${vm_name}" \
     -net "${vsphere_portgroup}" \
     -net.address "${mac_addresses[$i]}" ethernet-0
 
   govc vm.power \
-    -on=true "/${vsphere_datacenter}/vm/${vm_name}"
+    -on=true "/${vsphere_datacenter}/vm/${folder_name}/${vm_name}"
 done
 ## Monitor for `bootstrap-complete`
 echo "$(date -u --rfc-3339=seconds) - Monitoring for bootstrap to complete"
