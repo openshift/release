@@ -84,6 +84,9 @@ CONFIG = {
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
+    'aws-rhtap-qe-quota-slice': {
+        'us-west-2': 10
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
@@ -139,10 +142,10 @@ CONFIG = {
         'us-central1': 30,
     },
     'gcp-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 80,
     },
     'gcp-openshift-gce-devel-ci-2-quota-slice': {
-        'us-central1': 70,
+        'us-central1': 80,
     },
     'gcp-arm64-quota-slice': {
         'us-central1': 30,

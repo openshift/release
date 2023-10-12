@@ -114,6 +114,15 @@ tests:
     - as: test
       cli: latest
       commands: |
+        function cleanup() {
+          for child in $( jobs -p ); do
+            kill "${child}"
+          done
+          wait
+          exit 1
+        }
+        trap cleanup EXIT
+
         export JUNIT_DIRECTORY=${ARTIFACT_DIR}
         # Skip the flake tests, which are ran in a separate job
         export SKIP='\[FLAKE\]'
@@ -121,9 +130,11 @@ tests:
         export SKIP="$SKIP|an InstallPlan step contains a deprecated resource version"
         make e2e/olm
       from: ci-image
+      grace_period: 1m0s
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-olm-flaky
   optional: true
