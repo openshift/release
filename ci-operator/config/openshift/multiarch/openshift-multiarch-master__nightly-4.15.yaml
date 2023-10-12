@@ -568,6 +568,31 @@ tests:
       COMPUTE_NODE_TYPE: t2a-standard-4
       OCP_ARCH: arm64
     workflow: openshift-e2e-gcp-ovn
+- as: ocp-e2e-gcp-ovn-heterogeneous
+  cron: 0 11 * * 0
+  steps:
+    cluster_profile: gcp-arm64
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:multi-latest
+    env:
+      ADDITIONAL_WORKER_ARCHITECTURE: aarch64
+      ADDITIONAL_WORKER_VM_TYPE: t2a-standard-4
+      OCP_ARCH: amd64
+      TEST_SKIPS: deploymentconfigs\| should expose cluster services outside the cluster\|
+        FIPS TestFIPS\| Multi-stage image builds should succeed\| Optimized image
+        builds should succeed\| build can reference a cluster service\| custom build
+        with buildah\| oc new-app should succeed\| prune builds based on settings\|
+        s2i build with a root\| verify /run filesystem contents\| oc can run\| oc
+        debug\| oc idle\| Pods cannot access\| Image append should create\| Image
+        extract should extract\| Image info should display\| Image layer subresource\|
+        oc tag should change image\| when installed on the cluster should\| OpenShift
+        alerting rules\| The HAProxy router should\| egressrouter cni resources\|
+        pod should start\| pod sysctls\| build volumes should mount given secrets
+        and configmaps into the build pod
+    test:
+    - ref: ipi-install-heterogeneous
+    - ref: openshift-e2e-test
+    workflow: openshift-e2e-gcp-ovn
 zz_generated_metadata:
   branch: master
   org: openshift

@@ -16,43 +16,7 @@ build_root:
     name: release
     namespace: openshift
     tag: rhel-9-release-golang-1.20-openshift-4.14
-images:
-- dockerfile_literal: |
-    FROM src as rpms
-    RUN dnf install --setopt=tsflags=nodocs -y selinux-policy-devel
-    # Disable cgo when cross-compiling because it is not supported.
-    RUN make rpm && TARGET_ARCH=aarch64 CGO_ENABLED=0 make rpm
-    RUN tar cvf /rpms.tar -C _output/rpmbuild/RPMS/ .
-
-    FROM test-runtime
-
-    COPY oc openshift-tests /usr/bin/
-    RUN ln -rs /usr/bin/oc /usr/bin/kubectl
-
-    COPY microshift /microshift
-    COPY --from=rpms /rpms.tar /rpms.tar
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    src:
-      as:
-      - src
-      paths:
-      - destination_dir: .
-        source_path: /go/src/github.com/openshift/microshift
-    test-bin:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/openshift-tests
-    test-runtime:
-      as:
-      - test-runtime
-  to: microshift-test-payload
 promotion:
-  excluded_images:
-  - microshift-test-payload
   name: "4.16"
   namespace: ocp
 releases:

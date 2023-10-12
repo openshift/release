@@ -164,7 +164,7 @@ metadata:
   name: persistent-fuse-1
   labels:
     type: local
-    app: xpaas-qe
+    application: xpaas-qe
 spec:
   storageClassName: manual
   capacity:
@@ -190,7 +190,7 @@ spec:
       storage: 19Gi
   selector:
     matchLabels:
-      app: xpaas-qe
+      application: xpaas-qe
   storageClassName: manual
   volumeMode: Filesystem
 status:
@@ -205,6 +205,7 @@ EOF
 function create_nginx() {
   NGINX_DOMAIN="nginx.${CONSOLE_URL#"https://console-openshift-console."}"
   NGINX_HOST=${NGINX_DOMAIN//".org/"/.org}
+  export NGINX_HOST
 
   oc import-image ${1}/nginx:latest --from=quay.io/packit/nginx-unprivileged --confirm -n ${1}
   oc create -f - <<EOF
@@ -238,7 +239,7 @@ metadata:
   name: nginx-server
   namespace: ${1}
   labels:
-    application: nginx
+    application: xpaas-qe
 spec:
   strategy:
     type: Recreate
@@ -260,7 +261,7 @@ spec:
       name: nginx
       labels:
         deploymentConfig: nginx
-        application: nginx
+        application: xpaas-qe
     spec:
       securityContext:
         runAsUser: 0
@@ -313,7 +314,7 @@ kind: Service
 metadata:
   name: nginx
   labels:
-    application: nginx
+    application: xpaas-qe
 spec:
   externalTrafficPolicy: Local
   ports:
@@ -322,7 +323,7 @@ spec:
     protocol: TCP
     targetPort: 8080
   selector:
-    application: nginx
+    deploymentConfig: nginx
   type: NodePort
 EOF
 

@@ -63,19 +63,32 @@ else
   bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
   machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
 
+  printf "***** DEBUG dns: %s lb: %s bootstrap: %s cidr: %s ******\n" "$dns_server" "$lb_ip_address" "$bootstrap_ip_address" "$machine_cidr"
+
+  tempaddrs=()
   for n in $(seq "$start_master_num" "$end_master_num"); do
-    master_ips+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   done
+  printf "**** controlplane DEBUG %s ******\n" "${tempaddrs[@]}"
 
+  printf -v control_plane_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
+
+
+  printf "**** DEBUG start_worker_num: %s end_worker_num: %s ******\n" "${start_worker_num}" "${end_worker_num}"
+
+  tempaddrs=()
   for n in $(seq "$start_worker_num" "$end_worker_num"); do
-    worker_ips+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   done
-fi
 
-printf -v control_plane_ip_addresses "\"%s\"," "${master_ips[@]}"
-control_plane_ip_addresses="[${control_plane_ip_addresses%,}]"
-printf -v compute_ip_addresses '\"%s\",' "${worker_ips[@]}"
-compute_ip_addresses="[${compute_ip_addresses%,}]"
+  printf "**** compute DEBUG %s ******\n" "${tempaddrs[@]}"
+
+  printf -v compute_ip_addresses "\"%s\"," "${tempaddrs[@]}"
+  compute_ip_addresses="[${compute_ip_addresses%,}]"
+
+
+fi
 
 export HOME=/tmp
 export OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE=${RELEASE_IMAGE_LATEST}
