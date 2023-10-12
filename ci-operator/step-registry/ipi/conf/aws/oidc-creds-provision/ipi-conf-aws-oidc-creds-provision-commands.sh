@@ -53,7 +53,6 @@ pushd "${dir}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
 oc adm release extract --registry-config pull-secret --credentials-requests --cloud=aws --to="/tmp/credrequests" ${ADDITIONAL_OC_EXTRACT_ARGS} "${TESTING_RELEASE_IMAGE}"
-rm pull-secret
 popd
 
 echo "CR manifest files:"
@@ -68,7 +67,7 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   cat ${ingress_cr_file}
 
   # x.y.z
-  ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} -ojsonpath="{.metadata.version}" | cut -d. -f 1,2)
+  ocp_version=$(oc adm release info --registry-config "${dir}/pull-secret" ${TESTING_RELEASE_IMAGE} -ojsonpath="{.metadata.version}" | cut -d. -f 1,2)
   ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
   ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
   echo "OCP version: ${ocp_version}"
@@ -82,6 +81,8 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "Ingress CR content:"
   cat ${ingress_cr_file}
 fi
+
+rm -f "${dir}/pull-secret"
 
 # Create extra efs csi driver iam resources, it's optional only for efs csi driver related tests on sts clusters
 if [[ "${CREATE_EFS_CSI_DRIVER_IAM}" == "yes" ]]; then

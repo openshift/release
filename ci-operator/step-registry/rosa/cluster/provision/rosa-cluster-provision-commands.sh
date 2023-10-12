@@ -237,7 +237,7 @@ if [[ "$ETCD_ENCRYPTION" == "true" ]]; then
   if [[ "$HOSTED_CP" == "true" ]]; then
     kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
     ETCD_ENCRYPTION_SWITCH="${ETCD_ENCRYPTION_SWITCH} --etcd-encryption-kms-arn $kms_key_arn"
-    record_cluster "encrption" "etcd_encryption_kms_arn" $kms_key_arn
+    record_cluster "encryption" "etcd_encryption_kms_arn" $kms_key_arn
   fi
 fi
 
@@ -245,7 +245,7 @@ STORAGE_ENCRYPTION_SWITCH=""
 if [[ "$STORAGE_ENCRYPTION" == "true" ]]; then
   kms_key_arn=$(cat <${SHARED_DIR}/aws_kms_key_arn)
   STORAGE_ENCRYPTION_SWITCH="--enable-customer-managed-key --kms-key-arn $kms_key_arn"
-  record_cluster "encrption" "kms_key_arn" $kms_key_arn
+  record_cluster "encryption" "kms_key_arn" $kms_key_arn
 fi
 
 HYPERSHIFT_SWITCH=""
@@ -517,9 +517,9 @@ if [[ "${API_URL}" == "null" ]]; then
   # If api.url is null, call ocm-qe to analyze the root cause.
   if [[ -e ${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url ]]; then
     slack_hook_url=$(cat "${CLUSTER_PROFILE_DIR}/ocm-slack-hooks-url")
-    slack_message='{"text": "Warning: the api.url for the cluster '"${CLUSTER_ID}"' is null. Sleep 20 hours for debugging. <@UD955LPJL> <@UEEQ10T4L>"}'
+    slack_message='{"text": "Warning: the api.url for the cluster '"${CLUSTER_ID}"' is null. Sleep 10 hours for debugging with the job '"${JOB_NAME}/${BUILD_ID}"'. <@UD955LPJL> <@UEEQ10T4L>"}'
     curl -X POST -H 'Content-type: application/json' --data "${slack_message}" "${slack_hook_url}"
-    sleep 72000
+    sleep 36000
   fi
 
   port="6443"

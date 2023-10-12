@@ -269,6 +269,8 @@ function run {
     cat ./case_selected
     echo "-----------------------------------------------------"
 
+    # failures happening after this point should not be caught by the Overall CI test suite in RP
+    touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
@@ -286,17 +288,13 @@ function run {
     echo "try to handle result"
     handle_result
     echo "done to handle result"
-    if [ "W${ret_value}W" == "W0W" ]; then
-        echo "success"
-        exit 0
-    fi
-    echo "fail"
+    [ "W${ret_value}W" == "W0W" ] && echo "success" || echo "fail"
     # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
     # please refer to the junit result for case result, not depends on step result.
     if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
-        exit 1
+        echo "do not force success exit"
+        exit $ret_value
     fi
-    exit 0
 }
 
 # select the cases per FILTERS

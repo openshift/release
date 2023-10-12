@@ -9,10 +9,7 @@ info() {
 }
 
 CLUSTER_TYPE="${CLUSTER_TYPE_OVERRIDE:-$CLUSTER_TYPE}"
-CLUSTER_NAME=''
-if [ -r "${SHARED_DIR}/CLUSTER_NAME" ]; then
-	CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
-fi
+CLUSTER_NAME="$(<"${SHARED_DIR}/CLUSTER_NAME")"
 
 clouds_yaml="$(mktemp)"
 cp "/var/run/cluster-secrets/${CLUSTER_TYPE}/clouds.yaml" "$clouds_yaml"

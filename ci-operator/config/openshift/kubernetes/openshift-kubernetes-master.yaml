@@ -27,6 +27,18 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: oc-rpms
+  ocp_4.15_base-rhel9:
+    name: "4.15"
+    namespace: ocp
+    tag: base-rhel9
+  ocp_4.15_tools:
+    name: "4.15"
+    namespace: ocp
+    tag: tools
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
   ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
@@ -46,19 +58,23 @@ canonical_go_repository: k8s.io/kubernetes
 images:
 - dockerfile_path: openshift-hack/images/hyperkube/Dockerfile.rhel
   inputs:
+    ocp_4.15_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
     ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: hyperkube
 - dockerfile_path: openshift-hack/images/tests/Dockerfile.rhel
-  from: tools
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    ocp_4.15_tools:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+      - registry.ci.openshift.org/ocp/4.15:tools
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: kubernetes-tests
 - context_dir: openshift-hack/images/os/
-  from: base
   inputs:
     base-machine-with-rpms:
       as:
@@ -89,8 +105,13 @@ images:
   to: rhel-coreos
 - context_dir: build/pause
   dockerfile_path: Dockerfile.Rhel
-  from: base
   inputs:
+    ocp_4.15_base-rhel9:
+      as:
+      - registry.ci.openshift.org/ocp/4.15:base-rhel9
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
     ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
@@ -324,7 +345,7 @@ tests:
 - as: e2e-vsphere
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       TEST_SUITE: openshift/conformance/parallel
     workflow: openshift-e2e-vsphere

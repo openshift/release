@@ -31,10 +31,6 @@ base_images:
     name: ocm-2.10
     namespace: edge-infrastructure
     tag: assisted-test-infra-internal
-  coreos-centos-stream8:
-    name: stream8
-    namespace: coreos
-    tag: "8"
   dev-scripts:
     name: test
     namespace: ocp-kni
@@ -48,18 +44,12 @@ build_root:
 images:
 - dockerfile_path: Dockerfile.assisted_installer_agent
   inputs:
-    coreos-centos-stream8:
-      as:
-      - quay.io/centos/centos:stream8
     openshift_release_golang-1.18:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
   to: assisted-installer-agent
 - dockerfile_path: Dockerfile.assisted_installer_agent-build
   inputs:
-    coreos-centos-stream8:
-      as:
-      - quay.io/centos/centos:stream8
     openshift_release_golang-1.18:
       as:
       - registry.ci.openshift.org/openshift/release:golang-1.18
@@ -182,6 +172,10 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
         OPENSHIFT_VERSION=4.12
+        MASTER_MEMORY=17408
+        MASTER_CPU=8
+        WORKER_MEMORY=9216
+        WORKER_CPU=4
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
   optional: true
