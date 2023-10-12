@@ -135,6 +135,7 @@ declare GOVC_PASSWORD
 declare vsphere_datacenter
 declare vsphere_datastore
 declare dns_server
+declare vsphere_cluster
 
 total_host="$((MASTERS + WORKERS))"
 declare -a mac_addresses=()
@@ -255,9 +256,11 @@ cat >>"${SHARED_DIR}/platform-conf.sh" <<EOF
 export VSPHERE_USERNAME="${GOVC_USERNAME}"
 export VSPHERE_VCENTER="${vsphere_url}"
 export VSPHERE_DATACENTER="${vsphere_datacenter}"
+export VSPHERE_CLUSTER="${vsphere_cluster}"
 export VSPHERE_DATASTORE="${vsphere_datastore}"
 export VSPHERE_PASSWORD='${GOVC_PASSWORD}'
 export VSPHERE_NETWORK='${vsphere_portgroup}'
+export VSPHERE_FOLDER="${cluster_name}"
 EOF
 
 echo "Copying kubeconfig to the shared directory..."

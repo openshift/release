@@ -1,6 +1,7 @@
 periodics:
 - agent: kubernetes
   cluster: build01
+  cron: 4 11 1 * SAT
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -8,7 +9,6 @@ periodics:
   - base_ref: cnv-4.11
     org: RedHatQE
     repo: interop-testing
-  interval: 168h
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-interop-qe
@@ -17,6 +17,17 @@ periodics:
     job-release: "4.11"
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
   name: periodic-ci-RedHatQE-interop-testing-cnv-4.11-ocp-cnv-odf-4.11-cnv-odf-tests-aws-upi-ocp411
+  reporter_config:
+    slack:
+      channel: '#cnv-release-4-11-z'
+      job_states_to_report:
+      - success
+      - failure
+      - error
+      report_template: '{{if eq .Status.State "success"}} :slack-green: Job *{{.Spec.Job}}*
+        ended with *{{.Status.State}}*. <{{.Status.URL}}|View logs> {{else}} :failed:
+        Job *{{.Spec.Job}}* ended with *{{.Status.State}}*. <{{.Status.URL}}|View
+        logs> {{end}}'
   spec:
     containers:
     - args:

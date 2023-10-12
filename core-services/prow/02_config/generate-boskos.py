@@ -84,6 +84,9 @@ CONFIG = {
     'aws-perfscale-lrc-qe-quota-slice': {
         'us-west-2': 5,
     },
+    'aws-rhtap-qe-quota-slice': {
+        'us-west-2': 10
+    },
     'azure4-quota-slice': {
         'centralus': 33,
         'eastus': 8,
@@ -239,6 +242,9 @@ CONFIG = {
         'syd04': 1,
         'syd05': 1,
     },
+    'powervs-3-quota-slice': {
+        'dal10': 1,
+    },
     'ibmcloud-quota-slice': {
         'us-east': 7,
     },
@@ -298,12 +304,12 @@ CONFIG = {
 for i in range(3):
     for j in range(4):
         CONFIG['libvirt-s390x-quota-slice']['libvirt-s390x-{}-{}'.format(i, j)] = 1
-# mihawk1 system needs firmware update. We can put it in the list once the firmware is updated and then reserve one cluster back for internal debugging.
-for i in range(2):
+# Mihawk0 is updated with RHEL 8.8, adding the Mihawk back to the lease pool
+for i in range(3):
     for j in range(4):
-        CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i+1, j)] = 1
+        CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-{}-{}'.format(i, j)] = 1
 # Reserve one for internal debugging use
-# del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-1-3']
+del CONFIG['libvirt-ppc64le-quota-slice']['libvirt-ppc64le-0-3']
 
 for i in range(3):
     CONFIG['nutanix-quota-slice']['nutanix-segment-{0:0>2}'.format(i)] = 1
