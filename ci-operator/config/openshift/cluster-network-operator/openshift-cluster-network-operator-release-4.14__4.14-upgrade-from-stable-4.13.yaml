@@ -7,6 +7,14 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  tests-private-preupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
+  tests-private-postupg:
+    name: tests-private
+    namespace: ci
+    tag: "4.14"
 binary_build_commands: hack/build-go.sh
 build_root:
   from_repository: true
@@ -29,6 +37,12 @@ releases:
       include_built_images: true
       name: "4.14"
       namespace: ocp
+  target:
+    candidate:
+      architecture: amd64
+      product: ocp
+      stream: nightly
+      version: "4.14"
 resources:
   '*':
     requests:
@@ -58,6 +72,20 @@ tests:
       FAIL_ON_CORE_DUMP: "true"
       TEST_TYPE: upgrade-conformance
     workflow: openshift-upgrade-gcp-ovn
+- as: aws-hypershift-ovn-upgrade
+  optional: true
+  steps:
+    cluster_profile: aws-qe
+    env:
+      BASE_DOMAIN: qe.devcluster.openshift.com
+      TEST_FILTERS: ~DisconnectedOnly&;~HyperShiftMGMT&;~MicroShiftOnly&;~NonHyperShiftHOST&
+      UPGRADE_CHECK_RUN_TAGS: '@upgrade-check and @4.13 and @aws-ipi and @hypershift-hosted
+        and @network-ovnkubernetes and not @fips'
+      UPGRADE_PRE_RUN_TAGS: '@upgrade-prepare and @4.13 and @aws-ipi and @hypershift-hosted
+        and @network-ovnkubernetes and not @fips'
+    test:
+    - chain: openshift-upgrade-qe-test-hypershift
+    workflow: cucushift-installer-rehearse-aws-ipi-ovn-hypershift-guest
 zz_generated_metadata:
   branch: release-4.14
   org: openshift
