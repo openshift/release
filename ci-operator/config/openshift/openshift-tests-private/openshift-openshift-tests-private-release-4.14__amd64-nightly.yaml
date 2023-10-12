@@ -3,6 +3,10 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: ansible
+  assisted-service-scripts:
+    name: ocm-2.9
+    namespace: edge-infrastructure
+    tag: assisted-service-scripts
   aws-efs-csi-operator-create-efs:
     name: "4.14"
     namespace: ocp
@@ -2201,6 +2205,19 @@ tests:
     test:
     - chain: openshift-e2e-test-qe-destructive
     workflow: cucushift-installer-rehearse-azure-upi
+- as: baremetalds-assisted-hypershift-agent-mce-mgmt-f7
+  cron: 15 1 4,11,18,26 * *
+  steps:
+    cluster_profile: equinix-ocp-metal-qe
+    env:
+      LVM_OPERATOR_SUB_CHANNEL: stable-4.14
+      MCE_VERSION: "2.4"
+      TEST_ADDITIONAL: Hypershift
+      TEST_FILTERS: ~ChkUpgrade&;~DisconnectedOnly&;~MicroShiftOnly&;HyperShiftMGMT&
+      TEST_TIMEOUT: "30"
+    test:
+    - chain: openshift-e2e-test-hypershift-qe-mgmt
+    workflow: cucushift-installer-rehearse-baremetalds-assisted-hypershift-agent-mce
 - as: baremetalds-ipi-ovn-ipv4-fips-f4
   cron: 37 13 2,6,10,14,19,24,28 * *
   steps:
