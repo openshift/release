@@ -571,6 +571,11 @@ periodics:
         value: azurestack
       - name: UNRESOLVED_CONFIG
         value: |
+          base_images:
+            upi-installer:
+              name: "$(BRANCH)"
+              namespace: ocp
+              tag: upi-installer
           resources:
             '*':
               limits:
@@ -580,6 +585,14 @@ periodics:
                 memory: 200Mi
           tests:
           - as: launch
+            steps:
+              cluster_profile: $(CLUSTER_TYPE)
+              env:
+                CLUSTER_DURATION: $(CLUSTER_DURATION)
+              test:
+              - ref: clusterbot-wait
+              workflow: openshift-e2e-$(CLOUD_TYPE)
+          - as: launch-upi
             steps:
               cluster_profile: $(CLUSTER_TYPE)
               env:
