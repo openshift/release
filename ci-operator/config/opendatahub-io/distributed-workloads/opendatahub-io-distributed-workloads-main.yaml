@@ -28,6 +28,8 @@ tests:
       cli: latest
       commands: |
         oc logs -n openshift-operators deployment/codeflare-operator-manager > ${ARTIFACT_DIR}/codeflare-operator.log
+        oc logs -n opendatahub deployment/kuberay-operator > ${ARTIFACT_DIR}/kuberay-operator.log
+        oc logs -n openshift-operators deployment/opendatahub-operator-controller-manager > ${ARTIFACT_DIR}/odh-operator.log
       from: src
       resources:
         requests:
@@ -42,16 +44,17 @@ tests:
         export CODEFLARE_TEST_TIMEOUT_SHORT=1m
         export CODEFLARE_TEST_TIMEOUT_MEDIUM=5m
         export CODEFLARE_TEST_TIMEOUT_LONG=10m
-        # make install-opendatahub-operator
-        # temporary workaround until repo is migrated to ODH 2.x
-        oc create ns opendatahub
-        echo -e "apiVersion: operators.coreos.com/v1alpha1\nkind: Subscription\nmetadata:\n  name: opendatahub-operator\n  labels:\n    operators.coreos.com/opendatahub-operator.openshift-operators: ''\n  namespace: openshift-operators\nspec:\n  channel: rolling\n  name: opendatahub-operator\n  installPlanApproval: Automatic\n  source: community-operators\n  sourceNamespace: openshift-marketplace" | oc apply -f -
-        oc wait -n openshift-operators subscription/opendatahub-operator --for=jsonpath='{.status.state}'=AtLatestKnown --timeout=180s
-        sleep 60
-        make install-codeflare-operator-from-github
-        # So far old ODH is used, create ODH core KfDef
-        oc apply -f https://raw.githubusercontent.com/opendatahub-io/odh-manifests/master/kfdef/odh-core.yaml -n opendatahub
-        make deploy-codeflare-from-filesystem
+        make install-opendatahub-operator
+        make install-codeflare-operator
+        if [[ "${REPO_OWNER}" == "openshift" ]]; then
+          echo -e "Running in openshift repo, it means that this is PJ rehearsal, using latest main for DW manifest \n"
+          sed -i "s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/distributed-workloads/tarball/main|" ./contrib/configuration/basic-dsc.yaml
+        else
+          echo -e "Running PR ${PULL_NUMBER} \n"
+          sed -i "s|<DW PR tarball URI>|https://api.github.com/repos/opendatahub-io/distributed-workloads/tarball/pull/${PULL_NUMBER}/head|" ./contrib/configuration/basic-dsc.yaml
+        fi
+        oc apply -f ./contrib/configuration/basic-dsc.yaml -n opendatahub
+        cat ./contrib/configuration/basic-dsc.yaml
         sleep 60
         cd tests && go test -timeout 60m -v ./integration
       from: src

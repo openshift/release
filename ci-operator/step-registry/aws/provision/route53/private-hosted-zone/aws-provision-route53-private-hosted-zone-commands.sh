@@ -56,13 +56,20 @@ if [[ ${ENABLE_SHARED_PHZ} == "yes" ]]; then
         {
             "Effect": "Allow",
             "Action": [
-                "route53:GetHostedZone",
                 "route53:ChangeResourceRecordSets",
-                "route53:ChangeTagsForResource"
+                "route53:ListHostedZones",
+                "route53:ListHostedZonesByName",
+                "route53:ListResourceRecordSets",
+                "route53:ChangeTagsForResource",
+                "route53:GetAccountLimit",
+                "route53:GetChange",
+                "route53:GetHostedZone",
+                "route53:ListTagsForResource",
+                "route53:UpdateHostedZoneComment",
+                "tag:GetResources",
+                "tag:UntagResources"
             ],
-            "Resource": [
-                "arn:aws:route53:::hostedzone/${HOSTED_ZONE_ID}"
-            ]
+            "Resource": "*"
         }
     ]
 }
@@ -118,8 +125,5 @@ EOF
   # Attach policy to role
   cmd="aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn '${POLICY_ARN}'"
   eval "${cmd}"
-  
-  # TODO: narrow down the permission
-  aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn 'arn:aws:iam::aws:policy/ResourceGroupsandTagEditorFullAccess'
-  aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+
 fi

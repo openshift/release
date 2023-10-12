@@ -19,14 +19,9 @@ pushd e2e-benchmarking/workloads/kube-burner-ocp-wrapper
 export EXTRA_FLAGS="--pods-per-node=$PODS_PER_NODE --pod-ready-threshold=$POD_READY_THRESHOLD"
 export WORKLOAD=node-density
 
-# UUID Generation
-UUID="perfscale-cpt-$(uuidgen)"
-export UUID
-
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 
-OUTPUT_FILE="index_data.json"
-rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
+rm -f ${SHARED_DIR}/index.json
 
 ./run.sh 
 

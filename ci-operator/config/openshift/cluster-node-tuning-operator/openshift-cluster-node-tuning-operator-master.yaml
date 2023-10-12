@@ -11,10 +11,10 @@ base_images:
     name: "4.15"
     namespace: ocp
     tag: hypershift-tests
-  ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
     name: builder
     namespace: ocp
-    tag: rhel-9-golang-1.20-openshift-4.14
+    tag: rhel-9-golang-1.20-openshift-4.15
   openshift_release_golang-1.20:
     name: release
     namespace: openshift
@@ -32,9 +32,9 @@ images:
 - dockerfile_path: Dockerfile.rhel9
   from: base
   inputs:
-    ocp_builder_rhel-9-golang-1.20-openshift-4.14:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
       as:
-      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.14
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
   to: cluster-node-tuning-operator
 promotion:
   excluded_images:
@@ -57,6 +57,11 @@ resources:
       cpu: 100m
       memory: 200Mi
 tests:
+- as: lint
+  commands: make GOLANGCI_LINT_CACHE=/tmp/.golangci-lint-cache golangci-lint
+  container:
+    from: src
+  optional: true
 - as: unit
   commands: make test-unit
   container:

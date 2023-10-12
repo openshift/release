@@ -237,6 +237,10 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
         OPENSHIFT_VERSION=4.13
+        MASTER_MEMORY=17408
+        MASTER_CPU=8
+        WORKER_MEMORY=9216
+        WORKER_CPU=4
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-cnv-periodic
   cron: 15 02 */1 * 0-5
@@ -246,6 +250,10 @@ tests:
       ASSISTED_CONFIG: |
         OLM_OPERATORS=cnv
         OPENSHIFT_VERSION=4.13
+        MASTER_MEMORY=17408
+        MASTER_CPU=8
+        WORKER_MEMORY=9216
+        WORKER_CPU=4
       TEST_SUITE: full
     workflow: assisted-baremetal
 - as: e2e-metal-assisted-lvm
@@ -553,6 +561,18 @@ tests:
         TEST_FUNC=test_networking
       PACKET_PLAN: m3.large.x86
     workflow: assisted-baremetal
+- as: e2e-metal-assisted-bond
+  optional: true
+  run_if_changed: ^(terraform_files/.*|.*/controllers/.*)$
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IS_BONDED=true
+        TEST_FUNC=test_networking
+      PACKET_PLAN: m3.large.x86
+      TEST_SUITE: full
+    workflow: assisted-baremetal
 - as: e2e-metal-assisted-static-ip-suite-periodic
   cron: 30 04 */1 * 0-5
   steps:
@@ -560,6 +580,17 @@ tests:
     env:
       ASSISTED_CONFIG: |
         STATIC_IPS=true
+        TEST_FUNC=test_networking
+      PACKET_PLAN: m3.large.x86
+      TEST_SUITE: full
+    workflow: assisted-baremetal
+- as: e2e-metal-assisted-bond-periodic
+  cron: 45 03 */1 * 0-5
+  steps:
+    cluster_profile: packet-assisted
+    env:
+      ASSISTED_CONFIG: |
+        IS_BONDED=true
         TEST_FUNC=test_networking
       PACKET_PLAN: m3.large.x86
       TEST_SUITE: full
@@ -581,7 +612,7 @@ tests:
 - as: e2e-vsphere-assisted
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -591,7 +622,7 @@ tests:
 - as: e2e-vsphere-assisted-4-12
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -602,7 +633,7 @@ tests:
 - as: e2e-vsphere-assisted-4-13
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0
@@ -613,7 +644,7 @@ tests:
 - as: e2e-vsphere-assisted-periodic
   cron: 45 02 */1 * 0-5
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=3
@@ -625,7 +656,7 @@ tests:
 - as: e2e-vsphere-assisted-4-12-periodic
   cron: 40 02 */1 * 0-5
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=3
@@ -638,7 +669,7 @@ tests:
 - as: e2e-vsphere-assisted-kube-api
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         KUBE_API=true
@@ -653,7 +684,7 @@ tests:
 - as: e2e-vsphere-assisted-kube-api-periodic
   cron: 00 00 */1 * 0-5
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         KUBE_API=true
@@ -710,7 +741,7 @@ tests:
 - as: e2e-vsphere-assisted-umn
   optional: true
   steps:
-    cluster_profile: vsphere
+    cluster_profile: vsphere-2
     env:
       ASSISTED_CONFIG: |
         NUM_WORKERS=0

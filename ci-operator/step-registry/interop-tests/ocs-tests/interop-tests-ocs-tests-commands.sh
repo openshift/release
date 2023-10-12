@@ -10,7 +10,9 @@ OCP_VERSION="${OCP_MAJOR_MINOR}"
 
 OCS_VERSION=$(oc get csv -n openshift-storage -o json | jq -r '.items[] | select(.metadata.name | startswith("ocs-operator")).spec.version' | cut -d. -f1,2)
 
-CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
+# CLUSTER_NAME=$(cat "${SHARED_DIR}/CLUSTER_NAME")
+# CLUSTER_NAME="cluster-name"
+CLUSTER_NAME=$([[ -f "${SHARED_DIR}/CLUSTER_NAME" ]] && cat "${SHARED_DIR}/CLUSTER_NAME" || echo "cluster-name")
 CLUSTER_DOMAIN="${CLUSTER_DOMAIN:-release-ci.cnv-qe.rhood.us}"
 LOGS_FOLDER="${ARTIFACT_DIR}/ocs-tests"
 LOGS_CONFIG="${LOGS_FOLDER}/ocs-tests-config.yaml"
