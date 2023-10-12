@@ -142,7 +142,7 @@ done
 
 function check_tests() {
   declare -a trymap
-	mapfile -t podlist < <(oc get pods -n jboss-fuse-interop -l application=xpaas-qe --no-headers=true | awk '{print $1}')
+	mapfile -t podlist < <(oc get pods -n jboss-fuse-interop -l deploymentConfig=xpaas-qe --no-headers=true | awk '{print $1}')
 	echo "LIST ----"
 	echo "${podlist[@]}"
 	for k in "${!podlist[@]}"; do
@@ -184,7 +184,7 @@ function check_tests() {
          restartPodAfterFailure $currentPod ${trymap[$currentTest]}
       fi
     done
-    mapfile -t podlist < <(oc get pods -n jboss-fuse-interop -l application=xpaas-qe --no-headers=true | awk '{print $1}')
+    mapfile -t podlist < <(oc get pods -n jboss-fuse-interop -l deploymentConfig=xpaas-qe --no-headers=true | awk '{print $1}')
   done
 }
 
@@ -195,8 +195,13 @@ function restartPodAfterFailure() {
   currentTest=$(echo $currentPod | awk -F"[-]" '{print $1}')
 
   oc rollout latest dc/nginx-server -n jboss-fuse-interop || true
-  oc wait pods -n jboss-fuse-interop -l application=nginx --for condition=Ready --timeout=120s
+  oc wait pods -n jboss-fuse-interop -l deploymentConfig=nginx --for condition=Ready --timeout=120s
   sleep 30
+  echo "NGINX Route deletion ..."
+  NGINX_ROUTE=$(oc get routes nginx -n jboss-fuse-interop --no-headers=true | awk '{print $2}')
+  oc delete route nginx -n jboss-fuse-interop
+  oc expose svc/nginx --hostname=${NGINX_ROUTE}
+  echo "NGINX Route recreated."
   if [[ "$podFailures" -lt $maxFailures ]]; then
     oc exec $currentPod -n jboss-fuse-interop -- /bin/bash -c 'rm -rf /tmp/log/'$currentPod'' || true
     oc exec $currentPod -n jboss-fuse-interop -- /bin/bash -c 'rm -rf /tmp/surefire-reports/'$currentPod'' || true
@@ -215,9 +220,9 @@ function restartPodAfterFailure() {
 
 function copy_logs() {
   oc rollout latest dc/nginx-server -n jboss-fuse-interop
-  oc wait pods -n jboss-fuse-interop -l application=nginx --for condition=Ready
+  oc wait pods -n jboss-fuse-interop -l deploymentConfig=nginx --for condition=Ready
   sleep 60
-  NGINX_POD=$(oc get pods -n jboss-fuse-interop -l application=nginx --no-headers=true | awk '{print $1}')
+  NGINX_POD=$(oc get pods -n jboss-fuse-interop -l deploymentConfig=nginx --no-headers=true | awk '{print $1}')
   echo "get logs from pod ${NGINX_POD} at /tmp/reports"
   export kubeadminpwd
   kubeadminpwd=$(cat $SHARED_DIR/kubeadmin-password)
