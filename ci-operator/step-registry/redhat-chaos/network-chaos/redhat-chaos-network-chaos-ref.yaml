@@ -1,0 +1,68 @@
+ref:
+  as: redhat-chaos-network-chaos
+  from_image:
+    namespace: chaos
+    name: krkn
+    tag: latest
+  commands: redhat-chaos-network-chaos-commands.sh
+  credentials:
+  - namespace: test-credentials
+    name: cluster-secrets-aws-chaos
+    mount_path: /secret/telemetry
+  env:
+    - name: DURATION
+      default: "300"
+    - name: NODE_NAME
+      default: ""
+    - name: LABEL_SELECTOR
+      default: "node-role.kubernetes.io/master"
+    - name: INSTANCE_COUNT
+      default: "1"
+    - name: INTERFACES
+      default: ""
+    - name: EXECUTION
+      default: "parallel"
+    - name: EGRESS
+      default: "{bandwidth: 100mbit}"
+    - name: TARGET_NODE_AND_INTERFACE
+      default: ""
+    - name: NETWORK_PARAMS
+      default: ""
+    - name: WAIT_DURATION
+      default: "300"
+    - name: RETRY_WAIT
+      default: "60"
+    - name: ENABLE_ALERTS
+      default: "True"
+    - name: ALERTS_PATH
+      default: "/root/kraken/config/alerts" 
+    - name: CHECK_CRITICAL_ALERTS
+      default: "True"
+    - name: WAIT_DURATION
+      default: "100"
+    - name: TELEMETRY_ENABLED
+      default: "True"
+    - name: TELEMETRY_API_URL
+      default: "https://ulnmf9xv7j.execute-api.us-west-2.amazonaws.com/production"
+    - name: TELEMETRY_USERNAME
+      default: "redhat-chaos"
+    - name: TELEMETRY_RUN_TAG
+      default: "prow-pvc-fill"
+    - name: TELEMETRY_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMETRY_FULL_PROMETHEUS_BACKUP
+      default: "True"
+    - name: TELEMTRY_BACKUP_THREADS
+      default: "5"
+    - name: TELEMETRY_ARCHIVE_PATH
+      default: "/tmp"
+    - name: TELEMETRY_MAX_RETRIES
+      default: "0"
+    - name: TELEMETRY_ARCHIVE_SIZE
+      default: "1000000"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+  documentation: >-
+    This workflow runs the krkn-hub config workload in the deployed cluster and introduces network latency, packet loss, bandwidth restriction in the egress traffic of a Node's interface using the tc and Netem.
