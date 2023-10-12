@@ -447,6 +447,26 @@ for manifest_name in os.listdir("./"):
 
 }
 
+function enable_ipsec() {
+  if [ ! -f /tmp/yq ]; then
+    curl -L "https://github.com/mikefarah/yq/releases/download/3.3.0/yq_linux_$( get_arch )" \
+    -o /tmp/yq && chmod +x /tmp/yq
+  fi
+
+  # we need to patch the manifest to enable ipsec after the cidrs have been assigned
+  PATCH="${SHARED_DIR}/enable-ipsecConfig.yaml.patch"
+  cat > "${PATCH}" << EOF
+spec:
+  defaultNetwork:
+    ovnKubernetesConfig:
+      ipsecConfig: {}
+EOF
+
+  /tmp/yq m -x -i "${SHARED_DIR}/manifest_cluster-network-03-config.yml" "${PATCH}"
+  echo "Patched ipsecConfig into ${SHARED_DIR}/manifest_cluster-network-03-config.yml"
+}
+
+
 function get_arch() {
   ARCH=$(uname -m | sed -e 's/aarch64/arm64/' -e 's/x86_64/amd64/')
   echo "${ARCH}"
@@ -554,6 +574,11 @@ aws|aws-arm64|aws-usgov)
     fi
     ;;
 esac
+
+# patch the manifest after creation to preserve the selected network cidrs
+if [[ "${OVN_IPSEC:-}" == 'true' ]]; then
+  enable_ipsec
+fi
 
 set-cluster-version-spec-update-service
 
