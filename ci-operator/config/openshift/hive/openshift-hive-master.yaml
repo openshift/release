@@ -7,6 +7,10 @@ base_images:
     name: release
     namespace: openshift
     tag: rhel-8-release-golang-1.20-openshift-4.14
+  upi-installer:
+    name: scos-4.14
+    namespace: origin
+    tag: upi-installer
 binary_build_commands: make build
 build_root:
   project_image:
@@ -201,6 +205,24 @@ tests:
         requests:
           cpu: 100m
     workflow: ipi-azure
+- as: e2e-vsphere
+  run_if_changed: vsphere
+  steps:
+    cluster_profile: vsphere-2
+    test:
+    - as: test
+      cli: latest
+      commands: CLOUD=vsphere make test-e2e
+      dependencies:
+      - env: HIVE_IMAGE
+        name: hive
+      - env: RELEASE_IMAGE
+        name: release:latest
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+    workflow: ipi-vsphere
 zz_generated_metadata:
   branch: master
   org: openshift
