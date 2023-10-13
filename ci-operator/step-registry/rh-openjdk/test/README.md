@@ -28,7 +28,7 @@ Use to execute test script `run.sh` [rh-openjdk-test](https://github.com/rh-open
 ### Environment Variables
 
 - `OPENJDK_VERSION`
-  - **Definition**: Tag used to specify openjdk version to test. May be a list. Values separated by spaces (8, 11, 17)..
+  - **Definition**: Tag used to specify openjdk version to test. May be a list. Values separated by spaces (8 11 17)..
   - **If left empty**: It will use '11' as the default value. Meaning tests will be executed for the Openjdk 11.
 - `KUBECONFIG`
   - **Definition**: Path and name of kubeconfig file of cluster.
@@ -37,9 +37,9 @@ Use to execute test script `run.sh` [rh-openjdk-test](https://github.com/rh-open
 ### Other
 
 
-## Custom Image - `rh-openjdk-runner`
+## Base Image - `rh-openjdk-runner`
 
 - `rh-openjdk-runner`
-  - [Dockerfile](https://github.com/rh-openjdk/jdkContainerOcpTests/blob/main/Dockerfile)
-  - The custom image for this step uses the [`Open JDK11 execution environment. This container is a base platform for building and running plain Java applications`](registry.redhat.io/ubi8/openjdk-11:latest) image as it's base. The image should have all of the required dependencies installed and the [rh-openjdk/jdkContainerOcpTests repository](https://github.com/rh-openjdk/jdkContainerOcpTests) copied into `/tmp/rhscl_openshift_dir/openjdks`.
+  - [Dockerfile](https://github.com/rh-openjdk/jdkContainerOcpTests/blob/main/ContainerFile)
+  - The base image for this step uses the [`Open JDK8 execution environment. This container is a base platform for building and running plain Java applications`](registry.redhat.io/ubi8/openjdk-8:latest) image as it's base. The image should have all of the required dependencies installed and the [rh-openjdk/jdkContainerOcpTests repository](https://github.com/rh-openjdk/jdkContainerOcpTests) copied into `/tmp/rhscl_openshift_dir/openjdks`. The image is mirrored from quay.io/rhopenjdkqa/rh_jdk_ocp_testsuite:latest
 

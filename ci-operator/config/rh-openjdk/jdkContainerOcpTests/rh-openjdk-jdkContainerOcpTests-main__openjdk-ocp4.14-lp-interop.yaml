@@ -3,14 +3,15 @@ base_images:
     name: "4.14"
     namespace: ocp
     tag: cli
+  rh-openjdk-runner:
+    name: rh_jdk_ocp_testsuite
+    namespace: ci
+    tag: latest
 build_root:
   image_stream_tag:
     name: release
     namespace: openshift
     tag: golang-1.19
-images:
-- dockerfile_literal: FROM quay.io/rh-openjdk/rh-openjdk-test-image:latest
-  to: rh-openjdk-runner
 releases:
   latest:
     candidate:
@@ -31,10 +32,12 @@ tests:
       BASE_DOMAIN: cspilp.interop.ccitredhat.com
       FIREWATCH_CONFIG: |
         [
-          {"step": "ipi-*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI"},
-          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPTOCPCI"},
+          {"step": "ipi-conf*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}},
+          {"step": "ipi-install*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}},
+          {"step": "ipi-deprovision*", "failure_type": "all", "classification": "Infrastructure Provisioning - Cluster", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}},
+          {"step": "gather-*", "failure_type": "pod_failure", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 2}},
           {"step": "gather-*", "failure_type": "test_failure", "classification": "NONE", "jira_project": "NONE", "ignore": "true"},
-          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI"},
+          {"step": "openshift-*", "failure_type": "all", "classification": "Other", "jira_project": "LPTOCPCI", "group": {"name": "cluster", "priority": 1}},
           {"step": "rh-openjdk-test", "failure_type": "pod_failure", "classification": "Test Execution", "jira_project": "LPTOCPCI"},
           {"step": "rh-openjdk-test", "failure_type": "test_failure", "classification": "Test Failure", "jira_project": "OPENJDK", "jira_component": ["container_qe"]}
         ]
