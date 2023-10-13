@@ -193,9 +193,13 @@ CONFIG = {
     'packet-edge-quota-slice': {
         'default': 50,
     },
-    'vsphere-quota-slice':{},
+    'vsphere-quota-slice':{
+        'default': 5
+    },
     'vsphere-2-quota-slice':{},
-    'vsphere-8-quota-slice':{},
+    'vsphere-8-quota-slice':{
+        'default': 5
+    },
     'vsphere-ibm-7-quota-slice':{
         'default': 5
     },
@@ -211,9 +215,13 @@ CONFIG = {
     'vsphere-connected-2-quota-slice':{
         'default': 5
     },
-    'vsphere-multizone-quota-slice':{},
+    'vsphere-multizone-quota-slice':{
+        'default': 5
+    },
     'vsphere-multizone-2-quota-slice':{},
-    'vsphere-platform-none-quota-slice':{},
+    'vsphere-platform-none-quota-slice':{
+        'default': 5
+    },
     'vsphere-platform-none-2-quota-slice':{
         'default': 5
     },
@@ -332,17 +340,8 @@ for i in range(10, 15):
 for i in range(1, 7):
     CONFIG['ovirt-upgrade-quota-slice']['ovirt-upgrade-{}'.format(i)] = 1
 
-for i in range(89,93):
-    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
-
-for i in range(94,109):
-    CONFIG['vsphere-quota-slice']['ci-segment-{}'.format(i)] = 1
-
-for i in [1148,1197,1207,1225,1227,1229,1232,1233,1234,1235]:
+for i in [1148,1197,1207,1225,1227,1229,1232,1233,1234,1235,1237,1238,1240,1243,1246,1249,1254,1255,1260,1271,1272,1274,1279,1284]:
     CONFIG['vsphere-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
-
-for i in range(56,60):
-    CONFIG['vsphere-platform-none-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in range(230,235):
     CONFIG['vsphere-dis-quota-slice']['devqe-segment-{}-disconnected'.format(i)] = 1
@@ -353,17 +352,8 @@ for i in range(50,54):
 for i in range(223,229):
     CONFIG['vsphere-connected-quota-slice']['devqe-segment-{}'.format(i)] = 1
 
-for i in range(151,158):
-    CONFIG['vsphere-multizone-quota-slice']['ci-segment-{}'.format(i)] = 1
-
 for i in [1287,1289,1296,1298,1300,1302]:
     CONFIG['vsphere-multizone-2-quota-slice']['bcr03a.dal10.{}'.format(i)] = 1
-
-for i in range(202,204):
-    CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
-
-for i in range(205,214):
-    CONFIG['vsphere-8-quota-slice']['ci-segment-{}'.format(i)] = 1
 
 for i in [1153,1179,1211,1225,1232,1252,1256,1260,1261,1262,1263,1265,1272,1274,1283,1285,1305,1309,758,902]:
     CONFIG['vsphere-8-vpn-quota-slice']['bcr01a.dal10.{}'.format(i)] = 1
