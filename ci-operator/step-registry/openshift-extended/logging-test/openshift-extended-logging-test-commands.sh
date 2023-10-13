@@ -258,6 +258,8 @@ function run {
     cat ./case_selected
     echo "-----------------------------------------------------"
 
+    # failures happening after this point should not be caught by the Overall CI test suite in RP
+    touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then
@@ -280,12 +282,6 @@ function run {
     else
         echo "fail"
     fi
-    # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
-    # please refer to the junit result for case result, not depends on step result.
-    if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
-        echo "force success exit"
-        exit 1
-    fi
 
     # summarize test results
     echo "Summarizing test result..."
@@ -299,6 +295,13 @@ function run {
         echo "All tests have passed"
     else
         echo "${failures} failures in openshift-extended-logging-test" | tee -a "${SHARED_DIR}/openshift-e2e-test-qe-report-openshift-extended-test-failures"
+    fi
+
+    # it ensure the the step after this step in test will be executed per https://docs.ci.openshift.org/docs/architecture/step-registry/#workflow
+    # please refer to the junit result for case result, not depends on step result.
+    if [ "W${FORCE_SUCCESS_EXIT}W" == "WnoW" ]; then
+        echo "do not force success exit"
+        exit $ret_value
     fi
 }
 

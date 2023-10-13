@@ -102,35 +102,6 @@ popd
 echo "CR manifest files:"
 ls "/tmp/credrequests"
 
-# Create manual credentials using client secret for openshift-cluster-api.
-# This is a temp workaround until cluster-api supports workload identity
-# authentication. This enables the openshift-e2e test to succeed when running
-# the cluster-api tests. Placing it here so ccoctl can override it with
-# generated credentials as work is done to support workload identity.
-# At the time of this comment, openshift-cluster-api appears to only be
-# enabled with the TechPreviewNoUpgrade FeatureSet.
-mkdir -p "/tmp/manifests"
-echo "Creating credentials for openshift-cluster-api..."
-cat > "/tmp/manifests/openshift-cluster-api-capz-manager-bootstrap-credentials-credentials.yaml" << EOF
-apiVersion: v1
-stringData:
-  azure_client_id: ${AZURE_CLIENT_ID}
-  azure_client_secret: ${AZURE_CLIENT_SECRET}
-  azure_region: ${REGION}
-  azure_resourcegroup: ${CLUSTER_NAME}
-  azure_subscription_id: ${AZURE_SUBSCRIPTION_ID}
-  azure_tenant_id: ${AZURE_TENANT_ID}
-kind: Secret
-metadata:
-  name: capz-manager-bootstrap-credentials
-  namespace: openshift-cluster-api
-EOF
-
-# create metadata so cluster resource group is deleted in ipi-deprovision-deprovision
-cat > ${SHARED_DIR}/metadata.json << EOF
-{"infraID":"${CLUSTER_NAME}","azure":{"region":"${REGION}","resourceGroupName":"${CLUSTER_NAME}"}}
-EOF
-
 ADDITIONAL_CCOCTL_ARGS=""
 # ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS enables the relevant job for each operator to decide
 # independantly if it needs the --enable-tech-preview added to the ccoctl command. It is very
@@ -139,7 +110,13 @@ if [ "${ENABLE_TECH_PREVIEW_CREDENTIALS_REQUESTS:-\"false\"}" == "true" ]; then
   ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --enable-tech-preview"
 fi
 
+if [[ -s "${SHARED_DIR}/customer_vnet_subnets.yaml" ]] && [[ -s "${SHARED_DIR}/resourcegroup" ]]; then
+  vnet_resource_group=$(cat "${SHARED_DIR}/resourcegroup")
+  ADDITIONAL_CCOCTL_ARGS="$ADDITIONAL_CCOCTL_ARGS --network-resource-group-name=${vnet_resource_group}"
+fi
+
 # create required credentials infrastructure and installer manifests
+ccoctl_ouptut="/tmp/ccoctl_output"
 ccoctl azure create-all \
   --name="${CLUSTER_NAME}" \
   --region="${REGION}" \
@@ -149,7 +126,16 @@ ccoctl azure create-all \
   --dnszone-resource-group-name="${BASE_DOMAIN_RESOURCE_GROUP_NAME}" \
   --storage-account-name="$(tr -d '-' <<< ${CLUSTER_NAME})oidc" \
   --output-dir="/tmp" \
-  ${ADDITIONAL_CCOCTL_ARGS}
+  ${ADDITIONAL_CCOCTL_ARGS} &> "${ccoctl_ouptut}"
+cat "${ccoctl_ouptut}"
+
+# get oidc_provider_issuer_url from `oc get Authentication cluster -o json`, so not have to enable the follwoing lines yet 
+# save oidc_provider info for upgrade
+#oidc_provider_issuer_url=$(grep "Issuer URL .* is" "${ccoctl_ouptut}" | awk -F"is " '{print $NF}')
+#if [[ -n "${oidc_provider_issuer_url}" ]]; then
+#  echo "Saving oidc_provider_arn: ${oidc_provider_issuer_url}"
+#  echo "${oidc_provider_issuer_url}" > "${SHARED_DIR}/azure_oidc_provider_issuer_url"
+#fi
 
 # Output authentication file for ci logs
 echo "Cluster authentication:"
@@ -157,7 +143,7 @@ cat "/tmp/manifests/cluster-authentication-02-config.yaml"
 echo -e "\n"
 
 # save the resource_group name for use by ipi-conf-azure-provisioned-resourcegroup
-echo $CLUSTER_NAME > ${SHARED_DIR}/resourcegroup
+echo $CLUSTER_NAME > ${SHARED_DIR}/resourcegroup_cluster
 
 # copy generated service account signing from ccoctl target directory into shared directory
 cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"

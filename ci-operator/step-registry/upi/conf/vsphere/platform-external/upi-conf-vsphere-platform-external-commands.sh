@@ -47,26 +47,21 @@ EOM
 EOM
 else
 
-  if ! jq -e --arg VLANID "$vlanid" '. | has($VLANID)' "${SUBNETS_CONFIG}"; then
+  if ! jq -e --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH] | has($VLANID)' "${SUBNETS_CONFIG}"; then
     echo "VLAN ID: ${vlanid} does not exist in subnets.json file. This exists in vault - selfservice/vsphere-vmc/config"
     exit 1
   fi
 
   # ** NOTE: The first two addresses are not for use. [0] is the network, [1] is the gateway
 
-  lb_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
-  bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
-  machine_cidr=$(jq -r --arg VLANID "$vlanid" '.[$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
   dns_server=$(jq -r --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].dnsServer' "${SUBNETS_CONFIG}")
-
-
   lb_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[2]' "${SUBNETS_CONFIG}")
   bootstrap_ip_address=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].ipAddresses[3]' "${SUBNETS_CONFIG}")
   machine_cidr=$(jq -r --arg VLANID "$vlanid" --arg PRH "$primaryrouterhostname" '.[$PRH][$VLANID].machineNetworkCidr' "${SUBNETS_CONFIG}")
 
   tempaddrs=()
   for n in {4..6}; do
-    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   done
 
   printf -v control_plane_ip_addresses "\"%s\"," "${tempaddrs[@]}"
@@ -74,7 +69,7 @@ else
 
   tempaddrs=()
   for n in {7..9}; do
-    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
+    tempaddrs+=("$(jq -r --argjson N "$n" --arg PRH "$primaryrouterhostname" --arg VLANID "$vlanid" '.[$PRH][$VLANID].ipAddresses[$N]' "${SUBNETS_CONFIG}")")
   done
 
   printf -v compute_ip_addresses "\"%s\"," "${tempaddrs[@]}"

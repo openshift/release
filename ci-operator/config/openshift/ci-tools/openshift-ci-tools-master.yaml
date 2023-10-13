@@ -48,6 +48,14 @@ images:
       - destination_dir: .
         source_path: /go/bin/pr-reminder
   to: pr-reminder
+- context_dir: images/pipeline-controller/
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/pipeline-controller
+  to: pipeline-controller
 - context_dir: images/check-gh-automation/
   from: os
   inputs:
@@ -773,6 +781,9 @@ tests:
       - mount_path: /tmp/hive
         name: hive-hive-credentials
         namespace: test-credentials
+      - mount_path: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        namespace: test-credentials
       from: test-bin
       resources:
         requests:
@@ -855,6 +866,18 @@ tests:
   commands: make lint
   container:
     from: golangci-lint
+- as: canary-build09
+  cluster: build09
+  interval: 10m
+  steps:
+    test:
+    - as: test
+      commands: echo "here i am"
+      from: os
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
 zz_generated_metadata:
   branch: master
   org: openshift

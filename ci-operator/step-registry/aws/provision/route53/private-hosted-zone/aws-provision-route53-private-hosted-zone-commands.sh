@@ -18,7 +18,10 @@ CLUSTER_NAME="${NAMESPACE}-${UNIQUE_HASH}"
 
 ROUTE53_HOSTED_ZONE_NAME="${CLUSTER_NAME}.${BASE_DOMAIN}"
 VPC_ID=$(cat "${SHARED_DIR}/vpc_id")
-CALLER_REFERENCE_STR=$ROUTE53_HOSTED_ZONE_NAME
+# Use a timestamp to ensure the caller reference is unique, as we've found
+# cluster name can get reused in specific situations.
+TIMESTAMP=$(date +%s)
+CALLER_REFERENCE_STR="${ROUTE53_HOSTED_ZONE_NAME}-${TIMESTAMP}"
 
 echo -e "creating route53 hosted zone: ${ROUTE53_HOSTED_ZONE_NAME}"
 HOSTED_ZONE_CREATION=$(aws --region "$REGION" route53 create-hosted-zone --name "${ROUTE53_HOSTED_ZONE_NAME}" --vpc VPCRegion="${REGION}",VPCId="${VPC_ID}" --caller-reference "${CALLER_REFERENCE_STR}")
@@ -53,13 +56,20 @@ if [[ ${ENABLE_SHARED_PHZ} == "yes" ]]; then
         {
             "Effect": "Allow",
             "Action": [
-                "route53:GetHostedZone",
                 "route53:ChangeResourceRecordSets",
-                "route53:ChangeTagsForResource"
+                "route53:ListHostedZones",
+                "route53:ListHostedZonesByName",
+                "route53:ListResourceRecordSets",
+                "route53:ChangeTagsForResource",
+                "route53:GetAccountLimit",
+                "route53:GetChange",
+                "route53:GetHostedZone",
+                "route53:ListTagsForResource",
+                "route53:UpdateHostedZoneComment",
+                "tag:GetResources",
+                "tag:UntagResources"
             ],
-            "Resource": [
-                "arn:aws:route53:::hostedzone/${HOSTED_ZONE_ID}"
-            ]
+            "Resource": "*"
         }
     ]
 }
@@ -115,8 +125,5 @@ EOF
   # Attach policy to role
   cmd="aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn '${POLICY_ARN}'"
   eval "${cmd}"
-  
-  # TODO: narrow down the permission
-  aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn 'arn:aws:iam::aws:policy/ResourceGroupsandTagEditorFullAccess'
-  aws --region $REGION iam attach-role-policy --role-name ${ROLE_NAME} --policy-arn 'arn:aws:iam::aws:policy/AmazonRoute53FullAccess'
+
 fi

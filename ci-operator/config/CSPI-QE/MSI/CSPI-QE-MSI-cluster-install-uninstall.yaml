@@ -18,18 +18,17 @@ resources:
       memory: 200Mi
 tests:
 - as: cluster-install-uninstall-hypershift-4-13-candidate
-  cron: '@yearly'
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      CLUSTER1_CONFIG: name=ci-hyper;platform=hypershift;region=us-west-2;version=4.13;compute-machine-type=m5.4xlarge;replicas=2;channel-group=candidate;expiration-time=4h;timeout=1h;ocm-env=stage
+      CLUSTER_NAME_PREFIX: hyper
+      CLUSTER1_CONFIG: platform=hypershift;region=us-west-2;version=4.13;compute-machine-type=m5.4xlarge;replicas=2;channel-group=candidate;expiration-time=4h;timeout=1h;ocm-env=stage
       S3_BUCKET_NAME: openshift-cli-installer
       S3_BUCKET_PATH: openshift-ci
     test:
     - ref: cluster-install
     - ref: cluster-uninstall
 - as: cluster-install-uninstall-hypershift-4-13-candidate-rand-name
-  cron: '@yearly'
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
@@ -41,18 +40,16 @@ tests:
     - ref: cluster-install
     - ref: cluster-uninstall
 - as: cluster-install-uninstall-rosa-4-14-candidate
-  cron: '@yearly'
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
-      CLUSTER1_CONFIG: name=ci-rosa;platform=rosa;region=us-west-2;version=4.14;channel-group=candidate;compute-machine-type=m5.4xlarge;replicas=2;channel-group=candidate;expiration-time=4h;timeout=1h
+      CLUSTER1_CONFIG: name=ci-rosa;platform=rosa;region=us-west-2;version=4.14;channel-group=candidate;compute-machine-type=m5.4xlarge;replicas=2;expiration-time=4h;timeout=1h
       S3_BUCKET_NAME: openshift-cli-installer
       S3_BUCKET_PATH: openshift-ci
     test:
     - ref: cluster-install
     - ref: cluster-uninstall
 - as: cluster-install-uninstall-aws-ipi-4-13-ci
-  cron: '@yearly'
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
@@ -64,13 +61,25 @@ tests:
     - ref: cluster-install
     - ref: cluster-uninstall
 - as: multi-cluster-install-uninstall-aws-4-13-ci-4-14-nightly
-  cron: '@yearly'
   steps:
     cluster_profile: aws-managed-cspi-qe
     env:
       CLUSTER1_CONFIG: name=ci1-aws-ipi;base_domain=aws.interop.ccitredhat.com;platform=aws;region=us-east-2;version=4.13;stream=ci;timeout=1h
       CLUSTER2_CONFIG: name=ci2-aws-ipi;base_domain=aws.interop.ccitredhat.com;platform=aws;region=us-east-2;version=4.14;stream=nightly;timeout=1h
       CLUSTERS_RUN_IN_PARALLEL: "false"
+      PULL_SECRET_NAME: pull-secret
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
+    test:
+    - ref: cluster-install
+    - ref: cluster-uninstall
+- as: cluster-install-uninstall-gcp-osd-4-13-stable
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      CLUSTER_NAME_PREFIX: gcp
+      CLUSTER1_CONFIG: platform=gcp-osd;region=us-west1;version=4.13;compute-machine-type=custom-4-16384;replicas=2;channel-group=candidate;expiration-time=4h;timeout=2h
+      GCP_SERVICE_ACCOUNT_NAME: service_account.json
       PULL_SECRET_NAME: pull-secret
       S3_BUCKET_NAME: openshift-cli-installer
       S3_BUCKET_PATH: openshift-ci

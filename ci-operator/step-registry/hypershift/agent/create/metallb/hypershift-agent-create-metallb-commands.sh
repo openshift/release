@@ -42,7 +42,7 @@ spec:
   channel: stable
   installPlanApproval: Automatic
   name: metallb-operator
-  source: redhat-operators
+  source: "${METALLB_OPERATOR_SUB_SOURCE}"
   sourceNamespace: openshift-marketplace
 EOF
 

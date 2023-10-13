@@ -53,7 +53,6 @@ pushd "${dir}"
 cp ${CLUSTER_PROFILE_DIR}/pull-secret pull-secret
 oc registry login --to pull-secret
 oc adm release extract --registry-config pull-secret --credentials-requests --cloud=aws --to="/tmp/credrequests" ${ADDITIONAL_OC_EXTRACT_ARGS} "${TESTING_RELEASE_IMAGE}"
-rm pull-secret
 popd
 
 echo "CR manifest files:"
@@ -68,7 +67,7 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   cat ${ingress_cr_file}
 
   # x.y.z
-  ocp_version=$(oc adm release info ${RELEASE_IMAGE_LATEST_FROM_BUILD_FARM} -ojsonpath="{.metadata.version}" | cut -d. -f 1,2)
+  ocp_version=$(oc adm release info --registry-config "${dir}/pull-secret" ${TESTING_RELEASE_IMAGE} -ojsonpath="{.metadata.version}" | cut -d. -f 1,2)
   ocp_major_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $1}' )
   ocp_minor_version=$( echo "${ocp_version}" | awk --field-separator=. '{print $2}' )
   echo "OCP version: ${ocp_version}"
@@ -82,6 +81,8 @@ if [[ ${ENABLE_SHARED_VPC} == "yes" ]]; then
   echo "Ingress CR content:"
   cat ${ingress_cr_file}
 fi
+
+rm -f "${dir}/pull-secret"
 
 # Create extra efs csi driver iam resources, it's optional only for efs csi driver related tests on sts clusters
 if [[ "${CREATE_EFS_CSI_DRIVER_IAM}" == "yes" ]]; then
@@ -120,7 +121,16 @@ if [[ "${FEATURE_SET}" == "TechPreviewNoUpgrade" ]]; then
 fi
 
 # create required credentials infrastructure and installer manifests
-ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp"
+ccoctl_ouptut="/tmp/ccoctl_output"
+ccoctl aws create-all ${CCOCTL_OPTIONS} --name="${infra_name}" --region="${REGION}" --credentials-requests-dir="/tmp/credrequests" --output-dir="/tmp" &> "${ccoctl_ouptut}"
+cat "${ccoctl_ouptut}"
+
+# save oidc_provider info for upgrade
+oidc_provider_arn=$(grep "Identity Provider created with ARN:" "${ccoctl_ouptut}" | awk -F"ARN: " '{print $NF}')
+if [[ -n "${oidc_provider_arn}" ]]; then
+  echo "Saving oidc_provider_arn: ${oidc_provider_arn}"
+  echo "${oidc_provider_arn}" > "${SHARED_DIR}/aws_oidc_provider_arn"
+fi
 
 # copy generated service account signing from ccoctl target directory into shared directory
 cp "/tmp/tls/bound-service-account-signing-key.key" "${TPREFIX}_bound-service-account-signing-key.key"

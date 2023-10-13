@@ -1,0 +1,149 @@
+base_images:
+  base:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: base
+  ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-9-golang-1.20-openshift-4.15
+  openstack-installer:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: openstack-installer
+  sriov-cni:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: sriov-cni
+  sriov-dp-admission-controller:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: sriov-dp-admission-controller
+  sriov-infiniband-cni:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: sriov-infiniband-cni
+  sriov-network-device-plugin:
+    name: 4.16-priv
+    namespace: ocp-private
+    tag: sriov-network-device-plugin
+build_root:
+  from_repository: true
+canonical_go_repository: github.com/openshift/sriov-network-operator
+images:
+- dockerfile_path: Dockerfile.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+  to: sriov-network-operator
+- dockerfile_path: Dockerfile.sriov-network-config-daemon.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+  to: sriov-network-config-daemon
+- dockerfile_path: Dockerfile.webhook.rhel7
+  from: base
+  inputs:
+    ocp_builder_rhel-9-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15
+  to: sriov-network-webhook
+operator:
+  bundles:
+  - dockerfile_path: bundleci.Dockerfile
+  substitutions:
+  - pullspec: quay.io/openshift/origin-sriov-dp-admission-controller:4.11
+    with: pipeline:sriov-dp-admission-controller
+  - pullspec: quay.io/openshift/origin-sriov-cni:4.11
+    with: pipeline:sriov-cni
+  - pullspec: quay.io/openshift/origin-sriov-infiniband-cni:4.11
+    with: pipeline:sriov-infiniband-cni
+  - pullspec: quay.io/openshift/origin-sriov-network-device-plugin:4.11
+    with: pipeline:sriov-network-device-plugin
+  - pullspec: quay.io/openshift/origin-sriov-network-config-daemon:4.11
+    with: pipeline:sriov-network-config-daemon
+  - pullspec: quay.io/openshift/origin-sriov-network-webhook:4.11
+    with: pipeline:sriov-network-webhook
+  - pullspec: quay.io/openshift/origin-sriov-network-operator:4.11
+    with: pipeline:sriov-network-operator
+promotion:
+  name: 4.16-priv
+  namespace: ocp-private
+releases:
+  initial:
+    integration:
+      name: 4.16-priv
+      namespace: ocp-private
+  latest:
+    integration:
+      include_built_images: true
+      name: 4.16-priv
+      namespace: ocp-private
+resources:
+  '*':
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: gofmt
+  commands: IS_CONTAINER=TRUE make fmt
+  container:
+    from: src
+- as: controllers
+  commands: CLUSTER_TYPE=openshift make test-controllers
+  container:
+    from: src
+- as: pkg
+  commands: make test-pkg
+  container:
+    from: src
+- as: api
+  commands: make test-api
+  container:
+    from: src
+- as: operator-e2e
+  steps:
+    cluster_profile: aws
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OO_CHANNEL: alpha
+      OO_INSTALL_NAMESPACE: openshift-sriov-network-operator
+      OO_PACKAGE: sriov-network-operator
+      OO_TARGET_NAMESPACES: '!install'
+    test:
+    - as: e2e
+      commands: make test-e2e-validation-only
+      from: src
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+    workflow: optional-operators-ci-aws
+- as: e2e-openstack-nfv
+  optional: true
+  steps:
+    cluster_profile: openstack-nfv
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      OPENSTACK_DPDK_NETWORK: intel-dpdk
+    workflow: openshift-e2e-openstack-sriov-cgroupsv1
+- as: e2e-openstack-nfv-hwoffload
+  optional: true
+  steps:
+    cluster_profile: openstack-hwoffload
+    dependencies:
+      OO_INDEX: ci-index
+    env:
+      ADDITIONAL_WORKERS_NETWORKS: ""
+      OPENSTACK_SRIOV_NETWORK: mellanox-hwoffload
+    workflow: openshift-e2e-openstack-sriov-cgroupsv1
+zz_generated_metadata:
+  branch: release-4.16
+  org: openshift-priv
+  repo: sriov-network-operator

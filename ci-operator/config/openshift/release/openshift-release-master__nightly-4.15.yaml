@@ -95,6 +95,11 @@ releases:
       product: ocp
       stream: nightly
       version: "4.15"
+  oldest-supported-z-rollback:
+    candidate:
+      product: ocp
+      stream: nightly
+      version: "4.15"
 resources:
   '*':
     requests:
@@ -299,7 +304,7 @@ tests:
 - as: e2e-vsphere-sdn
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch
@@ -307,7 +312,7 @@ tests:
 - as: e2e-vsphere-ovn-techpreview
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       FEATURE_SET: TechPreviewNoUpgrade
       TEST_SKIPS: 'In-tree Volumes \[Driver: vsphere\] \[Testpattern: Inline-volume\|
@@ -330,7 +335,7 @@ tests:
 - as: e2e-vsphere-ovn
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -341,7 +346,7 @@ tests:
 - as: e2e-vsphere-externallb-ovn
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch
@@ -349,7 +354,7 @@ tests:
 - as: e2e-vsphere-ovn-serial
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -360,7 +365,7 @@ tests:
 - as: e2e-vsphere-ovn-techpreview-serial
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       FEATURE_SET: TechPreviewNoUpgrade
     observers:
@@ -370,7 +375,7 @@ tests:
 - as: e2e-vsphere-ovn-upi
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -381,7 +386,7 @@ tests:
 - as: e2e-vsphere-ovn-upi-serial
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -392,7 +397,7 @@ tests:
 - as: e2e-vsphere-ovn-csi
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     env:
       TEST_SKIPS: provisioning should mount multiple PV pointing to the same storage
         on the same node
@@ -403,12 +408,12 @@ tests:
 - as: e2e-vsphere-zones
   interval: 168h
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-zones
 - as: e2e-vsphere-upi-zones
   interval: 168h
   steps:
-    cluster_profile: vsphere-multizone
+    cluster_profile: vsphere-multizone-2
     workflow: openshift-e2e-vsphere-upi-zones
 - as: e2e-aws-ovn-workers-rhel8
   cron: '@daily'
@@ -587,6 +592,18 @@ tests:
     cluster_profile: gcp
     workflow: openshift-e2e-gcp-xpn
   timeout: 6h0m0s
+- as: e2e-aws-ovn-upgrade-rollback-oldest-supported
+  interval: 48h
+  steps:
+    cluster_profile: aws-2
+    dependencies:
+      OPENSHIFT_INSTALL_RELEASE_IMAGE_OVERRIDE: release:oldest-supported-z-rollback
+      OPENSHIFT_UPGRADE_RELEASE_IMAGE_OVERRIDE: release:latest
+    env:
+      BASE_DOMAIN: aws-2.ci.openshift.org
+      TEST_TYPE: upgrade-conformance
+      TEST_UPGRADE_OPTIONS: abort-at=random
+    workflow: openshift-upgrade-aws
 - as: e2e-aws-sdn-upgrade
   interval: 168h
   steps:
@@ -953,7 +970,7 @@ tests:
 - as: e2e-vsphere-ovn-etcd-scaling
   interval: 168h
   steps:
-    cluster_profile: vsphere-8
+    cluster_profile: vsphere-8-vpn
     observers:
       enable:
       - observers-resource-watch

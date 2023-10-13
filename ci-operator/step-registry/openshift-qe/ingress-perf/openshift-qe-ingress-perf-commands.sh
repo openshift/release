@@ -22,10 +22,10 @@ pushd e2e-benchmarking/workloads/ingress-perf
 export ES_SERVER="https://$ES_USERNAME:$ES_PASSWORD@search-ocp-qe-perf-scale-test-elk-hcm7wtsqpxy7xogbu72bor4uve.us-east-1.es.amazonaws.com"
 export ES_INDEX="ingress-performance"
 
-# UUID Generation
-UUID="CPT-$(uuidgen)"
-export UUID
+rm -f ${SHARED_DIR}/index.json
 
 # Start the Workload
-rm -rf "${SHARED_DIR}/${OUTPUT_FILE:?}"
-./run.sh |& tee "${SHARED_DIR}/${OUTPUT_FILE}"
+./run.sh
+
+folder_name=$(ls -t -d /tmp/*/ | head -1)
+cp $folder_name/index_data.json ${SHARED_DIR}/index_data.json

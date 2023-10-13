@@ -1,6 +1,6 @@
 periodics:
 - agent: kubernetes
-  cluster: build05
+  cluster: build03
   cron: 00 03 * * *
   decorate: true
   decoration_config:
@@ -14,10 +14,10 @@ periodics:
     ci-operator.openshift.io/cloud-cluster-profile: aws
     ci.openshift.io/generator: prowgen
     pj-rehearse.openshift.io/can-be-rehearsed: "true"
-  name: periodic-ci-maistra-istio-operator-maistra-3.0-nightly-images-3-0
+  name: periodic-ci-maistra-istio-operator-maistra-3.0-nightly-images
   reporter_config:
     slack:
-      channel: '#istio-notifications'
+      channel: '#ossm-sail'
       job_states_to_report:
       - failure
       - error
@@ -33,8 +33,8 @@ periodics:
       - --lease-server-credentials-file=/etc/boskos/credentials
       - --report-credentials-file=/etc/report/credentials
       - --secret-dir=/secrets/ci-pull-credentials
-      - --secret-dir=/usr/local/nightly-images-3-0-cluster-profile
-      - --target=nightly-images-3-0
+      - --secret-dir=/usr/local/nightly-images-cluster-profile
+      - --target=nightly-images
       command:
       - ci-operator
       image: ci-operator:latest
@@ -50,10 +50,13 @@ periodics:
       - mountPath: /secrets/ci-pull-credentials
         name: ci-pull-credentials
         readOnly: true
-      - mountPath: /usr/local/nightly-images-3-0-cluster-profile
+      - mountPath: /usr/local/nightly-images-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
         readOnly: true
       - mountPath: /etc/pull-secret
         name: pull-secret
@@ -75,6 +78,69 @@ periodics:
     - name: cluster-profile
       secret:
         secretName: cluster-secrets-aws
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build05
+  cron: 00 03 * * *
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: maistra-3.0
+    org: maistra
+    repo: istio-operator
+  labels:
+    ci.openshift.io/generator: prowgen
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-maistra-istio-operator-maistra-3.0-update-common
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/github-token
+      - --target=update-common
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/github-token
+        name: github-token
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: github-token
+      secret:
+        secretName: github-token
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
     - name: pull-secret
       secret:
         secretName: registry-pull-credentials

@@ -1,0 +1,28 @@
+build_root:
+  image_stream_tag:
+    name: release
+    namespace: openshift
+    tag: golang-1.19
+images:
+- dockerfile_path: Dockerfile
+  to: terraform-rhcs-rosa-clients
+resources:
+  '*':
+    limits:
+      memory: 4Gi
+    requests:
+      cpu: 100m
+      memory: 200Mi
+tests:
+- as: verify-format
+  commands: make verify
+  container:
+    from: terraform-rhcs-rosa-clients
+- as: tests
+  commands: make tests
+  container:
+    from: terraform-rhcs-rosa-clients
+zz_generated_metadata:
+  branch: main
+  org: terraform-redhat
+  repo: terraform-rhcs-rosa

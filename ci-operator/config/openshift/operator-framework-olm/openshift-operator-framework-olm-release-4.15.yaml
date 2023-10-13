@@ -7,6 +7,15 @@ base_images:
     name: builder
     namespace: ocp
     tag: rhel-8-golang-1.20-openshift-4.14
+  ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+    name: builder
+    namespace: ocp
+    tag: rhel-8-golang-1.20-openshift-4.15
+  os:
+    name: centos
+    namespace: origin
+    tag: stream8
+binary_build_commands: cd ./scripts/bumper && go install -mod=mod ./...
 build_root:
   from_repository: true
 images:
@@ -16,6 +25,9 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: operator-lifecycle-manager
 - dockerfile_path: operator-registry.Dockerfile
   from: base
@@ -23,14 +35,29 @@ images:
     ocp_builder_rhel-8-golang-1.20-openshift-4.14:
       as:
       - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+    ocp_builder_rhel-8-golang-1.20-openshift-4.15:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15
   to: operator-registry
 - dockerfile_path: base.Dockerfile
   from: src
   to: ci-image
+- context_dir: scripts/bumper
+  from: os
+  inputs:
+    bin:
+      paths:
+      - destination_dir: .
+        source_path: /go/bin/bumper
+    ocp_builder_rhel-8-golang-1.20-openshift-4.14:
+      as:
+      - registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.14
+  to: olm-bumper
 promotion:
   disabled: true
   excluded_images:
   - ci-image
+  - olm-bumper
   name: "4.15"
   namespace: ocp
 releases:
@@ -88,6 +115,15 @@ tests:
     - as: test
       cli: latest
       commands: |
+        function cleanup() {
+          for child in $( jobs -p ); do
+            kill "${child}"
+          done
+          wait
+          exit 1
+        }
+        trap cleanup EXIT
+
         export JUNIT_DIRECTORY=${ARTIFACT_DIR}
         # Skip the flake tests, which are ran in a separate job
         export SKIP='\[FLAKE\]'
@@ -95,9 +131,11 @@ tests:
         export SKIP="$SKIP|an InstallPlan step contains a deprecated resource version"
         make e2e/olm
       from: ci-image
+      grace_period: 1m0s
       resources:
         requests:
           cpu: 100m
+      timeout: 4h0m0s
     workflow: ipi-gcp
 - as: e2e-gcp-olm-flaky
   optional: true

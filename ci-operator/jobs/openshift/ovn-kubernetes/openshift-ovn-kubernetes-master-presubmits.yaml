@@ -6,16 +6,16 @@ presubmits:
     - ^master$
     - ^master-
     cluster: build05
-    context: ci/prow/4.14-upgrade-from-stable-4.13-e2e-aws-ovn-upgrade
+    context: ci/prow/4.15-upgrade-from-stable-4.14-e2e-aws-ovn-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: 4.14-upgrade-from-stable-4.13
+      ci-operator.openshift.io/variant: 4.15-upgrade-from-stable-4.14
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-4.14-upgrade-from-stable-4.13-e2e-aws-ovn-upgrade
-    rerun_command: /test 4.14-upgrade-from-stable-4.13-e2e-aws-ovn-upgrade
+    name: pull-ci-openshift-ovn-kubernetes-master-4.15-upgrade-from-stable-4.14-e2e-aws-ovn-upgrade
+    rerun_command: /test 4.15-upgrade-from-stable-4.14-e2e-aws-ovn-upgrade
     spec:
       containers:
       - args:
@@ -26,7 +26,7 @@ presubmits:
         - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
         - --target=e2e-aws-ovn-upgrade
-        - --variant=4.14-upgrade-from-stable-4.13
+        - --variant=4.15-upgrade-from-stable-4.14
         command:
         - ci-operator
         image: ci-operator:latest
@@ -46,6 +46,9 @@ presubmits:
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -67,78 +70,87 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.14-upgrade-from-stable-4.13-e2e-aws-ovn-upgrade,?($|\s.*)
-  - agent: kubernetes
-    always_run: true
-    branches:
-    - ^master$
-    - ^master-
-    cluster: build03
-    context: ci/prow/4.14-upgrade-from-stable-4.13-images
-    decorate: true
-    labels:
-      ci-operator.openshift.io/variant: 4.14-upgrade-from-stable-4.13
-      ci.openshift.io/generator: prowgen
-      pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-4.14-upgrade-from-stable-4.13-images
-    rerun_command: /test 4.14-upgrade-from-stable-4.13-images
-    spec:
-      containers:
-      - args:
-        - --gcs-upload-secret=/secrets/gcs/service-account.json
-        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
-        - --report-credentials-file=/etc/report/credentials
-        - --target=[images]
-        - --variant=4.14-upgrade-from-stable-4.13
-        command:
-        - ci-operator
-        image: ci-operator:latest
-        imagePullPolicy: Always
-        name: ""
-        resources:
-          requests:
-            cpu: 10m
-        volumeMounts:
-        - mountPath: /secrets/gcs
-          name: gcs-credentials
-          readOnly: true
-        - mountPath: /etc/pull-secret
-          name: pull-secret
-          readOnly: true
-        - mountPath: /etc/report
-          name: result-aggregator
-          readOnly: true
-      serviceAccountName: ci-operator
-      volumes:
-      - name: pull-secret
-        secret:
-          secretName: registry-pull-credentials
-      - name: result-aggregator
-        secret:
-          secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.14-upgrade-from-stable-4.13-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.15-upgrade-from-stable-4.14-e2e-aws-ovn-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
     cluster: build05
-    context: ci/prow/4.14-upgrade-from-stable-4.13-local-gateway-e2e-aws-ovn-upgrade
+    context: ci/prow/4.15-upgrade-from-stable-4.14-images
+    decorate: true
+    labels:
+      ci-operator.openshift.io/variant: 4.15-upgrade-from-stable-4.14
+      ci.openshift.io/generator: prowgen
+      pj-rehearse.openshift.io/can-be-rehearsed: "true"
+    name: pull-ci-openshift-ovn-kubernetes-master-4.15-upgrade-from-stable-4.14-images
+    rerun_command: /test 4.15-upgrade-from-stable-4.14-images
+    spec:
+      containers:
+      - args:
+        - --gcs-upload-secret=/secrets/gcs/service-account.json
+        - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+        - --report-credentials-file=/etc/report/credentials
+        - --target=[images]
+        - --variant=4.15-upgrade-from-stable-4.14
+        command:
+        - ci-operator
+        image: ci-operator:latest
+        imagePullPolicy: Always
+        name: ""
+        resources:
+          requests:
+            cpu: 10m
+        volumeMounts:
+        - mountPath: /secrets/gcs
+          name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
+        - mountPath: /etc/pull-secret
+          name: pull-secret
+          readOnly: true
+        - mountPath: /etc/report
+          name: result-aggregator
+          readOnly: true
+      serviceAccountName: ci-operator
+      volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
+      - name: pull-secret
+        secret:
+          secretName: registry-pull-credentials
+      - name: result-aggregator
+        secret:
+          secretName: result-aggregator
+    trigger: (?m)^/test( | .* )4.15-upgrade-from-stable-4.14-images,?($|\s.*)
+  - agent: kubernetes
+    always_run: true
+    branches:
+    - ^master$
+    - ^master-
+    cluster: build05
+    context: ci/prow/4.15-upgrade-from-stable-4.14-local-gateway-e2e-aws-ovn-upgrade
     decorate: true
     labels:
       ci-operator.openshift.io/cloud: aws
       ci-operator.openshift.io/cloud-cluster-profile: aws
-      ci-operator.openshift.io/variant: 4.14-upgrade-from-stable-4.13-local-gateway
+      ci-operator.openshift.io/variant: 4.15-upgrade-from-stable-4.14-local-gateway
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-4.14-upgrade-from-stable-4.13-local-gateway-e2e-aws-ovn-upgrade
-    rerun_command: /test 4.14-upgrade-from-stable-4.13-local-gateway-e2e-aws-ovn-upgrade
+    name: pull-ci-openshift-ovn-kubernetes-master-4.15-upgrade-from-stable-4.14-local-gateway-e2e-aws-ovn-upgrade
+    rerun_command: /test 4.15-upgrade-from-stable-4.14-local-gateway-e2e-aws-ovn-upgrade
     spec:
       containers:
       - args:
@@ -149,7 +161,7 @@ presubmits:
         - --secret-dir=/secrets/ci-pull-credentials
         - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-cluster-profile
         - --target=e2e-aws-ovn-upgrade
-        - --variant=4.14-upgrade-from-stable-4.13-local-gateway
+        - --variant=4.15-upgrade-from-stable-4.14-local-gateway
         command:
         - ci-operator
         image: ci-operator:latest
@@ -169,6 +181,9 @@ presubmits:
           name: cluster-profile
         - mountPath: /secrets/gcs
           name: gcs-credentials
+          readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
           readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
@@ -190,27 +205,30 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.14-upgrade-from-stable-4.13-local-gateway-e2e-aws-ovn-upgrade,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.15-upgrade-from-stable-4.14-local-gateway-e2e-aws-ovn-upgrade,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
     - ^master$
     - ^master-
-    cluster: build03
-    context: ci/prow/4.14-upgrade-from-stable-4.13-local-gateway-images
+    cluster: build05
+    context: ci/prow/4.15-upgrade-from-stable-4.14-local-gateway-images
     decorate: true
     labels:
-      ci-operator.openshift.io/variant: 4.14-upgrade-from-stable-4.13-local-gateway
+      ci-operator.openshift.io/variant: 4.15-upgrade-from-stable-4.14-local-gateway
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
-    name: pull-ci-openshift-ovn-kubernetes-master-4.14-upgrade-from-stable-4.13-local-gateway-images
-    rerun_command: /test 4.14-upgrade-from-stable-4.13-local-gateway-images
+    name: pull-ci-openshift-ovn-kubernetes-master-4.15-upgrade-from-stable-4.14-local-gateway-images
+    rerun_command: /test 4.15-upgrade-from-stable-4.14-local-gateway-images
     spec:
       containers:
       - args:
@@ -218,7 +236,7 @@ presubmits:
         - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
         - --report-credentials-file=/etc/report/credentials
         - --target=[images]
-        - --variant=4.14-upgrade-from-stable-4.13-local-gateway
+        - --variant=4.15-upgrade-from-stable-4.14-local-gateway
         command:
         - ci-operator
         image: ci-operator:latest
@@ -231,6 +249,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -239,13 +260,16 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
       - name: result-aggregator
         secret:
           secretName: result-aggregator
-    trigger: (?m)^/test( | .* )4.14-upgrade-from-stable-4.13-local-gateway-images,?($|\s.*)
+    trigger: (?m)^/test( | .* )4.15-upgrade-from-stable-4.14-local-gateway-images,?($|\s.*)
   - agent: kubernetes
     always_run: true
     branches:
@@ -293,6 +317,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -313,6 +340,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -325,7 +355,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-aws-ovn-hypershift
     decorate: true
     decoration_config:
@@ -336,7 +366,6 @@ presubmits:
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-master-e2e-aws-ovn-hypershift
-    optional: true
     rerun_command: /test e2e-aws-ovn-hypershift
     spec:
       containers:
@@ -368,6 +397,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -388,6 +420,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-hypershift
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -443,6 +478,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -463,6 +501,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -517,6 +558,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -537,6 +581,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws-2
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -591,6 +638,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -611,6 +661,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -665,6 +718,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -685,6 +741,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -739,6 +798,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -759,6 +821,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -813,6 +878,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -833,6 +901,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -887,6 +958,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -907,6 +981,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -961,6 +1038,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -981,6 +1061,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -993,7 +1076,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/e2e-azure-ovn
     decorate: true
     decoration_config:
@@ -1036,6 +1119,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1056,6 +1142,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-azure4
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1110,6 +1199,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1134,6 +1226,9 @@ presubmits:
               name: cluster-secrets-gcp-openshift-gce-devel-ci-2
           - configMap:
               name: cluster-profile-gcp-openshift-gce-devel-ci-2
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1189,6 +1284,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1209,6 +1307,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-equinix-ocp-metal
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1265,6 +1366,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1285,6 +1389,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-equinix-ocp-metal
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1340,6 +1447,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1360,6 +1470,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-equinix-ocp-metal
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1415,6 +1528,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1435,6 +1551,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-openstack-vexxhost
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1490,6 +1609,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1510,6 +1632,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-aws
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1522,14 +1647,14 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: vsphere
+    cluster: vsphere02
     context: ci/prow/e2e-vsphere-ovn
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-master-e2e-vsphere-ovn
@@ -1565,6 +1690,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1585,6 +1713,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-vsphere
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1597,14 +1728,14 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: vsphere
+    cluster: vsphere02
     context: ci/prow/e2e-vsphere-windows
     decorate: true
     decoration_config:
       skip_cloning: true
     labels:
       ci-operator.openshift.io/cloud: vsphere
-      ci-operator.openshift.io/cloud-cluster-profile: vsphere
+      ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
       ci.openshift.io/generator: prowgen
       pj-rehearse.openshift.io/can-be-rehearsed: "true"
     name: pull-ci-openshift-ovn-kubernetes-master-e2e-vsphere-windows
@@ -1639,6 +1770,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1659,6 +1793,9 @@ presubmits:
       - name: cluster-profile
         secret:
           secretName: cluster-secrets-vsphere
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1671,7 +1808,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/gofmt
     decorate: true
     decoration_config:
@@ -1700,6 +1837,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1708,6 +1848,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1720,7 +1863,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/images
     decorate: true
     decoration_config:
@@ -1750,6 +1893,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1758,6 +1904,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1770,7 +1919,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/lint
     decorate: true
     decoration_config:
@@ -1799,6 +1948,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1807,6 +1959,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1862,6 +2017,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1886,6 +2044,9 @@ presubmits:
               name: cluster-secrets-gcp
           - configMap:
               name: cluster-profile-gcp
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1898,7 +2059,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/okd-images
     decorate: true
     labels:
@@ -1927,6 +2088,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1935,6 +2099,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials
@@ -1947,7 +2114,7 @@ presubmits:
     branches:
     - ^master$
     - ^master-
-    cluster: build03
+    cluster: build05
     context: ci/prow/unit
     decorate: true
     decoration_config:
@@ -1976,6 +2143,9 @@ presubmits:
         - mountPath: /secrets/gcs
           name: gcs-credentials
           readOnly: true
+        - mountPath: /secrets/manifest-tool
+          name: manifest-tool-local-pusher
+          readOnly: true
         - mountPath: /etc/pull-secret
           name: pull-secret
           readOnly: true
@@ -1984,6 +2154,9 @@ presubmits:
           readOnly: true
       serviceAccountName: ci-operator
       volumes:
+      - name: manifest-tool-local-pusher
+        secret:
+          secretName: manifest-tool-local-pusher
       - name: pull-secret
         secret:
           secretName: registry-pull-credentials

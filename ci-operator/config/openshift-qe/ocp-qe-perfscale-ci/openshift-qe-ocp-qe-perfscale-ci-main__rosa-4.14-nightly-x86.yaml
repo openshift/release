@@ -36,8 +36,8 @@ tests:
     - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
   timeout: 6h0m0s
-- as: perfscale-rosa-sdn-to-ovn-24nodes-periodic
-  cron: 0 8 1-31/14 * *
+- as: perfscale-rosa-multiaz-control-plane-24nodes-periodic
+  cron: 0 15 * * 6
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -46,13 +46,14 @@ tests:
       ENABLE_AUTOSCALING: "false"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.14"
+      READY_WAIT_TIMEOUT: 30m
       REPLICAS: "24"
     test:
-    - ref: openshift-qe-cluster-density-v2
-    - ref: ovn-sdn-migration
+    - chain: openshift-qe-control-plane
     workflow: rosa-aws-sts
-- as: perfscale-rosa-sdn-to-ovn-120nodes-periodic
-  cron: 0 20 1-31/14 * *
+  timeout: 5h0m0s
+- as: perfscale-rosa-multiaz-node-density-heavy-24nodes-periodic
+  cron: 0 18 * * 6
   steps:
     cluster_profile: aws-perfscale-qe
     env:
@@ -61,11 +62,30 @@ tests:
       ENABLE_AUTOSCALING: "false"
       MULTI_AZ: "true"
       OPENSHIFT_VERSION: "4.14"
-      REPLICAS: "120"
+      PODS_PER_NODE: "100"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "24"
     test:
-    - ref: openshift-qe-cluster-density-v2
-    - ref: ovn-sdn-migration
+    - chain: openshift-qe-node-density-heavy
     workflow: rosa-aws-sts
+  timeout: 5h0m0s
+- as: perfscale-rosa-multiaz-node-density-cni-24nodes-periodic
+  cron: 0 15 * * 4
+  steps:
+    cluster_profile: aws-perfscale-qe
+    env:
+      CHANNEL_GROUP: nightly
+      COMPUTE_MACHINE_TYPE: m5.xlarge
+      ENABLE_AUTOSCALING: "false"
+      MULTI_AZ: "true"
+      OPENSHIFT_VERSION: "4.14"
+      PODS_PER_NODE: "100"
+      READY_WAIT_TIMEOUT: 30m
+      REPLICAS: "24"
+    test:
+    - chain: openshift-qe-node-density-cni
+    workflow: rosa-aws-sts
+  timeout: 5h0m0s
 zz_generated_metadata:
   branch: main
   org: openshift-qe
