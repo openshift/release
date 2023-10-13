@@ -61,6 +61,8 @@ parallel_cucumber -n "${PARALLEL}" ${PARALLEL_CUCUMBER_OPTIONS} --exec \
      parallel_cucumber --group-by found --only-group ${TEST_ENV_NUMBER} -o "--tags \"${E2E_RUN_TAGS} and ${E2E_SKIP_TAGS} and not @serial and not @console and @admin\" -p junit"' || true
 show_time_used "$timestamp_start" 'admin'
 
+sleep 2h
+
 # run the rest tests in serial
 export BUSHSLICER_REPORT_DIR="${ARTIFACT_DIR}/serial"
 export OPENSHIFT_ENV_OCP4_USER_MANAGER_USERS="${USERS}"
