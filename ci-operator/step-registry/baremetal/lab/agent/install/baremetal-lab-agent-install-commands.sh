@@ -347,11 +347,11 @@ case "${BOOT_MODE}" in
   oinst agent create pxe-files
   ### Copy the image to the auxiliary host
   echo -e "\nCopying the PXE files into the bastion host..."
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent.*-vmlinuz* \
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-vmlinuz* \
     "root@${AUX_HOST}:/opt/tftpboot/${CLUSTER_NAME}/vmlinuz_${gnu_arch}"
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent.*-initrd* \
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-initrd* \
     "root@${AUX_HOST}:/opt/tftpboot/${CLUSTER_NAME}/initramfs_${gnu_arch}.img"
-  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/pxe/agent.*-rootfs* \
+  scp "${SSHOPTS[@]}" "${INSTALL_DIR}"/boot-artifacts/agent.*-rootfs* \
     "root@${AUX_HOST}:/opt/html/${CLUSTER_NAME}/rootfs-${gnu_arch}.img"
 ;;
 *)
