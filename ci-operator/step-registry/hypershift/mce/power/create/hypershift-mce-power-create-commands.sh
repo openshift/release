@@ -3,7 +3,7 @@
 set -x
 
 # Agent hosted cluster configs
-CLUSTERS_NAMESPACE="clusters"
+CLUSTERS_NAMESPACE="local-cluster"
 HOSTED_CLUSTER_NAME="$(printf $PROW_JOB_ID|sha256sum|cut -c-20)"
 export HOSTED_CLUSTER_NAME
 export HOSTED_CONTROL_PLANE_NAMESPACE="${CLUSTERS_NAMESPACE}-${HOSTED_CLUSTER_NAME}"
@@ -189,6 +189,7 @@ mkdir /tmp/hc-manifests
 
 ${HYPERSHIFT_CLI_NAME} create cluster agent \
     --name=${HOSTED_CLUSTER_NAME} \
+    --namespace=${CLUSTERS_NAMESPACE} \
     --pull-secret=${PULL_SECRET} \
     --agent-namespace=${HOSTED_CONTROL_PLANE_NAMESPACE} \
     --base-domain=${HYPERSHIFT_BASE_DOMAIN} \
