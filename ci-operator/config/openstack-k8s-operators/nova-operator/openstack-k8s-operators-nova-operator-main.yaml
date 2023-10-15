@@ -1,35 +1,6 @@
-base_images:
-  cli:
-    name: "4.12"
-    namespace: ocp
-    tag: cli
-  openstack-operator-ci-tempest:
-    name: tools
-    namespace: openstack-k8s-operators
-    tag: openstack-operator-tempest-container
-  opm-builder:
-    name: opm-builder
-    namespace: ci
-    tag: latest
 build_root:
   from_repository: true
 images:
-- dockerfile_literal: |
-    FROM src
-    RUN pip3 install python-openstackclient
-    COPY oc /usr/bin/oc
-    COPY opm /usr/bin/opm
-  from: src
-  inputs:
-    cli:
-      paths:
-      - destination_dir: .
-        source_path: /usr/bin/oc
-    opm-builder:
-      paths:
-      - destination_dir: .
-        source_path: /bin/opm
-  to: openstack-operator-ci-build-deploy
 - dockerfile_literal: |
     FROM src
     RUN pip3 install pre-commit
@@ -51,19 +22,6 @@ tests:
     make test GINKGO_ARGS='--no-color'
   container:
     from: src
-- as: nova-operator-build-deploy
-  cluster_claim:
-    architecture: amd64
-    cloud: vexxhost
-    owner: openstack-k8s-operators
-    product: ocp
-    timeout: 1h0m0s
-    version: "4.12"
-  optional: true
-  steps:
-    env:
-      CEPH_HOSTNETWORK: "false"
-    workflow: openstack-k8s-operators-test-build-deploy
 - as: precommit-check
   commands: |
     export SKIP=no-commit-to-branch
@@ -77,20 +35,6 @@ tests:
     pre-commit run --all-files --show-diff-on-failure --verbose
   container:
     from: openstack-operator-ci-pre-commit
-- as: nova-operator-build-deploy-tempest
-  cluster_claim:
-    architecture: amd64
-    cloud: vexxhost
-    owner: openstack-k8s-operators
-    product: ocp
-    timeout: 1h20m0s
-    version: "4.12"
-  optional: true
-  steps:
-    env:
-      CEPH_HOSTNETWORK: "false"
-      TEMPEST_CONCURRENCY: "2"
-    workflow: openstack-k8s-operators-test-build-deploy-tempest
 zz_generated_metadata:
   branch: main
   org: openstack-k8s-operators
