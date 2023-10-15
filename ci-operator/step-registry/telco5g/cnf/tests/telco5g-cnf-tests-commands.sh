@@ -272,7 +272,9 @@ fi
 pushd $CNF_REPO_DIR
 if [[ "$T5CI_VERSION" == "4.15" ]]; then
     echo "Updating all submodules for >=4.15 versions"
-    git submodule update --init --force --recursive
+    # git version 1.8 doesn't work well with forked repositories, requires a specific branch to be set
+    sed -i "s@https://github.com/openshift/metallb-operator.git@https://github.com/openshift/metallb-operator.git\n        branch = main@" .gitmodules
+    git submodule update --init --force --recursive --remote
     git submodule foreach --recursive 'echo $path `git config --get remote.origin.url` `git rev-parse HEAD`' | grep -v Entering > ${ARTIFACT_DIR}/hashes.txt || true
 fi
 echo "Checking out pull request for repository cnf-features-deploy if exists"
