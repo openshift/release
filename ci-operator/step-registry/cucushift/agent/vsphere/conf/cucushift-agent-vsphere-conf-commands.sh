@@ -34,8 +34,8 @@ declare vsphere_portgroup
 source "${SHARED_DIR}/vsphere_context.sh"
 
 machine_cidr=$(<"${SHARED_DIR}"/machinecidr.txt)
-third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
 if [[ ${vsphere_portgroup} == *"segment"* ]]; then
+  third_octet=$(grep -oP '[ci|qe\-discon]-segment-\K[[:digit:]]+' <(echo "${vsphere_portgroup}"))
   gateway="192.168.${third_octet}.1"
   rendezvous_ip_address="192.168.${third_octet}.4"
 else
@@ -57,9 +57,9 @@ fi
 echo "${rendezvous_ip_address}" >"${SHARED_DIR}"/node-zero-ip.txt
 
 pull_secret_path=${CLUSTER_PROFILE_DIR}/pull-secret
-build01_secrets="/var/run/vault/secrets/.dockerconfigjson"
-extract_build01_auth=$(jq -c '.auths."registry.apps.build01-us-west-2.vmc.ci.openshift.org"' ${build01_secrets})
-final_pull_secret=$(jq -c --argjson auth "$extract_build01_auth" '.auths["registry.apps.build01-us-west-2.vmc.ci.openshift.org"] += $auth' "${pull_secret_path}")
+build02_secrets="/var/run/vault/secrets/.dockerconfigjson"
+extract_build02_auth=$(jq -c '.auths."registry.apps.build02.vmc.ci.openshift.org"' ${build02_secrets})
+final_pull_secret=$(jq -c --argjson auth "$extract_build02_auth" '.auths["registry.apps.build02.vmc.ci.openshift.org"] += $auth' "${pull_secret_path}")
 
 echo "${final_pull_secret}" >>"${SHARED_DIR}"/pull-secrets
 echo "$(date -u --rfc-3339=seconds) - Creating reusable variable files..."
@@ -73,7 +73,7 @@ pull_secret=$(<"${SHARED_DIR}/pull-secrets")
 echo "${NAMESPACE}-${UNIQUE_HASH}" >"${SHARED_DIR}"/cluster-name.txt
 cluster_name=$(<"${SHARED_DIR}"/cluster-name.txt)
 
-# Add build01 secrets if the mirror registry secrets are not available.
+# Add build02 secrets if the mirror registry secrets are not available.
 if [ ! -f "${SHARED_DIR}/pull_secret_ca.yaml.patch" ]; then
   yq -i 'del(.pullSecret)' "${SHARED_DIR}/install-config.yaml"
   cat >>"${SHARED_DIR}/install-config.yaml" <<EOF
