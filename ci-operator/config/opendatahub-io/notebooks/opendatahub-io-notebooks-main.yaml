@@ -137,13 +137,6 @@ images:
   dockerfile_path: Dockerfile
   from: cuda-c9s-python-3.9
   to: cuda-rstudio-c9s-python-3.9
-- context_dir: base/anaconda-python-3.8
-  dockerfile_path: Dockerfile
-  to: base-anaconda-python-3.8
-- context_dir: jupyter/datascience/anaconda-python-3.8
-  dockerfile_path: Dockerfile
-  from: base-anaconda-python-3.8
-  to: jupyter-datascience-anaconda-python-3.8
 promotion:
   namespace: opendatahub-io
   tag: latest
@@ -822,16 +815,6 @@ tests:
       IMAGE_TAG: YearIndex
       RELEASE_VERSION: cuda-rstudio-c9s-python-3.9
     workflow: opendatahub-io-ci-image-mirror
-- as: jupyter-datascience-anaconda-python-3-8-pr-image-mirror
-  run_if_changed: (base\/anaconda-python-3.8\/*)|(jupyter\/datascience\/anaconda-python-3.8\/*)
-  steps:
-    dependencies:
-      SOURCE_IMAGE_REF: jupyter-datascience-anaconda-python-3.8
-    env:
-      IMAGE_REPO: workbench-images
-      IMAGE_TAG: YearIndex
-      RELEASE_VERSION: jupyter-datascience-anaconda-python-3.8
-    workflow: opendatahub-io-ci-image-mirror
 - as: notebooks-e2e-tests
   skip_if_only_changed: ^docs\/|.github\/workflows\/*|\\.(md)$|^(\.gitignore|LICENSE|OWNERS|PROJECT)$
   steps:
@@ -1206,23 +1189,6 @@ tests:
       dependencies:
       - env: R_STUDIO_IMAGE
         name: rstudio-c9s-python-3.9
-      from: src
-      resources:
-        requests:
-          cpu: 100m
-          memory: 200Mi
-    - as: jupyter-datascience-anaconda-python-3.8-test-e2e
-      cli: latest
-      commands: |
-        oc new-project jupyter-datascience-anaconda-python-3-8
-        IFS=':' read -r -a NOTEBOOK_IMAGE <<< "${JUPYTER_ANACONDA_IMAGE}"
-        make deploy8-jupyter-datascience-anaconda-python-3.8 \
-            -e IMAGE_REGISTRY="${NOTEBOOK_IMAGE[0]}" -e NOTEBOOK_TAG="${NOTEBOOK_IMAGE[1]}"
-        make test-jupyter-datascience-anaconda-python-3.8
-        make undeploy8-jupyter-datascience-anaconda-python-3.8
-      dependencies:
-      - env: JUPYTER_ANACONDA_IMAGE
-        name: jupyter-datascience-anaconda-python-3.8
       from: src
       resources:
         requests:
