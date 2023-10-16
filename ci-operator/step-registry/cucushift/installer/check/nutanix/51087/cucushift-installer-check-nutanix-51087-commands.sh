@@ -100,17 +100,6 @@ while [ ${loop} -gt 0 ]; do
     fi
 done
 
-# Check left workers get ingressVip
-for worker_ip in "${worker_ips[@]}"; do
-    net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$worker_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$INGRESS_VIP/"; then
-        if [ "$worker_ip" != "$worker_reboot" ]; then
-            echo "Pass: worker: $worker_ip is holding ingressVip: $INGRESS_VIP"
-            break
-        fi
-    fi
-done
-
 # Check ingressVIP works well
 route_host=$(oc get routes httpd -o jsonpath='{.spec.host}')
 if curl --connect-timeout 6 "$route_host"; then
@@ -119,8 +108,6 @@ else
     echo "Fail: check ingressVIP works well"
     exit 1
 fi
-
-sleep 3600
 
 # Wait node Ready, maxmium 600 seconds
 loop=60
@@ -137,6 +124,17 @@ while [ ${loop} -gt 0 ]; do
     if [ ${loop} == 0 ]; then
         echo "Timeout: failed due to timeout"
         exit 1
+    fi
+done
+
+# Check left workers get ingressVip
+for worker_ip in "${worker_ips[@]}"; do
+    net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$worker_ip" sudo nmcli d show br-ex)"
+    if echo "$net_show" | grep "$INGRESS_VIP/"; then
+        if [ "$worker_ip" != "$worker_reboot" ]; then
+            echo "Pass: worker: $worker_ip is holding ingressVip: $INGRESS_VIP"
+            break
+        fi
     fi
 done
 
@@ -174,17 +172,6 @@ while [ ${loop} -gt 0 ]; do
     fi
 done
 
-# Check left masters get APIVip
-for master_ip in "${master_ips[@]}"; do
-    net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$master_ip" sudo nmcli d show br-ex)"
-    if echo "$net_show" | grep "$API_VIP/"; then
-        if [ "$master_ip" != "$master_reboot" ]; then
-            echo "Pass: worker: $master_ip is holding APIVip: $API_VIP"
-            break
-        fi
-    fi
-done
-
 # Check apiVIP works well
 set +e
 curl --connect-timeout 6 "$(oc get infrastructure cluster -o jsonpath='{.status.apiServerURL}')"
@@ -211,6 +198,17 @@ while [ ${loop} -gt 0 ]; do
     if [ ${loop} == 0 ]; then
         echo "Timeout: failed due to timeout"
         exit 1
+    fi
+done
+
+# Check left masters get APIVip
+for master_ip in "${master_ips[@]}"; do
+    net_show="$(ssh -o "StrictHostKeyChecking no" -i "${SSH_PRIV_KEY_PATH}" core@"$master_ip" sudo nmcli d show br-ex)"
+    if echo "$net_show" | grep "$API_VIP/"; then
+        if [ "$master_ip" != "$master_reboot" ]; then
+            echo "Pass: worker: $master_ip is holding APIVip: $API_VIP"
+            break
+        fi
     fi
 done
 
