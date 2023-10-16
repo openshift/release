@@ -60,7 +60,39 @@ tests:
     test:
     - ref: addon-tests-rhods
     workflow: addons-and-operators
-- as: smoke-osd-rhods-addon-baseline-fips
+- as: smoke-osd-gcp-rhods-addon-baseline-fips
+  cron: 0 0 1 1 *
+  steps:
+    cluster_profile: aws-managed-cspi-qe
+    env:
+      ADDON1_CONFIG: name=managed-odh;notification-email=interop-qe-ms@redhat.com
+      ADDONS_OPERATORS_RUN_IN_PARALLEL: "false"
+      CLUSTER_NAME_PREFIX: rhods
+      CLUSTER1_CONFIG: platform=gcp-osd;region=us-west1;version=4.13;channel-group=stable;compute-machine-type=custom-8-32768;timeout=90m;replicas=2;fips=true;ocm-env=stage
+      FIREWATCH_CONFIG: |
+        [
+          {"step": "operator-install", "failure_type": "all", "classification": "Provisioning - Operators", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-506"},
+          {"step": "addon-install", "failure_type": "all", "classification": "Provisioning - Addons", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-506"},
+          {"step": "addon-tests-*", "failure_type": "all", "classification": "Addons tests", "jira_project": "RHODS", "jira_epic": "RHODS-10718"},
+          {"step": "cluster-install-*", "failure_type": "all", "classification":  "Cluster Creation - OSD-GCP", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-506", "group": {"name": "cluster-provision", "priority": 1}},
+          {"step": "cluster-uninstall-*", "failure_type": "all", "classification":  "Cluster Creation - OSD-GCP", "jira_project": "MSINTEROP", "jira_epic": "MSINTEROP-506", "group": {"name": "cluster-provision", "priority": 2}}
+        ]
+      FIREWATCH_DEFAULT_JIRA_PROJECT: MSINTEROP
+      FIREWATCH_JIRA_API_TOKEN_PATH: /tmp/secrets/jira/access_token_msi
+      GCP_SERVICE_ACCOUNT_NAME: gcp_service_account.json
+      INSTALL_FROM_IIB: "true"
+      OPERATOR1_CONFIG: name=gpu-operator-certified;namespace=nvidia-gpu-operator;source=certified-operators;target-namespaces=nvidia-gpu-operator,
+      OPERATOR2_CONFIG: name=servicemeshoperator
+      OPERATOR3_CONFIG: name=serverless-operator;namespace=openshift-serverless
+      OPERATOR4_CONFIG: name=openshift-pipelines-operator-rh;namespace=openshift-pipelines;channel=latest
+      OPERATOR5_CONFIG: name=nfd;namespace=openshift-nfd;target-namespaces=openshift-nfd,
+      PULL_SECRET_NAME: pull-secret
+      S3_BUCKET_NAME: openshift-cli-installer
+      S3_BUCKET_PATH: openshift-ci
+    test:
+    - ref: addon-tests-rhods
+    workflow: addons-and-operators
+- as: smoke-osd-aws-rhods-addon-baseline-fips
   cron: 0 0 1 1 *
   steps:
     cluster_profile: aws-managed-cspi-qe
