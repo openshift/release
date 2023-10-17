@@ -51,22 +51,38 @@ function recert {
 
   sleep 10 # TODO: wait for etcd
 
+  RECERT_CONTAINER_MOUNTS=(
+    -v /tmp/certs:/certs
+    -v /tmp/keys:/keys
+    -v /etc/kubernetes:/kubernetes
+    -v /var/lib/kubelet:/kubelet
+    -v /etc/machine-config-daemon:/machine-config-daemon
+  )
+
+  RECERT_FLAGS=(
+    --etcd-endpoint localhost:2379
+    --static-dir /kubernetes
+    --static-dir /kubelet
+    --static-dir /machine-config-daemon
+    --use-cert /certs/admin-kubeconfig-client-ca.crt
+    --use-key "kube-apiserver-localhost-signer /keys/localhost-serving-signer.key"
+    --use-key "kube-apiserver-lb-signer /keys/loadbalancer-serving-signer.key"
+    --use-key "kube-apiserver-service-network-signer /keys/service-network-serving-signer.key"
+    --use-key "\${ROUTER_CA_CN} /keys/router-ca.key"
+  )
+
+  # # Run first with --dry-run to make sure dry-run completes
+  # podman run -it --network=host --privileged \
+  #     ${RECERT_CONTAINER_MOUNTS[@]} \
+  #     \${recert_image} \
+  #     ${RECERT_FLAGS[@]} \
+  #     --dry-run
+
+  # Run again without --dry-run to actually regenerate crypto
   podman run -it --network=host --privileged \
-      -v /tmp/certs:/certs  \
-      -v /tmp/keys:/keys \
-      -v /etc/kubernetes:/kubernetes \
-      -v /var/lib/kubelet:/kubelet \
-      -v /etc/machine-config-daemon:/machine-config-daemon \
+      ${RECERT_CONTAINER_MOUNTS[@]} \
       \${recert_image} \
-      --etcd-endpoint localhost:2379 \
-      --static-dir /kubernetes \
-      --static-dir /kubelet \
-      --static-dir /machine-config-daemon \
-      --use-cert /certs/admin-kubeconfig-client-ca.crt \
-      --use-key "kube-apiserver-localhost-signer /keys/localhost-serving-signer.key" \
-      --use-key "kube-apiserver-lb-signer /keys/loadbalancer-serving-signer.key" \
-      --use-key "kube-apiserver-service-network-signer /keys/service-network-serving-signer.key" \
-      --use-key "\${ROUTER_CA_CN} /keys/router-ca.key" \
+      ${RECERT_FLAGS[@]}
 
   podman kill recert_etcd
 
