@@ -11,16 +11,16 @@ echo "Installing the MTC operator on the source cluster."
 ansible-playbook /mtc-interop/install-mtc.yml \
     -e version=${MTC_VERSION} \
     -e isController=true \
-    -e kubeconfig_path=/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig
+    -e cluster_kubeconfig=/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeconfig
 
 echo "Installing the MTC operator on the target cluster."
 ansible-playbook /mtc-interop/install-mtc.yml \
     -e version=${MTC_VERSION} \
-    -e kubeconfig_path=/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeconfig
+    -e kubeconfig_path=/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig
 
 
 # Configure the clusters prior to executing tests
 echo "Configuring the source and target clusters."
 ansible-playbook /mtc-interop/config_mtc.yml \
-    -e controller_kubeconfig=/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig \
-    -e cluster_kubeconfig=/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeconfig
+    -e cluster_kubeconfig=/tmp/clusters-data/aws/mtc-aws-ipi-target/auth/kubeconfig \
+    -e kubeconfig_path=/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig
