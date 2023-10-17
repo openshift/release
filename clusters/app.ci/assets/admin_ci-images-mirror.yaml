@@ -1,0 +1,132 @@
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: ci-images-mirror
+  namespace: ci
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-images-mirror
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ci-images-mirror
+subjects:
+- kind: ServiceAccount
+  name: ci-images-mirror
+  namespace: ci
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ci-images-mirror
+rules:
+- apiGroups:
+  - image.openshift.io
+  resources:
+  - '*'
+  verbs:
+  - list
+  - watch
+- apiGroups:
+  - "coordination.k8s.io"
+  resources:
+  - leases
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    image.openshift.io/triggers: '[{"from":{"kind":"ImageStreamTag","name":"ci-images-mirror:latest"},"fieldPath":"spec.template.spec.containers[?(@.name==\"ci-images-mirror\")].image"}]'
+  labels:
+    app: ci-images-mirror
+  name: ci-images-mirror
+  namespace: ci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ci-images-mirror
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ci-images-mirror
+    spec:
+      initContainers:
+      - name: git-sync-init
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --root=/tmp/git-sync
+        - --one-time=true
+        - --depth=1
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+      containers:
+      - name: git-sync
+        command:
+        - /git-sync
+        args:
+        - --repo=https://github.com/openshift/release.git
+        - --branch=master
+        - --wait=30
+        - --root=/tmp/git-sync
+        - --max-sync-failures=3
+        env:
+        - name: GIT_SYNC_DEST
+          value: release
+        image: registry.k8s.io/git-sync/git-sync:v3.6.2
+        volumeMounts:
+        - name: release
+          mountPath: /tmp/git-sync
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "0.5"
+      - image: ci-images-mirror
+        name: ci-images-mirror
+        args:
+        - --leader-election-namespace=ci
+        - --release-repo-git-sync-path=/var/repo/release
+        - --registry-config=/etc/push/.dockerconfigjson
+        - --quayIOCIImagesDistributorOptions.additional-image-stream-namespace=ci
+        - --dry-run=true
+        ports:
+        - name: http
+          containerPort: 8090
+        volumeMounts:
+        - name: release
+          mountPath: /var/repo
+        - mountPath: "/etc/push"
+          name: push-credentials
+          readOnly: true
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "500m"
+      serviceAccountName: ci-images-mirror
+      volumes:
+      - name: release
+        emptyDir: {}
+      - name: push-credentials
+        secret:
+          secretName: registry-push-credentials-ci-images-mirror

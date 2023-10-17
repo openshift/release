@@ -2,6 +2,9 @@ ref:
   as: hypershift-hostedcluster-create-hostedcluster
   cli: latest
   env:
+  - name: PLATFORM
+    default: "aws"
+    documentation: "The platform(AWS/PowerVS) of the HostedCluster. AWS by default"
   - name: HYPERSHIFT_NODE_COUNT
     default: "3"
     documentation: "The number nodes to automatically create and join to the cluster."
@@ -38,6 +41,36 @@ ref:
   - name: HYPERSHIFT_INFRA_AVAILABILITY_POLICY
     default: "SingleReplica"
     documentation: "Availability policy for infrastructure services in guest cluster. Supported options: SingleReplica, HighlyAvailable, default SingleReplica"
+  - name: POWERVS_REGION
+    default: ""
+    documentation: "The PowerVS region of the cluster."
+  - name: POWERVS_ZONE
+    default: ""
+    documentation: "The PowerVS zone of the cluster."
+  - name: POWERVS_VPC_REGION
+    default: ""
+    documentation: "The region of the VPC created for PowerVS deployment"
+  - name: POWERVS_RESOURCE_GROUP
+    default: ""
+    documentation: "The PowerVS resource group."
+  - name: POWERVS_PROC_TYPE
+    default: ""
+    documentation: "The processor type of Power nodes."
+  - name: POWERVS_PROCESSORS
+    default: ""
+    documentation: "The processor count of Power nodes."
+  - name: POWERVS_SYS_TYPE
+    default: ""
+    documentation: "The system type of Power nodes."
+  - name: POWERVS_GUID
+    default: ""
+    documentation: "IBM Cloud PowerVS Service Instance ID.This flag is used to reuse an existing PowerVS Service Instance resource for cluster's infra"
+  - name: VPC
+    default: ""
+    documentation: "IBM Cloud VPC Name. This flag is used to reuse an existing VPC resource for cluster's infra"
+  - name: CLOUD_CONNECTION
+    default: ""
+    documentation: "Cloud Connection in given zone.This flag is used to reuse an existing Cloud Connection resource for cluster's infra"
   commands: hypershift-hostedcluster-create-hostedcluster-commands.sh
   from_image:
     namespace: ci
@@ -59,11 +92,16 @@ ref:
   - mount_path: /etc/ci-pull-credentials
     name: ci-pull-credentials
     namespace: test-credentials
+  - mount_path: /etc/registry-pull-credentials
+    name: registry-pull-credentials
+    namespace: test-credentials
   - mount_path: /var/run/hypershift-workload-credentials
     name: hypershift-workload-credentials
     namespace: test-credentials
   dependencies:
   - name: "release:latest"
     env: RELEASE_IMAGE_LATEST
+  - name: "release:multi-latest"
+    env: RELEASE_IMAGE_MULTI_LATEST
   - name: "stable:hypershift"
     env: HYPERSHIFT_RELEASE_LATEST
