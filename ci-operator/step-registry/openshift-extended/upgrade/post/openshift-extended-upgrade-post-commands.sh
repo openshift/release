@@ -152,7 +152,7 @@ ibmcloud)
 ovirt) export TEST_PROVIDER='{"type":"ovirt"}';;
 equinix-ocp-metal|equinix-ocp-metal-qe|powervs-1)
     export TEST_PROVIDER='{"type":"skeleton"}';;
-nutanix|nutanix-qe)
+nutanix|nutanix-qe|nutanix-qe-dis)
     export TEST_PROVIDER='{"type":"nutanix"}';;
 *)
     echo >&2 "Unsupported cluster type '${CLUSTER_TYPE}'"
@@ -269,6 +269,8 @@ function run {
     cat ./case_selected
     echo "-----------------------------------------------------"
 
+    # failures happening after this point should not be caught by the Overall CI test suite in RP
+    touch "${ARTIFACT_DIR}/skip_overall_if_fail"
     ret_value=0
     set -x
     if [ "W${TEST_PROVIDER}W" == "WnoneW" ]; then

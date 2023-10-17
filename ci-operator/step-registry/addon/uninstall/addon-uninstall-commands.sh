@@ -7,7 +7,7 @@ set -o verbose
 
 CLUSTER_NAME=$(cat "${SHARED_DIR}/cluster-name")
 OCM_TOKEN=$(cat /var/run/secrets/ci.openshift.io/cluster-profile/ocm-token)
-RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py addons --cluster ${CLUSTER_NAME} --token ${OCM_TOKEN} --api-host ${API_HOST} "
+RUN_COMMAND="poetry run python ocp_addons_operators_cli/cli.py --action uninstall --cluster-name ${CLUSTER_NAME} --ocm-token ${OCM_TOKEN} "
 export AWS_CONFIG_FILE="${CLUSTER_PROFILE_DIR}/.awscred"
 export OCM_TOKEN
 
@@ -24,8 +24,6 @@ RUN_COMMAND="${RUN_COMMAND} ${ADDONS_CMD}"
 if [ "${ADDONS_OPERATORS_RUN_IN_PARALLEL}" = "true" ]; then
     RUN_COMMAND+=" --parallel"
 fi
-
-RUN_COMMAND+=" uninstall"
 
 echo "$RUN_COMMAND" | sed -r "s/token [=A-Za-z0-9\.\-]+/token hashed-token /g"
 

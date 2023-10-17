@@ -26,6 +26,12 @@ releases:
     release:
       channel: stable
       version: "4.12"
+  multi-latest:
+    candidate:
+      architecture: multi
+      product: ocp
+      stream: nightly
+      version: "4.14"
 resources:
   '*':
     limits:
@@ -37,6 +43,7 @@ tests:
 - as: unit
   commands: |
     make test \
+    BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
@@ -48,6 +55,7 @@ tests:
 - as: gencheck
   commands: |
     make gen-check \
+    BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
@@ -58,6 +66,7 @@ tests:
 - as: lint
   commands: |
     make lint \
+    BUILD_WITH_CONTAINER="0" \
     GOBIN="/gobin" \
     GOCACHE="/tmp/cache" \
     GOMODCACHE="/tmp/cache" \
@@ -65,15 +74,40 @@ tests:
   container:
     from: src-test
   timeout: 20m0s
+- as: update-common
+  commands: |
+    # load test-infra automator.sh script
+    git clone --single-branch --depth=1 --branch main https://github.com/maistra/test-infra.git
+    cd test-infra
+    export BUILD_WITH_CONTAINER="0"
+    export XDG_CACHE_HOME="/tmp/cache"
+    export GOCACHE="/tmp/cache"
+    export GOMODCACHE="/tmp/cache"
+    ./tools/automator.sh \
+      -o maistra \
+      -r istio-operator \
+      -f /creds-github/token \
+      '-c make update-common' \
+      '-t [maistra-3.0] Automator: Update common-files' \
+      -m update_common_3.0 \
+      -l auto-merge \
+      -b maistra-3.0
+  container:
+    from: src-test
+  cron: 00 03 * * *
+  secrets:
+  - mount_path: /creds-github
+    name: github-token
 - as: push-images
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
       GOBIN: /gobin
       GOCACHE: /tmp/cache
       GOMODCACHE: /tmp/cache
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -103,6 +137,7 @@ tests:
           "docker login -u='maistra-dev+prow' \
           -p=${QUAY_PASS} quay.io; \
           cd /work && \
+          export BUILD_WITH_CONTAINER="0" && \
           make docker-build docker-push \
           IMAGE=quay.io/maistra-dev/istio-ubi9-operator:PR-${PULL_NUMBER}"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
@@ -123,13 +158,14 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-profile
+    workflow: servicemesh-istio-e2e-hypershift
 - as: integration-ocp
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -162,6 +198,7 @@ tests:
           export TAG=PR-${PULL_NUMBER} && \
           docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
           cd /work && \
+          export BUILD_WITH_CONTAINER="0" && \
           make test.integration.ocp"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
@@ -178,14 +215,14 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-profile
+    workflow: servicemesh-istio-e2e-hypershift
 - as: integration-kind
-  optional: true
   steps:
-    cluster_profile: aws
+    cluster_profile: aws-2
     dependencies:
       RELEASE_IMAGE_LATEST: release:latest
     env:
+      HYPERSHIFT_HC_RELEASE_IMAGE: quay.io/openshift-release-dev/ocp-release:4.13.14-multi
       MAISTRA_BUILDER_IMAGE: registry.ci.openshift.org/ci/maistra-builder:upstream-master
       MAISTRA_NAMESPACE: maistra-e2e-test
       MAISTRA_SC_POD: maistra-e2e-test-sc-pod
@@ -215,6 +252,7 @@ tests:
           "export TAG=PR-${PULL_NUMBER} && \
           docker login -u='maistra-dev+prow' -p=${QUAY_PASS} quay.io && \
           cd /work && \
+          export BUILD_WITH_CONTAINER="0" && \
           make test.integration.kind"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:
@@ -231,7 +269,7 @@ tests:
           cpu: 100m
           memory: 100Mi
       timeout: 2h0m0s
-    workflow: servicemesh-istio-e2e-profile
+    workflow: servicemesh-istio-e2e-hypershift
 - as: scorecard
   steps:
     cluster_profile: aws-2
@@ -266,6 +304,7 @@ tests:
           sh -c \
           "export KUBECONFIG=/work/ci-kubeconfig && \
           cd /work && \
+          export BUILD_WITH_CONTAINER="0" && \
           make test.scorecard"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       env:
@@ -321,6 +360,7 @@ tests:
           "git config --global user.email 'dgrimm@redhat.com'; \
            git config --global user.name 'Daniel Grimm'; \
            cd /work && \
+           export BUILD_WITH_CONTAINER="0" && \
            make -e GITHUB_TOKEN=${GITHUB_TOKEN} docker-push-nightly bundle-publish-nightly"
         oc cp "${MAISTRA_NAMESPACE}"/"${MAISTRA_SC_POD}":"${ARTIFACT_DIR}"/. "${ARTIFACT_DIR}"
       credentials:

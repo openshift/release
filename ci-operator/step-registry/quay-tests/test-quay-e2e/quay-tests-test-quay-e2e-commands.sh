@@ -15,7 +15,14 @@ mkdir -p $ARTIFACT_DIR
 
 
 function copyArtifacts {
-    cp -r ./cypress/results/* $ARTIFACT_DIR && cp -r ./cypress/videos/* $ARTIFACT_DIR
+    JUNIT_PREFIX="junit_"
+    cp -r ./cypress/results/* $ARTIFACT_DIR
+    for file in "$ARTIFACT_DIR"/*; do
+        if [[ ! "$(basename "$file")" =~ ^"$JUNIT_PREFIX" ]]; then
+            mv "$file" "$ARTIFACT_DIR"/"$JUNIT_PREFIX""$(basename "$file")"
+        fi
+    done
+    cp -r ./cypress/videos/* $ARTIFACT_DIR
 }
 
 # Install Dependcies defined in packages.json
