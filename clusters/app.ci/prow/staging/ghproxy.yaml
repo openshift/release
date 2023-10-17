@@ -1,0 +1,70 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  namespace: ci-staging
+  labels:
+    app: ghproxy
+  name: ghproxy
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci-staging
+  name: ghproxy
+  labels:
+    app: ghproxy
+spec:
+  selector:
+    matchLabels:
+      app: ghproxy
+  strategy:
+    type: Recreate
+  # GHProxy does not support HA
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ghproxy
+    spec:
+      containers:
+      - name: ghproxy
+        image: gcr.io/k8s-prow/ghproxy:v20221115-a6c6c84e3d
+        args:
+        - --cache-dir=/cache
+        - --cache-sizeGB=99
+        - --push-gateway=pushgateway
+        - --serve-metrics=true
+        ports:
+        - containerPort: 8888
+        volumeMounts:
+        - name: cache
+          mountPath: /cache
+      volumes:
+      - name: cache
+        persistentVolumeClaim:
+          claimName: ghproxy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: ghproxy
+  namespace: ci-staging
+  name: ghproxy
+spec:
+  ports:
+  - name: main
+    port: 80
+    protocol: TCP
+    targetPort: 8888
+  - name: metrics
+    port: 9090
+  selector:
+    app: ghproxy
+  type: ClusterIP
