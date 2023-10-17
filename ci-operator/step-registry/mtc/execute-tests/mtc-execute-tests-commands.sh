@@ -6,13 +6,13 @@ set -o pipefail
 SOURCE_KUBEADMIN_PASSWORD_FILE="/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeadmin-password"
 SOURCE_KUBECONFIG="/tmp/clusters-data/aws/mtc-aws-ipi-source/auth/kubeconfig"
 
+sleep 7200
 # Extract all tar files
 echo "Extracting cluster data, mtc-apps-deployer, and mtc-python-client."
 tar -xzvf "${SHARED_DIR}/clusters_data.tar.gz" --one-top-leve=/tmp/clusters-data
 tar -xfv /mtc-e2e-qev2/mtc-apps-deployer.tar.gz -C "${MTC_APPS_DEPLOYER_DIR}" --strip-components 1
 tar -xfv /mtc-e2e-qev2/mtc-python-client.tar.gz -C "${MTC_PYTHON_CLIENT_DIR}" --strip-components 1
 
-sleep 7200
 
 # Install required packages
 echo "Installing mtc-apps-deployer and mtc-python-client."
