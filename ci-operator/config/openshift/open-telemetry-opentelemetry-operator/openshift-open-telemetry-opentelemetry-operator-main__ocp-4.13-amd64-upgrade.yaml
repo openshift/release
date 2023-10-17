@@ -87,7 +87,7 @@ tests:
     env:
       EO_SUB_CHANNEL: stable-5.7
       EO_SUB_SOURCE: redhat-operators
-      SKIP_TESTS: tests/e2e-instrumentation/instrumentation-apache-httpd tests/e2e-openshift/otlp-metrics-traces
+      SKIP_TESTS: tests/e2e-instrumentation/instrumentation-apache-httpd tests/e2e-openshift/multi-cluster
     test:
     - ref: operatorhub-subscribe-elasticsearch-operator
     - ref: operatorhub-subscribe-amq-streams
@@ -112,17 +112,6 @@ tests:
       cli: latest
       commands: |
         operator-sdk run bundle-upgrade --timeout=10m --security-context-config restricted -n opentelemetry-operator "$OO_BUNDLE"
-        oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
-
-        # Extract the CSV to a variable
-        csv_yaml=$(oc get csv opentelemetry-operator.v0.85.0 -n opentelemetry-operator -o yaml)
-
-        # Use sed to modify the feature gate flag
-        new_csv_yaml=$(echo "$csv_yaml" | sed 's/--feature-gates=+operator.autoinstrumentation.go/--feature-gates=+operator.autoinstrumentation.go,+operator.observability.prometheus/g')
-
-        # Reapply the modified CSV
-        echo "$new_csv_yaml" | oc apply -f -
-
         oc wait --for condition=Available -n opentelemetry-operator deployment opentelemetry-operator-controller-manager
       dependencies:
       - env: OO_BUNDLE
