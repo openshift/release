@@ -61,7 +61,7 @@ if [[ "${PLATFORM}" == "aws" ]]; then
      echo 'Failed to delete the cluster, retrying...'
    fi
   done
-else
+elif [[ "${PLATFORM}" == "powervs" ]]; then
   for _ in {1..10}; do
    bin/hypershift destroy cluster powervs \
      --name ${CLUSTER_NAME} \
@@ -81,5 +81,8 @@ else
       echo 'Failed to delete the cluster, retrying...'
    fi
   done
+else
+  echo "Unsupported platform. Cluster deletion failed."
+  exit 1
 fi
 echo "$(date) Finished deleting cluster"
