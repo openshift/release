@@ -258,10 +258,14 @@ if [[ "$HOSTED_CP" == "true" ]]; then
       exit 1
     fi
 
+    PROVISION_SHARD_ID="745174c2-67ae-11ee-95cc-0a580a81151d"
     HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
     record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
   fi
 
+  PROVISION_SHARD_ID="745174c2-67ae-11ee-95cc-0a580a81151d"
+  HYPERSHIFT_SWITCH="${HYPERSHIFT_SWITCH}  --properties provision_shard_id:${PROVISION_SHARD_ID}"
+  record_cluster "properties" "provision_shard_id" ${PROVISION_SHARD_ID}
   ENABLE_BYOVPC="true"
   BYO_OIDC="true"
 fi
