@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: ci-staging
+  name: tide
+  labels:
+    app: prow
+    component: tide
+spec:
+  replicas: 1 # Do not scale up.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: prow
+      component: tide
+  template:
+    metadata:
+      labels:
+        app: prow
+        component: tide
+    spec:
+      serviceAccountName: "tide"
+      containers:
+      - name: tide
+        image: quay.io/sgoeddel/tide:2
+        args:
+        - --dry-run=false
+        - --config-path=/etc/config/config.yaml
+        - --github-endpoint=http://ghproxy
+        - --github-endpoint=https://api.github.com
+        - --github-graphql-endpoint=http://ghproxy/graphql
+        - --gcs-credentials-file=/etc/gcs-credentials/service-account.json
+        - --status-path=gs://ci-staging-deck/tide-status-checkpoint.yaml
+        - --history-uri=gs://ci-staging-deck/tide-history.json
+        - --github-app-id=$(GITHUB_APP_ID)
+        - --github-app-private-key-path=/etc/github/cert
+        env:
+        - name: GITHUB_APP_ID
+          valueFrom:
+            secretKeyRef:
+              name: openshift-ci-staging-prow-app
+              key: appid
+        ports:
+        - name: main
+          containerPort: 8888
+        volumeMounts:
+        - name: github-app-credentials
+          mountPath: /etc/github
+          readOnly: true
+        - name: config
+          mountPath: /etc/config
+          readOnly: true
+        - name: gcs-credentials
+          mountPath: /etc/gcs-credentials
+          readOnly: true
+      volumes:
+      - name: github-app-credentials
+        secret:
+          secretName: openshift-ci-staging-prow-app
+      - name: config
+        configMap:
+          name: config
+      - name: gcs-credentials
+        secret:
+          secretName: gce-sa-credentials-gcs-private
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: ci-staging
+  name: tide
+  labels:
+    app: prow
+    component: tide
+spec:
+  selector:
+    app: prow
+    component: tide
+  ports:
+  - port: 80
+    name: main
+    targetPort: 8888
+  type: ClusterIP
