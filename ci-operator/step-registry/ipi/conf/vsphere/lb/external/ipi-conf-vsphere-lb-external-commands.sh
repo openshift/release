@@ -2,7 +2,7 @@
 set -o nounset
 set -o errexit
 set -o pipefail
-
+set -x
 # ensure LEASED_RESOURCE is set
 if [[ -z "${LEASED_RESOURCE}" ]]; then
   echo "Failed to acquire lease"
