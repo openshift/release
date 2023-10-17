@@ -35,8 +35,9 @@ function cleanup_ibmcloud_powervs() {
             || tg connection-delete "${GW}" "${CS}" --force \
             && true && sleep 30
         done
-        ic tg gwd "${GW}" --force && true && sleep 120s || true
-        ic tg gateway "${GW}" && ic tg gwd "${GW}" --force && sleep 120s || true
+        ic tg gwd "${GW}" --force || sleep 120s || true
+        ic tg gateway "${GW}" || true
+        ic tg gwd "${GW}" --force || sleep 120s || true
         echo "waiting up a minute while the Transit Gateways are removed"
         sleep 60
       fi
@@ -227,4 +228,4 @@ then
   fi
 fi
 
-echo "IBM Cloud PowerVS resources destroyed successfully"
+echo "IBM Cloud PowerVS resources destroyed successfully $(date)"

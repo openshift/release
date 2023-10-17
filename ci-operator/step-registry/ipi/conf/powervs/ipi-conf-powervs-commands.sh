@@ -65,6 +65,11 @@ PLATFORM_ARGS_COMPUTE=( )
 PLATFORM_ARGS_WORKER=( )
 POWERVS_ZONE=${LEASED_RESOURCE}
 case "${LEASED_RESOURCE}" in
+   "dal10")
+      POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_DAL10")
+      POWERVS_REGION=dal
+      VPCREGION=us-south
+   ;;
    "lon04")
       POWERVS_SERVICE_INSTANCE_ID=$(cat "/var/run/powervs-ipi-cicd-secrets/powervs-creds/POWERVS_SERVICE_INSTANCE_ID_LON04")
       POWERVS_REGION=lon

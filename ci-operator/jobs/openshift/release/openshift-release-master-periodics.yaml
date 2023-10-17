@@ -3509,7 +3509,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -3520,7 +3520,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.10-upgrade-from-stable-4.9
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -7182,7 +7182,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -7193,7 +7193,7 @@ periodics:
   interval: 170h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.11-upgrade-from-stable-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -11027,7 +11027,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: 49 13 */10,24 * *
   decorate: true
   decoration_config:
@@ -11038,7 +11038,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.12-upgrade-from-stable-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -14946,7 +14946,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -14957,7 +14957,7 @@ periodics:
   interval: 153h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.13-upgrade-from-stable-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -15028,7 +15028,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -15039,7 +15039,7 @@ periodics:
   interval: 151h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.13-upgrade-from-stable-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -19276,7 +19276,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -19287,7 +19287,7 @@ periodics:
   interval: 168h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.14-upgrade-from-stable-4.13
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -19358,7 +19358,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -19369,7 +19369,7 @@ periodics:
   interval: 168h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.14-upgrade-from-stable-4.13
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -20060,6 +20060,89 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-aws-ovn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/cluster: build01
+    ci-operator.openshift.io/variant: ci-4.15
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.15-e2e-aws-ovn-upgrade-out-of-change
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-ovn-upgrade-out-of-change-cluster-profile
+      - --target=e2e-aws-ovn-upgrade-out-of-change
+      - --variant=ci-4.15
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-ovn-upgrade-out-of-change-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -20848,6 +20931,89 @@ periodics:
   labels:
     ci-operator.openshift.io/cloud: aws
     ci-operator.openshift.io/cloud-cluster-profile: aws-2
+    ci-operator.openshift.io/cluster: build01
+    ci-operator.openshift.io/variant: ci-4.15
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.15-e2e-aws-sdn-upgrade-out-of-change
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-aws-sdn-upgrade-out-of-change-cluster-profile
+      - --target=e2e-aws-sdn-upgrade-out-of-change
+      - --variant=ci-4.15
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-aws-sdn-upgrade-out-of-change-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-aws-2
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build01
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: aws
+    ci-operator.openshift.io/cloud-cluster-profile: aws-2
     ci-operator.openshift.io/variant: ci-4.15
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -21209,6 +21375,88 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-azure-ovn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure-2
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-2
+    ci-operator.openshift.io/variant: ci-4.15
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.15-e2e-azure-ovn-upgrade-out-of-change
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-azure-ovn-upgrade-out-of-change-cluster-profile
+      - --target=e2e-azure-ovn-upgrade-out-of-change
+      - --variant=ci-4.15
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-azure-ovn-upgrade-out-of-change-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -21656,6 +21904,88 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: azure4
+    ci-operator.openshift.io/cloud-cluster-profile: azure-2
+    ci-operator.openshift.io/variant: ci-4.15
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.15-e2e-azure-sdn-upgrade-out-of-change
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-azure-sdn-upgrade-out-of-change-cluster-profile
+      - --target=e2e-azure-sdn-upgrade-out-of-change
+      - --variant=ci-4.15
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-azure-sdn-upgrade-out-of-change-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      secret:
+        secretName: cluster-secrets-azure-2
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: build04
   decorate: true
   decoration_config:
@@ -22001,6 +22331,93 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/variant: ci-4.15
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.15-e2e-gcp-ovn-upgrade-out-of-change
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-gcp-ovn-upgrade-out-of-change-cluster-profile
+      - --target=e2e-gcp-ovn-upgrade-out-of-change
+      - --variant=ci-4.15
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-ovn-upgrade-out-of-change-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp-openshift-gce-devel-ci-2
+        - configMap:
+            name: cluster-profile-gcp-openshift-gce-devel-ci-2
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
   cluster: build04
   decorate: true
   decoration_config:
@@ -22305,6 +22722,93 @@ periodics:
         name: ci-pull-credentials
         readOnly: true
       - mountPath: /usr/local/e2e-gcp-sdn-upgrade-cluster-profile
+        name: cluster-profile
+      - mountPath: /secrets/gcs
+        name: gcs-credentials
+        readOnly: true
+      - mountPath: /secrets/manifest-tool
+        name: manifest-tool-local-pusher
+        readOnly: true
+      - mountPath: /etc/pull-secret
+        name: pull-secret
+        readOnly: true
+      - mountPath: /etc/report
+        name: result-aggregator
+        readOnly: true
+    serviceAccountName: ci-operator
+    volumes:
+    - name: boskos
+      secret:
+        items:
+        - key: credentials
+          path: credentials
+        secretName: boskos-credentials
+    - name: ci-pull-credentials
+      secret:
+        secretName: ci-pull-credentials
+    - name: cluster-profile
+      projected:
+        sources:
+        - secret:
+            name: cluster-secrets-gcp-openshift-gce-devel-ci-2
+        - configMap:
+            name: cluster-profile-gcp-openshift-gce-devel-ci-2
+    - name: manifest-tool-local-pusher
+      secret:
+        secretName: manifest-tool-local-pusher
+    - name: pull-secret
+      secret:
+        secretName: registry-pull-credentials
+    - name: result-aggregator
+      secret:
+        secretName: result-aggregator
+- agent: kubernetes
+  cluster: build02
+  decorate: true
+  decoration_config:
+    skip_cloning: true
+  extra_refs:
+  - base_ref: master
+    org: openshift
+    repo: release
+  interval: 168h
+  labels:
+    ci-operator.openshift.io/cloud: gcp
+    ci-operator.openshift.io/cloud-cluster-profile: gcp-openshift-gce-devel-ci-2
+    ci-operator.openshift.io/cluster: build02
+    ci-operator.openshift.io/variant: ci-4.15
+    ci.openshift.io/generator: prowgen
+    ci.openshift.io/no-builds: "true"
+    job-release: "4.15"
+    pj-rehearse.openshift.io/can-be-rehearsed: "true"
+  name: periodic-ci-openshift-release-master-ci-4.15-e2e-gcp-sdn-upgrade-out-of-change
+  spec:
+    containers:
+    - args:
+      - --gcs-upload-secret=/secrets/gcs/service-account.json
+      - --image-import-pull-secret=/etc/pull-secret/.dockerconfigjson
+      - --lease-server-credentials-file=/etc/boskos/credentials
+      - --report-credentials-file=/etc/report/credentials
+      - --secret-dir=/secrets/ci-pull-credentials
+      - --secret-dir=/usr/local/e2e-gcp-sdn-upgrade-out-of-change-cluster-profile
+      - --target=e2e-gcp-sdn-upgrade-out-of-change
+      - --variant=ci-4.15
+      command:
+      - ci-operator
+      image: ci-operator:latest
+      imagePullPolicy: Always
+      name: ""
+      resources:
+        requests:
+          cpu: 10m
+      volumeMounts:
+      - mountPath: /etc/boskos
+        name: boskos
+        readOnly: true
+      - mountPath: /secrets/ci-pull-credentials
+        name: ci-pull-credentials
+        readOnly: true
+      - mountPath: /usr/local/e2e-gcp-sdn-upgrade-out-of-change-cluster-profile
         name: cluster-profile
       - mountPath: /secrets/gcs
         name: gcs-credentials
@@ -23437,7 +23941,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -23448,7 +23952,7 @@ periodics:
   interval: 168h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.15-upgrade-from-stable-4.14
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -23519,7 +24023,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -23530,7 +24034,7 @@ periodics:
   interval: 168h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.15-upgrade-from-stable-4.14
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -27347,7 +27851,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -27358,7 +27862,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.6-upgrade-from-stable-4.5
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -29011,7 +29515,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -29022,7 +29526,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.7-upgrade-from-stable-4.6
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -31427,7 +31931,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -31438,7 +31942,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.8-upgrade-from-stable-4.7
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -34257,7 +34761,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -34268,7 +34772,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: ci-4.9-upgrade-from-stable-4.8
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -34450,7 +34954,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230927-4613add0a1
+      image: gcr.io/k8s-prow/commenter:v20231011-acf4a2e26b
       imagePullPolicy: Always
       name: ""
       resources:
@@ -39370,7 +39874,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -39381,7 +39885,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -39452,7 +39956,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -39463,7 +39967,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -39534,7 +40038,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -39545,7 +40049,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -39616,7 +40120,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -39627,7 +40131,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -39698,7 +40202,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -39709,7 +40213,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -39780,7 +40284,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -39791,7 +40295,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -39862,7 +40366,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -39873,7 +40377,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -39944,7 +40448,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -39955,7 +40459,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -45535,7 +46039,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -45546,7 +46050,7 @@ periodics:
   interval: 336h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -45617,7 +46121,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -45628,7 +46132,7 @@ periodics:
   interval: 350h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -45699,7 +46203,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -45710,7 +46214,7 @@ periodics:
   interval: 340h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -45781,7 +46285,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -45792,7 +46296,7 @@ periodics:
   interval: 342h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -45863,7 +46367,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -45874,7 +46378,7 @@ periodics:
   interval: 338h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -45945,7 +46449,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -45956,7 +46460,7 @@ periodics:
   interval: 344h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -46027,7 +46531,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -46038,7 +46542,7 @@ periodics:
   interval: 346h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -46109,7 +46613,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -46120,7 +46624,7 @@ periodics:
   interval: 348h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -52472,7 +52976,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: 58 5 */6,16 * *
   decorate: true
   decoration_config:
@@ -52483,7 +52987,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -52554,7 +53058,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: 37 14 */13,26 * *
   decorate: true
   decoration_config:
@@ -52565,7 +53069,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -52636,7 +53140,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: 35 19 */4,14 * *
   decorate: true
   decoration_config:
@@ -52647,7 +53151,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -52718,7 +53222,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: 46 20 */1,10 * *
   decorate: true
   decoration_config:
@@ -52729,7 +53233,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -52882,7 +53386,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: 5 18 */8,19 * *
   decorate: true
   decoration_config:
@@ -52893,7 +53397,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -52964,7 +53468,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: 48 6 */5,18 * *
   decorate: true
   decoration_config:
@@ -52975,7 +53479,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -59529,7 +60033,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -59540,7 +60044,7 @@ periodics:
   interval: 150h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.13
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -84328,7 +84832,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -84339,7 +84843,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -84410,7 +84914,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -84421,7 +84925,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -84492,7 +84996,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -84503,7 +85007,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -84574,7 +85078,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -84585,7 +85089,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.6
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -86882,7 +87386,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -86893,7 +87397,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -86964,7 +87468,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -86975,7 +87479,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -87046,7 +87550,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -87057,7 +87561,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -87128,7 +87632,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -87139,7 +87643,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -87210,7 +87714,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -87221,7 +87725,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.7
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -90304,7 +90808,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -90315,7 +90819,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -90386,7 +90890,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -90397,7 +90901,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -90468,7 +90972,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -90479,7 +90983,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -90550,7 +91054,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -90561,7 +91065,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -90632,7 +91136,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -90643,7 +91147,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -90714,7 +91218,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -90725,7 +91229,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.8
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -95061,7 +95565,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -95072,7 +95576,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -95143,7 +95647,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -95154,7 +95658,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -95225,7 +95729,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -95236,7 +95740,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -95307,7 +95811,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -95318,7 +95822,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -95389,7 +95893,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -95400,7 +95904,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -95471,7 +95975,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -95482,7 +95986,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: nightly-4.9
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -95892,7 +96396,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -95903,7 +96407,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: okd-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -95974,7 +96478,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: '@yearly'
   decorate: true
   decoration_config:
@@ -95985,7 +96489,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: okd-4.10
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -96306,7 +96810,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -96317,7 +96821,7 @@ periodics:
   interval: 48h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: okd-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -96388,7 +96892,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   decorate: true
   decoration_config:
     skip_cloning: true
@@ -96399,7 +96903,7 @@ periodics:
   interval: 48h
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: okd-4.11
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -96802,7 +97306,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: 0 5 */2,16 * *
   decorate: true
   decoration_config:
@@ -96813,7 +97317,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: okd-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -96884,7 +97388,7 @@ periodics:
       secret:
         secretName: result-aggregator
 - agent: kubernetes
-  cluster: vsphere
+  cluster: vsphere02
   cron: 2 16 */6,17 * *
   decorate: true
   decoration_config:
@@ -96895,7 +97399,7 @@ periodics:
     repo: release
   labels:
     ci-operator.openshift.io/cloud: vsphere
-    ci-operator.openshift.io/cloud-cluster-profile: vsphere
+    ci-operator.openshift.io/cloud-cluster-profile: vsphere-2
     ci-operator.openshift.io/variant: okd-4.12
     ci.openshift.io/generator: prowgen
     ci.openshift.io/no-builds: "true"
@@ -101151,7 +101655,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230927-4613add0a1
+      image: gcr.io/k8s-prow/commenter:v20231011-acf4a2e26b
       imagePullPolicy: Always
       name: ""
       resources:
@@ -101606,7 +102110,7 @@ periodics:
       - --confirm
       command:
       - /ko-app/commenter
-      image: gcr.io/k8s-prow/commenter:v20230927-4613add0a1
+      image: gcr.io/k8s-prow/commenter:v20231011-acf4a2e26b
       imagePullPolicy: Always
       name: ""
       resources:
