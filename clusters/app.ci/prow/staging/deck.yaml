@@ -1,0 +1,193 @@
+apiVersion: template.openshift.io/v1
+kind: Template
+parameters:
+- description: The session secret for the component.
+  name: SESSION_SECRET
+  generate: expression
+  from: "[a-zA-Z0-9]{43}"
+- description: "The namespace. Must come from a var or it will get stripped off"
+  name: NAMESPACE
+  value: ci-staging
+objects:
+- apiVersion: v1
+  kind: Route
+  metadata:
+    name: deck
+    namespace: ${NAMESPACE}
+    annotations:
+      haproxy.router.openshift.io/timeout: "90s"
+  spec:
+    port:
+      targetPort: 8080
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: deck
+- apiVersion: v1
+  kind: Route
+  metadata:
+    namespace: ${NAMESPACE}
+    name: prow
+    annotations:
+      haproxy.router.openshift.io/timeout: "90s"
+  spec:
+    port:
+      targetPort: 8080
+    tls:
+      insecureEdgeTerminationPolicy: Redirect
+      termination: edge
+    to:
+      kind: Service
+      name: deck
+- apiVersion: v1
+  kind: Service
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck
+    labels:
+      app: prow
+      component: deck
+  spec:
+    selector:
+      app: prow
+      component: deck
+    ports:
+    - name: main
+      port: 80
+      targetPort: 8080
+    - name: metrics
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    type: ClusterIP
+- apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    namespace: ${NAMESPACE}
+    name: deck
+    labels:
+      app: prow
+      component: deck
+  spec:
+    replicas: 1
+    revisionHistoryLimit: 2
+    selector:
+      matchLabels:
+        app: prow
+        component: deck
+    template:
+      metadata:
+        labels:
+          app: prow
+          component: deck
+      spec:
+        serviceAccountName: deck
+        containers:
+        - name: deck
+          image: gcr.io/k8s-prow/deck:v20231011-acf4a2e26b
+          args:
+          - --config-path=/etc/config/config.yaml
+          - --cookie-secret=/etc/cookie/cookie
+          - --github-oauth-config-file=/etc/oauth/config.json
+          - --github-app-id=$(GITHUB_APP_ID)
+          - --github-app-private-key-path=/etc/github/cert
+          - --github-endpoint=http://ghproxy
+          - --github-endpoint=https://api.github.com
+          - --github-graphql-endpoint=http://ghproxy/graphql
+          - --tide-url=http://tide/
+          - --hook-url=http://hook:8888/plugin-help
+          - --oauth-url=/github-login
+          - --spyglass=true
+          - --gcs-credentials-file=/etc/gce-sa-credentials-gcs-private/service-account.json
+          - --projected-token-file=/var/sa-token/token
+          - --rerun-creates-job=true
+          - --plugin-config=/etc/plugins/plugins.yaml
+          - --kubeconfig-dir=/etc/build-farm-credentials
+          - --kubeconfig-suffix=config
+          env:
+          - name: GITHUB_APP_ID
+            valueFrom:
+              secretKeyRef:
+                name: openshift-ci-staging-prow-app
+                key: appid
+          ports:
+          - name: main
+            containerPort: 8080
+          - name: metrics
+            containerPort: 9090
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz/ready
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 600
+          volumeMounts:
+          - name: github-app-credentials
+            mountPath: /etc/github
+            readOnly: true
+          - name: service-account-token
+            mountPath: /var/sa-token
+          - name: gce-sa-credentials-gcs-private
+            mountPath: /etc/gce-sa-credentials-gcs-private
+            readOnly: true
+          - name: config
+            mountPath: /etc/config
+            readOnly: true
+          - name: plugins
+            mountPath: /etc/plugins
+            readOnly: true
+          - name: extensions
+            mountPath: /var/run/ko/static/extensions
+            readOnly: true
+          - name: oauth-config
+            mountPath: /etc/oauth
+            readOnly: true
+          - name: cookie-secret
+            mountPath: /etc/cookie
+            readOnly: true
+          - mountPath: /etc/build-farm-credentials
+            name: build-farm-credentials
+            readOnly: true
+          resources:
+            requests:
+              memory: "1Gi"
+              cpu: "500m"
+        volumes:
+        - name: github-app-credentials
+          secret:
+            secretName: openshift-prow-github-app
+        - name: service-account-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                path: token
+        - name: gce-sa-credentials-gcs-private
+          secret:
+            secretName: gce-sa-credentials-gcs-private
+        - name: config
+          configMap:
+            name: config
+        - name: plugins
+          configMap:
+            name: plugins
+        - name: extensions
+          configMap:
+            name: deck-extensions
+        - name: oauth-config
+          secret:
+            secretName: ci-staging-github-app-credentials
+        - name: cookie-secret
+          secret:
+            secretName: cookie
+        - name: build-farm-credentials
+          secret:
+            secretName: deck

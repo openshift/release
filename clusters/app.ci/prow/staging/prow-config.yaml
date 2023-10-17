@@ -1,0 +1,128 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: ci-staging
+  name: config
+data:
+  config.yaml: |
+    prowjob_namespace: ci-staging
+    pod_namespace: ci-staging
+    in_repo_config:
+      enabled:
+        "*": true
+    deck:
+     spyglass:
+       lenses:
+       - lens:
+           name: metadata
+         required_files:
+         - started.json|finished.json
+       - lens:
+           config:
+           name: buildlog
+         required_files:
+         - build-log.txt
+       - lens:
+           name: junit
+         required_files:
+         - .*/junit.*\.xml
+       - lens:
+           name: podinfo
+         required_files:
+         - podinfo.json
+    plank:
+      job_url_prefix_config:
+        "*": https://prow-ci-staging.apps.ci.l2s4.p1.openshiftapps.com/view/
+      report_templates:
+        '*': >-
+            [Full PR test history](https://prow-ci-staging.apps.ci.l2s4.p1.openshiftapps.com/pr-history?org={{.Spec.Refs.Org}}&repo={{.Spec.Refs.Repo}}&pr={{with index .Spec.Refs.Pulls 0}}{{.Number}}{{end}}).
+            [Your PR dashboard](https://prow-ci-staging.apps.ci.l2s4.p1.openshiftapps.com/pr?query=is:pr+state:open+author:{{with
+            index .Spec.Refs.Pulls 0}}{{.Author}}{{end}}).
+      default_decoration_configs:
+        "*":
+          gcs_configuration:
+            bucket: gs://ci-staging-deck
+            default_org: openshift
+            default_repo: origin
+            mediaTypes:
+              log: text/plain
+            path_strategy: explicit
+            grace_period: 1h0m0s
+          gcs_credentials_secret: gce-sa-credentials-gcs-private
+          utility_images:
+            clonerefs: gcr.io/k8s-prow/clonerefs:v20221115-a6c6c84e3d
+            entrypoint: gcr.io/k8s-prow/entrypoint:v20221115-a6c6c84e3d
+            initupload: gcr.io/k8s-prow/initupload:v20221115-a6c6c84e3d
+            sidecar: gcr.io/k8s-prow/sidecar:v20221115-a6c6c84e3d
+    tide:
+      display_all_tide_queries_in_status: true
+      max_goroutines: 100
+      pr_status_base_urls:
+        '*': https://deck-ci-staging.apps.ci.l2s4.p1.openshiftapps.com/pr
+      rebase_label: tide/merge-method-rebase
+      merge_label: tide/merge-method-merge
+      squash_label: tide/merge-method-squash
+      blocker_label: tide/merge-blocker
+      status_update_period: 2m35s
+      sync_period: 2m35s
+      queries:
+      - labels:
+        - lgtm
+        - approved
+        missingLabels:
+        - needs-rebase
+        - do-not-merge/hold
+        - do-not-merge/work-in-progress
+        - do-not-merge/invalid-owners-file
+        repos:
+        - smg247/ci-staging
+      - author: openshift-bot
+        labels:
+        - rehearsals-ack
+        missingLabels:
+        - do-not-merge/hold
+        - do-not-merge/invalid-owners-file
+        - do-not-merge/work-in-progress
+        - needs-rebase
+        repos:
+        - smg247/ci-staging
+      - labels:
+        - lgtm
+        - approved
+        missingLabels:
+        - needs-rebase
+        - do-not-merge/hold
+        - do-not-merge/work-in-progress
+        - do-not-merge/invalid-owners-file
+        repos:
+        - smg247/release
+      - author: openshift-bot
+        labels:
+        - rehearsals-ack
+        missingLabels:
+        - do-not-merge/hold
+        - do-not-merge/invalid-owners-file
+        - do-not-merge/work-in-progress
+        - needs-rebase
+        repos:
+        - smg247/release
+    decorate_all_jobs: true
+    periodics:
+    - interval: 18h
+      agent: kubernetes
+      name: echo-test
+      spec:
+        containers:
+        - image: alpine
+          command: ["/bin/date"]
+    presubmits:
+      smg247/ci-staging:
+        - name: test-presubmit
+          agent: kubernetes
+          decorate: true
+          always_run: true
+          skip_report: false
+          spec:
+            containers:
+            - image: alpine
+              command: ["/bin/printenv"]
